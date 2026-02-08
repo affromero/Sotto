@@ -8,6 +8,7 @@ import { logger } from './logger';
 export enum JobType {
   EXTRACT_CONTENT = 'extract_content',
   GENERATE_SCRIPT = 'generate_script',
+  VALIDATE_REFERENCES = 'validate_references',
   GENERATE_AUDIO = 'generate_audio',
   STITCH_AUDIO = 'stitch_audio',
   PROCESS_INTERACTION = 'process_interaction',
@@ -67,6 +68,11 @@ export interface SendNotificationPayload {
   title: string;
   message: string;
   data?: Record<string, string>;
+}
+
+export interface ValidateReferencesPayload {
+  podcastId: string;
+  userId: string;
 }
 
 export interface GeneratePdfPayload {
@@ -196,4 +202,5 @@ export const audioStitchingQueue = createQueue('audio-stitching', { attempts: 2 
 export const interactionQueue = createQueue('interactions', { attempts: 3 });
 export const segmentRegenerationQueue = createQueue('segment-regeneration', { attempts: 2 });
 export const notificationQueue = createQueue('notifications', { attempts: 5 });
+export const referenceValidationQueue = createQueue('reference-validation', { attempts: 2 });
 export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2 });

@@ -7,7 +7,8 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | Worker | Queue Name | Concurrency | Input | Output |
 |--------|-----------|-------------|-------|--------|
 | `content-extraction` | `content-extraction` | 2 | URL/text → extracted content | Updates Discovery.sourceContent |
-| `script-generation` | `script-generation` | 2 | Discovery metadata → 2-voice script with `[N]` citations | Creates Script + Segments + References, queues audio |
+| `script-generation` | `script-generation` | 2 | Discovery metadata → 2-voice script with `[N]` citations | Creates Script + References, routes to validation |
+| `reference-validation` | `reference-validation` | 2 | References + Script → 4-layer verification (URL, CrossRef, OpenAlex, AI) | Verifies/replaces/removes refs, creates Segments, queues audio |
 | `audio-generation` | `audio-generation` | 5 | Segment text → ElevenLabs TTS | Uploads segment audio to R2 |
 | `audio-stitching` | `audio-stitching` | 1 | All segments → FFmpeg concat | Uploads final podcast audio, sets READY |
 | `interaction` | `interactions` | 3 | User question + script context → Claude answer | Updates Interaction.answer |
@@ -18,9 +19,9 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 ## Pipeline Flow
 
 ```
-content-extraction → script-generation → audio-generation (×N parallel) → audio-stitching → notification
-                                                                                              ↕
-                                                            pdf-generation (triggered on-demand via export API)
+content-extraction → script-generation → reference-validation → audio-generation (×N parallel) → audio-stitching → notification
+                                                                                                                      ↕
+                                                                                    pdf-generation (triggered on-demand via export API)
 ```
 
 ## Adding a New Worker

@@ -17,7 +17,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 | Frontend | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind) |
 | Database | PostgreSQL 16 + Prisma ORM |
 | Auth | NextAuth.js v5 (email, Google, GitHub, Apple Sign In) |
-| Queue | Redis 7 + BullMQ (8 worker types) |
+| Queue | Redis 7 + BullMQ (9 worker types) |
 | AI | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER` |
 | Audio | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER` |
 | Stitching | FFmpeg (segment concatenation + normalization) |
@@ -115,6 +115,8 @@ src/
 │   ├── r2.ts                   # Cloudflare R2 storage client
 │   ├── discovery-agent.ts      # Chat-based discovery: Claude streaming + chip generation
 │   ├── script-generator.ts     # Claude script generation with [N] citations
+│   ├── reference-validator.ts  # 4-layer reference verification (URL, CrossRef, OpenAlex, AI)
+│   ├── script-updater.ts       # Citation cleanup + renumbering after reference removal
 │   ├── citation-parser.tsx     # Parse [N] citation markers → React CitationMarker components
 │   ├── pdf-generator.ts        # pdfmake academic-style PDF generation
 │   ├── providers/              # Modular provider architecture (ai, tts, storage, payment)
@@ -132,15 +134,16 @@ src/
 │       ├── useDiscovery.ts
 │       └── useNotifications.ts
 ├── workers/
-│   ├── index.ts                # Worker orchestrator (8 workers)
+│   ├── index.ts                         # Worker orchestrator (9 workers)
 │   ├── content-extraction.worker.ts
-│   ├── script-generation.worker.ts  # Now persists References after script creation
+│   ├── script-generation.worker.ts      # Persists References, routes to validation
+│   ├── reference-validation.worker.ts   # 4-layer verification pipeline
 │   ├── audio-generation.worker.ts
 │   ├── audio-stitching.worker.ts
 │   ├── interaction.worker.ts
 │   ├── segment-regeneration.worker.ts
 │   ├── notification.worker.ts
-│   └── pdf-generation.worker.ts     # Async PDF generation → R2 upload
+│   └── pdf-generation.worker.ts         # Async PDF generation → R2 upload
 ├── styles/
 │   └── globals.css             # Design system tokens + global styles
 └── types/
@@ -150,7 +153,7 @@ src/
     ├── feed.ts
     ├── discovery.ts
     ├── notification.ts
-    └── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type)
+    └── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
 ```
 
 ## Design System: "Warm Intimacy"
@@ -183,6 +186,8 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
     ↓
 [script-generation] → Claude generates 2-voice script
     ↓
+[reference-validation] → 4-layer verification (URL, CrossRef, OpenAlex, AI)
+    ↓
 [audio-generation] × N → ElevenLabs TTS per segment (parallel, 5 concurrent)
     ↓
 [audio-stitching] → FFmpeg concat + normalize → final.mp3
@@ -212,7 +217,7 @@ User listening → taps "Ask a Question" → podcast pauses
 | `DiscoveryMessage` | Individual chat messages (role, content, chips) |
 | `Script` | Structured JSON turns + raw markdown, versioned |
 | `Segment` | Per-speaker audio chunk: text, audioUrl, timing, order |
-| `Reference` | Per-podcast citation: number, title, authors, year, URL, type (WEB/PAPER/BOOK/...) |
+| `Reference` | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus |
 | `Interaction` | Question at timestamp, answer, resolution status |
 | `Like` / `Save` | Social engagement |
 | `Tag` / `PodcastTag` | Discovery taxonomy |
@@ -222,7 +227,7 @@ User listening → taps "Ask a Question" → podcast pauses
 | `PushSubscription` | Web Push API endpoints |
 | `ApiUsageLog` | Cost tracking (Claude/ElevenLabs/FFmpeg) |
 
-**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING
+**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
 
 ## Pricing Tiers
 

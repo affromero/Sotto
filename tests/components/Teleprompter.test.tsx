@@ -27,6 +27,7 @@ const mockReferences: ReferenceData[] = [
     type: 'PAPER',
     publisher: 'Nature',
     doi: null,
+    verificationStatus: 'VERIFIED',
   },
 ];
 

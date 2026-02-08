@@ -27,7 +27,7 @@ Describe what you want to learn through a natural conversation. Sotto generates 
 | **Chat-based creation** | Conversational discovery with AI | Form-based | Manual recording |
 | **Voice diversity** | Unique voice pairs per podcast | Same 2 voices every time | Fixed hosts |
 | **Social feed** | Discover, fork, follow creators | No | Platform-dependent |
-| **Academic citations** | `[N]` references with PDF export | Partial | Manual |
+| **Verified references** | 4-layer verified `[N]` citations with PDF export | Partial | Manual |
 
 ## How It Works
 
@@ -47,6 +47,21 @@ Play your podcast anywhere. When something sparks a question, tap **"Ask a Quest
 
 Publish to the social feed. Other users can discover your podcast, follow you, fork episodes to create their own variations, and contribute questions that improve the content over time.
 
+## Verified References
+
+Every claim in a Sotto podcast is backed by real, verifiable sources. When the AI generates a script, it includes inline `[N]` citation markers — click any marker to see the full reference: title, authors, year, and URL.
+
+Before a podcast goes live, every reference passes through a **4-layer verification pipeline**:
+
+1. **URL Resolution** — HTTP HEAD request confirms the source URL is reachable
+2. **DOI via CrossRef** — Cross-references DOI against the CrossRef registry (250M+ works) to confirm title and author accuracy
+3. **Title Search via OpenAlex** — Fuzzy-matches titles against the OpenAlex academic database for independent confirmation
+4. **AI Verification Agent** — Claude critically evaluates plausibility and suggests real replacements for suspicious sources
+
+References that fail verification are either replaced with verified alternatives or removed entirely. Citation markers are automatically renumbered so the transcript stays clean.
+
+Export any podcast as an academic-style PDF with a full bibliography — every reference in it has been independently verified.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -54,7 +69,7 @@ Publish to the social feed. Other users can discover your podcast, follow you, f
 | **Frontend** | Next.js 14+ (App Router), TypeScript, CSS Modules |
 | **Database** | PostgreSQL 16 + Prisma ORM |
 | **Auth** | NextAuth.js v5 (Email, Google, GitHub, Apple) |
-| **Queue** | Redis 7 + BullMQ (8 worker types) |
+| **Queue** | Redis 7 + BullMQ (9 worker types) |
 | **AI** | Anthropic Claude (chat, scripts, Q&A) |
 | **Audio** | ElevenLabs (multi-voice TTS per segment) |
 | **Stitching** | FFmpeg (concatenation + normalization) |
@@ -86,6 +101,11 @@ User describes topic via chat
 ┌─────────────────┐
 │     Script       │  Claude generates 2-voice script with [N] citations
 │   Generation     │
+└────────┬────────┘
+         ▼
+┌─────────────────┐
+│   Reference      │  4-layer verification: URL, CrossRef, OpenAlex, AI
+│   Validation     │
 └────────┬────────┘
          ▼
 ┌─────────────────┐
@@ -125,7 +145,7 @@ Listener taps "Ask a Question"  →  Podcast pauses
 
 Key models: **User**, **Podcast**, **Discovery** + **DiscoveryMessage**, **Script**, **Segment**, **Reference**, **Interaction**, **Like/Save**, **Follow**, **Tag**, **Subscription**, **Notification**, **Job**, **ApiUsageLog**
 
-Status flow: `PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING`
+Status flow: `PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING`
 
 ## Project Structure
 
@@ -158,7 +178,7 @@ src/
 │   ├── stripe.ts             Payments + subscription management
 │   ├── providers/            Swappable service providers
 │   └── hooks/                useAuth, useAudioPlayer, usePodcast...
-├── workers/                  8 BullMQ background workers
+├── workers/                  9 BullMQ background workers
 ├── styles/
 │   └── globals.css           Design system tokens
 └── types/                    TypeScript definitions
@@ -218,6 +238,7 @@ Copy `.env.example` and configure:
 | `TTS_PROVIDER` | No | `elevenlabs` (default) or `openai` |
 | `STORAGE_PROVIDER` | No | `r2` (default), `s3`, or `local` |
 | `PAYMENT_PROVIDER` | No | `stripe` (default) or `none` |
+| `OPENALEX_EMAIL` | No | Email for OpenAlex polite pool (higher rate limits) |
 
 ### Commands
 

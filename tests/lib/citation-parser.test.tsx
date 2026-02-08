@@ -15,6 +15,7 @@ const mockReferences: ReferenceData[] = [
     type: 'PAPER',
     publisher: 'Nature',
     doi: '10.1234/test1',
+    verificationStatus: 'VERIFIED',
   },
   {
     id: 'ref-2',
@@ -26,6 +27,7 @@ const mockReferences: ReferenceData[] = [
     type: 'BOOK',
     publisher: 'MIT Press',
     doi: null,
+    verificationStatus: 'VERIFIED',
   },
   {
     id: 'ref-3',
@@ -37,6 +39,7 @@ const mockReferences: ReferenceData[] = [
     type: 'WEB',
     publisher: null,
     doi: null,
+    verificationStatus: 'VERIFIED',
   },
 ];
 

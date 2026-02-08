@@ -40,6 +40,7 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
       type: ref.type,
       publisher: ref.publisher,
       doi: ref.doi,
+      verificationStatus: ref.verificationStatus,
     })),
   });
 

@@ -13,7 +13,7 @@ The schema is organized into logical sections:
 | Discovery | Discovery, DiscoveryMessage | Chat-based creation flow |
 | Scripts | Script | Generated podcast scripts |
 | Segments | Segment | Per-speaker audio chunks |
-| References | Reference | Per-podcast `[N]` citations with title, authors, year, URL, type |
+| References | Reference | Per-podcast `[N]` citations with title, authors, year, URL, type, verificationStatus |
 | Interactions | Interaction | Q&A during playback |
 | Social Engagement | Like, Save | User engagement |
 | Tags | Tag, PodcastTag | Content taxonomy |
@@ -26,12 +26,13 @@ The schema is organized into logical sections:
 
 | Enum | Values | Used By |
 |------|--------|---------|
-| `PodcastStatus` | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED | Podcast.status |
+| `PodcastStatus` | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED | Podcast.status |
 | `Speaker` | HOST, EXPERT | Segment.speaker |
 | `InteractionStatus` | PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED | Interaction.status |
 | `SubscriptionTier` | FREE, PRO, TEAM | Subscription.tier |
 | `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE | Podcast.visibility |
 | `ReferenceType` | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT | Reference.type |
+| `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED | Reference.verificationStatus |
 
 ## Commands
 

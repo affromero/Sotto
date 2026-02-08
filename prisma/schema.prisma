@@ -230,6 +230,7 @@ enum PodcastStatus {
   DISCOVERING
   EXTRACTING
   SCRIPTING
+  VALIDATING_REFERENCES
   GENERATING_AUDIO
   STITCHING
   READY
@@ -562,6 +563,11 @@ model Reference {
   doi       String?
   createdAt DateTime      @default(now())
 
+  // Verification
+  verificationStatus  VerificationStatus @default(PENDING)
+  verificationDetails Json?
+  originalTitle       String?            @db.Text
+
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 
   @@unique([podcastId, number])
@@ -575,4 +581,12 @@ enum ReferenceType {
   ARTICLE
   VIDEO
   REPORT
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  REPLACED
+  REMOVED
 }

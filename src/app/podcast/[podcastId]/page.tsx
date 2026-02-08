@@ -79,6 +79,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           type: true,
           publisher: true,
           doi: true,
+          verificationStatus: true,
         },
       },
     },

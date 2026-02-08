@@ -2,6 +2,7 @@ import { createWorker } from '@/lib/queue';
 import { logger } from '@/lib/logger';
 import { processContentExtraction } from './content-extraction.worker';
 import { processScriptGeneration } from './script-generation.worker';
+import { processReferenceValidation } from './reference-validation.worker';
 import { processAudioGeneration } from './audio-generation.worker';
 import { processAudioStitching } from './audio-stitching.worker';
 import { processInteraction } from './interaction.worker';
@@ -15,6 +16,7 @@ logger.info('Starting Sotto workers...');
 const workers = [
   createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
   createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
+  createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
   createWorker('audio-generation', processAudioGeneration, { concurrency: 5 }),
   createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
   createWorker('interactions', processInteraction, { concurrency: 3 }),

@@ -1,4 +1,4 @@
-import { ReferenceType } from '@prisma/client';
+import { ReferenceType, VerificationStatus } from '@prisma/client';
 
 export interface ReferenceData {
   id: string;
@@ -10,4 +10,5 @@ export interface ReferenceData {
   type: ReferenceType;
   publisher: string | null;
   doi: string | null;
+  verificationStatus: VerificationStatus;
 }

@@ -13,6 +13,7 @@ interface GenerationProgressProps {
 const PIPELINE_STEPS = [
   { key: 'EXTRACTING', label: 'Extracting content' },
   { key: 'SCRIPTING', label: 'Writing script' },
+  { key: 'VALIDATING_REFERENCES', label: 'Verifying references' },
   { key: 'GENERATING_AUDIO', label: 'Generating audio' },
   { key: 'STITCHING', label: 'Stitching together' },
   { key: 'READY', label: 'Ready!' },

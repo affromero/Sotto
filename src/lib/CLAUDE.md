@@ -16,6 +16,8 @@ All shared business logic and external service integrations live here.
 | `r2.ts` | Cloudflare R2 file storage (upload, download, presign) | AWS S3 SDK → R2 |
 | `discovery-agent.ts` | Chat-based discovery: system prompt, chip parsing, metadata extraction | Uses `claude.ts` |
 | `script-generator.ts` | 2-voice podcast script generation with `[N]` citations from discovery metadata | Uses `claude.ts` |
+| `reference-validator.ts` | 4-layer reference verification: URL HEAD, CrossRef DOI, OpenAlex title search, Claude AI evaluation | fetch, `claude.ts` |
+| `script-updater.ts` | Citation cleanup + renumbering when references are removed after verification | Pure utility |
 | `citation-parser.tsx` | Parse `[N]` citation markers in text → React CitationMarker components | React |
 | `pdf-generator.ts` | Generate academic-style PDF transcripts with references via pdfmake | pdfmake |
 | `audio-stitcher.ts` | FFmpeg segment concatenation + loudness normalization | FFmpeg (CLI) |
