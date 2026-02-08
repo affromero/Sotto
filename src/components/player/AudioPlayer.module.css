@@ -1,0 +1,76 @@
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-md);
+}
+
+.progressSection {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.time {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  min-width: 40px;
+  text-align: center;
+}
+
+.progressBar {
+  flex: 1;
+  cursor: pointer;
+  padding: var(--spacing-sm) 0;
+}
+
+.progressTrack {
+  position: relative;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 100ms linear;
+}
+
+.progressThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transform: translate(-50%, -50%);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.progressBar:hover .progressThumb {
+  opacity: 1;
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .player {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-xl);
+  }
+}

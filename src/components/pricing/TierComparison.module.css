@@ -1,0 +1,105 @@
+.wrapper {
+  width: 100%;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.table {
+  width: 100%;
+  min-width: 500px;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+}
+
+/* Header */
+.featureHeader {
+  text-align: left;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.tierHeader {
+  text-align: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  font-weight: 400;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: relative;
+}
+
+.tierHeader.highlighted {
+  background: var(--color-primary-lighter);
+}
+
+.currentLabel {
+  display: block;
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Body */
+.row {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.featureCell {
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.valueCell {
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.valueCell.highlighted {
+  background: var(--color-primary-lighter);
+}
+
+/* Icons */
+.iconIncluded {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-success);
+}
+
+.iconExcluded {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+}
+
+/* Responsive */
+@media (min-width: 768px) {
+  .table {
+    font-size: var(--font-size-base);
+  }
+}

@@ -1,0 +1,109 @@
+.root {
+  background: #1A1A1A;
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  min-height: 320px;
+}
+
+.viewport {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  gap: var(--spacing-lg);
+  min-height: 320px;
+}
+
+.segment {
+  width: 100%;
+  max-width: 720px;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-radius: var(--radius-xl);
+  border-left: 4px solid transparent;
+  cursor: pointer;
+  transition: opacity var(--transition-slow), transform var(--transition-slow);
+}
+
+.prev {
+  opacity: 0.3;
+  transform: translateY(-4px);
+}
+
+.next {
+  opacity: 0.5;
+  transform: translateY(4px);
+}
+
+.active {
+  opacity: 1;
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.activeHost {
+  border-left-color: var(--color-speaker-host);
+}
+
+.activeExpert {
+  border-left-color: var(--color-speaker-expert);
+}
+
+.speaker {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.speakerHost {
+  color: var(--color-speaker-host);
+  background: rgba(217, 119, 6, 0.2);
+}
+
+.speakerExpert {
+  color: #93C5FD;
+  background: rgba(30, 58, 95, 0.4);
+}
+
+.text {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  color: #F5F5F5;
+  line-height: 1.7;
+}
+
+@media (min-width: 768px) {
+  .viewport {
+    padding: var(--spacing-3xl) var(--spacing-2xl);
+  }
+
+  .text {
+    font-size: var(--font-size-2xl);
+  }
+}
+
+@media (max-width: 768px) {
+  .root {
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .viewport {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .segment {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+
+  .text {
+    font-size: var(--font-size-lg);
+  }
+}

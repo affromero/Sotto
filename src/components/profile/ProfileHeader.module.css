@@ -1,0 +1,147 @@
+/* Mobile-first: stacked layout */
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+/* Desktop: horizontal with avatar left, info right */
+@media (min-width: 768px) {
+  .root {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-8);
+    padding: var(--space-8) 0;
+    text-align: left;
+  }
+}
+
+/* Avatar column */
+.avatarColumn {
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 3px solid var(--color-primary-light);
+}
+
+.avatarFallback {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--color-primary-light);
+}
+
+.initials {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-2xl);
+  color: var(--color-primary);
+  line-height: 1;
+  user-select: none;
+}
+
+/* Info column */
+.infoColumn {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Name and action row */
+.nameRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .nameRow {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.name {
+  font: var(--text-h2);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.action {
+  flex-shrink: 0;
+}
+
+/* Edit profile button */
+.editButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.editButton:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary);
+}
+
+/* Bio */
+.bio {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-4);
+  max-width: 560px;
+}
+
+@media (min-width: 768px) {
+  .bio {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* Stats row */
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .stats {
+    justify-content: flex-start;
+  }
+}
+
+/* Member since */
+.memberSince {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}

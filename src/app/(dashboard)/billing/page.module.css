@@ -1,0 +1,185 @@
+/* Billing Page */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.pageTitle {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Plan Header */
+
+.planHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.planInfo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.planNameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.planName {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.planPrice {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.priceAmount {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.priceInterval {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.periodInfo {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+/* Feature List */
+
+.featureList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.checkIcon {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+/* Usage */
+
+.usageBar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.usageInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usageLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.usageCount {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.progressOuter {
+  width: 100%;
+  height: 8px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressInner {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-slow);
+  min-width: 2px;
+}
+
+/* Pricing Grid (for free tier upgrade) */
+
+.upgradeText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.pricingGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+/* Manage Subscription */
+
+.manageText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.manageActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+/* Placeholder */
+
+.placeholder {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+  padding: var(--spacing-lg) 0;
+  text-align: center;
+}
+
+@media (min-width: 600px) {
+  .section {
+    padding: var(--spacing-xl);
+  }
+
+  .pricingGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

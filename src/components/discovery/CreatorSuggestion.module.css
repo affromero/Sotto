@@ -1,0 +1,102 @@
+/* CreatorSuggestion — Compact horizontal creator card */
+
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  transition: all var(--transition-fast);
+}
+
+.root:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Avatar */
+.avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  color: var(--color-primary);
+  font-weight: 400;
+}
+
+/* Info */
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+/* Follow button */
+.followButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--spacing-md);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.followButton:hover {
+  background: var(--color-primary-subtle);
+}
+
+.followButton.following {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.followButton.following:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}

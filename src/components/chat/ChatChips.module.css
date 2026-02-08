@@ -1,0 +1,43 @@
+.root {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-primary);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.chip:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.chip:active {
+  background: var(--color-primary-hover);
+  color: var(--color-text-inverse);
+}
+
+.disabled {
+  border-color: var(--color-border);
+  color: var(--color-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.disabled:hover {
+  background: transparent;
+  color: var(--color-text-tertiary);
+}

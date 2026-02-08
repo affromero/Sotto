@@ -1,0 +1,43 @@
+# Dependencies (installed inside container)
+node_modules
+
+# Next.js build output
+.next
+out
+build
+
+# Environment files (passed via env_file or environment)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Testing
+coverage
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+
+# Documentation
+docs
+*.md
+!prisma/*.md
+
+# Prisma migrations (schema is needed, migrations are not)
+prisma/migrations
+
+# Vercel
+.vercel

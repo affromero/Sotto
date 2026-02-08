@@ -1,0 +1,436 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { Heart, Bookmark, GitFork, Share2, Play, FileText, Download } from 'lucide-react';
+import { AudioPlayer } from '@/components/player/AudioPlayer';
+import { TranscriptPanel } from '@/components/player/TranscriptPanel';
+import { Teleprompter } from '@/components/player/Teleprompter';
+import { ReferenceList } from '@/components/player/ReferenceList';
+import { InterruptButton } from '@/components/player/InterruptButton';
+import { Badge } from '@/components/ui/Badge';
+import type { PodcastDetail } from '@/types/podcast';
+import type { PodcastStatus } from '@prisma/client';
+import styles from './page.module.css';
+
+interface PodcastPlayerViewProps {
+  podcast: PodcastDetail;
+  isOwner: boolean;
+  isAuthenticated: boolean;
+}
+
+type ViewMode = 'transcript' | 'teleprompter';
+
+const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
+  PENDING: 'default',
+  DISCOVERING: 'info',
+  EXTRACTING: 'info',
+  SCRIPTING: 'info',
+  GENERATING_AUDIO: 'info',
+  STITCHING: 'info',
+  READY: 'success',
+  UPDATING: 'warning',
+  FAILED: 'error',
+};
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+function formatCount(count: number): string {
+  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+  return count.toString();
+}
+
+function formatDuration(seconds: number | null): string {
+  if (!seconds) return '';
+  const mins = Math.floor(seconds / 60);
+  return `${mins} min`;
+}
+
+export function PodcastPlayerView({
+  podcast,
+  isOwner,
+  isAuthenticated,
+}: PodcastPlayerViewProps) {
+  const [liked, setLiked] = useState(podcast.isLiked);
+  const [likeCount, setLikeCount] = useState(podcast.likeCount);
+  const [saved, setSaved] = useState(podcast.isSaved);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [showInterruptChat, setShowInterruptChat] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('transcript');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  const handleLike = useCallback(async () => {
+    if (!isAuthenticated) return;
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikeCount((c) => c + (newLiked ? 1 : -1));
+    try {
+      await fetch(`/api/podcasts/${podcast.id}/like`, {
+        method: newLiked ? 'POST' : 'DELETE',
+      });
+    } catch {
+      setLiked(!newLiked);
+      setLikeCount((c) => c + (newLiked ? -1 : 1));
+    }
+  }, [liked, isAuthenticated, podcast.id]);
+
+  const handleSave = useCallback(async () => {
+    if (!isAuthenticated) return;
+    const newSaved = !saved;
+    setSaved(newSaved);
+    try {
+      await fetch(`/api/podcasts/${podcast.id}/save`, {
+        method: newSaved ? 'POST' : 'DELETE',
+      });
+    } catch {
+      setSaved(!newSaved);
+    }
+  }, [saved, isAuthenticated, podcast.id]);
+
+  const handleFork = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}/fork`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        window.location.href = `/podcast/${data.id}`;
+      }
+    } catch {
+      // silently fail
+    }
+  }, [isAuthenticated, podcast.id]);
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: podcast.title, url });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(url);
+    }
+  }, [podcast.title]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (!isAuthenticated) return;
+
+    // If PDF already available, open it
+    if (pdfUrl) {
+      window.open(pdfUrl, '_blank');
+      return;
+    }
+
+    setPdfLoading(true);
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}/export`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (data.status === 'ready' && data.pdfUrl) {
+        setPdfUrl(data.pdfUrl);
+        setPdfLoading(false);
+        window.open(data.pdfUrl, '_blank');
+        return;
+      }
+
+      // Poll for completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const pollResponse = await fetch(`/api/podcasts/${podcast.id}/export`);
+          const pollData = await pollResponse.json();
+          if (pollData.status === 'ready' && pollData.pdfUrl) {
+            clearInterval(pollInterval);
+            setPdfUrl(pollData.pdfUrl);
+            setPdfLoading(false);
+          }
+        } catch {
+          clearInterval(pollInterval);
+          setPdfLoading(false);
+        }
+      }, 3000);
+
+      // Safety timeout: stop polling after 60s
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setPdfLoading(false);
+      }, 60000);
+    } catch {
+      setPdfLoading(false);
+    }
+  }, [isAuthenticated, podcast.id, pdfUrl]);
+
+  const handleInterrupt = useCallback(() => {
+    setShowInterruptChat(true);
+  }, []);
+
+  const isReady = podcast.status === 'READY';
+  const isProcessing = !isReady && podcast.status !== 'FAILED';
+
+  return (
+    <div className={styles.playerView}>
+      {/* Back nav */}
+      <nav className={styles.breadcrumb}>
+        <Link href="/feed" className={styles.backLink}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+          Feed
+        </Link>
+      </nav>
+
+      {/* Podcast Info */}
+      <header className={styles.podcastHeader}>
+        <h1 className={styles.podcastTitle}>{podcast.title}</h1>
+
+        <div className={styles.metaRow}>
+          <Link href={`/profile/${podcast.user.id}`} className={styles.creator}>
+            <div className={styles.creatorAvatar}>
+              {podcast.user.image ? (
+                <Image
+                  src={podcast.user.image}
+                  alt={podcast.user.name || 'Creator'}
+                  width={32}
+                  height={32}
+                  className={styles.creatorAvatarImg}
+                />
+              ) : (
+                <span className={styles.creatorAvatarFallback}>
+                  {(podcast.user.name || '?')[0].toUpperCase()}
+                </span>
+              )}
+            </div>
+            <span className={styles.creatorName}>{podcast.user.name || 'Anonymous'}</span>
+          </Link>
+          <span className={styles.metaDot} aria-hidden="true" />
+          <time className={styles.metaDate} dateTime={podcast.createdAt}>
+            {formatDate(podcast.createdAt)}
+          </time>
+          {podcast.duration && (
+            <>
+              <span className={styles.metaDot} aria-hidden="true" />
+              <span className={styles.metaDuration}>{formatDuration(podcast.duration)}</span>
+            </>
+          )}
+          {podcast.status !== 'READY' && (
+            <Badge variant={statusVariants[podcast.status as PodcastStatus]}>
+              {podcast.status.replace(/_/g, ' ')}
+            </Badge>
+          )}
+        </div>
+
+        {podcast.tags.length > 0 && (
+          <div className={styles.tags}>
+            {podcast.tags.map((tag) => (
+              <Link
+                key={tag.id}
+                href={`/feed?tag=${tag.slug}`}
+                className={styles.tag}
+              >
+                {tag.name}
+              </Link>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {/* Processing state */}
+      {isProcessing && (
+        <div className={styles.processingState}>
+          <div className={styles.processingSpinner} aria-hidden="true" />
+          <p className={styles.processingText}>
+            Your podcast is being generated. This page will update automatically when it is ready.
+          </p>
+        </div>
+      )}
+
+      {/* Player */}
+      {isReady && podcast.audioUrl && (
+        <section className={styles.playerSection} aria-label="Audio player">
+          <AudioPlayer />
+        </section>
+      )}
+
+      {/* Stats & Actions */}
+      <div className={styles.actionsRow}>
+        <div className={styles.statsRow}>
+          <span className={styles.stat}>
+            <Play size={16} aria-hidden="true" />
+            {formatCount(podcast.playCount)}
+          </span>
+          <span className={styles.stat}>
+            <Heart size={16} aria-hidden="true" />
+            {formatCount(likeCount)}
+          </span>
+          <span className={styles.stat}>
+            <GitFork size={16} aria-hidden="true" />
+            {formatCount(podcast.forkCount)}
+          </span>
+        </div>
+
+        <div className={styles.actionButtons}>
+          <button
+            className={`${styles.actionBtn} ${liked ? styles.actionBtnActive : ''}`}
+            onClick={handleLike}
+            aria-label={liked ? 'Unlike' : 'Like'}
+            aria-pressed={liked}
+            type="button"
+          >
+            <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
+            <span>{liked ? 'Liked' : 'Like'}</span>
+          </button>
+          <button
+            className={`${styles.actionBtn} ${saved ? styles.actionBtnActive : ''}`}
+            onClick={handleSave}
+            aria-label={saved ? 'Unsave' : 'Save'}
+            aria-pressed={saved}
+            type="button"
+          >
+            <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
+            <span>{saved ? 'Saved' : 'Save'}</span>
+          </button>
+          {!isOwner && (
+            <button
+              className={styles.actionBtn}
+              onClick={handleFork}
+              aria-label="Fork this podcast"
+              type="button"
+            >
+              <GitFork size={18} />
+              <span>Fork</span>
+            </button>
+          )}
+          <button
+            className={styles.actionBtn}
+            onClick={handleShare}
+            aria-label="Share this podcast"
+            type="button"
+          >
+            <Share2 size={18} />
+            <span>Share</span>
+          </button>
+          {isReady && isAuthenticated && (
+            <button
+              className={styles.actionBtn}
+              onClick={handleExportPdf}
+              aria-label={pdfUrl ? 'Download PDF transcript' : 'Generate PDF transcript'}
+              disabled={pdfLoading}
+              type="button"
+            >
+              {pdfLoading ? (
+                <>
+                  <FileText size={18} />
+                  <span>Generating...</span>
+                </>
+              ) : pdfUrl ? (
+                <>
+                  <Download size={18} />
+                  <span>PDF</span>
+                </>
+              ) : (
+                <>
+                  <FileText size={18} />
+                  <span>PDF</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Interrupt */}
+      {isReady && isAuthenticated && (
+        <div className={styles.interruptSection}>
+          <InterruptButton onInterrupt={handleInterrupt} />
+        </div>
+      )}
+
+      {/* Interrupt Chat */}
+      {showInterruptChat && (
+        <section className={styles.interruptChat} aria-label="Ask a question about this podcast">
+          <div className={styles.interruptChatHeader}>
+            <h3 className={styles.interruptChatTitle}>Ask a Question</h3>
+            <button
+              className={styles.interruptChatClose}
+              onClick={() => setShowInterruptChat(false)}
+              aria-label="Close question panel"
+              type="button"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <p className={styles.interruptChatHint}>
+            Ask anything about what you just heard. Sotto will answer using the podcast context.
+          </p>
+        </section>
+      )}
+
+      {/* View Toggle + Transcript/Teleprompter */}
+      {podcast.segments.length > 0 && (
+        <>
+          <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
+              onClick={() => setViewMode('transcript')}
+              role="tab"
+              aria-selected={viewMode === 'transcript'}
+              type="button"
+            >
+              Transcript
+            </button>
+            <button
+              className={`${styles.viewToggleBtn} ${viewMode === 'teleprompter' ? styles.viewToggleBtnActive : ''}`}
+              onClick={() => setViewMode('teleprompter')}
+              role="tab"
+              aria-selected={viewMode === 'teleprompter'}
+              type="button"
+            >
+              Teleprompter
+            </button>
+          </div>
+
+          <section className={styles.transcriptSection}>
+            {viewMode === 'transcript' ? (
+              <TranscriptPanel
+                segments={podcast.segments}
+                references={podcast.references}
+                currentTime={currentTime}
+                onSegmentClick={setCurrentTime}
+              />
+            ) : (
+              <Teleprompter
+                segments={podcast.segments}
+                references={podcast.references}
+                currentTime={currentTime}
+                onSegmentClick={setCurrentTime}
+              />
+            )}
+          </section>
+
+          {podcast.references.length > 0 && (
+            <section className={styles.referencesSection}>
+              <ReferenceList references={podcast.references} />
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

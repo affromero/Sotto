@@ -1,0 +1,59 @@
+.button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  color: var(--color-text-secondary);
+}
+
+.button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.icon {
+  transition: color var(--transition-fast);
+}
+
+/* Gentle shake animation when unread */
+.hasUnread .icon {
+  animation: bellShake 0.6s ease-in-out;
+}
+
+@keyframes bellShake {
+  0% { transform: rotate(0); }
+  15% { transform: rotate(8deg); }
+  30% { transform: rotate(-8deg); }
+  45% { transform: rotate(4deg); }
+  60% { transform: rotate(-4deg); }
+  75% { transform: rotate(2deg); }
+  100% { transform: rotate(0); }
+}
+
+/* Unread badge */
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  line-height: 1;
+  pointer-events: none;
+}

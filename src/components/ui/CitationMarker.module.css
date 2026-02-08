@@ -1,0 +1,124 @@
+.wrapper {
+  position: relative;
+  display: inline;
+}
+
+.marker {
+  display: inline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75em;
+  font-weight: 700;
+  color: var(--color-primary);
+  vertical-align: super;
+  line-height: 1;
+  padding: 0 1px;
+  transition: color var(--transition-fast);
+}
+
+.marker:hover {
+  color: var(--color-primary-hover);
+}
+
+.tooltip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-dropdown);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-md);
+  min-width: 280px;
+  max-width: 360px;
+  animation: fadeIn 150ms ease;
+}
+
+.above {
+  bottom: calc(100% + 8px);
+}
+
+.below {
+  top: calc(100% + 8px);
+}
+
+.refItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.refItem + .refItem {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.refHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.refNumber {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+}
+
+.refType {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-secondary);
+  background: var(--color-primary-light);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.refTitle {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.refAuthors {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.refMeta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+}
+
+.refMetaDot {
+  color: var(--color-text-tertiary);
+}
+
+.refLink {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.refLink:hover {
+  color: var(--color-primary-hover);
+}
+
+@media (max-width: 768px) {
+  .tooltip {
+    min-width: 240px;
+    max-width: 300px;
+    left: 0;
+    transform: none;
+  }
+}

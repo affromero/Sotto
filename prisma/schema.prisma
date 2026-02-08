@@ -1,0 +1,578 @@
+// Sotto Database Schema
+// Interactive Podcast Platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ USERS & AUTH ============
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  bio           String?   @db.Text
+  emailVerified DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Usage tracking
+  podcastsUsed    Int @default(0)
+  podcastsAllowed Int @default(3) // 3 free podcasts for all users
+
+  // Team membership
+  teamId String?
+  team   Team?   @relation(fields: [teamId], references: [id])
+
+  // Relations
+  accounts           Account[]
+  sessions           Session[]
+  podcasts           Podcast[]
+  discoveries        Discovery[]
+  interactions       Interaction[]
+  subscription       Subscription?
+  notifications      Notification[]
+  subscriptionEvents SubscriptionEvent[]
+  ownedTeams         Team[]              @relation("TeamOwner")
+  apiUsageLogs       ApiUsageLog[]
+  pushSubscriptions  PushSubscription[]
+
+  // Social
+  likes     Like[]
+  saves     Save[]
+  followers Follow[] @relation("Following")
+  following Follow[] @relation("Follower")
+
+  @@index([teamId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============ SOCIAL: FOLLOW ============
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+// ============ SUBSCRIPTIONS ============
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  stripeCustomerId     String             @unique
+  stripeSubscriptionId String             @unique
+  stripePriceId        String
+  status               SubscriptionStatus @default(PENDING)
+  tier                 SubscriptionTier   @default(FREE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([tier])
+}
+
+enum SubscriptionStatus {
+  PENDING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  TRIALING
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+  TEAM
+}
+
+model SubscriptionEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String
+  stripeEventId String   @unique
+  data          Json
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============ TEAMS ============
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  seats     Int      @default(10)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User   @relation("TeamOwner", fields: [ownerId], references: [id])
+  members User[]
+
+  @@index([ownerId])
+}
+
+// ============ PODCASTS ============
+
+model Podcast {
+  id        String        @id @default(cuid())
+  userId    String
+  title     String
+  topic     String        @db.Text
+  status    PodcastStatus @default(PENDING)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  // Audio
+  audioUrl  String?
+  duration  Int?    // seconds
+  fileSize  Int?    // bytes
+
+  // Visibility
+  visibility PodcastVisibility @default(PUBLIC)
+
+  // Fork tracking
+  forkedFromId String?
+  forkedFrom   Podcast?  @relation("Forks", fields: [forkedFromId], references: [id])
+  forks        Podcast[] @relation("Forks")
+
+  // Counters (denormalized for performance)
+  playCount Int @default(0)
+  likeCount Int @default(0)
+  forkCount Int @default(0)
+  saveCount Int @default(0)
+
+  // PDF export
+  pdfUrl String?
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  discovery    Discovery?
+  script       Script?
+  segments     Segment[]
+  interactions Interaction[]
+  likes        Like[]
+  saves        Save[]
+  tags         PodcastTag[]
+  jobs         Job[]
+  references   Reference[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([visibility])
+  @@index([createdAt])
+  @@index([playCount])
+  @@index([likeCount])
+}
+
+enum PodcastStatus {
+  PENDING
+  DISCOVERING
+  EXTRACTING
+  SCRIPTING
+  GENERATING_AUDIO
+  STITCHING
+  READY
+  UPDATING
+  FAILED
+}
+
+enum PodcastVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+// ============ DISCOVERY (Chat-Based) ============
+
+model Discovery {
+  id        String   @id @default(cuid())
+  podcastId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Extracted metadata from chat
+  topic          String?  @db.Text
+  depth          String?  // quick_overview, standard, deep_dive
+  audienceLevel  String?  // beginner, intermediate, expert
+  focusAreas     String[] // array of focus topics
+  tone           String?  // casual, professional, socratic
+  durationTarget Int?     // minutes
+  priorKnowledge String?  @db.Text
+  sourceUrl      String?
+  sourceContent  String?  @db.Text
+
+  // Relations
+  podcast  Podcast            @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  messages DiscoveryMessage[]
+  user     User               @relation(fields: [userId], references: [id])
+  userId   String
+
+  @@index([userId])
+}
+
+model DiscoveryMessage {
+  id          String   @id @default(cuid())
+  discoveryId String
+  role        String   // user, assistant, system
+  content     String   @db.Text
+  chips       Json?    // suggested chip options [{label, value}]
+  createdAt   DateTime @default(now())
+
+  discovery Discovery @relation(fields: [discoveryId], references: [id], onDelete: Cascade)
+
+  @@index([discoveryId])
+}
+
+// ============ SCRIPTS ============
+
+model Script {
+  id        String   @id @default(cuid())
+  podcastId String   @unique
+  turns     Json     // [{speaker: "HOST"|"EXPERT", text: "..."}]
+  markdown  String   @db.Text
+  context   String?  @db.Text // source context used for generation
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+}
+
+// ============ AUDIO SEGMENTS ============
+
+model Segment {
+  id        String  @id @default(cuid())
+  podcastId String
+  speaker   Speaker
+  text      String  @db.Text
+  audioUrl  String?
+  order     Int
+  startTime Float?  // seconds
+  duration  Float?  // seconds
+  version   Int     @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([podcastId])
+  @@index([order])
+}
+
+enum Speaker {
+  HOST
+  EXPERT
+}
+
+// ============ INTERACTIONS (Q&A during playback) ============
+
+model Interaction {
+  id        String            @id @default(cuid())
+  podcastId String
+  userId    String
+  status    InteractionStatus @default(PENDING)
+
+  // Question context
+  question  String @db.Text
+  timestamp Float  // playback position in seconds
+
+  // Answer
+  answer String? @db.Text
+
+  // Resolution
+  resolved     Boolean @default(false)
+  incorporated Boolean @default(false) // baked into podcast
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([podcastId])
+  @@index([userId])
+  @@index([status])
+}
+
+enum InteractionStatus {
+  PENDING
+  ANSWERING
+  ANSWERED
+  RESOLVED
+  INCORPORATING
+  INCORPORATED
+}
+
+// ============ SOCIAL: LIKES & SAVES ============
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  podcastId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, podcastId])
+  @@index([podcastId])
+}
+
+model Save {
+  id        String   @id @default(cuid())
+  userId    String
+  podcastId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, podcastId])
+  @@index([podcastId])
+}
+
+// ============ TAGS ============
+
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  slug     String       @unique
+  podcasts PodcastTag[]
+
+  @@index([slug])
+}
+
+model PodcastTag {
+  id        String @id @default(cuid())
+  podcastId String
+  tagId     String
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([podcastId, tagId])
+  @@index([tagId])
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  data      Json?
+  read      Boolean          @default(false)
+  pushed    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  PODCAST_READY
+  PODCAST_LIKED
+  PODCAST_FORKED
+  NEW_FOLLOWER
+  SIMILAR_PODCAST_CREATED
+}
+
+// ============ PUSH SUBSCRIPTIONS ============
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ============ JOBS (BullMQ tracking) ============
+
+model Job {
+  id        String   @id @default(cuid())
+  podcastId String?
+  type      String
+  payload   Json
+  status    String   // pending, processing, complete, failed
+  result    Json?
+  error     String?
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([type, status])
+  @@index([podcastId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============ API USAGE TRACKING ============
+
+model ApiUsageLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  podcastId String?
+  userId    String?
+  service   String   // claude, elevenlabs, ffmpeg
+  category  String   // discovery, script_generation, audio_generation, interaction
+
+  // Cost tracking
+  inputTokens  Int?
+  outputTokens Int?
+  totalCost    Float
+
+  // Performance
+  durationMs Int?
+
+  metadata Json @default("{}")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([podcastId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([service])
+}
+
+// ============ FEEDBACK (Early Access) ============
+
+model Feedback {
+  id        String         @id @default(cuid())
+  userId    String?
+  email     String?
+  name      String?
+  type      FeedbackType
+  rating    Int?           // 1-5 stars
+  subject   String
+  message   String         @db.Text
+  context   String?        // page/feature where feedback was given
+  status    FeedbackStatus @default(NEW)
+  response  String?        @db.Text // admin response
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum FeedbackType {
+  BUG
+  FEATURE_REQUEST
+  GENERAL
+  PRAISE
+  CONCERN
+}
+
+enum FeedbackStatus {
+  NEW
+  REVIEWED
+  IN_PROGRESS
+  RESOLVED
+  ARCHIVED
+}
+
+// ============ REFERENCES (Citations) ============
+
+model Reference {
+  id        String        @id @default(cuid())
+  podcastId String
+  number    Int
+  title     String        @db.Text
+  authors   String[]
+  year      Int?
+  url       String?       @db.Text
+  type      ReferenceType @default(WEB)
+  publisher String?
+  doi       String?
+  createdAt DateTime      @default(now())
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([podcastId, number])
+  @@index([podcastId])
+}
+
+enum ReferenceType {
+  WEB
+  PAPER
+  BOOK
+  ARTICLE
+  VIDEO
+  REPORT
+}

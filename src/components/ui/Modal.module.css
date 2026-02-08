@@ -1,0 +1,52 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: fadeIn 0.15s ease;
+  padding: var(--spacing-md);
+}
+
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  animation: slideUp 0.2s ease;
+  max-height: 90vh;
+  overflow-y: auto;
+  width: 100%;
+}
+
+.small { max-width: 400px; }
+.medium { max-width: 560px; }
+.large { max-width: 720px; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-lg) 0;
+}
+
+.title {
+  font: var(--text-h3);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  padding: var(--spacing-xs);
+  line-height: 1;
+}
+
+.closeBtn:hover { color: var(--color-text-primary); }
+
+.body {
+  padding: var(--spacing-lg);
+}

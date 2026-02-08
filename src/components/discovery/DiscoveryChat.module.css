@@ -1,0 +1,301 @@
+/* DiscoveryChat — Main chat interface for podcast creation */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--color-background);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+/* ============================================ */
+/* MESSAGES AREA                                 */
+/* ============================================ */
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.messageGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  animation: messageIn 300ms ease forwards;
+}
+
+/* Bubble layout */
+.bubble {
+  display: flex;
+  gap: var(--spacing-sm);
+  max-width: 85%;
+}
+
+.userBubble {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.assistantBubble {
+  align-self: flex-start;
+}
+
+/* Bot avatar */
+.avatarCol {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.botAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Bubble content */
+.bubbleContent {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-2xl);
+  line-height: 1.5;
+}
+
+.userBubble .bubbleContent {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-bottom-right-radius: var(--radius-sm);
+}
+
+.assistantBubble .bubbleContent {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-bottom-left-radius: var(--radius-sm);
+}
+
+.messageText {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Chips row (indented to align with bubble content) */
+.chipsRow {
+  padding-left: 44px; /* 32px avatar + 12px gap */
+}
+
+/* ============================================ */
+/* TYPING INDICATOR                              */
+/* ============================================ */
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--spacing-xs) 0;
+}
+
+.typingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-tertiary);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+
+.typingDot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typingDot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* ============================================ */
+/* GENERATE CTA                                  */
+/* ============================================ */
+
+.generateBar {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-primary-lighter);
+  animation: slideUp 300ms ease forwards;
+}
+
+.generateButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-family: var(--font-body);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.generateButton:hover {
+  background: var(--color-primary-hover);
+}
+
+.generateButton:active {
+  background: var(--color-primary-active);
+}
+
+/* ============================================ */
+/* INPUT BAR                                     */
+/* ============================================ */
+
+.inputBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.input {
+  flex: 1;
+  height: 44px;
+  padding: 0 var(--spacing-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.input::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.sendButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sendButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.sendButton:active:not(:disabled) {
+  background: var(--color-primary-active);
+}
+
+.sendButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ============================================ */
+/* ANIMATIONS                                    */
+/* ============================================ */
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================ */
+/* RESPONSIVE                                    */
+/* ============================================ */
+
+@media (min-width: 768px) {
+  .messages {
+    padding: var(--spacing-lg);
+    gap: var(--spacing-lg);
+  }
+
+  .bubble {
+    max-width: 70%;
+  }
+
+  .inputBar {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+
+  .generateBar {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+
+  .chipsRow {
+    padding-left: 44px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .bubble {
+    max-width: 60%;
+  }
+}

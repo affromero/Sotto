@@ -1,0 +1,16 @@
+{
+  "name": "Sotto — Podcasts That Listen Back",
+  "short_name": "Sotto",
+  "description": "Generate AI podcasts, interrupt to ask questions, share knowledge.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FEFCF8",
+  "theme_color": "#D97706",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}

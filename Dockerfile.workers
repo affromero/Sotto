@@ -1,0 +1,39 @@
+# ============================================
+# Sotto — Production Workers Container
+# Multi-stage build: deps → runner
+# ============================================
+
+# ---- Stage 1: Install dependencies ----
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat openssl
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma/
+
+RUN npm ci --ignore-scripts
+RUN npx prisma generate
+
+# ---- Stage 2: Production runner ----
+FROM node:20-alpine AS runner
+RUN apk add --no-cache libc6-compat openssl ffmpeg
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Create non-root user
+RUN addgroup --system --gid 1001 sotto
+RUN adduser --system --uid 1001 sotto
+
+# Copy dependencies with Prisma client
+COPY --from=deps --chown=sotto:sotto /app/node_modules ./node_modules
+
+# Copy application source (workers need full src/ for tsx runtime compilation)
+COPY --chown=sotto:sotto package.json ./
+COPY --chown=sotto:sotto tsconfig.json ./
+COPY --chown=sotto:sotto prisma ./prisma/
+COPY --chown=sotto:sotto src ./src/
+
+USER sotto
+
+CMD ["node", "--import", "tsx", "src/workers/index.ts"]

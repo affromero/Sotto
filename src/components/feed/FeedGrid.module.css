@@ -1,0 +1,165 @@
+/* FeedGrid — Responsive grid layout for podcast cards */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-16) var(--space-6);
+  text-align: center;
+}
+
+.emptyIcon {
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-4);
+  opacity: 0.5;
+}
+
+.emptyMessage {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  margin: 0;
+  max-width: 320px;
+}
+
+/* Skeleton loading cards */
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.skeletonHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.skeletonTitle {
+  height: 20px;
+  width: 70%;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonDuration {
+  height: 18px;
+  width: 48px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 100ms;
+}
+
+.skeletonTopic {
+  height: 14px;
+  width: 100%;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 200ms;
+}
+
+.skeletonTopicShort {
+  height: 14px;
+  width: 60%;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 250ms;
+}
+
+.skeletonCreator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.skeletonAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 300ms;
+}
+
+.skeletonName {
+  height: 14px;
+  width: 100px;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 350ms;
+}
+
+.skeletonStats {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.skeletonStat {
+  height: 12px;
+  width: 40px;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 400ms;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Screen reader only */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Desktop: skeleton min-height matches card */
+@media (min-width: 768px) {
+  .skeleton {
+    min-height: 240px;
+  }
+}

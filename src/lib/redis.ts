@@ -1,0 +1,141 @@
+import Redis, { RedisOptions } from 'ioredis';
+import { logger } from './logger';
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+
+/**
+ * Base Redis options shared across all connections
+ */
+function getBaseRedisOptions(): RedisOptions {
+  return {
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    enableOfflineQueue: true,
+    retryStrategy(times) {
+      const delay = Math.min(times * 50, 2000);
+      if (times > 10) {
+        logger.warn(`Redis connection retry attempt ${times}, reconnecting...`);
+      }
+      return delay;
+    },
+    reconnectOnError(err) {
+      if (err.message.includes('READONLY')) {
+        logger.warn('Redis in readonly mode, reconnecting...');
+        return true;
+      }
+      return false;
+    },
+    connectTimeout: 10000,
+    keepAlive: 30000,
+    ...(REDIS_URL.startsWith('rediss://') && { tls: {} }),
+  };
+}
+
+/**
+ * Create a new Redis connection
+ * BullMQ requires dedicated connections for workers
+ */
+export function createRedisConnection(name?: string): Redis {
+  const client = new Redis(REDIS_URL, getBaseRedisOptions());
+  const prefix = name ? `[${name}] ` : '';
+
+  client.on('error', (error) => {
+    logger.error(`${prefix}Redis client error`, { error: error.message });
+  });
+
+  client.on('connect', () => {
+    logger.debug(`${prefix}Redis client connected`);
+  });
+
+  client.on('ready', () => {
+    logger.info(`${prefix}Redis client ready`);
+  });
+
+  client.on('reconnecting', () => {
+    logger.warn(`${prefix}Redis client reconnecting...`);
+  });
+
+  return client;
+}
+
+// Singleton for general-purpose operations
+let generalRedisClient: Redis | null = null;
+
+export function getRedisClient(): Redis {
+  if (!generalRedisClient) {
+    generalRedisClient = createRedisConnection('general');
+  }
+  return generalRedisClient;
+}
+
+/**
+ * Cache helpers
+ */
+export const cache = {
+  async get<T>(key: string): Promise<T | null> {
+    const client = getRedisClient();
+    const value = await client.get(key);
+    return value ? JSON.parse(value) : null;
+  },
+
+  async set(key: string, value: unknown, ttlSeconds?: number): Promise<void> {
+    const client = getRedisClient();
+    const serialized = JSON.stringify(value);
+    if (ttlSeconds) {
+      await client.setex(key, ttlSeconds, serialized);
+    } else {
+      await client.set(key, serialized);
+    }
+  },
+
+  async delete(key: string): Promise<void> {
+    const client = getRedisClient();
+    await client.del(key);
+  },
+
+  async deletePattern(pattern: string): Promise<void> {
+    const client = getRedisClient();
+    const keys = await client.keys(pattern);
+    if (keys.length > 0) {
+      await client.del(...keys);
+    }
+  },
+};
+
+/**
+ * Rate limiting with sliding window
+ */
+export async function checkRateLimit(
+  identifier: string,
+  limit: number,
+  windowSeconds: number
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const client = getRedisClient();
+  const key = `ratelimit:${identifier}`;
+  const now = Date.now();
+  const windowStart = now - windowSeconds * 1000;
+
+  await client.zremrangebyscore(key, 0, windowStart);
+  const current = await client.zcard(key);
+
+  if (current >= limit) {
+    const oldestEntry = await client.zrange(key, 0, 0, 'WITHSCORES');
+    const resetAt =
+      oldestEntry.length > 0
+        ? parseInt(oldestEntry[1]) + windowSeconds * 1000
+        : now + windowSeconds * 1000;
+    return { allowed: false, remaining: 0, resetAt };
+  }
+
+  await client.zadd(key, now, `${now}`);
+  await client.expire(key, windowSeconds);
+
+  return { allowed: true, remaining: limit - current - 1, resetAt: now + windowSeconds * 1000 };
+}
+
+export async function closeRedis(): Promise<void> {
+  if (generalRedisClient) {
+    await generalRedisClient.quit();
+    generalRedisClient = null;
+  }
+}

@@ -1,0 +1,133 @@
+.miniPlayer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: var(--mini-player-height);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-player);
+  z-index: var(--z-player);
+  animation: slideUp 300ms ease;
+}
+
+.progressLine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  background: var(--color-primary);
+  transition: width 100ms linear;
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  height: 100%;
+  padding: 0 var(--spacing-lg);
+}
+
+.artworkButton {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.artwork {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.artworkLetter {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.title {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.playButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--transition-fast);
+}
+
+.playButton:hover {
+  background: var(--color-primary-hover);
+}
+
+.closeButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.closeButton:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .miniPlayer {
+    height: var(--mini-player-height);
+  }
+
+  .content {
+    padding: 0 var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+
+  .artwork {
+    width: 40px;
+    height: 40px;
+  }
+}

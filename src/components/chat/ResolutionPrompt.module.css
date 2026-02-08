@@ -1,0 +1,146 @@
+.root {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+  animation: slideUp var(--transition-slow) ease both;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.question {
+  font: var(--text-h4);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.buttonSuccess {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  background: var(--color-success);
+  color: var(--color-text-inverse);
+}
+
+.buttonSuccess:hover:not(:disabled) {
+  background: var(--color-success-hover);
+}
+
+.buttonSuccess:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttonOutlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.buttonOutlined:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.buttonOutlined:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.buttonPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.buttonPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.buttonPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Transition between states */
+.fadeIn {
+  animation: fadeIn var(--transition-base) ease both;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--radius-full);
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

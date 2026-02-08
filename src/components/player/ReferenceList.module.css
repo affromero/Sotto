@@ -1,0 +1,132 @@
+.root {
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--spacing-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.header:hover {
+  background: var(--color-surface-hover);
+}
+
+.heading {
+  font: var(--text-h4);
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.count {
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.chevron {
+  color: var(--color-text-secondary);
+  transition: transform var(--transition-base);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.content {
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  list-style-position: inside;
+  padding-left: 0;
+}
+
+.item {
+  display: list-item;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+.item::marker {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.refBody {
+  display: inline;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-weight: 400;
+}
+
+.authors {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.meta {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.typeBadge {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.link {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
+  text-decoration: none;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.link:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.doi {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+
+.disclaimer {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+}

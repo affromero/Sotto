@@ -1,0 +1,54 @@
+/* Spinner - Loading indicator */
+
+.spinner {
+  display: inline-block;
+  border-style: solid;
+  border-radius: var(--radius-full);
+  border-color: transparent;
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Sizes */
+
+.small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+}
+
+.medium {
+  width: 24px;
+  height: 24px;
+  border-width: 2.5px;
+}
+
+.large {
+  width: 40px;
+  height: 40px;
+  border-width: 3px;
+}
+
+/* Colors */
+
+.primary {
+  color: var(--color-primary);
+}
+
+.accent {
+  color: var(--color-accent);
+}
+
+.white {
+  color: var(--color-text-inverse);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

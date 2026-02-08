@@ -1,0 +1,8 @@
+.main { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: var(--spacing-md); background: var(--color-background); }
+.container { width: 100%; max-width: 400px; text-align: center; }
+.title { font: var(--text-h1); margin-bottom: var(--spacing-sm); }
+.subtitle { font: var(--text-body); color: var(--color-text-secondary); margin-bottom: var(--spacing-xl); }
+.providers { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.providerBtn { height: 48px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); font-size: var(--font-size-base); font-weight: 500; cursor: pointer; transition: all var(--transition-fast); }
+.providerBtn:hover { border-color: var(--color-border-hover); background: var(--color-surface-hover); }
+.footer { margin-top: var(--spacing-lg); font: var(--text-body-sm); color: var(--color-text-secondary); }

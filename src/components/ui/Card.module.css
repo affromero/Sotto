@@ -1,0 +1,37 @@
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  transition: all var(--transition-fast);
+}
+
+.default {
+  border: 1px solid var(--color-border);
+}
+
+.elevated {
+  box-shadow: var(--shadow-md);
+}
+
+.outlined {
+  border: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.padnone { padding: 0; }
+.padsmall { padding: var(--spacing-sm); }
+.padmedium { padding: var(--spacing-lg); }
+.padlarge { padding: var(--spacing-xl); }
+
+.clickable {
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+}
+
+.clickable:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-sm);
+}
