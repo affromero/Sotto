@@ -1,30 +1,41 @@
 {
   "name": "sotto",
   "version": "0.1.0",
-  "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "private": true,
+  "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "scripts": {
-    "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
+    "build": "next build",
     "dev": "concurrently -n web,workers -c blue,green \"npm run dev:web\" \"npm run dev:workers\"",
     "dev:web": "next dev",
     "dev:workers": "tsx watch src/workers/index.ts",
-    "build": "next build",
-    "start": "next start",
-    "start:workers": "NODE_ENV=production tsx src/workers/index.ts",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "type-check": "tsc --noEmit",
+    "postinstall": "prisma generate",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "prisma:generate": "prisma generate",
-    "prisma:push": "prisma db push",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:studio": "prisma studio",
+    "setup": "chmod +x ./scripts/setup.sh && ./scripts/setup.sh",
+    "start": "next start",
+    "start:workers": "NODE_ENV=production tsx src/workers/index.ts",
     "test": "vitest run",
-    "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "postinstall": "prisma generate"
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0"
+    ],
+    "*.{ts,tsx,js,jsx,json,md,css,yaml,yml}": [
+      "prettier --write"
+    ],
+    "package.json": [
+      "sort-package-json"
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -66,7 +77,9 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
     "jsdom": "^27.0.1",
+    "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "sort-package-json": "^3.6.1",
     "tsx": "^4.21.0",
     "vitest": "^4.0.18"
   }

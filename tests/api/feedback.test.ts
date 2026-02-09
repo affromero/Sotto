@@ -1,21 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Mock prisma before importing route
-vi.mock('@/lib/prisma', () => {
-  const mockPrisma = {
+// Define mock fns at module scope so they're properly typed as Mock
+const mockFeedbackCreate = vi.fn();
+const mockFeedbackFindMany = vi.fn();
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
     feedback: {
-      create: vi.fn().mockResolvedValue({}),
-      findMany: vi.fn().mockResolvedValue([]),
+      create: (...args: unknown[]) => mockFeedbackCreate(...args),
+      findMany: (...args: unknown[]) => mockFeedbackFindMany(...args),
     },
-  };
-  return { prisma: mockPrisma };
-});
+  },
+}));
 
 import { POST, GET } from '@/app/api/feedback/route';
-import { prisma } from '@/lib/prisma';
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = {
+  feedback: {
+    create: mockFeedbackCreate,
+    findMany: mockFeedbackFindMany,
+  },
+};
 
 function createPostRequest(body: unknown): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/feedback'), {

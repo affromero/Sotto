@@ -48,6 +48,10 @@ docs/*.pdf
 # Snap
 snap/
 
+# Python (pre-commit tooling)
+.venv/
+__pycache__/
+
 # Accounting
 accounting/reports/*.html
 accounting/reports/*.pdf

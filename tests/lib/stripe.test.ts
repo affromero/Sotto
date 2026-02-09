@@ -17,11 +17,11 @@ describe('TIER_LIMITS', () => {
   });
 
   it('PRO tier has correct limits', () => {
-    expect(TIER_LIMITS.PRO.podcastsPerMonth).toBe(15);
+    expect(TIER_LIMITS.PRO.podcastsPerMonth).toBe(8);
     expect(TIER_LIMITS.PRO.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.PRO.interactionsPerPodcast).toBe(10);
-    expect(TIER_LIMITS.PRO.premiumVoiceCredits).toBe(5);
-    expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(3);
+    expect(TIER_LIMITS.PRO.premiumVoiceCredits).toBe(3);
+    expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(2);
     expect(TIER_LIMITS.PRO.canDownload).toBe(true);
     expect(TIER_LIMITS.PRO.canMakePrivate).toBe(true);
     expect(TIER_LIMITS.PRO.canBrowseVoiceLibrary).toBe(true);
@@ -31,11 +31,11 @@ describe('TIER_LIMITS', () => {
   });
 
   it('CREATOR tier has correct limits', () => {
-    expect(TIER_LIMITS.CREATOR.podcastsPerMonth).toBe(Infinity);
+    expect(TIER_LIMITS.CREATOR.podcastsPerMonth).toBe(30);
     expect(TIER_LIMITS.CREATOR.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.CREATOR.interactionsPerPodcast).toBe(Infinity);
-    expect(TIER_LIMITS.CREATOR.premiumVoiceCredits).toBe(20);
-    expect(TIER_LIMITS.CREATOR.maxVoiceClones).toBe(10);
+    expect(TIER_LIMITS.CREATOR.premiumVoiceCredits).toBe(10);
+    expect(TIER_LIMITS.CREATOR.maxVoiceClones).toBe(5);
     expect(TIER_LIMITS.CREATOR.canDownload).toBe(true);
     expect(TIER_LIMITS.CREATOR.canMakePrivate).toBe(true);
     expect(TIER_LIMITS.CREATOR.canBrowseVoiceLibrary).toBe(true);
@@ -74,17 +74,17 @@ describe('canCreatePodcast', () => {
 
   describe('PRO tier', () => {
     it('allows creation when under limit', () => {
-      const result = canCreatePodcast('PRO', 10);
+      const result = canCreatePodcast('PRO', 5);
       expect(result.allowed).toBe(true);
     });
 
-    it('allows creation at 14 podcasts used (under limit of 15)', () => {
-      const result = canCreatePodcast('PRO', 14);
+    it('allows creation at 7 podcasts used (under limit of 8)', () => {
+      const result = canCreatePodcast('PRO', 7);
       expect(result.allowed).toBe(true);
     });
 
-    it('blocks creation when at limit (15 used)', () => {
-      const result = canCreatePodcast('PRO', 15);
+    it('blocks creation when at limit (8 used)', () => {
+      const result = canCreatePodcast('PRO', 8);
       expect(result.allowed).toBe(false);
       expect(result.reason).toBeDefined();
     });
@@ -96,14 +96,15 @@ describe('canCreatePodcast', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('allows creation with many podcasts (unlimited)', () => {
-      const result = canCreatePodcast('CREATOR', 1000);
+    it('allows creation at 29 podcasts used (under limit of 30)', () => {
+      const result = canCreatePodcast('CREATOR', 29);
       expect(result.allowed).toBe(true);
     });
 
-    it('allows creation with very high count (unlimited)', () => {
-      const result = canCreatePodcast('CREATOR', 999999);
-      expect(result.allowed).toBe(true);
+    it('blocks creation when at limit (30 used)', () => {
+      const result = canCreatePodcast('CREATOR', 30);
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toBeDefined();
     });
   });
 });

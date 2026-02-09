@@ -1,0 +1,10 @@
+[project]
+name = "sotto-tools"
+version = "0.1.0"
+description = "Development tooling for Sotto"
+requires-python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.0.0",
+]

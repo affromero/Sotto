@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Mock prisma before importing route
-vi.mock('@/lib/prisma', () => {
-  const mockPrisma = {
+// Define mock fn at module scope so it's properly typed as Mock
+const mockTagFindMany = vi.fn();
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
     tag: {
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: (...args: unknown[]) => mockTagFindMany(...args),
     },
-  };
-  return { prisma: mockPrisma };
-});
+  },
+}));
 
 import { GET } from '@/app/api/tags/route';
-import { prisma } from '@/lib/prisma';
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = {
+  tag: {
+    findMany: mockTagFindMany,
+  },
+};
 
 function createRequest(): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/tags'));
