@@ -1,6 +1,6 @@
 # Sotto — Implementation Status
 
-> Last updated: 2026-02-08 — **COMPLETE (186/186)**
+> Last updated: 2026-02-09 — **197 items (197 complete + 0 remaining)**
 
 ## Legend
 - [x] Implemented (real code, not a stub)
@@ -302,6 +302,21 @@
 | CLAUDE.md | 9 | 9 |
 | Tests | 14 | 14 |
 | Build & Quality | 4 | 4 |
-| **Total** | **186** | **186** |
+| Remaining Work | 11 | 11 |
+| **Total** | **197** | **197** |
 
-**All items complete. 186/186 (100%).**
+## 26. Remaining Work
+
+- [x] **Wire OAuth buttons** — `src/app/auth/AuthButtons.tsx` shared client component with `signIn()` calls for Google/GitHub
+- [x] **Edit podcast page** — `src/app/podcast/[podcastId]/edit/` with EditPodcastForm (title, topic, visibility)
+- [x] **Fork confirmation modal** — Modal component with confirm/cancel before forking
+- [x] **Integration tests** — `tests/integration/generation-pipeline.test.ts` and `auth-flow.test.ts`
+- [x] **Mobile responsiveness audit** — 320px breakpoints for player, teleprompter, discovery chat
+- [x] **Error recovery paths** — FAILED status retry in generate API, retry button in player view, dashboard hint
+- [x] **Citation/reference UI polish** — VerificationBadge, expandable 4-layer details per reference
+- [x] **Team management** — Full CRUD: create team, invite members, accept/revoke invites, remove members
+- [x] **API access tier** — ApiKey model, `sk_sotto_` keys with SHA-256, Bearer token auth on podcast routes
+- [x] **Analytics dashboard** — Period selector, stat cards, CSS-only BarChart + TimeSeriesChart
+- [x] **Advanced discovery filters** — FilterPanel with depth, audience, tone, duration range, date range
+
+**197/197 items complete. All done.**

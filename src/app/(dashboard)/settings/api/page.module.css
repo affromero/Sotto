@@ -1,0 +1,206 @@
+/* API Keys Page */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.pageTitle {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.upgradeCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.upgradeTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.upgradeText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 400px;
+}
+
+/* Create Key Section */
+
+.createSection {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.createForm {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-end;
+}
+
+.createInput {
+  flex: 1;
+}
+
+.createBtn {
+  flex-shrink: 0;
+}
+
+/* Key List */
+
+.keyList {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.keyListHeader {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.keyListTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--spacing-md);
+}
+
+.keyRow:last-child {
+  border-bottom: none;
+}
+
+.keyInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.keyName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.keyPrefix {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.keyMeta {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.keyActions {
+  flex-shrink: 0;
+}
+
+.revokedBadge {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  background: var(--color-border);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.emptyKeys {
+  padding: var(--spacing-xl);
+  text-align: center;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Copy Modal */
+
+.copyModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.copyWarning {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.copyKeyBlock {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  overflow: hidden;
+}
+
+.copyKeyText {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  word-break: break-all;
+  flex: 1;
+}
+
+.copyBtn {
+  flex-shrink: 0;
+}
+
+.copiedText {
+  font: var(--text-caption);
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.errorText {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+}
+
+@media (min-width: 600px) {
+  .createSection,
+  .upgradeCard {
+    padding: var(--spacing-xl);
+  }
+
+  .keyRow {
+    padding: var(--spacing-md) var(--spacing-xl);
+  }
+
+  .keyListHeader {
+    padding: var(--spacing-md) var(--spacing-xl);
+  }
+}

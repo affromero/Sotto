@@ -1,5 +1,11 @@
 import { ReferenceType, VerificationStatus } from '@prisma/client';
 
+export interface VerificationLayerResult {
+  layer: string;
+  passed: boolean;
+  details?: string;
+}
+
 export interface ReferenceData {
   id: string;
   number: number;
@@ -11,4 +17,5 @@ export interface ReferenceData {
   publisher: string | null;
   doi: string | null;
   verificationStatus: VerificationStatus;
+  verificationDetails: Record<string, unknown> | null;
 }

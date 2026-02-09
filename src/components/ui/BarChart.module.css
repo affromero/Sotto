@@ -1,0 +1,46 @@
+/* Horizontal Bar Chart — CSS only */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.label {
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  min-width: 80px;
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+
+.barContainer {
+  flex: 1;
+  height: 24px;
+  background: var(--color-background);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  transition: width var(--transition-base);
+  min-width: 2px;
+}
+
+.value {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  min-width: 60px;
+  text-align: right;
+  flex-shrink: 0;
+}

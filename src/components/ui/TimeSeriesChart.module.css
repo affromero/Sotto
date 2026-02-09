@@ -1,0 +1,64 @@
+/* Vertical bar chart for time series — CSS grid */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 160px;
+  padding-top: var(--spacing-md);
+}
+
+.barWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.bar {
+  width: 100%;
+  max-width: 24px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--color-primary);
+  transition: height var(--transition-base);
+  min-height: 2px;
+}
+
+.barLabel {
+  font-size: 9px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  text-align: center;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+}
+
+@media (max-width: 599px) {
+  .chart {
+    height: 120px;
+  }
+
+  .barLabel {
+    font-size: 8px;
+  }
+}

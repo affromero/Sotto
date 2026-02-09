@@ -167,6 +167,9 @@ export default async function DashboardPage() {
                     <Badge variant={statusVariants[podcast.status]}>
                       {statusLabels[podcast.status]}
                     </Badge>
+                    {podcast.status === 'FAILED' && (
+                      <span className={styles.retryHint}>Tap to retry</span>
+                    )}
                     <span className={styles.podcastDuration}>{formatDuration(podcast.duration)}</span>
                     <time className={styles.podcastDate} dateTime={podcast.createdAt.toISOString()}>
                       {formatDate(podcast.createdAt)}

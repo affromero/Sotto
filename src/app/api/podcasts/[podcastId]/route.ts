@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
@@ -30,7 +30,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
   // Private/unlisted podcasts require ownership
   if (podcast.visibility !== 'PUBLIC') {
-    if (!session?.user?.id || session.user.id !== podcast.userId) {
+    if (!authResult || authResult.userId !== podcast.userId) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
   }
@@ -39,13 +39,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   let isLiked = false;
   let isSaved = false;
 
-  if (session?.user?.id) {
+  if (authResult) {
     const [like, save] = await Promise.all([
       prisma.like.findUnique({
-        where: { userId_podcastId: { userId: session.user.id, podcastId } },
+        where: { userId_podcastId: { userId: authResult.userId, podcastId } },
       }),
       prisma.save.findUnique({
-        where: { userId_podcastId: { userId: session.user.id, podcastId } },
+        where: { userId_podcastId: { userId: authResult.userId, podcastId } },
       }),
     ]);
 
@@ -58,9 +58,9 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -73,7 +73,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
-  if (podcast.userId !== session.user.id) {
+  if (podcast.userId !== authResult.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -96,11 +96,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -113,7 +113,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
-  if (podcast.userId !== session.user.id) {
+  if (podcast.userId !== authResult.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

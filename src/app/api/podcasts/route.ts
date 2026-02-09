@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
+import { checkRateLimit } from '@/lib/redis';
 
-export async function GET(_request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const podcasts = await prisma.podcast.findMany({
-    where: { userId: session.user.id },
+    where: { userId: authResult.userId },
     orderBy: { createdAt: 'desc' },
     include: {
       tags: { include: { tag: true } },
@@ -21,9 +22,21 @@ export async function GET(_request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Rate limit API key requests (60 requests per minute)
+  const authHeader = request.headers.get('authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const rateLimit = await checkRateLimit(`api:create:${authResult.userId}`, 60, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', resetAt: rateLimit.resetAt },
+        { status: 429 }
+      );
+    }
   }
 
   const body = await request.json();
@@ -34,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   const podcast = await prisma.podcast.create({
     data: {
-      userId: session.user.id,
+      userId: authResult.userId,
       title: parsed.data.title,
       topic: parsed.data.topic,
       status: 'PENDING',

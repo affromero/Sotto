@@ -49,6 +49,9 @@ model User {
   followers Follow[] @relation("Following")
   following Follow[] @relation("Follower")
 
+  // API Keys
+  apiKeys ApiKey[]
+
   @@index([teamId])
 }
 
@@ -166,10 +169,35 @@ model Team {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner   User   @relation("TeamOwner", fields: [ownerId], references: [id])
+  owner   User         @relation("TeamOwner", fields: [ownerId], references: [id])
   members User[]
+  invites TeamInvite[]
 
   @@index([ownerId])
+}
+
+model TeamInvite {
+  id        String           @id @default(cuid())
+  teamId    String
+  email     String
+  token     String           @unique
+  status    TeamInviteStatus @default(PENDING)
+  invitedBy String
+  expiresAt DateTime
+  createdAt DateTime         @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([email])
+  @@index([token])
+}
+
+enum TeamInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
 
 // ============ PODCASTS ============
@@ -442,6 +470,7 @@ enum NotificationType {
   PODCAST_FORKED
   NEW_FOLLOWER
   SIMILAR_PODCAST_CREATED
+  TEAM_INVITE
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -546,6 +575,24 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
+}
+
+// ============ API KEYS ============
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  keyHash    String    @unique
+  keyPrefix  String    // first 16 chars for display (sk_sotto_XXXX...)
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
 }
 
 // ============ REFERENCES (Citations) ============

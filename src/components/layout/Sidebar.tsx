@@ -7,6 +7,8 @@ import {
   Radio,
   Settings,
   CreditCard,
+  BarChart2,
+  Users,
   LogOut,
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
@@ -26,8 +28,10 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/create', label: 'Create', icon: PlusCircle },
   { href: '/feed', label: 'Feed', icon: Radio },
-  { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/billing', label: 'Billing', icon: CreditCard },
+  { href: '/team', label: 'Team', icon: Users },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar({ currentPath, isOpen = false, onClose, user }: SidebarProps) {

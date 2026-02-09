@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { authenticateRequest } from '@/lib/api-keys';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -27,15 +27,23 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
-  if (podcast.userId !== session.user.id) {
+  if (podcast.userId !== authResult.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (podcast.status !== 'PENDING' && podcast.status !== 'DISCOVERING') {
+  if (podcast.status !== 'PENDING' && podcast.status !== 'DISCOVERING' && podcast.status !== 'FAILED') {
     return NextResponse.json(
-      { error: 'Podcast must be in PENDING or DISCOVERING status to generate' },
+      { error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate' },
       { status: 400 }
     );
+  }
+
+  // For FAILED podcasts, clean up old failed jobs
+  if (podcast.status === 'FAILED') {
+    await prisma.job.updateMany({
+      where: { podcastId, status: 'failed' },
+      data: { status: 'superseded' },
+    });
   }
 
   // Update status to EXTRACTING
@@ -47,7 +55,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Queue content extraction job
   const payload: ExtractContentPayload = {
     podcastId,
-    userId: session.user.id,
+    userId: authResult.userId,
     sourceUrl: podcast.discovery?.sourceUrl ?? undefined,
     sourceText: podcast.discovery?.sourceContent ?? undefined,
   };

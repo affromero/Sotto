@@ -51,6 +51,14 @@ export const feedQuerySchema = z.object({
   search: z.string().max(200).optional(),
   tag: z.string().optional(),
   sort: z.enum(['recent', 'popular', 'trending']).default('recent'),
+  tags: z.string().optional(), // comma-separated tag slugs
+  depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
+  audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
+  tone: z.enum(['casual', 'professional', 'socratic']).optional(),
+  durationMin: z.coerce.number().int().min(0).optional(),
+  durationMax: z.coerce.number().int().min(0).optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
 });
 
 /**
@@ -66,4 +74,39 @@ export const paginationSchema = z.object({
  */
 export const checkoutSchema = z.object({
   tier: z.enum(['pro', 'team']),
+});
+
+/**
+ * Analytics query validation
+ */
+export const analyticsQuerySchema = z.object({
+  period: z.enum(['7d', '30d', '90d', 'all']).default('30d'),
+});
+
+/**
+ * Team creation validation
+ */
+export const createTeamSchema = z.object({
+  name: z.string().min(1).max(100),
+});
+
+/**
+ * Team update validation
+ */
+export const updateTeamSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+});
+
+/**
+ * Team invite validation
+ */
+export const teamInviteSchema = z.object({
+  email: z.string().email(),
+});
+
+/**
+ * API key creation validation
+ */
+export const createApiKeySchema = z.object({
+  name: z.string().min(1).max(100),
 });

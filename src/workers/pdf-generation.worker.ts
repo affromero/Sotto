@@ -41,6 +41,7 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
       publisher: ref.publisher,
       doi: ref.doi,
       verificationStatus: ref.verificationStatus,
+      verificationDetails: ref.verificationDetails as Record<string, unknown> | null,
     })),
   });
 

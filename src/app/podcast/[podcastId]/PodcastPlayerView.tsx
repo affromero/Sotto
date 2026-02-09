@@ -3,13 +3,15 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, Bookmark, GitFork, Share2, Play, FileText, Download } from 'lucide-react';
+import { Heart, Bookmark, GitFork, Share2, Play, FileText, Download, Pencil, RefreshCw } from 'lucide-react';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
 import { InterruptButton } from '@/components/player/InterruptButton';
 import { Badge } from '@/components/ui/Badge';
+import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 import type { PodcastDetail } from '@/types/podcast';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -68,6 +70,9 @@ export function PodcastPlayerView({
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [showForkConfirm, setShowForkConfirm] = useState(false);
+  const [forking, setForking] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const handleLike = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -97,8 +102,8 @@ export function PodcastPlayerView({
     }
   }, [saved, isAuthenticated, podcast.id]);
 
-  const handleFork = useCallback(async () => {
-    if (!isAuthenticated) return;
+  const handleForkConfirm = useCallback(async () => {
+    setForking(true);
     try {
       const response = await fetch(`/api/podcasts/${podcast.id}/fork`, {
         method: 'POST',
@@ -108,9 +113,24 @@ export function PodcastPlayerView({
         window.location.href = `/podcast/${data.id}`;
       }
     } catch {
-      // silently fail
+      setForking(false);
+      setShowForkConfirm(false);
     }
-  }, [isAuthenticated, podcast.id]);
+  }, [podcast.id]);
+
+  const handleRetry = useCallback(async () => {
+    setRetrying(true);
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}/generate`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        window.location.reload();
+      }
+    } catch {
+      setRetrying(false);
+    }
+  }, [podcast.id]);
 
   const handleShare = useCallback(async () => {
     const url = window.location.href;
@@ -249,6 +269,19 @@ export function PodcastPlayerView({
         )}
       </header>
 
+      {/* Failed state */}
+      {podcast.status === 'FAILED' && isOwner && (
+        <div className={styles.failedState}>
+          <p className={styles.failedText}>
+            Generation failed. You can retry the process.
+          </p>
+          <Button onClick={handleRetry} loading={retrying} disabled={retrying}>
+            <RefreshCw size={16} />
+            {retrying ? 'Retrying...' : 'Retry Generation'}
+          </Button>
+        </div>
+      )}
+
       {/* Processing state */}
       {isProcessing && (
         <div className={styles.processingState}>
@@ -304,10 +337,20 @@ export function PodcastPlayerView({
             <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
             <span>{saved ? 'Saved' : 'Save'}</span>
           </button>
-          {!isOwner && (
+          {isOwner && (
+            <Link
+              href={`/podcast/${podcast.id}/edit`}
+              className={styles.actionBtn}
+              aria-label="Edit this podcast"
+            >
+              <Pencil size={18} />
+              <span>Edit</span>
+            </Link>
+          )}
+          {!isOwner && isAuthenticated && (
             <button
               className={styles.actionBtn}
-              onClick={handleFork}
+              onClick={() => setShowForkConfirm(true)}
               aria-label="Fork this podcast"
               type="button"
             >
@@ -432,6 +475,26 @@ export function PodcastPlayerView({
           )}
         </>
       )}
+
+      {/* Fork Confirmation Modal */}
+      <Modal
+        isOpen={showForkConfirm}
+        onClose={() => setShowForkConfirm(false)}
+        title="Fork this podcast?"
+        size="small"
+      >
+        <p style={{ marginBottom: 'var(--spacing-md)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: '1.5' }}>
+          A copy of this podcast will be created in your library with PENDING status. You can then customize and regenerate it.
+        </p>
+        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
+          <Button onClick={handleForkConfirm} loading={forking} disabled={forking}>
+            Fork Podcast
+          </Button>
+          <Button variant="ghost" onClick={() => setShowForkConfirm(false)} disabled={forking}>
+            Cancel
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

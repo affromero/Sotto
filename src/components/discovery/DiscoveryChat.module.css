@@ -271,6 +271,30 @@
 /* RESPONSIVE                                    */
 /* ============================================ */
 
+@media (max-width: 374px) {
+  .bubble {
+    max-width: 92%;
+  }
+
+  .bubbleContent {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .chipsRow {
+    padding-left: var(--spacing-sm);
+  }
+
+  .input {
+    height: 40px;
+    font-size: var(--font-size-sm);
+  }
+
+  .sendButton {
+    width: 40px;
+    height: 40px;
+  }
+}
+
 @media (min-width: 768px) {
   .messages {
     padding: var(--spacing-lg);

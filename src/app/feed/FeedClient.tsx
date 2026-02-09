@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { TagFilter } from '@/components/feed/TagFilter';
+import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel';
 import { TrendingSection } from '@/components/feed/TrendingSection';
 import { FeedGrid } from '@/components/feed/FeedGrid';
 import { PodcastCard } from '@/components/feed/PodcastCard';
@@ -28,19 +29,27 @@ export function FeedClient({
 }: FeedClientProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | undefined>(undefined);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({});
   const [podcasts, setPodcasts] = useState(initialPodcasts);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialPodcasts.length >= 24);
 
   const fetchPodcasts = useCallback(
-    async (query: string, tag: string | undefined, append = false) => {
+    async (query: string, tag: string | undefined, filters: AdvancedFilters, append = false) => {
       setLoading(true);
       try {
         const params = new URLSearchParams();
-        if (query) params.set('q', query);
+        if (query) params.set('search', query);
         if (tag) params.set('tag', tag);
+        if (filters.depth) params.set('depth', filters.depth);
+        if (filters.audience) params.set('audience', filters.audience);
+        if (filters.tone) params.set('tone', filters.tone);
+        if (filters.durationMin !== undefined) params.set('durationMin', String(filters.durationMin));
+        if (filters.durationMax !== undefined) params.set('durationMax', String(filters.durationMax));
+        if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+        if (filters.dateTo) params.set('dateTo', filters.dateTo);
         if (append && podcasts.length > 0) {
-          params.set('cursor', podcasts[podcasts.length - 1].id);
+          params.set('page', String(Math.floor(podcasts.length / 20) + 1));
         }
 
         const response = await fetch(`/api/feed?${params.toString()}`);
@@ -64,25 +73,34 @@ export function FeedClient({
     (value: string) => {
       setSearchQuery(value);
       if (value.length === 0 || value.length >= 2) {
-        fetchPodcasts(value, activeTag);
+        fetchPodcasts(value, activeTag, advancedFilters);
       }
     },
-    [activeTag, fetchPodcasts]
+    [activeTag, advancedFilters, fetchPodcasts]
   );
 
   const handleTagSelect = useCallback(
     (slug: string | undefined) => {
       setActiveTag(slug);
-      fetchPodcasts(searchQuery, slug);
+      fetchPodcasts(searchQuery, slug, advancedFilters);
     },
-    [searchQuery, fetchPodcasts]
+    [searchQuery, advancedFilters, fetchPodcasts]
+  );
+
+  const handleFiltersChange = useCallback(
+    (filters: AdvancedFilters) => {
+      setAdvancedFilters(filters);
+      fetchPodcasts(searchQuery, activeTag, filters);
+    },
+    [searchQuery, activeTag, fetchPodcasts]
   );
 
   const handleLoadMore = useCallback(() => {
-    fetchPodcasts(searchQuery, activeTag, true);
-  }, [searchQuery, activeTag, fetchPodcasts]);
+    fetchPodcasts(searchQuery, activeTag, advancedFilters, true);
+  }, [searchQuery, activeTag, advancedFilters, fetchPodcasts]);
 
-  const showTrending = !searchQuery && !activeTag && trendingPodcasts.length > 0;
+  const hasActiveFilters = Object.values(advancedFilters).some((v) => v !== undefined);
+  const showTrending = !searchQuery && !activeTag && !hasActiveFilters && trendingPodcasts.length > 0;
 
   return (
     <div className={styles.feedContent}>
@@ -99,6 +117,10 @@ export function FeedClient({
             onTagSelect={handleTagSelect}
           />
         )}
+        <FilterPanel
+          filters={advancedFilters}
+          onChange={handleFiltersChange}
+        />
       </div>
 
       {showTrending && (
