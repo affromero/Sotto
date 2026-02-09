@@ -459,6 +459,17 @@ The web container only binds to `127.0.0.1:3000` (localhost), not `0.0.0.0:3000`
 
 ### 5.2 Build and start all containers
 
+> **Important:** The build takes 3-5 minutes and runs in the foreground. If your SSH connection drops mid-build, it gets killed. Use `tmux` or `screen` to protect the session:
+>
+> ```bash
+> # Start a tmux session (already installed by setup script)
+> tmux new -s deploy
+>
+> # If disconnected, reconnect with:
+> # ssh sotto@SERVER_IP
+> # tmux attach -t deploy
+> ```
+
 ```bash
 cd ~/sotto
 
@@ -520,7 +531,7 @@ docker compose -f docker-compose.prod.yml logs postgres --tail 50
 Prisma needs to create the tables in PostgreSQL:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+docker compose -f docker-compose.prod.yml run --rm web ./node_modules/.bin/prisma db push
 ```
 
 Expected output:
@@ -769,7 +780,7 @@ On every push to `main`:
    - SSHes into the server as `sotto`
    - `git pull origin main`
    - `docker compose build`
-   - `npx prisma db push` (apply any schema changes)
+   - `./node_modules/.bin/prisma db push` (apply any schema changes)
    - `docker compose up -d` (restart with new images)
    - Health check
    - Prunes old Docker images
@@ -1098,7 +1109,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 cd ~/sotto && git pull origin main && docker compose -f docker-compose.prod.yml up -d --build
 
 # Run database migrations after schema changes
-docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+docker compose -f docker-compose.prod.yml run --rm web ./node_modules/.bin/prisma db push
 ```
 
 ### Caddy (Reverse Proxy / HTTPS)
