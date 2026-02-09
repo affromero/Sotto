@@ -18,6 +18,9 @@ export enum JobType {
   GENERATE_PDF = 'generate_pdf',
   POLL_TWITTER_MENTIONS = 'poll_twitter_mentions',
   REPLY_TWITTER = 'reply_twitter',
+  INGEST_EVENTS = 'ingest_events',
+  COMPUTE_FEATURES = 'compute_features',
+  EXPORT_DATA = 'export_data',
 }
 
 /**
@@ -97,6 +100,39 @@ export interface ReplyTwitterPayload {
   podcastId: string;
   tweetMentionId: string;
   originalTweetId: string;
+}
+
+export interface IngestEventsPayload {
+  events: Array<{
+    context: {
+      sessionId: string;
+      userId?: string;
+      pageUrl: string;
+      deviceType?: string;
+      userAgent?: string;
+      referrer?: string;
+      clientTs: number;
+    };
+    payload: Record<string, unknown> & { eventType: string };
+  }>;
+}
+
+export interface ComputeFeaturesPayload {
+  scope: 'user' | 'podcast' | 'all';
+  targetId?: string;
+}
+
+export interface DataExportPayload {
+  exportType:
+    | 'playback_sessions'
+    | 'behavioral_events'
+    | 'user_features'
+    | 'podcast_features'
+    | 'interactions'
+    | 'training_pairs';
+  dateFrom?: string;
+  dateTo?: string;
+  format: 'jsonl' | 'csv';
 }
 
 /**
@@ -228,3 +264,9 @@ export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2 })
 export const scriptVerificationQueue = createQueue('script-verification', { attempts: 2 });
 export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1 });
 export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3 });
+export const eventIngestionQueue = createQueue('event-ingestion', {
+  attempts: 2,
+  removeOnComplete: { age: 3600, count: 500 },
+});
+export const featureComputationQueue = createQueue('feature-computation', { attempts: 2 });
+export const dataExportQueue = createQueue('data-export', { attempts: 2 });

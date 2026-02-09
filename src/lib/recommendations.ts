@@ -1,9 +1,10 @@
 import { prisma } from './prisma';
+import { createMLProvider } from './providers/ml';
 import { logger } from './logger';
 
 /**
- * Search for similar existing public podcasts based on topic
- * Uses PostgreSQL full-text search for MVP
+ * Search for similar existing public podcasts based on topic.
+ * Uses pgvector embedding similarity when available, falls back to text search.
  */
 export async function findSimilarPodcasts(params: {
   topic: string;
@@ -20,14 +21,54 @@ export async function findSimilarPodcasts(params: {
     user: { id: string; name: string | null; image: string | null };
   }>
 > {
-  const searchTerms = params.topic
-    .split(/\s+/)
-    .filter((term) => term.length > 2)
-    .slice(0, 10)
-    .join(' | ');
+  const limit = params.limit || 5;
 
-  if (!searchTerms) return [];
+  // Try embedding-based similarity first
+  try {
+    const ml = createMLProvider();
+    const embedding = await ml.embed(params.topic);
+    const similar = await ml.findSimilarByVector(embedding, limit * 2);
 
+    if (similar.length > 0) {
+      const podcastIds = similar.map((s) => s.podcastId);
+      const podcasts = await prisma.podcast.findMany({
+        where: {
+          id: { in: podcastIds },
+          status: 'READY',
+          visibility: 'PUBLIC',
+          ...(params.excludeUserId && { userId: { not: params.excludeUserId } }),
+        },
+        select: {
+          id: true,
+          title: true,
+          topic: true,
+          playCount: true,
+          likeCount: true,
+          duration: true,
+          user: { select: { id: true, name: true, image: true } },
+        },
+        take: limit,
+      });
+
+      // Preserve similarity ordering
+      const orderMap = new Map(similar.map((s, i) => [s.podcastId, i]));
+      podcasts.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
+
+      if (podcasts.length > 0) {
+        logger.info('Found similar podcasts via embedding', {
+          topic: params.topic,
+          count: String(podcasts.length),
+        });
+        return podcasts;
+      }
+    }
+  } catch (err) {
+    logger.warn('Embedding similarity search failed, falling back to text', {
+      error: (err as Error).message,
+    });
+  }
+
+  // Fallback: text search
   const podcasts = await prisma.podcast.findMany({
     where: {
       status: 'READY',
@@ -50,9 +91,12 @@ export async function findSimilarPodcasts(params: {
       },
     },
     orderBy: [{ playCount: 'desc' }, { likeCount: 'desc' }],
-    take: params.limit || 5,
+    take: limit,
   });
 
-  logger.info('Similar podcasts found', { topic: params.topic, count: String(podcasts.length) });
+  logger.info('Similar podcasts found via text search', {
+    topic: params.topic,
+    count: String(podcasts.length),
+  });
   return podcasts;
 }

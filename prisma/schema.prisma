@@ -2,12 +2,14 @@
 // Interactive Podcast Platform
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 // ============ USERS & AUTH ============
@@ -264,7 +266,10 @@ model Podcast {
   tags         PodcastTag[]
   jobs         Job[]
   references   Reference[]
-  tweetMention TweetMention?
+  tweetMention     TweetMention?
+  playbackSessions PlaybackSession[]
+  podcastFeature   PodcastFeature?
+  listeningQueues  ListeningQueue[]
 
   @@index([userId])
   @@index([status])
@@ -642,6 +647,219 @@ enum TweetMentionStatus {
   REPLIED
   FAILED
   IGNORED
+}
+
+// ============ RECOMMENDATION ENGINE ============
+
+model RecommendationLog {
+  id        String   @id @default(cuid())
+  userId    String
+  podcastId String
+  surface   String   // picks, explore, trending
+  position  Int
+  score     Float
+  signals   Json     // {relevance, collaborative, quality, freshness, novelty}
+  explanation String @db.Text
+  impressed   Boolean @default(false)
+  clicked     Boolean @default(false)
+  queued      Boolean @default(false)
+  listenedPercent Float?
+  refreshBatch Int   @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([podcastId, createdAt])
+  @@index([surface, createdAt])
+}
+
+model ListeningQueue {
+  id        String   @id @default(cuid())
+  userId    String
+  podcastId String
+  position  Int
+  addedAt   DateTime @default(now())
+  source    String   // picks, explore, following, search
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, podcastId])
+  @@index([userId, position])
+}
+
+// ============ ML FEATURE STORE ============
+
+model UserFeature {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  // Engagement
+  totalListenMinutes      Float @default(0)
+  totalPodcastsListened   Int   @default(0)
+  avgCompletionRate       Float @default(0)
+  avgListenSpeed          Float @default(1)
+
+  // Abandonment
+  avgAbandonPercent Float @default(0)
+  optimalDuration   Float @default(10) // minutes where highest completion
+
+  // Preferences (inferred from behavior)
+  preferredDepth         String? // quick_overview, standard, deep_dive
+  preferredTone          String? // casual, professional, socratic
+  preferredAudienceLevel String? // beginner, intermediate, expert
+  preferredDuration      Float?  // minutes
+
+  // Affinities
+  topicAffinity Json? // [{tagId, weight}]
+  voiceAffinity Json? // [{voiceId, completionRate}]
+
+  // Social
+  followingCount   Int   @default(0)
+  followerCount    Int   @default(0)
+  likeRate         Float @default(0)
+  forkRate         Float @default(0)
+  interactionRate  Float @default(0)
+  creatorLoyalty   Float @default(0)
+
+  // Behavioral
+  archetype         String? // deep_listener, skimmer, explorer, completer, social_learner
+  speakerPreference Float   @default(0) // -1 to 1
+  noveltyResponseRate Float @default(0)
+
+  // Temporal
+  peakListeningHours   Json? // [{hour, listenMinutes}]
+  postListenBehavior   Json? // {liked: pct, saved: pct, forked: pct, ...}
+  topicProgressionPath Json? // [{topic, depth, timestamp}]
+
+  // Recency
+  daysSinceLastListen Float @default(0)
+  listenFrequency     Float @default(0)
+
+  // Vector (pgvector)
+  embedding Unsupported("vector(384)")?
+
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([archetype])
+}
+
+model PodcastFeature {
+  id        String @id @default(cuid())
+  podcastId String @unique
+
+  // Quality
+  avgCompletionRate    Float @default(0)
+  medianCompletionRate Float @default(0)
+  totalUniqueListeners Int   @default(0)
+  totalListenMinutes   Float @default(0)
+
+  // Engagement
+  likeToListenRatio  Float @default(0)
+  saveToListenRatio  Float @default(0)
+  forkToListenRatio  Float @default(0)
+  interactionRate    Float @default(0)
+
+  // Abandonment
+  abandonmentCurve         Json?  // [{percentBucket, abandonRate}] in 5% increments
+  segmentAbandonRates      Json?  // [{segmentOrder, speaker, abandonRate}]
+  questionThenAbandonRate  Float  @default(0)
+
+  // Playback
+  avgListenSpeed    Float @default(1)
+  speedDistribution Json? // {1x: pct, 1.25x: pct, ...}
+  dropoffPoints     Json? // [{position, dropoffRate}]
+  seekHotspots      Json? // [{position, seekCount}]
+
+  // Re-engagement
+  relistenRate       Float @default(0)
+  completionBySource Json? // {feed: pct, recommendation: pct, search: pct, direct: pct}
+
+  // Content
+  segmentCount          Int   @default(0)
+  durationSeconds       Int   @default(0)
+  referenceCount        Int   @default(0)
+  verifiedReferenceRate Float @default(0)
+  questionDensityByPosition Json? // [{percentBucket, questionsPerListener}]
+
+  // Vector (pgvector)
+  embedding Unsupported("vector(384)")?
+
+  podcast    Podcast  @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  computedAt DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([podcastId])
+  @@index([avgCompletionRate])
+}
+
+// ============ BEHAVIORAL EVENTS (ML Data Pipeline) ============
+
+model BehavioralEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId    String?
+  sessionId String
+  eventType String   // e.g. playback.play, feed.impression
+  eventData Json     // event-specific payload
+
+  podcastId  String?
+  pageUrl    String?  @db.Text
+  deviceType String?
+  userAgent  String?  @db.VarChar(512)
+  referrer   String?  @db.Text
+  clientTs   DateTime?
+
+  @@index([userId, eventType, createdAt])
+  @@index([podcastId, eventType, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([createdAt])
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  sessionId String   @unique
+  userId    String?
+  startedAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  deviceType String?
+  userAgent  String?  @db.VarChar(512)
+  ipHash     String?  @db.VarChar(64) // SHA-256 of IP, never raw
+  referrer   String?  @db.Text
+  pageCount  Int      @default(1)
+
+  @@index([userId, startedAt])
+  @@index([sessionId])
+}
+
+model PlaybackSession {
+  id        String   @id @default(cuid())
+  userId    String?
+  sessionId String
+  podcastId String
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  // Aggregates
+  totalListenSeconds Float  @default(0)
+  maxPosition        Float  @default(0)
+  completionPercent  Float  @default(0)
+
+  // Behavior
+  pauseCount     Int    @default(0)
+  seekCount      Int    @default(0)
+  speedChanges   Int    @default(0)
+  lastSpeed      Float  @default(1)
+  interruptCount Int    @default(0)
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([userId, podcastId])
+  @@index([podcastId, startedAt])
+  @@index([userId, startedAt])
 }
 
 // ============ WAITLIST ============

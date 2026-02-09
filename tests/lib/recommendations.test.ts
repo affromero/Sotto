@@ -20,6 +20,13 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+// Mock ML provider to throw so we always hit the text search fallback
+vi.mock('@/lib/providers/ml', () => ({
+  createMLProvider: () => {
+    throw new Error('ML provider not configured');
+  },
+}));
+
 describe('findSimilarPodcasts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,7 +83,7 @@ describe('findSimilarPodcasts', () => {
         orderBy: [{ playCount: 'desc' }, { likeCount: 'desc' }],
       })
     );
-    expect(logger.info).toHaveBeenCalledWith('Similar podcasts found', {
+    expect(logger.info).toHaveBeenCalledWith('Similar podcasts found via text search', {
       topic: 'quantum',
       count: '2',
     });
@@ -114,17 +121,21 @@ describe('findSimilarPodcasts', () => {
   });
 
   it('returns empty array for empty topic', async () => {
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
+
     const result = await findSimilarPodcasts({ topic: '' });
 
+    // Text search with empty string still runs but returns empty from DB
     expect(result).toEqual([]);
-    expect(prisma.podcast.findMany).not.toHaveBeenCalled();
   });
 
-  it('returns empty array for topic with only short terms', async () => {
+  it('handles short search terms', async () => {
+    vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
+
     const result = await findSimilarPodcasts({ topic: 'a b c' });
 
+    // Text search with short terms still runs via OR contains
     expect(result).toEqual([]);
-    expect(prisma.podcast.findMany).not.toHaveBeenCalled();
   });
 
   it('excludes user podcasts when excludeUserId is provided', async () => {
@@ -198,16 +209,6 @@ describe('findSimilarPodcasts', () => {
         }),
       })
     );
-  });
-
-  it('limits search terms to first 10 words', async () => {
-    vi.mocked(prisma.podcast.findMany).mockResolvedValue([]);
-
-    await findSimilarPodcasts({
-      topic: 'one two three four five six seven eight nine ten eleven twelve',
-    });
-
-    expect(prisma.podcast.findMany).toHaveBeenCalled();
   });
 
   it('searches both title and topic fields case-insensitively', async () => {

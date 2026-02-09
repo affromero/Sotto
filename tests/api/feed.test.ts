@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 // Define mock fns at module scope so they're properly typed as Mock
 const mockPodcastFindMany = vi.fn();
 const mockPodcastCount = vi.fn();
+const mockFollowFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -11,7 +12,19 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...args: unknown[]) => mockPodcastFindMany(...args),
       count: (...args: unknown[]) => mockPodcastCount(...args),
     },
+    follow: {
+      findMany: (...args: unknown[]) => mockFollowFindMany(...args),
+    },
   },
+}));
+
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/recommendation-engine', () => ({
+  searchPodcasts: vi.fn().mockResolvedValue([]),
+  getTrending: vi.fn().mockResolvedValue([]),
 }));
 
 import { GET } from '@/app/api/feed/route';
