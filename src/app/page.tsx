@@ -305,6 +305,246 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== CREATOR ECONOMY ====== */}
+      <section className={styles.creatorSection} aria-label="Creator economy">
+        <div className={styles.creatorGlow} aria-hidden="true" />
+        <div className={styles.inner}>
+          <div className={styles.split}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overlineLight}>Creator Economy</span>
+              <h2 className={styles.h2Light}>Your voice is an asset.<br />Start earning from it.</h2>
+              <p className={styles.bodyLgLight}>
+                Clone your voice, list it on the Sotto marketplace, and earn every
+                time someone uses it for their podcast. Set your own price. Approve
+                every use. Keep 80% of revenue.
+              </p>
+              <div className={styles.creatorStats}>
+                <div className={styles.creatorStat}>
+                  <span className={styles.creatorStatNum}>80%</span>
+                  <span className={styles.creatorStatLabel}>Creator revenue share</span>
+                </div>
+                <div className={styles.creatorStatDivider} aria-hidden="true" />
+                <div className={styles.creatorStat}>
+                  <span className={styles.creatorStatNum}>$1–10</span>
+                  <span className={styles.creatorStatLabel}>You set the price per use</span>
+                </div>
+                <div className={styles.creatorStatDivider} aria-hidden="true" />
+                <div className={styles.creatorStat}>
+                  <span className={styles.creatorStatNum}>Subs</span>
+                  <span className={styles.creatorStatLabel}>Monthly voice subscriptions</span>
+                </div>
+              </div>
+              <a href="/create" className={styles.btnPrimary}>
+                Start Earning
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                  <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.marketplaceMock}>
+                <div className={styles.marketplaceHeader}>
+                  <span className={styles.marketplaceTitle}>Voice Marketplace</span>
+                  <span className={styles.marketplaceBrowse}>Browse all</span>
+                </div>
+                <div className={styles.marketplaceList}>
+                  <div className={styles.marketplaceVoice}>
+                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarAmber}`}>S</div>
+                    <div className={styles.marketplaceInfo}>
+                      <span className={styles.marketplaceName}>Sarah Mitchell</span>
+                      <span className={styles.marketplaceMeta}>British · Warm · Storytelling</span>
+                    </div>
+                    <div className={styles.marketplaceRight}>
+                      <span className={styles.marketplacePrice}>$3/use</span>
+                      <span className={styles.marketplaceUses}>1.2k uses</span>
+                    </div>
+                  </div>
+                  <div className={styles.marketplaceVoice}>
+                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarNavy}`}>J</div>
+                    <div className={styles.marketplaceInfo}>
+                      <span className={styles.marketplaceName}>James Chen</span>
+                      <span className={styles.marketplaceMeta}>American · Deep · Authoritative</span>
+                    </div>
+                    <div className={styles.marketplaceRight}>
+                      <span className={styles.marketplacePrice}>$5/use</span>
+                      <span className={styles.marketplaceUses}>847 uses</span>
+                    </div>
+                  </div>
+                  <div className={styles.marketplaceVoice}>
+                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarAmber}`}>L</div>
+                    <div className={styles.marketplaceInfo}>
+                      <span className={styles.marketplaceName}>Lena Rossi</span>
+                      <span className={styles.marketplaceMeta}>Italian · Expressive · Warm</span>
+                    </div>
+                    <div className={styles.marketplaceRight}>
+                      <span className={styles.marketplacePrice}>$4/use</span>
+                      <span className={styles.marketplaceUses}>623 uses</span>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.marketplaceEarnings}>
+                  <div className={styles.earningsHeader}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M1 14l3.5-4 3 2.5 4-5.5 3.5 3" />
+                    </svg>
+                    Your Earnings
+                  </div>
+                  <div className={styles.earningsRow}>
+                    <span>This month</span>
+                    <span className={styles.earningsAmount}>$247.80</span>
+                  </div>
+                  <div className={styles.earningsRow}>
+                    <span>Active subscribers</span>
+                    <span className={styles.earningsAmount}>38</span>
+                  </div>
+                  <div className={styles.earningsBar}>
+                    <div className={styles.earningsBarFill} style={{ width: '72%' }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.creatorFlow}>
+            <div className={`${styles.creatorFlowStep} ${styles.rev}`}>
+              <div className={styles.creatorFlowIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </div>
+              <h4>Clone your voice</h4>
+              <p>Upload a 30s audio sample. Our AI creates a digital twin of your voice in minutes.</p>
+            </div>
+            <div className={styles.creatorFlowArrow} aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </div>
+            <div className={`${styles.creatorFlowStep} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.creatorFlowIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+                </svg>
+              </div>
+              <h4>List on marketplace</h4>
+              <p>Set your price. Add a description. Your voice appears in the Sotto voice library.</p>
+            </div>
+            <div className={styles.creatorFlowArrow} aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+            </div>
+            <div className={`${styles.creatorFlowStep} ${styles.rev} ${styles.d2}`}>
+              <div className={styles.creatorFlowIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" />
+                </svg>
+              </div>
+              <h4>Get paid</h4>
+              <p>Approve usage requests. Earn per-use fees or monthly subscriptions. Payouts are automatic.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== FORK & REMIX ====== */}
+      <section className={styles.section} aria-label="Fork and remix">
+        <div className={styles.inner}>
+          <div className={`${styles.split} ${styles.splitReverse}`}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overline}>Fork &amp; Remix</span>
+              <h2 className={styles.h2}>Build on what others started</h2>
+              <p className={styles.bodyLg}>
+                Found a podcast you love? Fork it. Take someone else&apos;s script as a starting
+                point and make it yours — change the angle, update the focus, go deeper
+                on a subtopic. It&apos;s GitHub for podcasts.
+              </p>
+              <div className={styles.forkFeatures}>
+                <div className={styles.forkFeature}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="5" cy="3.5" r="2.5" /><circle cx="5" cy="12.5" r="2.5" /><circle cx="13" cy="8" r="2.5" /><path d="M5 6v4M7.5 12.5h3a2.5 2.5 0 0 0 0-5h-3" />
+                  </svg>
+                  <span>Fork any public podcast</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M11 4H2v10h10V5" /><path d="M14 1H5v3h9V1z" /><path d="M5 8h4M5 11h6" />
+                  </svg>
+                  <span>Edit the script, swap voices, add your twist</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M8 1v6m0 0l-3-3m3 3l3-3" /><path d="M1 11v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" />
+                  </svg>
+                  <span>Regenerate with your own voice</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14.5 8A6.5 6.5 0 1 1 8 1.5" /><path d="M8 8l4-4" /><circle cx="13" cy="3" r="2" />
+                  </svg>
+                  <span>Credit always links back to the original</span>
+                </div>
+              </div>
+              <a href="/feed" className={styles.linkArrow}>
+                Browse forkable podcasts
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.forkMock}>
+                <div className={styles.forkOriginal}>
+                  <div className={styles.forkCardLabel}>Original</div>
+                  <div className={styles.forkCardContent}>
+                    <h4>How CRISPR Is Changing Medicine</h4>
+                    <p className={styles.forkCardMeta}>by Dr. Sarah K. · 8 min · 342 listens</p>
+                    <div className={styles.forkCardTags}>
+                      <span>Biology</span>
+                      <span>Gene Editing</span>
+                      <span>Ethics</span>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.forkArrowDown} aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="5" cy="3" r="2" /><circle cx="5" cy="17" r="2" /><circle cx="15" cy="10" r="2" /><path d="M5 5v10M7 17h6a2 2 0 0 0 0-4H7" />
+                  </svg>
+                  <span>Fork</span>
+                </div>
+                <div className={styles.forkRemixed}>
+                  <div className={`${styles.forkCardLabel} ${styles.forkCardLabelNew}`}>Your remix</div>
+                  <div className={styles.forkCardContent}>
+                    <h4>CRISPR for Cancer: The Ethical Debate</h4>
+                    <p className={styles.forkCardMeta}>Narrowed focus · Your voice · Updated sources</p>
+                    <div className={styles.forkCardEdits}>
+                      <span className={styles.forkEditBadge}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M8.5 1.5l2 2L4 10H2V8z" />
+                        </svg>
+                        Script edited
+                      </span>
+                      <span className={styles.forkEditBadge}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M6 1a2 2 0 0 0-2 2v4a2 2 0 0 0 4 0V3a2 2 0 0 0-2-2z" /><path d="M10 5.5v1a4 4 0 0 1-8 0v-1" />
+                        </svg>
+                        Voice changed
+                      </span>
+                      <span className={styles.forkEditBadge}>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M1 6h10M6 1v10" />
+                        </svg>
+                        3 sources added
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ====== USE CASES ====== */}
       <section className={styles.section} aria-label="Use cases">
         <div className={styles.inner}>

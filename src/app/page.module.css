@@ -871,6 +871,425 @@
 }
 
 /* ==========================================================================
+   CREATOR ECONOMY
+   ========================================================================== */
+
+.creatorSection {
+  position: relative;
+  padding: 100px 0;
+  background: linear-gradient(170deg, #0B1120 0%, #122035 45%, #1A3050 100%);
+  overflow: hidden;
+}
+
+.creatorGlow {
+  position: absolute;
+  top: 20%;
+  right: 10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.overlineLight {
+  display: block;
+  font: var(--text-overline);
+  color: #F6AD55;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 12px;
+}
+
+.h2Light {
+  font-family: var(--font-heading);
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1.15;
+  color: #fff;
+  letter-spacing: -0.5px;
+  margin-bottom: 16px;
+}
+
+.bodyLgLight {
+  font-size: 17px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 32px;
+}
+
+.creatorStats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.creatorStat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.creatorStatNum {
+  font-size: 28px;
+  font-weight: 700;
+  color: #F6AD55;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.creatorStatLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.02em;
+}
+
+.creatorStatDivider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Creator Section — Split Text */
+.creatorSection .splitText {
+  max-width: 480px;
+}
+
+/* Marketplace Mockup */
+.marketplaceMock {
+  background: #0F1A2E;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.marketplaceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.marketplaceTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.marketplaceBrowse {
+  font-size: 12px;
+  color: #F6AD55;
+  font-weight: 500;
+}
+
+.marketplaceList {
+  padding: 8px 0;
+}
+
+.marketplaceVoice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  transition: background var(--transition-fast);
+}
+
+.marketplaceVoice:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.marketplaceAvatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.marketplaceAvatarAmber {
+  background: var(--color-primary);
+}
+
+.marketplaceAvatarNavy {
+  background: var(--color-accent);
+}
+
+.marketplaceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.marketplaceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.marketplaceMeta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.marketplaceRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.marketplacePrice {
+  font-size: 14px;
+  font-weight: 700;
+  color: #F6AD55;
+}
+
+.marketplaceUses {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.marketplaceEarnings {
+  margin: 4px 12px 12px;
+  padding: 16px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: var(--radius-xl);
+}
+
+.earningsHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #F6AD55;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.earningsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.earningsAmount {
+  font-weight: 700;
+  color: #fff;
+}
+
+.earningsBar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.earningsBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-primary), #F6AD55);
+  border-radius: 2px;
+  transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Creator Flow Steps */
+.creatorFlow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 72px;
+  padding-top: 56px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.creatorFlowStep {
+  flex: 1;
+  max-width: 280px;
+  text-align: center;
+}
+
+.creatorFlowIcon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+  background: rgba(217, 119, 6, 0.12);
+  color: #F6AD55;
+  margin: 0 auto 16px;
+}
+
+.creatorFlowStep h4 {
+  font: var(--text-h4);
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.creatorFlowStep p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.creatorFlowArrow {
+  display: flex;
+  align-items: center;
+  padding-top: 14px;
+  color: rgba(255, 255, 255, 0.15);
+}
+
+/* ==========================================================================
+   FORK & REMIX
+   ========================================================================== */
+
+.forkFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.forkFeature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.forkFeature svg {
+  color: var(--color-primary);
+  min-width: 16px;
+}
+
+/* Fork Mockup */
+.forkMock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.forkOriginal,
+.forkRemixed {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.forkRemixed {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary), var(--shadow-lg);
+}
+
+.forkCardLabel {
+  padding: 8px 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.forkCardLabelNew {
+  color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  border-bottom-color: rgba(217, 119, 6, 0.15);
+}
+
+.forkCardContent {
+  padding: 18px 20px;
+}
+
+.forkCardContent h4 {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 400;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+
+.forkCardMeta {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  margin-bottom: 12px;
+  display: block;
+}
+
+.forkCardTags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.forkCardTags span {
+  padding: 3px 10px;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.forkCardEdits {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.forkEditBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--color-primary-lighter);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.forkArrowDown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 0;
+  color: var(--color-primary);
+}
+
+.forkArrowDown span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* ==========================================================================
    USE CASES
    ========================================================================== */
 
@@ -1292,6 +1711,24 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .creatorFlow {
+    flex-wrap: wrap;
+    gap: 32px;
+  }
+
+  .creatorFlowArrow {
+    display: none;
+  }
+
+  .creatorFlowStep {
+    max-width: none;
+    flex: 0 0 calc(50% - 16px);
+  }
+
+  .creatorStats {
+    gap: 20px;
+  }
+
   .tiers {
     grid-template-columns: 1fr;
     max-width: 420px;
@@ -1385,6 +1822,42 @@
 
   .centered {
     margin-bottom: 40px;
+  }
+
+  /* Creator section */
+  .creatorSection {
+    padding: 64px 0;
+  }
+
+  .h2Light {
+    font-size: 30px;
+  }
+
+  .creatorStats {
+    gap: 16px;
+  }
+
+  .creatorStatNum {
+    font-size: 22px;
+  }
+
+  .creatorStatDivider {
+    height: 32px;
+  }
+
+  .creatorFlow {
+    margin-top: 48px;
+    padding-top: 40px;
+    gap: 24px;
+  }
+
+  .creatorFlowStep {
+    flex: 0 0 100%;
+  }
+
+  /* Fork section */
+  .forkFeatures {
+    gap: 10px;
   }
 
   /* Voice grid */
