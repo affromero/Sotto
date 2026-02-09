@@ -1,16 +1,13 @@
 import { logger } from './logger';
 import type { TwitterTweet } from '@/types/twitter';
 
-const TWITTER_BEARER_TOKEN = process.env.TWITTER_BEARER_TOKEN;
-const TWITTER_API_KEY = process.env.TWITTER_API_KEY;
-const TWITTER_API_SECRET = process.env.TWITTER_API_SECRET;
-const TWITTER_ACCESS_TOKEN = process.env.TWITTER_ACCESS_TOKEN;
-const TWITTER_ACCESS_SECRET = process.env.TWITTER_ACCESS_SECRET;
-const TWITTER_SOTTO_USER_ID = process.env.TWITTER_SOTTO_USER_ID;
+function getEnv(key: string): string | undefined {
+  return process.env[key];
+}
 
 const TWITTER_API_BASE = 'https://api.twitter.com/2';
 
-if (!TWITTER_BEARER_TOKEN) {
+if (!getEnv('TWITTER_BEARER_TOKEN')) {
   logger.warn('TWITTER_BEARER_TOKEN is not set — Twitter integration will not work');
 }
 
@@ -67,7 +64,12 @@ async function generateOAuthHeader(
   url: string,
   params: Record<string, string> = {}
 ): Promise<string> {
-  if (!TWITTER_API_KEY || !TWITTER_API_SECRET || !TWITTER_ACCESS_TOKEN || !TWITTER_ACCESS_SECRET) {
+  const apiKey = getEnv('TWITTER_API_KEY');
+  const apiSecret = getEnv('TWITTER_API_SECRET');
+  const accessToken = getEnv('TWITTER_ACCESS_TOKEN');
+  const accessSecret = getEnv('TWITTER_ACCESS_SECRET');
+
+  if (!apiKey || !apiSecret || !accessToken || !accessSecret) {
     throw new Error('Twitter OAuth 1.0a credentials not configured');
   }
 
@@ -76,11 +78,11 @@ async function generateOAuthHeader(
   const nonce = crypto.randomBytes(16).toString('hex');
 
   const oauthParams: Record<string, string> = {
-    oauth_consumer_key: TWITTER_API_KEY,
+    oauth_consumer_key: apiKey,
     oauth_nonce: nonce,
     oauth_signature_method: 'HMAC-SHA1',
     oauth_timestamp: timestamp,
-    oauth_token: TWITTER_ACCESS_TOKEN,
+    oauth_token: accessToken,
     oauth_version: '1.0',
   };
 
@@ -96,11 +98,8 @@ async function generateOAuthHeader(
     encodeURIComponent(paramString),
   ].join('&');
 
-  const signingKey = `${encodeURIComponent(TWITTER_API_SECRET)}&${encodeURIComponent(TWITTER_ACCESS_SECRET)}`;
-  const signature = crypto
-    .createHmac('sha1', signingKey)
-    .update(baseString)
-    .digest('base64');
+  const signingKey = `${encodeURIComponent(apiSecret)}&${encodeURIComponent(accessSecret)}`;
+  const signature = crypto.createHmac('sha1', signingKey).update(baseString).digest('base64');
 
   oauthParams['oauth_signature'] = signature;
 
@@ -117,8 +116,13 @@ async function generateOAuthHeader(
  * Uses Twitter API v2 GET /2/users/:id/mentions
  */
 export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
-  if (!TWITTER_BEARER_TOKEN || !TWITTER_SOTTO_USER_ID) {
-    throw new Error('Twitter credentials not configured — set TWITTER_BEARER_TOKEN and TWITTER_SOTTO_USER_ID');
+  const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
+  const userId = getEnv('TWITTER_SOTTO_USER_ID');
+
+  if (!bearerToken || !userId) {
+    throw new Error(
+      'Twitter credentials not configured — set TWITTER_BEARER_TOKEN and TWITTER_SOTTO_USER_ID'
+    );
   }
 
   if (!canMakeRequest('mentions')) {
@@ -134,9 +138,9 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
     params.set('since_id', sinceId);
   }
 
-  const url = `${TWITTER_API_BASE}/users/${TWITTER_SOTTO_USER_ID}/mentions?${params}`;
+  const url = `${TWITTER_API_BASE}/users/${userId}/mentions?${params}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${TWITTER_BEARER_TOKEN}` },
+    headers: { Authorization: `Bearer ${bearerToken}` },
   });
 
   updateRateLimit(response.headers, 'mentions');
@@ -160,7 +164,9 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
  * Fetch a single tweet by ID (e.g. parent tweet for reply context).
  */
 export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
-  if (!TWITTER_BEARER_TOKEN) {
+  const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
+
+  if (!bearerToken) {
     throw new Error('Twitter credentials not configured — set TWITTER_BEARER_TOKEN');
   }
 
@@ -174,7 +180,7 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
 
   const url = `${TWITTER_API_BASE}/tweets/${tweetId}?${params}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${TWITTER_BEARER_TOKEN}` },
+    headers: { Authorization: `Bearer ${bearerToken}` },
   });
 
   updateRateLimit(response.headers, 'tweets');
@@ -225,5 +231,11 @@ export async function replyToTweet(tweetId: string, text: string): Promise<strin
 }
 
 export function isTwitterConfigured(): boolean {
-  return !!(TWITTER_BEARER_TOKEN && TWITTER_SOTTO_USER_ID);
+  return !!(getEnv('TWITTER_BEARER_TOKEN') && getEnv('TWITTER_SOTTO_USER_ID'));
+}
+
+/** @internal Reset rate limit state — for testing only */
+export function _resetRateLimits(): void {
+  mentionsRateLimit = { remaining: 100, resetAt: 0 };
+  tweetsRateLimit = { remaining: 100, resetAt: 0 };
 }

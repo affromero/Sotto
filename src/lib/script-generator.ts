@@ -121,7 +121,13 @@ Only return the JSON object, nothing else.`;
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
   try {
-    parsed = JSON.parse(response.content);
+    const rawParsed = JSON.parse(response.content);
+    // Handle backward compat: if response is just an array, wrap it
+    if (Array.isArray(rawParsed)) {
+      parsed = { turns: rawParsed, soundCues: [], references: [] };
+    } else {
+      parsed = rawParsed;
+    }
   } catch {
     // Try to extract JSON from response
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -138,8 +144,18 @@ Only return the JSON object, nothing else.`;
   // Ensure defaults
   if (!parsed.soundCues || parsed.soundCues.length === 0) {
     parsed.soundCues = [
-      { type: 'intro', prompt: 'warm podcast intro jingle with soft chimes', durationSeconds: 3, insertAfterTurn: -1 },
-      { type: 'outro', prompt: 'gentle melodic podcast outro with fade out', durationSeconds: 4, insertAfterTurn: parsed.turns.length - 1 },
+      {
+        type: 'intro',
+        prompt: 'warm podcast intro jingle with soft chimes',
+        durationSeconds: 3,
+        insertAfterTurn: -1,
+      },
+      {
+        type: 'outro',
+        prompt: 'gentle melodic podcast outro with fade out',
+        durationSeconds: 4,
+        insertAfterTurn: parsed.turns.length - 1,
+      },
     ];
   }
 
