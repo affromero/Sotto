@@ -1,0 +1,860 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ---- Mocks (must be declared before any import that touches the modules) ----
+
+const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
+const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({ soundCues: [] });
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  userId: 'user-1',
+  title: 'Test Podcast',
+  source: 'WEB',
+  sourceTweetId: null,
+});
+const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
+const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    segment: {
+      findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
+      update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
+    },
+    script: {
+      findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
+    },
+    podcast: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
+      update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    },
+    tweetMention: {
+      findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
+      update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
+    },
+  },
+}));
+
+const mockStitchWithEffects = vi.fn().mockResolvedValue({ duration: 300 });
+const mockGetAudioDuration = vi.fn().mockResolvedValue(300);
+
+vi.mock('@/lib/audio-stitcher', () => ({
+  stitchWithEffects: (...args: unknown[]) => mockStitchWithEffects(...args),
+  getAudioDuration: (...args: unknown[]) => mockGetAudioDuration(...args),
+}));
+
+const mockDownloadFile = vi.fn().mockResolvedValue(Buffer.from('segment-audio'));
+const mockUploadPodcastAudio = vi.fn().mockResolvedValue('https://r2.example.com/final.mp3');
+
+vi.mock('@/lib/r2', () => ({
+  downloadFile: (...args: unknown[]) => mockDownloadFile(...args),
+  uploadPodcastAudio: (...args: unknown[]) => mockUploadPodcastAudio(...args),
+}));
+
+const mockAddJob = vi.fn().mockResolvedValue({ id: 'notification-job-1' });
+
+vi.mock('@/lib/queue', () => ({
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: {
+    SEND_NOTIFICATION: 'send_notification',
+    REPLY_TWITTER: 'reply_twitter',
+  },
+  notificationQueue: { name: 'notifications' },
+  twitterReplyQueue: { name: 'twitter-reply' },
+}));
+
+const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));
+
+vi.mock('@/lib/elevenlabs', () => ({
+  generateSoundEffect: (...args: unknown[]) => mockGenerateSoundEffect(...args),
+}));
+
+const mockGetUserTier = vi.fn().mockResolvedValue('FREE');
+
+vi.mock('@/lib/subscription', () => ({
+  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
+}));
+
+vi.mock('@/lib/stripe', () => ({
+  TIER_LIMITS: {
+    FREE: { hasPremiumSfx: false },
+    PRO: { hasPremiumSfx: false },
+    CREATOR: { hasPremiumSfx: true },
+  },
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// Mock fs/promises operations
+const mockWriteFile = vi.fn().mockResolvedValue(undefined);
+const mockMkdir = vi.fn().mockResolvedValue(undefined);
+const mockRm = vi.fn().mockResolvedValue(undefined);
+const mockReadFile = vi.fn().mockResolvedValue(Buffer.from('final-audio-data'));
+const mockCopyFile = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('fs/promises', () => ({
+  default: {
+    writeFile: (...args: unknown[]) => mockWriteFile(...args),
+    mkdir: (...args: unknown[]) => mockMkdir(...args),
+    rm: (...args: unknown[]) => mockRm(...args),
+    readFile: (...args: unknown[]) => mockReadFile(...args),
+    copyFile: (...args: unknown[]) => mockCopyFile(...args),
+  },
+  writeFile: (...args: unknown[]) => mockWriteFile(...args),
+  mkdir: (...args: unknown[]) => mockMkdir(...args),
+  rm: (...args: unknown[]) => mockRm(...args),
+  readFile: (...args: unknown[]) => mockReadFile(...args),
+  copyFile: (...args: unknown[]) => mockCopyFile(...args),
+}));
+
+// ---- Import under test ----
+import { processAudioStitching } from '@/workers/audio-stitching.worker';
+import type { StitchAudioPayload } from '@/lib/queue';
+import type { Job } from 'bullmq';
+
+// ---- Helpers ----
+
+function createMockJob(data: StitchAudioPayload): Job<StitchAudioPayload> {
+  return {
+    data,
+    updateProgress: vi.fn().mockResolvedValue(undefined),
+  } as unknown as Job<StitchAudioPayload>;
+}
+
+const defaultPayload: StitchAudioPayload = {
+  podcastId: 'podcast-001',
+  segmentIds: ['seg-1', 'seg-2', 'seg-3'],
+};
+
+// ---- Tests ----
+
+describe('processAudioStitching', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Default segment data
+    mockPrismaSegmentFindMany.mockResolvedValue([
+      { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+      { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+      { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+    ]);
+
+    // Default podcast data
+    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      userId: 'user-1',
+      title: 'Test Podcast',
+      source: 'WEB',
+      sourceTweetId: null,
+    });
+
+    // Default script data (no sound cues)
+    mockPrismaScriptFindUnique.mockResolvedValue({ soundCues: [] });
+
+    // Default user tier
+    mockGetUserTier.mockResolvedValue('FREE');
+
+    // Default stitch result
+    mockStitchWithEffects.mockResolvedValue({ duration: 300 });
+
+    // Default file operations
+    mockDownloadFile.mockResolvedValue(Buffer.from('segment-audio'));
+    mockReadFile.mockResolvedValue(Buffer.from('final-audio-data'));
+    mockUploadPodcastAudio.mockResolvedValue('https://r2.example.com/final.mp3');
+  });
+
+  describe('segment fetching', () => {
+    it('fetches segments from database by segmentIds', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaSegmentFindMany).toHaveBeenCalledWith({
+        where: { id: { in: ['seg-1', 'seg-2', 'seg-3'] } },
+        orderBy: { order: 'asc' },
+      });
+    });
+
+    it('orders segments by order ascending', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const callArgs = mockPrismaSegmentFindMany.mock.calls[0][0];
+      expect(callArgs.orderBy).toEqual({ order: 'asc' });
+    });
+
+    it('throws error when no segments are found', async () => {
+      mockPrismaSegmentFindMany.mockResolvedValue([]);
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow(
+        'No segments found for podcast podcast-001'
+      );
+    });
+
+    it('throws error when segment is missing audioUrl', async () => {
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: null, order: 1, duration: 100 },
+      ]);
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow(
+        'Segment seg-2 (order 1) has no audioUrl'
+      );
+    });
+  });
+
+  describe('audio downloading', () => {
+    it('downloads all segment audio files from R2', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockDownloadFile).toHaveBeenCalledTimes(3);
+      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-1.mp3');
+      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-2.mp3');
+      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-3.mp3');
+    });
+
+    it('writes downloaded audio to temp files', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockWriteFile).toHaveBeenCalledTimes(3);
+      const writeCalls = mockWriteFile.mock.calls;
+      expect(writeCalls[0][0]).toMatch(/seg-000\.mp3$/);
+      expect(writeCalls[1][0]).toMatch(/seg-001\.mp3$/);
+      expect(writeCalls[2][0]).toMatch(/seg-002\.mp3$/);
+    });
+
+    it('creates temp directory before downloading', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockMkdir).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
+        recursive: true,
+      });
+    });
+  });
+
+  describe('FFmpeg stitching', () => {
+    it('calls stitchWithEffects with segment paths', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockStitchWithEffects).toHaveBeenCalledWith(
+        expect.objectContaining({
+          segmentPaths: expect.arrayContaining([
+            expect.stringMatching(/seg-000\.mp3$/),
+            expect.stringMatching(/seg-001\.mp3$/),
+            expect.stringMatching(/seg-002\.mp3$/),
+          ]),
+          outputPath: expect.stringMatching(/final\.mp3$/),
+          crossfadeMs: 300,
+        })
+      );
+    });
+
+    it('passes correct number of segment paths to stitchWithEffects', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      expect(callArgs.segmentPaths).toHaveLength(3);
+    });
+
+    it('includes empty sfxInserts array when no sound cues', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({ soundCues: [] });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      expect(callArgs.sfxInserts).toEqual([]);
+    });
+  });
+
+  describe('sound effects (FREE tier)', () => {
+    beforeEach(() => {
+      mockGetUserTier.mockResolvedValue('FREE');
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        soundCues: [
+          { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
+          {
+            type: 'transition',
+            prompt: 'Smooth transition',
+            durationSeconds: 1,
+            insertAfterTurn: 2,
+          },
+        ],
+      });
+    });
+
+    it('uses stock SFX for FREE tier', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockCopyFile).toHaveBeenCalledTimes(2);
+      expect(mockGenerateSoundEffect).not.toHaveBeenCalled();
+    });
+
+    it('copies stock SFX files to temp directory', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const copyCalls = mockCopyFile.mock.calls;
+      expect(copyCalls[0][0]).toMatch(/intro-warm\.mp3$/);
+      expect(copyCalls[0][1]).toMatch(/sfx-0\.mp3$/);
+      expect(copyCalls[1][0]).toMatch(/transition-whoosh\.mp3$/);
+      expect(copyCalls[1][1]).toMatch(/sfx-1\.mp3$/);
+    });
+
+    it('passes SFX inserts to stitchWithEffects', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      expect(callArgs.sfxInserts).toHaveLength(2);
+      expect(callArgs.sfxInserts[0]).toMatchObject({
+        insertAfterSegment: 0,
+        durationMs: 2000,
+        type: 'intro',
+      });
+      expect(callArgs.sfxInserts[1]).toMatchObject({
+        insertAfterSegment: 2,
+        durationMs: 1000,
+        type: 'transition',
+      });
+    });
+  });
+
+  describe('sound effects (CREATOR tier)', () => {
+    beforeEach(() => {
+      mockGetUserTier.mockResolvedValue('CREATOR');
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        soundCues: [
+          {
+            type: 'intro',
+            prompt: 'Warm intro with soft piano',
+            durationSeconds: 3,
+            insertAfterTurn: 0,
+          },
+        ],
+      });
+    });
+
+    it('generates premium SFX via ElevenLabs for CREATOR tier', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockGenerateSoundEffect).toHaveBeenCalledWith({
+        prompt: 'Warm intro with soft piano',
+        durationSeconds: 3,
+      });
+      expect(mockCopyFile).not.toHaveBeenCalled();
+    });
+
+    it('writes generated SFX to temp file', async () => {
+      mockGenerateSoundEffect.mockResolvedValue(Buffer.from('custom-sfx-audio'));
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/sfx-0\.mp3$/),
+        Buffer.from('custom-sfx-audio')
+      );
+    });
+
+    it('falls back to stock SFX when ElevenLabs fails', async () => {
+      mockGenerateSoundEffect.mockRejectedValue(new Error('ElevenLabs API error'));
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockCopyFile).toHaveBeenCalledTimes(1);
+      expect(mockCopyFile).toHaveBeenCalledWith(
+        expect.stringMatching(/intro-warm\.mp3$/),
+        expect.stringMatching(/sfx-0\.mp3$/)
+      );
+    });
+  });
+
+  describe('R2 upload', () => {
+    it('reads final audio file after stitching', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockReadFile).toHaveBeenCalledWith(expect.stringMatching(/final\.mp3$/));
+    });
+
+    it('uploads final audio to R2', async () => {
+      mockReadFile.mockResolvedValue(Buffer.from('final-audio-bytes'));
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockUploadPodcastAudio).toHaveBeenCalledWith(
+        'podcast-001',
+        Buffer.from('final-audio-bytes')
+      );
+    });
+  });
+
+  describe('podcast status update', () => {
+    it('updates podcast status to READY', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({
+          status: 'READY',
+        }),
+      });
+    });
+
+    it('updates podcast with audioUrl from R2', async () => {
+      mockUploadPodcastAudio.mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({
+          audioUrl: 'https://cdn.sotto.fm/final.mp3',
+        }),
+      });
+    });
+
+    it('updates podcast with duration from stitcher', async () => {
+      mockStitchWithEffects.mockResolvedValue({ duration: 450.75 });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({
+          duration: 451, // rounded
+        }),
+      });
+    });
+
+    it('updates podcast with file size', async () => {
+      mockReadFile.mockResolvedValue(Buffer.alloc(1024 * 512)); // 512 KB
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({
+          fileSize: 1024 * 512,
+        }),
+      });
+    });
+  });
+
+  describe('segment start times', () => {
+    it('updates each segment with cumulative start time', async () => {
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 150 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 200 },
+      ]);
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'seg-1' },
+        data: { startTime: 0 },
+      });
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'seg-2' },
+        data: { startTime: 100 },
+      });
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'seg-3' },
+        data: { startTime: 250 },
+      });
+    });
+
+    it('handles segments with null duration', async () => {
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: null },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 200 },
+      ]);
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'seg-3' },
+        data: { startTime: 100 }, // 100 + 0 (null treated as 0)
+      });
+    });
+  });
+
+  describe('notification', () => {
+    it('queues notification job after stitching complete', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'notifications' }, 'send_notification', {
+        userId: 'user-1',
+        type: 'PODCAST_READY',
+        title: 'Your podcast is ready!',
+        message: '"Test Podcast" is ready to play.',
+        data: { podcastId: 'podcast-001' },
+      });
+    });
+
+    it('includes podcast title in notification message', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-2',
+        title: 'Quantum Computing Explained',
+        source: 'WEB',
+        sourceTweetId: null,
+      });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.objectContaining({
+          message: '"Quantum Computing Explained" is ready to play.',
+        })
+      );
+    });
+  });
+
+  describe('Twitter reply (source=TWITTER)', () => {
+    beforeEach(() => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Test Podcast',
+        source: 'TWITTER',
+        sourceTweetId: 'tweet-123',
+      });
+      mockPrismaTweetMentionFindFirst.mockResolvedValue({
+        id: 'mention-1',
+        tweetId: 'tweet-123',
+        status: 'GENERATING',
+      });
+    });
+
+    it('queues Twitter reply when source is TWITTER', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
+        podcastId: 'podcast-001',
+        tweetMentionId: 'mention-1',
+        originalTweetId: 'tweet-123',
+      });
+    });
+
+    it('updates mention status to READY after queueing reply', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaTweetMentionUpdate).toHaveBeenCalledWith({
+        where: { id: 'mention-1' },
+        data: { status: 'READY' },
+      });
+    });
+
+    it('does not queue Twitter reply when source is WEB', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Test Podcast',
+        source: 'WEB',
+        sourceTweetId: null,
+      });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
+      expect(mockAddJob).toHaveBeenCalledTimes(1); // only notification
+    });
+
+    it('does not queue Twitter reply when mention is not found', async () => {
+      mockPrismaTweetMentionFindFirst.mockResolvedValue(null);
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const replyJobCall = mockAddJob.mock.calls.find((call) => call[1] === 'reply_twitter');
+      expect(replyJobCall).toBeUndefined();
+    });
+  });
+
+  describe('progress tracking', () => {
+    it('reports progress at 5% after starting', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(5);
+    });
+
+    it('reports progress during segment downloads (10-50%)', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (call) => call[0]
+      );
+      expect(progressCalls).toContain(10); // after tier lookup
+      expect(progressCalls.some((p: number) => p > 10 && p < 50)).toBe(true); // during downloads
+    });
+
+    it('reports progress at 50% after all downloads', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(50);
+    });
+
+    it('reports progress at 80% after stitching', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(80);
+    });
+
+    it('reports progress at 90% after R2 upload', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(90);
+    });
+
+    it('reports progress at 95% after segment times update', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(95);
+    });
+
+    it('reports progress at 100% at completion', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+  });
+
+  describe('temp cleanup', () => {
+    it('cleans up temp directory after successful completion', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
+        recursive: true,
+        force: true,
+      });
+    });
+
+    it('cleans up temp directory even when job fails', async () => {
+      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
+
+      expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
+        recursive: true,
+        force: true,
+      });
+    });
+  });
+
+  describe('error handling', () => {
+    it('marks podcast as FAILED when stitching fails', async () => {
+      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'FAILED' },
+      });
+    });
+
+    it('propagates error from downloadFile', async () => {
+      mockDownloadFile.mockRejectedValue(new Error('R2 download failed'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow('R2 download failed');
+    });
+
+    it('propagates error from uploadPodcastAudio', async () => {
+      mockUploadPodcastAudio.mockRejectedValue(new Error('R2 upload failed'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow('R2 upload failed');
+    });
+
+    it('queues Twitter failure reply when Twitter-sourced podcast fails', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Test Podcast',
+        source: 'TWITTER',
+        sourceTweetId: 'tweet-123',
+      });
+      mockPrismaTweetMentionFindFirst.mockResolvedValue({
+        id: 'mention-1',
+        tweetId: 'tweet-123',
+        status: 'GENERATING',
+      });
+      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'twitter-reply' },
+        'reply_twitter',
+        expect.objectContaining({
+          podcastId: 'podcast-001',
+          tweetMentionId: 'mention-1',
+        })
+      );
+    });
+  });
+
+  describe('end-to-end flow', () => {
+    it('executes full pipeline for basic podcast (no SFX)', async () => {
+      mockStitchWithEffects.mockResolvedValue({ duration: 305.5 });
+      mockReadFile.mockResolvedValue(Buffer.alloc(1024 * 256));
+      mockUploadPodcastAudio.mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      // Segments fetched and ordered
+      expect(mockPrismaSegmentFindMany).toHaveBeenCalled();
+
+      // Podcast config fetched
+      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
+
+      // Script fetched for sound cues
+      expect(mockPrismaScriptFindUnique).toHaveBeenCalled();
+
+      // User tier checked
+      expect(mockGetUserTier).toHaveBeenCalledWith('user-1');
+
+      // Audio downloaded from R2
+      expect(mockDownloadFile).toHaveBeenCalledTimes(3);
+
+      // FFmpeg stitching called
+      expect(mockStitchWithEffects).toHaveBeenCalled();
+
+      // Final audio uploaded to R2
+      expect(mockUploadPodcastAudio).toHaveBeenCalledWith('podcast-001', expect.any(Buffer));
+
+      // Podcast updated to READY
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: {
+          status: 'READY',
+          audioUrl: 'https://cdn.sotto.fm/final.mp3',
+          duration: 306, // rounded
+          fileSize: 1024 * 256,
+        },
+      });
+
+      // Segment start times updated
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledTimes(3);
+
+      // Notification queued
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.anything()
+      );
+
+      // Temp cleaned up
+      expect(mockRm).toHaveBeenCalled();
+
+      // Progress reported to 100%
+      expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+
+    it('executes full pipeline for CREATOR tier podcast with SFX', async () => {
+      mockGetUserTier.mockResolvedValue('CREATOR');
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        soundCues: [
+          { type: 'intro', prompt: 'Warm piano intro', durationSeconds: 3, insertAfterTurn: 0 },
+          { type: 'outro', prompt: 'Gentle piano outro', durationSeconds: 2, insertAfterTurn: 5 },
+        ],
+      });
+      mockGenerateSoundEffect
+        .mockResolvedValueOnce(Buffer.from('intro-sfx'))
+        .mockResolvedValueOnce(Buffer.from('outro-sfx'));
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      // Premium SFX generated
+      expect(mockGenerateSoundEffect).toHaveBeenCalledTimes(2);
+      expect(mockGenerateSoundEffect).toHaveBeenCalledWith({
+        prompt: 'Warm piano intro',
+        durationSeconds: 3,
+      });
+
+      // SFX passed to stitcher
+      const stitchCall = mockStitchWithEffects.mock.calls[0][0];
+      expect(stitchCall.sfxInserts).toHaveLength(2);
+
+      // Podcast completed successfully
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({ status: 'READY' }),
+      });
+    });
+
+    it('executes full pipeline for Twitter-sourced podcast', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Twitter Podcast',
+        source: 'TWITTER',
+        sourceTweetId: 'tweet-789',
+      });
+      mockPrismaTweetMentionFindFirst.mockResolvedValue({
+        id: 'mention-2',
+        tweetId: 'tweet-789',
+        status: 'GENERATING',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      // Notification queued
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        'send_notification',
+        expect.anything()
+      );
+
+      // Twitter reply queued
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
+        podcastId: 'podcast-001',
+        tweetMentionId: 'mention-2',
+        originalTweetId: 'tweet-789',
+      });
+
+      // Mention status updated
+      expect(mockPrismaTweetMentionUpdate).toHaveBeenCalledWith({
+        where: { id: 'mention-2' },
+        data: { status: 'READY' },
+      });
+
+      // Podcast completed
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({ status: 'READY' }),
+      });
+    });
+  });
+});

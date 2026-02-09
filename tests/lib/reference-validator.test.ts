@@ -2,6 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
+const mockFetch = vi.fn();
+const mockGenerateResponse = vi.fn();
+
+global.fetch = mockFetch;
+
+vi.mock('@/lib/claude', () => ({
+  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -11,15 +20,6 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
-const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/claude', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
-}));
-
-// Mock global fetch
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
 // ---- Import under test ----
 import {
   verifyUrl,
@@ -27,417 +27,899 @@ import {
   searchTitle,
   aiEvaluateReferences,
   computeVerificationVerdict,
-  type ReferenceInput,
-  type VerificationCheck,
 } from '@/lib/reference-validator';
+import type { ReferenceInput, VerificationCheck } from '@/lib/reference-validator';
 
-// ---- Helpers ----
-
-function makeRef(overrides: Partial<ReferenceInput> = {}): ReferenceInput {
-  return {
-    id: 'ref-001',
-    number: 1,
-    title: 'Attention Is All You Need',
-    authors: ['Vaswani, A.', 'Shazeer, N.'],
-    year: 2017,
-    url: 'https://arxiv.org/abs/1706.03762',
-    doi: '10.48550/arXiv.1706.03762',
-    type: 'PAPER',
-    ...overrides,
-  };
-}
+// ---- Helper ----
+const createMockReference = (overrides: Partial<ReferenceInput> = {}): ReferenceInput => ({
+  id: 'ref-1',
+  number: 1,
+  title: 'Test Paper Title',
+  authors: ['Smith, J.', 'Doe, A.'],
+  year: 2023,
+  url: 'https://example.com/paper',
+  doi: '10.1234/test',
+  type: 'PAPER',
+  ...overrides,
+});
 
 // ---- Tests ----
 
-describe('verifyUrl', () => {
+describe('reference-validator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns passed when URL returns 200', async () => {
-    mockFetch.mockResolvedValue({ ok: true, status: 200 });
-    const result = await verifyUrl(makeRef());
-    expect(result.layer).toBe('url');
-    expect(result.passed).toBe(true);
-    expect(result.confidence).toBe(0.6);
-  });
+  describe('verifyUrl', () => {
+    it('returns passed=true for 200 OK status', async () => {
+      const ref = createMockReference();
+      mockFetch.mockResolvedValue({ ok: true, status: 200 });
 
-  it('returns passed for redirect (301)', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 301 });
-    const result = await verifyUrl(makeRef());
-    expect(result.passed).toBe(true);
-  });
+      const result = await verifyUrl(ref);
 
-  it('returns failed for 404', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404 });
-    const result = await verifyUrl(makeRef());
-    expect(result.passed).toBe(false);
-    expect(result.confidence).toBe(0);
-  });
-
-  it('returns failed when no URL provided', async () => {
-    const result = await verifyUrl(makeRef({ url: null }));
-    expect(result.passed).toBe(false);
-    expect(result.detail).toBe('No URL provided');
-  });
-
-  it('returns failed when fetch throws', async () => {
-    mockFetch.mockRejectedValue(new Error('Network error'));
-    const result = await verifyUrl(makeRef());
-    expect(result.passed).toBe(false);
-    expect(result.detail).toContain('Network error');
-  });
-});
-
-describe('verifyDoi', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns passed when DOI matches with high title similarity', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        message: {
-          title: ['Attention Is All You Need'],
-          author: [{ given: 'Ashish', family: 'Vaswani' }],
-          published: { 'date-parts': [[2017]] },
-          publisher: 'arXiv',
-        },
-      }),
+      expect(result.layer).toBe('url');
+      expect(result.passed).toBe(true);
+      expect(result.confidence).toBe(0.6);
+      expect(result.detail).toContain('200');
     });
 
-    const result = await verifyDoi(makeRef());
-    expect(result.layer).toBe('doi');
-    expect(result.passed).toBe(true);
-    expect(result.confidence).toBe(0.95);
-  });
+    it('returns passed=true for redirect status codes', async () => {
+      const ref = createMockReference();
+      mockFetch.mockResolvedValue({ ok: false, status: 301 });
 
-  it('returns failed when DOI exists but title does not match', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        message: {
-          title: ['Completely Different Paper Title'],
-          author: [],
-          published: { 'date-parts': [[2020]] },
-        },
-      }),
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(true);
+      expect(result.confidence).toBe(0.6);
+      expect(result.detail).toContain('301');
     });
 
-    const result = await verifyDoi(makeRef());
-    expect(result.passed).toBe(false);
-  });
+    it('returns passed=false for 404 status', async () => {
+      const ref = createMockReference();
+      mockFetch.mockResolvedValue({ ok: false, status: 404 });
 
-  it('returns failed when no DOI provided', async () => {
-    const result = await verifyDoi(makeRef({ doi: null }));
-    expect(result.passed).toBe(false);
-    expect(result.detail).toBe('No DOI provided');
-  });
+      const result = await verifyUrl(ref);
 
-  it('returns failed when CrossRef returns 404', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404 });
-    const result = await verifyDoi(makeRef());
-    expect(result.passed).toBe(false);
-  });
-
-  it('strips https://doi.org/ prefix from DOI', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        message: {
-          title: ['Attention Is All You Need'],
-          author: [],
-          published: { 'date-parts': [[2017]] },
-        },
-      }),
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toContain('404');
     });
 
-    await verifyDoi(makeRef({ doi: 'https://doi.org/10.48550/arXiv.1706.03762' }));
+    it('returns passed=false for 500 server error', async () => {
+      const ref = createMockReference();
+      mockFetch.mockResolvedValue({ ok: false, status: 500 });
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('10.48550'),
-      expect.anything()
-    );
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toContain('500');
+    });
+
+    it('returns passed=false when no URL provided', async () => {
+      const ref = createMockReference({ url: null });
+
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toBe('No URL provided');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns passed=false when URL is empty string', async () => {
+      const ref = createMockReference({ url: '' });
+
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toBe('No URL provided');
+    });
+
+    it('handles timeout with abort signal', async () => {
+      const ref = createMockReference();
+      mockFetch.mockImplementation(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('aborted')), 10);
+        });
+      });
+
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('URL check failed');
+    });
+
+    it('handles network errors gracefully', async () => {
+      const ref = createMockReference();
+      mockFetch.mockRejectedValue(new Error('Network error'));
+
+      const result = await verifyUrl(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toContain('Network error');
+    });
+
+    it('uses HEAD method and proper headers', async () => {
+      const ref = createMockReference({ url: 'https://test.com/article' });
+      mockFetch.mockResolvedValue({ ok: true, status: 200 });
+
+      await verifyUrl(ref);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://test.com/article',
+        expect.objectContaining({
+          method: 'HEAD',
+          redirect: 'follow',
+          headers: { 'User-Agent': 'Sotto/1.0 (reference-validator)' },
+        })
+      );
+    });
   });
 
-  it('returns failed when fetch throws', async () => {
-    mockFetch.mockRejectedValue(new Error('Timeout'));
-    const result = await verifyDoi(makeRef());
-    expect(result.passed).toBe(false);
-    expect(result.detail).toContain('Timeout');
-  });
-});
+  describe('verifyDoi', () => {
+    it('returns passed=true when DOI exists and title matches', async () => {
+      const ref = createMockReference({
+        title: 'Climate Change Analysis',
+        doi: '10.1234/climate',
+      });
 
-describe('searchTitle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: {
+            title: ['Climate Change Analysis'],
+            author: [
+              { given: 'John', family: 'Smith' },
+              { given: 'Alice', family: 'Doe' },
+            ],
+            published: { 'date-parts': [[2023]] },
+            publisher: 'Nature',
+          },
+        }),
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(true);
+      expect(result.confidence).toBeGreaterThanOrEqual(0.9);
+      expect(result.detail).toContain('DOI verified');
+      expect(result.replacement).toBeDefined();
+      expect(result.replacement?.title).toBe('Climate Change Analysis');
+      expect(result.replacement?.authors).toEqual(['John Smith', 'Alice Doe']);
+      expect(result.replacement?.year).toBe(2023);
+    });
+
+    it('strips https://doi.org/ prefix from DOI', async () => {
+      const ref = createMockReference({
+        doi: 'https://doi.org/10.1234/test',
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: {
+            title: ['Test Paper Title'],
+            author: [],
+            published: { 'date-parts': [[2022]] },
+          },
+        }),
+      });
+
+      await verifyDoi(ref);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.crossref.org/works/10.1234%2Ftest',
+        expect.any(Object)
+      );
+    });
+
+    it('returns passed=false when DOI not found (404)', async () => {
+      const ref = createMockReference({ doi: '10.9999/notfound' });
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toContain('404');
+    });
+
+    it('returns passed=false when no DOI provided', async () => {
+      const ref = createMockReference({ doi: null });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toBe('No DOI provided');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('returns passed=false when title similarity is low', async () => {
+      const ref = createMockReference({
+        title: 'Quantum Computing',
+        doi: '10.1234/different',
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: {
+            title: ['Climate Change Studies'],
+            author: [],
+            published: { 'date-parts': [[2023]] },
+            publisher: 'Elsevier',
+          },
+        }),
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('title mismatch');
+      expect(result.replacement).toBeDefined();
+      expect(result.replacement?.title).toBe('Climate Change Studies');
+    });
+
+    it('handles CrossRef timeout', async () => {
+      const ref = createMockReference({ doi: '10.1234/timeout' });
+
+      mockFetch.mockImplementation(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('aborted')), 10);
+        });
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('CrossRef check failed');
+    });
+
+    it('uses CrossRef API with proper headers', async () => {
+      const ref = createMockReference({ doi: '10.1234/test' });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: { title: ['Test'], author: [] },
+        }),
+      });
+
+      await verifyDoi(ref);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.crossref.org/works/10.1234%2Ftest',
+        expect.objectContaining({
+          headers: { 'User-Agent': 'Sotto/1.0 (mailto:hello@sotto.fm)' },
+        })
+      );
+    });
+
+    it('handles missing author information', async () => {
+      const ref = createMockReference({ doi: '10.1234/noauthor' });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          message: {
+            title: ['Test Paper Title'],
+            author: [],
+            published: { 'date-parts': [[2023]] },
+          },
+        }),
+      });
+
+      const result = await verifyDoi(ref);
+
+      expect(result.replacement?.authors).toEqual([]);
+    });
+
+    it('handles network errors gracefully', async () => {
+      const ref = createMockReference({ doi: '10.1234/error' });
+
+      mockFetch.mockRejectedValue(new Error('DNS failure'));
+
+      const result = await verifyDoi(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('DNS failure');
+    });
   });
 
-  it('returns passed when title matches in OpenAlex', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        results: [
-          {
-            title: 'Attention Is All You Need',
-            authorships: [{ author: { display_name: 'Ashish Vaswani' } }],
-            publication_year: 2017,
-            doi: 'https://doi.org/10.48550/arXiv.1706.03762',
-            primary_location: {
-              landing_page_url: 'https://arxiv.org/abs/1706.03762',
-              source: { display_name: 'arXiv' },
+  describe('searchTitle', () => {
+    it('returns passed=true when title found in OpenAlex', async () => {
+      const ref = createMockReference({
+        title: 'Machine Learning Fundamentals',
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              title: 'Machine Learning Fundamentals',
+              authorships: [
+                { author: { display_name: 'Jane Doe' } },
+                { author: { display_name: 'Bob Smith' } },
+              ],
+              publication_year: 2022,
+              doi: 'https://doi.org/10.5678/ml',
+              primary_location: {
+                landing_page_url: 'https://example.com/ml',
+                source: { display_name: 'Journal of AI' },
+              },
             },
-          },
-        ],
-      }),
+          ],
+        }),
+      });
+
+      const result = await searchTitle(ref);
+
+      expect(result.passed).toBe(true);
+      expect(result.confidence).toBe(0.9);
+      expect(result.detail).toContain('Title matched in OpenAlex');
+      expect(result.replacement).toBeDefined();
+      expect(result.replacement?.authors).toEqual(['Jane Doe', 'Bob Smith']);
+      expect(result.replacement?.year).toBe(2022);
     });
 
-    const result = await searchTitle(makeRef());
-    expect(result.layer).toBe('title_search');
-    expect(result.passed).toBe(true);
-    expect(result.confidence).toBe(0.9);
-  });
+    it('returns passed=false when title too short', async () => {
+      const ref = createMockReference({ title: 'AI' });
 
-  it('returns failed when no results found', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ results: [] }),
+      const result = await searchTitle(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toBe('Title too short to search');
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
-    const result = await searchTitle(makeRef());
-    expect(result.passed).toBe(false);
-    expect(result.detail).toContain('No results');
-  });
+    it('returns passed=false when no results found', async () => {
+      const ref = createMockReference({ title: 'Nonexistent Paper Title 9999' });
 
-  it('returns failed when title too short', async () => {
-    const result = await searchTitle(makeRef({ title: 'Hi' }));
-    expect(result.passed).toBe(false);
-    expect(result.detail).toContain('too short');
-  });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [] }),
+      });
 
-  it('returns failed when OpenAlex returns error', async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 500 });
-    const result = await searchTitle(makeRef());
-    expect(result.passed).toBe(false);
-  });
+      const result = await searchTitle(ref);
 
-  it('returns failed when best match similarity is below threshold', async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        results: [
-          {
-            title: 'Completely Unrelated Title About Something Else',
-            authorships: [],
-            publication_year: 2020,
-          },
-        ],
-      }),
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0);
+      expect(result.detail).toBe('No results found in OpenAlex');
     });
 
-    const result = await searchTitle(makeRef());
-    expect(result.passed).toBe(false);
-  });
-});
+    it('checks top 3 results for a match', async () => {
+      const ref = createMockReference({ title: 'Target Paper' });
 
-describe('aiEvaluateReferences', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns REAL verdict for verified references', async () => {
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify({
-        evaluations: [
-          {
-            refNumber: 1,
-            verdict: 'REAL',
-            confidence: 0.95,
-            reasoning: 'Well-known paper',
-            suggestedReplacement: null,
-          },
-        ],
-      }),
-      inputTokens: 100,
-      outputTokens: 50,
-    });
-
-    const refs = [makeRef()];
-    const priorChecks = new Map<string, VerificationCheck[]>();
-    priorChecks.set('ref-001', [
-      { layer: 'url', passed: true, confidence: 0.6, detail: 'OK' },
-    ]);
-
-    const results = await aiEvaluateReferences(refs, priorChecks, 'machine learning');
-
-    const check = results.get('ref-001');
-    expect(check).toBeDefined();
-    expect(check!.passed).toBe(true);
-    expect(check!.layer).toBe('ai');
-  });
-
-  it('returns HALLUCINATED verdict for suspicious references', async () => {
-    mockGenerateResponse.mockResolvedValue({
-      content: JSON.stringify({
-        evaluations: [
-          {
-            refNumber: 1,
-            verdict: 'HALLUCINATED',
-            confidence: 0.9,
-            reasoning: 'This paper does not exist',
-            suggestedReplacement: {
-              title: 'Real Paper Title',
-              authors: ['Real Author'],
-              year: 2020,
-              url: 'https://example.com',
-              doi: null,
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            { title: 'Unrelated Paper 1', authorships: [] },
+            { title: 'Unrelated Paper 2', authorships: [] },
+            {
+              title: 'Target Paper',
+              authorships: [{ author: { display_name: 'Author One' } }],
+              publication_year: 2021,
             },
-          },
-        ],
-      }),
-      inputTokens: 100,
-      outputTokens: 50,
+          ],
+        }),
+      });
+
+      const result = await searchTitle(ref);
+
+      expect(result.passed).toBe(true);
+      expect(result.replacement?.title).toBe('Target Paper');
     });
 
-    const refs = [makeRef()];
-    const priorChecks = new Map<string, VerificationCheck[]>();
+    it('returns low confidence when no match found', async () => {
+      const ref = createMockReference({ title: 'Quantum Computing Basics' });
 
-    const results = await aiEvaluateReferences(refs, priorChecks, 'test topic');
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [{ title: 'Classical Algorithm Theory', authorships: [] }],
+        }),
+      });
 
-    const check = results.get('ref-001');
-    expect(check!.passed).toBe(false);
-    expect(check!.replacement).toBeDefined();
-    expect(check!.replacement!.title).toBe('Real Paper Title');
-  });
+      const result = await searchTitle(ref);
 
-  it('handles AI failure gracefully', async () => {
-    mockGenerateResponse.mockRejectedValue(new Error('API unavailable'));
-
-    const refs = [makeRef()];
-    const priorChecks = new Map<string, VerificationCheck[]>();
-
-    const results = await aiEvaluateReferences(refs, priorChecks, 'test');
-
-    const check = results.get('ref-001');
-    expect(check).toBeDefined();
-    expect(check!.passed).toBe(false);
-    expect(check!.detail).toContain('failed');
-  });
-
-  it('handles non-JSON AI response', async () => {
-    mockGenerateResponse.mockResolvedValue({
-      content: 'I cannot evaluate these references.',
-      inputTokens: 100,
-      outputTokens: 50,
+      expect(result.passed).toBe(false);
+      expect(result.confidence).toBe(0); // No word overlap after normalization
+      expect(result.detail).toContain('below threshold');
     });
 
-    const refs = [makeRef()];
-    const priorChecks = new Map<string, VerificationCheck[]>();
+    it('handles OpenAlex API errors', async () => {
+      const ref = createMockReference({ title: 'Test Paper' });
 
-    const results = await aiEvaluateReferences(refs, priorChecks, 'test');
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+      });
 
-    const check = results.get('ref-001');
-    expect(check!.passed).toBe(false);
-    expect(check!.detail).toContain('unparseable');
+      const result = await searchTitle(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('503');
+    });
+
+    it('handles network timeout', async () => {
+      const ref = createMockReference({ title: 'Timeout Paper' });
+
+      mockFetch.mockImplementation(() => {
+        return new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('timeout')), 10);
+        });
+      });
+
+      const result = await searchTitle(ref);
+
+      expect(result.passed).toBe(false);
+      expect(result.detail).toContain('OpenAlex check failed');
+    });
+
+    it('includes mailto parameter when OPENALEX_EMAIL is set', async () => {
+      const originalEnv = process.env.OPENALEX_EMAIL;
+      process.env.OPENALEX_EMAIL = 'test@sotto.fm';
+
+      const ref = createMockReference({ title: 'Email Test Paper' });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [] }),
+      });
+
+      await searchTitle(ref);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('mailto=test%40sotto.fm'),
+        expect.any(Object)
+      );
+
+      process.env.OPENALEX_EMAIL = originalEnv;
+    });
+
+    it('falls back to DOI URL when no landing page URL available', async () => {
+      const ref = createMockReference({ title: 'Paper Without URL' });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              title: 'Paper Without URL',
+              authorships: [],
+              publication_year: 2023,
+              doi: 'https://doi.org/10.1234/nourl',
+              primary_location: {},
+            },
+          ],
+        }),
+      });
+
+      const result = await searchTitle(ref);
+
+      expect(result.replacement?.url).toBe('https://doi.org/10.1234/nourl');
+    });
   });
-});
 
-describe('computeVerificationVerdict', () => {
-  it('returns VERIFIED when DOI passes with high confidence', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified' },
-      { layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' },
-    ];
+  describe('aiEvaluateReferences', () => {
+    it('evaluates references and returns verification checks', async () => {
+      const refs: ReferenceInput[] = [
+        createMockReference({ id: 'ref-1', number: 1 }),
+        createMockReference({ id: 'ref-2', number: 2 }),
+      ];
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('VERIFIED');
-    expect(verdict.confidence).toBe(0.95);
-  });
+      const priorChecks = new Map<string, VerificationCheck[]>();
+      priorChecks.set('ref-1', [{ layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' }]);
+      priorChecks.set('ref-2', [{ layer: 'url', passed: false, confidence: 0, detail: 'URL 404' }]);
 
-  it('returns REMOVED when URL fails + title not found + AI says hallucinated', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'url', passed: false, confidence: 0, detail: 'URL returned 404' },
-      { layer: 'title_search', passed: false, confidence: 0, detail: 'Not found' },
-      { layer: 'ai', passed: false, confidence: 0, detail: 'AI: HALLUCINATED — does not exist' },
-    ];
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [
+            {
+              refNumber: 1,
+              verdict: 'REAL',
+              confidence: 0.95,
+              reasoning: 'Verified publication',
+            },
+            {
+              refNumber: 2,
+              verdict: 'HALLUCINATED',
+              confidence: 0.1,
+              reasoning: 'Cannot verify',
+              suggestedReplacement: {
+                title: 'Corrected Title',
+                authors: ['New Author'],
+                year: 2023,
+                url: 'https://real.com/paper',
+                doi: '10.9999/real',
+              },
+            },
+          ],
+        }),
+        inputTokens: 800,
+        outputTokens: 400,
+      });
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('REMOVED');
-  });
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
 
-  it('returns REPLACED when override rule triggers but replacement available', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'url', passed: false, confidence: 0, detail: 'URL returned 404' },
-      { layer: 'title_search', passed: false, confidence: 0, detail: 'Not found' },
-      {
+      expect(result.size).toBe(2);
+      expect(result.get('ref-1')).toMatchObject({
+        layer: 'ai',
+        passed: true,
+        detail: expect.stringContaining('REAL'),
+      });
+      expect(result.get('ref-2')).toMatchObject({
         layer: 'ai',
         passed: false,
-        confidence: 0,
-        detail: 'AI: HALLUCINATED — fake',
-        replacement: {
-          title: 'Real Paper',
-          authors: ['Author A'],
-          year: 2020,
-          url: 'https://example.com',
-          doi: null,
-          publisher: null,
-        },
-      },
-    ];
+        detail: expect.stringContaining('HALLUCINATED'),
+      });
+      expect(result.get('ref-2')?.replacement).toBeDefined();
+      expect(result.get('ref-2')?.replacement?.title).toBe('Corrected Title');
+    });
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('REPLACED');
-    expect(verdict.replacement).toBeDefined();
-    expect(verdict.replacement!.title).toBe('Real Paper');
-  });
+    it('includes prior checks in AI context', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+      priorChecks.set('ref-1', [
+        { layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' },
+        { layer: 'doi', passed: false, confidence: 0, detail: 'DOI not found' },
+      ]);
 
-  it('returns VERIFIED when weighted average is above threshold', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' },
-      { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Found' },
-      { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' },
-    ];
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [
+            { refNumber: 1, verdict: 'SUSPICIOUS', confidence: 0.5, reasoning: 'Mixed signals' },
+          ],
+        }),
+        inputTokens: 700,
+        outputTokens: 300,
+      });
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('VERIFIED');
-    expect(verdict.confidence).toBeGreaterThan(0.5);
-  });
+      await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
 
-  it('returns REMOVED when score is below threshold with no replacement', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'url', passed: false, confidence: 0, detail: 'Failed' },
-      { layer: 'doi', passed: false, confidence: 0, detail: 'No DOI' },
-      { layer: 'title_search', passed: false, confidence: 0.1, detail: 'Low match' },
-      { layer: 'ai', passed: false, confidence: 0, detail: 'AI: SUSPICIOUS' },
-    ];
+      const call = mockGenerateResponse.mock.calls[0];
+      const userMessage = call[1][0].content;
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('REMOVED');
-  });
+      expect(userMessage).toContain('url: PASS (URL OK)');
+      expect(userMessage).toContain('doi: FAIL (DOI not found)');
+    });
 
-  it('returns REPLACED when score is below threshold but replacement available', () => {
-    const checks: VerificationCheck[] = [
-      { layer: 'url', passed: false, confidence: 0, detail: 'Failed' },
-      {
-        layer: 'title_search',
+    it('caps AI confidence at 0.85 for REAL verdict', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [
+            { refNumber: 1, verdict: 'REAL', confidence: 0.99, reasoning: 'Very confident' },
+          ],
+        }),
+        inputTokens: 600,
+        outputTokens: 250,
+      });
+
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(result.get('ref-1')?.confidence).toBe(0.85);
+    });
+
+    it('handles non-JSON response from Claude', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: 'This is not JSON at all',
+        inputTokens: 500,
+        outputTokens: 100,
+      });
+
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(result.get('ref-1')).toMatchObject({
+        layer: 'ai',
         passed: false,
-        confidence: 0.2,
-        detail: 'Partial match',
-        replacement: {
-          title: 'Better Paper',
-          authors: ['Author B'],
-          year: 2021,
-          url: 'https://example.com/better',
-          doi: '10.1234/better',
-          publisher: 'Publisher X',
-        },
-      },
-      { layer: 'ai', passed: false, confidence: 0, detail: 'AI: SUSPICIOUS' },
-    ];
+        detail: expect.stringContaining('unparseable response'),
+      });
+    });
 
-    const verdict = computeVerificationVerdict(checks);
-    expect(verdict.status).toBe('REPLACED');
-    expect(verdict.replacement!.title).toBe('Better Paper');
+    it('fills in missing refs not in AI response', async () => {
+      const refs: ReferenceInput[] = [
+        createMockReference({ id: 'ref-1', number: 1 }),
+        createMockReference({ id: 'ref-2', number: 2 }),
+      ];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [{ refNumber: 1, verdict: 'REAL', confidence: 0.9, reasoning: 'Good' }],
+        }),
+        inputTokens: 650,
+        outputTokens: 280,
+      });
+
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(result.size).toBe(2);
+      expect(result.get('ref-2')).toMatchObject({
+        layer: 'ai',
+        passed: false,
+        detail: expect.stringContaining('did not include this reference'),
+      });
+    });
+
+    it('handles AI evaluation errors gracefully', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockRejectedValue(new Error('API rate limit'));
+
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(result.get('ref-1')).toMatchObject({
+        layer: 'ai',
+        passed: false,
+        detail: expect.stringContaining('API rate limit'),
+      });
+    });
+
+    it('handles SUSPICIOUS verdict', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [
+            { refNumber: 1, verdict: 'SUSPICIOUS', confidence: 0.4, reasoning: 'Unclear validity' },
+          ],
+        }),
+        inputTokens: 550,
+        outputTokens: 200,
+      });
+
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(result.get('ref-1')?.passed).toBe(false);
+      expect(result.get('ref-1')?.confidence).toBe(0);
+    });
+
+    it('uses maxTokens of 4096', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [{ refNumber: 1, verdict: 'REAL', confidence: 0.9, reasoning: 'Good' }],
+        }),
+        inputTokens: 600,
+        outputTokens: 250,
+      });
+
+      await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(mockGenerateResponse).toHaveBeenCalledWith(expect.any(String), expect.any(Array), {
+        maxTokens: 4096,
+      });
+    });
+  });
+
+  describe('computeVerificationVerdict', () => {
+    it('returns VERIFIED for high DOI confidence', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified' },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('VERIFIED');
+      expect(verdict.confidence).toBe(0.95);
+    });
+
+    it('returns REMOVED for hallucinated reference with no replacement', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: false, confidence: 0, detail: 'URL 404' },
+        { layer: 'title_search', passed: false, confidence: 0, detail: 'Not found' },
+        { layer: 'ai', passed: false, confidence: 0, detail: 'AI: HALLUCINATED — Not real' },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('REMOVED');
+      expect(verdict.confidence).toBe(0);
+    });
+
+    it('returns REPLACED for failed reference with suggested replacement', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: false, confidence: 0, detail: 'URL 404' },
+        { layer: 'title_search', passed: false, confidence: 0, detail: 'Not found' },
+        {
+          layer: 'ai',
+          passed: false,
+          confidence: 0,
+          detail: 'AI: HALLUCINATED — Fake',
+          replacement: {
+            title: 'Real Paper',
+            authors: ['Real Author'],
+            year: 2022,
+            url: 'https://real.com',
+            doi: null,
+            publisher: null,
+          },
+        },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('REPLACED');
+      expect(verdict.replacement).toBeDefined();
+      expect(verdict.replacement?.title).toBe('Real Paper');
+    });
+
+    it('computes weighted average for mixed results', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' },
+        { layer: 'title_search', passed: false, confidence: 0.2, detail: 'Partial match' },
+        { layer: 'ai', passed: false, confidence: 0.3, detail: 'Suspicious' },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.confidence).toBeCloseTo(0.3, 1);
+      expect(verdict.status).toBe('REMOVED');
+    });
+
+    it('returns VERIFIED when composite score >= 0.5', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: true, confidence: 0.6, detail: 'URL OK' },
+        { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Found' },
+        { layer: 'ai', passed: true, confidence: 0.8, detail: 'Real' },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('VERIFIED');
+      expect(verdict.confidence).toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('prefers DOI replacement over other layers', async () => {
+      const checks: VerificationCheck[] = [
+        {
+          layer: 'doi',
+          passed: false,
+          confidence: 0.1,
+          detail: 'Title mismatch',
+          replacement: {
+            title: 'DOI Title',
+            authors: ['DOI Author'],
+            year: 2021,
+            url: 'https://doi.com/test',
+            doi: '10.1234/test',
+            publisher: 'DOI Publisher',
+          },
+        },
+        {
+          layer: 'title_search',
+          passed: false,
+          confidence: 0.2,
+          detail: 'Below threshold',
+          replacement: {
+            title: 'Title Search Result',
+            authors: ['Search Author'],
+            year: 2022,
+            url: 'https://search.com',
+            doi: null,
+            publisher: null,
+          },
+        },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.replacement?.title).toBe('DOI Title');
+      expect(verdict.replacement?.doi).toBe('10.1234/test');
+    });
+
+    it('handles empty checks array', async () => {
+      const checks: VerificationCheck[] = [];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('REMOVED');
+      expect(verdict.confidence).toBe(0);
+    });
+
+    it('returns REPLACED when score below threshold with replacement', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: false, confidence: 0.1, detail: 'Failed' },
+        {
+          layer: 'title_search',
+          passed: false,
+          confidence: 0.3,
+          detail: 'Partial match',
+          replacement: {
+            title: 'Better Paper',
+            authors: ['Author B'],
+            year: 2021,
+            url: 'https://example.com/better',
+            doi: '10.1234/better',
+            publisher: 'Publisher X',
+          },
+        },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('REPLACED');
+      expect(verdict.replacement?.title).toBe('Better Paper');
+    });
+
+    it('overrides with VERIFIED for DOI with 0.9+ confidence even with failed other checks', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified' },
+        { layer: 'url', passed: false, confidence: 0, detail: 'URL 404' },
+        { layer: 'ai', passed: false, confidence: 0, detail: 'Suspicious' },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.status).toBe('VERIFIED');
+      expect(verdict.confidence).toBe(0.95);
+    });
+
+    it('uses title_search replacement as fallback when DOI has no replacement', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'doi', passed: false, confidence: 0, detail: 'Not found' },
+        {
+          layer: 'title_search',
+          passed: false,
+          confidence: 0.2,
+          detail: 'Partial match',
+          replacement: {
+            title: 'Title Match',
+            authors: ['Author T'],
+            year: 2020,
+            url: 'https://title.com',
+            doi: null,
+            publisher: null,
+          },
+        },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.replacement?.title).toBe('Title Match');
+    });
+
+    it('uses AI replacement as last resort', async () => {
+      const checks: VerificationCheck[] = [
+        { layer: 'url', passed: false, confidence: 0, detail: 'Failed' },
+        {
+          layer: 'ai',
+          passed: false,
+          confidence: 0,
+          detail: 'HALLUCINATED',
+          replacement: {
+            title: 'AI Suggested',
+            authors: ['AI Author'],
+            year: 2023,
+            url: 'https://ai.com',
+            doi: null,
+            publisher: null,
+          },
+        },
+      ];
+
+      const verdict = computeVerificationVerdict(checks);
+
+      expect(verdict.replacement?.title).toBe('AI Suggested');
+    });
   });
 });

@@ -6,143 +6,455 @@ import {
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
 
-describe('buildRenumberMap', () => {
-  it('creates contiguous numbering after removals', () => {
-    const map = buildRenumberMap([1, 2, 3, 4, 5], new Set([2, 4]));
-    expect(map.get(1)).toBe(1);
-    expect(map.get(3)).toBe(2);
-    expect(map.get(5)).toBe(3);
-    expect(map.has(2)).toBe(false);
-    expect(map.has(4)).toBe(false);
+describe('script-updater', () => {
+  describe('buildRenumberMap', () => {
+    it('builds a renumber map when removing middle references', () => {
+      const allNumbers = [1, 2, 3, 4, 5];
+      const removedNumbers = new Set([2, 4]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(3)).toBe(2);
+      expect(map.get(5)).toBe(3);
+      expect(map.has(2)).toBe(false);
+      expect(map.has(4)).toBe(false);
+    });
+
+    it('builds a renumber map when removing first reference', () => {
+      const allNumbers = [1, 2, 3, 4];
+      const removedNumbers = new Set([1]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(2)).toBe(1);
+      expect(map.get(3)).toBe(2);
+      expect(map.get(4)).toBe(3);
+      expect(map.has(1)).toBe(false);
+    });
+
+    it('builds a renumber map when removing last reference', () => {
+      const allNumbers = [1, 2, 3, 4];
+      const removedNumbers = new Set([4]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(2)).toBe(2);
+      expect(map.get(3)).toBe(3);
+      expect(map.has(4)).toBe(false);
+    });
+
+    it('builds a renumber map when removing consecutive references', () => {
+      const allNumbers = [1, 2, 3, 4, 5, 6];
+      const removedNumbers = new Set([2, 3, 4]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(5)).toBe(2);
+      expect(map.get(6)).toBe(3);
+    });
+
+    it('returns empty map when all references are removed', () => {
+      const allNumbers = [1, 2, 3];
+      const removedNumbers = new Set([1, 2, 3]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.size).toBe(0);
+    });
+
+    it('returns identity map when no references are removed', () => {
+      const allNumbers = [1, 2, 3, 4];
+      const removedNumbers = new Set<number>();
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(2)).toBe(2);
+      expect(map.get(3)).toBe(3);
+      expect(map.get(4)).toBe(4);
+    });
+
+    it('handles unsorted input numbers', () => {
+      const allNumbers = [3, 1, 4, 2, 5];
+      const removedNumbers = new Set([2, 4]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(3)).toBe(2);
+      expect(map.get(5)).toBe(3);
+    });
+
+    it('handles non-contiguous input numbers', () => {
+      const allNumbers = [1, 3, 5, 7, 9];
+      const removedNumbers = new Set([3, 7]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(5)).toBe(2);
+      expect(map.get(9)).toBe(3);
+    });
+
+    it('handles removing only one reference from many', () => {
+      const allNumbers = [1, 2, 3, 4, 5, 6, 7, 8];
+      const removedNumbers = new Set([5]);
+
+      const map = buildRenumberMap(allNumbers, removedNumbers);
+
+      expect(map.get(1)).toBe(1);
+      expect(map.get(4)).toBe(4);
+      expect(map.get(6)).toBe(5);
+      expect(map.get(8)).toBe(7);
+    });
   });
 
-  it('returns identity map when nothing is removed', () => {
-    const map = buildRenumberMap([1, 2, 3], new Set());
-    expect(map.get(1)).toBe(1);
-    expect(map.get(2)).toBe(2);
-    expect(map.get(3)).toBe(3);
+  describe('cleanCitationText', () => {
+    it('removes single citation markers for removed references', () => {
+      const text = 'This is a fact [2] that is true.';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('This is a fact that is true.');
+    });
+
+    it('renumbers remaining single citations', () => {
+      const text = 'First fact [1] and second fact [3] and third fact [5].';
+      const removedNumbers = new Set([2, 4]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+        [5, 3],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('First fact [1] and second fact [2] and third fact [3].');
+    });
+
+    it('handles grouped citations with commas', () => {
+      const text = 'Multiple sources [1,2,3] confirm this.';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Multiple sources [1,2] confirm this.');
+    });
+
+    it('handles grouped citations with spaces', () => {
+      const text = 'Multiple sources [1, 2, 3, 4] confirm this.';
+      const removedNumbers = new Set([2, 4]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Multiple sources [1,2] confirm this.');
+    });
+
+    it('removes entire grouped citation if all numbers are removed', () => {
+      const text = 'Invalid sources [2,4] should be removed.';
+      const removedNumbers = new Set([2, 4]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+        [5, 3],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Invalid sources should be removed.');
+    });
+
+    it('handles adjacent citations', () => {
+      const text = 'Back to back [1][2][3] citations.';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Back to back [1][2] citations.');
+    });
+
+    it('cleans up double spaces left by removed citations', () => {
+      const text = 'Text [2] with  extra spaces.';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map();
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Text with extra spaces.');
+    });
+
+    it('cleans up space before punctuation', () => {
+      const text = 'End of sentence [2] .';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map();
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('End of sentence.');
+    });
+
+    it('cleans up trailing spaces at line ends', () => {
+      const text = 'Line with citation [2]  \nNext line';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map();
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Line with citation\nNext line');
+    });
+
+    it('preserves text without citations', () => {
+      const text = 'This text has no citations at all.';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('This text has no citations at all.');
+    });
+
+    it('handles multiple citation types in one text', () => {
+      const text = 'Single [1] grouped [2,3] and adjacent [4][5] citations.';
+      const removedNumbers = new Set([2, 4]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+        [5, 3],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Single [1] grouped [2] and adjacent [3] citations.');
+    });
+
+    it('handles empty text', () => {
+      const text = '';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([[1, 1]]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('');
+    });
+
+    it('handles complex mixed citation patterns', () => {
+      const text = 'Studies [1,2,3] and [4] show that [5][6] is valid.';
+      const removedNumbers = new Set([2, 4, 6]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+        [5, 3],
+      ]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('Studies [1,2] and show that [3] is valid.');
+    });
+
+    it('preserves punctuation after citations', () => {
+      const text = 'See study [1], and also [2].';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([[1, 1]]);
+
+      const result = cleanCitationText(text, removedNumbers, renumberMap);
+
+      expect(result).toBe('See study [1], and also.');
+    });
   });
 
-  it('handles removing all references', () => {
-    const map = buildRenumberMap([1, 2, 3], new Set([1, 2, 3]));
-    expect(map.size).toBe(0);
+  describe('cleanAndRenumberCitations', () => {
+    it('cleans and renumbers citations across multiple script turns', () => {
+      const turns = [
+        { speaker: 'HOST' as const, text: 'First fact [1] here.' },
+        { speaker: 'EXPERT' as const, text: 'Second fact [2] and third [3].' },
+        { speaker: 'HOST' as const, text: 'More info [4] available.' },
+      ];
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+        [4, 3],
+      ]);
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result).toEqual([
+        { speaker: 'HOST', text: 'First fact [1] here.' },
+        { speaker: 'EXPERT', text: 'Second fact and third [2].' },
+        { speaker: 'HOST', text: 'More info [3] available.' },
+      ]);
+    });
+
+    it('preserves turn metadata including direction', () => {
+      const turns = [
+        { speaker: 'HOST' as const, text: 'Fact [1].', direction: 'question' },
+        { speaker: 'EXPERT' as const, text: 'Answer [2].', direction: 'explanation' },
+      ];
+      const removedNumbers = new Set([1]);
+      const renumberMap = new Map([[2, 1]]);
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result[0]).toEqual({ speaker: 'HOST', text: 'Fact.', direction: 'question' });
+      expect(result[1]).toEqual({
+        speaker: 'EXPERT',
+        text: 'Answer [1].',
+        direction: 'explanation',
+      });
+    });
+
+    it('handles empty turns array', () => {
+      const turns: Array<{ speaker: 'HOST' | 'EXPERT'; text: string }> = [];
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([[1, 1]]);
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result).toEqual([]);
+    });
+
+    it('handles turns with no citations', () => {
+      const turns = [
+        { speaker: 'HOST' as const, text: 'No citations here.' },
+        { speaker: 'EXPERT' as const, text: 'None here either.' },
+      ];
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result).toEqual([
+        { speaker: 'HOST', text: 'No citations here.' },
+        { speaker: 'EXPERT', text: 'None here either.' },
+      ]);
+    });
+
+    it('handles all citations being removed from all turns', () => {
+      const turns = [
+        { speaker: 'HOST' as const, text: 'Study [1] says.' },
+        { speaker: 'EXPERT' as const, text: 'And [2] confirms.' },
+      ];
+      const removedNumbers = new Set([1, 2]);
+      const renumberMap = new Map();
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result[0].text).toBe('Study says.');
+      expect(result[1].text).toBe('And confirms.');
+    });
+
+    it('preserves all turn properties except text', () => {
+      const turns = [
+        { speaker: 'HOST' as const, text: 'Ref [1]', direction: 'excited', custom: 'value' },
+      ];
+      const removedNumbers = new Set<number>();
+      const renumberMap = new Map([[1, 1]]);
+
+      const result = cleanAndRenumberCitations(turns, removedNumbers, renumberMap);
+
+      expect(result[0]).toHaveProperty('speaker', 'HOST');
+      expect(result[0]).toHaveProperty('text', 'Ref [1]');
+      expect(result[0]).toHaveProperty('direction', 'excited');
+      expect(result[0]).toHaveProperty('custom', 'value');
+    });
   });
 
-  it('handles removing the first reference', () => {
-    const map = buildRenumberMap([1, 2, 3], new Set([1]));
-    expect(map.get(2)).toBe(1);
-    expect(map.get(3)).toBe(2);
-  });
+  describe('cleanAndRenumberMarkdown', () => {
+    it('cleans and renumbers citations in markdown text', () => {
+      const markdown = '# Heading\n\nParagraph with [1] citation.\n\nAnother with [2] and [3].';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
 
-  it('handles removing the last reference', () => {
-    const map = buildRenumberMap([1, 2, 3], new Set([3]));
-    expect(map.get(1)).toBe(1);
-    expect(map.get(2)).toBe(2);
-  });
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-  it('handles non-contiguous input numbers', () => {
-    const map = buildRenumberMap([1, 3, 5, 7], new Set([3]));
-    expect(map.get(1)).toBe(1);
-    expect(map.get(5)).toBe(2);
-    expect(map.get(7)).toBe(3);
-  });
-});
+      expect(result).toBe('# Heading\n\nParagraph with [1] citation.\n\nAnother with and [2].');
+    });
 
-describe('cleanCitationText', () => {
-  const removed = new Set([2, 4]);
-  const renumberMap = new Map([[1, 1], [3, 2], [5, 3]]);
+    it('preserves markdown formatting', () => {
+      const markdown = '**Bold [1]** and *italic [2]* text.';
+      const removedNumbers = new Set([1]);
+      const renumberMap = new Map([[2, 1]]);
 
-  it('removes single dangling citation', () => {
-    const result = cleanCitationText('See this study [2] for more.', removed, renumberMap);
-    expect(result).toBe('See this study for more.');
-  });
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-  it('renumbers single citation', () => {
-    const result = cleanCitationText('According to [3], this is true.', removed, renumberMap);
-    expect(result).toBe('According to [2], this is true.');
-  });
+      expect(result).toBe('**Bold ** and *italic [1]* text.');
+    });
 
-  it('keeps citation that is not removed', () => {
-    const result = cleanCitationText('See [1] for details.', removed, renumberMap);
-    expect(result).toBe('See [1] for details.');
-  });
+    it('handles multiline markdown with citations', () => {
+      const markdown = 'Line 1 [1]\nLine 2 [2]\nLine 3 [3]';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
 
-  it('handles grouped citations with removals', () => {
-    const result = cleanCitationText('Studies [1,2,3] show that...', removed, renumberMap);
-    expect(result).toBe('Studies [1,2] show that...');
-  });
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-  it('handles grouped citations where all are removed', () => {
-    const result = cleanCitationText('Studies [2,4] show that...', removed, renumberMap);
-    expect(result).toBe('Studies show that...');
-  });
+      expect(result).toBe('Line 1 [1]\nLine 2\nLine 3 [2]');
+    });
 
-  it('handles grouped citations with spaces', () => {
-    const result = cleanCitationText('Studies [1, 3, 5] confirm...', removed, renumberMap);
-    expect(result).toBe('Studies [1,2,3] confirm...');
-  });
+    it('handles empty markdown', () => {
+      const markdown = '';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([[1, 1]]);
 
-  it('cleans up double spaces after removal', () => {
-    const result = cleanCitationText('One [2] two', removed, renumberMap);
-    expect(result).toBe('One two');
-  });
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-  it('cleans up space before punctuation after removal', () => {
-    const result = cleanCitationText('Results [2]. Next sentence.', removed, renumberMap);
-    expect(result).toBe('Results. Next sentence.');
-  });
+      expect(result).toBe('');
+    });
 
-  it('handles text with no citations', () => {
-    const result = cleanCitationText('No citations here.', removed, renumberMap);
-    expect(result).toBe('No citations here.');
-  });
+    it('handles markdown with code blocks and citations', () => {
+      const markdown = '```js\ncode [1]\n```\n\nText [2] after.';
+      const removedNumbers = new Set([1]);
+      const renumberMap = new Map([[2, 1]]);
 
-  it('handles multiple citations in one text', () => {
-    const result = cleanCitationText('See [1] and [3] and [5].', removed, renumberMap);
-    expect(result).toBe('See [1] and [2] and [3].');
-  });
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-  it('handles adjacent citations', () => {
-    const result = cleanCitationText('See [1][3][5] for details.', removed, renumberMap);
-    expect(result).toBe('See [1][2][3] for details.');
-  });
-});
+      expect(result).toContain('```js');
+      expect(result).toContain('code');
+      expect(result).toContain('Text [1] after.');
+    });
 
-describe('cleanAndRenumberCitations', () => {
-  it('updates text in all turns', () => {
-    const turns = [
-      { speaker: 'HOST' as const, text: 'Study [1] shows...' },
-      { speaker: 'EXPERT' as const, text: 'And [2] confirms [3].' },
-    ];
+    it('handles markdown lists with citations', () => {
+      const markdown = '- Item [1]\n- Item [2]\n- Item [3]';
+      const removedNumbers = new Set([2]);
+      const renumberMap = new Map([
+        [1, 1],
+        [3, 2],
+      ]);
 
-    const removed = new Set([2]);
-    const renumberMap = new Map([[1, 1], [3, 2]]);
+      const result = cleanAndRenumberMarkdown(markdown, removedNumbers, renumberMap);
 
-    const result = cleanAndRenumberCitations(turns, removed, renumberMap);
-
-    expect(result[0].text).toBe('Study [1] shows...');
-    expect(result[1].text).toBe('And confirms [2].');
-    expect(result[0].speaker).toBe('HOST');
-    expect(result[1].speaker).toBe('EXPERT');
-  });
-
-  it('preserves direction field', () => {
-    const turns = [
-      { speaker: 'HOST' as const, text: 'Ref [1]', direction: 'excited' },
-    ];
-
-    const result = cleanAndRenumberCitations(turns, new Set(), new Map([[1, 1]]));
-    expect(result[0].direction).toBe('excited');
-  });
-});
-
-describe('cleanAndRenumberMarkdown', () => {
-  it('cleans citations in markdown text', () => {
-    const markdown = '# Title\n\nSee [1] and [2] and [3].\n\n## Section\n\nMore [4] refs [5].';
-    const removed = new Set([2, 4]);
-    const renumberMap = new Map([[1, 1], [3, 2], [5, 3]]);
-
-    const result = cleanAndRenumberMarkdown(markdown, removed, renumberMap);
-    expect(result).toBe('# Title\n\nSee [1] and and [2].\n\n## Section\n\nMore refs [3].');
+      expect(result).toBe('- Item [1]\n- Item\n- Item [2]');
+    });
   });
 });

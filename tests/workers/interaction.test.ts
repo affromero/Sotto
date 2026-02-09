@@ -1,0 +1,526 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ---- Mocks (must be declared before any import that touches the modules) ----
+
+const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
+  turns: [
+    { speaker: 'HOST', text: 'Welcome to the show!' },
+    { speaker: 'EXPERT', text: 'Thanks for having me.' },
+  ],
+});
+const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    script: {
+      findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
+    },
+    interaction: {
+      update: (...args: unknown[]) => mockPrismaInteractionUpdate(...args),
+    },
+    apiUsageLog: {
+      create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
+    },
+  },
+}));
+
+const mockGenerateResponse = vi.fn().mockResolvedValue({
+  content: 'Here is the answer to your question.',
+  inputTokens: 150,
+  outputTokens: 50,
+});
+
+const mockLogApiUsage = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/lib/claude', () => ({
+  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  logApiUsage: (...args: unknown[]) => mockLogApiUsage(...args),
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+// ---- Import under test ----
+import { processInteraction } from '@/workers/interaction.worker';
+import type { ProcessInteractionPayload } from '@/lib/queue';
+import type { Job } from 'bullmq';
+
+// ---- Helpers ----
+
+function createMockJob(data: ProcessInteractionPayload): Job<ProcessInteractionPayload> {
+  return {
+    data,
+    updateProgress: vi.fn().mockResolvedValue(undefined),
+  } as unknown as Job<ProcessInteractionPayload>;
+}
+
+const defaultPayload: ProcessInteractionPayload = {
+  podcastId: 'podcast-001',
+  interactionId: 'interaction-001',
+  userId: 'user-001',
+  question: 'Can you explain that in more detail?',
+  timestamp: 45,
+};
+
+// ---- Tests ----
+
+describe('processInteraction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockPrismaScriptFindUnique.mockResolvedValue({
+      turns: [
+        { speaker: 'HOST', text: 'Welcome to the show!' },
+        { speaker: 'EXPERT', text: 'Thanks for having me.' },
+        { speaker: 'HOST', text: 'Today we discuss quantum computing.' },
+        { speaker: 'EXPERT', text: 'Quantum computing leverages superposition and entanglement.' },
+        { speaker: 'HOST', text: 'How does superposition work?' },
+        { speaker: 'EXPERT', text: 'A qubit can exist in multiple states simultaneously.' },
+        { speaker: 'HOST', text: 'That sounds complex.' },
+        { speaker: 'EXPERT', text: 'It is, but it opens new computational possibilities.' },
+      ],
+    });
+    mockGenerateResponse.mockResolvedValue({
+      content: 'Here is the answer to your question.',
+      inputTokens: 150,
+      outputTokens: 50,
+    });
+    mockPrismaInteractionUpdate.mockResolvedValue({});
+    mockLogApiUsage.mockResolvedValue(undefined);
+  });
+
+  describe('script context lookup', () => {
+    it('fetches the script for the podcast', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockPrismaScriptFindUnique).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-001' },
+      });
+    });
+
+    it('throws error when script is not found', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue(null);
+      const job = createMockJob(defaultPayload);
+
+      await expect(processInteraction(job)).rejects.toThrow(
+        'Script not found for podcast podcast-001'
+      );
+    });
+
+    it('handles podcast with no turns gracefully', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({ turns: [] });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+    });
+  });
+
+  describe('context construction from timestamp', () => {
+    it('builds context from turns based on timestamp position', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 45 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain('Recent podcast context:');
+    });
+
+    it('takes last 5 turns as recent context', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', text: 'Turn 1' },
+          { speaker: 'EXPERT', text: 'Turn 2' },
+          { speaker: 'HOST', text: 'Turn 3' },
+          { speaker: 'EXPERT', text: 'Turn 4' },
+          { speaker: 'HOST', text: 'Turn 5' },
+          { speaker: 'EXPERT', text: 'Turn 6' },
+          { speaker: 'HOST', text: 'Turn 7' },
+          { speaker: 'EXPERT', text: 'Turn 8' },
+        ],
+      });
+      const job = createMockJob({ ...defaultPayload, timestamp: 100 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      const content = messages[0].content;
+
+      expect(content).toContain('Turn 4');
+      expect(content).toContain('Turn 5');
+      expect(content).toContain('Turn 6');
+      expect(content).toContain('Turn 7');
+      expect(content).toContain('Turn 8');
+      expect(content).not.toContain('Turn 1');
+      expect(content).not.toContain('Turn 2');
+    });
+
+    it('includes speaker labels in context turns', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      const content = messages[0].content;
+
+      expect(content).toMatch(/HOST:/);
+      expect(content).toMatch(/EXPERT:/);
+    });
+
+    it('handles early timestamp (beginning of podcast)', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 5 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain('Recent podcast context:');
+    });
+
+    it('handles very late timestamp (end of podcast)', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 1200 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain('Recent podcast context:');
+    });
+
+    it('constructs context message with user question', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        question: 'What is quantum entanglement?',
+      });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain("User's question: What is quantum entanglement?");
+    });
+  });
+
+  describe('Claude answer generation', () => {
+    it('calls generateResponse with correct system prompt', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const systemPrompt = callArgs[0];
+      expect(systemPrompt).toContain("Sotto's Q&A assistant");
+      expect(systemPrompt).toContain('podcast context');
+      expect(systemPrompt).toContain('under 200 words');
+    });
+
+    it('calls generateResponse with user message containing context and question', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages).toHaveLength(1);
+      expect(messages[0].role).toBe('user');
+      expect(messages[0].content).toContain('Recent podcast context:');
+      expect(messages[0].content).toContain("User's question:");
+    });
+
+    it('passes exact question text to Claude', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        question: 'Can you clarify the difference between classical and quantum bits?',
+      });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain(
+        'Can you clarify the difference between classical and quantum bits?'
+      );
+    });
+  });
+
+  describe('interaction update with answer', () => {
+    it('updates interaction with Claude answer and ANSWERED status', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: 'Quantum entanglement is a phenomenon where particles become correlated.',
+        inputTokens: 200,
+        outputTokens: 75,
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
+        where: { id: 'interaction-001' },
+        data: {
+          answer: 'Quantum entanglement is a phenomenon where particles become correlated.',
+          status: 'ANSWERED',
+        },
+      });
+    });
+
+    it('updates with multi-paragraph answer', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: 'First paragraph.\n\nSecond paragraph with more detail.',
+        inputTokens: 180,
+        outputTokens: 60,
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
+        where: { id: 'interaction-001' },
+        data: {
+          answer: 'First paragraph.\n\nSecond paragraph with more detail.',
+          status: 'ANSWERED',
+        },
+      });
+    });
+
+    it('updates interaction for the correct interactionId', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        interactionId: 'interaction-xyz-789',
+      });
+      await processInteraction(job);
+
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
+        where: { id: 'interaction-xyz-789' },
+        data: expect.anything(),
+      });
+    });
+  });
+
+  describe('API usage logging', () => {
+    it('logs API usage with token counts', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: 'Answer here.',
+        inputTokens: 225,
+        outputTokens: 90,
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockLogApiUsage).toHaveBeenCalledWith({
+        podcastId: 'podcast-001',
+        userId: 'user-001',
+        category: 'interaction',
+        inputTokens: 225,
+        outputTokens: 90,
+      });
+    });
+
+    it('logs correct userId from payload', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        userId: 'user-abc-123',
+      });
+      await processInteraction(job);
+
+      expect(mockLogApiUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-abc-123',
+        })
+      );
+    });
+
+    it('logs correct podcastId from payload', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        podcastId: 'podcast-xyz-456',
+      });
+      await processInteraction(job);
+
+      expect(mockLogApiUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          podcastId: 'podcast-xyz-456',
+        })
+      );
+    });
+  });
+
+  describe('job progress tracking', () => {
+    it('reports progress at 10% after starting', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(10);
+    });
+
+    it('reports progress at 80% after generating response', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(80);
+    });
+
+    it('reports progress at 100% at the end', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(job.updateProgress).toHaveBeenCalledWith(100);
+    });
+
+    it('reports progress in correct order', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
+        (call: number[]) => call[0]
+      );
+      expect(progressCalls).toEqual([10, 80, 100]);
+    });
+  });
+
+  describe('error propagation', () => {
+    it('propagates error when script not found', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue(null);
+      const job = createMockJob(defaultPayload);
+
+      await expect(processInteraction(job)).rejects.toThrow(
+        'Script not found for podcast podcast-001'
+      );
+    });
+
+    it('propagates error from Claude generateResponse', async () => {
+      mockGenerateResponse.mockRejectedValue(new Error('Claude API rate limit exceeded'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processInteraction(job)).rejects.toThrow('Claude API rate limit exceeded');
+    });
+
+    it('propagates error from interaction update', async () => {
+      mockPrismaInteractionUpdate.mockRejectedValue(new Error('Interaction not found'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processInteraction(job)).rejects.toThrow('Interaction not found');
+    });
+
+    it('propagates error from logApiUsage', async () => {
+      mockLogApiUsage.mockRejectedValue(new Error('Database connection lost'));
+      const job = createMockJob(defaultPayload);
+
+      await expect(processInteraction(job)).rejects.toThrow('Database connection lost');
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles single-turn script', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [{ speaker: 'HOST', text: 'This is a very short podcast.' }],
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalled();
+    });
+
+    it('handles timestamp of 0 (very start)', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 0 });
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain('Recent podcast context:');
+    });
+
+    it('handles very long question text', async () => {
+      const longQuestion = 'Can you explain '.repeat(50) + 'quantum computing?';
+      const job = createMockJob({ ...defaultPayload, question: longQuestion });
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain(longQuestion);
+    });
+
+    it('handles Claude returning empty answer', async () => {
+      mockGenerateResponse.mockResolvedValue({
+        content: '',
+        inputTokens: 100,
+        outputTokens: 0,
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
+        where: { id: 'interaction-001' },
+        data: {
+          answer: '',
+          status: 'ANSWERED',
+        },
+      });
+    });
+
+    it('handles script with very long turns', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', text: 'A'.repeat(5000) },
+          { speaker: 'EXPERT', text: 'B'.repeat(5000) },
+        ],
+      });
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+    });
+  });
+
+  describe('end-to-end flow', () => {
+    it('executes full interaction processing pipeline', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', text: 'Welcome!' },
+          { speaker: 'EXPERT', text: 'Glad to be here.' },
+          { speaker: 'HOST', text: 'Let us talk about AI.' },
+        ],
+      });
+      mockGenerateResponse.mockResolvedValue({
+        content: 'AI stands for Artificial Intelligence, which refers to...',
+        inputTokens: 180,
+        outputTokens: 65,
+      });
+
+      const job = createMockJob({
+        podcastId: 'podcast-final',
+        interactionId: 'interaction-final',
+        userId: 'user-final',
+        question: 'What is AI?',
+        timestamp: 30,
+      });
+
+      await processInteraction(job);
+
+      expect(mockPrismaScriptFindUnique).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-final' },
+      });
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+
+      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
+        where: { id: 'interaction-final' },
+        data: {
+          answer: 'AI stands for Artificial Intelligence, which refers to...',
+          status: 'ANSWERED',
+        },
+      });
+
+      expect(mockLogApiUsage).toHaveBeenCalledWith({
+        podcastId: 'podcast-final',
+        userId: 'user-final',
+        category: 'interaction',
+        inputTokens: 180,
+        outputTokens: 65,
+      });
+
+      expect(job.updateProgress).toHaveBeenCalledTimes(3);
+    });
+  });
+});

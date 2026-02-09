@@ -5,13 +5,10 @@ import { resetMonthlyUsage } from '@/lib/subscription';
 import { logger } from '@/lib/logger';
 import type { SubscriptionTier } from '@prisma/client';
 
-const PRICE_TO_TIER: Record<string, SubscriptionTier> = {
-  [process.env.STRIPE_PRICE_ID_PRO || '']: 'PRO',
-  [process.env.STRIPE_PRICE_ID_CREATOR || '']: 'CREATOR',
-};
-
 function tierFromPriceId(priceId: string): SubscriptionTier {
-  return PRICE_TO_TIER[priceId] || 'FREE';
+  if (priceId === process.env.STRIPE_PRICE_ID_PRO) return 'PRO';
+  if (priceId === process.env.STRIPE_PRICE_ID_CREATOR) return 'CREATOR';
+  return 'FREE';
 }
 
 export async function POST(request: NextRequest) {
@@ -106,7 +103,12 @@ export async function POST(request: NextRequest) {
           data: {
             stripePriceId: priceId,
             tier,
-            status: sub.status === 'active' ? 'ACTIVE' : sub.status === 'past_due' ? 'PAST_DUE' : 'CANCELED',
+            status:
+              sub.status === 'active'
+                ? 'ACTIVE'
+                : sub.status === 'past_due'
+                  ? 'PAST_DUE'
+                  : 'CANCELED',
             currentPeriodStart: new Date(sub.current_period_start * 1000),
             currentPeriodEnd: new Date(sub.current_period_end * 1000),
             cancelAtPeriodEnd: sub.cancel_at_period_end,

@@ -1,9 +1,13 @@
 import { logger } from './logger';
 
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 
-if (!ELEVENLABS_API_KEY) {
+// Helper to get API key dynamically for better testability
+function getApiKey(): string | undefined {
+  return process.env.ELEVENLABS_API_KEY;
+}
+
+if (!getApiKey()) {
   logger.warn('ELEVENLABS_API_KEY is not set — audio generation will not work');
 }
 
@@ -26,23 +30,135 @@ export interface VoiceProfile {
 // These are public ElevenLabs voices available on all paid plans.
 const VOICE_POOL: VoiceProfile[] = [
   // --- Male voices ---
-  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', gender: 'male', accent: 'american', ageRange: 'middle', character: 'warm narrator' },
-  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni', gender: 'male', accent: 'american', ageRange: 'young', character: 'friendly conversationalist' },
-  { id: 'VR6AewLTigWG4xSOukaG', name: 'Arnold', gender: 'male', accent: 'american', ageRange: 'mature', character: 'authoritative expert' },
-  { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', gender: 'male', accent: 'american', ageRange: 'young', character: 'upbeat storyteller' },
-  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', gender: 'male', accent: 'american', ageRange: 'middle', character: 'confident presenter' },
-  { id: 'IKne3meq5aSn9XLyUdCD', name: 'Charlie', gender: 'male', accent: 'australian', ageRange: 'young', character: 'casual and curious' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', name: 'George', gender: 'male', accent: 'british', ageRange: 'mature', character: 'distinguished professor' },
-  { id: 'N2lVS1w4EtoT3dr4eOWO', name: 'Callum', gender: 'male', accent: 'british', ageRange: 'middle', character: 'articulate intellectual' },
+  {
+    id: 'pNInz6obpgDQGcFmaJgB',
+    name: 'Adam',
+    gender: 'male',
+    accent: 'american',
+    ageRange: 'middle',
+    character: 'warm narrator',
+  },
+  {
+    id: 'ErXwobaYiN019PkySvjV',
+    name: 'Antoni',
+    gender: 'male',
+    accent: 'american',
+    ageRange: 'young',
+    character: 'friendly conversationalist',
+  },
+  {
+    id: 'VR6AewLTigWG4xSOukaG',
+    name: 'Arnold',
+    gender: 'male',
+    accent: 'american',
+    ageRange: 'mature',
+    character: 'authoritative expert',
+  },
+  {
+    id: 'yoZ06aMxZJJ28mfd3POQ',
+    name: 'Sam',
+    gender: 'male',
+    accent: 'american',
+    ageRange: 'young',
+    character: 'upbeat storyteller',
+  },
+  {
+    id: 'TxGEqnHWrfWFTfGW9XjX',
+    name: 'Josh',
+    gender: 'male',
+    accent: 'american',
+    ageRange: 'middle',
+    character: 'confident presenter',
+  },
+  {
+    id: 'IKne3meq5aSn9XLyUdCD',
+    name: 'Charlie',
+    gender: 'male',
+    accent: 'australian',
+    ageRange: 'young',
+    character: 'casual and curious',
+  },
+  {
+    id: 'JBFqnCBsd6RMkjVDRZzb',
+    name: 'George',
+    gender: 'male',
+    accent: 'british',
+    ageRange: 'mature',
+    character: 'distinguished professor',
+  },
+  {
+    id: 'N2lVS1w4EtoT3dr4eOWO',
+    name: 'Callum',
+    gender: 'male',
+    accent: 'british',
+    ageRange: 'middle',
+    character: 'articulate intellectual',
+  },
   // --- Female voices ---
-  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', gender: 'female', accent: 'american', ageRange: 'young', character: 'engaging storyteller' },
-  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', gender: 'female', accent: 'american', ageRange: 'middle', character: 'calm and authoritative' },
-  { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli', gender: 'female', accent: 'american', ageRange: 'young', character: 'enthusiastic explainer' },
-  { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi', gender: 'female', accent: 'american', ageRange: 'young', character: 'energetic and playful' },
-  { id: 'z9fAnlkpzviPz146aGWa', name: 'Glinda', gender: 'female', accent: 'american', ageRange: 'mature', character: 'wise mentor' },
-  { id: 'jsCqWAovK2LkecY7zXl4', name: 'Freya', gender: 'female', accent: 'british', ageRange: 'young', character: 'witty and sharp' },
-  { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female', accent: 'british', ageRange: 'middle', character: 'polished professional' },
-  { id: 'oWAxZDx7w5VEj9dCyTzz', name: 'Grace', gender: 'female', accent: 'australian', ageRange: 'middle', character: 'warm and approachable' },
+  {
+    id: 'EXAVITQu4vr4xnSDxMaL',
+    name: 'Bella',
+    gender: 'female',
+    accent: 'american',
+    ageRange: 'young',
+    character: 'engaging storyteller',
+  },
+  {
+    id: '21m00Tcm4TlvDq8ikWAM',
+    name: 'Rachel',
+    gender: 'female',
+    accent: 'american',
+    ageRange: 'middle',
+    character: 'calm and authoritative',
+  },
+  {
+    id: 'MF3mGyEYCl7XYWbV9V6O',
+    name: 'Elli',
+    gender: 'female',
+    accent: 'american',
+    ageRange: 'young',
+    character: 'enthusiastic explainer',
+  },
+  {
+    id: 'AZnzlk1XvdvUeBnXmlld',
+    name: 'Domi',
+    gender: 'female',
+    accent: 'american',
+    ageRange: 'young',
+    character: 'energetic and playful',
+  },
+  {
+    id: 'z9fAnlkpzviPz146aGWa',
+    name: 'Glinda',
+    gender: 'female',
+    accent: 'american',
+    ageRange: 'mature',
+    character: 'wise mentor',
+  },
+  {
+    id: 'jsCqWAovK2LkecY7zXl4',
+    name: 'Freya',
+    gender: 'female',
+    accent: 'british',
+    ageRange: 'young',
+    character: 'witty and sharp',
+  },
+  {
+    id: 'XB0fDUnXU5powFXDhCwa',
+    name: 'Charlotte',
+    gender: 'female',
+    accent: 'british',
+    ageRange: 'middle',
+    character: 'polished professional',
+  },
+  {
+    id: 'oWAxZDx7w5VEj9dCyTzz',
+    name: 'Grace',
+    gender: 'female',
+    accent: 'australian',
+    ageRange: 'middle',
+    character: 'warm and approachable',
+  },
 ];
 
 /**
@@ -113,31 +229,28 @@ export async function generateSpeech(params: {
   similarityBoost?: number;
   style?: number;
 }): Promise<Buffer> {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
-  const response = await fetch(
-    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}`,
-    {
-      method: 'POST',
-      headers: {
-        'xi-api-key': ELEVENLABS_API_KEY,
-        'Content-Type': 'application/json',
-        Accept: 'audio/mpeg',
+  const response = await fetch(`${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': getApiKey()!,
+      'Content-Type': 'application/json',
+      Accept: 'audio/mpeg',
+    },
+    body: JSON.stringify({
+      text: params.text,
+      model_id: params.modelId || 'eleven_multilingual_v2',
+      voice_settings: {
+        stability: params.stability ?? 0.5,
+        similarity_boost: params.similarityBoost ?? 0.75,
+        style: params.style ?? 0.3,
+        use_speaker_boost: true,
       },
-      body: JSON.stringify({
-        text: params.text,
-        model_id: params.modelId || 'eleven_multilingual_v2',
-        voice_settings: {
-          stability: params.stability ?? 0.5,
-          similarity_boost: params.similarityBoost ?? 0.75,
-          style: params.style ?? 0.3,
-          use_speaker_boost: true,
-        },
-      }),
-    }
-  );
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -156,7 +269,7 @@ export async function generateSoundEffect(params: {
   prompt: string;
   durationSeconds?: number;
 }): Promise<Buffer> {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
@@ -168,7 +281,7 @@ export async function generateSoundEffect(params: {
   const response = await fetch(`${ELEVENLABS_BASE_URL}/sound-generation`, {
     method: 'POST',
     headers: {
-      'xi-api-key': ELEVENLABS_API_KEY,
+      'xi-api-key': getApiKey()!,
       'Content-Type': 'application/json',
       Accept: 'audio/mpeg',
     },
@@ -181,7 +294,10 @@ export async function generateSoundEffect(params: {
   }
 
   const arrayBuffer = await response.arrayBuffer();
-  logger.info('Sound effect generated', { prompt: params.prompt, durationSeconds: String(params.durationSeconds ?? 'auto') });
+  logger.info('Sound effect generated', {
+    prompt: params.prompt,
+    durationSeconds: String(params.durationSeconds ?? 'auto'),
+  });
   return Buffer.from(arrayBuffer);
 }
 
@@ -193,14 +309,14 @@ export async function designVoice(params: {
   description: string;
   sampleText: string;
 }): Promise<{ voiceId: string; audioPreview: Buffer }> {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voice-generation/generate-voice`, {
     method: 'POST',
     headers: {
-      'xi-api-key': ELEVENLABS_API_KEY,
+      'xi-api-key': getApiKey()!,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -228,12 +344,12 @@ export async function designVoice(params: {
 export async function getVoices(): Promise<
   Array<{ voice_id: string; name: string; category: string }>
 > {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured');
   }
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices`, {
-    headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+    headers: { 'xi-api-key': getApiKey()! },
   });
 
   if (!response.ok) {
@@ -249,8 +365,8 @@ export async function getVoices(): Promise<
 // ---------------------------------------------------------------------------
 
 const ELEVENLABS_RATE_PER_K_CHARS: Record<string, number> = {
-  free: 0.00,
-  starter: 0.30,
+  free: 0.0,
+  starter: 0.3,
   creator: 0.24,
   scale: 0.17,
 };
@@ -285,7 +401,7 @@ export async function cloneVoice(
   audioFiles: Buffer[],
   description?: string
 ): Promise<{ voiceId: string }> {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
@@ -304,7 +420,7 @@ export async function cloneVoice(
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/add`, {
     method: 'POST',
     headers: {
-      'xi-api-key': ELEVENLABS_API_KEY,
+      'xi-api-key': getApiKey()!,
     },
     body: formData,
   });
@@ -323,13 +439,13 @@ export async function cloneVoice(
  * Delete a cloned voice from ElevenLabs.
  */
 export async function deleteClonedVoice(voiceId: string): Promise<void> {
-  if (!ELEVENLABS_API_KEY) {
+  if (!getApiKey()) {
     throw new Error('ElevenLabs API key not configured');
   }
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
     method: 'DELETE',
-    headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+    headers: { 'xi-api-key': getApiKey()! },
   });
 
   if (!response.ok) {
