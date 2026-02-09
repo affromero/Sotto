@@ -34,11 +34,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   await job.updateProgress(50);
 
-  // Save script
+  // Save script (including sound cues for the stitching pipeline)
   await prisma.script.create({
     data: {
       podcastId,
       turns: result.turns,
+      soundCues: result.soundCues.length > 0 ? result.soundCues : undefined,
       markdown: result.markdown,
     },
   });

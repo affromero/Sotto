@@ -326,6 +326,7 @@ model Script {
   id        String   @id @default(cuid())
   podcastId String   @unique
   turns     Json     // [{speaker: "HOST"|"EXPERT", text: "..."}]
+  soundCues Json?    // [{type, prompt, durationSeconds, insertAfterTurn}]
   markdown  String   @db.Text
   context   String?  @db.Text // source context used for generation
   version   Int      @default(1)
@@ -582,6 +583,17 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
+}
+
+// ============ WAITLIST ============
+
+model Waitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String?  // "hero", "footer", "cta" — where they signed up
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 // ============ API KEYS ============

@@ -73,7 +73,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 +--------------------------------------------------------------+
 |                                                              |
 |  PRICING          [See docs/pricing page for full layout]    |
-|  Embedded PricingCard x3 (Free / Pro / Team)                 |
+|  Embedded PricingCard x3 (Free / Pro / Creator)                 |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
@@ -642,18 +642,18 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |                                                              |
 |  +----------------+  +----------------+  +----------------+  |
 |  |                |  |  MOST POPULAR  |  |                |  |
-|  |  FREE          |  |  PRO           |  |  TEAM          |  |
-|  |  $0/month      |  |  $19/month     |  |  $49/month     |  |
+|  |  FREE          |  |  PRO           |  |  CREATOR       |  |
+|  |  $0/month      |  |  $14/month     |  |  $29/month     |  |
 |  |                |  |                |  |                |  |
-|  |  ✓ 3 podcasts  |  |  ✓ 20 podcasts |  |  ✓ Unlimited   |  |
-|  |  ✓ 10 min max  |  |  ✓ 30 min max  |  |  ✓ 30 min max  |  |
-|  |  ✓ 3 questions |  |  ✓ Unlimited Q |  |  ✓ Unlimited Q |  |
-|  |  ✓ Public only |  |  ✓ Private     |  |  ✓ Team feed   |  |
-|  |  ✓ Community   |  |  ✓ Downloads   |  |  ✓ 10 seats    |  |
-|  |    feed        |  |  ✓ Priority    |  |  ✓ API access  |  |
-|  |                |  |  ✓ 6 voices    |  |  ✓ Analytics   |  |
-|  |                |  |                |  |  ✓ Priority    |  |
-|  |  [Get Started] |  |  [Upgrade Now] |  |  [Contact Us]  |  |
+|  |  ✓ 2 podcasts  |  |  ✓ 8 podcasts  |  |  ✓ 30 podcasts |  |
+|  |  ✓ 10 min max  |  |  ✓ 10 min max  |  |  ✓ 10 min max  |  |
+|  |  ✓ 2 questions |  |  ✓ 10 Q&As     |  |  ✓ Unlimited Q |  |
+|  |  ✓ Public only |  |  ✓ Private     |  |  ✓ Marketplace |  |
+|  |  ✓ Community   |  |  ✓ Downloads   |  |  ✓ 10 premium  |  |
+|  |    feed        |  |  ✓ 3 premium   |  |  ✓ 5 clones    |  |
+|  |                |  |  ✓ 2 clones    |  |  ✓ Analytics   |  |
+|  |                |  |                |  |  ✓ Premium SFX |  |
+|  |  [Get Started] |  |  [Upgrade Now] |  |  [Go Creator]  |  |
 |  |                |  |                |  |                |  |
 |  +----------------+  +----------------+  +----------------+  |
 |                                                              |
@@ -689,14 +689,14 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |  [▸ What counts as a podcast?               ]                |
 |  [▸ Can I cancel anytime?                   ]                |
 |  [▸ What happens to my podcasts if I cancel?]                |
-|  [▸ How does the Team plan work?            ]                |
+|  [▸ How does the Creator plan work?         ]                |
 |                                                              |
 +--------------------------------------------------------------+
 ```
 
 ### 8.2 Section Details
 
-**Pricing cards**: Three cards side by side. Pro card is slightly elevated (larger shadow, "MOST POPULAR" badge at top in amber). Each card: white background, border, tier name (h3), price (display size, DM Serif Display), feature list (checkmarks in amber), CTA button (Free=outline, Pro=primary amber, Team=secondary accent).
+**Pricing cards**: Three cards side by side. Pro card is slightly elevated (larger shadow, "MOST POPULAR" badge at top in amber). Each card: white background, border, tier name (h3), price (display size, DM Serif Display), feature list (checkmarks in amber), CTA button (Free=outline, Pro=primary amber, Creator=secondary accent).
 
 **SOON badges**: Small amber pill badges next to feature names. Uses the SoonBadge component.
 
@@ -846,7 +846,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
           |  CURRENT PLAN                                       |
           |  +------------------------------------------------+|
           |  |  Pro Plan                                      ||
-          |  |  $19/month                                     ||
+          |  |  $14/month                                     ||
           |  |                                                ||
           |  |  Next billing date: March 8, 2026              ||
           |  |  Payment method: Visa ending 4242              ||
@@ -857,18 +857,18 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
           |                                                     |
           |  USAGE THIS PERIOD                                  |
           |  +------------------------------------------------+|
-          |  |  Podcasts: 8 / 20                              ||
-          |  |  [========............] 40%                     ||
+          |  |  Podcasts: 3 / 8                               ||
+          |  |  [=====...............] 38%                     ||
           |  |                                                ||
-          |  |  Interactions: 47 (unlimited)                   ||
-          |  |  Storage: 120 MB                               ||
+          |  |  Premium credits: 1 / 3                         ||
+          |  |  Interactions: 12 (10 per podcast)              ||
           |  +------------------------------------------------+|
           |                                                     |
           |  BILLING HISTORY                                    |
           |  +------------------------------------------------+|
-          |  |  Feb 8, 2026   Pro Plan    $19.00   [Receipt]  ||
-          |  |  Jan 8, 2026   Pro Plan    $19.00   [Receipt]  ||
-          |  |  Dec 8, 2025   Pro Plan    $19.00   [Receipt]  ||
+          |  |  Feb 8, 2026   Pro Plan    $14.00   [Receipt]  ||
+          |  |  Jan 8, 2026   Pro Plan    $14.00   [Receipt]  ||
+          |  |  Dec 8, 2025   Pro Plan    $14.00   [Receipt]  ||
           |  +------------------------------------------------+|
 ```
 

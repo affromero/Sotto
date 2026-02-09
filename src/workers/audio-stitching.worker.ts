@@ -1,46 +1,201 @@
 import { Job } from 'bullmq';
 import { StitchAudioPayload, addJob, JobType, notificationQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-
+import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
+import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
+import { generateSoundEffect } from '@/lib/elevenlabs';
+import { getUserTier } from '@/lib/subscription';
+import { TIER_LIMITS } from '@/lib/stripe';
+import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
+
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+import { writeFile, mkdir, rm } from 'fs/promises';
+
+/** Map SoundCue types to stock SFX filenames bundled in the app */
+const STOCK_SFX: Record<SoundCue['type'], string> = {
+  intro: 'intro-warm.mp3',
+  transition: 'transition-whoosh.mp3',
+  outro: 'outro-gentle.mp3',
+  ambient: 'ambient-soft.mp3',
+};
 
 export async function processAudioStitching(job: Job<StitchAudioPayload>): Promise<void> {
   const { podcastId, segmentIds } = job.data;
+  const tmpDir = path.join(os.tmpdir(), `sotto-stitch-${crypto.randomUUID()}`);
 
   logger.info('Stitching audio', { podcastId, segmentCount: String(segmentIds.length) });
-  await job.updateProgress(10);
+  await job.updateProgress(5);
 
-  // Get segment audio URLs
-  const segments = await prisma.segment.findMany({
-    where: { id: { in: segmentIds } },
-    orderBy: { order: 'asc' },
-  });
+  try {
+    await mkdir(tmpDir, { recursive: true });
 
-  // For now, concatenate segment audio buffers
-  // In production, this would download segments, use FFmpeg, and re-upload
-  const totalDuration = segments.reduce((sum, s) => sum + (s.duration || 0), 0);
+    // 1. Fetch ordered segments from database
+    const segments = await prisma.segment.findMany({
+      where: { id: { in: segmentIds } },
+      orderBy: { order: 'asc' },
+    });
 
-  await job.updateProgress(80);
+    if (segments.length === 0) {
+      throw new Error(`No segments found for podcast ${podcastId}`);
+    }
 
-  // Update podcast as READY
-  const podcast = await prisma.podcast.update({
-    where: { id: podcastId },
-    data: {
-      status: 'READY',
-      duration: Math.round(totalDuration),
-    },
-    include: { user: true },
-  });
+    // 2. Fetch the script for sound cues
+    const script = await prisma.script.findUnique({
+      where: { podcastId },
+      select: { soundCues: true },
+    });
 
-  // Send notification
-  await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-    userId: podcast.userId,
-    type: 'PODCAST_READY',
-    title: 'Your podcast is ready!',
-    message: `"${podcast.title}" is ready to play.`,
-    data: { podcastId },
-  });
+    const soundCues = (script?.soundCues ?? []) as SoundCue[];
 
-  await job.updateProgress(100);
-  logger.info('Audio stitching complete', { podcastId });
+    // 3. Determine user tier for SFX quality
+    const podcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { userId: true, title: true },
+    });
+    const tier = await getUserTier(podcast.userId);
+    const tierLimits = TIER_LIMITS[tier];
+    const usePremiumSfx = tierLimits.hasPremiumSfx;
+
+    await job.updateProgress(10);
+
+    // 4. Download segment audio files from R2 to temp directory
+    const segmentPaths: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (!seg.audioUrl) {
+        throw new Error(`Segment ${seg.id} (order ${seg.order}) has no audioUrl`);
+      }
+
+      const segPath = path.join(tmpDir, `seg-${String(i).padStart(3, '0')}.mp3`);
+      const audioBuffer = await downloadFile(seg.audioUrl);
+      await writeFile(segPath, audioBuffer);
+      segmentPaths.push(segPath);
+
+      // Update progress: downloading is 10-50%
+      const downloadProgress = 10 + Math.round((i / segments.length) * 40);
+      await job.updateProgress(downloadProgress);
+    }
+
+    await job.updateProgress(50);
+
+    // 5. Generate or load SFX files
+    const sfxInserts: SfxInsert[] = [];
+    for (let i = 0; i < soundCues.length; i++) {
+      const cue = soundCues[i];
+      const sfxPath = path.join(tmpDir, `sfx-${i}.mp3`);
+
+      if (usePremiumSfx) {
+        // Creator tier: generate custom SFX via ElevenLabs
+        try {
+          const sfxBuffer = await generateSoundEffect({
+            prompt: cue.prompt,
+            durationSeconds: cue.durationSeconds,
+          });
+          await writeFile(sfxPath, sfxBuffer);
+        } catch (err) {
+          // Fall back to stock SFX if ElevenLabs fails
+          logger.warn('Premium SFX generation failed, using stock', {
+            prompt: cue.prompt,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          const stockFile = STOCK_SFX[cue.type];
+          const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
+          const { copyFile } = await import('fs/promises');
+          await copyFile(stockPath, sfxPath);
+        }
+      } else {
+        // Free/Pro tier: use bundled stock SFX (zero marginal cost)
+        const stockFile = STOCK_SFX[cue.type];
+        const stockPath = path.resolve(__dirname, '..', 'assets', 'sfx', stockFile);
+        const { copyFile } = await import('fs/promises');
+        await copyFile(stockPath, sfxPath);
+      }
+
+      sfxInserts.push({
+        path: sfxPath,
+        insertAfterSegment: cue.insertAfterTurn,
+        durationMs: cue.durationSeconds * 1000,
+        type: cue.type,
+      });
+
+      // Update progress: SFX generation is 50-65%
+      const sfxProgress = 50 + Math.round((i / soundCues.length) * 15);
+      await job.updateProgress(sfxProgress);
+    }
+
+    await job.updateProgress(65);
+
+    // 6. Run FFmpeg stitching
+    const outputPath = path.join(tmpDir, 'final.mp3');
+    const { duration } = await stitchWithEffects({
+      segmentPaths,
+      sfxInserts,
+      outputPath,
+      crossfadeMs: 300,
+    });
+
+    await job.updateProgress(80);
+
+    // 7. Read final audio and upload to R2
+    const { readFile } = await import('fs/promises');
+    const finalAudio = await readFile(outputPath);
+    const audioUrl = await uploadPodcastAudio(podcastId, finalAudio);
+
+    await job.updateProgress(90);
+
+    // 8. Update podcast record
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: {
+        status: 'READY',
+        audioUrl,
+        duration: Math.round(duration),
+        fileSize: finalAudio.length,
+      },
+    });
+
+    // 9. Update segment start times based on durations
+    let cumulativeTime = 0;
+    for (const seg of segments) {
+      await prisma.segment.update({
+        where: { id: seg.id },
+        data: { startTime: cumulativeTime },
+      });
+      cumulativeTime += seg.duration || 0;
+    }
+
+    await job.updateProgress(95);
+
+    // 10. Send notification
+    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+      userId: podcast.userId,
+      type: 'PODCAST_READY',
+      title: 'Your podcast is ready!',
+      message: `"${podcast.title}" is ready to play.`,
+      data: { podcastId },
+    });
+
+    await job.updateProgress(100);
+    logger.info('Audio stitching complete', {
+      podcastId,
+      duration: String(Math.round(duration)),
+      fileSize: String(finalAudio.length),
+      sfxCount: String(sfxInserts.length),
+      premiumSfx: String(usePremiumSfx),
+    });
+  } catch (err) {
+    // Mark podcast as failed on unrecoverable error
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'FAILED' },
+    }).catch(() => {});
+
+    throw err;
+  } finally {
+    // 11. Clean up temp directory
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 }

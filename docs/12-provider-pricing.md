@@ -111,7 +111,7 @@ TTS is **97% of Sotto's COGS**. This is the most critical cost decision.
 |-------|---------|-----------------|-----|
 | **MVP (0-50 users)** | OpenAI TTS-1-HD | $0.45 | Best price/quality ratio, simple API |
 | **Beta (50-500 users)** | OpenAI TTS-1-HD + Google WaveNet | $0.24-0.45 | Add Google as fallback, use free tiers |
-| **Growth (500+ users)** | Self-hosted XTTS v2 + ElevenLabs for premium | $0.05-3.00 | Self-hosted for Free tier, ElevenLabs for Pro/Team |
+| **Growth (500+ users)** | Self-hosted XTTS v2 + ElevenLabs for premium | $0.05-3.00 | Self-hosted for Free tier, ElevenLabs for Pro/Creator |
 
 **Critical insight**: Switching from ElevenLabs ($3.00/podcast) to OpenAI TTS-1-HD ($0.45/podcast) makes Pro tier immediately profitable. ElevenLabs quality is noticeably better, but OpenAI is "good enough" for MVP.
 
@@ -159,18 +159,18 @@ For the future "driver mode" where users interact with Sotto by voice while driv
 | **Budget** (Gemini Flash + Google WaveNet) | $0.01 | $0.29 | $0 | $0.01 | **$0.31** |
 | **Self-hosted** (Gemini Flash + XTTS v2) | $0.01 | $0.06 | $0 | $0.01 | **$0.08** |
 
-### Scenario: Pro Tier User ($19/mo, 6 podcasts/month, 5 interactions)
+### Scenario: Pro Tier User ($14/mo, 4 podcasts/month avg, 1 premium credit)
 
 | Strategy | LLM | TTS | Voice Agent | Storage | Total COGS | Gross Margin |
 |----------|-----|-----|-------------|---------|-----------|-------------|
-| **Premium** | $0.65 | $18.00 | $0 | $0.05 | **$18.70** | **$0.30 (2%)** |
-| **Balanced** | $0.45 | $2.70 | $0 | $0.05 | **$3.20** | **$15.80 (83%)** |
-| **Budget** | $0.03 | $1.44 | $0 | $0.05 | **$1.52** | **$17.48 (92%)** |
-| **Self-hosted** | $0.03 | $0.30 | $0 | $0.05 | **$0.38** | **$18.62 (98%)** |
+| **Premium** (all ElevenLabs) | $0.43 | $12.00 | $0 | $0.03 | **$12.46** | **$1.54 (11%)** |
+| **Balanced** (OpenAI std + 1 ElevenLabs premium) | $0.43 | $1.47 | $0 | $0.03 | **$1.93** | **$12.07 (86%)** |
+| **Budget** (all OpenAI) | $0.02 | $0.92 | $0 | $0.03 | **$0.97** | **$13.03 (93%)** |
+| **Self-hosted** | $0.02 | $0.20 | $0 | $0.03 | **$0.25** | **$13.75 (98%)** |
 
 ### Key Takeaway
 
-The "Balanced" strategy (Claude Haiku + OpenAI TTS-1-HD) achieves **83% gross margin** on Pro tier while maintaining high quality. This is the recommended starting point.
+The "Balanced" strategy (Claude Haiku + OpenAI TTS-1-HD for standard, ElevenLabs for premium credits) achieves **86% gross margin** on the $14/month Pro tier while maintaining high quality. This is the recommended starting point.
 
 ---
 
@@ -188,7 +188,7 @@ The "Balanced" strategy (Claude Haiku + OpenAI TTS-1-HD) achieves **83% gross ma
 
 **Winner for MVP: OpenAI TTS** — best balance of quality, cost, and simplicity.
 **Winner for scale: Self-hosted** — but only when engineering capacity allows.
-**Winner for premium: ElevenLabs** — offer as Pro/Team perk.
+**Winner for premium: ElevenLabs** — offer as Pro/Creator perk.
 
 ---
 
@@ -258,7 +258,7 @@ The script generator now includes delivery directions that influence TTS paramet
 | **MVP** | 16-voice pool from ElevenLabs prebuilt voices | ElevenLabs SFX v2 (intro + transitions + outro) | $0.45-3.15 (TTS) + $0.10 (SFX) |
 | **Beta** | Voice Design API — generate unique voices per podcast topic | ElevenLabs SFX v2 + FFmpeg crossfades | $0.50-3.20 |
 | **Growth** | User voice selection UI + Voice cloning for "listen in my voice" premium feature | Curated SFX library (pre-generated, cached) | $0.05-3.00 |
-| **Scale** | Self-hosted XTTS v2 for Free tier + ElevenLabs for Pro/Team + Fish Audio as fallback | Mixed (self-hosted + cached + generated) | $0.05-2.00 |
+| **Scale** | Self-hosted XTTS v2 for Free tier + ElevenLabs for Pro/Creator + Fish Audio as fallback | Mixed (self-hosted + cached + generated) | $0.05-2.00 |
 
 ### 6.6 Alternative TTS Providers for Voice Diversity
 

@@ -23,22 +23,27 @@ After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmp
 
 | Company | What They Do | Strengths | Weaknesses | Sotto's Edge |
 |---------|-------------|-----------|------------|-------------|
-| **Google NotebookLM** | Upload docs → AI podcast | Free, Google backing, great source grounding | No interactivity, no social, can't interrupt, no customization | Real-time Q&A, social feed, podcast updates |
-| **Podcastfy** (OSS) | Python lib: multi-modal → podcast | Open source, 100+ LLMs, multilingual, CLI | No UI, no interactivity, developer-only, no social | Full SaaS with UI, interactive playback, community |
-| **Inception Point AI** | Mass AI podcast network (3k eps/week) | Scale (12M downloads), hyper-niche content | No personalization, no user-generated, passive listening | User creates their own, interactive, on-demand |
+| **Google NotebookLM** | Upload docs → AI podcast | Free, Google backing, 76+ languages, 2M token context | No interactivity, no social, no customization, fixed voices | Interactive Q&A, social feed, podcast updates, voice diversity |
+| **Chatterbox (Hume AI)** | Real-time AI voice conversation | True mid-sentence interruption, emotion detection, web search | Ephemeral (no MP3/URL), no social, no production value, single voice | Persistent content, shareability, production value, social feed, creator economy |
+| **Wondercraft** | AI podcast studio | Full production suite, music, editing ($25-60/mo) | No interactivity, creator-focused, no social feed | Listener-first: interrupt, ask, learn, share |
+| **Descript** | Text-based podcast editing | Edit audio like text, $100M+ raised | Editing tool, not generation. No interactivity | Generate from zero: topic → full podcast |
+| **Podcastle** | AI podcast creation | Revoice cloning, $22.2M funded, $12-40/mo | Traditional workflow, no topic generation, no interactivity | AI-native generation, interactive, social |
+| **Riverside.fm** | Remote podcast recording | Best recording quality, $47M raised | Recording tool, not AI generation | AI generation from scratch, no guests needed |
 | **ElevenLabs** | Voice/audio AI platform | Best TTS quality ($6.6B valuation), API leader | Infrastructure, not a podcast product | We use ElevenLabs as infrastructure |
-| **Wondercraft** | AI podcast studio | Full production suite, music, editing | No real-time interactivity, creator-focused not learner-focused | Listener-first: interrupt, ask, learn |
-| **PocketFM** | AI audio fiction platform | 1000+ pilots/month, India market leader | Fiction-focused, not educational, no interactivity | Educational focus, topic-driven, interactive |
-| **Snorkl / Descript** | Podcast editing tools | Good editing UX, transcription | Tools for existing podcasters, not generation from scratch | Generate from zero: topic → full podcast |
+| **Podbean AI** | AI podcast hosting | Established since 2006, large user base | Bolt-on AI, not AI-native. No interactivity | Ground-up AI-native, listener-first |
+| **Snipd** | AI podcast player | Great summarization, note-taking integrations | Only works with existing podcasts | Generates new content on-demand |
+| **podcast.ai** | AI celebrity interviews | Viral novelty | Entertainment only, no user-generated content | Educational utility, interactive, social |
 
 ### Sotto's Competitive Moat
 
-**Nobody else does real-time interactive podcasts.** Every competitor generates a static audio file. Sotto is the only platform where:
+**Sotto's moat is the podcast format itself — persistent, shareable, discoverable, and improvable content.** Chatterbox by Hume AI has real-time voice interruption, proving the market for interactive AI audio. But Sotto and Chatterbox solve it from opposite ends: Chatterbox optimizes for spontaneity (ephemeral conversations), Sotto optimizes for persistence and reach (produced shows you can share). No existing player combines all of:
 
-1. **Interrupt & Ask** — Pause at any point, ask a question, get an answer in the context of what was just said
-2. **Adaptive Content** — The podcast evolves based on your questions, then offers to bake clarifications into the final version
-3. **Social Knowledge Graph** — Public podcasts mean someone else's question improves everyone's podcast. Fork a podcast to create your own version with different emphasis
-4. **Learning-First** — Not a creator tool, not a passive player. It's an **active learning environment** disguised as a podcast
+1. **Persistent Podcast Updates** — Questions and answers get permanently baked back into the episode. Chatterbox conversations disappear.
+2. **Social Discovery Feed** — Public podcasts, fork & remix, follow creators. One great podcast serves thousands. Chatterbox is solo.
+3. **Structured Personalized Generation** — Chat-based discovery tailors content to your background. NotebookLM only processes uploaded docs.
+4. **Voice Diversity Pool** — 16 curated voices, unique pair per podcast. NotebookLM uses the same two voices for everything.
+5. **Citation Verification** — 4-layer reference validation pipeline. No competitor has formal citation systems.
+6. **Creator Economy** — Voice marketplace, fork & remix distribution, creator analytics — a path to "YouTube of AI podcasts."
 
 ### Positioning Statement
 
@@ -154,46 +159,42 @@ This discovery feeds into the Claude system prompt as structured context, produc
 
 ### Free
 - **$0/month**
-- 3 podcasts/month
+- 2 podcasts/month
 - Listen unlimited (anyone's public podcasts)
-- 2 standard voices (Host + Expert)
+- Standard voices (OpenAI TTS)
 - Up to 10 min per podcast
-- 3 interactions per podcast
+- 2 interactions per podcast
 - Public podcasts only
 - Community feed access
 
-### Pro — $19/month
+### Pro — $14/month
 - **Everything in Free, plus:**
-- 20 podcasts/month
-- Up to 30 min per podcast
-- Unlimited interactions
-- Podcast updates from Q&A (bake answers in)
+- 8 podcasts/month
+- 10 interactions per podcast
+- 3 premium voice credits/month (ElevenLabs)
+- 2 voice clones
 - Private & unlisted podcasts
-- Priority generation queue
-- Voice selection (6 premium voices)
-- Download MP3s
-- Transcript export
+- Download MP3s + PDF transcripts
+- Browse voice library
 
-### Team — $49/month
+### Creator — $29/month
 - **Everything in Pro, plus:**
-- Unlimited podcasts
-- 10 team seats
-- Private team feed (shared knowledge base)
-- API access (programmatic generation)
-- Custom voice profiles per team
-- Analytics dashboard (most-asked questions, topic trends)
-- Priority support
+- 30 podcasts/month
+- Unlimited interactions
+- 10 premium voice credits/month
+- 5 voice clones
+- Premium sound effects (ElevenLabs SFX)
+- Voice marketplace listing
+- Creator analytics dashboard
 
 ### Premium Add-ons (SOON badges on pricing page)
 
 | Feature | Tier | Status | Description |
 |---------|------|--------|-------------|
 | **Video Explainers** | Pro+ | SOON | AI-generated visual companion (Manim/motion graphics) synced to podcast audio |
-| **Voice Cloning** | Pro+ | SOON | Clone your own voice as Host or Expert using ElevenLabs voice cloning |
 | **Course Mode** | Pro+ | SOON | Series of podcasts with knowledge checks, progress tracking, completion certificates |
-| **Live Collab Listening** | Team | SOON | Listen together in real-time, shared Q&A thread, group annotations |
 | **Multi-Language** | Pro+ | SOON | Generate the same podcast in 29 languages via ElevenLabs multilingual v2 |
-| **Custom Intro/Outro** | Pro+ | SOON | Branded podcast intro music and outro with your name/company |
+| **Custom Intro/Outro** | Creator | SOON | Branded podcast intro music and outro with your name/company |
 | **Podcast Playlists** | Free | SOON | Curate and share ordered collections of public podcasts |
 | **Embed Widget** | Pro+ | SOON | Embeddable player widget for blogs, docs, and learning platforms |
 
@@ -218,7 +219,7 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 | Storage | Cloudflare R2 (S3-compatible, podcast audio + assets) |
 | Search | PostgreSQL full-text search (MVP) → vector similarity (later) |
 | Notifications | Web Push API (web) + Expo Push (mobile SOON) |
-| Payments | Stripe (Free/Pro $19/Team $49) |
+| Payments | Stripe (Free $0/Pro $14/Creator $29) |
 | Hosting | Vercel (web) + Railway (workers) |
 
 ## Design System: "Warm Intimacy"
@@ -331,7 +332,7 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 | `Like` / `Save` | Social engagement (unique per user+podcast) |
 | `Follow` | Social follow (unique per follower+following pair) |
 | `Tag` / `PodcastTag` | Discovery taxonomy |
-| `Subscription` | Stripe integration (FREE/PRO/TEAM tiers) |
+| `Subscription` | Stripe integration (FREE/PRO/CREATOR tiers) |
 | `Job` | BullMQ job tracking |
 | `Notification` | In-app + push notifications (type, read status, push delivery status) |
 | `PushSubscription` | Web Push API subscription endpoints per user/device |

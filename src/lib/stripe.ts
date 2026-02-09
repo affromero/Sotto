@@ -14,7 +14,7 @@ export const stripe = STRIPE_SECRET_KEY
 /**
  * Pricing tiers and limits
  *
- * Free $0 / Pro $24 / Creator $49
+ * Free $0 / Pro $14 / Creator $29
  * All tiers cap at 10 min — the sweet spot for focused, digestible content.
  * Default TTS is OpenAI (standard). Premium voice credits use ElevenLabs.
  */
@@ -25,6 +25,7 @@ export const TIER_LIMITS = {
     interactionsPerPodcast: 2,
     premiumVoiceCredits: 0,
     maxVoiceClones: 0,
+    hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
     canBrowseVoiceLibrary: false,
@@ -33,11 +34,12 @@ export const TIER_LIMITS = {
     canExportPdf: false,
   },
   PRO: {
-    podcastsPerMonth: 15,
+    podcastsPerMonth: 8,
     maxDurationMinutes: 10,
     interactionsPerPodcast: 10,
-    premiumVoiceCredits: 5,
-    maxVoiceClones: 3,
+    premiumVoiceCredits: 3,
+    maxVoiceClones: 2,
+    hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
     canBrowseVoiceLibrary: true,
@@ -46,11 +48,12 @@ export const TIER_LIMITS = {
     canExportPdf: true,
   },
   CREATOR: {
-    podcastsPerMonth: Infinity,
+    podcastsPerMonth: 30,
     maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
-    premiumVoiceCredits: 20,
-    maxVoiceClones: 10,
+    premiumVoiceCredits: 10,
+    maxVoiceClones: 5,
+    hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
     canBrowseVoiceLibrary: true,

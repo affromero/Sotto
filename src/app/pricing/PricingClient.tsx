@@ -49,14 +49,14 @@ export function PricingClient() {
         />
         <PricingCard
           tier="pro"
-          price={24}
+          price={14}
           isPopular
           features={[
-            '15 podcasts per month',
+            '8 podcasts per month',
             'Up to 10 minutes each',
             '10 interactions per podcast',
-            '5 premium voice credits/mo',
-            'Clone up to 3 personal voices',
+            '3 premium voice credits/mo',
+            'Clone up to 2 personal voices',
             'Private & unlisted podcasts',
             'MP3 download + transcript PDF',
             'Voice library access',
@@ -66,17 +66,16 @@ export function PricingClient() {
         />
         <PricingCard
           tier="creator"
-          price={49}
+          price={29}
           features={[
-            'Unlimited podcasts',
+            '30 podcasts per month',
             'Up to 10 minutes each',
             'Unlimited interactions',
-            '20 premium voice credits/mo',
-            'Clone up to 10 personal voices',
-            'Private & unlisted podcasts',
+            '10 premium voice credits/mo',
+            'Clone up to 5 personal voices',
+            'Premium sound effects',
             'MP3 download + transcript PDF',
-            'Voice library + marketplace listing',
-            'Full analytics dashboard',
+            'Voice marketplace + analytics',
           ]}
           onSelect={() => handleSelect('creator')}
           loading={loading}

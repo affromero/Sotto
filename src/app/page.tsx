@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
 import styles from './page.module.css';
 
 const VOICES = [
@@ -20,9 +20,118 @@ const CHECK = (
   </svg>
 );
 
+type WaitlistStatus = 'idle' | 'submitting' | 'success' | 'error';
+
+function WaitlistForm({ source, variant = 'dark' }: { source: string; variant?: 'dark' | 'light' }) {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<WaitlistStatus>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setStatus('submitting');
+    setErrorMsg('');
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), source }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        const msg = data?.error?.fieldErrors?.email?.[0] || 'Please enter a valid email.';
+        setErrorMsg(msg);
+        setStatus('error');
+        return;
+      }
+
+      setStatus('success');
+      setEmail('');
+    } catch {
+      setErrorMsg('Something went wrong. Please try again.');
+      setStatus('error');
+    }
+  }
+
+  if (status === 'success') {
+    return (
+      <div className={`${styles.waitlistSuccess} ${variant === 'light' ? styles.waitlistSuccessLight : ''}`}>
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="10" cy="10" r="10" fill="currentColor" opacity="0.15" />
+          <path d="M6 10.5l2.5 2.5 5.5-5.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        You&apos;re on the list! We&apos;ll let you know when Sotto launches.
+      </div>
+    );
+  }
+
+  return (
+    <form className={`${styles.waitlistForm} ${variant === 'light' ? styles.waitlistFormLight : ''}`} onSubmit={handleSubmit}>
+      <input
+        type="email"
+        className={`${styles.waitlistInput} ${variant === 'light' ? styles.waitlistInputLight : ''}`}
+        placeholder="you@email.com"
+        value={email}
+        onChange={(e) => {
+          setEmail(e.target.value);
+          if (status === 'error') setStatus('idle');
+        }}
+        required
+        aria-label="Email address"
+      />
+      <button
+        type="submit"
+        className={styles.waitlistBtn}
+        disabled={status === 'submitting'}
+      >
+        {status === 'submitting' ? 'Joining...' : 'Join the Waitlist'}
+      </button>
+      {status === 'error' && <p className={styles.waitlistError}>{errorMsg}</p>}
+    </form>
+  );
+}
+
+const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
+const MAX_RIPPLES = 3;
+
 export default function LandingPage() {
   const [navSolid, setNavSolid] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const activeRipples = useRef(0);
+
+  const handlePageClick = useCallback((e: MouseEvent) => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if ((e.target as HTMLElement).closest(INTERACTIVE_SELECTOR)) return;
+    if (activeRipples.current >= MAX_RIPPLES) return;
+
+    const container = pageRef.current;
+    if (!container) return;
+
+    const ripple = document.createElement('div');
+    ripple.className = styles.ripple;
+    ripple.setAttribute('aria-hidden', 'true');
+    ripple.style.setProperty('--ripple-x', `${e.pageX}px`);
+    ripple.style.setProperty('--ripple-y', `${e.pageY}px`);
+
+    activeRipples.current += 1;
+    container.appendChild(ripple);
+
+    let removed = false;
+    const cleanup = () => {
+      if (removed) return;
+      removed = true;
+      ripple.remove();
+      activeRipples.current -= 1;
+    };
+
+    ripple.addEventListener('animationend', cleanup, { once: true });
+    setTimeout(cleanup, 2500);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setNavSolid(window.scrollY > 60);
@@ -41,26 +150,33 @@ export default function LandingPage() {
     );
     document.querySelectorAll(`.${styles.rev}`).forEach((el) => observer.observe(el));
 
+    const pageEl = pageRef.current;
+    if (pageEl) {
+      pageEl.addEventListener('click', handlePageClick);
+    }
+
     return () => {
       window.removeEventListener('scroll', onScroll);
       observer.disconnect();
+      if (pageEl) {
+        pageEl.removeEventListener('click', handlePageClick);
+      }
     };
-  }, []);
+  }, [handlePageClick]);
 
   return (
-    <div className={styles.page}>
+    <div ref={pageRef} className={styles.page}>
       {/* ====== NAV ====== */}
       <nav className={`${styles.nav} ${navSolid ? styles.navSolid : ''}`} role="navigation" aria-label="Main">
         <div className={styles.navInner}>
           <a href="/" className={styles.navLogo} aria-label="Sotto home">Sotto</a>
           <div className={`${styles.navLinks} ${menuOpen ? styles.navLinksOpen : ''}`}>
-            <a href="/feed" onClick={() => setMenuOpen(false)}>Feed</a>
-            <a href="/create" onClick={() => setMenuOpen(false)}>Create</a>
-            <a href="/pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
+            <a href="#features" onClick={() => setMenuOpen(false)}>Features</a>
+            <a href="#voices" onClick={() => setMenuOpen(false)}>Voices</a>
+            <a href="#pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
           </div>
           <div className={styles.navRight}>
-            <a href="/auth/login" className={styles.navSign}>Sign In</a>
-            <a href="/create" className={styles.navCta}>Get Started</a>
+            <a href="#waitlist" className={styles.navCta}>Join Waitlist</a>
             <button
               type="button"
               className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ''}`}
@@ -75,12 +191,12 @@ export default function LandingPage() {
       </nav>
 
       {/* ====== HERO ====== */}
-      <section className={styles.hero} aria-label="Introduction">
+      <section className={styles.hero} id="waitlist" aria-label="Introduction">
         <div className={styles.heroGlow} aria-hidden="true" />
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            Now with voice cloning
+            Coming Soon
           </div>
           <h1 className={styles.heroTitle}>
             Podcasts That<br />Listen <em>Back</em>
@@ -89,14 +205,8 @@ export default function LandingPage() {
             Generate AI podcasts from any topic. Interrupt mid-playback to ask
             questions. Share knowledge with the world.
           </p>
-          <div className={styles.heroCtas}>
-            <a href="/create" className={styles.btnPrimary}>
-              Start Creating — Free
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </a>
-            <a href="/feed" className={styles.btnGhost}>Explore Podcasts</a>
+          <div className={styles.heroWaitlist}>
+            <WaitlistForm source="hero" variant="dark" />
           </div>
         </div>
         <div className={styles.heroWave} aria-hidden="true">
@@ -107,7 +217,7 @@ export default function LandingPage() {
       </section>
 
       {/* ====== PILLARS ====== */}
-      <section className={styles.section} aria-label="Key features">
+      <section className={styles.section} id="features" aria-label="Key features">
         <div className={styles.inner}>
           <div className={styles.pillars}>
             <article className={`${styles.pillar} ${styles.rev}`}>
@@ -153,12 +263,6 @@ export default function LandingPage() {
                 your background and interests, then crafts a podcast that feels like
                 it was made by your favorite producers.
               </p>
-              <a href="/create" className={styles.linkArrow}>
-                Try it yourself
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
             </div>
             <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
               <div className={styles.chatMock}>
@@ -217,12 +321,6 @@ export default function LandingPage() {
                 what you&apos;ve been hearing. Then your Q&amp;A gets woven back into
                 the conversation.
               </p>
-              <a href="/create" className={styles.linkArrow}>
-                Experience it
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
             </div>
             <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
               <div className={styles.interruptMock}>
@@ -259,7 +357,7 @@ export default function LandingPage() {
       </section>
 
       {/* ====== VOICES ====== */}
-      <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Voice selection">
+      <section className={`${styles.section} ${styles.sectionAlt}`} id="voices" aria-label="Voice selection">
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
             <span className={styles.overline}>Premium Voices</span>
@@ -334,12 +432,6 @@ export default function LandingPage() {
                   <span className={styles.creatorStatLabel}>Monthly voice subscriptions</span>
                 </div>
               </div>
-              <a href="/create" className={styles.btnPrimary}>
-                Start Earning
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-                  <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
             </div>
             <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
               <div className={styles.marketplaceMock}>
@@ -485,12 +577,6 @@ export default function LandingPage() {
                   <span>Credit always links back to the original</span>
                 </div>
               </div>
-              <a href="/feed" className={styles.linkArrow}>
-                Browse forkable podcasts
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </a>
             </div>
             <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
               <div className={styles.forkMock}>
@@ -651,7 +737,7 @@ export default function LandingPage() {
                 <li>{CHECK} Public podcasts</li>
                 <li>{CHECK} 2 interactions per podcast</li>
               </ul>
-              <a href="/auth/signup" className={styles.tierBtn}>Get Started</a>
+              <a href="#waitlist" className={styles.tierBtn}>Join Waitlist</a>
             </div>
             {/* PRO */}
             <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d1}`}>
@@ -659,46 +745,46 @@ export default function LandingPage() {
               <div className={styles.tierHead}>
                 <h3>Pro</h3>
                 <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$24</span>
+                  <span className={styles.tierAmount}>$14</span>
                   <span className={styles.tierPeriod}>/mo</span>
                 </div>
                 <p className={styles.tierDesc}>For power learners</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 15 podcasts per month</li>
-                <li>{CHECK} 5 premium voice credits</li>
-                <li>{CHECK} Clone up to 3 voices</li>
+                <li>{CHECK} 8 podcasts per month</li>
+                <li>{CHECK} 3 premium voice credits</li>
+                <li>{CHECK} Clone up to 2 voices</li>
                 <li>{CHECK} 10 interactions per podcast</li>
                 <li>{CHECK} Private &amp; unlisted podcasts</li>
                 <li>{CHECK} MP3 download + PDF transcript</li>
                 <li>{CHECK} Voice library access</li>
               </ul>
-              <a href="/auth/signup" className={styles.tierBtnPrimary}>Start Pro Trial</a>
+              <a href="#waitlist" className={styles.tierBtnPrimary}>Join Waitlist</a>
             </div>
             {/* CREATOR */}
             <div className={`${styles.tier} ${styles.rev} ${styles.d2}`}>
               <div className={styles.tierHead}>
                 <h3>Creator</h3>
                 <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$49</span>
+                  <span className={styles.tierAmount}>$29</span>
                   <span className={styles.tierPeriod}>/mo</span>
                 </div>
                 <p className={styles.tierDesc}>For serious creators</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} Unlimited podcasts</li>
-                <li>{CHECK} 20 premium voice credits</li>
-                <li>{CHECK} Clone up to 10 voices</li>
+                <li>{CHECK} 30 podcasts per month</li>
+                <li>{CHECK} 10 premium voice credits</li>
+                <li>{CHECK} Clone up to 5 voices</li>
                 <li>{CHECK} Unlimited interactions</li>
-                <li>{CHECK} Voice marketplace listing</li>
-                <li>{CHECK} Full analytics dashboard</li>
+                <li>{CHECK} Premium sound effects</li>
+                <li>{CHECK} Voice marketplace + analytics</li>
                 <li>{CHECK} Everything in Pro</li>
               </ul>
-              <a href="/auth/signup" className={styles.tierBtn}>Start Creator Trial</a>
+              <a href="#waitlist" className={styles.tierBtn}>Join Waitlist</a>
             </div>
           </div>
           <p className={styles.tierFootnote}>
-            All plans include unlimited listening. <a href="/pricing">See full comparison</a>
+            All plans include unlimited listening. Pricing shown is for launch day.
           </p>
         </div>
       </section>
@@ -707,17 +793,12 @@ export default function LandingPage() {
       <section className={styles.cta} aria-label="Get started">
         <div className={styles.ctaGlow} aria-hidden="true" />
         <div className={`${styles.ctaContent} ${styles.rev}`}>
-          <h2 className={styles.ctaTitle}>Ready to hear something new?</h2>
+          <h2 className={styles.ctaTitle}>Be the first to know</h2>
           <p className={styles.ctaSub}>
-            Your first two podcasts are completely free. No credit card required.
-            No commitment. Just curiosity.
+            Drop your email and we&apos;ll let you know the moment Sotto goes live.
+            No spam, just one launch email.
           </p>
-          <a href="/create" className={styles.btnPrimary}>
-            Start Creating
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-              <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </a>
+          <WaitlistForm source="cta" variant="dark" />
         </div>
       </section>
 
@@ -731,14 +812,13 @@ export default function LandingPage() {
           <div className={styles.footerCols}>
             <div>
               <h4>Product</h4>
-              <a href="/feed">Feed</a>
-              <a href="/create">Create</a>
-              <a href="/pricing">Pricing</a>
-              <a href="/settings/voices">Voices</a>
+              <a href="#features">Features</a>
+              <a href="#voices">Voices</a>
+              <a href="#pricing">Pricing</a>
             </div>
             <div>
               <h4>Company</h4>
-              <a href="/feedback">Feedback</a>
+              <a href="/feedback" className={styles.footerFeedback}>Share Feedback</a>
               <a href="#">About</a>
               <a href="#">Privacy</a>
               <a href="#">Terms</a>

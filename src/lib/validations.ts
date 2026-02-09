@@ -129,3 +129,11 @@ export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
 });
+
+/**
+ * Waitlist signup validation
+ */
+export const waitlistSchema = z.object({
+  email: z.string().email().max(200),
+  source: z.string().max(50).optional(),
+});

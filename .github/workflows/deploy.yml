@@ -1,0 +1,64 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build
+
+  deploy:
+    name: Deploy to Production
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: sotto
+          key: ${{ secrets.SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd ~/sotto
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Building containers..."
+            docker compose -f docker-compose.prod.yml build
+
+            echo "Running database migrations..."
+            docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+
+            echo "Restarting services..."
+            docker compose -f docker-compose.prod.yml up -d
+
+            echo "Waiting for health check..."
+            sleep 10
+            curl -sf http://localhost:3000/api/health || echo "WARNING: Health check failed"
+
+            echo "Cleaning up old images..."
+            docker image prune -f
+
+            echo "Deploy complete!"

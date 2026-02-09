@@ -19,11 +19,11 @@ const faqs = [
   },
   {
     question: 'What are premium voice credits?',
-    answer: 'Each premium voice credit lets you generate one podcast with ElevenLabs premium voices. Pro gets 5 credits per month, Creator gets 20. Standard voice generation is always unlimited.',
+    answer: 'Each premium voice credit lets you generate one podcast with ElevenLabs premium voices. Pro gets 3 credits per month, Creator gets 10. Standard voice generation is always unlimited.',
   },
   {
     question: 'Can I clone my own voice?',
-    answer: 'Yes! Pro users can clone up to 3 personal voices, and Creator users can clone up to 10. Upload a short audio sample and your voice becomes available for your podcasts.',
+    answer: 'Yes! Pro users can clone up to 2 personal voices, and Creator users can clone up to 5. Upload a short audio sample and your voice becomes available for your podcasts.',
   },
   {
     question: 'What are interactions?',

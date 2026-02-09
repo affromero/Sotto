@@ -16,6 +16,7 @@ const mockReferences: ReferenceData[] = [
     publisher: 'Nature',
     doi: '10.1234/test1',
     verificationStatus: 'VERIFIED',
+    verificationDetails: null,
   },
   {
     id: 'ref-2',
@@ -28,6 +29,7 @@ const mockReferences: ReferenceData[] = [
     publisher: 'MIT Press',
     doi: null,
     verificationStatus: 'VERIFIED',
+    verificationDetails: null,
   },
   {
     id: 'ref-3',
@@ -40,6 +42,7 @@ const mockReferences: ReferenceData[] = [
     publisher: null,
     doi: null,
     verificationStatus: 'VERIFIED',
+    verificationDetails: null,
   },
 ];
 

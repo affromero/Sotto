@@ -19,6 +19,7 @@ Comprehensive documentation following the Quvo philosophy: document everything, 
 | `10-mobile-strategy.md` | PWA now, React Native roadmap | Engineering |
 | `11-unit-economics.md` | Cost per user, bootstrapping budget, revenue projections, breakeven analysis | Business |
 | `12-provider-pricing.md` | AI provider comparison: LLM, TTS, voice agents with exact pricing and links | Engineering + Business |
+| `13-hosting-infrastructure.md` | Hosting architecture: Vercel (web) + Railway (workers) + R2 (storage) | Engineering |
 | `13-mvp-launch-guide.md` | Step-by-step deployment checklist, cost breakdown, testing checklist | Engineering |
 | `14-ios-app-strategy.md` | Three-phase iOS plan: PWA → React Native → Native enhancements | Engineering |
 | `15-logo-brief.md` | Outsource-ready logo design brief with creative directions + AI prompts | Design |

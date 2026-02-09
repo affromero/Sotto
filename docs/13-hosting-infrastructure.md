@@ -346,3 +346,53 @@ deploy:
 ```
 
 Or use Caddy's load balancing to run two instances during deployment.
+
+---
+
+## Quick-Start Deployment Checklist
+
+Everything you need is in the repo. Here's the shortest path from bare VPS to live site:
+
+```bash
+# 1. On your LOCAL machine — set up the server
+ssh root@YOUR_SERVER_IP "bash -s" < scripts/setup-server.sh
+
+# 2. SSH in as sotto user
+ssh sotto@YOUR_SERVER_IP
+
+# 3. Clone and configure
+git clone https://github.com/YOUR_USERNAME/sotto.git ~/sotto
+cd ~/sotto
+cp .env.example .env
+nano .env  # Fill in all required values (see .env.example comments)
+
+# 4. Deploy
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+
+# 5. Set up Caddy (edit domain first)
+sudo cp Caddyfile /etc/caddy/Caddyfile
+sudo nano /etc/caddy/Caddyfile  # Replace sotto.fm with your domain
+sudo systemctl reload caddy
+
+# 6. Set up daily backups
+mkdir -p ~/backups
+(crontab -l 2>/dev/null; echo "0 3 * * * ~/sotto/scripts/backup.sh") | crontab -
+
+# 7. Verify
+curl -s https://YOUR_DOMAIN/api/health | jq .
+```
+
+### Project Files Reference
+
+| File | Purpose |
+|------|---------|
+| `Dockerfile` | Multi-stage Next.js web container (standalone output) |
+| `Dockerfile.workers` | Workers container with FFmpeg |
+| `docker-compose.prod.yml` | Full production stack (web, workers, postgres, redis) |
+| `Caddyfile` | Reverse proxy template (HTTPS + security headers) |
+| `.env.example` | All environment variables documented |
+| `scripts/setup-server.sh` | Automated VPS provisioning (Docker, Caddy, firewall, SSH hardening) |
+| `scripts/backup.sh` | Daily PostgreSQL backup with 30-day retention |
+| `.github/workflows/ci.yml` | CI pipeline (lint, typecheck, test, build) |
+| `.github/workflows/deploy.yml` | Auto-deploy to production on push to main |

@@ -13,6 +13,9 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `discovery.ts` | DiscoveryMessage, DiscoveryMetadata, DiscoveryState |
 | `notification.ts` | NotificationData, PushSubscriptionData |
 | `reference.ts` | ReferenceData (id, number, title, authors, year, url, type, publisher, doi) |
+| `analytics.ts` | UsageStats, AnalyticsData, CostBreakdown |
+| `api-key.ts` | ApiKeyData, CreateKeyRequest, KeyListResponse |
+| `team.ts` | TeamData, TeamInviteData, TeamMember |
 
 ## Rules
 - Types here are for **API responses and component props** — not Prisma models

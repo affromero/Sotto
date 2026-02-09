@@ -697,12 +697,12 @@ Apple's App Store guidelines require that apps offering digital content subscrip
 
 | Subscription | Direct (Stripe) | IAP Price (covering 30% cut) |
 |-------------|-----------------|------------------------------|
-| Pro $19/mo | $19/mo | $24.99/mo (nearest Apple tier) |
-| Team $49/mo | $49/mo | $64.99/mo (nearest Apple tier) |
+| Pro $14/mo | $14/mo | $17.99/mo (nearest Apple tier) |
+| Creator $29/mo | $29/mo | $37.99/mo (nearest Apple tier) |
 
 Options to mitigate the IAP tax:
 1. **Reader rule**: If Sotto qualifies as a "reader" app (consuming pre-existing content), the app can link out to the web for purchases. This is unlikely since Sotto generates content.
-2. **Web-first pricing**: Keep the web app at $19/$49, price the iOS app at $24.99/$64.99 to maintain margin.
+2. **Web-first pricing**: Keep the web app at $14/$29, price the iOS app at $17.99/$37.99 to maintain margin.
 3. **Delayed native launch**: Focus on PWA for the first year. By the time a native app is needed, the platform may have better economics to absorb the Apple tax.
 4. **StoreKit 2 external purchase links**: As of 2024-2025, Apple allows apps to link to external purchase pages in certain regions with conditions. Monitor policy changes.
 

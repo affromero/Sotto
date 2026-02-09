@@ -38,7 +38,7 @@ The palette must serve these specific product surfaces:
 | **Audio player** | Playback controls, waveform visualization, transcript panel | Speaker differentiation (Host vs. Expert), progress indicators |
 | **Social feed** | Grid of podcast cards with tags, likes, creator avatars | Card backgrounds, metadata text, tag colors, engagement icons |
 | **Transcript** | Alternating turns between Host and Expert with citations | Two distinct speaker colors with readable backgrounds |
-| **Pricing page** | Three tiers (Free / Pro / Team) with feature comparison | Tier differentiation, CTA hierarchy, "SOON" badges |
+| **Pricing page** | Three tiers (Free / Pro / Creator) with feature comparison | Tier differentiation, CTA hierarchy, "SOON" badges |
 | **Dashboard** | Usage stats, podcast list, settings, billing | Data visualization, status indicators, navigation highlights |
 
 ---
@@ -339,7 +339,7 @@ These describe how the palette should look in specific product contexts. The des
 - **Background**: Page background
 - **Free tier card**: Surface, standard border, no special highlight
 - **Pro tier card**: Primary border or subtle primary background tint — this is the "recommended" tier
-- **Team tier card**: Accent border or subtle accent background tint
+- **Creator tier card**: Accent border or subtle accent background tint
 - **CTA buttons**: Primary fill for the recommended tier; outline for others
 - **"SOON" badges**: Primary-light background with primary text, small rounded pill
 - **Feature checkmarks**: Success color

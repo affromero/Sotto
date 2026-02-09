@@ -8,7 +8,7 @@ All shared business logic and external service integrations live here.
 |------|---------|-----------------|
 | `prisma.ts` | Database client (PostgreSQL) | Prisma ORM |
 | `redis.ts` | Redis connections, cache helpers, rate limiting | Redis / ioredis |
-| `queue.ts` | BullMQ job queues (8 types), worker creation | BullMQ + Redis |
+| `queue.ts` | BullMQ job queues (9 types), worker creation | BullMQ + Redis |
 | `auth.ts` | NextAuth configuration, OAuth providers | NextAuth v5 |
 | `claude.ts` | Anthropic Claude client (streaming + non-streaming) | Anthropic API |
 | `elevenlabs.ts` | ElevenLabs TTS client, voice ID mapping | ElevenLabs API |
@@ -28,6 +28,7 @@ All shared business logic and external service integrations live here.
 | `validations.ts` | Zod schemas for all API input validation | Zod |
 | `logger.ts` | Structured logging with levels (debug/info/warn/error) | Console |
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |
+| `api-keys.ts` | API key generation, hashing, validation | crypto |
 
 ## Providers (`src/lib/providers/`)
 

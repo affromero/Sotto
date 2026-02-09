@@ -82,6 +82,38 @@ export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<st
 }
 
 /**
+ * Download a file from R2 by its public URL or key
+ */
+export async function downloadFile(urlOrKey: string): Promise<Buffer> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured — set R2_* environment variables');
+  }
+
+  // If it's a full URL, extract the key
+  const key =
+    R2_PUBLIC_URL && urlOrKey.startsWith(R2_PUBLIC_URL)
+      ? urlOrKey.slice(R2_PUBLIC_URL.length + 1)
+      : urlOrKey;
+
+  const response = await s3Client.send(
+    new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })
+  );
+
+  if (!response.Body) {
+    throw new Error(`Empty response downloading ${key} from R2`);
+  }
+
+  const chunks: Uint8Array[] = [];
+  const stream = response.Body as AsyncIterable<Uint8Array>;
+  for await (const chunk of stream) {
+    chunks.push(chunk);
+  }
+
+  logger.info('File downloaded from R2', { key });
+  return Buffer.concat(chunks);
+}
+
+/**
  * Delete a file from R2
  */
 export async function deleteFile(key: string): Promise<void> {

@@ -66,7 +66,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: They already listen to educational podcasts (Lex Fridman, Huberman Lab, Radiolab) and wish they could ask follow-up questions. They value the intimacy and clarity of conversational explanation over reading.
 
-**Conversion path**: Free tier (3 podcasts/month to explore) -> Pro ($19/month for unlimited interactions and longer episodes).
+**Conversion path**: Free tier (2 podcasts/month to explore) -> Pro ($14/month for 10 interactions/podcast, private podcasts, and downloads).
 
 ### 3.2 Busy Professionals
 
@@ -76,7 +76,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Their screen time is maxed out. Audio is the only content format that fits into the gaps of a busy day without competing for visual attention. The conversational format makes complex topics feel approachable rather than intimidating.
 
-**Conversion path**: Free tier (try it once during a commute) -> Pro (private podcasts for sensitive work topics, unlimited Q&A, longer episodes, downloadable MP3s for offline listening).
+**Conversion path**: Free tier (try it once during a commute) -> Pro ($14/month for private podcasts, 10 Q&A interactions, downloadable MP3s for offline listening).
 
 ### 3.3 Content Creators and Educators
 
@@ -86,7 +86,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Audio content has higher engagement and completion rates than text. A blog post gets skimmed; a podcast gets listened to from start to finish. Creators want to reach the growing audience that prefers audio. The social feed gives them distribution they do not have to build themselves.
 
-**Conversion path**: Free tier (test with one piece of content) -> Pro (20 episodes/month, voice selection, transcript export) -> Team (unlimited, API access for programmatic generation, team knowledge base).
+**Conversion path**: Free tier (test with one piece of content) -> Pro ($14/month — 8 episodes/month, voice library, PDF transcripts) -> Creator ($29/month — 30 episodes, unlimited interactions, marketplace, analytics).
 
 ---
 
@@ -120,7 +120,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Monday morning, Priya gets in her car and opens Sotto. She types "I want to understand how design systems scale at large companies." Sotto asks about her background (she selects "working designer"), her focus ("organizational challenges, not just component libraries"), and tone ("casual, with real examples"). Two minutes later, she is listening to a tailored 15-minute episode. At minute 8, the Expert mentions "design tokens" in a way she finds confusing. She taps "Ask a Question," types "Can you explain what design tokens are with a concrete example?", gets a clear answer, taps "Update podcast," and resumes. The next time she shares this episode with her team, the improved version plays.
 
-**Tier**: Pro ($19/month) — she generates 4-6 podcasts per week and uses the Q&A feature constantly.
+**Tier**: Pro ($14/month) — she generates 4-6 podcasts per week and uses the Q&A feature constantly.
 
 ---
 
@@ -152,7 +152,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Marcus has a board meeting Thursday about AI strategy. On his Tuesday morning run, he opens Sotto and says "Explain the current state of AI in fintech payments, including fraud detection, compliance automation, and personalization. I'm a technical executive — skip the basics." Sotto generates a 25-minute deep dive. During his run, he pauses twice to ask questions: "What's the ROI timeline for implementing this?" and "Which vendors are leading in this space?" He marks the podcast as Private, downloads the MP3, and listens again on his Wednesday flight to prepare.
 
-**Tier**: Pro ($19/month) — private podcasts and offline downloads are essential for his use case.
+**Tier**: Pro ($14/month) — private podcasts and offline downloads are essential for his use case.
 
 ---
 
@@ -183,7 +183,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Before her Monday lecture on CRISPR delivery mechanisms, Amara creates a Sotto podcast by pasting the URL to her course notes. She specifies: "My students are junior-level biology majors. Focus on the lipid nanoparticle delivery pathway. Keep it at 15 minutes. Professional tone." She shares the podcast link in Canvas. Over the weekend, 40 students listen. Twelve use the Q&A feature: "Why can't we use viral vectors for this?", "What's the size limit for the cargo?", "How does this compare to electroporation?" Amara reviews the questions before class and uses them to shape her lecture. Three of the best Q&A pairs get baked into the episode for next semester's students.
 
-**Tier**: Team ($49/month) — she uses it across two courses with multiple TAs who also create content, and wants the analytics dashboard to track which topics generate the most questions.
+**Tier**: Creator ($29/month) — she generates high volumes of content across two courses, wants the analytics dashboard to track which topics generate the most questions, and uses the marketplace to share her voice profiles with colleagues.
 
 ---
 
@@ -201,7 +201,7 @@ Unlike reading (which requires dedicated visual attention), watching (which requ
 |-----------|-------------------|-------------|---------------|
 | **Personalization** | Podcast tailored to your exact background, interests, and depth preference through conversational discovery | Generic content written for an imagined average reader | No two Sotto episodes are the same, even on the same topic |
 | **Format** | Two-voice conversational audio with production value (distinct voices, sound effects, natural pacing) | Monotone AI narration, text articles, video lectures | Conversational format is more engaging and retainable than monologue |
-| **Interactivity** | Pause, ask, get contextual answers, update the content | Static playback with no recourse | No other audio platform offers mid-playback Q&A |
+| **Interactivity** | Pause, ask, get contextual answers, update the content | Static playback with no recourse | Chatterbox offers real-time voice interruption, but only Sotto bakes answers back into a persistent, shareable podcast |
 | **Convenience** | Listen anywhere — commute, workout, walk, cook, clean | Requires a screen, a desk, or dedicated study time | Audio is the only format that fits into existing routines without trade-offs |
 | **Social learning** | Discover what others are learning, fork their podcasts, see community questions | Solo learning in isolation | Knowledge compounds when shared |
 | **Efficiency** | 10-30 minute focused episodes, skip what you know, drill into what you do not | Hours of searching, filtering, reading, watching to extract the same knowledge | Sotto compresses the discovery-to-understanding cycle |

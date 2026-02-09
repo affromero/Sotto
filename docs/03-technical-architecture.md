@@ -430,7 +430,7 @@ User ──< Podcast ──< Segment
 | `Speaker` | HOST, EXPERT | Identifies speaker in segments |
 | `InteractionStatus` | PENDING, ANSWERING, ANSWERED, RESOLVED, INCORPORATING, INCORPORATED | Tracks Q&A lifecycle |
 | `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE | Access control |
-| `SubscriptionTier` | FREE, PRO, TEAM | Billing tier |
+| `SubscriptionTier` | FREE, PRO, CREATOR | Billing tier |
 | `SubscriptionStatus` | PENDING, ACTIVE, PAST_DUE, CANCELED, UNPAID, TRIALING | Stripe subscription state |
 | `NotificationType` | PODCAST_READY, PODCAST_LIKED, PODCAST_FORKED, NEW_FOLLOWER, SIMILAR_PODCAST_CREATED | Notification categorization |
 

@@ -32,7 +32,7 @@ export async function getUserUsage(userId: string): Promise<{
   return {
     tier,
     podcastsUsed: user.podcastsUsed,
-    podcastsAllowed: limits.podcastsPerMonth === Infinity ? -1 : limits.podcastsPerMonth,
+    podcastsAllowed: limits.podcastsPerMonth,
     canCreate: user.podcastsUsed < limits.podcastsPerMonth,
   };
 }

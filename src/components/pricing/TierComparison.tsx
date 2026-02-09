@@ -15,12 +15,13 @@ interface ComparisonRow {
 }
 
 const rows: ComparisonRow[] = [
-  { label: 'Podcasts / month', free: '2', pro: '15', creator: 'Unlimited' },
+  { label: 'Podcasts / month', free: '2', pro: '8', creator: '30' },
   { label: 'Max duration', free: '10 min', pro: '10 min', creator: '10 min' },
   { label: 'Interactions', free: '2 per podcast', pro: '10 per podcast', creator: 'Unlimited' },
   { label: 'Default TTS', free: 'Standard', pro: 'Standard', creator: 'Standard' },
-  { label: 'Premium voice credits', free: '0', pro: '5 / month', creator: '20 / month' },
-  { label: 'Personal voice clones', free: false, pro: '3', creator: '10' },
+  { label: 'Premium voice credits', free: '0', pro: '3 / month', creator: '10 / month' },
+  { label: 'Personal voice clones', free: false, pro: '2', creator: '5' },
+  { label: 'Sound effects', free: 'Standard', pro: 'Standard', creator: 'Premium' },
   { label: 'Voice library browse', free: false, pro: true, creator: true },
   { label: 'Marketplace listing', free: false, pro: false, creator: true },
   { label: 'Private podcasts', free: false, pro: true, creator: true },

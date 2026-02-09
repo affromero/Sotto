@@ -19,6 +19,9 @@ The schema is organized into logical sections:
 | Tags | Tag, PodcastTag | Content taxonomy |
 | Notifications | Notification, PushSubscription | In-app + push notifications |
 | Jobs | Job | BullMQ job tracking |
+| Voice Clones | VoiceClone | User voice clones (name, ElevenLabs ID, source) |
+| API Keys | ApiKey | Developer API keys (hashed, prefix, usage) |
+| Teams | Team, TeamInvite | Team ownership, member management, invites |
 | Analytics | ApiUsageLog | Cost tracking |
 | Feedback | Feedback | Early access user feedback |
 
@@ -29,7 +32,9 @@ The schema is organized into logical sections:
 | `PodcastStatus` | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED | Podcast.status |
 | `Speaker` | HOST, EXPERT | Segment.speaker |
 | `InteractionStatus` | PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED | Interaction.status |
-| `SubscriptionTier` | FREE, PRO, TEAM | Subscription.tier |
+| `SubscriptionTier` | FREE, PRO, CREATOR | Subscription.tier |
+| `TeamInviteStatus` | PENDING, ACCEPTED, EXPIRED, REVOKED | TeamInvite.status |
+| `VoiceCloneSource` | UPLOAD, RECORD | VoiceClone.sourceType |
 | `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE | Podcast.visibility |
 | `ReferenceType` | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT | Reference.type |
 | `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED | Reference.verificationStatus |

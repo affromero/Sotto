@@ -10,6 +10,11 @@
 | `/dashboard` | `(dashboard)/dashboard/page.tsx` | Yes | My podcasts, usage |
 | `/settings` | `(dashboard)/settings/page.tsx` | Yes | Profile & preferences |
 | `/billing` | `(dashboard)/billing/page.tsx` | Yes | Subscription management |
+| `/analytics` | `(dashboard)/analytics/page.tsx` | Yes | Usage analytics dashboard |
+| `/settings/api` | `(dashboard)/settings/api/page.tsx` | Yes | API key management |
+| `/settings/voices` | `(dashboard)/settings/voices/page.tsx` | Yes | Voice clone management |
+| `/team` | `(dashboard)/team/page.tsx` | Yes | Team management |
+| `/team/invite/[token]` | `(dashboard)/team/invite/[token]/page.tsx` | Yes | Accept team invite |
 | `/create` | `create/page.tsx` | Yes | Chat-based podcast creation |
 | `/podcast/[podcastId]` | `podcast/[podcastId]/page.tsx` | No (public) / Yes (private) | Podcast player |
 | `/feed` | `feed/page.tsx` | No | Public podcast feed |
@@ -39,8 +44,20 @@
 | `/api/notifications` | GET | Yes | List notifications |
 | `/api/notifications/[notificationId]` | PATCH | Yes | Mark notification read |
 | `/api/notifications/mark-all-read` | POST | Yes | Mark all read |
+| `/api/analytics` | GET | Yes | Usage analytics data |
 | `/api/billing/checkout` | POST | Yes | Stripe checkout session |
 | `/api/billing/portal` | POST | Yes | Stripe billing portal |
+| `/api/billing/subscription` | GET | Yes | Current subscription details |
+| `/api/billing/usage` | GET | Yes | Usage tracking |
+| `/api/keys` | GET/POST | Yes | List/create API keys |
+| `/api/keys/[keyId]` | DELETE | Yes | Revoke API key |
+| `/api/teams/[teamId]` | GET/PATCH/DELETE | Yes | Team CRUD |
+| `/api/teams/invite` | POST | Yes | Send team invite |
+| `/api/users/me` | GET/PATCH | Yes | Current user profile |
+| `/api/voices/clone` | POST | Yes | Create voice clone |
+| `/api/voices/preview` | POST | Yes | Preview voice sample |
+| `/api/waitlist` | POST | No | Waitlist signup |
+| `/api/health` | GET | No | Health check |
 | `/api/feedback` | POST/GET | No | Submit/list feedback |
 | `/api/webhooks/stripe` | POST | Stripe sig | Stripe webhook handler |
 

@@ -331,12 +331,12 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_xxxxx"
 
 **Pro Tier**:
 - Name: "Sotto Pro"
-- Pricing: Recurring, $19/month
+- Pricing: Recurring, $14/month
 - Billing period: Monthly
 
-**Team Tier**:
-- Name: "Sotto Team"
-- Pricing: Recurring, $49/month
+**Creator Tier**:
+- Name: "Sotto Creator"
+- Pricing: Recurring, $29/month
 - Billing period: Monthly
 
 3. Copy Price IDs (e.g., `price_xxxxx`)
@@ -344,7 +344,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_xxxxx"
 
 ```env
 STRIPE_PRICE_ID_PRO="price_xxxxx"
-STRIPE_PRICE_ID_TEAM="price_xxxxx"
+STRIPE_PRICE_ID_CREATOR="price_xxxxx"
 ```
 
 ### Webhook Setup
@@ -887,10 +887,10 @@ Once you have 50+ beta users and stable performance:
 3. **Improve onboarding**: Add tutorial overlay for first-time users
 4. **Add mobile apps**: React Native or PWA enhancement
 5. **Expand OAuth**: Add LinkedIn, Twitter/X
-6. **Team features**: Shared workspaces, collaborative editing
+6. **Creator features**: Voice marketplace, analytics dashboard
 7. **Analytics dashboard**: Show creators their podcast stats
 8. **Public API**: Let developers build on Sotto
-9. **Monetization**: Enable Pro/Team tier conversions with in-app prompts
+9. **Monetization**: Enable Pro/Creator tier conversions with in-app prompts
 
 ---
 

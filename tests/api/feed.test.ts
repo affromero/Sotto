@@ -5,8 +5,8 @@ import { NextRequest } from 'next/server';
 vi.mock('@/lib/prisma', () => {
   const mockPrisma = {
     podcast: {
-      findMany: vi.fn(),
-      count: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
     },
   };
   return { prisma: mockPrisma };

@@ -22,7 +22,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 | Audio | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER` |
 | Stitching | FFmpeg (segment concatenation + normalization) |
 | Storage | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER` |
-| Payments | Stripe (Free $0 / Pro $19 / Team $49) — swappable via `PAYMENT_PROVIDER` |
+| Payments | Stripe (Free $0 / Pro $14 / Creator $29) — swappable via `PAYMENT_PROVIDER` |
 | PDF | pdfmake (server-side transcript PDF generation) |
 | Hosting | Vercel (web) + Railway (workers) |
 
@@ -75,7 +75,7 @@ src/
 │   ├── layout.tsx              # Root layout (DM Serif Display + Inter fonts)
 │   ├── page.tsx                # Landing page
 │   ├── auth/                   # Login, signup pages
-│   ├── (dashboard)/            # Dashboard, billing, settings (auth required)
+│   ├── (dashboard)/            # Dashboard, billing, settings, analytics, team (auth required)
 │   ├── create/                 # Chat-based discovery → generation
 │   ├── podcast/[podcastId]/    # Playback + interrupt + fork
 │   ├── feed/                   # Public social feed
@@ -88,9 +88,15 @@ src/
 │       ├── recommendations/    # Search similar podcasts
 │       ├── feed/               # Public feed, trending, search
 │       ├── users/              # Profile, follow/unfollow
-│       ├── billing/            # Stripe checkout, subscription, portal
+│       ├── billing/            # Stripe checkout, subscription, portal, usage
 │       ├── notifications/      # List, mark read, push registration
 │       ├── tags/               # Tag taxonomy
+│       ├── keys/               # API key management (CRUD, rotate)
+│       ├── teams/              # Team management + invites
+│       ├── voices/             # Voice clone + preview
+│       ├── analytics/          # Usage analytics
+│       ├── waitlist/           # Waitlist signup
+│       ├── health/             # Health check
 │       └── webhooks/stripe/    # Stripe webhook handler
 ├── components/
 │   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner, CitationMarker
@@ -127,6 +133,7 @@ src/
 │   ├── subscription.ts         # Subscription tier management + limits
 │   ├── notifications.ts        # In-app notification helpers
 │   ├── validations.ts          # Zod schemas for API validation
+│   ├── api-keys.ts             # API key generation, hashing, validation
 │   └── hooks/                  # React hooks
 │       ├── useAuth.ts
 │       ├── useAudioPlayer.ts
@@ -153,7 +160,10 @@ src/
     ├── feed.ts
     ├── discovery.ts
     ├── notification.ts
-    └── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
+    ├── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
+    ├── analytics.ts            # Usage analytics types
+    ├── api-key.ts              # API key types
+    └── team.ts                 # Team + invite types
 ```
 
 ## Design System: "Warm Intimacy"
@@ -221,7 +231,11 @@ User listening → taps "Ask a Question" → podcast pauses
 | `Interaction` | Question at timestamp, answer, resolution status |
 | `Like` / `Save` | Social engagement |
 | `Tag` / `PodcastTag` | Discovery taxonomy |
-| `Subscription` | Stripe (FREE/PRO/TEAM) |
+| `Subscription` | Stripe (FREE/PRO/CREATOR) |
+| `VoiceClone` | User voice clones (name, ElevenLabs ID, source type) |
+| `ApiKey` | Developer API keys (hashed, prefix, usage tracking) |
+| `Team` | Team ownership + member management |
+| `TeamInvite` | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED) |
 | `Job` | BullMQ job tracking |
 | `Notification` | In-app + push notifications |
 | `PushSubscription` | Web Push API endpoints |
@@ -231,11 +245,11 @@ User listening → taps "Ask a Question" → podcast pauses
 
 ## Pricing Tiers
 
-| Tier | Price | Podcasts | Duration | Interactions | Visibility |
-|------|-------|----------|----------|-------------|------------|
-| Free | $0 | 3/month | 10 min | 3 per podcast | Public only |
-| Pro | $19/mo | 20/month | 30 min | Unlimited | Private + unlisted |
-| Team | $49/mo | Unlimited | 30 min | Unlimited | Team feed |
+| Tier | Price | Podcasts | Duration | Interactions | Premium Credits | Voice Clones | Sound Effects |
+|------|-------|----------|----------|-------------|----------------|-------------|--------------|
+| Free | $0 | 2/month | 10 min | 2 per podcast | 0 | 0 | Standard |
+| Pro | $14/mo | 8/month | 10 min | 10 per podcast | 3 | 2 | Standard |
+| Creator | $29/mo | 30/month | 10 min | Unlimited | 10 | 5 | Premium (ElevenLabs SFX) |
 
 ## Engineering Standards
 

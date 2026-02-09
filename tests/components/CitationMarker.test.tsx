@@ -14,6 +14,7 @@ const mockRef: ReferenceData = {
   publisher: 'Nature',
   doi: '10.1234/test1',
   verificationStatus: 'VERIFIED',
+  verificationDetails: null,
 };
 
 const mockRefNoUrl: ReferenceData = {
@@ -27,6 +28,7 @@ const mockRefNoUrl: ReferenceData = {
   publisher: 'MIT Press',
   doi: null,
   verificationStatus: 'VERIFIED',
+  verificationDetails: null,
 };
 
 describe('CitationMarker', () => {

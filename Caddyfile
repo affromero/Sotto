@@ -1,0 +1,38 @@
+# Sotto — Caddy Reverse Proxy Configuration
+#
+# Usage:
+#   1. Copy this file to /etc/caddy/Caddyfile on your server
+#   2. Replace "sotto.fm" with your actual domain
+#   3. Reload: sudo systemctl reload caddy
+#
+# Caddy automatically obtains and renews Let's Encrypt SSL certificates.
+
+sotto.fm {
+	reverse_proxy localhost:3000
+
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(self), geolocation=()"
+		-Server
+	}
+
+	# Cache static assets
+	@static path /fonts/* /_next/static/* /favicon.ico /manifest.json /sw.js
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	log {
+		output file /var/log/caddy/sotto-access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
+}
+
+www.sotto.fm {
+	redir https://sotto.fm{uri} permanent
+}

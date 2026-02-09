@@ -8,7 +8,7 @@
 
 ## Overview
 
-Sotto uses Stripe for subscription billing with three tiers: Free ($0), Pro ($19/month), and Team ($49/month). All users start on the Free tier with no Stripe involvement. When a user upgrades, a Stripe Checkout session is created. Stripe webhooks update the local database as subscription state changes (renewals, cancellations, payment failures). The Stripe Customer Portal allows users to manage their own billing, update payment methods, and cancel subscriptions without any custom UI.
+Sotto uses Stripe for subscription billing with three tiers: Free ($0), Pro ($14/month), and Creator ($29/month). All users start on the Free tier with no Stripe involvement. When a user upgrades, a Stripe Checkout session is created. Stripe webhooks update the local database as subscription state changes (renewals, cancellations, payment failures). The Stripe Customer Portal allows users to manage their own billing, update payment methods, and cancel subscriptions without any custom UI.
 
 | Component | File | Purpose |
 |-----------|------|---------|
@@ -27,8 +27,8 @@ Sotto uses Stripe for subscription billing with three tiers: Free ($0), Pro ($19
 | `STRIPE_SECRET_KEY` | Yes (for billing) | Stripe API secret key | `sk_test_xxxxxxxxxxxx` |
 | `STRIPE_PUBLISHABLE_KEY` | Yes (for billing) | Stripe publishable key (client-side) | `pk_test_xxxxxxxxxxxx` |
 | `STRIPE_WEBHOOK_SECRET` | Yes (for billing) | Webhook endpoint signing secret | `whsec_xxxxxxxxxxxx` |
-| `STRIPE_PRICE_ID_PRO` | Yes (for billing) | Price ID for Pro tier ($19/mo) | `price_xxxxxxxxxxxx` |
-| `STRIPE_PRICE_ID_TEAM` | Yes (for billing) | Price ID for Team tier ($49/mo) | `price_xxxxxxxxxxxx` |
+| `STRIPE_PRICE_ID_PRO` | Yes (for billing) | Price ID for Pro tier ($14/mo) | `price_xxxxxxxxxxxx` |
+| `STRIPE_PRICE_ID_CREATOR` | Yes (for billing) | Price ID for Creator tier ($29/mo) | `price_xxxxxxxxxxxx` |
 
 All variables are optional in the sense that the app starts without them. Billing features are disabled gracefully when `STRIPE_SECRET_KEY` is missing.
 
@@ -51,22 +51,22 @@ Create two products in the Stripe Dashboard (or via the API). The Free tier has 
 | Field | Value |
 |-------|-------|
 | Product name | Sotto Pro |
-| Description | 20 podcasts/month, 30 min max, unlimited interactions, private podcasts, downloads |
+| Description | 8 podcasts/month, 10 interactions/podcast, 3 premium voice credits, private podcasts, downloads |
 | Pricing model | Standard pricing |
-| Price | $19.00 USD |
+| Price | $14.00 USD |
 | Billing period | Monthly |
 | Price ID | Copy this into `STRIPE_PRICE_ID_PRO` |
 
-**Product 2: Sotto Team**
+**Product 2: Sotto Creator**
 
 | Field | Value |
 |-------|-------|
-| Product name | Sotto Team |
-| Description | Unlimited podcasts, 10 team seats, private team feed, API access, analytics |
+| Product name | Sotto Creator |
+| Description | 30 podcasts/month, unlimited interactions, 10 premium voice credits, marketplace, analytics |
 | Pricing model | Standard pricing |
-| Price | $49.00 USD |
+| Price | $29.00 USD |
 | Billing period | Monthly |
-| Price ID | Copy this into `STRIPE_PRICE_ID_TEAM` |
+| Price ID | Copy this into `STRIPE_PRICE_ID_CREATOR` |
 
 To create via Stripe Dashboard:
 1. Navigate to **Products** in the sidebar
@@ -83,9 +83,9 @@ The customer portal lets users manage their subscription without custom UI:
 2. Enable the following features:
    - **Invoices**: allow customers to view invoice history
    - **Payment methods**: allow updating payment method
-   - **Subscriptions**: allow canceling, and switching between Pro and Team
+   - **Subscriptions**: allow canceling, and switching between Pro and Creator
    - **Cancel subscription**: enable with "Cancel at end of billing period" behavior
-3. Under **Products**, add both Sotto Pro and Sotto Team so users can switch between them
+3. Under **Products**, add both Sotto Pro and Sotto Creator so users can switch between them
 4. Set the **Default return URL** to `https://sotto.fm/billing` (or `http://localhost:3000/billing` for dev)
 5. Save the configuration
 
@@ -115,49 +115,52 @@ Tier limits are defined in `src/lib/stripe.ts` and enforced throughout the appli
 ```typescript
 export const TIER_LIMITS = {
   FREE: {
-    podcastsPerMonth: 3,
+    podcastsPerMonth: 2,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 3,
+    interactionsPerPodcast: 2,
+    premiumVoiceCredits: 0,
+    maxVoiceClones: 0,
+    hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
-    voiceCount: 2,
   },
   PRO: {
-    podcastsPerMonth: 20,
-    maxDurationMinutes: 30,
-    interactionsPerPodcast: Infinity,
+    podcastsPerMonth: 8,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: 10,
+    premiumVoiceCredits: 3,
+    maxVoiceClones: 2,
+    hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
-    voiceCount: 6,
   },
-  TEAM: {
-    podcastsPerMonth: Infinity,
-    maxDurationMinutes: 30,
+  CREATOR: {
+    podcastsPerMonth: 30,
+    maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
+    premiumVoiceCredits: 10,
+    maxVoiceClones: 5,
+    hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
-    voiceCount: 6,
   },
 } as const;
 ```
 
 ### Tier Comparison
 
-| Feature | Free | Pro ($19/mo) | Team ($49/mo) |
-|---------|------|-------------|---------------|
-| Podcasts per month | 3 | 20 | Unlimited |
-| Max duration | 10 min | 30 min | 30 min |
-| Interactions per podcast | 3 | Unlimited | Unlimited |
-| Download MP3 | No | Yes | Yes |
+| Feature | Free | Pro ($14/mo) | Creator ($29/mo) |
+|---------|------|-------------|------------------|
+| Podcasts per month | 2 | 8 | 30 |
+| Max duration | 10 min | 10 min | 10 min |
+| Interactions per podcast | 2 | 10 | Unlimited |
+| Premium voice credits | 0 | 3/mo | 10/mo |
+| Voice clones | 0 | 2 | 5 |
+| Sound effects | Standard | Standard | Premium (ElevenLabs SFX) |
+| Download MP3 / PDF | No | Yes | Yes |
 | Private/Unlisted podcasts | No | Yes | Yes |
-| Voice selection | 2 standard | 6 premium | 6 premium |
-| Priority generation queue | No | Yes | Yes |
-| Team seats | N/A | N/A | 10 |
-| Private team feed | No | No | Yes |
-| API access | No | No | Yes |
-| Analytics dashboard | No | No | Yes |
-| Transcript export | No | Yes | Yes |
-| Podcast updates from Q&A | No | Yes | Yes |
+| Voice library browsing | No | Yes | Yes |
+| Marketplace / Analytics | No | No | Yes |
 
 ### Limit Enforcement Points
 
@@ -309,7 +312,7 @@ export async function POST(request: NextRequest) {
 
   const priceId = tier === 'pro'
     ? process.env.STRIPE_PRICE_ID_PRO
-    : process.env.STRIPE_PRICE_ID_TEAM;
+    : process.env.STRIPE_PRICE_ID_CREATOR;
 
   if (!priceId) {
     return NextResponse.json({ error: 'Price not configured' }, { status: 500 });
@@ -355,7 +358,7 @@ export async function createPortalSession(
 Users access the portal from the `/billing` page. The portal allows:
 - Viewing invoice history
 - Updating payment method
-- Switching between Pro and Team plans
+- Switching between Pro and Creator plans
 - Canceling the subscription (takes effect at end of billing period)
 
 ---
@@ -397,7 +400,7 @@ export async function POST(request: NextRequest) {
 
 | Event | When It Fires | What the Handler Does |
 |-------|--------------|----------------------|
-| `checkout.session.completed` | User completes payment on Stripe Checkout | Creates `Subscription` record, links Stripe customer ID to user, sets tier to PRO or TEAM, sets status to ACTIVE |
+| `checkout.session.completed` | User completes payment on Stripe Checkout | Creates `Subscription` record, links Stripe customer ID to user, sets tier to PRO or CREATOR, sets status to ACTIVE |
 | `customer.subscription.updated` | Subscription renews, plan changes, or period updates | Updates tier (if plan changed), updates `currentPeriodStart`/`currentPeriodEnd`, updates status, resets monthly usage on period renewal |
 | `customer.subscription.deleted` | Subscription is canceled (after period end) or immediately deleted | Sets subscription status to CANCELED, downgrades user to FREE tier limits |
 | `invoice.payment_failed` | Payment attempt fails (card declined, insufficient funds) | Sets subscription status to PAST_DUE, creates in-app notification to update payment method |
@@ -421,7 +424,7 @@ case 'checkout.session.completed': {
   const priceId = stripeSubscription.items.data[0].price.id;
 
   // Determine tier from price ID
-  const tier = priceId === process.env.STRIPE_PRICE_ID_TEAM ? 'TEAM' : 'PRO';
+  const tier = priceId === process.env.STRIPE_PRICE_ID_CREATOR ? 'CREATOR' : 'PRO';
 
   // Create or update subscription record
   await prisma.subscription.upsert({
@@ -467,7 +470,7 @@ case 'checkout.session.completed': {
 case 'customer.subscription.updated': {
   const subscription = event.data.object;
   const priceId = subscription.items.data[0].price.id;
-  const tier = priceId === process.env.STRIPE_PRICE_ID_TEAM ? 'TEAM' : 'PRO';
+  const tier = priceId === process.env.STRIPE_PRICE_ID_CREATOR ? 'CREATOR' : 'PRO';
 
   // Map Stripe status to our enum
   const statusMap: Record<string, string> = {
@@ -566,7 +569,7 @@ case 'invoice.payment_failed': {
         userId: dbSubscription.userId,
         type: 'PODCAST_READY', // Using closest type; consider adding PAYMENT_FAILED
         title: 'Payment failed',
-        message: 'Your subscription payment failed. Please update your payment method to continue using Pro/Team features.',
+        message: 'Your subscription payment failed. Please update your payment method to continue using Pro/Creator features.',
         data: { action: 'update_payment' },
       },
     });
@@ -596,7 +599,7 @@ case 'invoice.payment_failed': {
       |
       | checkout.session.completed webhook
       v
-[ACTIVE - PRO or TEAM]
+[ACTIVE - PRO or CREATOR]
       |
       +----> [Period renews: invoice.paid]
       |          Reset podcastsUsed = 0
@@ -623,7 +626,7 @@ case 'invoice.payment_failed': {
       |      customer.subscription.deleted --> CANCELED
       |
       +----> [User switches plan: customer.subscription.updated]
-                 Tier changes (PRO <-> TEAM)
+                 Tier changes (PRO <-> CREATOR)
                  Proration applied by Stripe
 ```
 
@@ -670,7 +673,7 @@ enum SubscriptionStatus {
 enum SubscriptionTier {
   FREE
   PRO
-  TEAM
+  CREATOR
 }
 
 model SubscriptionEvent {
@@ -793,7 +796,7 @@ When a user cancels their subscription through the customer portal, Stripe sets 
 
 The `cancelAtPeriodEnd` flag on the `Subscription` model is used to show a "Your subscription will end on [date]" message on the billing page.
 
-### Subscription Switching (Pro to Team or Team to Pro)
+### Subscription Switching (Pro to Creator or Creator to Pro)
 
 When a user changes their plan through the customer portal, Stripe sends a `customer.subscription.updated` event with the new price ID. The handler maps the price ID to the tier and updates the database. Stripe handles proration automatically (charging or crediting the difference for the remaining period).
 
