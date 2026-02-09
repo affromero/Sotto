@@ -48,10 +48,12 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=sotto:sotto /app/.next/standalone ./
 COPY --from=builder --chown=sotto:sotto /app/.next/static ./.next/static
 
-# Copy Prisma schema and generated client for runtime
+# Copy Prisma schema, generated client, and CLI for runtime migrations
 COPY --from=builder --chown=sotto:sotto /app/prisma ./prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=deps --chown=sotto:sotto /app/node_modules/prisma ./node_modules/prisma
+COPY --from=deps --chown=sotto:sotto /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
 USER sotto
 
