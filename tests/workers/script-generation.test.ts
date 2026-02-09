@@ -77,9 +77,11 @@ const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
+    VERIFY_SCRIPT: 'verify_script',
     VALIDATE_REFERENCES: 'validate_references',
     GENERATE_AUDIO: 'generate_audio',
   },
+  scriptVerificationQueue: { name: 'script-verification' },
   referenceValidationQueue: { name: 'reference-validation' },
   audioGenerationQueue: { name: 'audio-generation' },
 }));
@@ -477,8 +479,8 @@ describe('processScriptGeneration', () => {
     });
   });
 
-  describe('pipeline routing: with references', () => {
-    beforeEach(() => {
+  describe('pipeline routing: always routes to script verification', () => {
+    it('updates podcast status to VERIFYING_SCRIPT with references', async () => {
       mockGenerateScript.mockResolvedValue({
         turns: [{ speaker: 'HOST', text: 'With refs [1]' }],
         soundCues: [],
@@ -498,40 +500,100 @@ describe('processScriptGeneration', () => {
         inputTokens: 1000,
         outputTokens: 500,
       });
-    });
 
-    it('updates podcast status to VALIDATING_REFERENCES when references exist', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VALIDATING_REFERENCES' },
+        data: { status: 'VERIFYING_SCRIPT' },
       });
     });
 
-    it('queues reference validation job when references exist', async () => {
+    it('queues script verification job with references', async () => {
+      mockGenerateScript.mockResolvedValue({
+        turns: [{ speaker: 'HOST', text: 'With refs [1]' }],
+        soundCues: [],
+        references: [
+          {
+            number: 1,
+            title: 'Test Paper',
+            authors: ['Author'],
+            year: 2023,
+            url: 'https://example.com',
+            type: 'PAPER',
+            publisher: null,
+            doi: null,
+          },
+        ],
+        markdown: '**HOST:** With refs [1]',
+        inputTokens: 1000,
+        outputTokens: 500,
+      });
+
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'reference-validation' },
-        'validate_references',
-        {
-          podcastId: 'podcast-001',
-          userId: 'user-001',
-        }
-      );
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'script-verification' }, 'verify_script', {
+        podcastId: 'podcast-001',
+        userId: 'user-001',
+        discoveryId: 'discovery-001',
+      });
     });
 
-    it('does not create segments when references exist', async () => {
+    it('updates podcast status to VERIFYING_SCRIPT without references', async () => {
+      mockGenerateScript.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', text: 'First turn' },
+          { speaker: 'EXPERT', text: 'Second turn' },
+        ],
+        soundCues: [],
+        references: [],
+        markdown: '**HOST:** First turn\n\n**EXPERT:** Second turn',
+        inputTokens: 1500,
+        outputTokens: 800,
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'VERIFYING_SCRIPT' },
+      });
+    });
+
+    it('queues script verification job without references', async () => {
+      mockGenerateScript.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', text: 'First turn' },
+          { speaker: 'EXPERT', text: 'Second turn' },
+        ],
+        soundCues: [],
+        references: [],
+        markdown: '**HOST:** First turn\n\n**EXPERT:** Second turn',
+        inputTokens: 1500,
+        outputTokens: 800,
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'script-verification' }, 'verify_script', {
+        podcastId: 'podcast-001',
+        userId: 'user-001',
+        discoveryId: 'discovery-001',
+      });
+    });
+
+    it('does not create segments directly (verification worker handles this)', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
       expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
     });
 
-    it('does not queue audio generation when references exist', async () => {
+    it('does not queue audio generation directly', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
@@ -539,114 +601,6 @@ describe('processScriptGeneration', () => {
         (call) => call[1] === 'generate_audio'
       );
       expect(audioGenerationCalls).toHaveLength(0);
-    });
-  });
-
-  describe('pipeline routing: without references', () => {
-    beforeEach(() => {
-      mockGenerateScript.mockResolvedValue({
-        turns: [
-          { speaker: 'HOST', text: 'First turn' },
-          { speaker: 'EXPERT', text: 'Second turn' },
-          { speaker: 'HOST', text: 'Third turn' },
-        ],
-        soundCues: [],
-        references: [],
-        markdown: '**HOST:** First turn\n\n**EXPERT:** Second turn\n\n**HOST:** Third turn',
-        inputTokens: 1500,
-        outputTokens: 800,
-      });
-    });
-
-    it('creates segments with correct order when no references', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledTimes(3);
-      expect(mockPrismaSegmentCreate).toHaveBeenNthCalledWith(1, {
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'HOST',
-          text: 'First turn',
-          order: 0,
-        },
-      });
-      expect(mockPrismaSegmentCreate).toHaveBeenNthCalledWith(2, {
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'EXPERT',
-          text: 'Second turn',
-          order: 1,
-        },
-      });
-      expect(mockPrismaSegmentCreate).toHaveBeenNthCalledWith(3, {
-        data: {
-          podcastId: 'podcast-001',
-          speaker: 'HOST',
-          text: 'Third turn',
-          order: 2,
-        },
-      });
-    });
-
-    it('queues audio generation for each segment', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(mockAddJob).toHaveBeenCalledTimes(3);
-      expect(mockAddJob).toHaveBeenNthCalledWith(
-        1,
-        { name: 'audio-generation' },
-        'generate_audio',
-        {
-          podcastId: 'podcast-001',
-          segmentId: 'segment-0',
-          speaker: 'HOST',
-          text: 'First turn',
-        }
-      );
-      expect(mockAddJob).toHaveBeenNthCalledWith(
-        2,
-        { name: 'audio-generation' },
-        'generate_audio',
-        {
-          podcastId: 'podcast-001',
-          segmentId: 'segment-1',
-          speaker: 'EXPERT',
-          text: 'Second turn',
-        }
-      );
-      expect(mockAddJob).toHaveBeenNthCalledWith(
-        3,
-        { name: 'audio-generation' },
-        'generate_audio',
-        {
-          podcastId: 'podcast-001',
-          segmentId: 'segment-2',
-          speaker: 'HOST',
-          text: 'Third turn',
-        }
-      );
-    });
-
-    it('updates podcast status to GENERATING_AUDIO when no references', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        data: { status: 'GENERATING_AUDIO' },
-      });
-    });
-
-    it('does not queue reference validation when no references', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      const validationCalls = mockAddJob.mock.calls.filter(
-        (call) => call[1] === 'validate_references'
-      );
-      expect(validationCalls).toHaveLength(0);
     });
   });
 
@@ -786,15 +740,15 @@ describe('processScriptGeneration', () => {
       await expect(processScriptGeneration(job)).rejects.toThrow('Foreign key constraint failed');
     });
 
-    it('propagates errors from segment.create', async () => {
+    it('propagates errors from podcast.update', async () => {
       mockPrismaScriptCreate.mockResolvedValueOnce({
         id: 'script-001',
         podcastId: 'podcast-001',
       });
-      mockPrismaSegmentCreate.mockRejectedValue(new Error('Segment creation failed'));
+      mockPrismaPodcastUpdate.mockRejectedValue(new Error('Podcast update failed'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processScriptGeneration(job)).rejects.toThrow('Segment creation failed');
+      await expect(processScriptGeneration(job)).rejects.toThrow('Podcast update failed');
     });
 
     it('propagates errors from addJob', async () => {
@@ -893,20 +847,20 @@ describe('processScriptGeneration', () => {
         ]),
       });
 
-      // Status updated to VALIDATING_REFERENCES
+      // Status updated to VERIFYING_SCRIPT
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VALIDATING_REFERENCES' },
+        data: { status: 'VERIFYING_SCRIPT' },
       });
 
-      // Validation job queued
+      // Script verification job queued
       expect(mockAddJob).toHaveBeenCalledWith(
-        { name: 'reference-validation' },
-        'validate_references',
+        { name: 'script-verification' },
+        'verify_script',
         expect.objectContaining({ podcastId: 'podcast-001' })
       );
 
-      // No segments created
+      // No segments created (verification worker handles this)
       expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
 
       // Usage logged
@@ -950,24 +904,21 @@ describe('processScriptGeneration', () => {
       // No references saved
       expect(mockPrismaReferenceCreateMany).not.toHaveBeenCalled();
 
-      // Segments created
-      expect(mockPrismaSegmentCreate).toHaveBeenCalledTimes(2);
+      // No segments created directly (verification worker handles this)
+      expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
 
-      // Audio jobs queued
-      const audioJobs = mockAddJob.mock.calls.filter((call) => call[1] === 'generate_audio');
-      expect(audioJobs).toHaveLength(2);
+      // Script verification job queued
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'script-verification' },
+        'verify_script',
+        expect.objectContaining({ podcastId: 'podcast-001' })
+      );
 
-      // Status updated to GENERATING_AUDIO
+      // Status updated to VERIFYING_SCRIPT
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'GENERATING_AUDIO' },
+        data: { status: 'VERIFYING_SCRIPT' },
       });
-
-      // No validation job
-      const validationJobs = mockAddJob.mock.calls.filter(
-        (call) => call[1] === 'validate_references'
-      );
-      expect(validationJobs).toHaveLength(0);
 
       // Usage logged
       expect(mockLogApiUsage).toHaveBeenCalled();

@@ -38,9 +38,19 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 const mockConsumeVoiceCredit = vi.fn();
+const mockGetUserTier = vi.fn().mockResolvedValue('FREE');
 
 vi.mock('@/lib/subscription', () => ({
   consumeVoiceCredit: (...args: unknown[]) => mockConsumeVoiceCredit(...args),
+  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
+}));
+
+vi.mock('@/lib/stripe', () => ({
+  TIER_LIMITS: {
+    FREE: { maxDurationMinutes: 10 },
+    PRO: { maxDurationMinutes: 10 },
+    CREATOR: { maxDurationMinutes: 10 },
+  },
 }));
 
 // ---- Import under test ----
@@ -97,7 +107,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       where: { id: 'podcast-nonexistent' },
       include: {
         discovery: {
-          select: { sourceUrl: true, sourceContent: true },
+          select: { sourceUrl: true, sourceContent: true, durationTarget: true },
         },
       },
     });
@@ -496,7 +506,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       where: { id: 'podcast-017' },
       include: {
         discovery: {
-          select: { sourceUrl: true, sourceContent: true },
+          select: { sourceUrl: true, sourceContent: true, durationTarget: true },
         },
       },
     });

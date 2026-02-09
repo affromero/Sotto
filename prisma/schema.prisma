@@ -279,6 +279,7 @@ enum PodcastStatus {
   DISCOVERING
   EXTRACTING
   SCRIPTING
+  VERIFYING_SCRIPT
   VALIDATING_REFERENCES
   GENERATING_AUDIO
   STITCHING
@@ -350,6 +351,8 @@ model Script {
   markdown  String   @db.Text
   context   String?  @db.Text // source context used for generation
   version   Int      @default(1)
+  verificationAttempts Int      @default(0)
+  verificationFeedback String?  @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -13,6 +13,7 @@ import {
   searchTitle,
   aiEvaluateReferences,
   computeVerificationVerdict,
+  assessSourceQuality,
   type ReferenceInput,
   type VerificationCheck,
   type VerificationVerdict,
@@ -45,7 +46,9 @@ async function runWithConcurrencyLimit<T>(
   return results;
 }
 
-export async function processReferenceValidation(job: Job<ValidateReferencesPayload>): Promise<void> {
+export async function processReferenceValidation(
+  job: Job<ValidateReferencesPayload>
+): Promise<void> {
   const { podcastId, userId } = job.data;
 
   logger.info('Starting reference validation', { podcastId });
@@ -72,7 +75,10 @@ export async function processReferenceValidation(job: Job<ValidateReferencesPayl
 
   if (references.length === 0) {
     logger.info('No references to validate, proceeding to audio generation', { podcastId });
-    await createSegmentsAndQueueAudio(podcastId, script.turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>);
+    await createSegmentsAndQueueAudio(
+      podcastId,
+      script.turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>
+    );
     await job.updateProgress(100);
     return;
   }
@@ -88,10 +94,27 @@ export async function processReferenceValidation(job: Job<ValidateReferencesPayl
     type: r.type,
   }));
 
+  // Source quality pre-filter: reject blocked domains before running verification layers
+  const rejectedRefIds = new Set<string>();
+  for (const ref of refInputs) {
+    const quality = assessSourceQuality(ref);
+    if (!quality.accepted) {
+      rejectedRefIds.add(ref.id);
+      logger.info('Reference rejected by source quality filter', {
+        podcastId,
+        refNumber: String(ref.number),
+        reason: quality.reason,
+      });
+    }
+  }
+
+  // Filter to only refs that passed the quality check
+  const acceptedRefInputs = refInputs.filter((r) => !rejectedRefIds.has(r.id));
+
   // Layers 1-3: run in parallel per reference, with concurrency limit
   const allChecks = new Map<string, VerificationCheck[]>();
 
-  const layer1to3Tasks = refInputs.map((ref) => async () => {
+  const layer1to3Tasks = acceptedRefInputs.map((ref) => async () => {
     const [urlCheck, doiCheck, titleCheck] = await Promise.all([
       verifyUrl(ref),
       verifyDoi(ref),
@@ -119,10 +142,10 @@ export async function processReferenceValidation(job: Job<ValidateReferencesPayl
 
   await job.updateProgress(50);
 
-  // Layer 4: AI evaluation (single batch call)
+  // Layer 4: AI evaluation (single batch call, only accepted refs)
   let aiResults: Map<string, VerificationCheck>;
   try {
-    aiResults = await aiEvaluateReferences(refInputs, allChecks, podcast?.topic || '');
+    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '');
   } catch (error) {
     logger.warn('AI evaluation failed, using external checks only', {
       error: error instanceof Error ? error.message : 'Unknown',
@@ -143,18 +166,16 @@ export async function processReferenceValidation(job: Job<ValidateReferencesPayl
   const verdicts = new Map<string, VerificationVerdict>();
   const removedNumbers = new Set<number>();
 
-  // Determine if we're in fallback mode (no external checks succeeded)
-  const hasExternalChecks = externalChecksResults.some((r) => r.checks.length > 0);
-  const hasAiChecks = aiResults.size > 0;
-
   for (const ref of references) {
+    // References rejected by source quality filter are immediately REMOVED
+    if (rejectedRefIds.has(ref.id)) {
+      verdicts.set(ref.id, { status: 'REMOVED', confidence: 0 });
+      removedNumbers.add(ref.number);
+      continue;
+    }
+
     const checks = allChecks.get(ref.id) || [];
     const verdict = computeVerificationVerdict(checks);
-
-    // In AI-only fallback mode, use lower threshold
-    if (!hasExternalChecks && hasAiChecks && verdict.confidence < 0.5 && verdict.confidence >= 0.3) {
-      verdict.status = 'VERIFIED';
-    }
 
     verdicts.set(ref.id, verdict);
 

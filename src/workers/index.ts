@@ -11,6 +11,7 @@ import { processSegmentRegeneration } from './segment-regeneration.worker';
 import { processNotification } from './notification.worker';
 import { processPdfGeneration } from './pdf-generation.worker';
 import { processTwitterMentions } from './twitter-mentions.worker';
+import { processScriptVerification } from './script-verification.worker';
 import { processTwitterReply } from './twitter-reply.worker';
 
 logger.info('Starting Sotto workers...');
@@ -19,6 +20,7 @@ logger.info('Starting Sotto workers...');
 const workers = [
   createWorker('content-extraction', processContentExtraction, { concurrency: 2 }),
   createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
+  createWorker('script-verification', processScriptVerification, { concurrency: 2 }),
   createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
   createWorker('audio-generation', processAudioGeneration, { concurrency: 5 }),
   createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
@@ -35,7 +37,9 @@ if (isTwitterConfigured()) {
   const pollInterval = parseInt(process.env.TWITTER_POLL_INTERVAL_MS || '60000', 10);
   twitterMentionsQueue
     .add(JobType.POLL_TWITTER_MENTIONS, {}, { repeat: { every: pollInterval } })
-    .then(() => logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) }))
+    .then(() =>
+      logger.info('Twitter mentions polling scheduled', { intervalMs: String(pollInterval) })
+    )
     .catch((err) => logger.error('Failed to schedule Twitter polling', { error: err.message }));
 } else {
   logger.info('Twitter integration not configured — polling disabled');

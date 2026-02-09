@@ -8,6 +8,7 @@ import { logger } from './logger';
 export enum JobType {
   EXTRACT_CONTENT = 'extract_content',
   GENERATE_SCRIPT = 'generate_script',
+  VERIFY_SCRIPT = 'verify_script',
   VALIDATE_REFERENCES = 'validate_references',
   GENERATE_AUDIO = 'generate_audio',
   STITCH_AUDIO = 'stitch_audio',
@@ -75,6 +76,12 @@ export interface SendNotificationPayload {
 export interface ValidateReferencesPayload {
   podcastId: string;
   userId: string;
+}
+
+export interface VerifyScriptPayload {
+  podcastId: string;
+  userId: string;
+  discoveryId: string;
 }
 
 export interface GeneratePdfPayload {
@@ -196,7 +203,9 @@ export function createWorker<T>(
   });
 
   worker.on('ready', () => logger.info(`Worker ready for ${queueName}`));
-  worker.on('error', (err) => logger.error(`Worker error for ${queueName}:`, { error: err.message }));
+  worker.on('error', (err) =>
+    logger.error(`Worker error for ${queueName}:`, { error: err.message })
+  );
   worker.on('failed', (job, err) =>
     logger.error(`Worker job failed for ${queueName}:`, { jobId: job?.id, error: err.message })
   );
@@ -216,5 +225,6 @@ export const segmentRegenerationQueue = createQueue('segment-regeneration', { at
 export const notificationQueue = createQueue('notifications', { attempts: 5 });
 export const referenceValidationQueue = createQueue('reference-validation', { attempts: 2 });
 export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2 });
+export const scriptVerificationQueue = createQueue('script-verification', { attempts: 2 });
 export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1 });
 export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3 });

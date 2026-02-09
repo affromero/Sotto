@@ -1,11 +1,5 @@
 import { Job } from 'bullmq';
-import {
-  GenerateScriptPayload,
-  addJob,
-  JobType,
-  audioGenerationQueue,
-  referenceValidationQueue,
-} from '@/lib/queue';
+import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { generateScript } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
@@ -62,46 +56,22 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     logger.info('References saved', { podcastId, count: String(result.references.length) });
   }
 
-  // Route based on whether references exist
-  if (result.references.length > 0) {
-    // References exist: route through validation pipeline
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'VALIDATING_REFERENCES' },
-    });
+  // Route to script verification (handles both with and without references)
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { status: 'VERIFYING_SCRIPT' },
+  });
 
-    await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
-      podcastId,
-      userId,
-    });
+  await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
+    podcastId,
+    userId,
+    discoveryId,
+  });
 
-    logger.info('References queued for validation', { podcastId, count: String(result.references.length) });
-  } else {
-    // No references: create segments and go directly to audio generation
-    const turns = result.turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>;
-    for (let i = 0; i < turns.length; i++) {
-      const segment = await prisma.segment.create({
-        data: {
-          podcastId,
-          speaker: turns[i].speaker,
-          text: turns[i].text,
-          order: i,
-        },
-      });
-
-      await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, {
-        podcastId,
-        segmentId: segment.id,
-        speaker: turns[i].speaker,
-        text: turns[i].text,
-      });
-    }
-
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'GENERATING_AUDIO' },
-    });
-  }
+  logger.info('Script queued for verification', {
+    podcastId,
+    references: String(result.references.length),
+  });
 
   // Log API usage
   await logApiUsage({
@@ -113,5 +83,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   });
 
   await job.updateProgress(100);
-  logger.info('Script generation complete', { podcastId, references: String(result.references.length) });
+  logger.info('Script generation complete', {
+    podcastId,
+    references: String(result.references.length),
+  });
 }

@@ -1,5 +1,11 @@
 import { Job } from 'bullmq';
-import { StitchAudioPayload, addJob, JobType, notificationQueue, twitterReplyQueue } from '@/lib/queue';
+import {
+  StitchAudioPayload,
+  addJob,
+  JobType,
+  notificationQueue,
+  twitterReplyQueue,
+} from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
@@ -139,14 +145,40 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(80);
 
-    // 7. Read final audio and upload to R2
+    // 7. Post-stitch duration hard check
+    const maxDurationSeconds = tierLimits.maxDurationMinutes * 60 * 1.1; // 10% grace
+    if (duration > maxDurationSeconds) {
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { status: 'FAILED' },
+      });
+
+      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+        userId: podcast.userId,
+        type: 'PODCAST_READY',
+        title: 'Podcast generation failed',
+        message: `"${podcast.title}" exceeded the ${tierLimits.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        data: { podcastId },
+      });
+
+      logger.error('Podcast exceeded duration limit', {
+        podcastId,
+        durationSeconds: String(Math.round(duration)),
+        maxSeconds: String(Math.round(maxDurationSeconds)),
+      });
+
+      await job.updateProgress(100);
+      return;
+    }
+
+    // 8. Read final audio and upload to R2
     const { readFile } = await import('fs/promises');
     const finalAudio = await readFile(outputPath);
     const audioUrl = await uploadPodcastAudio(podcastId, finalAudio);
 
     await job.updateProgress(90);
 
-    // 8. Update podcast record
+    // 9. Update podcast record
     await prisma.podcast.update({
       where: { id: podcastId },
       data: {
@@ -207,17 +239,21 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
   } catch (err) {
     // Mark podcast as failed on unrecoverable error
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'FAILED' },
-    }).catch(() => {});
+    await prisma.podcast
+      .update({
+        where: { id: podcastId },
+        data: { status: 'FAILED' },
+      })
+      .catch(() => {});
 
     // If Twitter-sourced, queue failure reply
     if (job.data.podcastId) {
-      const mention = await prisma.tweetMention.findFirst({
-        where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
-        select: { id: true, tweetId: true },
-      }).catch(() => null);
+      const mention = await prisma.tweetMention
+        .findFirst({
+          where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, tweetId: true },
+        })
+        .catch(() => null);
       if (mention) {
         await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
           podcastId: job.data.podcastId,
