@@ -2,8 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const USE_CLAUDE_CODE = process.env.AI_PROVIDER === 'claude-code';
 
-if (!ANTHROPIC_API_KEY) {
+if (!ANTHROPIC_API_KEY && !USE_CLAUDE_CODE) {
   logger.warn('ANTHROPIC_API_KEY is not set — Claude features will not work');
 }
 
@@ -17,6 +18,14 @@ export async function generateResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   options?: { maxTokens?: number; model?: string }
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  if (USE_CLAUDE_CODE) {
+    const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
+    return executeClaudeCode(systemPrompt, serializeMessages(messages), {
+      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
+      maxTokens: options?.maxTokens,
+    });
+  }
+
   if (!client) {
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY');
   }
@@ -46,6 +55,15 @@ export async function* streamResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   options?: { maxTokens?: number; model?: string }
 ): AsyncGenerator<string> {
+  if (USE_CLAUDE_CODE) {
+    const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
+    yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
+      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
+      maxTokens: options?.maxTokens,
+    });
+    return;
+  }
+
   if (!client) {
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY');
   }
@@ -58,10 +76,7 @@ export async function* streamResponse(
   });
 
   for await (const event of stream) {
-    if (
-      event.type === 'content_block_delta' &&
-      event.delta.type === 'text_delta'
-    ) {
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
       yield event.delta.text;
     }
   }

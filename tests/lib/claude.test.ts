@@ -29,18 +29,26 @@ vi.mock('@/lib/logger', () => ({
 
 describe('claude', () => {
   let originalApiKey: string | undefined;
+  let originalAiProvider: string | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     originalApiKey = process.env.ANTHROPIC_API_KEY;
+    originalAiProvider = process.env.AI_PROVIDER;
     // Set API key before importing module
     process.env.ANTHROPIC_API_KEY = 'test-api-key-123';
+    delete process.env.AI_PROVIDER;
     // Clear module cache to force re-import
     vi.resetModules();
   });
 
   afterEach(() => {
     process.env.ANTHROPIC_API_KEY = originalApiKey;
+    if (originalAiProvider !== undefined) {
+      process.env.AI_PROVIDER = originalAiProvider;
+    } else {
+      delete process.env.AI_PROVIDER;
+    }
   });
 
   describe('generateResponse', () => {
@@ -454,6 +462,122 @@ describe('claude', () => {
       const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }]);
 
       await expect(generator.next()).rejects.toThrow('Stream interrupted');
+    });
+  });
+
+  describe('claude-code delegation', () => {
+    it('generateResponse delegates to claude-code-client when AI_PROVIDER=claude-code', async () => {
+      process.env.AI_PROVIDER = 'claude-code';
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.resetModules();
+
+      const mockExecute = vi.fn().mockResolvedValue({
+        content: 'CLI response',
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+      const mockSerialize = vi.fn().mockReturnValue('serialized prompt');
+
+      vi.doMock('@/lib/claude-code-client', () => ({
+        executeClaudeCode: mockExecute,
+        serializeMessages: mockSerialize,
+      }));
+
+      const { generateResponse } = await import('@/lib/claude');
+
+      const result = await generateResponse('System prompt', [{ role: 'user', content: 'Hello' }]);
+
+      expect(mockSerialize).toHaveBeenCalledWith([{ role: 'user', content: 'Hello' }]);
+      expect(mockExecute).toHaveBeenCalledWith('System prompt', 'serialized prompt', {
+        model: 'haiku',
+        maxTokens: undefined,
+      });
+      expect(result.content).toBe('CLI response');
+      expect(result.inputTokens).toBe(0);
+      expect(result.outputTokens).toBe(0);
+      // Anthropic SDK should NOT be called
+      expect(mockMessagesCreate).not.toHaveBeenCalled();
+    });
+
+    it('streamResponse delegates to claude-code-client when AI_PROVIDER=claude-code', async () => {
+      process.env.AI_PROVIDER = 'claude-code';
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.resetModules();
+
+      async function* mockStream() {
+        yield 'chunk1';
+        yield 'chunk2';
+      }
+
+      const mockStreamFn = vi.fn().mockReturnValue(mockStream());
+      const mockSerialize = vi.fn().mockReturnValue('serialized prompt');
+
+      vi.doMock('@/lib/claude-code-client', () => ({
+        streamClaudeCode: mockStreamFn,
+        serializeMessages: mockSerialize,
+      }));
+
+      const { streamResponse } = await import('@/lib/claude');
+
+      const chunks: string[] = [];
+      for await (const chunk of streamResponse('System', [{ role: 'user', content: 'Test' }])) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(['chunk1', 'chunk2']);
+      expect(mockStreamFn).toHaveBeenCalled();
+      // Anthropic SDK should NOT be called
+      expect(mockMessagesStream).not.toHaveBeenCalled();
+    });
+
+    it('does not warn about missing API key when AI_PROVIDER=claude-code', async () => {
+      process.env.AI_PROVIDER = 'claude-code';
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.resetModules();
+
+      vi.doMock('@/lib/claude-code-client', () => ({
+        executeClaudeCode: vi
+          .fn()
+          .mockResolvedValue({ content: '', inputTokens: 0, outputTokens: 0 }),
+        serializeMessages: vi.fn().mockReturnValue(''),
+        streamClaudeCode: vi.fn(),
+      }));
+
+      await import('@/lib/claude');
+      const { logger } = await import('@/lib/logger');
+
+      expect(logger.warn).not.toHaveBeenCalledWith(
+        'ANTHROPIC_API_KEY is not set — Claude features will not work'
+      );
+    });
+
+    it('passes custom model option to claude-code-client', async () => {
+      process.env.AI_PROVIDER = 'claude-code';
+      delete process.env.ANTHROPIC_API_KEY;
+      vi.resetModules();
+
+      const mockExecute = vi.fn().mockResolvedValue({
+        content: 'response',
+        inputTokens: 0,
+        outputTokens: 0,
+      });
+
+      vi.doMock('@/lib/claude-code-client', () => ({
+        executeClaudeCode: mockExecute,
+        serializeMessages: vi.fn().mockReturnValue('prompt'),
+      }));
+
+      const { generateResponse } = await import('@/lib/claude');
+
+      await generateResponse('System', [{ role: 'user', content: 'Test' }], {
+        model: 'sonnet',
+        maxTokens: 2048,
+      });
+
+      expect(mockExecute).toHaveBeenCalledWith('System', 'prompt', {
+        model: 'sonnet',
+        maxTokens: 2048,
+      });
     });
   });
 

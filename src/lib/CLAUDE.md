@@ -10,7 +10,8 @@ All shared business logic and external service integrations live here.
 | `redis.ts`               | Redis connections, cache helpers, rate limiting                                                     | Redis / ioredis                |
 | `queue.ts`               | BullMQ job queues (12 types), worker creation                                                       | BullMQ + Redis                 |
 | `auth.ts`                | NextAuth configuration, OAuth providers (Google, GitHub, Twitter)                                   | NextAuth v5                    |
-| `claude.ts`              | Anthropic Claude client (streaming + non-streaming)                                                 | Anthropic API                  |
+| `claude.ts`              | Anthropic Claude client (streaming + non-streaming), provider-aware (`AI_PROVIDER`)                 | Anthropic API / Claude CLI     |
+| `claude-code-client.ts`  | Claude Code CLI wrapper (`claude -p`): serialize messages, execute, stream                          | Claude CLI (`claude`)          |
 | `elevenlabs.ts`          | ElevenLabs TTS client, voice ID mapping                                                             | ElevenLabs API                 |
 | `stripe.ts`              | Stripe client, pricing tier limits, checkout                                                        | Stripe                         |
 | `r2.ts`                  | Cloudflare R2 file storage (upload, download, presign)                                              | AWS S3 SDK → R2                |
@@ -37,14 +38,15 @@ All shared business logic and external service integrations live here.
 
 Modular provider architecture — swap external services via env vars.
 
-| File          | Interface         | Implementations                                    | Env Var            |
-| ------------- | ----------------- | -------------------------------------------------- | ------------------ |
-| `ai.ts`       | `AIProvider`      | `AnthropicProvider`, `OpenAIProvider`              | `AI_PROVIDER`      |
-| `tts.ts`      | `TtsProvider`     | `ElevenLabsProvider`, `OpenAITtsProvider`          | `TTS_PROVIDER`     |
-| `storage.ts`  | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider`        | `STORAGE_PROVIDER` |
-| `payment.ts`  | `PaymentProvider` | `StripeProvider`, `NoOpProvider`                   | `PAYMENT_PROVIDER` |
-| `index.ts`    | `Providers`       | `getProviders()` singleton factory                 | —                  |
-| `openai.d.ts` | —                 | Type declarations for optional `openai` dependency | —                  |
+| File             | Interface         | Implementations                                                 | Env Var            |
+| ---------------- | ----------------- | --------------------------------------------------------------- | ------------------ |
+| `ai.ts`          | `AIProvider`      | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER`      |
+| `claude-code.ts` | `AIProvider`      | `ClaudeCodeProvider` (standalone)                               | `AI_PROVIDER`      |
+| `tts.ts`         | `TtsProvider`     | `ElevenLabsProvider`, `OpenAITtsProvider`                       | `TTS_PROVIDER`     |
+| `storage.ts`     | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider`                     | `STORAGE_PROVIDER` |
+| `payment.ts`     | `PaymentProvider` | `StripeProvider`, `NoOpProvider`                                | `PAYMENT_PROVIDER` |
+| `index.ts`       | `Providers`       | `getProviders()` singleton factory                              | —                  |
+| `openai.d.ts`    | —                 | Type declarations for optional `openai` dependency              | —                  |
 
 ## Patterns
 
