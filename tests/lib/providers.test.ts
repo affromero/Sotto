@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock the underlying service modules to prevent initialization errors
 vi.mock('@/lib/claude', () => ({
-  generateResponse: vi.fn().mockResolvedValue({ content: 'test', inputTokens: 10, outputTokens: 20 }),
+  generateResponse: vi
+    .fn()
+    .mockResolvedValue({ content: 'test', inputTokens: 10, outputTokens: 20 }),
   streamResponse: vi.fn(),
 }));
 
@@ -20,8 +22,22 @@ vi.mock('@/lib/r2', () => ({
 
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
-    FREE: { podcastsPerMonth: 3, maxDurationMinutes: 10, interactionsPerPodcast: 3, canDownload: false, canMakePrivate: false, voiceCount: 2 },
-    PRO: { podcastsPerMonth: 20, maxDurationMinutes: 30, interactionsPerPodcast: Infinity, canDownload: true, canMakePrivate: true, voiceCount: 6 },
+    FREE: {
+      podcastsPerMonth: 3,
+      maxDurationMinutes: 10,
+      interactionsPerPodcast: 3,
+      canDownload: false,
+      canMakePrivate: false,
+      voiceCount: 2,
+    },
+    PRO: {
+      podcastsPerMonth: 20,
+      maxDurationMinutes: 30,
+      interactionsPerPodcast: Infinity,
+      canDownload: true,
+      canMakePrivate: true,
+      voiceCount: 6,
+    },
   },
   createCheckoutSession: vi.fn().mockResolvedValue('https://checkout.stripe.com/session'),
   createPortalSession: vi.fn().mockResolvedValue('https://billing.stripe.com/portal'),
@@ -30,7 +46,6 @@ vi.mock('@/lib/stripe', () => ({
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-
 
 import { createAIProvider } from '@/lib/providers/ai';
 import { createTtsProvider } from '@/lib/providers/tts';
@@ -79,8 +94,23 @@ describe('Provider Factories', () => {
 
     it('anthropic provider delegates to claude.ts', async () => {
       const provider = createAIProvider('anthropic');
-      const result = await provider.generateResponse('system', [{ role: 'user', content: 'hello' }]);
+      const result = await provider.generateResponse('system', [
+        { role: 'user', content: 'hello' },
+      ]);
       expect(result).toEqual({ content: 'test', inputTokens: 10, outputTokens: 20 });
+    });
+
+    it('creates claude-code provider', () => {
+      const provider = createAIProvider('claude-code');
+      expect(provider).toBeDefined();
+      expect(provider.generateResponse).toBeDefined();
+      expect(provider.streamResponse).toBeDefined();
+    });
+
+    it('reads claude-code from AI_PROVIDER env var', () => {
+      process.env.AI_PROVIDER = 'claude-code';
+      const provider = createAIProvider();
+      expect(provider).toBeDefined();
     });
   });
 

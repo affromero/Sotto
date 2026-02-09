@@ -31,7 +31,11 @@ class AnthropicProvider implements AIProvider {
     return import('../claude');
   }
 
-  async generateResponse(system: string, messages: ChatMessage[], opts?: AIOptions): Promise<AIResponse> {
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
     const claude = await this.getClient();
     return claude.generateResponse(system, messages, {
       maxTokens: opts?.maxTokens,
@@ -39,7 +43,11 @@ class AnthropicProvider implements AIProvider {
     });
   }
 
-  async *streamResponse(system: string, messages: ChatMessage[], opts?: AIOptions): AsyncGenerator<string> {
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
     const claude = await this.getClient();
     yield* claude.streamResponse(system, messages, {
       maxTokens: opts?.maxTokens,
@@ -59,7 +67,11 @@ class OpenAIProvider implements AIProvider {
     return new OpenAI({ apiKey });
   }
 
-  async generateResponse(system: string, messages: ChatMessage[], opts?: AIOptions): Promise<AIResponse> {
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
     const client = await this.getClient();
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -67,10 +79,7 @@ class OpenAIProvider implements AIProvider {
       model,
       max_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [
-        { role: 'system', content: system },
-        ...messages,
-      ],
+      messages: [{ role: 'system', content: system }, ...messages],
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -81,7 +90,11 @@ class OpenAIProvider implements AIProvider {
     };
   }
 
-  async *streamResponse(system: string, messages: ChatMessage[], opts?: AIOptions): AsyncGenerator<string> {
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
     const client = await this.getClient();
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -89,10 +102,7 @@ class OpenAIProvider implements AIProvider {
       model,
       max_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [
-        { role: 'system', content: system },
-        ...messages,
-      ],
+      messages: [{ role: 'system', content: system }, ...messages],
       stream: true,
     });
 
@@ -103,6 +113,39 @@ class OpenAIProvider implements AIProvider {
   }
 }
 
+/**
+ * Claude Code CLI provider — uses `claude -p` for free local testing.
+ */
+class ClaudeCodeLazyProvider implements AIProvider {
+  private getClient() {
+    return import('../claude-code-client');
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    const { executeClaudeCode, serializeMessages } = await this.getClient();
+    return executeClaudeCode(system, serializeMessages(messages), {
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
+      maxTokens: opts?.maxTokens,
+    });
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    const { streamClaudeCode, serializeMessages } = await this.getClient();
+    yield* streamClaudeCode(system, serializeMessages(messages), {
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
+      maxTokens: opts?.maxTokens,
+    });
+  }
+}
+
 export function createAIProvider(type?: string): AIProvider {
   const providerType = type || process.env.AI_PROVIDER || 'anthropic';
   switch (providerType) {
@@ -110,6 +153,8 @@ export function createAIProvider(type?: string): AIProvider {
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
+    case 'claude-code':
+      return new ClaudeCodeLazyProvider();
     default:
       logger.warn(`Unknown AI_PROVIDER "${providerType}", falling back to anthropic`);
       return new AnthropicProvider();
