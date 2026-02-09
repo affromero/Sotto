@@ -9,6 +9,7 @@ import {
 } from '@/lib/subscription';
 import { prisma } from '@/lib/prisma';
 import { TIER_LIMITS } from '@/lib/stripe';
+import type { UserRole } from '@prisma/client';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -128,6 +129,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -159,6 +161,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -204,6 +207,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -249,6 +253,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -275,6 +280,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -315,6 +321,7 @@ describe('getUserUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -536,6 +543,7 @@ describe('incrementPodcastUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -578,6 +586,7 @@ describe('resetMonthlyUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -615,6 +624,7 @@ describe('resetMonthlyUsage', () => {
       preferredHostVoiceId: null,
       preferredExpertVoiceId: null,
       teamId: null,
+      role: 'USER' as UserRole,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import * as nextAuthReact from 'next-auth/react';
+import type { UserRole } from '@prisma/client';
 
 vi.mock('next-auth/react', () => ({
   useSession: vi.fn(),
@@ -55,6 +56,7 @@ describe('useAuth', () => {
             name: 'Test User',
             email: 'test@example.com',
             image: 'https://example.com/avatar.jpg',
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -90,6 +92,7 @@ describe('useAuth', () => {
             name: 'John Doe',
             email: 'john@example.com',
             image: 'https://example.com/john.jpg',
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -104,6 +107,7 @@ describe('useAuth', () => {
         name: 'John Doe',
         email: 'john@example.com',
         image: 'https://example.com/john.jpg',
+        role: 'USER',
       });
     });
 
@@ -127,6 +131,7 @@ describe('useAuth', () => {
             name: null,
             email: 'test@example.com',
             image: null,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -148,6 +153,7 @@ describe('useAuth', () => {
             name: undefined,
             email: 'test@example.com',
             image: undefined,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -211,6 +217,7 @@ describe('useAuth', () => {
             name: 'Test User',
             email: 'test@example.com',
             image: null,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -266,6 +273,7 @@ describe('useAuth', () => {
             name: 'New User',
             email: 'new@example.com',
             image: null,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -286,6 +294,7 @@ describe('useAuth', () => {
             name: 'Test User',
             email: 'test@example.com',
             image: null,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -320,6 +329,7 @@ describe('useAuth', () => {
             name: 'Test User',
             email: null,
             image: null,
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -338,6 +348,7 @@ describe('useAuth', () => {
         data: {
           user: {
             id: 'user-minimal',
+            role: 'USER' as UserRole,
           },
           expires: '2025-01-01',
         },
@@ -352,6 +363,7 @@ describe('useAuth', () => {
         name: null,
         email: null,
         image: null,
+        role: 'USER',
       });
     });
   });

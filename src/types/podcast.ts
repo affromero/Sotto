@@ -17,6 +17,7 @@ export interface PodcastSummary {
     id: string;
     name: string | null;
     image: string | null;
+    role?: string;
   };
   tags: Array<{ id: string; name: string; slug: string }>;
 }

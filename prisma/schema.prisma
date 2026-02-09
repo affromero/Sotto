@@ -12,6 +12,14 @@ datasource db {
   extensions = [vector]
 }
 
+// ============ USER ROLES ============
+
+enum UserRole {
+  USER
+  CREATOR
+  ADMIN
+}
+
 // ============ USERS & AUTH ============
 
 model User {
@@ -20,6 +28,7 @@ model User {
   name          String?
   image         String?
   bio           String?   @db.Text
+  role          UserRole  @default(USER)
   emailVerified DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -65,6 +74,7 @@ model User {
   tweetMentions TweetMention[]
 
   @@index([teamId])
+  @@index([role])
 }
 
 model Account {

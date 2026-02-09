@@ -34,6 +34,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       name: true,
       image: true,
       bio: true,
+      role: true,
       createdAt: true,
       podcasts: {
         where: {
@@ -100,6 +101,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     name: user.name,
     image: user.image,
     bio: user.bio,
+    role: user.role,
     createdAt: user.createdAt.toISOString(),
   };
 

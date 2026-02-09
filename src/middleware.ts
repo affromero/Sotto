@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing', '/analytics'];
+const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing', '/analytics', '/admin'];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 // Public routes that bypass the password gate (exact match)
@@ -97,6 +97,11 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/auth/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin route protection: only ADMIN role can access /admin
+  if (pathname.startsWith('/admin') && token?.role !== 'ADMIN') {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();

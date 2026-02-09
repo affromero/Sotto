@@ -208,8 +208,8 @@ export default function LandingPage() {
             </a>
           </div>
           <div className={styles.navRight}>
-            <a href="#waitlist" className={styles.navCta}>
-              Join Waitlist
+            <a href="/auth/signup" className={styles.navCta}>
+              Get Started
             </a>
             <button
               type="button"
@@ -232,7 +232,7 @@ export default function LandingPage() {
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            Coming Soon
+            Now in Alpha
           </div>
           <h1 className={styles.heroTitle}>
             Podcasts That
@@ -243,9 +243,12 @@ export default function LandingPage() {
             Generate AI podcasts from any topic. Interrupt mid-playback to ask questions. Share
             knowledge with the world.
           </p>
-          <div className={styles.heroWaitlist}>
-            <WaitlistForm source="hero" variant="dark" />
+          <div className={styles.heroCtas}>
+            <a href="/auth/signup" className={styles.btnPrimary}>
+              Get Started Free
+            </a>
           </div>
+          <p className={styles.heroCtaNote}>No credit card required</p>
         </div>
         <div className={styles.heroWave} aria-hidden="true">
           {Array.from({ length: 64 }, (_, i) => (
@@ -1101,8 +1104,8 @@ export default function LandingPage() {
                 <li>{CHECK} Public podcasts</li>
                 <li>{CHECK} 2 interactions per podcast</li>
               </ul>
-              <a href="#waitlist" className={styles.tierBtn}>
-                Join Waitlist
+              <a href="/auth/signup" className={styles.tierBtn}>
+                Sign Up Free
               </a>
             </div>
             {/* PRO */}
@@ -1125,8 +1128,8 @@ export default function LandingPage() {
                 <li>{CHECK} MP3 download + PDF transcript</li>
                 <li>{CHECK} Voice library access</li>
               </ul>
-              <a href="#waitlist" className={styles.tierBtnPrimary}>
-                Join Waitlist
+              <a href="/auth/signup" className={styles.tierBtnPrimary}>
+                Get Started
               </a>
             </div>
             {/* CREATOR */}
@@ -1148,8 +1151,8 @@ export default function LandingPage() {
                 <li>{CHECK} Voice marketplace + analytics</li>
                 <li>{CHECK} Everything in Pro</li>
               </ul>
-              <a href="#waitlist" className={styles.tierBtn}>
-                Join Waitlist
+              <a href="/auth/signup" className={styles.tierBtn}>
+                Get Started
               </a>
             </div>
           </div>
@@ -1163,11 +1166,16 @@ export default function LandingPage() {
       <section className={styles.cta} aria-label="Get started">
         <div className={styles.ctaGlow} aria-hidden="true" />
         <div className={`${styles.ctaContent} ${styles.rev}`}>
-          <h2 className={styles.ctaTitle}>Be the first to know</h2>
+          <h2 className={styles.ctaTitle}>Ready to start learning?</h2>
           <p className={styles.ctaSub}>
-            Drop your email and we&apos;ll let you know the moment Sotto goes live. No spam, just
-            one launch email.
+            Create your first AI podcast in under a minute. Free, no credit card required.
           </p>
+          <a href="/auth/signup" className={styles.ctaBtn}>
+            Get Started Free
+          </a>
+          <div className={styles.ctaDivider}>
+            <span>or get notified at launch</span>
+          </div>
           <WaitlistForm source="cta" variant="dark" />
         </div>
       </section>

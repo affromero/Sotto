@@ -77,6 +77,7 @@ src/
 │   ├── page.tsx                # Landing page
 │   ├── auth/                   # Login, signup pages
 │   ├── (dashboard)/            # Dashboard, billing, settings, analytics, team (auth required)
+│   ├── (admin)/                # Admin dashboard: overview, users, podcasts, waitlist, analytics, moderation (ADMIN only)
 │   ├── create/                 # Chat-based discovery → generation
 │   ├── podcast/[podcastId]/    # Playback + interrupt + fork
 │   ├── feed/                   # Public social feed
@@ -96,6 +97,7 @@ src/
 │       ├── teams/              # Team management + invites
 │       ├── voices/             # Voice clone + preview
 │       ├── analytics/          # Usage analytics
+│       ├── admin/              # Admin API (user role, podcast delete, waitlist export) — ADMIN only
 │       ├── waitlist/           # Waitlist signup
 │       ├── health/             # Health check
 │       └── webhooks/stripe/    # Stripe webhook handler
@@ -111,7 +113,7 @@ src/
 │   ├── notifications/          # NotificationBell, NotificationList, PushPrompt
 │   ├── settings/               # VoicePreferenceSelector
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
-│   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider
+│   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider, EventProvider, PageViewTracker
 ├── lib/
 │   ├── prisma.ts               # Prisma client (PostgreSQL required)
 │   ├── redis.ts                # Redis connection + cache helpers
@@ -247,29 +249,29 @@ User listening → taps "Ask a Question" → podcast pauses
 
 ## Database Schema (Key Models)
 
-| Model                | Purpose                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------- |
-| `User`               | Auth, profile, bio, avatar, usage tracking, Twitter handle + prefs                          |
-| `Follow`             | Social: follower → following                                                                |
-| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking |
-| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                      |
-| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                             |
-| `Script`             | Structured JSON turns + raw markdown, versioned                                             |
-| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                      |
-| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus           |
-| `Interaction`        | Question at timestamp, answer, resolution status                                            |
-| `Like` / `Save`      | Social engagement                                                                           |
-| `Tag` / `PodcastTag` | Discovery taxonomy                                                                          |
-| `Subscription`       | Stripe (FREE/PRO/CREATOR)                                                                   |
-| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                        |
-| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                         |
-| `Team`               | Team ownership + member management                                                          |
-| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                       |
-| `Job`                | BullMQ job tracking                                                                         |
-| `Notification`       | In-app + push notifications                                                                 |
-| `PushSubscription`   | Web Push API endpoints                                                                      |
-| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                      |
-| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                    |
+| Model                | Purpose                                                                                       |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| `User`               | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs |
+| `Follow`             | Social: follower → following                                                                  |
+| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking   |
+| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                        |
+| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                               |
+| `Script`             | Structured JSON turns + raw markdown, versioned                                               |
+| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                        |
+| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus             |
+| `Interaction`        | Question at timestamp, answer, resolution status                                              |
+| `Like` / `Save`      | Social engagement                                                                             |
+| `Tag` / `PodcastTag` | Discovery taxonomy                                                                            |
+| `Subscription`       | Stripe (FREE/PRO/CREATOR)                                                                     |
+| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                          |
+| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                           |
+| `Team`               | Team ownership + member management                                                            |
+| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                         |
+| `Job`                | BullMQ job tracking                                                                           |
+| `Notification`       | In-app + push notifications                                                                   |
+| `PushSubscription`   | Web Push API endpoints                                                                        |
+| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                        |
+| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                      |
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
 

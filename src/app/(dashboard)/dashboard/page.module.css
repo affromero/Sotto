@@ -79,6 +79,33 @@
   color: var(--color-text-secondary);
 }
 
+/* Creator Stats */
+
+.creatorStats {
+  background: rgba(30, 58, 95, 0.04);
+  border: 1px solid rgba(30, 58, 95, 0.1);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+}
+
+.creatorStatsTitle {
+  font: var(--text-h3);
+  color: var(--color-accent);
+  margin-bottom: var(--spacing-md);
+}
+
+.creatorStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+}
+
+.creatorStatCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
 /* Podcasts Section */
 
 .podcastsSection {
@@ -156,7 +183,9 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .podcastItem:hover {

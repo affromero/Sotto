@@ -15,16 +15,18 @@ describe('Sidebar', () => {
     expect(screen.getByText('Sotto')).toBeInTheDocument();
   });
 
-  it('renders all navigation links', () => {
+  it('renders all navigation links for default USER role', () => {
     render(<Sidebar currentPath="/dashboard" />);
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Create')).toBeInTheDocument();
     expect(screen.getByText('Feed')).toBeInTheDocument();
     expect(screen.getByText('Billing')).toBeInTheDocument();
-    expect(screen.getByText('Voices')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+    // Voices, Analytics, Team are CREATOR/ADMIN only
+    expect(screen.queryByText('Voices')).not.toBeInTheDocument();
+    expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
+    expect(screen.queryByText('Team')).not.toBeInTheDocument();
   });
 
   it('highlights active link for exact path match', () => {
@@ -57,9 +59,28 @@ describe('Sidebar', () => {
     expect(screen.getByText('Create').closest('a')).toHaveAttribute('href', '/create');
     expect(screen.getByText('Feed').closest('a')).toHaveAttribute('href', '/feed');
     expect(screen.getByText('Billing').closest('a')).toHaveAttribute('href', '/billing');
-    expect(screen.getByText('Voices').closest('a')).toHaveAttribute('href', '/settings/voices');
-    expect(screen.getByText('Analytics').closest('a')).toHaveAttribute('href', '/analytics');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
+  });
+
+  it('shows creator/admin nav items when role is CREATOR', () => {
+    const creatorUser = { ...mockUser, role: 'CREATOR' };
+    render(<Sidebar currentPath="/dashboard" user={creatorUser} />);
+
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    expect(screen.getByText('Voices')).toBeInTheDocument();
+    expect(screen.getByText('Team')).toBeInTheDocument();
+    expect(screen.getByText('Billing')).toBeInTheDocument();
+    expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument();
+  });
+
+  it('shows admin panel link for ADMIN role', () => {
+    const adminUser = { ...mockUser, role: 'ADMIN' };
+    render(<Sidebar currentPath="/dashboard" user={adminUser} />);
+
+    expect(screen.getByText('Admin Panel')).toBeInTheDocument();
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    // ADMIN doesn't see Billing
+    expect(screen.queryByText('Billing')).not.toBeInTheDocument();
   });
 
   it('displays user name when provided', () => {

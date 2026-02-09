@@ -9,11 +9,11 @@ All shared business logic and external service integrations live here.
 | `prisma.ts`              | Database client (PostgreSQL)                                                                        | Prisma ORM                     |
 | `redis.ts`               | Redis connections, cache helpers, rate limiting                                                     | Redis / ioredis                |
 | `queue.ts`               | BullMQ job queues (12 types), worker creation                                                       | BullMQ + Redis                 |
-| `auth.ts`                | NextAuth configuration, OAuth providers (Google, GitHub, Twitter)                                   | NextAuth v5                    |
+| `auth.ts`                | NextAuth config, OAuth providers, role system (USER/CREATOR/ADMIN), `ADMIN_EMAILS` auto-assignment  | NextAuth v5                    |
 | `claude.ts`              | Anthropic Claude client (streaming + non-streaming), provider-aware (`AI_PROVIDER`)                 | Anthropic API / Claude CLI     |
 | `claude-code-client.ts`  | Claude Code CLI wrapper (`claude -p`): serialize messages, execute, stream                          | Claude CLI (`claude`)          |
 | `elevenlabs.ts`          | ElevenLabs TTS client, voice ID mapping                                                             | ElevenLabs API                 |
-| `stripe.ts`              | Stripe client, pricing tier limits, checkout                                                        | Stripe                         |
+| `stripe.ts`              | Stripe client, pricing tier limits, `getEffectiveTier()` (role-aware), checkout                     | Stripe                         |
 | `r2.ts`                  | Cloudflare R2 file storage (upload, download, presign)                                              | AWS S3 SDK → R2                |
 | `discovery-agent.ts`     | Chat-based discovery: system prompt, chip parsing, metadata extraction                              | Uses `claude.ts`               |
 | `script-generator.ts`    | 2-voice podcast script generation with `[N]` citations + revision with feedback                     | Uses `claude.ts`               |

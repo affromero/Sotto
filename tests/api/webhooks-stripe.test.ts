@@ -9,6 +9,7 @@ const mockSubscriptionUpsert = vi.fn();
 const mockSubscriptionUpdate = vi.fn();
 const mockSubscriptionUpdateMany = vi.fn();
 const mockSubscriptionEventCreate = vi.fn();
+const mockUserUpdate = vi.fn();
 const mockResetMonthlyUsage = vi.fn();
 const mockLoggerInfo = vi.fn();
 const mockLoggerError = vi.fn();
@@ -40,6 +41,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     subscriptionEvent: {
       create: (...args: unknown[]) => mockSubscriptionEventCreate(...args),
+    },
+    user: {
+      update: (...args: unknown[]) => mockUserUpdate(...args),
     },
   },
 }));
@@ -79,6 +83,7 @@ function createRequest(body: string, signature: string | null = 'valid_sig'): Ne
 describe('POST /api/webhooks/stripe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserUpdate.mockResolvedValue({});
     process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
     process.env.STRIPE_PRICE_ID_PRO = 'price_pro_123';
     process.env.STRIPE_PRICE_ID_CREATOR = 'price_creator_456';

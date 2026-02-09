@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, Inter } from 'next/font/google';
 import { EventProvider } from '@/components/providers/EventProvider';
+import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import '@/styles/globals.css';
 
 const dmSerifDisplay = DM_Serif_Display({
@@ -44,7 +45,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`}>
       <body>
-        <EventProvider>{children}</EventProvider>
+        <EventProvider>
+          <PageViewTracker />
+          {children}
+        </EventProvider>
       </body>
     </html>
   );

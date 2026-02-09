@@ -2,7 +2,7 @@ import styles from './Badge.module.css';
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'soon';
+  variant?: 'default' | 'success' | 'warning' | 'error' | 'info' | 'soon' | 'creator' | 'admin';
 }
 
 export function Badge({ children, variant = 'default' }: BadgeProps) {

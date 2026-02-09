@@ -1,0 +1,197 @@
+/* Admin Moderation Page */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+/* Sections */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.empty {
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font: var(--text-body);
+}
+
+/* Table */
+
+.tableContainer {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.table td {
+  padding: var(--spacing-md);
+  font: var(--text-body);
+  color: var(--color-text-primary);
+}
+
+.link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.secondaryCell {
+  color: var(--color-text-secondary);
+}
+
+.dateCell {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.subjectCell {
+  font-weight: 500;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.messageCell {
+  color: var(--color-text-secondary);
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Badges */
+
+.badge {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+/* Feedback Type Badges */
+
+.badgeBUG {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.badgeFEATURE_REQUEST {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.badgeGENERAL {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.badgePRAISE {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badgeCONCERN {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+/* Feedback Status Badges */
+
+.badgeNEW {
+  background: var(--color-info-light);
+  color: var(--color-info);
+}
+
+.badgeREVIEWED {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.badgeIN_PROGRESS {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.badgeRESOLVED {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badgeARCHIVED {
+  background: var(--color-border);
+  color: var(--color-text-tertiary);
+}

@@ -12,6 +12,7 @@ interface DashboardShellProps {
     name: string | null;
     email: string | null;
     image: string | null;
+    role?: string;
   };
   children: React.ReactNode;
 }
@@ -42,9 +43,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           <span className={styles.logo}>Sotto</span>
         </header>
 
-        <div className={styles.content}>
-          {children}
-        </div>
+        <div className={styles.content}>{children}</div>
       </div>
 
       <MobileNav currentPath={pathname} />

@@ -60,6 +60,8 @@ export default async function DashboardPage() {
     return null;
   }
 
+  const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
+
   const [user, podcasts] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -67,8 +69,14 @@ export default async function DashboardPage() {
         name: true,
         podcastsUsed: true,
         podcastsAllowed: true,
+        role: true,
         subscription: {
           select: { tier: true, status: true },
+        },
+        _count: {
+          select: {
+            followers: true,
+          },
         },
       },
     }),
@@ -82,6 +90,7 @@ export default async function DashboardPage() {
         status: true,
         duration: true,
         playCount: true,
+        forkCount: true,
         createdAt: true,
         audioUrl: true,
       },
@@ -92,6 +101,10 @@ export default async function DashboardPage() {
   const tier = user?.subscription?.tier || 'FREE';
   const podcastsUsed = user?.podcastsUsed ?? 0;
   const podcastsAllowed = user?.podcastsAllowed ?? 3;
+  const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
+  const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
+  const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
+  const followerCount = user?._count?.followers ?? 0;
 
   return (
     <main className={styles.main}>
@@ -135,6 +148,26 @@ export default async function DashboardPage() {
           <span className={styles.statValue}>{podcasts.length}</span>
         </div>
       </section>
+
+      {isCreatorOrAdmin && (
+        <section className={styles.creatorStats} aria-label="Creator statistics">
+          <h2 className={styles.creatorStatsTitle}>Creator Stats</h2>
+          <div className={styles.creatorStatsGrid}>
+            <div className={styles.creatorStatCard}>
+              <span className={styles.statLabel}>Total Listens</span>
+              <span className={styles.statValue}>{totalListens.toLocaleString()}</span>
+            </div>
+            <div className={styles.creatorStatCard}>
+              <span className={styles.statLabel}>Followers</span>
+              <span className={styles.statValue}>{followerCount.toLocaleString()}</span>
+            </div>
+            <div className={styles.creatorStatCard}>
+              <span className={styles.statLabel}>Forks</span>
+              <span className={styles.statValue}>{totalForks.toLocaleString()}</span>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className={styles.podcastsSection}>
         <h2 className={styles.sectionTitle}>My Podcasts</h2>

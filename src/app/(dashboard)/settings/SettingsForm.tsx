@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { signIn, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -52,6 +53,9 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [avatarUrl, setAvatarUrl] = useState(image);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Twitter state
   const isTwitterConnected = connectedProviders.includes('twitter');
@@ -124,6 +128,50 @@ export function SettingsForm({
     }
   };
 
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxSize = 2 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('File too large. Maximum size is 2MB.');
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await fetch('/api/users/me/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvatarUrl(data.url);
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to upload avatar');
+      }
+    } catch {
+      alert('Failed to upload avatar');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const initials = (name || email || '?').charAt(0).toUpperCase();
 
   return (
@@ -134,15 +182,36 @@ export function SettingsForm({
         <form onSubmit={handleSaveProfile} className={styles.form}>
           <div className={styles.avatarSection}>
             <div className={styles.avatar}>
-              {image ? (
-                <img src={image} alt="Your avatar" className={styles.avatarImage} />
+              {avatarUrl ? (
+                <Image
+                  src={avatarUrl}
+                  alt="Your avatar"
+                  width={80}
+                  height={80}
+                  className={styles.avatarImage}
+                />
               ) : (
                 <span className={styles.avatarFallback}>{initials}</span>
               )}
             </div>
             <div className={styles.avatarInfo}>
               <p className={styles.avatarEmail}>{email}</p>
-              <p className={styles.avatarHint}>Avatar is synced from your sign-in provider</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleAvatarChange}
+                style={{ display: 'none' }}
+                aria-label="Upload avatar"
+              />
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                disabled={uploading}
+                className={`${styles.avatarUploadBtn} ${uploading ? styles.avatarUploading : ''}`}
+              >
+                {uploading ? 'Uploading...' : 'Change Avatar'}
+              </button>
             </div>
           </div>
 
@@ -155,7 +224,9 @@ export function SettingsForm({
           />
 
           <div className={styles.fieldGroup}>
-            <label htmlFor="bio" className={styles.fieldLabel}>Bio</label>
+            <label htmlFor="bio" className={styles.fieldLabel}>
+              Bio
+            </label>
             <textarea
               id="bio"
               className={styles.textarea}
@@ -183,7 +254,9 @@ export function SettingsForm({
           <label className={styles.toggleRow}>
             <div className={styles.toggleInfo}>
               <span className={styles.toggleLabel}>Email Notifications</span>
-              <span className={styles.toggleDescription}>Receive updates about your podcasts via email</span>
+              <span className={styles.toggleDescription}>
+                Receive updates about your podcasts via email
+              </span>
             </div>
             <input
               type="checkbox"
@@ -196,7 +269,9 @@ export function SettingsForm({
           <label className={styles.toggleRow}>
             <div className={styles.toggleInfo}>
               <span className={styles.toggleLabel}>Push Notifications</span>
-              <span className={styles.toggleDescription}>Get notified when your podcast is ready</span>
+              <span className={styles.toggleDescription}>
+                Get notified when your podcast is ready
+              </span>
             </div>
             <input
               type="checkbox"
@@ -215,9 +290,7 @@ export function SettingsForm({
         <div className={styles.providerList}>
           {connectedProviders.map((provider) => (
             <div key={provider} className={styles.providerRow}>
-              <span className={styles.providerName}>
-                {providerLabels[provider] || provider}
-              </span>
+              <span className={styles.providerName}>{providerLabels[provider] || provider}</span>
               <span className={styles.providerStatus}>Connected</span>
             </div>
           ))}
@@ -241,16 +314,12 @@ export function SettingsForm({
               Connect your Twitter account to generate podcasts by tweeting at @sottofm.
             </p>
             <div className={styles.formActions}>
-              <Button onClick={() => signIn('twitter')}>
-                Connect Twitter
-              </Button>
+              <Button onClick={() => signIn('twitter')}>Connect Twitter</Button>
             </div>
           </div>
         ) : (
           <div className={styles.form}>
-            {twitterHandle && (
-              <p className={styles.twitterHandle}>@{twitterHandle}</p>
-            )}
+            {twitterHandle && <p className={styles.twitterHandle}>@{twitterHandle}</p>}
 
             <label className={styles.toggleRow}>
               <div className={styles.toggleInfo}>
@@ -315,7 +384,9 @@ export function SettingsForm({
           </Button>
         ) : (
           <div className={styles.deleteConfirm}>
-            <p className={styles.confirmText}>Are you sure? This will delete all your podcasts, data, and cannot be reversed.</p>
+            <p className={styles.confirmText}>
+              Are you sure? This will delete all your podcasts, data, and cannot be reversed.
+            </p>
             <div className={styles.confirmActions}>
               <Button variant="danger" onClick={handleDeleteAccount}>
                 Yes, Delete My Account

@@ -69,6 +69,15 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Auto-grant CREATOR role when subscribing to CREATOR tier
+        if (tier === 'CREATOR') {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { role: 'CREATOR' },
+          });
+          logger.info('Auto-granted CREATOR role via checkout', { userId });
+        }
+
         await prisma.subscriptionEvent.create({
           data: { userId, type: event.type, stripeEventId: event.id, data: session as object },
         });
@@ -118,6 +127,17 @@ export async function POST(request: NextRequest) {
         if (isRenewal) {
           await resetMonthlyUsage(existing.userId);
           logger.info('Monthly usage reset on period renewal', { userId: existing.userId });
+        }
+
+        // Auto-grant CREATOR role on upgrade (don't revoke on downgrade)
+        if (tier === 'CREATOR') {
+          await prisma.user.update({
+            where: { id: existing.userId },
+            data: { role: 'CREATOR' },
+          });
+          logger.info('Auto-granted CREATOR role via subscription update', {
+            userId: existing.userId,
+          });
         }
 
         logger.info('Subscription updated', { subscriptionId: sub.id, tier });

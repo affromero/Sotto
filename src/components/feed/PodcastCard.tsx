@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
 import { useTrack } from '@/components/providers/EventProvider';
+import { Badge } from '@/components/ui/Badge';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastCard.module.css';
 
@@ -120,7 +121,11 @@ export function PodcastCard({
               </span>
             )}
           </div>
-          <span className={styles.creatorName}>{podcast.user.name || 'Anonymous'}</span>
+          <span className={styles.creatorName}>
+            {podcast.user.name || 'Anonymous'}
+            {podcast.user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
+            {podcast.user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
+          </span>
           <span className={styles.dot} aria-hidden="true" />
           <time className={styles.date} dateTime={podcast.createdAt}>
             {formatDate(podcast.createdAt)}
