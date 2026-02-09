@@ -1,82 +1,514 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import styles from './page.module.css';
 
+const VOICES = [
+  { name: 'Adam', accent: 'American', character: 'Warm narrator', gender: 'm' },
+  { name: 'Rachel', accent: 'American', character: 'Calm & authoritative', gender: 'f' },
+  { name: 'George', accent: 'British', character: 'Distinguished professor', gender: 'm' },
+  { name: 'Freya', accent: 'British', character: 'Witty & sharp', gender: 'f' },
+  { name: 'Sam', accent: 'American', character: 'Upbeat storyteller', gender: 'm' },
+  { name: 'Charlotte', accent: 'British', character: 'Polished professional', gender: 'f' },
+  { name: 'Charlie', accent: 'Australian', character: 'Casual & curious', gender: 'm' },
+  { name: 'Grace', accent: 'Australian', character: 'Warm & approachable', gender: 'f' },
+];
+
+const CHECK = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export default function LandingPage() {
+  const [navSolid, setNavSolid] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setNavSolid(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add(styles.vis);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+    );
+    document.querySelectorAll(`.${styles.rev}`).forEach((el) => observer.observe(el));
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    };
+  }, []);
+
   return (
-    <main className={styles.main}>
-      <section className={styles.hero}>
-        <h1 className={styles.title}>Podcasts That Listen Back</h1>
-        <p className={styles.subtitle}>
-          Generate AI podcasts from any topic. Interrupt to ask questions.
-          Share knowledge with the world.
-        </p>
-        <div className={styles.actions}>
-          <a href="/create" className={styles.primaryCta}>
-            Create Your First Podcast
-          </a>
-          <a href="/feed" className={styles.secondaryCta}>
-            Explore Podcasts
+    <div className={styles.page}>
+      {/* ====== NAV ====== */}
+      <nav className={`${styles.nav} ${navSolid ? styles.navSolid : ''}`} role="navigation" aria-label="Main">
+        <div className={styles.navInner}>
+          <a href="/" className={styles.navLogo} aria-label="Sotto home">Sotto</a>
+          <div className={`${styles.navLinks} ${menuOpen ? styles.navLinksOpen : ''}`}>
+            <a href="/feed" onClick={() => setMenuOpen(false)}>Feed</a>
+            <a href="/create" onClick={() => setMenuOpen(false)}>Create</a>
+            <a href="/pricing" onClick={() => setMenuOpen(false)}>Pricing</a>
+          </div>
+          <div className={styles.navRight}>
+            <a href="/auth/login" className={styles.navSign}>Sign In</a>
+            <a href="/create" className={styles.navCta}>Get Started</a>
+            <button
+              type="button"
+              className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ''}`}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+            >
+              <span /><span /><span />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* ====== HERO ====== */}
+      <section className={styles.hero} aria-label="Introduction">
+        <div className={styles.heroGlow} aria-hidden="true" />
+        <div className={styles.heroContent}>
+          <div className={styles.badge}>
+            <span className={styles.badgeDot} aria-hidden="true" />
+            Now with voice cloning
+          </div>
+          <h1 className={styles.heroTitle}>
+            Podcasts That<br />Listen <em>Back</em>
+          </h1>
+          <p className={styles.heroSub}>
+            Generate AI podcasts from any topic. Interrupt mid-playback to ask
+            questions. Share knowledge with the world.
+          </p>
+          <div className={styles.heroCtas}>
+            <a href="/create" className={styles.btnPrimary}>
+              Start Creating — Free
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </a>
+            <a href="/feed" className={styles.btnGhost}>Explore Podcasts</a>
+          </div>
+        </div>
+        <div className={styles.heroWave} aria-hidden="true">
+          {Array.from({ length: 64 }, (_, i) => (
+            <span key={i} className={styles.bar} style={{ '--i': i } as React.CSSProperties} />
+          ))}
+        </div>
+      </section>
+
+      {/* ====== PILLARS ====== */}
+      <section className={styles.section} aria-label="Key features">
+        <div className={styles.inner}>
+          <div className={styles.pillars}>
+            <article className={`${styles.pillar} ${styles.rev}`}>
+              <div className={styles.pIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              </div>
+              <h3>AI-Powered Discovery</h3>
+              <p>Chat naturally about what you want to learn. Sotto asks the right questions, then generates a two-voice podcast tailored to your level.</p>
+            </article>
+            <article className={`${styles.pillar} ${styles.rev} ${styles.d1}`}>
+              <div className={`${styles.pIcon} ${styles.pIconNavy}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              <h3>Interactive Playback</h3>
+              <p>Pause anytime to ask questions. Get answers in full context. Your curiosity drives the conversation — the podcast actually listens back.</p>
+            </article>
+            <article className={`${styles.pillar} ${styles.rev} ${styles.d2}`}>
+              <div className={styles.pIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                </svg>
+              </div>
+              <h3>Voices That Feel Real</h3>
+              <p>16 curated AI voices or clone your own. Every podcast pairs a distinct host and expert — always in contrast, always unique.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== DEMO ====== */}
+      <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Product demo">
+        <div className={styles.inner}>
+          <div className={styles.split}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overline}>See it in action</span>
+              <h2 className={styles.h2}>From curiosity to podcast in under a minute</h2>
+              <p className={styles.bodyLg}>
+                Describe what you want to learn. Sotto chats with you to understand
+                your background and interests, then crafts a podcast that feels like
+                it was made by your favorite producers.
+              </p>
+              <a href="/create" className={styles.linkArrow}>
+                Try it yourself
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.chatMock}>
+                <div className={styles.chatHeader}>
+                  <div className={styles.chatHeaderDot} aria-hidden="true" />
+                  <span>Sotto Discovery</span>
+                </div>
+                <div className={styles.chatBody}>
+                  <div className={`${styles.chatMsg} ${styles.chatUser}`}>
+                    <div className={styles.chatBubble}>I want to understand how CRISPR gene editing works</div>
+                  </div>
+                  <div className={`${styles.chatMsg} ${styles.chatBot}`}>
+                    <div className={styles.chatAvatar} aria-hidden="true">S</div>
+                    <div className={styles.chatBubble}>
+                      Fascinating topic! To tailor this for you — what&apos;s your background in biology?
+                    </div>
+                  </div>
+                  <div className={styles.chatChips}>
+                    <span className={styles.chip}>Complete beginner</span>
+                    <span className={`${styles.chip} ${styles.chipFaded}`}>Some college bio</span>
+                    <span className={`${styles.chip} ${styles.chipFaded}`}>Research background</span>
+                  </div>
+                  <div className={`${styles.chatMsg} ${styles.chatUser}`}>
+                    <div className={styles.chatBubble}>Complete beginner</div>
+                  </div>
+                  <div className={`${styles.chatMsg} ${styles.chatBot}`}>
+                    <div className={styles.chatAvatar} aria-hidden="true">S</div>
+                    <div className={styles.chatBubble}>
+                      Perfect. Should we focus on the science, the ethics, or both?
+                    </div>
+                  </div>
+                  <div className={`${styles.chatMsg} ${styles.chatUser}`}>
+                    <div className={styles.chatBubble}>Both — that sounds great</div>
+                  </div>
+                  <div className={styles.chatGenerating}>
+                    <div className={styles.chatSpinner} aria-hidden="true" />
+                    Generating your podcast...
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== INTERRUPT ====== */}
+      <section className={styles.section} aria-label="Interactive feature">
+        <div className={styles.inner}>
+          <div className={`${styles.split} ${styles.splitReverse}`}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overline}>Interactive</span>
+              <h2 className={styles.h2}>The podcast that pauses when you&apos;re curious</h2>
+              <p className={styles.bodyLg}>
+                Unlike anything you&apos;ve listened to before. Tap to interrupt,
+                ask a follow-up, and get an answer drawn from the full context of
+                what you&apos;ve been hearing. Then your Q&amp;A gets woven back into
+                the conversation.
+              </p>
+              <a href="/create" className={styles.linkArrow}>
+                Experience it
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 8h10m0 0l-3.5-3.5M13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </a>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.interruptMock}>
+                <div className={styles.interruptPlaying}>
+                  <div className={styles.interruptWave} aria-hidden="true">
+                    {Array.from({ length: 32 }, (_, i) => (
+                      <span key={i} className={styles.interruptBar} style={{ '--j': i } as React.CSSProperties} />
+                    ))}
+                  </div>
+                  <div className={styles.interruptTranscript}>
+                    <p><span className={styles.speakerHost}>Host:</span> &ldquo;...so the Cas9 protein acts like molecular scissors, cutting the DNA at a precise location&mdash;&rdquo;</p>
+                  </div>
+                </div>
+                <div className={styles.interruptPause}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <rect x="5" y="3" width="4" height="14" rx="1" /><rect x="11" y="3" width="4" height="14" rx="1" />
+                  </svg>
+                  You paused to ask:
+                </div>
+                <div className={styles.interruptQuestion}>
+                  &ldquo;Wait, what exactly is a guide RNA?&rdquo;
+                </div>
+                <div className={styles.interruptAnswer}>
+                  <div className={styles.chatAvatar} aria-hidden="true">S</div>
+                  <div>
+                    <p className={styles.interruptAnswerLabel}>Sotto answered:</p>
+                    <p>&ldquo;Think of it as GPS coordinates for CRISPR. The guide RNA tells Cas9 exactly where on the genome to make its cut. Without it, the scissors have no target.&rdquo;</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== VOICES ====== */}
+      <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Voice selection">
+        <div className={styles.inner}>
+          <div className={`${styles.centered} ${styles.rev}`}>
+            <span className={styles.overline}>Premium Voices</span>
+            <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
+            <p className={styles.bodyLg}>
+              Choose from 16 curated AI voices or clone your own. Every podcast pairs
+              a unique host and expert for natural, engaging conversation.
+            </p>
+          </div>
+          <div className={styles.voiceGrid}>
+            {VOICES.map((v, i) => (
+              <div key={v.name} className={`${styles.voiceCard} ${styles.rev}`} style={{ '--vi': i } as React.CSSProperties}>
+                <div className={`${styles.voiceAvatar} ${v.gender === 'f' ? styles.voiceAvatarF : ''}`}>
+                  {v.name[0]}
+                </div>
+                <div className={styles.voiceInfo}>
+                  <span className={styles.voiceName}>{v.name}</span>
+                  <span className={styles.voiceChar}>{v.character}</span>
+                </div>
+                <span className={styles.voiceAccent}>{v.accent}</span>
+              </div>
+            ))}
+          </div>
+          <div className={`${styles.voicePairing} ${styles.rev}`}>
+            <div className={styles.pairingExample}>
+              <div className={`${styles.pairingRole} ${styles.pairingHost}`}>
+                <span className={styles.pairingDot} />
+                Host
+              </div>
+              <div className={styles.pairingLine} aria-hidden="true" />
+              <div className={styles.pairingLabel}>contrasting voices</div>
+              <div className={styles.pairingLine} aria-hidden="true" />
+              <div className={`${styles.pairingRole} ${styles.pairingExpert}`}>
+                <span className={styles.pairingDot} />
+                Expert
+              </div>
+            </div>
+            <p className={styles.pairingHint}>
+              Sotto automatically pairs voices with different genders, accents, or
+              tones for auditory contrast. Or pick your own combination.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== USE CASES ====== */}
+      <section className={styles.section} aria-label="Use cases">
+        <div className={styles.inner}>
+          <div className={`${styles.centered} ${styles.rev}`}>
+            <span className={styles.overline}>Built for the curious</span>
+            <h2 className={styles.h2}>Turn any topic into a podcast worth sharing</h2>
+          </div>
+          <div className={styles.useCases}>
+            <article className={`${styles.useCase} ${styles.rev}`}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+                </svg>
+              </div>
+              <h3>Students</h3>
+              <p>Turn dense research papers into digestible conversations. Study smarter by listening and asking questions in real time.</p>
+            </article>
+            <article className={`${styles.useCase} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+                </svg>
+              </div>
+              <h3>Professionals</h3>
+              <p>Stay current on industry trends during your commute. Get up to speed on any subject in 10 focused minutes.</p>
+            </article>
+            <article className={`${styles.useCase} ${styles.rev} ${styles.d2}`}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <h3>Educators</h3>
+              <p>Create engaging supplementary material for your students. Interactive audio that adapts to every learner.</p>
+            </article>
+            <article className={`${styles.useCase} ${styles.rev} ${styles.d3}`}>
+              <div className={styles.useCaseIcon} aria-hidden="true">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </div>
+              <h3>Researchers</h3>
+              <p>Make your work accessible to a wider audience. Transform complex findings into compelling conversations anyone can follow.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== HOW IT WORKS ====== */}
+      <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="How it works">
+        <div className={styles.inner}>
+          <div className={`${styles.centered} ${styles.rev}`}>
+            <span className={styles.overline}>How it works</span>
+            <h2 className={styles.h2}>Three steps. One incredible podcast.</h2>
+          </div>
+          <div className={styles.steps}>
+            <div className={`${styles.step} ${styles.rev}`}>
+              <div className={styles.stepNum}>1</div>
+              <div className={styles.stepContent}>
+                <h3>Describe what you want to learn</h3>
+                <p>Chat naturally with Sotto. Tell us the topic, your background, and what angle interests you most. Our AI handles the rest.</p>
+              </div>
+            </div>
+            <div className={styles.stepLine} aria-hidden="true" />
+            <div className={`${styles.step} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.stepNum}>2</div>
+              <div className={styles.stepContent}>
+                <h3>Listen and interact</h3>
+                <p>A two-voice podcast is generated in under a minute. Listen with an interactive transcript. Pause to ask questions anytime — Sotto answers in context.</p>
+              </div>
+            </div>
+            <div className={styles.stepLine} aria-hidden="true" />
+            <div className={`${styles.step} ${styles.rev} ${styles.d2}`}>
+              <div className={styles.stepNum}>3</div>
+              <div className={styles.stepContent}>
+                <h3>Share with the world</h3>
+                <p>Your podcasts join a public feed. Discover what others are learning. Fork, remix, and follow your favorite creators.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== PRICING ====== */}
+      <section className={styles.section} aria-label="Pricing" id="pricing">
+        <div className={styles.inner}>
+          <div className={`${styles.centered} ${styles.rev}`}>
+            <span className={styles.overline}>Pricing</span>
+            <h2 className={styles.h2}>Simple, honest pricing</h2>
+            <p className={styles.bodyLg}>Start free. Upgrade when you need more.</p>
+          </div>
+          <div className={styles.tiers}>
+            {/* FREE */}
+            <div className={`${styles.tier} ${styles.rev}`}>
+              <div className={styles.tierHead}>
+                <h3>Free</h3>
+                <div className={styles.tierPrice}><span className={styles.tierAmount}>$0</span></div>
+                <p className={styles.tierDesc}>Perfect for trying Sotto</p>
+              </div>
+              <ul className={styles.tierFeatures}>
+                <li>{CHECK} 2 podcasts per month</li>
+                <li>{CHECK} Up to 10 minutes each</li>
+                <li>{CHECK} Standard AI voices</li>
+                <li>{CHECK} Public podcasts</li>
+                <li>{CHECK} 2 interactions per podcast</li>
+              </ul>
+              <a href="/auth/signup" className={styles.tierBtn}>Get Started</a>
+            </div>
+            {/* PRO */}
+            <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.tierBadge}>Most Popular</div>
+              <div className={styles.tierHead}>
+                <h3>Pro</h3>
+                <div className={styles.tierPrice}>
+                  <span className={styles.tierAmount}>$24</span>
+                  <span className={styles.tierPeriod}>/mo</span>
+                </div>
+                <p className={styles.tierDesc}>For power learners</p>
+              </div>
+              <ul className={styles.tierFeatures}>
+                <li>{CHECK} 15 podcasts per month</li>
+                <li>{CHECK} 5 premium voice credits</li>
+                <li>{CHECK} Clone up to 3 voices</li>
+                <li>{CHECK} 10 interactions per podcast</li>
+                <li>{CHECK} Private &amp; unlisted podcasts</li>
+                <li>{CHECK} MP3 download + PDF transcript</li>
+                <li>{CHECK} Voice library access</li>
+              </ul>
+              <a href="/auth/signup" className={styles.tierBtnPrimary}>Start Pro Trial</a>
+            </div>
+            {/* CREATOR */}
+            <div className={`${styles.tier} ${styles.rev} ${styles.d2}`}>
+              <div className={styles.tierHead}>
+                <h3>Creator</h3>
+                <div className={styles.tierPrice}>
+                  <span className={styles.tierAmount}>$49</span>
+                  <span className={styles.tierPeriod}>/mo</span>
+                </div>
+                <p className={styles.tierDesc}>For serious creators</p>
+              </div>
+              <ul className={styles.tierFeatures}>
+                <li>{CHECK} Unlimited podcasts</li>
+                <li>{CHECK} 20 premium voice credits</li>
+                <li>{CHECK} Clone up to 10 voices</li>
+                <li>{CHECK} Unlimited interactions</li>
+                <li>{CHECK} Voice marketplace listing</li>
+                <li>{CHECK} Full analytics dashboard</li>
+                <li>{CHECK} Everything in Pro</li>
+              </ul>
+              <a href="/auth/signup" className={styles.tierBtn}>Start Creator Trial</a>
+            </div>
+          </div>
+          <p className={styles.tierFootnote}>
+            All plans include unlimited listening. <a href="/pricing">See full comparison</a>
+          </p>
+        </div>
+      </section>
+
+      {/* ====== FINAL CTA ====== */}
+      <section className={styles.cta} aria-label="Get started">
+        <div className={styles.ctaGlow} aria-hidden="true" />
+        <div className={`${styles.ctaContent} ${styles.rev}`}>
+          <h2 className={styles.ctaTitle}>Ready to hear something new?</h2>
+          <p className={styles.ctaSub}>
+            Your first two podcasts are completely free. No credit card required.
+            No commitment. Just curiosity.
+          </p>
+          <a href="/create" className={styles.btnPrimary}>
+            Start Creating
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+              <path d="M3.75 9h10.5M9.75 4.5L14.25 9l-4.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </a>
         </div>
       </section>
 
-      <section className={styles.howItWorks}>
-        <h2>How It Works</h2>
-        <div className={styles.steps}>
-          <div className={styles.step}>
-            <span className={styles.stepNumber}>1</span>
-            <h3>Chat About Your Topic</h3>
-            <p>Tell Sotto what you want to learn. Our AI asks smart questions to tailor your podcast perfectly.</p>
+      {/* ====== FOOTER ====== */}
+      <footer className={styles.footer}>
+        <div className={styles.footerInner}>
+          <div className={styles.footerBrand}>
+            <span className={styles.footerLogo}>Sotto</span>
+            <p>Podcasts that listen back.</p>
           </div>
-          <div className={styles.step}>
-            <span className={styles.stepNumber}>2</span>
-            <h3>Listen & Interact</h3>
-            <p>A two-voice podcast is generated just for you. Pause anytime to ask questions — Sotto answers in context.</p>
-          </div>
-          <div className={styles.step}>
-            <span className={styles.stepNumber}>3</span>
-            <h3>Share & Discover</h3>
-            <p>Your podcasts are public by default. Discover what others are learning, follow creators, fork and remix.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className={styles.pricing}>
-        <h2>Simple Pricing</h2>
-        <div className={styles.tiers}>
-          <div className={styles.tier}>
-            <h3>Free</h3>
-            <p className={styles.price}>$0</p>
-            <ul>
-              <li>3 podcasts/month</li>
-              <li>Up to 10 minutes each</li>
-              <li>Unlimited listening</li>
-              <li>Public feed access</li>
-            </ul>
-          </div>
-          <div className={`${styles.tier} ${styles.featured}`}>
-            <h3>Pro</h3>
-            <p className={styles.price}>$19<span>/mo</span></p>
-            <ul>
-              <li>20 podcasts/month</li>
-              <li>Up to 30 minutes each</li>
-              <li>Unlimited interactions</li>
-              <li>Private podcasts</li>
-              <li>Download MP3s</li>
-            </ul>
-          </div>
-          <div className={styles.tier}>
-            <h3>Team</h3>
-            <p className={styles.price}>$49<span>/mo</span></p>
-            <ul>
-              <li>Unlimited podcasts</li>
-              <li>10 team seats</li>
-              <li>Private team feed</li>
-              <li>API access</li>
-              <li>Analytics dashboard</li>
-            </ul>
+          <div className={styles.footerCols}>
+            <div>
+              <h4>Product</h4>
+              <a href="/feed">Feed</a>
+              <a href="/create">Create</a>
+              <a href="/pricing">Pricing</a>
+              <a href="/settings/voices">Voices</a>
+            </div>
+            <div>
+              <h4>Company</h4>
+              <a href="/feedback">Feedback</a>
+              <a href="#">About</a>
+              <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+            </div>
           </div>
         </div>
-      </section>
-    </main>
+        <div className={styles.footerBottom}>
+          &copy; {new Date().getFullYear()} Sotto. All rights reserved.
+        </div>
+      </footer>
+    </div>
   );
 }
