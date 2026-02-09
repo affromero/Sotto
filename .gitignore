@@ -47,3 +47,11 @@ docs/*.pdf
 
 # Snap
 snap/
+
+# Accounting
+accounting/reports/*.html
+accounting/reports/*.pdf
+accounting/reports/*.txt
+accounting/imports/*.ofx
+accounting/imports/*.csv
+.fava-cache/
