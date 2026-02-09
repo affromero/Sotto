@@ -4,17 +4,31 @@ import { getToken } from 'next-auth/jwt';
 const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing', '/analytics'];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
+const PASSWORD_GATE_BYPASS = ['/access', '/api/access', '/api/health'];
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Skip static files
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/fonts')) {
+    return NextResponse.next();
+  }
+
+  // Site-wide password gate (early access)
+  if (process.env.SITE_PASSWORD) {
+    const isBypassed = PASSWORD_GATE_BYPASS.some((route) => pathname.startsWith(route));
+    if (!isBypassed) {
+      const accessCookie = request.cookies.get('sotto_access');
+      if (accessCookie?.value !== 'granted') {
+        return NextResponse.redirect(new URL('/access', request.url));
+      }
+    }
+  }
+
   const token = await getToken({ req: request });
 
   // Skip API routes (handled by individual route handlers)
   if (pathname.startsWith('/api/')) {
-    return NextResponse.next();
-  }
-
-  // Skip static files and webhooks
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/fonts')) {
     return NextResponse.next();
   }
 

@@ -53,8 +53,8 @@ fi
 echo "[4/7] Installing Caddy..."
 if ! command -v caddy &>/dev/null; then
   apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-  curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.gpg' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.list' | tee /etc/apt/sources.list.d/caddy-stable.list
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
   apt update && apt install -y caddy
   echo "  Caddy installed"
 else
