@@ -1,21 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-// Mock prisma before importing route
-vi.mock('@/lib/prisma', () => {
-  const mockPrisma = {
+// Define mock fns at module scope so they're properly typed as Mock
+const mockPodcastFindMany = vi.fn();
+const mockPodcastCount = vi.fn();
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
     podcast: {
-      findMany: vi.fn().mockResolvedValue([]),
-      count: vi.fn().mockResolvedValue(0),
+      findMany: (...args: unknown[]) => mockPodcastFindMany(...args),
+      count: (...args: unknown[]) => mockPodcastCount(...args),
     },
-  };
-  return { prisma: mockPrisma };
-});
+  },
+}));
 
 import { GET } from '@/app/api/feed/route';
-import { prisma } from '@/lib/prisma';
 
-const mockPrisma = vi.mocked(prisma);
+const mockPrisma = {
+  podcast: {
+    findMany: mockPodcastFindMany,
+    count: mockPodcastCount,
+  },
+};
 
 function createRequest(params: Record<string, string> = {}): NextRequest {
   const url = new URL('http://localhost:3000/api/feed');
@@ -114,7 +120,11 @@ describe('GET /api/feed', () => {
     const podcast = body.podcasts[0];
     expect(podcast.id).toBe('pod-1');
     expect(podcast.title).toBe('Quantum Physics 101');
-    expect(podcast.user).toEqual({ id: 'user-1', name: 'Alice', image: 'https://example.com/alice.jpg' });
+    expect(podcast.user).toEqual({
+      id: 'user-1',
+      name: 'Alice',
+      image: 'https://example.com/alice.jpg',
+    });
     expect(podcast.tags).toHaveLength(1);
     expect(podcast.tags[0].tag.slug).toBe('science');
   });

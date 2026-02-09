@@ -283,9 +283,7 @@ describe('Twitter Settings API', () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-010' } });
       mockPrismaTransaction.mockImplementation(async (operations) => {
         if (Array.isArray(operations)) {
-          return Promise.all(
-            operations.map((op: Promise<unknown>) => Promise.resolve(op))
-          );
+          return Promise.all(operations.map((op: Promise<unknown>) => Promise.resolve(op)));
         }
         return Promise.resolve([]);
       });
@@ -300,8 +298,7 @@ describe('Twitter Settings API', () => {
 
     it('deletes Twitter account records', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-011' } });
-      mockPrismaTransaction.mockImplementation(async (operations) => {
-        const ops = operations as Array<Promise<unknown>>;
+      mockPrismaTransaction.mockImplementation(async () => {
         const mockDeleteResult = { count: 1 };
         const mockUpdateResult = {
           id: 'user-011',
@@ -314,10 +311,7 @@ describe('Twitter Settings API', () => {
       await DELETE();
 
       expect(mockPrismaTransaction).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.any(Object),
-          expect.any(Object),
-        ])
+        expect.arrayContaining([expect.any(Object), expect.any(Object)])
       );
     });
 
@@ -334,8 +328,7 @@ describe('Twitter Settings API', () => {
 
     it('clears twitterHandle and disables twitterEnabled', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-012' } });
-      mockPrismaTransaction.mockImplementation(async (operations) => {
-        const ops = operations as Array<Promise<unknown>>;
+      mockPrismaTransaction.mockImplementation(async () => {
         const mockUpdateResult = {
           id: 'user-012',
           twitterHandle: null,

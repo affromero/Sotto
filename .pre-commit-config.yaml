@@ -1,0 +1,36 @@
+---
+# Setup: uv sync && uv run pre-commit install --install-hooks
+# See https://pre-commit.com for more information
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.snap$
+      - id: end-of-file-fixer
+        exclude: \.snap$
+      - id: mixed-line-ending
+        args: [--fix, lf]
+      - id: check-yaml
+      - id: check-json
+        exclude: ^tsconfig\.json$
+      - id: check-added-large-files
+        args: [--maxkb=2000]
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+  - repo: local
+    hooks:
+      - id: lint-staged
+        name: lint-staged (eslint + prettier + sort-package-json)
+        entry: npx lint-staged --allow-empty
+        language: system
+        always_run: true
+        pass_filenames: false
+
+      - id: typecheck
+        name: typecheck (tsc --noEmit)
+        entry: npx tsc --noEmit
+        language: system
+        always_run: true
+        pass_filenames: false

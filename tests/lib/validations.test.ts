@@ -357,11 +357,11 @@ describe('checkoutSchema', () => {
     }
   });
 
-  it('accepts team tier', () => {
-    const result = checkoutSchema.safeParse({ tier: 'team' });
+  it('accepts creator tier', () => {
+    const result = checkoutSchema.safeParse({ tier: 'creator' });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tier).toBe('team');
+      expect(result.data.tier).toBe('creator');
     }
   });
 
