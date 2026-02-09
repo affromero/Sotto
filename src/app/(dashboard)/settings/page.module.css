@@ -249,6 +249,20 @@
   color: var(--color-text-secondary);
 }
 
+/* Twitter Integration */
+
+.twitterDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.twitterHandle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
 /* Danger Zone */
 
 .dangerSection {

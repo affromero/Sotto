@@ -54,6 +54,7 @@
 | `/api/teams/[teamId]` | GET/PATCH/DELETE | Yes | Team CRUD |
 | `/api/teams/invite` | POST | Yes | Send team invite |
 | `/api/users/me` | GET/PATCH | Yes | Current user profile |
+| `/api/users/me/twitter` | GET/PATCH/DELETE | Yes | Twitter settings (handle, enabled, voice prefs, disconnect) |
 | `/api/voices/clone` | POST | Yes | Create voice clone |
 | `/api/voices/preview` | POST | Yes | Preview voice sample |
 | `/api/waitlist` | POST | No | Waitlist signup |

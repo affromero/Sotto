@@ -16,6 +16,7 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 | `pricing/` | PricingCard, FeatureList, TierComparison | Pricing page |
 | `profile/` | ProfileHeader, PodcastList, FollowButton, FollowerCount | User profiles |
 | `notifications/` | NotificationBell, NotificationList, PushPrompt | Notifications |
+| `settings/` | VoicePreferenceSelector | Twitter voice preference dropdowns |
 | `providers/` | SessionProvider, AudioPlayerProvider, NotificationProvider | React context providers |
 
 ## Component Pattern

@@ -110,12 +110,12 @@ describe('createPodcastSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing discoveryId', () => {
+  it('accepts missing discoveryId (optional for Twitter/API sources)', () => {
     const result = createPodcastSchema.safeParse({
       title: 'My Podcast',
       topic: 'A topic',
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('rejects missing title', () => {

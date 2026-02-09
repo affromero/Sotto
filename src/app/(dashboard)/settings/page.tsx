@@ -14,7 +14,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts] = await Promise.all([
+  const [user, accounts, voiceClones] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -22,12 +22,24 @@ export default async function SettingsPage() {
         email: true,
         image: true,
         bio: true,
+        twitterHandle: true,
+        twitterEnabled: true,
+        preferredHostVoiceId: true,
+        preferredExpertVoiceId: true,
       },
     }),
     prisma.account.findMany({
       where: { userId },
       select: {
         provider: true,
+      },
+    }),
+    prisma.voiceClone.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        name: true,
+        elevenLabsVoiceId: true,
       },
     }),
   ]);
@@ -46,6 +58,11 @@ export default async function SettingsPage() {
         email={user.email}
         image={user.image}
         connectedProviders={connectedProviders}
+        twitterHandle={user.twitterHandle}
+        twitterEnabled={user.twitterEnabled}
+        preferredHostVoiceId={user.preferredHostVoiceId}
+        preferredExpertVoiceId={user.preferredExpertVoiceId}
+        voiceClones={voiceClones}
       />
     </main>
   );

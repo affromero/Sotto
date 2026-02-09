@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { StitchAudioPayload, addJob, JobType, notificationQueue } from '@/lib/queue';
+import { StitchAudioPayload, addJob, JobType, notificationQueue, twitterReplyQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
@@ -53,7 +53,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 3. Determine user tier for SFX quality
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { userId: true, title: true },
+      select: { userId: true, title: true, source: true, sourceTweetId: true },
     });
     const tier = await getUserTier(podcast.userId);
     const tierLimits = TIER_LIMITS[tier];
@@ -178,6 +178,25 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       data: { podcastId },
     });
 
+    // 11. If generated from Twitter, queue a reply to the original tweet
+    if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
+      const mention = await prisma.tweetMention.findFirst({
+        where: { podcastId, status: { in: ['GENERATING'] } },
+        select: { id: true, tweetId: true },
+      });
+      if (mention) {
+        await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
+          podcastId,
+          tweetMentionId: mention.id,
+          originalTweetId: mention.tweetId,
+        });
+        await prisma.tweetMention.update({
+          where: { id: mention.id },
+          data: { status: 'READY' },
+        });
+      }
+    }
+
     await job.updateProgress(100);
     logger.info('Audio stitching complete', {
       podcastId,
@@ -192,6 +211,21 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       where: { id: podcastId },
       data: { status: 'FAILED' },
     }).catch(() => {});
+
+    // If Twitter-sourced, queue failure reply
+    if (job.data.podcastId) {
+      const mention = await prisma.tweetMention.findFirst({
+        where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
+        select: { id: true, tweetId: true },
+      }).catch(() => null);
+      if (mention) {
+        await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
+          podcastId: job.data.podcastId,
+          tweetMentionId: mention.id,
+          originalTweetId: mention.tweetId,
+        }).catch(() => {});
+      }
+    }
 
     throw err;
   } finally {

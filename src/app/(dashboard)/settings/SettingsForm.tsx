@@ -1,10 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { signOut } from 'next-auth/react';
+import { signIn, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import styles from './page.module.css';
+
+interface VoiceCloneData {
+  id: string;
+  name: string;
+  elevenLabsVoiceId: string;
+}
 
 interface SettingsFormProps {
   initialName: string;
@@ -12,12 +19,18 @@ interface SettingsFormProps {
   email: string;
   image: string | null;
   connectedProviders: string[];
+  twitterHandle: string | null;
+  twitterEnabled: boolean;
+  preferredHostVoiceId: string | null;
+  preferredExpertVoiceId: string | null;
+  voiceClones: VoiceCloneData[];
 }
 
 const providerLabels: Record<string, string> = {
   google: 'Google',
   github: 'GitHub',
   apple: 'Apple',
+  twitter: 'Twitter',
 };
 
 export function SettingsForm({
@@ -26,6 +39,11 @@ export function SettingsForm({
   email,
   image,
   connectedProviders,
+  twitterHandle,
+  twitterEnabled: initialTwitterEnabled,
+  preferredHostVoiceId: initialHostVoiceId,
+  preferredExpertVoiceId: initialExpertVoiceId,
+  voiceClones,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -34,6 +52,15 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+
+  // Twitter state
+  const isTwitterConnected = connectedProviders.includes('twitter');
+  const [twitterEnabled, setTwitterEnabled] = useState(initialTwitterEnabled);
+  const [hostVoiceId, setHostVoiceId] = useState<string | null>(initialHostVoiceId);
+  const [expertVoiceId, setExpertVoiceId] = useState<string | null>(initialExpertVoiceId);
+  const [twitterSaving, setTwitterSaving] = useState(false);
+  const [twitterSaved, setTwitterSaved] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +87,40 @@ export function SettingsForm({
     });
     if (response.ok) {
       signOut({ callbackUrl: '/' });
+    }
+  };
+
+  const handleSaveTwitterSettings = async () => {
+    setTwitterSaving(true);
+    setTwitterSaved(false);
+    try {
+      const response = await fetch('/api/users/me/twitter', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          twitterEnabled,
+          preferredHostVoiceId: hostVoiceId,
+          preferredExpertVoiceId: expertVoiceId,
+        }),
+      });
+      if (response.ok) {
+        setTwitterSaved(true);
+        setTimeout(() => setTwitterSaved(false), 3000);
+      }
+    } finally {
+      setTwitterSaving(false);
+    }
+  };
+
+  const handleDisconnectTwitter = async () => {
+    setDisconnecting(true);
+    try {
+      const response = await fetch('/api/users/me/twitter', { method: 'DELETE' });
+      if (response.ok) {
+        window.location.reload();
+      }
+    } finally {
+      setDisconnecting(false);
     }
   };
 
@@ -169,6 +230,77 @@ export function SettingsForm({
             Sign Out
           </Button>
         </div>
+      </section>
+
+      {/* Twitter Integration Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Twitter Integration</h2>
+        {!isTwitterConnected ? (
+          <div>
+            <p className={styles.twitterDescription}>
+              Connect your Twitter account to generate podcasts by tweeting at @sottofm.
+            </p>
+            <div className={styles.formActions}>
+              <Button onClick={() => signIn('twitter')}>
+                Connect Twitter
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.form}>
+            {twitterHandle && (
+              <p className={styles.twitterHandle}>@{twitterHandle}</p>
+            )}
+
+            <label className={styles.toggleRow}>
+              <div className={styles.toggleInfo}>
+                <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
+                <span className={styles.toggleDescription}>
+                  Generate podcasts when you tweet at @sottofm
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                className={styles.toggle}
+                checked={twitterEnabled}
+                onChange={(e) => setTwitterEnabled(e.target.checked)}
+                aria-label="Toggle Twitter podcast generation"
+              />
+            </label>
+
+            <VoicePreferenceSelector
+              label="Preferred Host Voice"
+              value={hostVoiceId}
+              onChange={setHostVoiceId}
+              voiceClones={voiceClones}
+            />
+
+            <VoicePreferenceSelector
+              label="Preferred Expert Voice"
+              value={expertVoiceId}
+              onChange={setExpertVoiceId}
+              voiceClones={voiceClones}
+            />
+
+            <div className={styles.formActions}>
+              <Button
+                onClick={handleSaveTwitterSettings}
+                loading={twitterSaving}
+                disabled={twitterSaving}
+              >
+                {twitterSaved ? 'Saved' : 'Save Twitter Settings'}
+              </Button>
+              <Button
+                variant="danger"
+                onClick={handleDisconnectTwitter}
+                loading={disconnecting}
+                disabled={disconnecting}
+              >
+                Disconnect Twitter
+              </Button>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Danger Zone */}

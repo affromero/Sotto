@@ -15,6 +15,8 @@ export enum JobType {
   REGENERATE_SEGMENT = 'regenerate_segment',
   SEND_NOTIFICATION = 'send_notification',
   GENERATE_PDF = 'generate_pdf',
+  POLL_TWITTER_MENTIONS = 'poll_twitter_mentions',
+  REPLY_TWITTER = 'reply_twitter',
 }
 
 /**
@@ -78,6 +80,16 @@ export interface ValidateReferencesPayload {
 export interface GeneratePdfPayload {
   podcastId: string;
   userId: string;
+}
+
+export interface PollTwitterMentionsPayload {
+  // Empty — repeatable job, no per-invocation data
+}
+
+export interface ReplyTwitterPayload {
+  podcastId: string;
+  tweetMentionId: string;
+  originalTweetId: string;
 }
 
 /**
@@ -204,3 +216,5 @@ export const segmentRegenerationQueue = createQueue('segment-regeneration', { at
 export const notificationQueue = createQueue('notifications', { attempts: 5 });
 export const referenceValidationQueue = createQueue('reference-validation', { attempts: 2 });
 export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2 });
+export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1 });
+export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3 });

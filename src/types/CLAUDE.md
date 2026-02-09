@@ -16,6 +16,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `analytics.ts` | UsageStats, AnalyticsData, CostBreakdown |
 | `api-key.ts` | ApiKeyData, CreateKeyRequest, KeyListResponse |
 | `team.ts` | TeamData, TeamInviteData, TeamMember |
+| `twitter.ts` | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData |
 
 ## Rules
 - Types here are for **API responses and component props** — not Prisma models

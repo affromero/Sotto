@@ -14,7 +14,7 @@ export const discoveryMessageSchema = z.object({
 export const createPodcastSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
-  discoveryId: z.string(),
+  discoveryId: z.string().optional(),
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
   usePremiumVoice: z.boolean().default(false),
@@ -136,4 +136,13 @@ export const voicePreviewSchema = z.object({
 export const waitlistSchema = z.object({
   email: z.string().email().max(200),
   source: z.string().max(50).optional(),
+});
+
+/**
+ * Twitter settings validation
+ */
+export const twitterSettingsSchema = z.object({
+  twitterEnabled: z.boolean().optional(),
+  preferredHostVoiceId: z.string().nullable().optional(),
+  preferredExpertVoiceId: z.string().nullable().optional(),
 });

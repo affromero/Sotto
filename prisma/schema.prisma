@@ -26,6 +26,12 @@ model User {
   podcastsUsed    Int @default(0)
   podcastsAllowed Int @default(2) // 2 free podcasts for all users
 
+  // Twitter integration
+  twitterHandle          String?   @unique
+  twitterEnabled         Boolean   @default(false)
+  preferredHostVoiceId   String?
+  preferredExpertVoiceId String?
+
   // Team membership (dormant — kept for future use)
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id])
@@ -52,6 +58,9 @@ model User {
 
   // API Keys
   apiKeys ApiKey[]
+
+  // Twitter mentions
+  tweetMentions TweetMention[]
 
   @@index([teamId])
 }
@@ -223,6 +232,10 @@ model Podcast {
   expertVoiceId   String?
   usePremiumVoice Boolean @default(false)
 
+  // Source tracking (web, twitter, api)
+  source        PodcastSource @default(WEB)
+  sourceTweetId String?
+
   // Visibility
   visibility PodcastVisibility @default(PUBLIC)
 
@@ -241,7 +254,7 @@ model Podcast {
   pdfUrl String?
 
   // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   discovery    Discovery?
   script       Script?
   segments     Segment[]
@@ -251,6 +264,7 @@ model Podcast {
   tags         PodcastTag[]
   jobs         Job[]
   references   Reference[]
+  tweetMention TweetMention?
 
   @@index([userId])
   @@index([status])
@@ -277,6 +291,12 @@ enum PodcastVisibility {
   PUBLIC
   UNLISTED
   PRIVATE
+}
+
+enum PodcastSource {
+  WEB
+  TWITTER
+  API
 }
 
 // ============ DISCOVERY (Chat-Based) ============
@@ -479,6 +499,7 @@ enum NotificationType {
   NEW_FOLLOWER
   SIMILAR_PODCAST_CREATED
   TEAM_INVITE
+  TWITTER_PODCAST_READY
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -583,6 +604,41 @@ enum FeedbackStatus {
   IN_PROGRESS
   RESOLVED
   ARCHIVED
+}
+
+// ============ TWITTER MENTIONS ============
+
+model TweetMention {
+  id            String             @id @default(cuid())
+  tweetId       String             @unique
+  authorId      String             // Twitter numeric user ID
+  text          String             @db.Text
+  parsedTopic   String?            @db.Text
+  status        TweetMentionStatus @default(PENDING)
+  userId        String?
+  podcastId     String?            @unique
+  replyTweetId  String?
+  parentTweetId String?
+  errorMessage  String?            @db.Text
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+
+  @@index([authorId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum TweetMentionStatus {
+  PENDING
+  PARSING
+  GENERATING
+  READY
+  REPLIED
+  FAILED
+  IGNORED
 }
 
 // ============ WAITLIST ============

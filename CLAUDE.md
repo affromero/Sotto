@@ -16,8 +16,8 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 |-------|-----------|
 | Frontend | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind) |
 | Database | PostgreSQL 16 + Prisma ORM |
-| Auth | NextAuth.js v5 (email, Google, GitHub, Apple Sign In) |
-| Queue | Redis 7 + BullMQ (9 worker types) |
+| Auth | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In) |
+| Queue | Redis 7 + BullMQ (11 worker types) |
 | AI | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER` |
 | Audio | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER` |
 | Stitching | FFmpeg (segment concatenation + normalization) |
@@ -87,7 +87,7 @@ src/
 │       ├── discovery/          # Streaming Claude chat + chip suggestions
 │       ├── recommendations/    # Search similar podcasts
 │       ├── feed/               # Public feed, trending, search
-│       ├── users/              # Profile, follow/unfollow
+│       ├── users/              # Profile, follow/unfollow, Twitter settings
 │       ├── billing/            # Stripe checkout, subscription, portal, usage
 │       ├── notifications/      # List, mark read, push registration
 │       ├── tags/               # Tag taxonomy
@@ -108,6 +108,7 @@ src/
 │   ├── pricing/                # PricingCard, FeatureList, SoonBadge
 │   ├── profile/                # ProfileHeader, PodcastList, FollowButton
 │   ├── notifications/          # NotificationBell, NotificationList, PushPrompt
+│   ├── settings/               # VoicePreferenceSelector
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
 │   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider
 ├── lib/
@@ -133,6 +134,8 @@ src/
 │   ├── subscription.ts         # Subscription tier management + limits
 │   ├── notifications.ts        # In-app notification helpers
 │   ├── validations.ts          # Zod schemas for API validation
+│   ├── twitter.ts              # Twitter API v2 client (mentions, replies, OAuth 1.0a)
+│   ├── tweet-parser.ts         # Claude-based tweet intent extraction
 │   ├── api-keys.ts             # API key generation, hashing, validation
 │   └── hooks/                  # React hooks
 │       ├── useAuth.ts
@@ -141,7 +144,7 @@ src/
 │       ├── useDiscovery.ts
 │       └── useNotifications.ts
 ├── workers/
-│   ├── index.ts                         # Worker orchestrator (9 workers)
+│   ├── index.ts                         # Worker orchestrator (11 workers)
 │   ├── content-extraction.worker.ts
 │   ├── script-generation.worker.ts      # Persists References, routes to validation
 │   ├── reference-validation.worker.ts   # 4-layer verification pipeline
@@ -150,7 +153,9 @@ src/
 │   ├── interaction.worker.ts
 │   ├── segment-regeneration.worker.ts
 │   ├── notification.worker.ts
-│   └── pdf-generation.worker.ts         # Async PDF generation → R2 upload
+│   ├── pdf-generation.worker.ts         # Async PDF generation → R2 upload
+│   ├── twitter-mentions.worker.ts       # Poll @sottofm mentions → parse → generate
+│   └── twitter-reply.worker.ts          # Reply to tweet when podcast is ready
 ├── styles/
 │   └── globals.css             # Design system tokens + global styles
 └── types/
@@ -163,7 +168,8 @@ src/
     ├── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
     ├── analytics.ts            # Usage analytics types
     ├── api-key.ts              # API key types
-    └── team.ts                 # Team + invite types
+    ├── team.ts                 # Team + invite types
+    └── twitter.ts              # TweetParseResult, TwitterTweet, TwitterSettingsData
 ```
 
 ## Design System: "Warm Intimacy"
@@ -203,6 +209,19 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
 [audio-stitching] → FFmpeg concat + normalize → final.mp3
     ↓
 [notification] → Push notification: "Your podcast is ready!"
+    ↓ (if source=TWITTER)
+[twitter-reply] → Reply to original tweet with podcast link
+```
+
+### Twitter @sottofm Integration
+```
+User tweets: "@sottofm make a podcast about quantum computing"
+    ↓
+[twitter-mentions] polls every 60s → lookup user → parse intent via Claude
+    ↓
+Creates Podcast (source: TWITTER) → kicks off pipeline above
+    ↓
+[twitter-reply] posts reply: "Your podcast is ready! Listen: sotto.fm/podcast/xyz"
 ```
 
 ### Interactive Playback
@@ -220,9 +239,9 @@ User listening → taps "Ask a Question" → podcast pauses
 
 | Model | Purpose |
 |-------|---------|
-| `User` | Auth, profile, bio, avatar, usage tracking |
+| `User` | Auth, profile, bio, avatar, usage tracking, Twitter handle + prefs |
 | `Follow` | Social: follower → following |
-| `Podcast` | Title, topic, status, audioUrl, pdfUrl, visibility, fork tracking |
+| `Podcast` | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking |
 | `Discovery` | Chat metadata (audience, depth, tone, focus, duration) |
 | `DiscoveryMessage` | Individual chat messages (role, content, chips) |
 | `Script` | Structured JSON turns + raw markdown, versioned |
@@ -239,6 +258,7 @@ User listening → taps "Ask a Question" → podcast pauses
 | `Job` | BullMQ job tracking |
 | `Notification` | In-app + push notifications |
 | `PushSubscription` | Web Push API endpoints |
+| `TweetMention` | Twitter mention tracking (dedup, status, reply thread, linked podcast) |
 | `ApiUsageLog` | Cost tracking (Claude/ElevenLabs/FFmpeg) |
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
@@ -349,6 +369,13 @@ See `.env.example` for all required/optional variables. Critical ones:
 - `ELEVENLABS_API_KEY` — ElevenLabs TTS API key
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Payments
 - `R2_*` — Cloudflare R2 storage credentials
+
+Twitter integration (optional):
+- `TWITTER_BEARER_TOKEN` — Twitter API v2 read access
+- `TWITTER_API_KEY` / `TWITTER_API_SECRET` — OAuth 1.0a for @sottofm bot
+- `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` — @sottofm bot access
+- `TWITTER_SOTTO_USER_ID` — Numeric user ID for @sottofm
+- `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` — Twitter OAuth for user login
 
 Provider selection (swap services via env):
 - `AI_PROVIDER` — `anthropic` (default) | `openai`

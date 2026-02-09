@@ -1,6 +1,6 @@
 # Sotto — Implementation Status
 
-> Last updated: 2026-02-09 — **197 items (197 complete + 0 remaining)**
+> Last updated: 2026-02-09 — **277 items (214 complete + 63 remaining)**
 
 ## Legend
 - [x] Implemented (real code, not a stub)
@@ -40,8 +40,8 @@
 
 - [x] `prisma.ts` — Prisma singleton client (build-safe, lazy validation)
 - [x] `redis.ts` — Redis connection, cache helpers, rate limiting
-- [x] `queue.ts` — BullMQ 7 queue types with typed payloads
-- [x] `auth.ts` — NextAuth v5 config (Google, GitHub providers)
+- [x] `queue.ts` — BullMQ 11 queue types with typed payloads
+- [x] `auth.ts` — NextAuth v5 config (Google, GitHub, Twitter providers)
 - [x] `claude.ts` — Anthropic client (streaming + non-streaming)
 - [x] `elevenlabs.ts` — TTS generation client
 - [x] `stripe.ts` — Stripe client, tier limits, checkout/portal
@@ -54,13 +54,15 @@
 - [x] `push-notifications.ts` — Web Push API
 - [x] `subscription.ts` — tier management, usage tracking
 - [x] `notifications.ts` — in-app notification helpers
-- [x] `validations.ts` — Zod schemas (discovery, podcast, interaction, profile, feed)
+- [x] `validations.ts` — Zod schemas (discovery, podcast, interaction, profile, feed, twitter)
 - [x] `logger.ts` — structured logger
+- [x] `twitter.ts` — Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a)
+- [x] `tweet-parser.ts` — Claude-based tweet intent extraction
 - [x] `CLAUDE.md` — documentation
 
 ## 4. Workers (`src/workers/`)
 
-- [x] `index.ts` — orchestrator (7 workers, graceful shutdown)
+- [x] `index.ts` — orchestrator (11 workers, graceful shutdown)
 - [x] `content-extraction.worker.ts`
 - [x] `script-generation.worker.ts`
 - [x] `audio-generation.worker.ts`
@@ -68,6 +70,8 @@
 - [x] `interaction.worker.ts`
 - [x] `segment-regeneration.worker.ts`
 - [x] `notification.worker.ts`
+- [x] `twitter-mentions.worker.ts` — poll @sottofm mentions, parse intent, create podcast
+- [x] `twitter-reply.worker.ts` — reply to tweet when podcast is ready
 - [x] `CLAUDE.md` — documentation
 
 ## 5. Types (`src/types/`)
@@ -78,6 +82,7 @@
 - [x] `feed.ts` — FeedResponse, FeedSort, FeedFilters
 - [x] `discovery.ts` — DiscoveryMessage, DiscoveryMetadata, DiscoveryState
 - [x] `notification.ts` — NotificationData, PushSubscriptionData
+- [x] `twitter.ts` — TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData
 - [x] `CLAUDE.md` — documentation
 
 ## 6. Design System (`src/styles/`)
@@ -158,6 +163,10 @@
 - [x] `NotificationList.tsx` + `.module.css` — notification dropdown
 - [x] `PushPrompt.tsx` + `.module.css` — enable push banner
 
+## 16b. Settings Components (`src/components/settings/`)
+
+- [x] `VoicePreferenceSelector.tsx` + `.module.css` — voice preference dropdowns for Twitter integration
+
 ## 17. Providers (`src/components/providers/`)
 
 - [x] `AudioPlayerProvider.tsx` — React context for audio player
@@ -213,6 +222,7 @@
 - [x] `billing/checkout/route.ts` — Stripe checkout session
 - [x] `billing/portal/route.ts` — Stripe customer portal
 - [x] `webhooks/stripe/route.ts` — Stripe webhook handler
+- [x] `users/me/twitter/route.ts` — Twitter settings API (GET/PATCH/DELETE)
 
 ## 21. Middleware
 
@@ -264,12 +274,17 @@
 - [x] `tests/api/feedback.test.ts` — 27 tests (POST validation, GET list, optional fields)
 - [x] `tests/workers/audio-generation.test.ts` — 28 tests (voice diversity, R2 upload, stitching queue)
 - [x] `tests/workers/notification.test.ts` — 24 tests (in-app + push, error propagation)
+- [x] `tests/lib/tweet-parser.test.ts` — 13 tests (intent extraction, JSON parsing, error handling)
+- [x] `tests/workers/twitter-mentions.test.ts` — 11 tests (polling, dedup, user lookup, pipeline kick-off)
+- [x] `tests/workers/twitter-reply.test.ts` — 14 tests (reply composition, 280-char limit, failure handling)
+- [x] `tests/api/twitter-settings.test.ts` — 15 tests (GET/PATCH/DELETE, validation, disconnect)
+- [x] `tests/lib/twitter-validations.test.ts` — 24 tests (twitterSettingsSchema, updated createPodcastSchema)
 
 ## 25. Build & Quality
 
 - [x] `npx tsc --noEmit` — 0 TypeScript errors
-- [x] `npm run lint` — 0 errors (10 warnings)
-- [x] `npm run test` — 288 tests passing (13 test files)
+- [x] `npm run lint` — 0 errors (11 warnings)
+- [x] `npm run test` — 365 tests passing (18 test files)
 - [x] `npm run build` — production build succeeds (33 routes)
 
 ---
@@ -280,9 +295,9 @@
 |----------|------|-------|
 | Config | 16 | 16 |
 | Database | 5 | 5 |
-| Core Libs | 19 | 19 |
-| Workers | 9 | 9 |
-| Types | 7 | 7 |
+| Core Libs | 21 | 21 |
+| Workers | 11 | 11 |
+| Types | 8 | 8 |
 | UI Components | 8 | 8 |
 | Player Components | 6 | 6 |
 | Layout Components | 4 | 4 |
@@ -293,19 +308,21 @@
 | Profile Components | 4 | 4 |
 | Pricing Components | 3 | 3 |
 | Notification Components | 3 | 3 |
+| Settings Components | 1 | 1 |
 | Providers | 3 | 3 |
 | Hooks | 5 | 5 |
 | Pages | 15 | 15 |
-| API Routes | 21 | 21 |
+| API Routes | 22 | 22 |
 | Middleware | 1 | 1 |
 | Docs | 15 | 15 |
 | CLAUDE.md | 9 | 9 |
-| Tests | 14 | 14 |
+| Tests (existing) | 19 | 19 |
+| Tests (backlog) | 0 | 63 |
 | Build & Quality | 4 | 4 |
-| Remaining Work | 11 | 11 |
-| **Total** | **197** | **197** |
+| Completed Work | 12 | 12 |
+| **Total** | **214** | **277** |
 
-## 26. Remaining Work
+## 26. Completed Work
 
 - [x] **Wire OAuth buttons** — `src/app/auth/AuthButtons.tsx` shared client component with `signIn()` calls for Google/GitHub
 - [x] **Edit podcast page** — `src/app/podcast/[podcastId]/edit/` with EditPodcastForm (title, topic, visibility)
@@ -318,5 +335,87 @@
 - [x] **API access tier** — ApiKey model, `sk_sotto_` keys with SHA-256, Bearer token auth on podcast routes
 - [x] **Analytics dashboard** — Period selector, stat cards, CSS-only BarChart + TimeSeriesChart
 - [x] **Advanced discovery filters** — FilterPanel with depth, audience, tone, duration range, date range
+- [x] **Twitter @sottofm integration** — Tweet-to-podcast pipeline (mention polling, intent parsing, reply posting, settings UI, OAuth)
 
-**197/197 items complete. All done.**
+## 27. Test Backlog
+
+Comprehensive tests to add for full coverage across the app.
+
+### API Route Tests
+
+- [ ] `tests/api/discovery.test.ts` — SSE streaming discovery chat (auth, message validation, streaming response format)
+- [ ] `tests/api/podcasts-crud.test.ts` — podcast list, create, get, update, delete (auth, ownership, validation)
+- [ ] `tests/api/podcasts-generate.test.ts` — trigger generation (status checks, tier limits, duplicate prevention)
+- [ ] `tests/api/podcasts-interact.test.ts` — submit interaction (timestamp validation, question length, podcast status checks)
+- [ ] `tests/api/podcasts-fork.test.ts` — fork podcast (auth, source podcast validation, visibility rules)
+- [ ] `tests/api/podcasts-like.test.ts` — like/unlike (toggle behavior, auth, duplicate handling)
+- [ ] `tests/api/podcasts-save.test.ts` — save/unsave (toggle behavior, auth, duplicate handling)
+- [ ] `tests/api/podcasts-export.test.ts` — PDF export trigger + status check (auth, podcast ownership)
+- [ ] `tests/api/users-profile.test.ts` — user profile endpoint (public access, includes podcasts/follows)
+- [ ] `tests/api/users-follow.test.ts` — follow/unfollow (auth, self-follow prevention, toggle behavior)
+- [ ] `tests/api/users-me.test.ts` — current user GET/PATCH (auth, validation, profile update)
+- [ ] `tests/api/notifications.test.ts` — list + mark read + mark all read (auth, pagination, ownership)
+- [ ] `tests/api/recommendations.test.ts` — similar podcast search (auth, query validation, result format)
+- [ ] `tests/api/billing-checkout.test.ts` — Stripe checkout session creation (tier validation, auth)
+- [ ] `tests/api/billing-portal.test.ts` — Stripe customer portal (auth, customer validation)
+- [ ] `tests/api/billing-subscription.test.ts` — subscription details endpoint (auth, tier data)
+- [ ] `tests/api/billing-usage.test.ts` — usage tracking endpoint (auth, period filtering)
+- [ ] `tests/api/keys.test.ts` — API key CRUD (create, list, revoke, auth, tier limits)
+- [ ] `tests/api/teams.test.ts` — team CRUD + invite flow (create, update, delete, membership)
+- [ ] `tests/api/voices.test.ts` — voice clone + preview (auth, file upload, tier limits)
+- [ ] `tests/api/webhooks-stripe.test.ts` — Stripe webhook handler (signature verification, event types)
+
+### Worker Tests
+
+- [ ] `tests/workers/content-extraction.test.ts` — URL/PDF extraction (URL parsing, content limits, pipeline chaining)
+- [ ] `tests/workers/script-generation.test.ts` — script generation (Claude prompt, reference extraction, segment creation)
+- [ ] `tests/workers/reference-validation.test.ts` — 4-layer verification (URL HEAD, CrossRef, OpenAlex, AI fallback)
+- [ ] `tests/workers/audio-stitching.test.ts` — FFmpeg concat (segment ordering, normalization, R2 upload, Twitter reply trigger)
+- [ ] `tests/workers/interaction.test.ts` — Q&A processing (Claude context, timestamp lookup, resolution flow)
+- [ ] `tests/workers/segment-regeneration.test.ts` — segment insertion (reordering, TTS, re-stitch trigger)
+- [ ] `tests/workers/pdf-generation.test.ts` — PDF creation (pdfmake, R2 upload, URL update)
+
+### Lib Tests
+
+- [ ] `tests/lib/claude.test.ts` — Claude client (streaming, non-streaming, error handling, retries)
+- [ ] `tests/lib/elevenlabs.test.ts` — ElevenLabs TTS (voice selection, voice pool diversity, generation, cloning)
+- [ ] `tests/lib/r2.test.ts` — R2 storage (upload, download, presign, delete, error handling)
+- [ ] `tests/lib/redis.test.ts` — Redis client (cache helpers, rate limiting, connection management)
+- [ ] `tests/lib/discovery-agent.test.ts` — discovery chat (system prompt, chip parsing, metadata extraction)
+- [ ] `tests/lib/script-generator.test.ts` — script generation (prompt construction, citation parsing, voice assignment)
+- [ ] `tests/lib/reference-validator.test.ts` — reference verification (URL HEAD, CrossRef, OpenAlex, AI, status transitions)
+- [ ] `tests/lib/script-updater.test.ts` — citation cleanup (renumbering after removal, segment text updates)
+- [ ] `tests/lib/audio-stitcher.test.ts` — FFmpeg stitching (concat, normalization, error handling)
+- [ ] `tests/lib/content-parser.test.ts` — content extraction (URL fetch, PDF parsing, length limits)
+- [ ] `tests/lib/recommendations.test.ts` — similar podcast search (full-text query, ranking, dedup)
+- [ ] `tests/lib/push-notifications.test.ts` — Web Push (send, expired subscription cleanup, payload format)
+- [ ] `tests/lib/subscription.test.ts` — tier management (limits per tier, usage increment, canCreate logic)
+- [ ] `tests/lib/notifications.test.ts` — in-app notifications (create, types, user targeting)
+- [ ] `tests/lib/api-keys.test.ts` — API key lifecycle (generate, hash, validate, revoke, prefix matching)
+- [ ] `tests/lib/pdf-generator.test.ts` — PDF generation (pdfmake doc definition, references, formatting)
+- [ ] `tests/lib/twitter.test.ts` — Twitter API client (getMentions, getTweet, replyToTweet, OAuth sig, rate limits)
+- [ ] `tests/lib/citation-parser.test.ts` — citation parsing (`[N]` markers → React components, edge cases)
+
+### Component Tests
+
+- [ ] `tests/components/Input.test.tsx` — Input component (label, error, helper text, forwardRef, variants)
+- [ ] `tests/components/Modal.test.tsx` — Modal (open/close, escape key, overlay click, focus trap)
+- [ ] `tests/components/Toast.test.tsx` — Toast (auto-dismiss, variants, animation, stacking)
+- [ ] `tests/components/AudioPlayer.test.tsx` — full player (play/pause, progress, speed, volume)
+- [ ] `tests/components/MiniPlayer.test.tsx` — persistent player (minimize, expand, track info)
+- [ ] `tests/components/InterruptButton.test.tsx` — ask question button (glow animation, disabled states)
+- [ ] `tests/components/TranscriptPanel.test.tsx` — transcript (speaker labels, auto-scroll, timestamp sync)
+- [ ] `tests/components/DiscoveryChat.test.tsx` — discovery chat (message flow, chip selection, metadata)
+- [ ] `tests/components/PodcastCard.test.tsx` — feed card (image, title, creator, like/save, click)
+- [ ] `tests/components/FeedGrid.test.tsx` — responsive grid (layout, pagination, loading states)
+- [ ] `tests/components/Sidebar.test.tsx` — sidebar navigation (active state, collapse, mobile)
+- [ ] `tests/components/VoicePreferenceSelector.test.tsx` — voice dropdown (loading, selection, auto-assign)
+
+### Hook Tests
+
+- [ ] `tests/hooks/usePodcast.test.ts` — podcast fetching (like/save/fork actions, loading states, errors)
+- [ ] `tests/hooks/useDiscovery.test.ts` — discovery SSE streaming (connection, messages, metadata)
+- [ ] `tests/hooks/useNotifications.test.ts` — notification polling (fetch, mark read, badge count)
+- [ ] `tests/hooks/useAuth.test.ts` — auth convenience hook (session data, loading, redirect)
+
+**214/277 items complete. 63 tests remaining in backlog.**

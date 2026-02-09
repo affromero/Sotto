@@ -15,13 +15,17 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `segment-regeneration` | `segment-regeneration` | 2 | New text → TTS → insert into podcast | Reorders segments, marks incorporated |
 | `notification` | `notifications` | 5 | User + message → in-app + push | Creates Notification + sends push |
 | `pdf-generation` | `pdf-generation` | 2 | Podcast → pdfmake PDF → R2 upload | Sets Podcast.pdfUrl |
+| `twitter-mentions` | `twitter-mentions` | 1 | Poll @sottofm mentions → parse intent → create podcast | Creates TweetMention + Podcast, kicks off pipeline |
+| `twitter-reply` | `twitter-reply` | 2 | Podcast ready → compose reply → post to Twitter | Updates TweetMention.status to REPLIED |
 
 ## Pipeline Flow
 
 ```
 content-extraction → script-generation → reference-validation → audio-generation (×N parallel) → audio-stitching → notification
-                                                                                                                      ↕
-                                                                                    pdf-generation (triggered on-demand via export API)
+                                                                                                                      ↕               ↕
+                                                                                    pdf-generation (on-demand)         twitter-reply (if source=TWITTER)
+
+twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast → kicks off pipeline above
 ```
 
 ## Adding a New Worker

@@ -6,10 +6,10 @@ The schema is organized into logical sections:
 
 | Section | Models | Purpose |
 |---------|--------|---------|
-| Users & Auth | User, Account, Session, VerificationToken | Authentication + profiles |
+| Users & Auth | User, Account, Session, VerificationToken | Authentication + profiles (includes `twitterHandle`, `twitterEnabled`, voice prefs) |
 | Social | Follow | Follower/following relationships |
 | Subscriptions | Subscription, SubscriptionEvent, Team | Stripe billing |
-| Podcasts | Podcast (includes `pdfUrl`) | Core content entity |
+| Podcasts | Podcast (includes `pdfUrl`, `source`, `sourceTweetId`) | Core content entity |
 | Discovery | Discovery, DiscoveryMessage | Chat-based creation flow |
 | Scripts | Script | Generated podcast scripts |
 | Segments | Segment | Per-speaker audio chunks |
@@ -22,6 +22,7 @@ The schema is organized into logical sections:
 | Voice Clones | VoiceClone | User voice clones (name, ElevenLabs ID, source) |
 | API Keys | ApiKey | Developer API keys (hashed, prefix, usage) |
 | Teams | Team, TeamInvite | Team ownership, member management, invites |
+| Twitter | TweetMention | Tweet-to-podcast tracking (dedup, status, reply thread) |
 | Analytics | ApiUsageLog | Cost tracking |
 | Feedback | Feedback | Early access user feedback |
 
@@ -36,6 +37,8 @@ The schema is organized into logical sections:
 | `TeamInviteStatus` | PENDING, ACCEPTED, EXPIRED, REVOKED | TeamInvite.status |
 | `VoiceCloneSource` | UPLOAD, RECORD | VoiceClone.sourceType |
 | `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE | Podcast.visibility |
+| `PodcastSource` | WEB, TWITTER, API | Podcast.source |
+| `TweetMentionStatus` | PENDING, PARSING, GENERATING, READY, REPLIED, FAILED, IGNORED | TweetMention.status |
 | `ReferenceType` | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT | Reference.type |
 | `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED | Reference.verificationStatus |
 
