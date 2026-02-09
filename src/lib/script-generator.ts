@@ -78,7 +78,7 @@ You MUST include inline citations in the dialogue using [N] notation (e.g. [1], 
 - HOST introduces citations conversationally: "I read that researchers at MIT found..." [3]
 - EXPERT cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim
-- Do NOT invent fake citations — only include sources that actually exist or are highly plausible based on the topic
+- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source. Do NOT cite Wikipedia, personal blogs, social media, or content farms. Only cite: peer-reviewed journals, published books, government reports (.gov), academic institutions (.edu), and established news outlets (Reuters, AP, BBC, NYT, etc). Each non-obvious factual claim should be supported by at least 3 independent sources
 
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
@@ -164,6 +164,157 @@ Only return the JSON object, nothing else.`;
   }
 
   // Generate markdown version with delivery directions
+  const markdown = parsed.turns
+    .map((turn) => {
+      const direction = turn.direction ? ` _(${turn.direction})_` : '';
+      return `**${turn.speaker}:**${direction} ${turn.text}`;
+    })
+    .join('\n\n');
+
+  return {
+    turns: parsed.turns,
+    soundCues: parsed.soundCues,
+    references: parsed.references,
+    markdown,
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  };
+}
+
+/**
+ * Regenerate a script incorporating verification feedback.
+ * Used by the script-verification worker when the "teacher" agent rejects a script.
+ */
+export async function generateScriptWithFeedback(params: {
+  topic: string;
+  depth: string;
+  audienceLevel: string;
+  focusAreas: string[];
+  tone: string;
+  durationTarget: number;
+  sourceContent?: string;
+  previousScript: ScriptTurn[];
+  previousReferences: GeneratedReference[];
+  verificationFeedback: string;
+}): Promise<{
+  turns: ScriptTurn[];
+  soundCues: SoundCue[];
+  references: GeneratedReference[];
+  markdown: string;
+  inputTokens: number;
+  outputTokens: number;
+}> {
+  const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on fact-checking feedback.
+
+## REVISION INSTRUCTIONS:
+A fact-checking agent reviewed your previous script and found issues. You MUST address every piece of feedback below. Do NOT ignore any feedback item.
+
+Key rules for this revision:
+1. Fix ALL unsourced claims — add real citations or remove the claim
+2. Replace ALL unreliable sources (Wikipedia, blogs, social media) with peer-reviewed journals, books, government reports, or established news outlets
+3. Ensure every non-obvious factual claim has at least 1 citation, ideally 3+ independent sources
+4. If a claim cannot be properly sourced, remove it and replace with a well-sourced alternative
+5. Maintain the conversational quality and engagement of the original script
+
+## Speakers:
+- HOST: Warm, curious, asks great questions, guides the conversation
+- EXPERT: Knowledgeable, vivid storyteller, uses analogies and examples
+
+## Voice & Delivery Guidelines:
+- Write dialogue that sounds like a REAL conversation, not a lecture
+- Include natural speech patterns and delivery directions in parentheses when tone shifts
+- ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
+- ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
+- ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}
+- ${params.tone === 'storytelling' ? 'Frame everything as narrative — characters, conflict, resolution' : ''}
+
+## Pacing:
+- Target approximately ${params.durationTarget} minutes (~${params.durationTarget * 150} words)
+- Audience level: ${params.audienceLevel}
+- Focus areas: ${params.focusAreas.join(', ')}
+
+## Citation Requirements:
+- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source.
+- Do NOT cite Wikipedia, personal blogs, social media, or content farms.
+- Only cite: peer-reviewed journals, published books, government reports (.gov), academic institutions (.edu), and established news outlets (Reuters, AP, BBC, NYT, etc).
+- Each non-obvious factual claim should be supported by at least 3 independent sources.
+- Use [N] notation for inline citations.
+
+## Sound Effect Cues:
+Include [SFX: description] markers at natural transition points (3-5 per episode max).
+
+## Output Format:
+Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
+Only return the JSON object, nothing else.`;
+
+  const previousScriptText = params.previousScript
+    .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
+    .join('\n');
+
+  const previousRefsText = params.previousReferences
+    .map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`)
+    .join('\n');
+
+  const userMessage = `Topic: ${params.topic}
+Depth: ${params.depth}
+
+## FACT-CHECKER FEEDBACK:
+${params.verificationFeedback}
+
+## PREVIOUS SCRIPT (to revise):
+${previousScriptText}
+
+## PREVIOUS REFERENCES:
+${previousRefsText}
+
+${params.sourceContent ? `\nSource material:\n${params.sourceContent.substring(0, 8000)}` : ''}
+
+Revise the script addressing ALL feedback. Return JSON only.`;
+
+  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+    maxTokens: 12288,
+  });
+
+  let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
+  try {
+    const rawParsed = JSON.parse(response.content);
+    if (Array.isArray(rawParsed)) {
+      parsed = { turns: rawParsed, soundCues: [], references: [] };
+    } else {
+      parsed = rawParsed;
+    }
+  } catch {
+    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsed = JSON.parse(jsonMatch[0]);
+    } else {
+      const arrayMatch = response.content.match(/\[[\s\S]*\]/);
+      const turns = arrayMatch ? JSON.parse(arrayMatch[0]) : [];
+      parsed = { turns, soundCues: [], references: [] };
+    }
+  }
+
+  if (!parsed.soundCues || parsed.soundCues.length === 0) {
+    parsed.soundCues = [
+      {
+        type: 'intro',
+        prompt: 'warm podcast intro jingle with soft chimes',
+        durationSeconds: 3,
+        insertAfterTurn: -1,
+      },
+      {
+        type: 'outro',
+        prompt: 'gentle melodic podcast outro with fade out',
+        durationSeconds: 4,
+        insertAfterTurn: parsed.turns.length - 1,
+      },
+    ];
+  }
+
+  if (!parsed.references) {
+    parsed.references = [];
+  }
+
   const markdown = parsed.turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';

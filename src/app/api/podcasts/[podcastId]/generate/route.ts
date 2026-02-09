@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { consumeVoiceCredit } from '@/lib/subscription';
+import { consumeVoiceCredit, getUserTier } from '@/lib/subscription';
+import { TIER_LIMITS } from '@/lib/stripe';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     include: {
       discovery: {
-        select: { sourceUrl: true, sourceContent: true },
+        select: { sourceUrl: true, sourceContent: true, durationTarget: true },
       },
     },
   });
@@ -32,11 +33,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (podcast.status !== 'PENDING' && podcast.status !== 'DISCOVERING' && podcast.status !== 'FAILED') {
+  if (
+    podcast.status !== 'PENDING' &&
+    podcast.status !== 'DISCOVERING' &&
+    podcast.status !== 'FAILED'
+  ) {
     return NextResponse.json(
       { error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate' },
       { status: 400 }
     );
+  }
+
+  // Pre-generation duration validation
+  const durationTarget = podcast.discovery?.durationTarget;
+  if (durationTarget) {
+    const tier = await getUserTier(authResult.userId);
+    const maxMinutes = TIER_LIMITS[tier].maxDurationMinutes;
+    if (durationTarget > maxMinutes) {
+      return NextResponse.json(
+        {
+          error: `Requested duration (${durationTarget} min) exceeds your plan's limit of ${maxMinutes} minutes. Reduce duration or upgrade your plan.`,
+        },
+        { status: 400 }
+      );
+    }
   }
 
   // If using premium voice, consume a credit before generation
@@ -45,7 +65,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await consumeVoiceCredit(authResult.userId);
     } catch {
       return NextResponse.json(
-        { error: 'No premium voice credits remaining. Switch to standard voices or upgrade your plan.' },
+        {
+          error:
+            'No premium voice credits remaining. Switch to standard voices or upgrade your plan.',
+        },
         { status: 402 }
       );
     }

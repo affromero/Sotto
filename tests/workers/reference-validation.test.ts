@@ -61,12 +61,17 @@ const mockComputeVerificationVerdict = vi.fn().mockReturnValue({
   confidence: 0.8,
 });
 
+const mockAssessSourceQuality = vi
+  .fn()
+  .mockReturnValue({ accepted: true, reason: 'Trusted source' });
+
 vi.mock('@/lib/reference-validator', () => ({
   verifyUrl: (...args: unknown[]) => mockVerifyUrl(...args),
   verifyDoi: (...args: unknown[]) => mockVerifyDoi(...args),
   searchTitle: (...args: unknown[]) => mockSearchTitle(...args),
   aiEvaluateReferences: (...args: unknown[]) => mockAiEvaluateReferences(...args),
   computeVerificationVerdict: (...args: unknown[]) => mockComputeVerificationVerdict(...args),
+  assessSourceQuality: (...args: unknown[]) => mockAssessSourceQuality(...args),
 }));
 
 const mockBuildRenumberMap = vi.fn().mockReturnValue(new Map());

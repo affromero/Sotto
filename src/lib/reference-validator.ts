@@ -44,6 +44,91 @@ export interface VerificationVerdict {
   replacement?: ReplacementData;
 }
 
+// ---- Source Quality Pre-Filter ----
+
+const BLOCKED_DOMAINS = [
+  'wikipedia.org',
+  'medium.com',
+  'substack.com',
+  'reddit.com',
+  'quora.com',
+  'twitter.com',
+  'x.com',
+  'facebook.com',
+  'blogspot.com',
+  'wordpress.com',
+  'tumblr.com',
+  'buzzfeed.com',
+  'ehow.com',
+  'wikihow.com',
+  'about.com',
+];
+
+const TRUSTED_PATTERNS = [
+  '.gov',
+  '.edu',
+  '.ac.',
+  'nature.com',
+  'science.org',
+  'springer.com',
+  'wiley.com',
+  'nih.gov',
+  'arxiv.org',
+  'jstor.org',
+  'reuters.com',
+  'apnews.com',
+  'bbc.com',
+  'bbc.co.uk',
+  'nytimes.com',
+  'sciencedirect.com',
+  'pubmed.ncbi.nlm.nih.gov',
+  'pnas.org',
+  'thelancet.com',
+  'bmj.com',
+  'cell.com',
+  'ieee.org',
+  'acm.org',
+  'tandfonline.com',
+  'cambridge.org',
+  'oxford.org',
+  'oxfordacademic.com',
+];
+
+export function assessSourceQuality(ref: ReferenceInput): {
+  accepted: boolean;
+  reason: string;
+} {
+  if (!ref.url) {
+    // No URL — allow through (might have DOI or be a book)
+    if (ref.doi || ref.type === 'BOOK') {
+      return { accepted: true, reason: 'No URL but has DOI or is a book' };
+    }
+    return { accepted: true, reason: 'No URL to evaluate' };
+  }
+
+  let hostname: string;
+  try {
+    hostname = new URL(ref.url).hostname.toLowerCase();
+  } catch {
+    return { accepted: false, reason: 'Invalid URL format' };
+  }
+
+  for (const blocked of BLOCKED_DOMAINS) {
+    if (hostname === blocked || hostname.endsWith(`.${blocked}`)) {
+      return { accepted: false, reason: `Blocked source: ${blocked}` };
+    }
+  }
+
+  for (const trusted of TRUSTED_PATTERNS) {
+    if (hostname.includes(trusted)) {
+      return { accepted: true, reason: `Trusted source: ${trusted}` };
+    }
+  }
+
+  // Unknown domain — allow through for further verification
+  return { accepted: true, reason: 'Unknown domain, proceeding with verification' };
+}
+
 // ---- Layer 1: URL Resolution ----
 
 export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck> {
@@ -65,7 +150,12 @@ export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck>
     clearTimeout(timeout);
 
     if (response.ok || (response.status >= 300 && response.status < 400)) {
-      return { layer: 'url', passed: true, confidence: 0.6, detail: `URL returned ${response.status}` };
+      return {
+        layer: 'url',
+        passed: true,
+        confidence: 0.6,
+        detail: `URL returned ${response.status}`,
+      };
     }
 
     return {
@@ -124,7 +214,12 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { layer: 'doi', passed: false, confidence: 0, detail: `CrossRef returned ${response.status}` };
+      return {
+        layer: 'doi',
+        passed: false,
+        confidence: 0,
+        detail: `CrossRef returned ${response.status}`,
+      };
     }
 
     const data = await response.json();
@@ -136,8 +231,7 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
 
     // Extract authors
     const crossRefAuthors: string[] = (work.author || []).map(
-      (a: { given?: string; family?: string }) =>
-        [a.given, a.family].filter(Boolean).join(' ')
+      (a: { given?: string; family?: string }) => [a.given, a.family].filter(Boolean).join(' ')
     );
 
     if (similarity >= 0.7) {
@@ -173,7 +267,12 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { layer: 'doi', passed: false, confidence: 0, detail: `CrossRef check failed: ${message}` };
+    return {
+      layer: 'doi',
+      passed: false,
+      confidence: 0,
+      detail: `CrossRef check failed: ${message}`,
+    };
   }
 }
 
@@ -181,7 +280,12 @@ export async function verifyDoi(ref: ReferenceInput): Promise<VerificationCheck>
 
 export async function searchTitle(ref: ReferenceInput): Promise<VerificationCheck> {
   if (!ref.title || ref.title.trim().length < 5) {
-    return { layer: 'title_search', passed: false, confidence: 0, detail: 'Title too short to search' };
+    return {
+      layer: 'title_search',
+      passed: false,
+      confidence: 0,
+      detail: 'Title too short to search',
+    };
   }
 
   try {
@@ -203,14 +307,24 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { layer: 'title_search', passed: false, confidence: 0, detail: `OpenAlex returned ${response.status}` };
+      return {
+        layer: 'title_search',
+        passed: false,
+        confidence: 0,
+        detail: `OpenAlex returned ${response.status}`,
+      };
     }
 
     const data = await response.json();
     const results = data.results || [];
 
     if (results.length === 0) {
-      return { layer: 'title_search', passed: false, confidence: 0, detail: 'No results found in OpenAlex' };
+      return {
+        layer: 'title_search',
+        passed: false,
+        confidence: 0,
+        detail: 'No results found in OpenAlex',
+      };
     }
 
     // Check top 3 results for a match
@@ -219,9 +333,9 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
       const similarity = titleSimilarity(ref.title, workTitle);
 
       if (similarity >= 0.7) {
-        const authors: string[] = (work.authorships || []).map(
-          (a: { author?: { display_name?: string } }) => a.author?.display_name || ''
-        ).filter(Boolean);
+        const authors: string[] = (work.authorships || [])
+          .map((a: { author?: { display_name?: string } }) => a.author?.display_name || '')
+          .filter(Boolean);
 
         return {
           layer: 'title_search',
@@ -232,7 +346,10 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
             title: workTitle,
             authors,
             year: work.publication_year || null,
-            url: work.primary_location?.landing_page_url || work.doi ? `https://doi.org/${work.doi?.replace('https://doi.org/', '')}` : null,
+            url:
+              work.primary_location?.landing_page_url || work.doi
+                ? `https://doi.org/${work.doi?.replace('https://doi.org/', '')}`
+                : null,
             doi: work.doi?.replace('https://doi.org/', '') || null,
             publisher: work.primary_location?.source?.display_name || null,
           },
@@ -251,7 +368,12 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return { layer: 'title_search', passed: false, confidence: 0, detail: `OpenAlex check failed: ${message}` };
+    return {
+      layer: 'title_search',
+      passed: false,
+      confidence: 0,
+      detail: `OpenAlex check failed: ${message}`,
+    };
   }
 }
 
@@ -264,13 +386,14 @@ export async function aiEvaluateReferences(
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
-  const refsContext = refs.map((ref) => {
-    const checks = priorChecks.get(ref.id) || [];
-    const checkSummary = checks
-      .map((c) => `  ${c.layer}: ${c.passed ? 'PASS' : 'FAIL'} (${c.detail})`)
-      .join('\n');
+  const refsContext = refs
+    .map((ref) => {
+      const checks = priorChecks.get(ref.id) || [];
+      const checkSummary = checks
+        .map((c) => `  ${c.layer}: ${c.passed ? 'PASS' : 'FAIL'} (${c.detail})`)
+        .join('\n');
 
-    return `[${ref.number}] "${ref.title}"
+      return `[${ref.number}] "${ref.title}"
   Authors: ${ref.authors.join(', ') || 'none'}
   Year: ${ref.year || 'unknown'}
   URL: ${ref.url || 'none'}
@@ -278,7 +401,8 @@ export async function aiEvaluateReferences(
   Type: ${ref.type}
   Prior checks:
 ${checkSummary}`;
-  }).join('\n\n');
+    })
+    .join('\n\n');
 
   const systemPrompt = `You are a reference verification agent. Your job is to critically evaluate whether academic and web references are real, verifiable sources.
 
@@ -311,9 +435,13 @@ ${refsContext}
 Evaluate each reference. Return JSON only.`;
 
   try {
-    const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-      maxTokens: 4096,
-    });
+    const response = await generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: userMessage }],
+      {
+        maxTokens: 4096,
+      }
+    );
 
     // Parse the JSON response
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -411,9 +539,7 @@ const LAYER_WEIGHTS = {
   url: 0.1,
 };
 
-export function computeVerificationVerdict(
-  checks: VerificationCheck[]
-): VerificationVerdict {
+export function computeVerificationVerdict(checks: VerificationCheck[]): VerificationVerdict {
   const checkMap = new Map<string, VerificationCheck>();
   for (const check of checks) {
     checkMap.set(check.layer, check);
@@ -431,9 +557,12 @@ export function computeVerificationVerdict(
 
   // Override rule 2: URL 404 + title not found + AI says hallucinated → always failed
   if (
-    urlCheck && !urlCheck.passed &&
-    titleCheck && !titleCheck.passed &&
-    aiCheck && !aiCheck.passed &&
+    urlCheck &&
+    !urlCheck.passed &&
+    titleCheck &&
+    !titleCheck.passed &&
+    aiCheck &&
+    !aiCheck.passed &&
     aiCheck.detail.includes('HALLUCINATED')
   ) {
     // Check if any layer has a replacement
@@ -456,7 +585,7 @@ export function computeVerificationVerdict(
 
   const compositeScore = totalWeight > 0 ? weightedSum / totalWeight : 0;
 
-  if (compositeScore >= 0.5) {
+  if (compositeScore >= 0.65) {
     return { status: 'VERIFIED', confidence: compositeScore };
   }
 

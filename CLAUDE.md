@@ -5,6 +5,7 @@
 ## What is Sotto?
 
 Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast platform where:
+
 1. Users chat with AI to describe what they want to learn → AI generates a 2-voice conversational podcast
 2. Users can **interrupt mid-playback** to ask questions → AI answers in context
 3. Podcasts can be **updated** with Q&A explanations baked in
@@ -12,19 +13,19 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind) |
-| Database | PostgreSQL 16 + Prisma ORM |
-| Auth | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In) |
-| Queue | Redis 7 + BullMQ (11 worker types) |
-| AI | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER` |
-| Audio | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER` |
-| Stitching | FFmpeg (segment concatenation + normalization) |
-| Storage | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER` |
-| Payments | Stripe (Free $0 / Pro $14 / Creator $29) — swappable via `PAYMENT_PROVIDER` |
-| PDF | pdfmake (server-side transcript PDF generation) |
-| Hosting | Vercel (web) + Railway (workers) |
+| Layer     | Technology                                                                              |
+| --------- | --------------------------------------------------------------------------------------- |
+| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                         |
+| Database  | PostgreSQL 16 + Prisma ORM                                                              |
+| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                          |
+| Queue     | Redis 7 + BullMQ (11 worker types)                                                      |
+| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER` |
+| Audio     | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER`                 |
+| Stitching | FFmpeg (segment concatenation + normalization)                                          |
+| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                        |
+| Payments  | Stripe (Free $0 / Pro $14 / Creator $29) — swappable via `PAYMENT_PROVIDER`             |
+| PDF       | pdfmake (server-side transcript PDF generation)                                         |
+| Hosting   | Vercel (web) + Railway (workers)                                                        |
 
 ## Build & Development Commands
 
@@ -121,8 +122,9 @@ src/
 │   ├── stripe.ts               # Stripe client + subscription management
 │   ├── r2.ts                   # Cloudflare R2 storage client
 │   ├── discovery-agent.ts      # Chat-based discovery: Claude streaming + chip generation
-│   ├── script-generator.ts     # Claude script generation with [N] citations
-│   ├── reference-validator.ts  # 4-layer reference verification (URL, CrossRef, OpenAlex, AI)
+│   ├── script-generator.ts     # Claude script generation with [N] citations + revision with feedback
+│   ├── script-verifier.ts     # "Teacher" agent: claim extraction, sourcing evaluation, duration check
+│   ├── reference-validator.ts  # Source quality filter + 4-layer reference verification
 │   ├── script-updater.ts       # Citation cleanup + renumbering after reference removal
 │   ├── citation-parser.tsx     # Parse [N] citation markers → React CitationMarker components
 │   ├── pdf-generator.ts        # pdfmake academic-style PDF generation
@@ -144,10 +146,11 @@ src/
 │       ├── useDiscovery.ts
 │       └── useNotifications.ts
 ├── workers/
-│   ├── index.ts                         # Worker orchestrator (11 workers)
+│   ├── index.ts                         # Worker orchestrator (12 workers)
 │   ├── content-extraction.worker.ts
-│   ├── script-generation.worker.ts      # Persists References, routes to validation
-│   ├── reference-validation.worker.ts   # 4-layer verification pipeline
+│   ├── script-generation.worker.ts      # Persists References, routes to script verification
+│   ├── script-verification.worker.ts    # "Teacher" agent: claim extraction, sourcing check, ≤3 revision loops
+│   ├── reference-validation.worker.ts   # Source quality filter + 4-layer verification pipeline
 │   ├── audio-generation.worker.ts
 │   ├── audio-stitching.worker.ts
 │   ├── interaction.worker.ts
@@ -174,39 +177,44 @@ src/
 
 ## Design System: "Warm Intimacy"
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Primary | `#D97706` (Golden Amber) | CTAs, Host speaker, highlights |
-| Accent | `#1E3A5F` (Deep Navy) | Expert speaker, secondary actions |
-| Background | `#FEFCF8` (Soft Cream) | Page background |
-| Surface | `#FFFFFF` | Cards, panels |
-| Text Primary | `#1A1A1A` | Headings, body |
-| Text Secondary | `#6B7280` | Captions, metadata |
-| Heading Font | DM Serif Display | Editorial warmth |
-| Body Font | Inter | Clean readability |
+| Token          | Value                    | Usage                             |
+| -------------- | ------------------------ | --------------------------------- |
+| Primary        | `#D97706` (Golden Amber) | CTAs, Host speaker, highlights    |
+| Accent         | `#1E3A5F` (Deep Navy)    | Expert speaker, secondary actions |
+| Background     | `#FEFCF8` (Soft Cream)   | Page background                   |
+| Surface        | `#FFFFFF`                | Cards, panels                     |
+| Text Primary   | `#1A1A1A`                | Headings, body                    |
+| Text Secondary | `#6B7280`                | Captions, metadata                |
+| Heading Font   | DM Serif Display         | Editorial warmth                  |
+| Body Font      | Inter                    | Clean readability                 |
 
 **Speaker Colors**: Host = amber (`#D97706`), Expert = navy (`#1E3A5F`)
 
 ## Core User Flow
 
 ### Chat-Based Discovery (NOT forms)
+
 User opens "Create Podcast" → chats with AI agent → AI asks conversational questions with tappable chip suggestions:
+
 - Topic, depth, audience background, focus area, tone, duration
 - AI extracts structured metadata: `{topic, depth, audience, tone, focus, duration}`
 - Before generating, searches existing public podcasts → shows recommendations
 - User can follow creators, explore, or say "Create mine"
 
 ### Generation Pipeline (Workers)
+
 ```
 [content-extraction] → Parse URL/PDF if provided
     ↓
 [script-generation] → Claude generates 2-voice script
     ↓
-[reference-validation] → 4-layer verification (URL, CrossRef, OpenAlex, AI)
+[script-verification] → "Teacher" agent: claim extraction + sourcing check (≤3 revision loops)
+    ↓
+[reference-validation] → Source quality filter + 4-layer verification (URL, CrossRef, OpenAlex, AI)
     ↓
 [audio-generation] × N → ElevenLabs TTS per segment (parallel, 5 concurrent)
     ↓
-[audio-stitching] → FFmpeg concat + normalize → final.mp3
+[audio-stitching] → FFmpeg concat + normalize + duration hard check → final.mp3
     ↓
 [notification] → Push notification: "Your podcast is ready!"
     ↓ (if source=TWITTER)
@@ -214,6 +222,7 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
 ```
 
 ### Twitter @sottofm Integration
+
 ```
 User tweets: "@sottofm make a podcast about quantum computing"
     ↓
@@ -225,6 +234,7 @@ Creates Podcast (source: TWITTER) → kicks off pipeline above
 ```
 
 ### Interactive Playback
+
 ```
 User listening → taps "Ask a Question" → podcast pauses
     ↓
@@ -237,43 +247,44 @@ User listening → taps "Ask a Question" → podcast pauses
 
 ## Database Schema (Key Models)
 
-| Model | Purpose |
-|-------|---------|
-| `User` | Auth, profile, bio, avatar, usage tracking, Twitter handle + prefs |
-| `Follow` | Social: follower → following |
-| `Podcast` | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking |
-| `Discovery` | Chat metadata (audience, depth, tone, focus, duration) |
-| `DiscoveryMessage` | Individual chat messages (role, content, chips) |
-| `Script` | Structured JSON turns + raw markdown, versioned |
-| `Segment` | Per-speaker audio chunk: text, audioUrl, timing, order |
-| `Reference` | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus |
-| `Interaction` | Question at timestamp, answer, resolution status |
-| `Like` / `Save` | Social engagement |
-| `Tag` / `PodcastTag` | Discovery taxonomy |
-| `Subscription` | Stripe (FREE/PRO/CREATOR) |
-| `VoiceClone` | User voice clones (name, ElevenLabs ID, source type) |
-| `ApiKey` | Developer API keys (hashed, prefix, usage tracking) |
-| `Team` | Team ownership + member management |
-| `TeamInvite` | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED) |
-| `Job` | BullMQ job tracking |
-| `Notification` | In-app + push notifications |
-| `PushSubscription` | Web Push API endpoints |
-| `TweetMention` | Twitter mention tracking (dedup, status, reply thread, linked podcast) |
-| `ApiUsageLog` | Cost tracking (Claude/ElevenLabs/FFmpeg) |
+| Model                | Purpose                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------- |
+| `User`               | Auth, profile, bio, avatar, usage tracking, Twitter handle + prefs                          |
+| `Follow`             | Social: follower → following                                                                |
+| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking |
+| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                      |
+| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                             |
+| `Script`             | Structured JSON turns + raw markdown, versioned                                             |
+| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                      |
+| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus           |
+| `Interaction`        | Question at timestamp, answer, resolution status                                            |
+| `Like` / `Save`      | Social engagement                                                                           |
+| `Tag` / `PodcastTag` | Discovery taxonomy                                                                          |
+| `Subscription`       | Stripe (FREE/PRO/CREATOR)                                                                   |
+| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                        |
+| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                         |
+| `Team`               | Team ownership + member management                                                          |
+| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                       |
+| `Job`                | BullMQ job tracking                                                                         |
+| `Notification`       | In-app + push notifications                                                                 |
+| `PushSubscription`   | Web Push API endpoints                                                                      |
+| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                      |
+| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                    |
 
-**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
+**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
 
 ## Pricing Tiers
 
-| Tier | Price | Podcasts | Duration | Interactions | Premium Credits | Voice Clones | Sound Effects |
-|------|-------|----------|----------|-------------|----------------|-------------|--------------|
-| Free | $0 | 2/month | 10 min | 2 per podcast | 0 | 0 | Standard |
-| Pro | $14/mo | 8/month | 10 min | 10 per podcast | 3 | 2 | Standard |
-| Creator | $29/mo | 30/month | 10 min | Unlimited | 10 | 5 | Premium (ElevenLabs SFX) |
+| Tier    | Price  | Podcasts | Duration | Interactions   | Premium Credits | Voice Clones | Sound Effects            |
+| ------- | ------ | -------- | -------- | -------------- | --------------- | ------------ | ------------------------ |
+| Free    | $0     | 2/month  | 10 min   | 2 per podcast  | 0               | 0            | Standard                 |
+| Pro     | $14/mo | 8/month  | 10 min   | 10 per podcast | 3               | 2            | Standard                 |
+| Creator | $29/mo | 30/month | 10 min   | Unlimited      | 10              | 5            | Premium (ElevenLabs SFX) |
 
 ## Engineering Standards
 
 ### Component Pattern (CSS Modules, NO Tailwind)
+
 ```tsx
 // ComponentName.tsx
 import styles from './ComponentName.module.css';
@@ -284,15 +295,12 @@ interface ComponentNameProps {
 }
 
 export function ComponentName({ variant = 'primary', children }: ComponentNameProps) {
-  return (
-    <div className={`${styles.root} ${styles[variant]}`}>
-      {children}
-    </div>
-  );
+  return <div className={`${styles.root} ${styles[variant]}`}>{children}</div>;
 }
 ```
 
 ### API Route Pattern
+
 ```tsx
 // src/app/api/resource/route.ts
 import { NextRequest, NextResponse } from 'next/server';
@@ -310,6 +318,7 @@ export async function GET(request: NextRequest) {
 ```
 
 ### Worker Pattern
+
 ```tsx
 // src/workers/example.worker.ts
 import { Job } from 'bullmq';
@@ -324,6 +333,7 @@ export async function processJob(job: Job) {
 ```
 
 ### Lib Pattern
+
 ```tsx
 // src/lib/service.ts
 // External service client with retry logic and error handling
@@ -362,6 +372,7 @@ export const serviceClient = new ServiceClient();
 ## Environment Variables
 
 See `.env.example` for all required/optional variables. Critical ones:
+
 - `DATABASE_URL` — PostgreSQL connection string
 - `REDIS_URL` — Redis connection string
 - `NEXTAUTH_SECRET` — Auth encryption key
@@ -371,6 +382,7 @@ See `.env.example` for all required/optional variables. Critical ones:
 - `R2_*` — Cloudflare R2 storage credentials
 
 Twitter integration (optional):
+
 - `TWITTER_BEARER_TOKEN` — Twitter API v2 read access
 - `TWITTER_API_KEY` / `TWITTER_API_SECRET` — OAuth 1.0a for @sottofm bot
 - `TWITTER_ACCESS_TOKEN` / `TWITTER_ACCESS_SECRET` — @sottofm bot access
@@ -378,6 +390,7 @@ Twitter integration (optional):
 - `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` — Twitter OAuth for user login
 
 Provider selection (swap services via env):
+
 - `AI_PROVIDER` — `anthropic` (default) | `openai`
 - `TTS_PROVIDER` — `elevenlabs` (default) | `openai`
 - `STORAGE_PROVIDER` — `r2` (default) | `s3` | `local`

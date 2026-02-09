@@ -8,24 +8,27 @@ import styles from './page.module.css';
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard' };
 
-const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
-  PENDING: 'default',
-  DISCOVERING: 'info',
-  EXTRACTING: 'info',
-  SCRIPTING: 'info',
-  VALIDATING_REFERENCES: 'info',
-  GENERATING_AUDIO: 'info',
-  STITCHING: 'info',
-  READY: 'success',
-  UPDATING: 'warning',
-  FAILED: 'error',
-};
+const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
+  {
+    PENDING: 'default',
+    DISCOVERING: 'info',
+    EXTRACTING: 'info',
+    SCRIPTING: 'info',
+    VERIFYING_SCRIPT: 'info',
+    VALIDATING_REFERENCES: 'info',
+    GENERATING_AUDIO: 'info',
+    STITCHING: 'info',
+    READY: 'success',
+    UPDATING: 'warning',
+    FAILED: 'error',
+  };
 
 const statusLabels: Record<PodcastStatus, string> = {
   PENDING: 'Pending',
   DISCOVERING: 'Discovering',
   EXTRACTING: 'Extracting',
   SCRIPTING: 'Scripting',
+  VERIFYING_SCRIPT: 'Fact-Checking',
   VALIDATING_REFERENCES: 'Verifying',
   GENERATING_AUDIO: 'Generating',
   STITCHING: 'Stitching',
@@ -118,7 +121,9 @@ export default async function DashboardPage() {
           <span className={styles.statLabel}>Podcasts Created</span>
           <span className={styles.statValue}>
             {podcastsUsed}
-            <span className={styles.statLimit}>/ {podcastsAllowed === -1 ? 'Unlimited' : podcastsAllowed}</span>
+            <span className={styles.statLimit}>
+              / {podcastsAllowed === -1 ? 'Unlimited' : podcastsAllowed}
+            </span>
           </span>
         </div>
         <div className={styles.statCard}>
@@ -138,8 +143,20 @@ export default async function DashboardPage() {
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon} aria-hidden="true">
               <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle cx="32" cy="32" r="28" stroke="currentColor" strokeWidth="2" strokeDasharray="4 4" />
-                <path d="M26 24L40 32L26 40V24Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="28"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeDasharray="4 4"
+                />
+                <path
+                  d="M26 24L40 32L26 40V24Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                />
               </svg>
             </div>
             <h3 className={styles.emptyTitle}>Create your first podcast</h3>
@@ -170,7 +187,9 @@ export default async function DashboardPage() {
                     {podcast.status === 'FAILED' && (
                       <span className={styles.retryHint}>Tap to retry</span>
                     )}
-                    <span className={styles.podcastDuration}>{formatDuration(podcast.duration)}</span>
+                    <span className={styles.podcastDuration}>
+                      {formatDuration(podcast.duration)}
+                    </span>
                     <time className={styles.podcastDate} dateTime={podcast.createdAt.toISOString()}>
                       {formatDate(podcast.createdAt)}
                     </time>

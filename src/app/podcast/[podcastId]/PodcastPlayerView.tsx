@@ -3,7 +3,17 @@
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, Bookmark, GitFork, Share2, Play, FileText, Download, Pencil, RefreshCw } from 'lucide-react';
+import {
+  Heart,
+  Bookmark,
+  GitFork,
+  Share2,
+  Play,
+  FileText,
+  Download,
+  Pencil,
+  RefreshCw,
+} from 'lucide-react';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
@@ -24,18 +34,20 @@ interface PodcastPlayerViewProps {
 
 type ViewMode = 'transcript' | 'teleprompter';
 
-const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> = {
-  PENDING: 'default',
-  DISCOVERING: 'info',
-  EXTRACTING: 'info',
-  SCRIPTING: 'info',
-  VALIDATING_REFERENCES: 'info',
-  GENERATING_AUDIO: 'info',
-  STITCHING: 'info',
-  READY: 'success',
-  UPDATING: 'warning',
-  FAILED: 'error',
-};
+const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
+  {
+    PENDING: 'default',
+    DISCOVERING: 'info',
+    EXTRACTING: 'info',
+    SCRIPTING: 'info',
+    VERIFYING_SCRIPT: 'info',
+    VALIDATING_REFERENCES: 'info',
+    GENERATING_AUDIO: 'info',
+    STITCHING: 'info',
+    READY: 'success',
+    UPDATING: 'warning',
+    FAILED: 'error',
+  };
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -57,11 +69,7 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-export function PodcastPlayerView({
-  podcast,
-  isOwner,
-  isAuthenticated,
-}: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: PodcastPlayerViewProps) {
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
@@ -206,7 +214,17 @@ export function PodcastPlayerView({
       {/* Back nav */}
       <nav className={styles.breadcrumb}>
         <Link href="/feed" className={styles.backLink}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
@@ -257,11 +275,7 @@ export function PodcastPlayerView({
         {podcast.tags.length > 0 && (
           <div className={styles.tags}>
             {podcast.tags.map((tag) => (
-              <Link
-                key={tag.id}
-                href={`/feed?tag=${tag.slug}`}
-                className={styles.tag}
-              >
+              <Link key={tag.id} href={`/feed?tag=${tag.slug}`} className={styles.tag}>
                 {tag.name}
               </Link>
             ))}
@@ -272,9 +286,7 @@ export function PodcastPlayerView({
       {/* Failed state */}
       {podcast.status === 'FAILED' && isOwner && (
         <div className={styles.failedState}>
-          <p className={styles.failedText}>
-            Generation failed. You can retry the process.
-          </p>
+          <p className={styles.failedText}>Generation failed. You can retry the process.</p>
           <Button onClick={handleRetry} loading={retrying} disabled={retrying}>
             <RefreshCw size={16} />
             {retrying ? 'Retrying...' : 'Retry Generation'}
@@ -414,7 +426,14 @@ export function PodcastPlayerView({
               aria-label="Close question panel"
               type="button"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -483,8 +502,16 @@ export function PodcastPlayerView({
         title="Fork this podcast?"
         size="small"
       >
-        <p style={{ marginBottom: 'var(--spacing-md)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', lineHeight: '1.5' }}>
-          A copy of this podcast will be created in your library with PENDING status. You can then customize and regenerate it.
+        <p
+          style={{
+            marginBottom: 'var(--spacing-md)',
+            color: 'var(--color-text-secondary)',
+            fontSize: 'var(--font-size-sm)',
+            lineHeight: '1.5',
+          }}
+        >
+          A copy of this podcast will be created in your library with PENDING status. You can then
+          customize and regenerate it.
         </p>
         <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
           <Button onClick={handleForkConfirm} loading={forking} disabled={forking}>
