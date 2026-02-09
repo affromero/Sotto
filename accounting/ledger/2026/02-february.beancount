@@ -1,0 +1,55 @@
+; Sotto — February 2026 Transactions
+; Monthly operational expenses and revenue
+
+; ============================================================
+; Infrastructure — Hetzner VPS
+; ============================================================
+
+; Hetzner not yet provisioned — add transactions when VPS is started
+; Expected: CPX31 ~EUR 10.59/mo + 20% backups
+
+; ============================================================
+; Infrastructure — Cloudflare (free tier)
+; ============================================================
+
+; Cloudflare DNS + CDN + R2 — free tier, $0
+
+; ============================================================
+; Shared / Free Resources (no Sotto-specific cost)
+; ============================================================
+
+; Claude Code — $200/mo personal subscription (flat rate, shared across all projects)
+; Not allocated to Sotto — cost doesn't change with Sotto usage
+;
+; ElevenLabs — free tier used for proof-of-concept
+; No charge; will become a Sotto expense when upgraded to a paid plan
+
+; ============================================================
+; API Usage Costs
+; ============================================================
+
+; API costs are imported from ApiUsageLog via:
+;   uv run import-api-usage --month 2026-02
+;
+; Categories mapped from ApiUsageLog.service + ApiUsageLog.category:
+;   claude/discovery       → Expenses:AI:Claude:Discovery
+;   claude/script_gen      → Expenses:AI:Claude:ScriptGeneration
+;   claude/interaction     → Expenses:AI:Claude:Interaction
+;   claude/ref_validation  → Expenses:AI:Claude:ReferenceValidation
+;   claude/tweet_parsing   → Expenses:AI:Claude:TweetParsing
+;   elevenlabs/standard    → Expenses:TTS:ElevenLabs:Standard
+;   elevenlabs/premium     → Expenses:TTS:ElevenLabs:Premium
+;   elevenlabs/sfx         → Expenses:TTS:ElevenLabs:SoundEffects
+;   openai/tts             → Expenses:TTS:OpenAI:Standard
+;   ffmpeg/*               → (compute cost, negligible, tracked but not billed)
+
+; ============================================================
+; Stripe Revenue
+; ============================================================
+
+; Stripe revenue is imported via:
+;   uv run import-stripe --month 2026-02
+;
+; Subscription payments → Income:Subscriptions:Pro|Creator
+; Stripe fees → Expenses:PaymentProcessing:StripeFees
+; Payouts → Assets:Current:Cash:Stripe → Assets:Current:Cash:Bank

@@ -24,6 +24,7 @@ Comprehensive documentation following the Quvo philosophy: document everything, 
 | `14-ios-app-strategy.md` | Three-phase iOS plan: PWA → React Native → Native enhancements | Engineering |
 | `15-logo-brief.md` | Outsource-ready logo design brief with creative directions + AI prompts | Design |
 | `16-palette-brief.md` | Outsource-ready color palette brief with refinement + alternative proposals | Design |
+| `accounting/` | Beancount double-entry ledger, import scripts, monthly close procedure | Business + Engineering |
 
 ## Rules
 - Every doc must have a clear title, date, and summary at the top

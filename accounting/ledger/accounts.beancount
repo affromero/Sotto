@@ -1,0 +1,122 @@
+; Sotto — Chart of Accounts
+; SaaS podcast platform: AI generation, TTS, hosting, subscriptions
+; Last updated: 2026-02-09
+
+; ============================================================
+; ASSETS
+; ============================================================
+
+; Cash & equivalents
+2026-01-01 open Assets:Current:Cash:Bank                        USD
+2026-01-01 open Assets:Current:Cash:Stripe                      USD
+
+; Prepaid expenses (amortized monthly)
+2026-01-01 open Assets:Prepaid:Domain                           USD
+2026-01-01 open Assets:Prepaid:APICredits                       USD
+
+; Accounts receivable (Stripe pending payouts)
+2026-01-01 open Assets:Receivable:Stripe                        USD
+
+; ============================================================
+; LIABILITIES
+; ============================================================
+
+; Accounts payable
+2026-01-01 open Liabilities:AccountsPayable:Hetzner             USD
+2026-01-01 open Liabilities:AccountsPayable:Namecheap           USD
+2026-01-01 open Liabilities:AccountsPayable:Anthropic           USD
+2026-01-01 open Liabilities:AccountsPayable:ElevenLabs          USD
+
+; Accrued usage-based costs (API calls not yet invoiced)
+2026-01-01 open Liabilities:Accrued:APIUsage                    USD
+
+; Deferred revenue (annual subscriptions paid upfront)
+2026-01-01 open Liabilities:DeferredRevenue:Subscriptions       USD
+
+; ============================================================
+; EQUITY
+; ============================================================
+
+2026-01-01 open Equity:Opening                                  USD
+2026-01-01 open Equity:RetainedEarnings                         USD
+
+; ============================================================
+; INCOME (Revenue)
+; ============================================================
+
+; Subscription revenue by tier
+2026-01-01 open Income:Subscriptions:Pro                        USD
+2026-01-01 open Income:Subscriptions:Creator                    USD
+
+; API key revenue (developer access)
+2026-01-01 open Income:APIKeys                                  USD
+
+; Other revenue (tips, sponsorships, etc.)
+2026-01-01 open Income:Other                                    USD
+
+; ============================================================
+; EXPENSES — Infrastructure
+; ============================================================
+
+; Domain & DNS
+2026-01-01 open Expenses:Infrastructure:Domain                  USD
+
+; Compute — Hetzner VPS
+2026-01-01 open Expenses:Infrastructure:Compute:Hetzner         USD
+2026-01-01 open Expenses:Infrastructure:Compute:HetznerBackups  USD
+
+; Storage — Cloudflare R2
+2026-01-01 open Expenses:Infrastructure:Storage:R2              USD
+
+; CDN — Cloudflare (currently free)
+2026-01-01 open Expenses:Infrastructure:CDN:Cloudflare          USD
+
+; Email service
+2026-01-01 open Expenses:Infrastructure:Email                   USD
+
+; ============================================================
+; EXPENSES — AI Services
+; ============================================================
+
+; Anthropic Claude — broken out by usage category
+2026-01-01 open Expenses:AI:Claude:Discovery                    USD
+2026-01-01 open Expenses:AI:Claude:ScriptGeneration             USD
+2026-01-01 open Expenses:AI:Claude:Interaction                  USD
+2026-01-01 open Expenses:AI:Claude:ReferenceValidation          USD
+2026-01-01 open Expenses:AI:Claude:TweetParsing                 USD
+2026-01-01 open Expenses:AI:Claude:Other                        USD
+
+; ============================================================
+; EXPENSES — TTS (Text-to-Speech)
+; ============================================================
+
+; ElevenLabs — premium voice generation
+2026-01-01 open Expenses:TTS:ElevenLabs:Standard                USD
+2026-01-01 open Expenses:TTS:ElevenLabs:Premium                 USD
+2026-01-01 open Expenses:TTS:ElevenLabs:SoundEffects            USD
+2026-01-01 open Expenses:TTS:ElevenLabs:VoiceClone              USD
+
+; OpenAI TTS — standard voice generation (fallback/default)
+2026-01-01 open Expenses:TTS:OpenAI:Standard                    USD
+
+; ============================================================
+; EXPENSES — Payment Processing
+; ============================================================
+
+2026-01-01 open Expenses:PaymentProcessing:StripeFees           USD
+
+; ============================================================
+; EXPENSES — Software & Tools
+; ============================================================
+
+2026-01-01 open Expenses:Software:DevTools                      USD
+2026-01-01 open Expenses:Software:Monitoring                    USD
+2026-01-01 open Expenses:Software:Other                         USD
+
+; ============================================================
+; EXPENSES — General & Admin
+; ============================================================
+
+2026-01-01 open Expenses:Admin:Legal                            USD
+2026-01-01 open Expenses:Admin:Accounting                       USD
+2026-01-01 open Expenses:Admin:Other                            USD

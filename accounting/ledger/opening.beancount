@@ -1,0 +1,25 @@
+; Sotto — Opening Balances & Initial Transactions
+; Effective: 2026-02-01 (project start for accounting purposes)
+
+; ============================================================
+; Opening balance — seed the business
+; ============================================================
+
+2026-02-01 * "Opening balance" "Initial funding for Sotto operations"
+  Assets:Current:Cash:Bank                          70.00 USD
+  Equity:Opening                                   -70.00 USD
+
+; ============================================================
+; Domain purchase — sotto.fm
+; ============================================================
+
+; sotto.fm purchased from Namecheap — $70/yr, prepaid
+; Amortized at $5.83/mo over 12 months
+2026-02-01 * "Namecheap" "Domain registration: sotto.fm (1 year)"
+  Assets:Prepaid:Domain                             70.00 USD
+  Assets:Current:Cash:Bank                         -70.00 USD
+
+; February amortization of domain cost
+2026-02-28 * "Domain amortization" "sotto.fm — February 2026 (1/12)"
+  Expenses:Infrastructure:Domain                     5.83 USD
+  Assets:Prepaid:Domain                             -5.83 USD

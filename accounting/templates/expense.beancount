@@ -1,0 +1,37 @@
+; Template: Manual Expense Entry
+; Copy this template and fill in the values
+;
+; Instructions:
+;   1. Replace DATE with YYYY-MM-DD
+;   2. Replace PAYEE with the vendor name
+;   3. Replace DESCRIPTION with what was purchased
+;   4. Replace EXPENSE_ACCOUNT with the appropriate account from accounts.beancount
+;   5. Replace AMOUNT with the dollar amount
+;   6. Replace PAYMENT_ACCOUNT with how it was paid
+;
+; Common expense accounts:
+;   Expenses:Infrastructure:Domain
+;   Expenses:Infrastructure:Compute:Hetzner
+;   Expenses:Infrastructure:Compute:HetznerBackups
+;   Expenses:Infrastructure:Storage:R2
+;   Expenses:Infrastructure:Email
+;   Expenses:AI:Claude:Discovery
+;   Expenses:AI:Claude:ScriptGeneration
+;   Expenses:TTS:ElevenLabs:Standard
+;   Expenses:TTS:ElevenLabs:Premium
+;   Expenses:TTS:OpenAI:Standard
+;   Expenses:PaymentProcessing:StripeFees
+;   Expenses:Software:DevTools
+;   Expenses:Software:Monitoring
+;   Expenses:Admin:Legal
+;
+; Common payment accounts:
+;   Assets:Current:Cash:Bank
+;   Assets:Current:Cash:Stripe
+;   Liabilities:AccountsPayable:Hetzner
+;   Liabilities:AccountsPayable:Anthropic
+;   Liabilities:AccountsPayable:ElevenLabs
+
+; DATE * "PAYEE" "DESCRIPTION"
+;   EXPENSE_ACCOUNT  AMOUNT USD
+;   PAYMENT_ACCOUNT  -AMOUNT USD

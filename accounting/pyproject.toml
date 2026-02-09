@@ -1,0 +1,24 @@
+[project]
+name = "sotto-accounting"
+version = "0.1.0"
+description = "Sotto financial ledger — Beancount double-entry accounting"
+requires-python = ">=3.11"
+dependencies = [
+    "beancount>=3.0.0",
+    "fava>=1.29",
+    "psycopg[binary]>=3.1",
+    "stripe>=8.0",
+]
+
+[project.scripts]
+import-api-usage = "scripts.import_api_usage:main"
+import-stripe = "scripts.import_stripe:main"
+monthly-close = "scripts.monthly_close:main"
+reports = "scripts.generate_reports:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["scripts"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
