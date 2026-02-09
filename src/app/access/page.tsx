@@ -23,7 +23,7 @@ export default function AccessPage() {
       });
 
       if (res.ok) {
-        router.push('/');
+        router.push('/romero');
         router.refresh();
       } else {
         setError('Wrong password. Ask the team for access.');

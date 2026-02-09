@@ -1,0 +1,12 @@
+User-agent: *
+Disallow: /romero
+Disallow: /access
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /create
+Disallow: /settings
+Disallow: /billing
+Disallow: /analytics
+Disallow: /team
+
+Sitemap: https://sotto.fm/sitemap.xml

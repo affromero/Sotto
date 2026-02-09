@@ -4,24 +4,79 @@ import { getToken } from 'next-auth/jwt';
 const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing', '/analytics'];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
-const PASSWORD_GATE_BYPASS = ['/access', '/api/access', '/api/health'];
+// Public routes that bypass the password gate (exact match)
+const PASSWORD_GATE_BYPASS = new Set([
+  '/',
+  '/access',
+  '/api/access',
+  '/api/health',
+  '/api/waitlist',
+  '/feedback',
+  '/api/feedback',
+]);
+
+// Prefix-based bypasses that skip the gate entirely
+const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth'];
+
+async function verifyAccessCookie(value: string, secret: string): Promise<boolean> {
+  const separatorIndex = value.indexOf(':');
+  if (separatorIndex === -1) return false;
+
+  const timestamp = value.substring(0, separatorIndex);
+  const signature = value.substring(separatorIndex + 1);
+  if (!timestamp || !signature) return false;
+
+  const age = Date.now() - parseInt(timestamp, 10);
+  if (isNaN(age) || age < 0 || age > 30 * 24 * 60 * 60 * 1000) return false;
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(timestamp));
+
+  const expected = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return expected === signature;
+}
+
+function isPasswordGateBypassed(pathname: string): boolean {
+  if (PASSWORD_GATE_BYPASS.has(pathname)) return true;
+  return PASSWORD_GATE_BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Skip static files
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/fonts')) {
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/fonts')
+  ) {
     return NextResponse.next();
   }
 
   // Site-wide password gate (early access)
-  if (process.env.SITE_PASSWORD) {
-    const isBypassed = PASSWORD_GATE_BYPASS.some((route) => pathname.startsWith(route));
-    if (!isBypassed) {
-      const accessCookie = request.cookies.get('sotto_access');
-      if (accessCookie?.value !== 'granted') {
-        return NextResponse.redirect(new URL('/access', request.url));
-      }
+  // The alpha landing page at /romero is gated because it's not in the bypass set.
+  // To rotate the path: rename src/app/romero/, update robots.txt, update access/page.tsx redirect.
+  if (process.env.SITE_PASSWORD && !isPasswordGateBypassed(pathname)) {
+    const accessCookie = request.cookies.get('sotto_access');
+    const secret = process.env.NEXTAUTH_SECRET;
+
+    let isAuthenticated = false;
+    if (accessCookie?.value && secret) {
+      isAuthenticated = await verifyAccessCookie(accessCookie.value, secret);
+    }
+
+    if (!isAuthenticated) {
+      return NextResponse.redirect(new URL('/access', request.url));
     }
   }
 
