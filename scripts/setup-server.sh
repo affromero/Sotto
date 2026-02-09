@@ -87,7 +87,7 @@ if grep -q "^PermitRootLogin" /etc/ssh/sshd_config; then
 else
   echo "PermitRootLogin no" >> /etc/ssh/sshd_config
 fi
-systemctl reload sshd
+systemctl reload ssh
 echo "  SSH hardened (password auth disabled, root login disabled)"
 
 echo ""
