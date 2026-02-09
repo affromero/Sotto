@@ -21,7 +21,8 @@ export interface TtsProvider {
 }
 
 /**
- * ElevenLabs provider — wraps existing elevenlabs.ts.
+ * ElevenLabs provider — premium voice generation.
+ * Used when podcast.usePremiumVoice is true.
  */
 class ElevenLabsProvider implements TtsProvider {
   private clientPromise: Promise<typeof import('../elevenlabs')> | null = null;
@@ -44,8 +45,6 @@ class ElevenLabsProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: 'HOST' | 'EXPERT', _podcastId?: string): string {
-    // Default voice IDs matching the ElevenLabs voice pool
-    // HOST gets a warm, engaging voice; EXPERT gets an authoritative voice
     return speaker === 'HOST'
       ? (process.env.ELEVENLABS_VOICE_HOST || 'pNInz6obpgDQGcFmaJgB')
       : (process.env.ELEVENLABS_VOICE_EXPERT || 'ErXwobaYiN019PkySvjV');
@@ -53,7 +52,8 @@ class ElevenLabsProvider implements TtsProvider {
 }
 
 /**
- * OpenAI TTS provider — uses OpenAI's tts-1-hd model.
+ * OpenAI TTS provider — standard voice generation (default).
+ * 90% cheaper than ElevenLabs. Good quality for most use cases.
  */
 class OpenAITtsProvider implements TtsProvider {
   private async getClient() {
@@ -87,15 +87,27 @@ class OpenAITtsProvider implements TtsProvider {
   }
 }
 
+/**
+ * Create a TTS provider instance.
+ * Default is now 'openai' (standard voices). Use 'elevenlabs' for premium.
+ */
 export function createTtsProvider(type?: string): TtsProvider {
-  const providerType = type || process.env.TTS_PROVIDER || 'elevenlabs';
+  const providerType = type || process.env.TTS_PROVIDER || 'openai';
   switch (providerType) {
     case 'elevenlabs':
       return new ElevenLabsProvider();
     case 'openai':
       return new OpenAITtsProvider();
     default:
-      logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to elevenlabs`);
-      return new ElevenLabsProvider();
+      logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to openai`);
+      return new OpenAITtsProvider();
   }
+}
+
+/**
+ * Get the premium (ElevenLabs) TTS provider.
+ * Always returns ElevenLabs regardless of TTS_PROVIDER env var.
+ */
+export function createPremiumTtsProvider(): TtsProvider {
+  return new ElevenLabsProvider();
 }

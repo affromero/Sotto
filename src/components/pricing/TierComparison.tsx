@@ -2,7 +2,7 @@ import { Check, X } from 'lucide-react';
 import styles from './TierComparison.module.css';
 
 interface TierComparisonProps {
-  currentTier?: 'free' | 'pro' | 'team';
+  currentTier?: 'free' | 'pro' | 'creator';
 }
 
 type CellValue = string | boolean;
@@ -11,25 +11,31 @@ interface ComparisonRow {
   label: string;
   free: CellValue;
   pro: CellValue;
-  team: CellValue;
+  creator: CellValue;
 }
 
 const rows: ComparisonRow[] = [
-  { label: 'Podcasts / month', free: '3', pro: '20', team: 'Unlimited' },
-  { label: 'Max duration', free: '10 min', pro: '30 min', team: '30 min' },
-  { label: 'Interactions', free: '3 per podcast', pro: 'Unlimited', team: 'Unlimited' },
-  { label: 'Private podcasts', free: false, pro: true, team: true },
-  { label: 'Team features', free: false, pro: false, team: true },
-  { label: 'Priority support', free: false, pro: true, team: true },
+  { label: 'Podcasts / month', free: '2', pro: '15', creator: 'Unlimited' },
+  { label: 'Max duration', free: '10 min', pro: '10 min', creator: '10 min' },
+  { label: 'Interactions', free: '2 per podcast', pro: '10 per podcast', creator: 'Unlimited' },
+  { label: 'Default TTS', free: 'Standard', pro: 'Standard', creator: 'Standard' },
+  { label: 'Premium voice credits', free: '0', pro: '5 / month', creator: '20 / month' },
+  { label: 'Personal voice clones', free: false, pro: '3', creator: '10' },
+  { label: 'Voice library browse', free: false, pro: true, creator: true },
+  { label: 'Marketplace listing', free: false, pro: false, creator: true },
+  { label: 'Private podcasts', free: false, pro: true, creator: true },
+  { label: 'MP3 download', free: false, pro: true, creator: true },
+  { label: 'Transcript PDF', free: false, pro: true, creator: true },
+  { label: 'Analytics', free: false, pro: false, creator: true },
 ];
 
 const tierLabels: Record<string, string> = {
   free: 'Free',
   pro: 'Pro',
-  team: 'Team',
+  creator: 'Creator',
 };
 
-const tiers = ['free', 'pro', 'team'] as const;
+const tiers = ['free', 'pro', 'creator'] as const;
 
 function CellContent({ value }: { value: CellValue }) {
   if (typeof value === 'boolean') {

@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import styles from './PricingCard.module.css';
 
 interface PricingCardProps {
-  tier: 'free' | 'pro' | 'team';
+  tier: 'free' | 'pro' | 'creator';
   price: number;
   interval?: string;
   features: string[];
@@ -15,7 +15,7 @@ interface PricingCardProps {
 const tierLabels: Record<string, string> = {
   free: 'Free',
   pro: 'Pro',
-  team: 'Team',
+  creator: 'Creator',
 };
 
 export function PricingCard({

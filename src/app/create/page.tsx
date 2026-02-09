@@ -3,44 +3,62 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
+import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
+type Step = 'discovery' | 'voice' | 'generating';
+
 export default function CreatePage() {
   const router = useRouter();
-  const [generating, setGenerating] = useState(false);
+  const [step, setStep] = useState<Step>('discovery');
+  const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
+  const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({
+    usePremiumVoice: false,
+  });
   const [error, setError] = useState<string | null>(null);
 
-  const handleComplete = useCallback(
-    async (metadata: DiscoveryMetadata) => {
-      setGenerating(true);
-      setError(null);
+  const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
+    setMetadata(meta);
+    setStep('voice');
+  }, []);
 
-      try {
-        const response = await fetch('/api/podcasts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: metadata.topic,
-            topic: metadata.topic,
-            metadata,
-          }),
-        });
+  const handleVoiceSelectionChange = useCallback((selection: VoiceSelection) => {
+    setVoiceSelection(selection);
+  }, []);
 
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to create podcast');
-        }
+  const handleGenerate = useCallback(async () => {
+    if (!metadata) return;
 
-        const podcast = await response.json();
-        router.push(`/podcast/${podcast.id}`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong');
-        setGenerating(false);
+    setStep('generating');
+    setError(null);
+
+    try {
+      const response = await fetch('/api/podcasts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: metadata.topic,
+          topic: metadata.topic,
+          metadata,
+          hostVoiceId: voiceSelection.hostVoiceId,
+          expertVoiceId: voiceSelection.expertVoiceId,
+          usePremiumVoice: voiceSelection.usePremiumVoice,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create podcast');
       }
-    },
-    [router]
-  );
+
+      const podcast = await response.json();
+      router.push(`/podcast/${podcast.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setStep('voice');
+    }
+  }, [metadata, voiceSelection, router]);
 
   return (
     <main className={styles.main}>
@@ -63,9 +81,15 @@ export default function CreatePage() {
             </svg>
           </a>
           <div className={styles.headerText}>
-            <h1 className={styles.title}>Create a Podcast</h1>
+            <h1 className={styles.title}>
+              {step === 'discovery' && 'Create a Podcast'}
+              {step === 'voice' && 'Choose Voices'}
+              {step === 'generating' && 'Creating Your Podcast'}
+            </h1>
             <p className={styles.subtitle}>
-              Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.
+              {step === 'discovery' && 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'}
+              {step === 'voice' && 'Pick voices for your Host and Expert, or use auto-assign.'}
+              {step === 'generating' && 'Hang tight while we generate your podcast.'}
             </p>
           </div>
         </header>
@@ -87,7 +111,7 @@ export default function CreatePage() {
           </div>
         )}
 
-        {generating && (
+        {step === 'generating' && (
           <div className={styles.generatingOverlay} role="status">
             <div className={styles.generatingContent}>
               <div className={styles.spinner} aria-hidden="true" />
@@ -97,9 +121,33 @@ export default function CreatePage() {
           </div>
         )}
 
-        <div className={styles.chatArea}>
-          <DiscoveryChat onComplete={handleComplete} />
-        </div>
+        {step === 'discovery' && (
+          <div className={styles.chatArea}>
+            <DiscoveryChat onComplete={handleDiscoveryComplete} />
+          </div>
+        )}
+
+        {step === 'voice' && (
+          <div className={styles.chatArea}>
+            <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
+            <div className={styles.voiceActions}>
+              <button
+                type="button"
+                className={styles.backButton}
+                onClick={() => setStep('discovery')}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                className={styles.generateButton}
+                onClick={handleGenerate}
+              >
+                Generate Podcast
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

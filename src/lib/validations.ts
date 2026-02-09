@@ -15,6 +15,9 @@ export const createPodcastSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
   discoveryId: z.string(),
+  hostVoiceId: z.string().optional(),
+  expertVoiceId: z.string().optional(),
+  usePremiumVoice: z.boolean().default(false),
 });
 
 /**
@@ -73,7 +76,7 @@ export const paginationSchema = z.object({
  * Billing checkout validation
  */
 export const checkoutSchema = z.object({
-  tier: z.enum(['pro', 'team']),
+  tier: z.enum(['pro', 'creator']),
 });
 
 /**
@@ -109,4 +112,20 @@ export const teamInviteSchema = z.object({
  */
 export const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
+});
+
+/**
+ * Voice clone creation validation
+ */
+export const cloneVoiceSchema = z.object({
+  name: z.string().min(1).max(100),
+  sourceType: z.enum(['UPLOAD', 'RECORD']),
+});
+
+/**
+ * Voice preview validation
+ */
+export const voicePreviewSchema = z.object({
+  voiceId: z.string().min(1),
+  text: z.string().min(1).max(500),
 });

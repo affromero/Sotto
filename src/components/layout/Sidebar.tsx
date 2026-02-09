@@ -8,7 +8,7 @@ import {
   Settings,
   CreditCard,
   BarChart2,
-  Users,
+  Mic,
   LogOut,
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
@@ -29,7 +29,7 @@ const navItems = [
   { href: '/create', label: 'Create', icon: PlusCircle },
   { href: '/feed', label: 'Feed', icon: Radio },
   { href: '/billing', label: 'Billing', icon: CreditCard },
-  { href: '/team', label: 'Team', icon: Users },
+  { href: '/settings/voices', label: 'Voices', icon: Mic },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

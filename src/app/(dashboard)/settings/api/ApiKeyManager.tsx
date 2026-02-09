@@ -89,7 +89,7 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
     setCopied(false);
   }, []);
 
-  if (tier !== 'TEAM') {
+  if (tier !== 'CREATOR') {
     return (
       <div className={styles.upgradeCard}>
         <h2 className={styles.upgradeTitle}>API Access</h2>

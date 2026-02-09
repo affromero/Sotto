@@ -37,9 +37,9 @@ export async function POST(request: NextRequest) {
 
   // Only TEAM tier can create API keys
   const tier = await getUserTier(session.user.id);
-  if (tier !== 'TEAM') {
+  if (tier !== 'CREATOR') {
     return NextResponse.json(
-      { error: 'API keys require a Team subscription' },
+      { error: 'API keys require a Creator subscription' },
       { status: 403 }
     );
   }

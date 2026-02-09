@@ -11,23 +11,23 @@ export const metadata: Metadata = {
 const faqs = [
   {
     question: 'Can I try Sotto for free?',
-    answer: 'Absolutely. The Free plan lets you create up to 3 podcasts per month with up to 10 minutes each. No credit card required.',
+    answer: 'Absolutely. The Free plan lets you create up to 2 podcasts per month with up to 10 minutes each. No credit card required.',
   },
   {
-    question: 'What happens when I hit my podcast limit?',
-    answer: 'You can still listen to and interact with existing podcasts. To create new ones, wait for the next billing cycle or upgrade your plan.',
+    question: 'What are standard vs premium voices?',
+    answer: 'All podcasts use high-quality standard AI voices by default. Premium voices (powered by ElevenLabs) offer more natural, expressive audio and include access to the full voice library and personal voice cloning.',
   },
   {
-    question: 'Can I cancel my subscription anytime?',
-    answer: 'Yes. You can cancel at any time from your billing settings. Your plan remains active until the end of the current billing period.',
+    question: 'What are premium voice credits?',
+    answer: 'Each premium voice credit lets you generate one podcast with ElevenLabs premium voices. Pro gets 5 credits per month, Creator gets 20. Standard voice generation is always unlimited.',
+  },
+  {
+    question: 'Can I clone my own voice?',
+    answer: 'Yes! Pro users can clone up to 3 personal voices, and Creator users can clone up to 10. Upload a short audio sample and your voice becomes available for your podcasts.',
   },
   {
     question: 'What are interactions?',
-    answer: 'Interactions let you pause a podcast and ask a question. The AI answers using the podcast context. Free users get 3 per podcast; Pro and Team users get unlimited.',
-  },
-  {
-    question: 'What does forking a podcast mean?',
-    answer: 'Forking creates a copy of a public podcast that you can modify, like adding your own questions and regenerating sections. It is like remixing content.',
+    answer: 'Interactions let you pause a podcast and ask a question. The AI answers using the podcast context. Free users get 2 per podcast, Pro gets 10, and Creator users get unlimited.',
   },
   {
     question: 'Do you offer refunds?',

@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
       title: parsed.data.title,
       topic: parsed.data.topic,
       status: 'PENDING',
+      hostVoiceId: parsed.data.hostVoiceId,
+      expertVoiceId: parsed.data.expertVoiceId,
+      usePremiumVoice: parsed.data.usePremiumVoice,
     },
   });
 

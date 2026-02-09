@@ -244,5 +244,101 @@ export async function getVoices(): Promise<
   return data.voices;
 }
 
+// ---------------------------------------------------------------------------
+// Cost Tracking
+// ---------------------------------------------------------------------------
+
+const ELEVENLABS_RATE_PER_K_CHARS: Record<string, number> = {
+  free: 0.00,
+  starter: 0.30,
+  creator: 0.24,
+  scale: 0.17,
+};
+
+/**
+ * Get the ElevenLabs cost per 1,000 characters based on the account tier.
+ * Configured via ELEVENLABS_TIER env var (default: 'scale').
+ */
+export function getElevenLabsPerKCharRate(): number {
+  const tier = process.env.ELEVENLABS_TIER || 'scale';
+  return ELEVENLABS_RATE_PER_K_CHARS[tier] ?? 0.17;
+}
+
+/**
+ * Get the OpenAI TTS cost per 1,000 characters.
+ * tts-1-hd: $15/1M chars = $0.015/1K chars
+ */
+export function getOpenAiPerKCharRate(): number {
+  return 0.015;
+}
+
+// ---------------------------------------------------------------------------
+// Voice Cloning (Instant Voice Cloning — IVC)
+// ---------------------------------------------------------------------------
+
+/**
+ * Clone a voice from audio samples using ElevenLabs Instant Voice Cloning.
+ * Requires a paid ElevenLabs plan.
+ */
+export async function cloneVoice(
+  name: string,
+  audioFiles: Buffer[],
+  description?: string
+): Promise<{ voiceId: string }> {
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
+  }
+
+  const formData = new FormData();
+  formData.append('name', name);
+  if (description) {
+    formData.append('description', description);
+  }
+
+  for (let i = 0; i < audioFiles.length; i++) {
+    const uint8 = new Uint8Array(audioFiles[i]);
+    const blob = new Blob([uint8], { type: 'audio/mpeg' });
+    formData.append('files', blob, `sample_${i}.mp3`);
+  }
+
+  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/add`, {
+    method: 'POST',
+    headers: {
+      'xi-api-key': ELEVENLABS_API_KEY,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs Voice Cloning error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  logger.info('Voice cloned successfully', { name, voiceId: data.voice_id });
+  return { voiceId: data.voice_id };
+}
+
+/**
+ * Delete a cloned voice from ElevenLabs.
+ */
+export async function deleteClonedVoice(voiceId: string): Promise<void> {
+  if (!ELEVENLABS_API_KEY) {
+    throw new Error('ElevenLabs API key not configured');
+  }
+
+  const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
+    method: 'DELETE',
+    headers: { 'xi-api-key': ELEVENLABS_API_KEY },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs voice deletion error (${response.status}): ${errorText}`);
+  }
+
+  logger.info('Cloned voice deleted', { voiceId });
+}
+
 // Export the pool for external access (e.g. voice selection UI)
 export { VOICE_POOL };

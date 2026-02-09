@@ -25,7 +25,7 @@ export function BillingActions({ tier }: BillingActionsProps) {
     }
   };
 
-  const handleSelectPlan = async (selectedTier: 'free' | 'pro' | 'team') => {
+  const handleSelectPlan = async (selectedTier: 'free' | 'pro' | 'creator') => {
     if (selectedTier === 'free') return;
     setLoading(true);
     try {
@@ -48,16 +48,17 @@ export function BillingActions({ tier }: BillingActionsProps) {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Upgrade Your Plan</h2>
         <p className={styles.upgradeText}>
-          Unlock more podcasts, longer episodes, and premium features.
+          Unlock more podcasts, premium voices, and creator features.
         </p>
         <div className={styles.pricingGrid}>
           <PricingCard
             tier="free"
             price={0}
             features={[
-              '3 podcasts/month',
+              '2 podcasts/month',
               '10 min max',
-              '3 interactions',
+              '2 interactions',
+              'Standard voices',
               'Public only',
             ]}
             isCurrentPlan
@@ -65,29 +66,29 @@ export function BillingActions({ tier }: BillingActionsProps) {
           />
           <PricingCard
             tier="pro"
-            price={19}
+            price={24}
             features={[
-              '20 podcasts/month',
-              '30 min max',
-              'Unlimited interactions',
+              '15 podcasts/month',
+              '5 premium voice credits',
+              '3 voice clones',
               'Private podcasts',
-              'MP3 downloads',
+              'MP3 + PDF export',
             ]}
             isPopular
             onSelect={() => handleSelectPlan('pro')}
             loading={loading}
           />
           <PricingCard
-            tier="team"
+            tier="creator"
             price={49}
             features={[
               'Unlimited podcasts',
-              '10 team seats',
-              'Private team feed',
-              'API access',
-              'Analytics',
+              '20 premium voice credits',
+              '10 voice clones',
+              'Marketplace listing',
+              'Full analytics',
             ]}
-            onSelect={() => handleSelectPlan('team')}
+            onSelect={() => handleSelectPlan('creator')}
             loading={loading}
           />
         </div>

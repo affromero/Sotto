@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
+import { consumeVoiceCredit } from '@/lib/subscription';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -36,6 +37,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate' },
       { status: 400 }
     );
+  }
+
+  // If using premium voice, consume a credit before generation
+  if (podcast.usePremiumVoice) {
+    try {
+      await consumeVoiceCredit(authResult.userId);
+    } catch {
+      return NextResponse.json(
+        { error: 'No premium voice credits remaining. Switch to standard voices or upgrade your plan.' },
+        { status: 402 }
+      );
+    }
   }
 
   // For FAILED podcasts, clean up old failed jobs

@@ -5,8 +5,8 @@ import { createCheckoutSession } from '@/lib/stripe';
 import { checkoutSchema } from '@/lib/validations';
 
 const PRICE_IDS: Record<string, string> = {
-  pro: process.env.STRIPE_PRO_PRICE_ID || '',
-  team: process.env.STRIPE_TEAM_PRICE_ID || '',
+  pro: process.env.STRIPE_PRICE_ID_PRO || '',
+  creator: process.env.STRIPE_PRICE_ID_CREATOR || '',
 };
 
 export async function POST(request: NextRequest) {

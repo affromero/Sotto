@@ -24,9 +24,9 @@ model User {
 
   // Usage tracking
   podcastsUsed    Int @default(0)
-  podcastsAllowed Int @default(3) // 3 free podcasts for all users
+  podcastsAllowed Int @default(2) // 2 free podcasts for all users
 
-  // Team membership
+  // Team membership (dormant — kept for future use)
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id])
 
@@ -42,6 +42,7 @@ model User {
   ownedTeams         Team[]              @relation("TeamOwner")
   apiUsageLogs       ApiUsageLog[]
   pushSubscriptions  PushSubscription[]
+  voiceClones        VoiceClone[]
 
   // Social
   likes     Like[]
@@ -120,6 +121,7 @@ model Subscription {
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean            @default(false)
+  premiumCreditsUsed   Int                @default(0)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -141,7 +143,7 @@ enum SubscriptionStatus {
 enum SubscriptionTier {
   FREE
   PRO
-  TEAM
+  CREATOR
 }
 
 model SubscriptionEvent {
@@ -215,6 +217,11 @@ model Podcast {
   audioUrl  String?
   duration  Int?    // seconds
   fileSize  Int?    // bytes
+
+  // Voice selection
+  hostVoiceId     String?
+  expertVoiceId   String?
+  usePremiumVoice Boolean @default(false)
 
   // Visibility
   visibility PodcastVisibility @default(PUBLIC)
@@ -593,6 +600,27 @@ model ApiKey {
 
   @@index([userId])
   @@index([keyHash])
+}
+
+// ============ VOICE CLONES ============
+
+model VoiceClone {
+  id                String           @id @default(cuid())
+  userId            String
+  name              String
+  elevenLabsVoiceId String           @unique
+  sourceType        VoiceCloneSource
+  sampleUrl         String?
+  createdAt         DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum VoiceCloneSource {
+  UPLOAD
+  RECORD
 }
 
 // ============ REFERENCES (Citations) ============

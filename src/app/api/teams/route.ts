@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     select: { tier: true },
   });
 
-  if (!subscription || subscription.tier !== 'TEAM') {
-    return NextResponse.json({ error: 'Team subscription required' }, { status: 403 });
+  if (!subscription || subscription.tier !== 'CREATOR') {
+    return NextResponse.json({ error: 'Creator subscription required' }, { status: 403 });
   }
 
   // Check not already in a team

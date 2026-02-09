@@ -39,6 +39,6 @@ export type { PaymentProvider, TierLimits, CheckoutParams } from './payment';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
-export { createTtsProvider } from './tts';
+export { createTtsProvider, createPremiumTtsProvider } from './tts';
 export { createStorageProvider } from './storage';
 export { createPaymentProvider } from './payment';

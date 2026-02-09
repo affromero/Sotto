@@ -7,7 +7,7 @@ import styles from './page.module.css';
 export function PricingClient() {
   const [loading, setLoading] = useState(false);
 
-  const handleSelect = async (tier: 'free' | 'pro' | 'team') => {
+  const handleSelect = async (tier: 'free' | 'pro' | 'creator') => {
     if (tier === 'free') {
       window.location.href = '/create';
       return;
@@ -24,7 +24,6 @@ export function PricingClient() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        // Not authenticated, redirect to login
         window.location.href = '/auth/login';
       }
     } finally {
@@ -39,43 +38,47 @@ export function PricingClient() {
           tier="free"
           price={0}
           features={[
-            '3 podcasts per month',
+            '2 podcasts per month',
             'Up to 10 minutes each',
-            '3 interactions per podcast',
+            '2 interactions per podcast',
+            'Standard AI voices',
             'Public podcasts only',
-            'Community feed access',
             'Unlimited listening',
           ]}
           onSelect={() => handleSelect('free')}
         />
         <PricingCard
           tier="pro"
-          price={19}
+          price={24}
           isPopular
           features={[
-            '20 podcasts per month',
-            'Up to 30 minutes each',
-            'Unlimited interactions',
+            '15 podcasts per month',
+            'Up to 10 minutes each',
+            '10 interactions per podcast',
+            '5 premium voice credits/mo',
+            'Clone up to 3 personal voices',
             'Private & unlisted podcasts',
-            'Download MP3s',
-            'Priority support',
+            'MP3 download + transcript PDF',
+            'Voice library access',
           ]}
           onSelect={() => handleSelect('pro')}
           loading={loading}
         />
         <PricingCard
-          tier="team"
+          tier="creator"
           price={49}
           features={[
             'Unlimited podcasts',
-            'Up to 30 minutes each',
+            'Up to 10 minutes each',
             'Unlimited interactions',
-            'Private team feed',
-            '10 team seats',
-            'API access',
-            'Analytics dashboard',
+            '20 premium voice credits/mo',
+            'Clone up to 10 personal voices',
+            'Private & unlisted podcasts',
+            'MP3 download + transcript PDF',
+            'Voice library + marketplace listing',
+            'Full analytics dashboard',
           ]}
-          onSelect={() => handleSelect('team')}
+          onSelect={() => handleSelect('creator')}
           loading={loading}
         />
       </div>

@@ -25,7 +25,7 @@ export default async function TeamPage() {
 
   const tier = subscription?.tier || 'FREE';
 
-  if (tier !== 'TEAM') {
+  if (tier !== 'CREATOR') {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>

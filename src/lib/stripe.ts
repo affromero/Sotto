@@ -13,31 +13,50 @@ export const stripe = STRIPE_SECRET_KEY
 
 /**
  * Pricing tiers and limits
+ *
+ * Free $0 / Pro $24 / Creator $49
+ * All tiers cap at 10 min — the sweet spot for focused, digestible content.
+ * Default TTS is OpenAI (standard). Premium voice credits use ElevenLabs.
  */
 export const TIER_LIMITS = {
   FREE: {
-    podcastsPerMonth: 3,
+    podcastsPerMonth: 2,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 3,
+    interactionsPerPodcast: 2,
+    premiumVoiceCredits: 0,
+    maxVoiceClones: 0,
     canDownload: false,
     canMakePrivate: false,
-    voiceCount: 2,
+    canBrowseVoiceLibrary: false,
+    canListOnMarketplace: false,
+    canViewAnalytics: false,
+    canExportPdf: false,
   },
   PRO: {
-    podcastsPerMonth: 20,
-    maxDurationMinutes: 30,
-    interactionsPerPodcast: Infinity,
+    podcastsPerMonth: 15,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: 10,
+    premiumVoiceCredits: 5,
+    maxVoiceClones: 3,
     canDownload: true,
     canMakePrivate: true,
-    voiceCount: 6,
+    canBrowseVoiceLibrary: true,
+    canListOnMarketplace: false,
+    canViewAnalytics: false,
+    canExportPdf: true,
   },
-  TEAM: {
+  CREATOR: {
     podcastsPerMonth: Infinity,
-    maxDurationMinutes: 30,
+    maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
+    premiumVoiceCredits: 20,
+    maxVoiceClones: 10,
     canDownload: true,
     canMakePrivate: true,
-    voiceCount: 6,
+    canBrowseVoiceLibrary: true,
+    canListOnMarketplace: true,
+    canViewAnalytics: true,
+    canExportPdf: true,
   },
 } as const;
 
@@ -71,7 +90,7 @@ export function canInteract(
   if (interactionCount >= limits.interactionsPerPodcast) {
     return {
       allowed: false,
-      reason: `Free tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
+      reason: `${tier === 'FREE' ? 'Free' : tier === 'PRO' ? 'Pro' : 'Creator'} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
     };
   }
   return { allowed: true };

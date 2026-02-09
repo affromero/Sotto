@@ -1,7 +1,9 @@
 import { Job } from 'bullmq';
 import { GenerateAudioPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { generateSpeech, getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
+import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
+import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
+import { getElevenLabsPerKCharRate, getOpenAiPerKCharRate } from '@/lib/elevenlabs';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 
@@ -11,17 +13,49 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   logger.info('Generating audio for segment', { podcastId, segmentId, speaker });
   await job.updateProgress(10);
 
-  // Select voice from the diverse pool, seeded by podcast ID for consistency
-  const voiceId = getVoiceId(speaker, podcastId);
-  const profile = getVoiceProfile(voiceId);
-  logger.info('Voice selected', {
-    speaker,
-    voiceName: profile?.name ?? 'custom',
-    voiceId,
-    podcastId,
+  // Fetch podcast to determine voice configuration
+  const podcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { userId: true, usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
   });
 
-  const audioBuffer = await generateSpeech({ text, voiceId });
+  const startTime = Date.now();
+  let audioBuffer: Buffer;
+  let service: string;
+  let voiceId: string;
+
+  if (podcast.usePremiumVoice) {
+    // Premium path: use ElevenLabs with custom or pool voice selection
+    const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
+    voiceId = customVoiceId || getVoiceId(speaker, podcastId);
+    const profile = getVoiceProfile(voiceId);
+
+    logger.info('Using premium voice (ElevenLabs)', {
+      speaker,
+      voiceName: profile?.name ?? 'custom',
+      voiceId,
+      podcastId,
+    });
+
+    const premiumProvider = createPremiumTtsProvider();
+    audioBuffer = await premiumProvider.generateSpeech({ text, voiceId });
+    service = 'elevenlabs';
+  } else {
+    // Standard path: use OpenAI TTS (default, 90% cheaper)
+    const standardProvider = createTtsProvider('openai');
+    voiceId = standardProvider.getVoiceId(speaker, podcastId);
+
+    logger.info('Using standard voice (OpenAI)', {
+      speaker,
+      voiceId,
+      podcastId,
+    });
+
+    audioBuffer = await standardProvider.generateSpeech({ text, voiceId });
+    service = 'openai_tts';
+  }
+
+  const durationMs = Date.now() - startTime;
 
   await job.updateProgress(60);
 
@@ -32,6 +66,24 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   await prisma.segment.update({
     where: { id: segmentId },
     data: { audioUrl },
+  });
+
+  // Log TTS cost
+  const charCount = text.length;
+  const costPerKChar = service === 'elevenlabs' ? getElevenLabsPerKCharRate() : getOpenAiPerKCharRate();
+  const totalCost = (charCount / 1000) * costPerKChar;
+
+  await prisma.apiUsageLog.create({
+    data: {
+      podcastId,
+      userId: podcast.userId,
+      service,
+      category: 'audio_generation',
+      inputTokens: charCount,
+      totalCost,
+      durationMs,
+      metadata: { voiceId, speaker },
+    },
   });
 
   await job.updateProgress(90);
@@ -61,5 +113,5 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   }
 
   await job.updateProgress(100);
-  logger.info('Audio generation complete for segment', { podcastId, segmentId });
+  logger.info('Audio generation complete for segment', { podcastId, segmentId, service });
 }
