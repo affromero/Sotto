@@ -146,3 +146,23 @@ export const twitterSettingsSchema = z.object({
   preferredHostVoiceId: z.string().nullable().optional(),
   preferredExpertVoiceId: z.string().nullable().optional(),
 });
+
+/**
+ * Listening queue validation
+ */
+export const addToQueueSchema = z.object({
+  podcastId: z.string(),
+  source: z.enum(['picks', 'explore', 'following', 'search']).default('explore'),
+});
+
+export const reorderQueueSchema = z.object({
+  podcastId: z.string(),
+  newPosition: z.number().int().min(0),
+});
+
+/**
+ * Picks refresh validation
+ */
+export const refreshPicksSchema = z.object({
+  refreshBatch: z.number().int().min(0).default(0),
+});

@@ -2,12 +2,14 @@ import { createAIProvider, type AIProvider } from './ai';
 import { createTtsProvider, type TtsProvider } from './tts';
 import { createStorageProvider, type StorageProvider } from './storage';
 import { createPaymentProvider, type PaymentProvider } from './payment';
+import { createMLProvider, type MLProvider } from './ml';
 
 export interface Providers {
   ai: AIProvider;
   tts: TtsProvider;
   storage: StorageProvider;
   payment: PaymentProvider;
+  ml: MLProvider;
 }
 
 let _providers: Providers | null = null;
@@ -26,6 +28,7 @@ export function getProviders(): Providers {
       tts: createTtsProvider(),
       storage: createStorageProvider(),
       payment: createPaymentProvider(),
+      ml: createMLProvider(),
     };
   }
   return _providers;
@@ -36,9 +39,11 @@ export type { AIProvider, ChatMessage, AIOptions, AIResponse } from './ai';
 export type { TtsProvider, SpeechParams, SfxParams } from './tts';
 export type { StorageProvider } from './storage';
 export type { PaymentProvider, TierLimits, CheckoutParams } from './payment';
+export type { MLProvider, RecommendationSignals, ScoredPodcast } from './ml';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
 export { createTtsProvider, createPremiumTtsProvider } from './tts';
 export { createStorageProvider } from './storage';
 export { createPaymentProvider } from './payment';
+export { createMLProvider } from './ml';

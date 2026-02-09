@@ -13,6 +13,9 @@ import { processPdfGeneration } from './pdf-generation.worker';
 import { processTwitterMentions } from './twitter-mentions.worker';
 import { processScriptVerification } from './script-verification.worker';
 import { processTwitterReply } from './twitter-reply.worker';
+import { processEventIngestion } from './event-ingestion.worker';
+import { processFeatureComputation } from './feature-computation.worker';
+import { processDataExport } from './data-export.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -30,6 +33,9 @@ const workers = [
   createWorker('pdf-generation', processPdfGeneration, { concurrency: 2 }),
   createWorker('twitter-mentions', processTwitterMentions, { concurrency: 1 }),
   createWorker('twitter-reply', processTwitterReply, { concurrency: 2 }),
+  createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
+  createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
+  createWorker('data-export', processDataExport, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

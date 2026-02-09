@@ -1,12 +1,26 @@
+'use client';
+
+import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
+import { useTrack } from '@/components/providers/EventProvider';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastCard.module.css';
 
 interface PodcastCardProps {
   podcast: PodcastSummary;
   onPlay?: (id: string) => void;
+  position?: number;
+  feedSort?: string;
+  searchQuery?: string;
+  observeRef?: (
+    el: HTMLElement | null,
+    podcastId: string,
+    position: number,
+    feedSort?: string,
+    searchQuery?: string
+  ) => void;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -39,15 +53,49 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-export function PodcastCard({ podcast, onPlay }: PodcastCardProps) {
+export function PodcastCard({
+  podcast,
+  onPlay,
+  position = 0,
+  feedSort,
+  searchQuery,
+  observeRef,
+}: PodcastCardProps) {
+  const track = useTrack();
+  const mountTimeRef = useRef(0);
   const duration = formatDuration(podcast.duration);
 
+  useEffect(() => {
+    mountTimeRef.current = Date.now();
+  }, []);
+
+  const cardRef = useCallback(
+    (el: HTMLElement | null) => {
+      if (observeRef && el) {
+        observeRef(el, podcast.id, position, feedSort, searchQuery);
+      }
+    },
+    [observeRef, podcast.id, position, feedSort, searchQuery]
+  );
+
+  const handleClick = useCallback(() => {
+    track({
+      eventType: 'feed.click',
+      podcastId: podcast.id,
+      position,
+      feedSort,
+      searchQuery,
+      dwellTimeMs: Date.now() - mountTimeRef.current,
+    });
+  }, [track, podcast.id, position, feedSort, searchQuery]);
+
   return (
-    <article className={styles.card}>
+    <article className={styles.card} ref={cardRef}>
       <Link
         href={`/podcast/${podcast.id}`}
         className={styles.cardLink}
         aria-label={`Listen to ${podcast.title} by ${podcast.user.name || 'Unknown'}`}
+        onClick={handleClick}
       >
         <div className={styles.header}>
           <h3 className={styles.title}>{podcast.title}</h3>
