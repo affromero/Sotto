@@ -531,7 +531,7 @@ docker compose -f docker-compose.prod.yml logs postgres --tail 50
 Prisma needs to create the tables in PostgreSQL:
 
 ```bash
-docker compose -f docker-compose.prod.yml run --rm web ./node_modules/.bin/prisma db push
+docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push
 ```
 
 Expected output:
@@ -780,7 +780,7 @@ On every push to `main`:
    - SSHes into the server as `sotto`
    - `git pull origin main`
    - `docker compose build`
-   - `./node_modules/.bin/prisma db push` (apply any schema changes)
+   - `docker compose --profile migration run --rm migrate npx prisma db push` (apply any schema changes)
    - `docker compose up -d` (restart with new images)
    - Health check
    - Prunes old Docker images
@@ -1109,7 +1109,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 cd ~/sotto && git pull origin main && docker compose -f docker-compose.prod.yml up -d --build
 
 # Run database migrations after schema changes
-docker compose -f docker-compose.prod.yml run --rm web ./node_modules/.bin/prisma db push
+docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push
 ```
 
 ### Caddy (Reverse Proxy / HTTPS)
