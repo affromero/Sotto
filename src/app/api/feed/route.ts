@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
       take: 20,
       include: {
-        user: { select: { id: true, name: true, image: true } },
+        user: { select: { id: true, name: true, image: true, role: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
       },
     });
@@ -163,7 +163,7 @@ export async function GET(request: NextRequest) {
       skip,
       take: limit,
       include: {
-        user: { select: { id: true, name: true, image: true } },
+        user: { select: { id: true, name: true, image: true, role: true } },
         tags: { include: { tag: true } },
       },
     }),

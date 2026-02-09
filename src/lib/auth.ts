@@ -5,6 +5,14 @@ import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
 import { prisma } from './prisma';
 
+function isAdminEmail(email: string): boolean {
+  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   providers: [
@@ -43,11 +51,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async linkAccount({ user, account, profile }) {
       if (account.provider === 'twitter' && user.id) {
-        // profile.data.username contains the Twitter handle (e.g. "sottofm").
-        // NextAuth v5 Twitter provider exposes it on the profile object.
         const twitterHandle =
-          (profile as Record<string, unknown>)?.username as string | undefined ??
-          (profile as Record<string, unknown>)?.screen_name as string | undefined;
+          ((profile as Record<string, unknown>)?.username as string | undefined) ??
+          ((profile as Record<string, unknown>)?.screen_name as string | undefined);
 
         await prisma.user.update({
           where: { id: user.id },
@@ -63,13 +69,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.role = token.role ?? 'USER';
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.sub = user.id;
       }
+
+      // On sign-in or session update, fetch role from DB
+      if ((user || trigger === 'update') && token.sub) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { email: true, role: true },
+        });
+
+        if (dbUser) {
+          // Auto-assign ADMIN role if email is in admin list
+          if (dbUser.email && isAdminEmail(dbUser.email) && dbUser.role !== 'ADMIN') {
+            await prisma.user.update({
+              where: { id: token.sub },
+              data: { role: 'ADMIN' },
+            });
+            token.role = 'ADMIN';
+          } else {
+            token.role = dbUser.role;
+          }
+        }
+      }
+
       return token;
     },
   },

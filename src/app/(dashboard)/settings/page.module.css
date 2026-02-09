@@ -95,6 +95,40 @@
   color: var(--color-text-tertiary);
 }
 
+.avatarUploadBtn {
+  appearance: none;
+  background: transparent;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.avatarUploadBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.avatarUploadBtn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.avatarUploadBtn:disabled {
+  cursor: not-allowed;
+}
+
+.avatarUploading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 /* Textarea Field */
 
 .fieldGroup {

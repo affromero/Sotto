@@ -11,6 +11,7 @@ const updateUserSchema = z
       .pipe(z.string().min(1).max(100))
       .optional(),
     bio: z.string().max(500).optional(),
+    image: z.string().url().optional(),
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
   })

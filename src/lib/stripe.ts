@@ -61,18 +61,43 @@ export const TIER_LIMITS = {
     canViewAnalytics: true,
     canExportPdf: true,
   },
+  ADMIN: {
+    podcastsPerMonth: Infinity,
+    maxDurationMinutes: 60,
+    interactionsPerPodcast: Infinity,
+    premiumVoiceCredits: Infinity,
+    maxVoiceClones: Infinity,
+    hasPremiumSfx: true,
+    canDownload: true,
+    canMakePrivate: true,
+    canBrowseVoiceLibrary: true,
+    canListOnMarketplace: true,
+    canViewAnalytics: true,
+    canExportPdf: true,
+  },
 } as const;
 
 export type TierName = keyof typeof TIER_LIMITS;
+
+/**
+ * Get effective tier limits considering user role.
+ * ADMIN role always gets ADMIN tier regardless of subscription.
+ */
+export function getEffectiveTier(subscriptionTier: TierName, userRole?: string): TierName {
+  if (userRole === 'ADMIN') return 'ADMIN';
+  return subscriptionTier;
+}
 
 /**
  * Check if user can create a new podcast
  */
 export function canCreatePodcast(
   tier: TierName,
-  podcastsUsed: number
+  podcastsUsed: number,
+  userRole?: string
 ): { allowed: boolean; reason?: string } {
-  const limits = TIER_LIMITS[tier];
+  const effectiveTier = getEffectiveTier(tier, userRole);
+  const limits = TIER_LIMITS[effectiveTier];
   if (podcastsUsed >= limits.podcastsPerMonth) {
     return {
       allowed: false,
@@ -87,13 +112,15 @@ export function canCreatePodcast(
  */
 export function canInteract(
   tier: TierName,
-  interactionCount: number
+  interactionCount: number,
+  userRole?: string
 ): { allowed: boolean; reason?: string } {
-  const limits = TIER_LIMITS[tier];
+  const effectiveTier = getEffectiveTier(tier, userRole);
+  const limits = TIER_LIMITS[effectiveTier];
   if (interactionCount >= limits.interactionsPerPodcast) {
     return {
       allowed: false,
-      reason: `${tier === 'FREE' ? 'Free' : tier === 'PRO' ? 'Pro' : 'Creator'} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
+      reason: `${effectiveTier === 'FREE' ? 'Free' : effectiveTier === 'PRO' ? 'Pro' : 'Creator'} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
     };
   }
   return { allowed: true };

@@ -8,6 +8,7 @@ interface AuthUser {
   name: string | null;
   email: string | null;
   image: string | null;
+  role: string;
 }
 
 interface UseAuthReturn {
@@ -30,6 +31,7 @@ export function useAuth(): UseAuthReturn {
         name: session.user.name ?? null,
         email: session.user.email ?? null,
         image: session.user.image ?? null,
+        role: ((session.user as Record<string, unknown>).role as string) ?? 'USER',
       }
     : null;
 

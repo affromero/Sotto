@@ -1,3 +1,5 @@
+import Image from 'next/image';
+import { Badge } from '@/components/ui/Badge';
 import { FollowButton } from './FollowButton';
 import { FollowerCount } from './FollowerCount';
 import styles from './ProfileHeader.module.css';
@@ -8,6 +10,7 @@ interface ProfileUser {
   image: string | null;
   bio: string | null;
   createdAt: string;
+  role?: string;
 }
 
 interface ProfileHeaderProps {
@@ -54,7 +57,7 @@ export function ProfileHeader({
     <section className={styles.root} aria-label="User profile">
       <div className={styles.avatarColumn}>
         {user.image ? (
-          <img
+          <Image
             src={user.image}
             alt={`${user.name || 'User'}'s avatar`}
             className={styles.avatar}
@@ -74,7 +77,11 @@ export function ProfileHeader({
 
       <div className={styles.infoColumn}>
         <div className={styles.nameRow}>
-          <h1 className={styles.name}>{user.name || 'Anonymous'}</h1>
+          <h1 className={styles.name}>
+            {user.name || 'Anonymous'}
+            {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
+            {user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
+          </h1>
           <div className={styles.action}>
             {isOwnProfile ? (
               onEdit && (
@@ -102,8 +109,7 @@ export function ProfileHeader({
         </div>
 
         <p className={styles.memberSince}>
-          Member since{' '}
-          <time dateTime={user.createdAt}>{formatMemberSince(user.createdAt)}</time>
+          Member since <time dateTime={user.createdAt}>{formatMemberSince(user.createdAt)}</time>
         </p>
       </div>
     </section>

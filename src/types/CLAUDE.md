@@ -4,21 +4,24 @@ Shared types used across the application. These mirror Prisma models but are sha
 
 ## File Index
 
-| File | Contents |
-|------|---------|
-| `podcast.ts` | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`), SegmentData, CreatePodcastRequest |
-| `player.ts` | PlayerState, PlayerControls |
-| `interaction.ts` | InteractionRequest, InteractionResponse, ResolutionChoice |
-| `feed.ts` | FeedResponse, FeedSort, FeedFilters |
-| `discovery.ts` | DiscoveryMessage, DiscoveryMetadata, DiscoveryState |
-| `notification.ts` | NotificationData, PushSubscriptionData |
-| `reference.ts` | ReferenceData (id, number, title, authors, year, url, type, publisher, doi) |
-| `analytics.ts` | UsageStats, AnalyticsData, CostBreakdown |
-| `api-key.ts` | ApiKeyData, CreateKeyRequest, KeyListResponse |
-| `team.ts` | TeamData, TeamInviteData, TeamMember |
-| `twitter.ts` | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData |
+| File              | Contents                                                                                           |
+| ----------------- | -------------------------------------------------------------------------------------------------- |
+| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`), SegmentData, CreatePodcastRequest |
+| `player.ts`       | PlayerState, PlayerControls                                                                        |
+| `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                          |
+| `feed.ts`         | FeedResponse, FeedSort, FeedFilters                                                                |
+| `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                |
+| `notification.ts` | NotificationData, PushSubscriptionData                                                             |
+| `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                        |
+| `analytics.ts`    | UsageStats, AnalyticsData, CostBreakdown                                                           |
+| `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                      |
+| `team.ts`         | TeamData, TeamInviteData, TeamMember                                                               |
+| `twitter.ts`      | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData              |
+| `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput           |
+| `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                     |
 
 ## Rules
+
 - Types here are for **API responses and component props** — not Prisma models
 - Prisma types are auto-generated and imported from `@prisma/client`
 - Keep types flat — avoid deep nesting

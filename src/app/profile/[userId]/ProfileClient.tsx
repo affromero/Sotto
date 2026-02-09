@@ -13,6 +13,7 @@ interface ProfileUser {
   image: string | null;
   bio: string | null;
   createdAt: string;
+  role?: string;
 }
 
 interface ProfileClientProps {

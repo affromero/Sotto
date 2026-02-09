@@ -326,7 +326,7 @@ describe('GET /api/feed', () => {
     expect(mockPrisma.podcast.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         include: expect.objectContaining({
-          user: { select: { id: true, name: true, image: true } },
+          user: { select: { id: true, name: true, image: true, role: true } },
           tags: { include: { tag: true } },
         }),
       })
