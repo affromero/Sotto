@@ -1,0 +1,319 @@
+{
+  "brand": {
+    "name": "Sotto",
+    "tagline": "Podcasts that listen back.",
+    "origin": "From 'sotto voce' — soft voice in Italian",
+    "elevator_pitch": "Generate AI podcasts from any topic, interrupt to ask questions mid-playback, and share knowledge with the world. Think NotebookLM meets social media.",
+    "url": "https://sotto.fm",
+    "twitter_handle": "@sottofm",
+    "twitter_bot": "@sottofm",
+    "twitter_bot_cta": "Tweet @sottofm to generate a podcast about anything"
+  },
+
+  "voice": {
+    "personality": [
+      "Curious and knowledge-hungry — we genuinely love learning",
+      "Warm but sharp — approachable with substance",
+      "Builder energy — we ship, we iterate, we share the journey",
+      "Democratizing — knowledge should be accessible, not gatekept",
+      "Slightly irreverent — we respect expertise but not pretension"
+    ],
+    "tone_spectrum": {
+      "educational": "Clear, generous, 'let me show you something cool'",
+      "product": "Confident but not pushy, show don't tell",
+      "behind_the_scenes": "Honest, raw, founder-mode energy",
+      "engagement": "Warm, curious, asking real questions",
+      "thought_leadership": "Informed, opinionated but open-minded"
+    },
+    "do": [
+      "Use 'we' for the team, 'you' for the user — never 'users'",
+      "Lead with the insight, not the product",
+      "Show real examples and demos over descriptions",
+      "Acknowledge what exists (NotebookLM etc.) and explain what's different",
+      "Use conversational language — write like you talk",
+      "Reference specific use cases (researchers, students, curious minds, creators)",
+      "Celebrate the community — retweet, quote, amplify",
+      "Be transparent about what's building vs what's live"
+    ],
+    "dont": [
+      "Never say 'revolutionary', 'game-changing', 'disruptive', or 'leverage'",
+      "Never disparage competitors directly — differentiate on features",
+      "Never make claims about features that don't exist yet",
+      "Never use corporate jargon ('synergy', 'ecosystem', 'paradigm')",
+      "Never sound like a press release",
+      "Never promise timelines publicly",
+      "Avoid generic AI hype — be specific about what Sotto does",
+      "Don't use 'users' — say 'listeners', 'creators', 'people', or 'you'"
+    ],
+    "signature_phrases": [
+      "Podcasts that listen back",
+      "What if your podcast could answer questions?",
+      "Turn any idea into a conversation worth hearing",
+      "Knowledge you can interrupt",
+      "The podcast that pauses for you",
+      "From curiosity to conversation in minutes",
+      "Tweet it. Hear it. Share it."
+    ]
+  },
+
+  "audience": {
+    "personas": [
+      {
+        "name": "The Curious Learner",
+        "description": "Wants to understand complex topics without reading 50 papers. Listens to podcasts on commute. Values depth over surface-level summaries.",
+        "platforms": ["Twitter/X", "Reddit", "YouTube"],
+        "hook_angles": [
+          "Learn [complex topic] in 10 minutes — just ask when you're confused",
+          "Turned a Wikipedia rabbit hole into a podcast I can actually finish",
+          "What if you could interrupt your podcast to ask 'wait, what?'"
+        ],
+        "pain_points": ["Information overload", "Podcasts can't answer questions", "Papers are dense"]
+      },
+      {
+        "name": "The Content Creator",
+        "description": "Wants to repurpose content into new formats. Thinks in audience growth and engagement. Always looking for new distribution channels.",
+        "platforms": ["Twitter/X", "TikTok", "Newsletter"],
+        "hook_angles": [
+          "I turned my blog post into a 2-voice podcast in 3 minutes",
+          "New content format just dropped: interactive podcasts your audience can interrupt",
+          "The laziest way to start a podcast (it's also the best)"
+        ],
+        "pain_points": ["Content repurposing is manual", "Starting a podcast is hard", "Engagement metrics plateau"]
+      },
+      {
+        "name": "The Researcher / Student",
+        "description": "Needs to absorb academic content efficiently. Values citations and references. Wants to study on the go.",
+        "platforms": ["Twitter/X", "Reddit (r/MachineLearning, r/science)", "LinkedIn"],
+        "hook_angles": [
+          "Fed it my professor's paper. Got a podcast that actually explains the methodology.",
+          "Study hack: turn your textbook chapter into a conversation, then quiz yourself by interrupting",
+          "Sotto generates cited podcasts — every claim links back to source material"
+        ],
+        "pain_points": ["Reading fatigue", "Can't study while commuting", "Papers lack context"]
+      },
+      {
+        "name": "The Builder / Founder",
+        "description": "Ships fast, learns publicly. Interested in AI tools, productivity, and building in public. Follows indie hackers and maker communities.",
+        "platforms": ["Twitter/X", "Hacker News", "Product Hunt", "Indie Hackers"],
+        "hook_angles": [
+          "We built a podcast platform where you can interrupt the hosts. Here's how.",
+          "Day N of building Sotto: [specific technical or product insight]",
+          "The @sottofm Twitter bot generates podcasts from tweets. Here's the architecture."
+        ],
+        "pain_points": ["Keeping up with AI developments", "Content marketing is a time sink", "Want tools that compound"]
+      }
+    ]
+  },
+
+  "content_pillars": [
+    {
+      "id": "interactive-knowledge",
+      "name": "Interactive Knowledge",
+      "description": "The core product value: podcasts you can interrupt, question, and learn from actively rather than passively.",
+      "example_topics": [
+        "Why passive listening isn't learning",
+        "The interrupt feature: how it works",
+        "From monologue to dialogue: the future of audio",
+        "Compare: reading a paper vs. listening to an interactive podcast about it"
+      ]
+    },
+    {
+      "id": "ai-audio-future",
+      "name": "AI + Audio Future",
+      "description": "Thought leadership on where AI-generated audio, voice AI, and podcast technology is headed.",
+      "example_topics": [
+        "AI voices are getting indistinguishable. What does that mean for podcasts?",
+        "The podcast format hasn't changed in 20 years. Until now.",
+        "Why text-to-podcast is the next text-to-video",
+        "Voice cloning for creators: personalize your podcast"
+      ]
+    },
+    {
+      "id": "building-in-public",
+      "name": "Building in Public",
+      "description": "Behind-the-scenes of building Sotto: technical decisions, growth experiments, lessons learned.",
+      "example_topics": [
+        "Our Claude prompt that generates 2-voice scripts",
+        "How we stitched 50 audio segments into one seamless podcast",
+        "Why we chose BullMQ over plain Redis queues",
+        "The @sottofm Twitter bot: from tweet to podcast in 90 seconds"
+      ]
+    },
+    {
+      "id": "creator-tools",
+      "name": "Creator Tools & Workflows",
+      "description": "How creators, educators, and researchers use Sotto. Practical workflows, tips, and integrations.",
+      "example_topics": [
+        "Turn your newsletter into a weekly podcast",
+        "Study workflow: PDF → podcast → interrupt to quiz yourself",
+        "Voice clone your brand: custom podcast voices",
+        "Fork and remix: build on other creators' podcasts"
+      ]
+    },
+    {
+      "id": "social-proof",
+      "name": "Community & Social Proof",
+      "description": "User stories, testimonials, engagement metrics, community highlights.",
+      "example_topics": [
+        "This researcher turned her thesis into a podcast her grandma could follow",
+        "Most popular topics on Sotto this week",
+        "Community spotlight: [creator name]'s podcast series",
+        "Waitlist update: N people signed up this week"
+      ]
+    }
+  ],
+
+  "competitors": {
+    "notebooklm": {
+      "name": "Google NotebookLM",
+      "what_they_do": "Generates 2-voice podcast summaries from uploaded documents (Google Docs, PDFs, URLs)",
+      "strengths": ["Google brand trust", "Free", "Good voice quality", "Deep Dive format is popular"],
+      "weaknesses": ["Not interactive — can't interrupt or ask questions", "No social feed or community", "No voice customization", "Tied to Google ecosystem", "No API or developer access"],
+      "our_differentiation": "Sotto lets you interrupt, ask questions mid-playback, and get answers in context. Plus social feed, fork & remix, voice clones, and the @sottofm Twitter bot."
+    },
+    "wondercraft": {
+      "name": "Wondercraft",
+      "what_they_do": "AI podcast creation platform focused on branded content and advertising",
+      "strengths": ["Ad insertion", "Brand voices", "Enterprise focus"],
+      "weaknesses": ["Not interactive", "Enterprise pricing", "No social/community", "No real-time Q&A"],
+      "our_differentiation": "Sotto is consumer-first, interactive, and social. Wondercraft is B2B ad tech."
+    },
+    "snipd": {
+      "name": "Snipd",
+      "what_they_do": "AI podcast player that creates highlights, chapters, and summaries of existing podcasts",
+      "strengths": ["Good UX", "Works with existing podcasts", "AI summaries"],
+      "weaknesses": ["Only works on existing content — can't generate new podcasts", "No interactivity", "Limited to consumption"],
+      "our_differentiation": "Snipd enhances existing podcasts. Sotto creates new ones from any topic and makes them interactive."
+    },
+    "hume_ai": {
+      "name": "Hume AI (EVI)",
+      "what_they_do": "Emotionally intelligent voice AI for conversational interfaces",
+      "strengths": ["Emotional intelligence", "Real-time voice", "Research-backed"],
+      "weaknesses": ["Not a content platform", "Developer-focused API", "No podcast format"],
+      "our_differentiation": "Hume is infrastructure. Sotto is a product. We could use Hume's voice tech, but we deliver the end-to-end podcast experience."
+    }
+  },
+
+  "design_tokens": {
+    "colors": {
+      "primary": "#D97706",
+      "primary_name": "Golden Amber",
+      "accent": "#1E3A5F",
+      "accent_name": "Deep Navy",
+      "background": "#FEFCF8",
+      "background_name": "Soft Cream",
+      "surface": "#FFFFFF",
+      "text_primary": "#1A1A1A",
+      "text_secondary": "#6B7280"
+    },
+    "fonts": {
+      "heading": "DM Serif Display",
+      "heading_vibe": "Editorial warmth",
+      "body": "Inter",
+      "body_vibe": "Clean readability"
+    },
+    "speaker_colors": {
+      "host": "#D97706",
+      "expert": "#1E3A5F"
+    },
+    "design_system_name": "Warm Intimacy"
+  },
+
+  "pricing": {
+    "tiers": [
+      {
+        "name": "Free",
+        "price": "$0",
+        "podcasts_per_month": 2,
+        "max_duration": "10 min",
+        "interactions_per_podcast": 2,
+        "voice_clones": 0,
+        "cta": "Start free — no credit card needed"
+      },
+      {
+        "name": "Pro",
+        "price": "$14/mo",
+        "podcasts_per_month": 8,
+        "max_duration": "10 min",
+        "interactions_per_podcast": 10,
+        "voice_clones": 2,
+        "cta": "Go Pro for unlimited interrupts"
+      },
+      {
+        "name": "Creator",
+        "price": "$29/mo",
+        "podcasts_per_month": 30,
+        "max_duration": "10 min",
+        "interactions_per_podcast": "Unlimited",
+        "voice_clones": 5,
+        "cta": "Build your podcast empire"
+      }
+    ]
+  },
+
+  "product_status": {
+    "stage": "pre-launch",
+    "last_updated": "2026-02-09",
+    "whats_live": [
+      "Landing page at sotto.fm",
+      "Waitlist signup",
+      "Pricing page",
+      "@sottofm Twitter bot (tweet to generate a podcast)",
+      "Full generation pipeline (chat → script → audio → stitch)",
+      "Interactive playback with interrupt & Q&A",
+      "Social feed with discover, like, save, fork",
+      "User profiles with follow",
+      "Reference validation (4-layer citation verification)",
+      "PDF transcript generation",
+      "Voice diversity (unique voice pairs per podcast)",
+      "Stripe billing integration"
+    ],
+    "whats_building": [
+      "Voice cloning for creators",
+      "Mobile app (iOS)",
+      "API access for developers",
+      "Team workspaces",
+      "Premium sound effects"
+    ],
+    "key_hooks": [
+      "Tweet @sottofm to generate a podcast — already works",
+      "Interrupt your podcast to ask questions — the core differentiator",
+      "Fork and remix other creators' podcasts",
+      "Every claim is cited — references verified through 4 layers",
+      "Free tier: 2 podcasts/month, no credit card"
+    ]
+  },
+
+  "hashtags": {
+    "primary": ["#Sotto", "#SottoFM", "#PodcastsThatListenBack"],
+    "topic": ["#AIPodcast", "#InteractivePodcast", "#AIAudio", "#VoiceAI", "#PodcastAI"],
+    "community": ["#BuildInPublic", "#IndieHackers", "#AITools", "#CreatorEconomy"],
+    "discovery": ["#LearnAnything", "#CuriousMinds", "#KnowledgeSharing"]
+  },
+
+  "channels": {
+    "twitter": {
+      "handle": "@sottofm",
+      "content_types": ["Product demos", "Build in public threads", "Engagement questions", "Quote tweets of bot-generated podcasts", "Memes / relatable content"],
+      "posting_cadence": "2-3x daily",
+      "best_times": ["8:00 AM ET", "12:00 PM ET", "6:00 PM ET"],
+      "notes": "The @sottofm bot IS a marketing channel — every tweet-generated podcast is organic content"
+    },
+    "reddit": {
+      "subreddits": ["r/artificial", "r/MachineLearning", "r/podcasts", "r/productivity", "r/ChatGPT", "r/singularity", "r/SideProject"],
+      "content_types": ["Genuine value posts (not ads)", "Technical deep dives", "Show HN-style posts"],
+      "notes": "Reddit hates self-promotion. Lead with value, mention Sotto only when relevant."
+    },
+    "tiktok_reels": {
+      "content_types": ["Quick demos (30-60s)", "Before/after (topic → podcast)", "React to AI news with Sotto angle"],
+      "notes": "Show, don't tell. Demo the product in action."
+    },
+    "newsletter_seo": {
+      "content_types": ["Weekly 'What We Learned' newsletter", "SEO blog posts targeting 'AI podcast generator'"],
+      "notes": "Long-form content drives organic traffic. Each post should target a search intent."
+    },
+    "product_hunt": {
+      "notes": "Major launch event. Plan 2-4 weeks in advance. Requires maker community prep."
+    }
+  }
+}
