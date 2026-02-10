@@ -55,14 +55,22 @@ if [ ! -f "$PANDOC_TEMPLATE" ]; then
   echo ""
 fi
 
-# ── Step 1: Seed demo data ────────────────────────────────────────
+# ── Step 1: Seed demo data (optional) ────────────────────────────
 echo "=== Step 1: Seed demo data ==="
-npx tsx prisma/seed-demo.ts
+if command -v npx &> /dev/null; then
+  npx tsx prisma/seed-demo.ts || echo "  Warning: seed failed (non-fatal)"
+else
+  echo "  Skipping (npx not available)"
+fi
 echo ""
 
-# ── Step 2: Capture screenshots ───────────────────────────────────
+# ── Step 2: Capture screenshots (optional) ───────────────────────
 echo "=== Step 2: Capture screenshots ==="
-npx tsx scripts/capture-pitch-screenshots.ts
+if command -v npx &> /dev/null; then
+  npx tsx scripts/capture-pitch-screenshots.ts || echo "  Warning: screenshots failed (non-fatal)"
+else
+  echo "  Skipping (npx not available)"
+fi
 echo ""
 
 # ── Step 3: Generate showcase doc ─────────────────────────────────
@@ -161,6 +169,12 @@ echo ""
 # ── Step 4: Build HTML ────────────────────────────────────────────
 echo "=== Step 4: Build HTML ==="
 
+if ! command -v pandoc &> /dev/null; then
+  echo "Error: pandoc not found. Install with: sudo apt install pandoc"
+  echo "Skipping HTML conversion — manifest will not be generated."
+  exit 1
+fi
+
 mkdir -p "$BUILD_DIR"
 
 # Document order (same as update-pitch skill, with 99-app-showcase prepended)
@@ -188,25 +202,25 @@ DOCS=(
   "deploy-sotto-fm.md:Deployment Guide"
 )
 
-# Build pandoc options
-PANDOC_OPTS="--standalone --embed-resources --resource-path=docs/"
+# Build pandoc options (array to preserve quoting)
+PANDOC_OPTS=(--standalone --embed-resources --resource-path=docs/)
 
 if [ -f "$PANDOC_TEMPLATE" ]; then
-  PANDOC_OPTS="$PANDOC_OPTS --template=$PANDOC_TEMPLATE"
+  PANDOC_OPTS+=(--template="$PANDOC_TEMPLATE")
   echo "Using template: $PANDOC_TEMPLATE"
 fi
 
 if [ -f "$DOWNLOAD_IMAGES_FILTER" ]; then
-  PANDOC_OPTS="$PANDOC_OPTS --lua-filter=$DOWNLOAD_IMAGES_FILTER"
+  PANDOC_OPTS+=(--lua-filter="$DOWNLOAD_IMAGES_FILTER")
   echo "Using filter: $DOWNLOAD_IMAGES_FILTER"
 fi
 
 # Warm Amber palette variables (matching Sotto design system)
-PANDOC_OPTS="$PANDOC_OPTS -V primary-color=#D97706 -V accent-color=#1E3A5F"
-PANDOC_OPTS="$PANDOC_OPTS -V bg-color=#FEFCF8 -V surface-color=#FFFFFF"
-PANDOC_OPTS="$PANDOC_OPTS -V text-color=#1A1A1A -V muted-color=#6B7280"
-PANDOC_OPTS="$PANDOC_OPTS -V heading-font='DM Serif Display' -V body-font=Inter"
-PANDOC_OPTS="$PANDOC_OPTS --mathml --highlight-style=tango"
+PANDOC_OPTS+=(-V primary-color=#D97706 -V accent-color=#1E3A5F)
+PANDOC_OPTS+=(-V bg-color=#FEFCF8 -V surface-color=#FFFFFF)
+PANDOC_OPTS+=(-V text-color=#1A1A1A -V muted-color=#6B7280)
+PANDOC_OPTS+=(-V "heading-font=DM Serif Display" -V body-font=Inter)
+PANDOC_OPTS+=(--mathml --highlight-style=tango)
 
 converted=0
 skipped=0
@@ -230,7 +244,7 @@ for entry in "${DOCS[@]}"; do
   fi
 
   echo "  Converting: $filename → $html_name"
-  pandoc $PANDOC_OPTS \
+  pandoc "${PANDOC_OPTS[@]}" \
     --metadata title="$doc_title" \
     -o "$dest" \
     "$src" 2>/dev/null || {
