@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "Setting up Sotto..."
 
-# Install system dependencies (node, docker, uv, pandoc)
-bash "$SCRIPT_DIR/install-deps.sh"
+# Install all system dependencies (node, docker, uv, pandoc)
+bash "$SCRIPT_DIR/install-deps.sh" --all
 
 # Install Node.js dependencies
 echo "Installing Node.js dependencies..."
