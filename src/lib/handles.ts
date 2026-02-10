@@ -1,4 +1,7 @@
 import { prisma } from './prisma';
+import { generateResponse } from './claude';
+import { cache } from './redis';
+import { logger } from './logger';
 
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/;
 
@@ -60,18 +63,63 @@ const RESERVED_HANDLES = new Set([
   'no_reply',
   'mailer',
   'daemon',
-  // Profanity (minimal set — extend as needed)
-  'fuck',
-  'shit',
-  'ass',
-  'bitch',
-  'dick',
-  'porn',
-  'xxx',
-  'nazi',
-  'nigger',
-  'faggot',
 ]);
+
+const HANDLE_CHECK_CACHE_PREFIX = 'handle:check:';
+const HANDLE_CHECK_CACHE_TTL = 60 * 60 * 24 * 30; // 30 days
+
+type HandleCheckResult = 'NAME' | 'OFFENSIVE' | 'OK';
+
+/**
+ * LLM-based handle screening: catches common first names (premium)
+ * and profane/offensive content in one call. Results cached in Redis.
+ * Fails open — if the LLM or Redis is unavailable, allows the handle.
+ */
+export async function checkHandleContent(handle: string): Promise<HandleCheckResult> {
+  const normalized = handle.toLowerCase();
+
+  // Handles with underscores/digits are unlikely plain names or slurs
+  if (normalized.includes('_') || /\d/.test(normalized)) {
+    return 'OK';
+  }
+
+  try {
+    const cacheKey = `${HANDLE_CHECK_CACHE_PREFIX}${normalized}`;
+    const cached = await cache.get<HandleCheckResult>(cacheKey);
+    if (cached !== null) return cached;
+
+    const { content } = await generateResponse(
+      'Classify the word into exactly one category. Answer with a single word: NAME, OFFENSIVE, or OK. Nothing else.',
+      [
+        {
+          role: 'user',
+          content: `Classify "${normalized}":\n- NAME if it is a common given name (first name) in any language or culture\n- OFFENSIVE if it is profane, vulgar, a slur, hate speech, or sexually explicit\n- OK otherwise`,
+        },
+      ],
+      { maxTokens: 3, model: 'claude-haiku-4-5-20251001' }
+    );
+
+    const answer = content.trim().toUpperCase();
+    const result: HandleCheckResult = answer.startsWith('NAME')
+      ? 'NAME'
+      : answer.startsWith('OFFENSIVE')
+        ? 'OFFENSIVE'
+        : 'OK';
+    await cache.set(cacheKey, result, HANDLE_CHECK_CACHE_TTL);
+    return result;
+  } catch (err) {
+    logger.warn('Handle content check failed, allowing handle', {
+      handle: normalized,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return 'OK';
+  }
+}
+
+/** @deprecated Use checkHandleContent instead */
+export async function isPremiumHandle(handle: string): Promise<boolean> {
+  return (await checkHandleContent(handle)) === 'NAME';
+}
 
 export function isValidHandleFormat(handle: string): boolean {
   return HANDLE_REGEX.test(handle);
@@ -110,6 +158,14 @@ export async function isHandleAvailable(
 
   if (isHardcodedReserved(normalized)) {
     return { available: false, reason: 'This handle is reserved' };
+  }
+
+  const contentCheck = await checkHandleContent(normalized);
+  if (contentCheck === 'NAME') {
+    return { available: false, reason: 'This handle is already taken' };
+  }
+  if (contentCheck === 'OFFENSIVE') {
+    return { available: false, reason: 'This handle is not allowed' };
   }
 
   if (await isDbReserved(normalized)) {
