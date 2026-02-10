@@ -28,6 +28,7 @@ export default async function SettingsPage() {
         twitterEnabled: true,
         preferredHostVoiceId: true,
         preferredExpertVoiceId: true,
+        elevenLabsApiKey: true,
       },
     }),
     prisma.account.findMany({
@@ -81,6 +82,7 @@ export default async function SettingsPage() {
         voiceClones={voiceClones}
         interestTags={allTags}
         selectedInterestTagIds={selectedInterestTagIds}
+        hasByokKey={!!user.elevenLabsApiKey}
       />
     </main>
   );

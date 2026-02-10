@@ -7,6 +7,7 @@ export interface SpeechParams {
   stability?: number;
   similarityBoost?: number;
   style?: number;
+  apiKeyOverride?: string;
 }
 
 export interface SfxParams {
@@ -26,6 +27,11 @@ export interface TtsProvider {
  */
 class ElevenLabsProvider implements TtsProvider {
   private clientPromise: Promise<typeof import('../elevenlabs')> | null = null;
+  private byokApiKey: string | undefined;
+
+  constructor(byokApiKey?: string) {
+    this.byokApiKey = byokApiKey;
+  }
 
   private async getClient() {
     if (!this.clientPromise) {
@@ -36,7 +42,8 @@ class ElevenLabsProvider implements TtsProvider {
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const el = await this.getClient();
-    return el.generateSpeech(params);
+    const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
+    return el.generateSpeech({ ...params, apiKeyOverride });
   }
 
   async generateSoundEffect(params: SfxParams): Promise<Buffer> {
@@ -46,8 +53,8 @@ class ElevenLabsProvider implements TtsProvider {
 
   getVoiceId(speaker: 'HOST' | 'EXPERT', _podcastId?: string): string {
     return speaker === 'HOST'
-      ? (process.env.ELEVENLABS_VOICE_HOST || 'pNInz6obpgDQGcFmaJgB')
-      : (process.env.ELEVENLABS_VOICE_EXPERT || 'ErXwobaYiN019PkySvjV');
+      ? process.env.ELEVENLABS_VOICE_HOST || 'pNInz6obpgDQGcFmaJgB'
+      : process.env.ELEVENLABS_VOICE_EXPERT || 'ErXwobaYiN019PkySvjV';
   }
 }
 
@@ -67,9 +74,11 @@ class OpenAITtsProvider implements TtsProvider {
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const client = await this.getClient();
-    const voice = (this.voices.includes(params.voiceId as (typeof this.voices)[number])
-      ? params.voiceId
-      : 'alloy') as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+    const voice = (
+      this.voices.includes(params.voiceId as (typeof this.voices)[number])
+        ? params.voiceId
+        : 'alloy'
+    ) as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 
     const response = await client.audio.speech.create({
       model: 'tts-1-hd',
@@ -107,7 +116,8 @@ export function createTtsProvider(type?: string): TtsProvider {
 /**
  * Get the premium (ElevenLabs) TTS provider.
  * Always returns ElevenLabs regardless of TTS_PROVIDER env var.
+ * Pass a BYOK API key to use the user's own ElevenLabs account.
  */
-export function createPremiumTtsProvider(): TtsProvider {
-  return new ElevenLabsProvider();
+export function createPremiumTtsProvider(byokApiKey?: string): TtsProvider {
+  return new ElevenLabsProvider(byokApiKey);
 }

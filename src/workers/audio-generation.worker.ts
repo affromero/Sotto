@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
 import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
 import { getElevenLabsPerKCharRate, getOpenAiPerKCharRate } from '@/lib/elevenlabs';
+import { getByokKey } from '@/lib/byok';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { logger } from '@/lib/logger';
@@ -39,7 +40,10 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   let service: string;
   let voiceId: string;
 
-  if (podcast.usePremiumVoice) {
+  // Check for BYOK key — user provides their own ElevenLabs API key
+  const byokKey = await getByokKey(podcast.userId);
+
+  if (podcast.usePremiumVoice || byokKey) {
     // Premium path: use ElevenLabs with custom or pool voice selection
     const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
     voiceId = customVoiceId || getVoiceId(speaker, podcastId);
@@ -50,11 +54,12 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       voiceName: profile?.name ?? 'custom',
       voiceId,
       podcastId,
+      byok: !!byokKey,
     });
 
-    const premiumProvider = createPremiumTtsProvider();
+    const premiumProvider = createPremiumTtsProvider(byokKey ?? undefined);
     audioBuffer = await premiumProvider.generateSpeech({ text, voiceId });
-    service = 'elevenlabs';
+    service = byokKey ? 'elevenlabs_byok' : 'elevenlabs';
   } else {
     // Standard path: use OpenAI TTS (default, 90% cheaper)
     const standardProvider = createTtsProvider('openai');
