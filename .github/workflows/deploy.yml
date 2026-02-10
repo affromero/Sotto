@@ -111,6 +111,7 @@ jobs:
         run: |
           COMMIT_MSG=$(git log -1 --format='%s')
           COMMIT_SHA=$(git log -1 --format='%h')
+          PREV_SHA=$(git log -1 --format='%h' HEAD~1)
           AUTHOR=$(git log -1 --format='%an')
 
           if [ "$DEPLOY_STATUS" = "success" ] || [ "$DEPLOY_STATUS" = "" ]; then
@@ -155,7 +156,7 @@ jobs:
           fi
 
           TEXT="${EMOJI} <b>sotto.fm ${STATUS}</b>
-          Commit: <code>${COMMIT_SHA}</code> ${COMMIT_MSG}
+          <code>${PREV_SHA}</code> → <code>${COMMIT_SHA}</code> ${COMMIT_MSG}
           By: ${AUTHOR}
           ${PITCH_LINE}
           ${HEALTH_LINE}
