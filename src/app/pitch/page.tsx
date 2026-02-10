@@ -5,7 +5,7 @@ import styles from './page.module.css';
 import type { PitchManifest, PitchDocument } from '@/types/pitch';
 
 export default function PitchPage() {
-  const [state, setState] = useState<'loading' | 'locked' | 'unlocked'>('loading');
+  const [state, setState] = useState<'loading' | 'locked' | 'unlocked' | 'empty'>('loading');
   const [manifest, setManifest] = useState<PitchManifest | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string>('');
   const [docIndex, setDocIndex] = useState(0);
@@ -65,6 +65,10 @@ export default function PitchPage() {
       const res = await fetch('/api/pitch/manifest');
       if (res.status === 401) {
         setState('locked');
+        return;
+      }
+      if (res.status === 404) {
+        setState('empty');
         return;
       }
       if (!res.ok) {
@@ -149,6 +153,20 @@ export default function PitchPage() {
             </button>
             {error && <p className={styles.error}>{error}</p>}
           </form>
+        </div>
+      </main>
+    );
+  }
+
+  if (state === 'empty') {
+    return (
+      <main className={styles.main}>
+        <div className={styles.gateContainer}>
+          <h1 className={styles.logo}>Sotto</h1>
+          <p className={styles.subtitle}>Investor Materials</p>
+          <p className={styles.subtitle}>
+            No pitch builds yet. Run the rebuild pipeline to generate.
+          </p>
         </div>
       </main>
     );
