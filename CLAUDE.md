@@ -1,31 +1,33 @@
 # CLAUDE.md — Sotto
 
-> **Sotto** — Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.
+> **Sotto** — The Open Podcast Network. Generate AI podcasts from any topic, interrupt to ask questions, fork & remix, import existing content, and share knowledge with the world.
 
 ## What is Sotto?
 
-Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast platform where:
+Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network where:
 
 1. Users chat with AI to describe what they want to learn → AI generates a 2-voice conversational podcast
 2. Users can **interrupt mid-playback** to ask questions → AI answers in context
 3. Podcasts can be **updated** with Q&A explanations baked in
-4. Public podcasts on a **social feed** — discover, listen, fork, follow creators
+4. **Fork any podcast** — remix with your own angle, build on others' work
+5. **Import any podcast** — human or AI-made — and add social features on top
+6. Public podcasts on a **social feed** — discover, listen, fork, follow creators
 
 ## Tech Stack
 
-| Layer     | Technology                                                                                                            |
-| --------- | --------------------------------------------------------------------------------------------------------------------- |
-| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                                       |
-| Database  | PostgreSQL 16 + Prisma ORM                                                                                            |
-| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                                        |
-| Queue     | Redis 7 + BullMQ (11 worker types)                                                                                    |
-| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                               |
-| Audio     | Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) — BYOK or platform, resolved via `resolveTtsProvider` |
-| Stitching | FFmpeg (segment concatenation + normalization)                                                                        |
-| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                                      |
-| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69) — swappable via `PAYMENT_PROVIDER`                              |
-| PDF       | pdfmake (server-side transcript PDF generation)                                                                       |
-| Hosting   | Vercel (web) + Railway (workers)                                                                                      |
+| Layer     | Technology                                                                                               |
+| --------- | -------------------------------------------------------------------------------------------------------- |
+| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                          |
+| Database  | PostgreSQL 16 + Prisma ORM                                                                               |
+| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                           |
+| Queue     | Redis 7 + BullMQ (13 worker types)                                                                       |
+| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                  |
+| Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume (multi-provider TTS) — resolved via resolveTtsProvider()      |
+| Stitching | FFmpeg (segment concatenation + normalization)                                                           |
+| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                         |
+| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69 / Power $9 BYOK) — swappable via `PAYMENT_PROVIDER` |
+| PDF       | pdfmake (server-side transcript PDF generation)                                                          |
+| Hosting   | Vercel (web) + Railway (workers)                                                                         |
 
 ## Build & Development Commands
 
@@ -102,17 +104,18 @@ src/
 │       ├── health/             # Health check
 │       └── webhooks/stripe/    # Stripe webhook handler
 ├── components/
-│   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner, CitationMarker
-│   ├── player/                 # AudioPlayer, Waveform, PlaybackControls, MiniPlayer, TranscriptPanel, ReferenceList, Teleprompter
+│   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner, CitationMarker, TtsProviderLogo
+│   ├── player/                 # AudioPlayer, Waveform, PlaybackControls, MiniPlayer, TranscriptPanel, ReferenceList, Teleprompter, VersionHistory, ForkAttribution, ForkLineage, ForkRemixModal, ForkGraph, ListeningQueue
 │   ├── chat/                   # ChatContainer, ChatMessage, ChatChips
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
-│   ├── create/                 # GenerationProgress, ScriptPreview
+│   ├── create/                 # GenerationProgress, ScriptPreview, TtsProviderSelector
+│   ├── import/                 # ImportUploader, ImportProgress
 │   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar
 │   ├── pricing/                # PricingCard, FeatureList, TierComparison
 │   ├── billing/                # CreditPackCard
 │   ├── profile/                # ProfileHeader, PodcastList, FollowButton
 │   ├── notifications/          # NotificationBell, NotificationList, PushPrompt
-│   ├── settings/               # VoicePreferenceSelector
+│   ├── settings/               # VoicePreferenceSelector, TtsProviderCards — Voice preferences + TTS provider BYOK key management
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
 │   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider, EventProvider, PageViewTracker
 ├── lib/
@@ -133,15 +136,17 @@ src/
 │   ├── citation-parser.tsx     # Parse [N] citation markers → React CitationMarker components
 │   ├── pdf-generator.ts        # pdfmake academic-style PDF generation
 │   ├── voice-pool.ts           # Unified voice pool with per-provider IDs
-│   ├── byok.ts                 # Multi-provider BYOK key encryption + storage
-│   ├── providers/              # Modular provider architecture (ai, tts, storage, payment)
-│   ├── tts-registry.ts         # Provider capability metadata (quality, cost, auth)
-│   └── tts/                    # Per-provider TTS implementations
-│       ├── elevenlabs.provider.ts
-│       ├── openai.provider.ts
-│       ├── playht.provider.ts
-│       ├── cartesia.provider.ts
-│       └── hume.provider.ts
+│   ├── cost-monitor.ts         # Provider cost tracking + budget warnings
+│   ├── transcript-parser.ts    # Parse SRT/VTT/JSON transcripts → Segment[] for imports
+│   ├── providers/              # Modular provider architecture (ai, tts, stt, storage, payment)
+│   │   ├── stt.ts              # Speech-to-text provider interface
+│   │   ├── tts-registry.ts     # Provider capability metadata (quality, cost, auth)
+│   │   └── tts/                # Per-provider TTS implementations
+│   │       ├── elevenlabs.provider.ts
+│   │       ├── openai.provider.ts
+│   │       ├── playht.provider.ts
+│   │       ├── cartesia.provider.ts
+│   │       └── hume.provider.ts
 │   ├── audio-stitcher.ts       # FFmpeg segment concatenation + normalization
 │   ├── content-parser.ts       # URL/PDF content extraction
 │   ├── recommendations.ts      # Search similar podcasts, rank by relevance
@@ -159,13 +164,14 @@ src/
 │       ├── useDiscovery.ts
 │       └── useNotifications.ts
 ├── workers/
-│   ├── index.ts                         # Worker orchestrator (12 workers)
+│   ├── index.ts                         # Worker orchestrator (13 workers)
 │   ├── content-extraction.worker.ts
 │   ├── script-generation.worker.ts      # Persists References, routes to script verification
 │   ├── script-verification.worker.ts    # "Teacher" agent: claim extraction, sourcing check, ≤3 revision loops
 │   ├── reference-validation.worker.ts   # Source quality filter + 4-layer verification pipeline
 │   ├── audio-generation.worker.ts
 │   ├── audio-stitching.worker.ts
+│   ├── audio-import.worker.ts           # STT + transcript parsing for imported podcasts
 │   ├── interaction.worker.ts
 │   ├── segment-regeneration.worker.ts
 │   ├── notification.worker.ts
@@ -182,6 +188,8 @@ src/
     ├── discovery.ts
     ├── notification.ts
     ├── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
+    ├── version.ts              # PodcastVersion + version history types
+    ├── import.ts               # Import job types (audio upload, STT, transcript parsing)
     ├── analytics.ts            # Usage analytics types
     ├── api-key.ts              # API key types
     ├── team.ts                 # Team + invite types
@@ -225,7 +233,7 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
     ↓
 [reference-validation] → Source quality filter + 4-layer verification (URL, CrossRef, OpenAlex, AI)
     ↓
-[audio-generation] × N → ElevenLabs TTS per segment (parallel, 5 concurrent)
+[audio-generation] × N → TTS per segment (multi-provider: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) (parallel, 5 concurrent)
     ↓
 [audio-stitching] → FFmpeg concat + normalize + duration hard check → final.mp3
     ↓
@@ -266,47 +274,49 @@ Claude generates natural HOST segment addressing Q&A
 
 ## Database Schema (Key Models)
 
-| Model                | Purpose                                                                                                                                           |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`               | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs                                                     |
-| `Follow`             | Social: follower → following                                                                                                                      |
-| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, creditCost (Float?)                                  |
-| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                                                                            |
-| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                                                                                   |
-| `Script`             | Structured JSON turns + raw markdown, versioned                                                                                                   |
-| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                                                                            |
-| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                                                 |
-| `Interaction`        | Question at timestamp, answer, resolution status                                                                                                  |
-| `Like` / `Save`      | Social engagement                                                                                                                                 |
-| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                                                                |
-| `Subscription`       | Stripe (FREE/STARTER/PRO/STUDIO) with credit balance (Float) + rollover (includes voiceCreatorAddonActive, voiceCreatorAddonStripeSubscriptionId) |
-| `CreditTransaction`  | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases                                        |
-| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                                                                              |
-| `VoiceAllowlist`     | Pre-approved voice access: voice clone → allowed user (Studio + Voice Creator addon)                                                              |
-| `UserTtsKey`         | BYOK encrypted API keys per TTS provider (AES-256-GCM), `@@unique([userId, provider])`                                                            |
-| `PodcastVersion`     | Audio version snapshots: version number, audioUrl, duration, changeType (initial/regeneration/incorporation)                                      |
-| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                                                                               |
-| `Team`               | Team ownership + member management                                                                                                                |
-| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                                                                             |
-| `Job`                | BullMQ job tracking                                                                                                                               |
-| `Notification`       | In-app + push notifications                                                                                                                       |
-| `PushSubscription`   | Web Push API endpoints                                                                                                                            |
-| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                                            |
-| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                                                          |
+| Model                   | Purpose                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs                                                                                                                            |
+| `Follow`                | Social: follower → following                                                                                                                                                                                             |
+| `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), creditCost (Float?) |
+| `Discovery`             | Chat metadata (audience, depth, tone, focus, duration)                                                                                                                                                                   |
+| `DiscoveryMessage`      | Individual chat messages (role, content, chips)                                                                                                                                                                          |
+| `Script`                | Structured JSON turns + raw markdown, versioned                                                                                                                                                                          |
+| `Segment`               | Per-speaker audio chunk: text, audioUrl, timing, order                                                                                                                                                                   |
+| `Reference`             | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                                                                                                                        |
+| `Interaction`           | Question at timestamp, answer, resolution status                                                                                                                                                                         |
+| `Like` / `Save`         | Social engagement                                                                                                                                                                                                        |
+| `Tag` / `PodcastTag`    | Discovery taxonomy                                                                                                                                                                                                       |
+| `Subscription`          | Stripe (FREE/STARTER/PRO/STUDIO/POWER) with credit balance (Float) + rollover (includes voiceCreatorAddonActive, voiceCreatorAddonStripeSubscriptionId)                                                                  |
+| `CreditTransaction`     | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases                                                                                                               |
+| `VoiceClone`            | User voice clones (name, ElevenLabs ID, source type)                                                                                                                                                                     |
+| `VoiceAllowlist`        | Pre-approved voice access: voice clone → allowed user (Studio + Voice Creator addon)                                                                                                                                     |
+| `UserTtsKey`            | BYOK encrypted API keys per TTS provider (AES-256-GCM), `@@unique([userId, provider])`                                                                                                                                   |
+| `PodcastVersion`        | Version snapshots (immutable segments, stitched audio per version)                                                                                                                                                       |
+| `PodcastVersionSegment` | Segment ordering per version                                                                                                                                                                                             |
+| `ApiKey`                | Developer API keys (hashed, prefix, usage tracking)                                                                                                                                                                      |
+| `Team`                  | Team ownership + member management                                                                                                                                                                                       |
+| `TeamInvite`            | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                                                                                                                                                    |
+| `Job`                   | BullMQ job tracking                                                                                                                                                                                                      |
+| `Notification`          | In-app + push notifications                                                                                                                                                                                              |
+| `PushSubscription`      | Web Push API endpoints                                                                                                                                                                                                   |
+| `TweetMention`          | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                                                                                                                   |
+| `ApiUsageLog`           | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                                                                                                                                 |
 
-**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
+**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
 
 ## Pricing Tiers (Credit-Based)
 
-All tiers use ElevenLabs TTS — no OpenAI fallback. Quality is the product.
-Podcast generation costs 1 credit. Interactions cost 0.25 credits each (no per-podcast limits). Free caps at 5 min, all paid tiers at 10 min.
+Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). BYOK users bring their own keys.
+Podcast generation costs 1 credit. Interactions cost 0.25 credits each (no per-podcast limits). Imports cost 0.5 credits each (no TTS cost, just storage + optional STT). Free caps at 5 min, all paid tiers at 10 min.
 
-| Tier    | Price  | Credits/mo | Rollover | Duration | Voice Clones | Sound Effects            |
-| ------- | ------ | ---------- | -------- | -------- | ------------ | ------------------------ |
-| Free    | $0     | 1          | 0        | 5 min    | 0            | Standard                 |
-| Starter | $14/mo | 3          | 1        | 10 min   | 1            | Standard                 |
-| Pro     | $34/mo | 10         | 3        | 10 min   | 3            | Standard                 |
-| Studio  | $69/mo | 20         | 8        | 10 min   | 10           | Premium (ElevenLabs SFX) |
+| Tier         | Price  | Credits/mo | Rollover | Duration | Voice Clones | Sound Effects            |
+| ------------ | ------ | ---------- | -------- | -------- | ------------ | ------------------------ |
+| Free         | $0     | 3/mo       | 0        | 5 min    | 0            | Standard                 |
+| Starter      | $14/mo | 5/mo       | 1        | 10 min   | 1            | Standard                 |
+| Pro          | $34/mo | 10/mo      | 3        | 10 min   | 3            | Standard                 |
+| Studio       | $69/mo | 20/mo      | 8        | 10 min   | 10           | Premium (ElevenLabs SFX) |
+| Power (BYOK) | $9/mo  | 50/mo      | 10       | 10 min   | 10           | Premium                  |
 
 Credit packs available for paid tiers: 3 credits ($7), 10 credits ($20), 25 credits ($45) (one-time purchase).
 
@@ -337,12 +347,11 @@ export function ComponentName({ variant = 'primary', children }: ComponentNamePr
 ```tsx
 // src/app/api/resource/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -431,8 +440,10 @@ Provider selection (swap services via env):
 
 - `AI_PROVIDER` — `anthropic` (default) | `openai`
 - `TTS_PROVIDER` — `elevenlabs` (default) | `openai`
+- `STT_PROVIDER` — `openai` (default) | `elevenlabs`
 - `STORAGE_PROVIDER` — `r2` (default) | `s3` | `local`
 - `PAYMENT_PROVIDER` — `stripe` (default) | `none`
+- `BYOK_ENCRYPTION_KEY` — AES-256-GCM key for encrypting user TTS API keys
 
 ## Reference
 

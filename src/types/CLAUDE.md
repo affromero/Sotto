@@ -4,21 +4,24 @@ Shared types used across the application. These mirror Prisma models but are sha
 
 ## File Index
 
-| File              | Contents                                                                                           |
-| ----------------- | -------------------------------------------------------------------------------------------------- |
-| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`), SegmentData, CreatePodcastRequest |
-| `player.ts`       | PlayerState, PlayerControls                                                                        |
-| `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                          |
-| `feed.ts`         | FeedResponse, FeedSort, FeedFilters                                                                |
-| `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                |
-| `notification.ts` | NotificationData, PushSubscriptionData                                                             |
-| `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                        |
-| `analytics.ts`    | UsageStats, AnalyticsData, CostBreakdown                                                           |
-| `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                      |
-| `team.ts`         | TeamData, TeamInviteData, TeamMember                                                               |
-| `twitter.ts`      | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData              |
-| `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput           |
-| `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                     |
+| File              | Contents                                                                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `podcast.ts`      | PodcastSummary, PodcastDetail (includes `references`, `pdfUrl`, `forkedFrom`, `forks`, `remixNote`, `versions`, `ttsProvider`), SegmentData, CreatePodcastRequest |
+| `player.ts`       | PlayerState, PlayerControls                                                                                                                                       |
+| `interaction.ts`  | InteractionRequest, InteractionResponse, ResolutionChoice                                                                                                         |
+| `feed.ts`         | FeedResponse, FeedSort (includes `most_forked`), FeedFilters (includes remixes mode)                                                                              |
+| `discovery.ts`    | DiscoveryMessage, DiscoveryMetadata, DiscoveryState                                                                                                               |
+| `notification.ts` | NotificationData, PushSubscriptionData                                                                                                                            |
+| `reference.ts`    | ReferenceData (id, number, title, authors, year, url, type, publisher, doi)                                                                                       |
+| `analytics.ts`    | UsageStats, AnalyticsData, CostBreakdown                                                                                                                          |
+| `api-key.ts`      | ApiKeyData, CreateKeyRequest, KeyListResponse                                                                                                                     |
+| `team.ts`         | TeamData, TeamInviteData, TeamMember                                                                                                                              |
+| `twitter.ts`      | TweetParseResult, TwitterTweet, TwitterMention, TwitterSettingsData, TweetMentionData                                                                             |
+| `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput                                                                          |
+| `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
+| `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
+| `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
+| `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
 ## Rules
 
