@@ -41,7 +41,7 @@ export function ProfileClient({
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
-  const [activeTab, setActiveTab] = useState<'podcasts' | 'liked'>('podcasts');
+  const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked'>('podcasts');
 
   const handleFollow = useCallback(async () => {
     const newFollowing = !isFollowing;
@@ -87,6 +87,14 @@ export function ProfileClient({
         </button>
         <button
           type="button"
+          className={`${styles.tab} ${activeTab === 'remixes' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('remixes')}
+          aria-pressed={activeTab === 'remixes'}
+        >
+          Remixes
+        </button>
+        <button
+          type="button"
           className={`${styles.tab} ${activeTab === 'liked' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('liked')}
           aria-pressed={activeTab === 'liked'}
@@ -97,11 +105,22 @@ export function ProfileClient({
 
       {activeTab === 'podcasts' && (
         <PodcastList
-          podcasts={podcasts}
+          podcasts={podcasts.filter((p) => !p.forkedFromId)}
           emptyMessage={
             isOwnProfile
               ? 'You have not published any podcasts yet.'
               : 'This user has not published any podcasts yet.'
+          }
+        />
+      )}
+
+      {activeTab === 'remixes' && (
+        <PodcastList
+          podcasts={podcasts.filter((p) => p.forkedFromId)}
+          emptyMessage={
+            isOwnProfile
+              ? 'You have not created any remixes yet.'
+              : 'This user has not created any remixes yet.'
           }
         />
       )}

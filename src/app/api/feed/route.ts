@@ -11,6 +11,7 @@ import type { Prisma } from '@prisma/client';
  * - trending: 6 results, no auth required
  * - explore: max 10 results with search/filters, optional auth for personalization
  * - following: from followed creators, auth required
+ * - remixes: podcasts that are forks (forkedFromId != null), supports pagination & filters
  * - (default): recent podcasts for backward compatibility
  */
 export async function GET(request: NextRequest) {
@@ -74,6 +75,46 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({ podcasts: serialized, total: serialized.length });
+  }
+
+  // Mode: remixes — only forked podcasts, with pagination
+  if (mode === 'remixes') {
+    const parsed = feedQuerySchema.safeParse(searchParams);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const { page, limit } = parsed.data;
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.PodcastWhereInput = {
+      status: 'READY',
+      visibility: 'PUBLIC',
+      forkedFromId: { not: null },
+    };
+
+    const [podcasts, total] = await Promise.all([
+      prisma.podcast.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          user: { select: { id: true, name: true, image: true, role: true } },
+          tags: { include: { tag: true } },
+          forkedFrom: { select: { id: true, title: true } },
+        },
+      }),
+      prisma.podcast.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      podcasts,
+      total,
+      page,
+      limit,
+      hasMore: skip + limit < total,
+    });
   }
 
   // Default mode: full feed with filters (backward compatible)
@@ -154,7 +195,9 @@ export async function GET(request: NextRequest) {
       ? { playCount: 'desc' as const }
       : sort === 'trending'
         ? { likeCount: 'desc' as const }
-        : { createdAt: 'desc' as const };
+        : sort === 'most_forked'
+          ? { forkCount: 'desc' as const }
+          : { createdAt: 'desc' as const };
 
   const [podcasts, total] = await Promise.all([
     prisma.podcast.findMany({

@@ -4,21 +4,21 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 ## Directory Structure
 
-| Directory        | Components                                                                                                         | Purpose                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `ui/`            | Button, Input, Card, Modal, Toast, Badge (+ creator/admin/system variants), Chip, Spinner, CitationMarker          | Shared primitives                                    |
-| `layout/`        | TopBar, Footer, Sidebar, MobileNav                                                                                 | App shell                                            |
-| `player/`        | AudioPlayer, MiniPlayer, Waveform, PlaybackControls, TranscriptPanel, InterruptButton, ReferenceList, Teleprompter | Podcast playback + transcript                        |
-| `chat/`          | ChatContainer, ChatMessage, ChatChips, ResolutionPrompt                                                            | Chat UI                                              |
-| `discovery/`     | DiscoveryChat, SuggestionChips, RecommendationCard, CreatorSuggestion, InterestGrid, InspireMe, TopicCard          | Create flow + interest selection + topic inspiration |
-| `create/`        | GenerationProgress, ScriptPreview                                                                                  | Generation status                                    |
-| `feed/`          | PodcastCard, FeedGrid, TagFilter, SearchBar, TrendingSection                                                       | Public feed                                          |
-| `pricing/`       | PricingCard, FeatureList, TierComparison                                                                           | Pricing page (4 tiers)                               |
-| `billing/`       | CreditPackCard                                                                                                     | Credit pack purchase cards                           |
-| `profile/`       | ProfileHeader, PodcastList, FollowButton, FollowerCount                                                            | User profiles                                        |
-| `notifications/` | NotificationBell, NotificationList, PushPrompt                                                                     | Notifications                                        |
-| `settings/`      | VoicePreferenceSelector                                                                                            | Twitter voice preference dropdowns                   |
-| `providers/`     | SessionProvider, AudioPlayerProvider, NotificationProvider, EventProvider, PageViewTracker                         | React context providers + event tracking             |
+| Directory        | Components                                                                                                                                                                  | Purpose                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `ui/`            | Button, Input, Card, Modal, Toast, Badge (+ creator/admin/system variants), Chip, Spinner, CitationMarker                                                                   | Shared primitives                                    |
+| `layout/`        | TopBar, Footer, Sidebar, MobileNav                                                                                                                                          | App shell                                            |
+| `player/`        | AudioPlayer, MiniPlayer, Waveform, PlaybackControls, TranscriptPanel, InterruptButton, ReferenceList, Teleprompter, ForkAttribution, ForkLineage, ForkRemixModal, ForkGraph | Podcast playback + transcript + fork lineage         |
+| `chat/`          | ChatContainer, ChatMessage, ChatChips, ResolutionPrompt                                                                                                                     | Chat UI                                              |
+| `discovery/`     | DiscoveryChat, SuggestionChips, RecommendationCard, CreatorSuggestion, InterestGrid, InspireMe, TopicCard                                                                   | Create flow + interest selection + topic inspiration |
+| `create/`        | GenerationProgress, ScriptPreview                                                                                                                                           | Generation status                                    |
+| `feed/`          | PodcastCard, FeedGrid, TagFilter, SearchBar, TrendingSection                                                                                                                | Public feed                                          |
+| `pricing/`       | PricingCard, FeatureList, TierComparison                                                                                                                                    | Pricing page (4 tiers)                               |
+| `billing/`       | CreditPackCard                                                                                                                                                              | Credit pack purchase cards                           |
+| `profile/`       | ProfileHeader, PodcastList, FollowButton, FollowerCount                                                                                                                     | User profiles                                        |
+| `notifications/` | NotificationBell, NotificationList, PushPrompt                                                                                                                              | Notifications                                        |
+| `settings/`      | VoicePreferenceSelector                                                                                                                                                     | Twitter voice preference dropdowns                   |
+| `providers/`     | SessionProvider, AudioPlayerProvider, NotificationProvider, EventProvider, PageViewTracker                                                                                  | React context providers + event tracking             |
 
 ## Component Pattern
 

@@ -194,7 +194,30 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(90);
 
-    // 9. Update podcast record
+    // 9. Create version snapshot before updating podcast record
+    const currentPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { currentVersion: true, audioUrl: true },
+    });
+
+    const newVersion = currentPodcast.currentVersion + (currentPodcast.audioUrl ? 1 : 0);
+    const changeType = currentPodcast.audioUrl
+      ? skipSfx
+        ? 'incorporation'
+        : 'regeneration'
+      : 'initial';
+
+    await prisma.podcastVersion.create({
+      data: {
+        podcastId,
+        version: newVersion,
+        audioUrl,
+        duration: Math.round(duration),
+        changeType,
+      },
+    });
+
+    // Update podcast record
     await prisma.podcast.update({
       where: { id: podcastId },
       data: {
@@ -202,6 +225,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         audioUrl,
         duration: Math.round(duration),
         fileSize: finalAudio.length,
+        currentVersion: newVersion,
       },
     });
 

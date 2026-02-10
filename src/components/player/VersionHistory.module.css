@@ -1,0 +1,209 @@
+.root {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.toggle:hover {
+  background: var(--color-surface-hover);
+}
+
+.heading {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.count {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  margin-left: auto;
+}
+
+.chevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.chevronExpanded {
+  transform: rotate(180deg);
+}
+
+/* Timeline */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: none;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+
+.item:hover {
+  background: var(--color-surface-hover);
+}
+
+.item::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--spacing-md) + 5px);
+  top: calc(var(--spacing-md) + 16px);
+  bottom: calc(-1 * var(--spacing-md));
+  width: 2px;
+  background: var(--color-border);
+}
+
+.item:last-child::before,
+.item:last-of-type::before {
+  display: none;
+}
+
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  flex-shrink: 0;
+  margin-top: 4px;
+  position: relative;
+  z-index: 1;
+  transition: all var(--transition-fast);
+}
+
+.dotActive {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.itemHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.versionLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.changeType {
+  font: var(--text-caption);
+  font-weight: 500;
+  padding: 1px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+.changeType_initial {
+  background: var(--color-accent-lighter, #e8edf3);
+  color: var(--color-accent);
+}
+
+.changeType_incorporation {
+  background: var(--color-primary-lighter, #fef3e2);
+  color: var(--color-primary);
+}
+
+.changeType_regeneration {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.currentBadge {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin: var(--spacing-xs) 0 0;
+  font-style: italic;
+}
+
+.meta {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xs);
+}
+
+.metaItem {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.showMore {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  margin-top: var(--spacing-xs);
+}
+
+.showMore:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.itemActive {
+  background: var(--color-primary-subtle, rgba(217, 119, 6, 0.05));
+}
+
+@media (max-width: 768px) {
+  .toggle {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .timeline {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+  }
+
+  .item {
+    padding: var(--spacing-sm);
+  }
+}
