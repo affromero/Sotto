@@ -1,0 +1,64 @@
+name: Server Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Service to fetch logs from'
+        required: true
+        default: 'web'
+        type: choice
+        options:
+          - web
+          - workers
+          - all
+      lines:
+        description: 'Number of log lines'
+        required: true
+        default: '200'
+        type: string
+
+jobs:
+  fetch-logs:
+    name: Fetch & Send Logs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch logs via SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+
+          SERVICE="${{ inputs.service }}"
+          LINES="${{ inputs.lines }}"
+
+          if [ "$SERVICE" = "all" ]; then
+            SVC_ARG=""
+          else
+            SVC_ARG="$SERVICE"
+          fi
+
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/key sotto@${{ secrets.SERVER_IP }} \
+            "cd ~/sotto && docker compose -f docker-compose.prod.yml logs --tail=${LINES} --timestamps ${SVC_ARG} 2>&1" \
+            > logs.txt 2>&1 || true
+
+          rm -f ~/.ssh/key
+
+          # Fallback if empty
+          if [ ! -s logs.txt ]; then
+            echo "No log output returned." > logs.txt
+          fi
+
+      - name: Send to Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          SERVICE="${{ inputs.service }}"
+          LINES="${{ inputs.lines }}"
+          TS=$(date -u +"%Y-%m-%d %H:%M UTC")
+
+          curl -sf -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${TELEGRAM_CHAT_ID}" \
+            -F "document=@logs.txt;filename=sotto-${SERVICE}-${LINES}.log" \
+            -F "caption=Server logs: ${SERVICE} (last ${LINES} lines) — ${TS}"
