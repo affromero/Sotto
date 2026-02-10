@@ -6,6 +6,9 @@ import {
   findByVoiceId,
   type VoicePoolEntry,
 } from '../voice-pool';
+import type { TtsProviderId } from './tts-registry';
+import { getProviderMeta, compareQuality } from './tts-registry';
+import { getByokKey, getByokExtraData, listByokProviders } from '../byok';
 
 export interface SpeechParams {
   text: string;
@@ -26,96 +29,36 @@ export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
   getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string;
+  readonly providerId: TtsProviderId;
 }
 
 // ---------------------------------------------------------------------------
-// ElevenLabs provider — premium voice generation
+// Lazy provider imports (keeps module loading fast)
 // ---------------------------------------------------------------------------
 
-class ElevenLabsProvider implements TtsProvider {
-  private clientPromise: Promise<typeof import('../elevenlabs')> | null = null;
-  private byokApiKey: string | undefined;
-
-  constructor(byokApiKey?: string) {
-    this.byokApiKey = byokApiKey;
-  }
-
-  private async getClient() {
-    if (!this.clientPromise) {
-      this.clientPromise = import('../elevenlabs');
-    }
-    return this.clientPromise;
-  }
-
-  async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const el = await this.getClient();
-    const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
-    return el.generateSpeech({ ...params, apiKeyOverride });
-  }
-
-  async generateSoundEffect(params: SfxParams): Promise<Buffer> {
-    const el = await this.getClient();
-    return el.generateSoundEffect(params);
-  }
-
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
-    if (!podcastId) {
-      return speaker === 'HOST' ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
-    }
-    const pair = selectVoicePair(podcastId);
-    const entry = speaker === 'HOST' ? pair.host : pair.expert;
-    return resolveVoiceId(entry, 'elevenlabs');
-  }
+async function importElevenLabs() {
+  const { ElevenLabsProvider } = await import('./tts/elevenlabs.provider');
+  return ElevenLabsProvider;
 }
 
-// ---------------------------------------------------------------------------
-// OpenAI TTS provider — standard voice generation (90 % cheaper)
-// ---------------------------------------------------------------------------
+async function importOpenAI() {
+  const { OpenAITtsProvider } = await import('./tts/openai.provider');
+  return OpenAITtsProvider;
+}
 
-const OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
-type OpenAIVoice = (typeof OPENAI_VOICES)[number];
+async function importPlayHT() {
+  const { PlayHTProvider } = await import('./tts/playht.provider');
+  return PlayHTProvider;
+}
 
-class OpenAITtsProvider implements TtsProvider {
-  private async getClient() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
-    const { default: OpenAI } = await import('openai');
-    return new OpenAI({ apiKey });
-  }
+async function importCartesia() {
+  const { CartesiaProvider } = await import('./tts/cartesia.provider');
+  return CartesiaProvider;
+}
 
-  async generateSpeech(params: SpeechParams): Promise<Buffer> {
-    const client = await this.getClient();
-
-    // Resolve the ElevenLabs voice ID to its OpenAI counterpart via the pool
-    let openaiVoice: string = params.voiceId;
-    const entry = findByVoiceId(params.voiceId);
-    if (entry?.ids.openai) {
-      openaiVoice = entry.ids.openai;
-    }
-
-    const voice: OpenAIVoice = OPENAI_VOICES.includes(openaiVoice as OpenAIVoice)
-      ? (openaiVoice as OpenAIVoice)
-      : 'alloy';
-
-    const response = await client.audio.speech.create({
-      model: 'tts-1-hd',
-      voice,
-      input: params.text,
-      response_format: 'mp3',
-    });
-
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  }
-
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
-    if (!podcastId) {
-      return speaker === 'HOST' ? 'nova' : 'onyx';
-    }
-    const pair = selectVoicePair(podcastId);
-    const entry = speaker === 'HOST' ? pair.host : pair.expert;
-    return resolveVoiceId(entry, 'openai');
-  }
+async function importHume() {
+  const { HumeProvider } = await import('./tts/hume.provider');
+  return HumeProvider;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,12 +66,16 @@ class OpenAITtsProvider implements TtsProvider {
 // ---------------------------------------------------------------------------
 
 class FallbackTtsProvider implements TtsProvider {
+  readonly providerId: TtsProviderId;
+
   constructor(
     private primary: TtsProvider,
     private fallback: TtsProvider,
     private primaryName: string,
     private fallbackName: string
-  ) {}
+  ) {
+    this.providerId = primary.providerId;
+  }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     try {
@@ -139,7 +86,6 @@ class FallbackTtsProvider implements TtsProvider {
         voiceId: params.voiceId,
       });
 
-      // Map voice ID to fallback provider's equivalent
       const entry = findByVoiceId(params.voiceId);
       const fallbackVoiceId = entry
         ? resolveVoiceId(entry, this.fallbackName as 'elevenlabs' | 'openai')
@@ -175,44 +121,200 @@ class FallbackTtsProvider implements TtsProvider {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a TTS provider instance.
- * Default is 'openai' (standard voices). Use 'elevenlabs' for premium.
+ * Create a TTS provider instance by ID, optionally with a BYOK API key.
  */
-export function createTtsProvider(type?: string): TtsProvider {
+export function createTtsProvider(type?: string, byokApiKey?: string): TtsProvider {
   const providerType = type || process.env.TTS_PROVIDER || 'openai';
+  // Use lazy-loaded classes synchronously via pre-instantiated inline classes
+  // that delegate to the async providers. For backward compat, we keep
+  // ElevenLabs and OpenAI as synchronous constructors.
   switch (providerType) {
-    case 'elevenlabs':
-      return new ElevenLabsProvider();
-    case 'openai':
-      return new OpenAITtsProvider();
+    case 'elevenlabs': {
+      // Inline sync version using the same lazy-loading pattern
+      const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
+      return new ElevenLabsProvider(byokApiKey);
+    }
+    case 'openai': {
+      const { OpenAITtsProvider } = require('./tts/openai.provider');
+      return new OpenAITtsProvider(byokApiKey);
+    }
     default:
       logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to openai`);
-      return new OpenAITtsProvider();
+      const { OpenAITtsProvider: Fallback } = require('./tts/openai.provider');
+      return new Fallback(byokApiKey);
+  }
+}
+
+/**
+ * Create a TTS provider instance asynchronously — supports all providers.
+ */
+export async function createTtsProviderAsync(
+  providerId: TtsProviderId,
+  apiKey?: string,
+  extraData?: Record<string, string>
+): Promise<TtsProvider> {
+  switch (providerId) {
+    case 'elevenlabs': {
+      const Cls = await importElevenLabs();
+      return new Cls(apiKey);
+    }
+    case 'openai': {
+      const Cls = await importOpenAI();
+      return new Cls(apiKey);
+    }
+    case 'playht': {
+      if (!apiKey) throw new Error('PlayHT requires an API key');
+      if (!extraData?.userId) throw new Error('PlayHT requires a userId in extraData');
+      const Cls = await importPlayHT();
+      return new Cls(apiKey, extraData.userId);
+    }
+    case 'cartesia': {
+      if (!apiKey) throw new Error('Cartesia requires an API key');
+      const Cls = await importCartesia();
+      return new Cls(apiKey);
+    }
+    case 'hume': {
+      if (!apiKey) throw new Error('Hume AI requires an API key');
+      const Cls = await importHume();
+      return new Cls(apiKey);
+    }
+    default:
+      throw new Error(`Unknown TTS provider: ${providerId}`);
   }
 }
 
 /**
  * Get the premium (ElevenLabs) TTS provider.
  * Always returns ElevenLabs regardless of TTS_PROVIDER env var.
- * Pass a BYOK API key to use the user's own ElevenLabs account.
  */
 export function createPremiumTtsProvider(byokApiKey?: string): TtsProvider {
+  const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
   return new ElevenLabsProvider(byokApiKey);
 }
 
 /**
  * Create a TTS provider with automatic fallback.
- *
- * Primary: ElevenLabs (or user's BYOK key)
- * Fallback: OpenAI TTS
- *
- * If the primary provider fails on any call, the fallback provider is used
- * with an automatically-mapped voice ID from the voice pool.
+ * Primary: ElevenLabs (or user's BYOK key), Fallback: OpenAI TTS.
  */
 export function createTtsProviderWithFallback(byokApiKey?: string): TtsProvider {
+  const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
+  const { OpenAITtsProvider } = require('./tts/openai.provider');
   const primary = new ElevenLabsProvider(byokApiKey);
   const fallback = new OpenAITtsProvider();
   return new FallbackTtsProvider(primary, fallback, 'elevenlabs', 'openai');
+}
+
+// ---------------------------------------------------------------------------
+// Smart provider resolution
+// ---------------------------------------------------------------------------
+
+export interface ResolvedProvider {
+  provider: TtsProvider;
+  source: 'byok' | 'platform';
+  providerId: TtsProviderId;
+}
+
+/**
+ * Resolve the best TTS provider for a given generation context.
+ *
+ * Resolution order:
+ * 1. If `requestedProvider` is specific + user has BYOK key → BYOK
+ * 2. If `requestedProvider` is specific + no BYOK + platform has key → platform
+ * 3. If 'auto' or null: check user BYOK keys → pick highest quality tier. Fallback to platform default.
+ * 4. Legacy: `usePremiumVoice=true` + no `requestedProvider` → ElevenLabs
+ */
+export async function resolveTtsProvider(context: {
+  userId: string;
+  podcastId: string;
+  requestedProvider?: TtsProviderId | 'auto' | null;
+  usePremiumVoice?: boolean;
+}): Promise<ResolvedProvider> {
+  const { userId, requestedProvider, usePremiumVoice } = context;
+
+  // Case 1+2: Specific provider requested
+  if (requestedProvider && requestedProvider !== 'auto') {
+    const byokKey = await getByokKey(userId, requestedProvider);
+    if (byokKey) {
+      const extraData = await getByokExtraData(userId, requestedProvider);
+      const provider = await createTtsProviderAsync(
+        requestedProvider,
+        byokKey,
+        extraData ?? undefined
+      );
+      return { provider, source: 'byok', providerId: requestedProvider };
+    }
+
+    // Platform fallback for elevenlabs/openai (we have platform keys)
+    if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
+      return {
+        provider: createPremiumTtsProvider(),
+        source: 'platform',
+        providerId: 'elevenlabs',
+      };
+    }
+    if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
+      return {
+        provider: createTtsProvider('openai'),
+        source: 'platform',
+        providerId: 'openai',
+      };
+    }
+
+    // No key available for requested provider
+    throw new Error(
+      `No API key available for ${requestedProvider}. Please add a BYOK key in Settings.`
+    );
+  }
+
+  // Case 3: Auto-select based on BYOK keys
+  const byokProviders = await listByokProviders(userId);
+  if (byokProviders.length > 0) {
+    // Sort by quality tier (highest first)
+    const sorted = byokProviders
+      .filter((p) => p.isValid)
+      .map((p) => ({ ...p, meta: getProviderMeta(p.provider) }))
+      .sort((a, b) => compareQuality(a.meta, b.meta));
+
+    if (sorted.length > 0) {
+      const best = sorted[0];
+      const byokKey = await getByokKey(userId, best.provider);
+      if (byokKey) {
+        const extraData = await getByokExtraData(userId, best.provider);
+        const provider = await createTtsProviderAsync(
+          best.provider,
+          byokKey,
+          extraData ?? undefined
+        );
+        return { provider, source: 'byok', providerId: best.provider };
+      }
+    }
+  }
+
+  // Case 4: Legacy usePremiumVoice flag
+  if (usePremiumVoice) {
+    // Check for BYOK ElevenLabs key first
+    const byokKey = await getByokKey(userId, 'elevenlabs');
+    if (byokKey) {
+      return {
+        provider: createPremiumTtsProvider(byokKey),
+        source: 'byok',
+        providerId: 'elevenlabs',
+      };
+    }
+    // Platform ElevenLabs
+    return {
+      provider: createPremiumTtsProvider(),
+      source: 'platform',
+      providerId: 'elevenlabs',
+    };
+  }
+
+  // Default: platform OpenAI
+  return {
+    provider: createTtsProvider('openai'),
+    source: 'platform',
+    providerId: 'openai',
+  };
 }
 
 // Re-export voice pool utilities for convenience

@@ -291,6 +291,7 @@ describe('POST /api/podcasts', () => {
         hostVoiceId: 'voice-host-custom',
         expertVoiceId: 'voice-expert-custom',
         usePremiumVoice: true,
+        ttsProvider: null,
       },
     });
   });

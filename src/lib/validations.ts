@@ -18,6 +18,7 @@ export const createPodcastSchema = z.object({
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
   usePremiumVoice: z.boolean().default(false),
+  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
 });
 
 /**
@@ -235,10 +236,12 @@ export const userSearchSchema = z.object({
 });
 
 /**
- * BYOK API key validation
+ * BYOK API key validation (multi-provider)
  */
 export const byokSchema = z.object({
-  apiKey: z.string().min(10).max(200),
+  provider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']),
+  apiKey: z.string().min(10).max(500),
+  userId: z.string().optional(), // PlayHT requires this
 });
 
 /**

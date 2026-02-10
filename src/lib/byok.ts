@@ -1,6 +1,11 @@
 import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import { logger } from './logger';
 import { prisma } from './prisma';
+import {
+  type TtsProviderId,
+  validateProviderCredentials,
+  getProviderMeta,
+} from './providers/tts-registry';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -55,52 +60,100 @@ export function decryptApiKey(encoded: string): string {
   return decrypted.toString('utf8');
 }
 
+// ---------------------------------------------------------------------------
+// Multi-provider BYOK operations (UserTtsKey model)
+// ---------------------------------------------------------------------------
+
+export interface ByokCredentials {
+  apiKey: string;
+  userId?: string; // PlayHT requires this
+}
+
+export interface ByokKeyInfo {
+  provider: TtsProviderId;
+  isValid: boolean;
+  lastUsedAt: Date | null;
+  label: string | null;
+}
+
 /**
- * Validate an ElevenLabs API key by calling their user endpoint.
+ * Store (upsert) a BYOK key for a specific provider.
  */
-export async function validateElevenLabsKey(apiKey: string): Promise<boolean> {
-  try {
-    const response = await fetch('https://api.elevenlabs.io/v1/user', {
-      headers: { 'xi-api-key': apiKey },
-    });
-    return response.ok;
-  } catch (error) {
-    logger.warn('Failed to validate ElevenLabs API key', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
+export async function storeByokKey(
+  userId: string,
+  provider: TtsProviderId,
+  credentials: ByokCredentials
+): Promise<void> {
+  const encryptedKey = encryptApiKey(credentials.apiKey);
+  const encryptedExtra = credentials.userId
+    ? encryptApiKey(JSON.stringify({ userId: credentials.userId }))
+    : null;
+
+  await prisma.userTtsKey.upsert({
+    where: { userId_provider: { userId, provider } },
+    update: {
+      encryptedKey,
+      extraData: encryptedExtra,
+      isValid: true,
+      updatedAt: new Date(),
+    },
+    create: {
+      userId,
+      provider,
+      encryptedKey,
+      extraData: encryptedExtra,
+      isValid: true,
+      label: getProviderMeta(provider).displayName,
+    },
+  });
+
+  logger.info('Stored BYOK key', { userId, provider });
+}
+
+/**
+ * Retrieve and decrypt a user's BYOK key for a specific provider.
+ * Returns null if the user has no key for that provider.
+ */
+export async function getByokKey(userId: string, provider?: TtsProviderId): Promise<string | null> {
+  // Legacy: no provider arg → query elevenlabs (backward compat)
+  const targetProvider = provider ?? 'elevenlabs';
+
+  const record = await prisma.userTtsKey.findUnique({
+    where: { userId_provider: { userId, provider: targetProvider } },
+  });
+
+  if (!record) {
+    // Fallback: check legacy column for elevenlabs
+    if (targetProvider === 'elevenlabs') {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { elevenLabsApiKey: true },
+      });
+      if (!user?.elevenLabsApiKey) return null;
+      try {
+        return decryptApiKey(user.elevenLabsApiKey);
+      } catch (error) {
+        logger.error('Failed to decrypt legacy BYOK key', {
+          userId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
+      }
+    }
+    return null;
   }
-}
-
-/**
- * Store an encrypted ElevenLabs API key for a user.
- */
-export async function storeByokKey(userId: string, apiKey: string): Promise<void> {
-  const encrypted = encryptApiKey(apiKey);
-  await prisma.user.update({
-    where: { id: userId },
-    data: { elevenLabsApiKey: encrypted },
-  });
-  logger.info('Stored BYOK key for user', { userId });
-}
-
-/**
- * Retrieve and decrypt a user's ElevenLabs API key.
- * Returns null if user has no BYOK key.
- */
-export async function getByokKey(userId: string): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { elevenLabsApiKey: true },
-  });
-
-  if (!user?.elevenLabsApiKey) return null;
 
   try {
-    return decryptApiKey(user.elevenLabsApiKey);
+    // Update lastUsedAt
+    await prisma.userTtsKey.update({
+      where: { id: record.id },
+      data: { lastUsedAt: new Date() },
+    });
+    return decryptApiKey(record.encryptedKey);
   } catch (error) {
     logger.error('Failed to decrypt BYOK key', {
       userId,
+      provider: targetProvider,
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
@@ -108,23 +161,107 @@ export async function getByokKey(userId: string): Promise<string | null> {
 }
 
 /**
- * Remove a user's BYOK key.
+ * Retrieve the extra credentials (e.g. PlayHT userId) for a provider.
  */
-export async function removeByokKey(userId: string): Promise<void> {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { elevenLabsApiKey: null },
+export async function getByokExtraData(
+  userId: string,
+  provider: TtsProviderId
+): Promise<Record<string, string> | null> {
+  const record = await prisma.userTtsKey.findUnique({
+    where: { userId_provider: { userId, provider } },
+    select: { extraData: true },
   });
-  logger.info('Removed BYOK key for user', { userId });
+
+  if (!record?.extraData) return null;
+
+  try {
+    return JSON.parse(decryptApiKey(record.extraData));
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Check if a user has a BYOK key configured.
+ * Remove a user's BYOK key for a specific provider.
  */
-export async function hasByokKey(userId: string): Promise<boolean> {
+export async function removeByokKey(userId: string, provider?: TtsProviderId): Promise<void> {
+  const targetProvider = provider ?? 'elevenlabs';
+
+  await prisma.userTtsKey
+    .delete({
+      where: { userId_provider: { userId, provider: targetProvider } },
+    })
+    .catch(() => {
+      // Ignore if doesn't exist
+    });
+
+  // Also clear legacy column for elevenlabs
+  if (targetProvider === 'elevenlabs') {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { elevenLabsApiKey: null },
+    });
+  }
+
+  logger.info('Removed BYOK key', { userId, provider: targetProvider });
+}
+
+/**
+ * List all configured BYOK providers for a user.
+ */
+export async function listByokProviders(userId: string): Promise<ByokKeyInfo[]> {
+  const keys = await prisma.userTtsKey.findMany({
+    where: { userId },
+    select: {
+      provider: true,
+      isValid: true,
+      lastUsedAt: true,
+      label: true,
+    },
+  });
+
+  return keys.map((k) => ({
+    provider: k.provider as TtsProviderId,
+    isValid: k.isValid,
+    lastUsedAt: k.lastUsedAt,
+    label: k.label,
+  }));
+}
+
+/**
+ * Check if a user has any BYOK key configured.
+ */
+export async function hasByokKey(userId: string, provider?: TtsProviderId): Promise<boolean> {
+  if (provider) {
+    const count = await prisma.userTtsKey.count({
+      where: { userId, provider },
+    });
+    return count > 0;
+  }
+
+  // Any provider
+  const count = await prisma.userTtsKey.count({ where: { userId } });
+  if (count > 0) return true;
+
+  // Legacy fallback
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { elevenLabsApiKey: true },
   });
   return !!user?.elevenLabsApiKey;
 }
+
+/**
+ * Validate a BYOK key against the provider's API.
+ */
+export async function validateByokKey(
+  provider: TtsProviderId,
+  credentials: ByokCredentials
+): Promise<boolean> {
+  const creds: Record<string, string> = { apiKey: credentials.apiKey };
+  if (credentials.userId) creds.userId = credentials.userId;
+  return validateProviderCredentials(provider, creds);
+}
+
+// Legacy exports for backward compat
+export { validateProviderCredentials as validateElevenLabsKey };

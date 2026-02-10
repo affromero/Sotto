@@ -3,7 +3,7 @@ import { canGenerate, canInteract, TIER_LIMITS, INTERACTION_CREDIT_COST } from '
 
 describe('TIER_LIMITS', () => {
   it('FREE tier has correct limits', () => {
-    expect(TIER_LIMITS.FREE.creditsMonthly).toBe(1);
+    expect(TIER_LIMITS.FREE.creditsMonthly).toBe(3);
     expect(TIER_LIMITS.FREE.maxRollover).toBe(0);
     expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(5);
     expect(TIER_LIMITS.FREE.maxVoiceClones).toBe(0);
@@ -18,7 +18,7 @@ describe('TIER_LIMITS', () => {
   });
 
   it('STARTER tier has correct limits', () => {
-    expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(3);
+    expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(5);
     expect(TIER_LIMITS.STARTER.maxRollover).toBe(1);
     expect(TIER_LIMITS.STARTER.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.STARTER.maxVoiceClones).toBe(1);

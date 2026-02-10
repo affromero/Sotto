@@ -45,7 +45,7 @@ model User {
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
 
-  // BYOK (Bring Your Own Key) — encrypted ElevenLabs API key
+  // BYOK (Bring Your Own Key) — encrypted ElevenLabs API key (legacy, migrated to UserTtsKey)
   elevenLabsApiKey String? @db.Text
 
   // Team membership (dormant — kept for future use)
@@ -80,6 +80,9 @@ model User {
 
   // Credit transactions
   creditTransactions CreditTransaction[]
+
+  // BYOK TTS keys (multi-provider)
+  userTtsKeys UserTtsKey[]
 
   // Interests (onboarding + settings)
   interests             UserInterest[]
@@ -291,6 +294,7 @@ model Podcast {
   hostVoiceId     String?
   expertVoiceId   String?
   usePremiumVoice Boolean @default(false)
+  ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
   creditCost      Float?
 
   // Source tracking (web, twitter, api)
@@ -1140,4 +1144,24 @@ enum VoiceRequestStatus {
   APPROVED
   DENIED
   REVOKED
+}
+
+// ============ USER TTS KEYS (Multi-Provider BYOK) ============
+
+model UserTtsKey {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String    // 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  encryptedKey String    @db.Text
+  extraData    String?   @db.Text // encrypted JSON for multi-field auth (e.g. PlayHT userId)
+  isValid      Boolean   @default(true)
+  label        String?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
 }

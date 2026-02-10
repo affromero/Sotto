@@ -10,8 +10,11 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   title: 'Test Podcast',
   source: 'WEB',
   sourceTweetId: null,
+  currentVersion: 0,
+  audioUrl: null,
 });
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
 const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
 
@@ -27,6 +30,9 @@ vi.mock('@/lib/prisma', () => ({
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    },
+    podcastVersion: {
+      create: (...args: unknown[]) => mockPrismaPodcastVersionCreate(...args),
     },
     tweetMention: {
       findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
@@ -79,7 +85,7 @@ vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: { hasPremiumSfx: false, maxDurationMinutes: 5 },
     PRO: { hasPremiumSfx: false, maxDurationMinutes: 10 },
-    CREATOR: { hasPremiumSfx: true, maxDurationMinutes: 10 },
+    STUDIO: { hasPremiumSfx: true, maxDurationMinutes: 10 },
   },
 }));
 
@@ -158,6 +164,8 @@ describe('processAudioStitching', () => {
       title: 'Test Podcast',
       source: 'WEB',
       sourceTweetId: null,
+      currentVersion: 0,
+      audioUrl: null,
     });
 
     // Default script data (no sound cues)
@@ -397,7 +405,7 @@ describe('processAudioStitching', () => {
 
   describe('skipSfx option', () => {
     beforeEach(() => {
-      mockGetUserTier.mockResolvedValue('CREATOR');
+      mockGetUserTier.mockResolvedValue('STUDIO');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
@@ -433,9 +441,9 @@ describe('processAudioStitching', () => {
     });
   });
 
-  describe('sound effects (CREATOR tier)', () => {
+  describe('sound effects (STUDIO tier)', () => {
     beforeEach(() => {
-      mockGetUserTier.mockResolvedValue('CREATOR');
+      mockGetUserTier.mockResolvedValue('STUDIO');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           {
@@ -448,7 +456,7 @@ describe('processAudioStitching', () => {
       });
     });
 
-    it('generates premium SFX via ElevenLabs for CREATOR tier', async () => {
+    it('generates premium SFX via ElevenLabs for STUDIO tier', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -632,6 +640,8 @@ describe('processAudioStitching', () => {
         title: 'Quantum Computing Explained',
         source: 'WEB',
         sourceTweetId: null,
+        currentVersion: 0,
+        audioUrl: null,
       });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -653,6 +663,8 @@ describe('processAudioStitching', () => {
         title: 'Test Podcast',
         source: 'TWITTER',
         sourceTweetId: 'tweet-123',
+        currentVersion: 0,
+        audioUrl: null,
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-1',
@@ -688,6 +700,8 @@ describe('processAudioStitching', () => {
         title: 'Test Podcast',
         source: 'WEB',
         sourceTweetId: null,
+        currentVersion: 0,
+        audioUrl: null,
       });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -773,6 +787,11 @@ describe('processAudioStitching', () => {
     });
 
     it('cleans up temp directory even when job fails', async () => {
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
       mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
       const job = createMockJob(defaultPayload);
 
@@ -830,6 +849,8 @@ describe('processAudioStitching', () => {
         title: 'Test Podcast',
         source: 'TWITTER',
         sourceTweetId: 'tweet-123',
+        currentVersion: 0,
+        audioUrl: null,
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-1',
@@ -903,6 +924,7 @@ describe('processAudioStitching', () => {
           audioUrl: 'https://cdn.sotto.fm/final.mp3',
           duration: 306, // rounded
           fileSize: 1024 * 256,
+          currentVersion: 0,
         },
       });
 
@@ -923,8 +945,8 @@ describe('processAudioStitching', () => {
       expect(job.updateProgress).toHaveBeenCalledWith(100);
     });
 
-    it('executes full pipeline for CREATOR tier podcast with SFX', async () => {
-      mockGetUserTier.mockResolvedValue('CREATOR');
+    it('executes full pipeline for STUDIO tier podcast with SFX', async () => {
+      mockGetUserTier.mockResolvedValue('STUDIO');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm piano intro', durationSeconds: 3, insertAfterTurn: 0 },
@@ -962,6 +984,8 @@ describe('processAudioStitching', () => {
         title: 'Twitter Podcast',
         source: 'TWITTER',
         sourceTweetId: 'tweet-789',
+        currentVersion: 0,
+        audioUrl: null,
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-2',

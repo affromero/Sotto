@@ -988,6 +988,13 @@
   line-height: 1.6;
 }
 
+/* Provider logos row (BYOK section on landing page) */
+.providerLogos {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
 /* ==========================================================================
    CREATOR ECONOMY
    ========================================================================== */

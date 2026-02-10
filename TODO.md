@@ -434,3 +434,51 @@ Comprehensive tests to add for full coverage across the app.
 - [ ] Script review before audio generation — manual review step at REVIEWING_SCRIPT status (if revisited should be redesigned from scratch)
 - [ ] Voice clone moderation queue — admin approval before new voices go live
 - [ ] Dedicated voice types file — `src/types/voice.ts` consolidating inline types from VoiceManager/VoicePicker
+
+## 29. TTS Provider Expansion (Future)
+
+Currently ElevenLabs and OpenAI run as platform-managed providers. PlayHT, Cartesia, and Hume are BYOK-only. This section tracks expanding platform support and adding open source self-hosted models.
+
+### Commercial providers — add as platform (non-BYOK) options
+
+- [ ] **PlayHT** — obtain platform API key, negotiate volume pricing, add `PLAYHT_API_KEY` env var
+- [ ] **Cartesia (Sonic 2)** — obtain platform API key, very fast inference, add `CARTESIA_API_KEY` env var
+- [ ] **Hume AI (EEVC)** — obtain platform API key, emotionally expressive, add `HUME_API_KEY` env var
+- [ ] Update `resolveTtsProvider()` platform fallback chain to include new providers
+- [ ] Set actual `platformCostPerKChar` in `tts-registry.ts` based on negotiated pricing
+- [ ] Update tier routing logic — which tiers get which platform providers as default
+
+### Open source / self-hosted TTS — high priority (production-ready quality)
+
+- [ ] **Dia** (Nari Labs) — purpose-built for 2-speaker dialogue (`[S1]`/`[S2]` tags), perfect fit for Sotto's podcast format. Apache 2.0.
+- [ ] **Orpheus** (Canopy Labs) — emotional speech, human-like prosody, Llama-based. Apache 2.0.
+- [ ] **F5-TTS** — high quality zero-shot voice cloning, fast inference. MIT license.
+- [ ] **Kokoro** — 82M params, very fast, good quality for size. Apache 2.0.
+- [ ] **Fish Speech** — multilingual, VQGAN+Llama architecture, few-shot cloning. Apache 2.0.
+
+### Open source / self-hosted TTS — medium priority (worth evaluating)
+
+- [ ] **Parler TTS** (Hugging Face) — natural language voice control ("a warm female voice"). Apache 2.0.
+- [ ] **StyleTTS 2** — state-of-art style transfer, human-level on LJSpeech. MIT license.
+- [ ] **XTTS v2** (Coqui) — multilingual (17 languages), zero-shot cloning. MPL 2.0 (check commercial terms).
+- [ ] **Piper** — very fast, lightweight, good for bulk generation. MIT license.
+- [ ] **MetaVoice** (1B) — emotional speech, filler words, zero-shot cloning. Apache 2.0.
+
+### Open source / self-hosted TTS — lower priority (experimental)
+
+- [ ] **Bark** (Suno) — can do music/SFX too, but slow and inconsistent for long-form
+- [ ] **Tortoise TTS** — very high quality but extremely slow inference
+- [ ] **VITS / VITS2** — lightweight, fast, but lower quality than newer models
+- [ ] **CSM** (Sesame) — conversational model with good turn-taking, early stage
+
+### Self-hosted infrastructure
+
+- [ ] Create `src/lib/providers/tts/selfhosted.provider.ts` implementing `TtsProvider`
+- [ ] Add `selfhosted` to `TtsProviderId` union type in `tts-registry.ts`
+- [ ] Internal inference service exposing `/v1/tts` endpoint (OpenAI-compatible format)
+- [ ] `SELFHOSTED_TTS_URL` env var for the inference endpoint
+- [ ] Voice mapping: Sotto voice pool IDs → model-specific voice/speaker IDs
+- [ ] GPU hosting setup: Modal, RunPod, or dedicated GPU server (A10G/L40S for production)
+- [ ] Add as platform provider — $0 per-char cost (infrastructure cost only)
+
+**Recommended first self-hosted model:** Dia by Nari Labs — natively handles multi-speaker dialogue, which is exactly what Sotto generates. Then add Orpheus for emotional range and F5-TTS for voice cloning.

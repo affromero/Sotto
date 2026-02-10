@@ -1,5 +1,80 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Create mock TTS provider classes that will be injected via module.require
+class MockElevenLabsProvider {
+  providerId = 'elevenlabs';
+  async generateSpeech() {
+    return Buffer.from('audio');
+  }
+  async generateSoundEffect() {
+    return Buffer.from('sfx');
+  }
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string) {
+    if (!podcastId) {
+      return speaker === 'HOST' ? 'host-default' : 'expert-default';
+    }
+    return speaker === 'HOST' ? 'host-elevenlabs-id' : 'expert-elevenlabs-id';
+  }
+}
+
+class MockOpenAITtsProvider {
+  providerId = 'openai';
+  async generateSpeech() {
+    return Buffer.from('audio');
+  }
+  getVoiceId(speaker: 'HOST' | 'EXPERT') {
+    return speaker === 'HOST' ? 'nova' : 'onyx';
+  }
+}
+
+// Mock TTS provider dependencies
+vi.mock('@/lib/voice-pool', () => ({
+  VOICE_POOL: [],
+  selectVoicePair: vi.fn().mockReturnValue({
+    host: { ids: { elevenlabs: 'host-elevenlabs-id', openai: 'nova' } },
+    expert: { ids: { elevenlabs: 'expert-elevenlabs-id', openai: 'onyx' } },
+  }),
+  resolveVoiceId: vi.fn((entry, provider) => {
+    if (provider === 'elevenlabs') return entry.ids.elevenlabs;
+    return entry.ids.openai;
+  }),
+  findByVoiceId: vi.fn(),
+}));
+
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderMeta: vi.fn(),
+  compareQuality: vi.fn(),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getByokKey: vi.fn(),
+  getByokExtraData: vi.fn(),
+  listByokProviders: vi.fn().mockResolvedValue([]),
+}));
+
+// Inject mocks into Node's require cache before tts.ts is loaded
+const Module = require('module');
+const originalRequire = Module.prototype.require;
+
+Module.prototype.require = function (id: string) {
+  if (id === './tts/elevenlabs.provider' || id.endsWith('/tts/elevenlabs.provider')) {
+    return { ElevenLabsProvider: MockElevenLabsProvider };
+  }
+  if (id === './tts/openai.provider' || id.endsWith('/tts/openai.provider')) {
+    return { OpenAITtsProvider: MockOpenAITtsProvider };
+  }
+  return originalRequire.apply(this, arguments as any);
+};
+
+// Also mock the ES module imports
+vi.mock('@/lib/providers/tts/elevenlabs.provider', () => ({
+  ElevenLabsProvider: MockElevenLabsProvider,
+}));
+
+vi.mock('@/lib/providers/tts/openai.provider', () => ({
+  OpenAITtsProvider: MockOpenAITtsProvider,
+}));
+
 // Mock the underlying service modules to prevent initialization errors
 vi.mock('@/lib/claude', () => ({
   generateResponse: vi
@@ -23,7 +98,7 @@ vi.mock('@/lib/r2', () => ({
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: {
-      creditsMonthly: 1,
+      creditsMonthly: 3,
       maxRollover: 0,
       maxDurationMinutes: 5,
       maxVoiceClones: 0,
@@ -54,6 +129,7 @@ import { createAIProvider } from '@/lib/providers/ai';
 import { createTtsProvider } from '@/lib/providers/tts';
 import { createStorageProvider } from '@/lib/providers/storage';
 import { createPaymentProvider } from '@/lib/providers/payment';
+import { resolveTtsProvider, createTtsProviderAsync } from '@/lib/providers';
 
 describe('Provider Factories', () => {
   const originalEnv = process.env;
@@ -236,6 +312,20 @@ describe('Provider Factories', () => {
       const provider = createPaymentProvider('stripe');
       const limits = provider.getTierLimits('FREE');
       expect(limits.creditsMonthly).toBe(1);
+    });
+  });
+
+  describe('resolveTtsProvider', () => {
+    it('exports resolveTtsProvider function', () => {
+      expect(resolveTtsProvider).toBeDefined();
+      expect(typeof resolveTtsProvider).toBe('function');
+    });
+  });
+
+  describe('createTtsProviderAsync', () => {
+    it('exports createTtsProviderAsync function', () => {
+      expect(createTtsProviderAsync).toBeDefined();
+      expect(typeof createTtsProviderAsync).toBe('function');
     });
   });
 });
