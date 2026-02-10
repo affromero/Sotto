@@ -31,7 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
       - name: Deploy via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
@@ -63,3 +68,32 @@ jobs:
             docker image prune -f
 
             echo "Deploy complete!"
+
+      - name: Notify via Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEPLOY_STATUS: ${{ steps.deploy.outcome || job.status }}
+        run: |
+          COMMIT_MSG=$(git log -1 --format='%s')
+          COMMIT_SHA=$(git log -1 --format='%h')
+          AUTHOR=$(git log -1 --format='%an')
+
+          if [ "$DEPLOY_STATUS" = "success" ] || [ "$DEPLOY_STATUS" = "" ]; then
+            EMOJI="✅"
+            STATUS="deployed"
+          else
+            EMOJI="❌"
+            STATUS="failed"
+          fi
+
+          TEXT="${EMOJI} *sotto.fm ${STATUS}*
+          Commit: \`${COMMIT_SHA}\` ${COMMIT_MSG}
+          By: ${AUTHOR}
+          [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$TEXT" \
+              '{chat_id: $chat_id, text: $text, parse_mode: "Markdown", disable_web_page_preview: true}')"

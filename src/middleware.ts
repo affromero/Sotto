@@ -13,10 +13,11 @@ const PASSWORD_GATE_BYPASS = new Set([
   '/api/waitlist',
   '/feedback',
   '/api/feedback',
+  '/pitch',
 ]);
 
 // Prefix-based bypasses that skip the gate entirely
-const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth'];
+const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth', '/api/pitch'];
 
 async function verifyAccessCookie(value: string, secret: string): Promise<boolean> {
   const separatorIndex = value.indexOf(':');

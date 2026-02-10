@@ -8,3 +8,9 @@ requires-python = ">=3.10"
 dev = [
     "pre-commit>=4.0.0",
 ]
+pitch = [
+    "Pillow>=10.0.0",
+    "playwright>=1.40.0",
+    "matplotlib>=3.8.0",
+    "requests>=2.31.0",
+]
