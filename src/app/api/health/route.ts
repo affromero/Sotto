@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { execFile } from 'child_process';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { stripe } from '@/lib/stripe';
@@ -72,33 +71,13 @@ export async function GET() {
     checks.storage = { status: 'error', latencyMs: Date.now() - r2Start };
   }
 
-  // --- FFmpeg (non-critical) ---
-  const ffmpegStart = Date.now();
-  try {
-    const version = await new Promise<string>((resolve, reject) => {
-      execFile('ffmpeg', ['-version'], { timeout: 3000 }, (err, stdout) => {
-        if (err) return reject(err);
-        const match = stdout.match(/ffmpeg version (\S+)/);
-        resolve(match ? match[1] : 'unknown');
-      });
-    });
-    checks.ffmpeg = { status: 'ok', latencyMs: Date.now() - ffmpegStart, detail: version };
-  } catch {
-    checks.ffmpeg = { status: 'not_installed', latencyMs: Date.now() - ffmpegStart };
-  }
-
-  // --- Claude Code CLI (non-critical) ---
-  const ccStart = Date.now();
-  try {
-    const ccVersion = await new Promise<string>((resolve, reject) => {
-      execFile('claude', ['--version'], { timeout: 3000 }, (err, stdout) => {
-        if (err) return reject(err);
-        resolve(stdout.trim());
-      });
-    });
-    checks.claudeCode = { status: 'ok', latencyMs: Date.now() - ccStart, detail: ccVersion };
-  } catch {
-    checks.claudeCode = { status: 'not_installed', latencyMs: Date.now() - ccStart };
+  // --- Claude Code (non-critical, env-based — CLI lives on host, not in web container) ---
+  const aiProvider = process.env.AI_PROVIDER || 'anthropic';
+  if (aiProvider === 'claude-code') {
+    const model = process.env.CLAUDE_CODE_MODEL || 'haiku';
+    checks.claudeCode = { status: 'ok', detail: `provider=claude-code, model=${model}` };
+  } else {
+    checks.claudeCode = { status: 'not_configured', detail: `provider=${aiProvider}` };
   }
 
   // --- Anthropic API (non-critical) ---
