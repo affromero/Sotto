@@ -8,13 +8,15 @@ import styles from './DiscoveryChat.module.css';
 interface DiscoveryChatProps {
   podcastId?: string;
   onComplete: (metadata: DiscoveryMetadata) => void;
+  initialTopic?: string;
 }
 
-export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
+export function DiscoveryChat({ podcastId, onComplete, initialTopic }: DiscoveryChatProps) {
   const [messages, setMessages] = useState<DiscoveryMessage[]>([]);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const initialTopicSentRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,13 +59,7 @@ export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
             role: 'assistant',
             content:
               "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore?",
-            chips: [
-              'AI & Technology',
-              'Science',
-              'History',
-              'Business',
-              'Philosophy',
-            ],
+            chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
             createdAt: new Date().toISOString(),
           },
         ]);
@@ -76,10 +72,9 @@ export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const sendMessage = useCallback(
-    async (content: string) => {
-      if (!content.trim() || isLoading) return;
-
+  // Core send logic (used by both sendMessage and initialTopic effect)
+  const doSend = useCallback(
+    async (content: string, currentMessages: DiscoveryMessage[]) => {
       const userMessage: DiscoveryMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
@@ -88,7 +83,7 @@ export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
         createdAt: new Date().toISOString(),
       };
 
-      const updatedMessages = [...messages, userMessage];
+      const updatedMessages = [...currentMessages, userMessage];
       setMessages(updatedMessages);
       setInputValue('');
       setIsLoading(true);
@@ -118,8 +113,7 @@ export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
           {
             id: `error-${Date.now()}`,
             role: 'assistant',
-            content:
-              "I'm sorry, something went wrong. Could you try saying that again?",
+            content: "I'm sorry, something went wrong. Could you try saying that again?",
             chips: [],
             createdAt: new Date().toISOString(),
           },
@@ -129,7 +123,24 @@ export function DiscoveryChat({ podcastId, onComplete }: DiscoveryChatProps) {
         inputRef.current?.focus();
       }
     },
-    [isLoading, messages, podcastId]
+    [podcastId]
+  );
+
+  // Auto-send initialTopic from Inspire Me when it changes
+  useEffect(() => {
+    if (initialTopic && !initialTopicSentRef.current && messages.length > 0 && !isLoading) {
+      initialTopicSentRef.current = true;
+      doSend(initialTopic, messages);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTopic, messages.length, isLoading]);
+
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim() || isLoading) return;
+      await doSend(content, messages);
+    },
+    [isLoading, messages, doSend]
   );
 
   const handleSubmit = (e: React.FormEvent) => {

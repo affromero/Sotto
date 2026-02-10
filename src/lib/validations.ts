@@ -168,6 +168,21 @@ export const reorderQueueSchema = z.object({
 });
 
 /**
+ * Onboarding interests validation
+ */
+export const onboardingInterestsSchema = z.object({
+  tagIds: z.array(z.string()).max(12),
+});
+
+/**
+ * Inspire Me drill-down validation
+ */
+export const inspireDrillSchema = z.object({
+  category: z.string().min(1).max(200),
+  parentTitle: z.string().min(1).max(200).optional(),
+});
+
+/**
  * Picks refresh validation
  */
 export const refreshPicksSchema = z.object({

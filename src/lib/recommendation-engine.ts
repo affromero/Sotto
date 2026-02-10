@@ -8,7 +8,7 @@ const EXPLORE_MAX = 10;
 const TRENDING_COUNT = 6;
 
 export interface PickCategory {
-  label: 'Continue Learning' | 'Fresh Perspective' | 'From Your People';
+  label: 'Continue Learning' | 'Fresh Perspective' | 'From Your People' | string;
   podcasts: RecommendedPodcast[];
 }
 
@@ -119,11 +119,19 @@ export async function getDailyPicks(
   const selected = applyDiversity(confident, candidates, DAILY_PICKS_MAX);
 
   // Categorize into slots
-  const followedIds = await prisma.follow.findMany({
-    where: { followerId: userId },
-    select: { followingId: true },
-  });
+  const [followedIds, userInterests] = await Promise.all([
+    prisma.follow.findMany({
+      where: { followerId: userId },
+      select: { followingId: true },
+    }),
+    prisma.userInterest.findMany({
+      where: { userId },
+      include: { tag: { select: { id: true, name: true } } },
+    }),
+  ]);
   const followedSet = new Set(followedIds.map((f) => f.followingId));
+  const interestTagIds = new Set(userInterests.map((i) => i.tag.id));
+  const interestTagNames = new Map(userInterests.map((i) => [i.tag.id, i.tag.name]));
 
   const categories: PickCategory[] = [
     { label: 'Continue Learning', podcasts: [] },
@@ -153,9 +161,17 @@ export async function getDailyPicks(
       category: '',
     };
 
+    // Check if podcast matches explicit user interests
+    const matchingTag = candidate.tags.find((pt) => interestTagIds.has(pt.tag.id));
+    const matchingInterestName = matchingTag ? interestTagNames.get(matchingTag.tag.id) : null;
+
     if (followedSet.has(candidate.userId) && categories[2].podcasts.length < 2) {
       rec.category = 'From Your People';
       categories[2].podcasts.push(rec);
+    } else if (matchingInterestName && categories[0].podcasts.length < 3) {
+      rec.category = 'Continue Learning';
+      rec.explanation = `Because you're interested in ${matchingInterestName}`;
+      categories[0].podcasts.push(rec);
     } else if (pick.signals.novelty > pick.signals.relevance && categories[1].podcasts.length < 2) {
       rec.category = 'Fresh Perspective';
       categories[1].podcasts.push(rec);

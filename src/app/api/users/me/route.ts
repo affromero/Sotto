@@ -14,6 +14,7 @@ const updateUserSchema = z
     image: z.string().url().optional(),
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
+    interests: z.array(z.string()).max(12).optional(),
   })
   .strict();
 
@@ -64,11 +65,47 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
-    const data = validation.data;
+    const { interests, ...data } = validation.data;
 
-    const updatedUser = await prisma.user.update({
-      where: { id: session.user.id },
-      data,
+    const updatedUser = await prisma.$transaction(async (tx) => {
+      // Update user profile fields
+      const user = await tx.user.update({
+        where: { id: session.user.id },
+        data,
+      });
+
+      // Update interests if provided
+      if (interests !== undefined) {
+        // Verify all tag IDs exist
+        if (interests.length > 0) {
+          const existingTags = await tx.tag.findMany({
+            where: { id: { in: interests } },
+            select: { id: true },
+          });
+          if (existingTags.length !== interests.length) {
+            throw new Error('One or more tag IDs are invalid');
+          }
+        }
+
+        // Delete existing manual interests
+        await tx.userInterest.deleteMany({
+          where: { userId: session.user.id, source: { in: ['onboarding', 'manual'] } },
+        });
+
+        // Create new interests
+        if (interests.length > 0) {
+          await tx.userInterest.createMany({
+            data: interests.map((tagId) => ({
+              userId: session.user.id,
+              tagId,
+              source: 'manual',
+              weight: 1.0,
+            })),
+          });
+        }
+      }
+
+      return user;
     });
 
     return NextResponse.json({

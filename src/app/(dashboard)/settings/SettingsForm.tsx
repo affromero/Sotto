@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { signIn, signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { InterestGrid } from '@/components/discovery/InterestGrid';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import styles from './page.module.css';
 
@@ -12,6 +13,12 @@ interface VoiceCloneData {
   id: string;
   name: string;
   elevenLabsVoiceId: string;
+}
+
+interface TagOption {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 interface SettingsFormProps {
@@ -25,6 +32,8 @@ interface SettingsFormProps {
   preferredHostVoiceId: string | null;
   preferredExpertVoiceId: string | null;
   voiceClones: VoiceCloneData[];
+  interestTags: TagOption[];
+  selectedInterestTagIds: string[];
 }
 
 const providerLabels: Record<string, string> = {
@@ -45,6 +54,8 @@ export function SettingsForm({
   preferredHostVoiceId: initialHostVoiceId,
   preferredExpertVoiceId: initialExpertVoiceId,
   voiceClones,
+  interestTags,
+  selectedInterestTagIds,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -65,6 +76,29 @@ export function SettingsForm({
   const [twitterSaving, setTwitterSaving] = useState(false);
   const [twitterSaved, setTwitterSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // Interests state
+  const [interestIds, setInterestIds] = useState<string[]>(selectedInterestTagIds);
+  const [interestsSaving, setInterestsSaving] = useState(false);
+  const [interestsSaved, setInterestsSaved] = useState(false);
+
+  const handleSaveInterests = async () => {
+    setInterestsSaving(true);
+    setInterestsSaved(false);
+    try {
+      const response = await fetch('/api/users/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interests: interestIds }),
+      });
+      if (response.ok) {
+        setInterestsSaved(true);
+        setTimeout(() => setInterestsSaved(false), 3000);
+      }
+    } finally {
+      setInterestsSaving(false);
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,6 +279,24 @@ export function SettingsForm({
             </Button>
           </div>
         </form>
+      </section>
+
+      {/* Interests Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Interests</h2>
+        <p className={styles.interestsDescription}>
+          Select topics you&apos;re curious about. This helps us recommend better podcasts for you.
+        </p>
+        <InterestGrid tags={interestTags} selectedTagIds={interestIds} onChange={setInterestIds} />
+        <div className={styles.formActions}>
+          <Button
+            onClick={handleSaveInterests}
+            loading={interestsSaving}
+            disabled={interestsSaving}
+          >
+            {interestsSaved ? 'Saved' : 'Save Interests'}
+          </Button>
+        </div>
       </section>
 
       {/* Notifications Section */}

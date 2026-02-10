@@ -34,6 +34,8 @@ All shared business logic and external service integrations live here.
 | `twitter.ts`             | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a)                                                                                                                                            | Twitter API v2                                |
 | `tweet-parser.ts`        | Claude-based tweet intent extraction (topic, title, depth, tone)                                                                                                                                         | Uses `claude.ts`                              |
 | `api-keys.ts`            | API key generation, hashing, validation                                                                                                                                                                  | crypto                                        |
+| `tag-icons.tsx`          | Tag slug → SVG icon mapping (12 categories), `TagIcon` component, `ONBOARDING_TAG_SLUGS` array                                                                                                           | React (SVG)                                   |
+| `inspire-engine.ts`      | "Inspire Me" topic suggestions: `getPersonalizedTopics()`, `getTrendingTopics()`, `getCurrentEvents()` (Claude + web search), `drillDown()`                                                              | Anthropic API + `redis.ts`                    |
 
 ## Providers (`src/lib/providers/`)
 

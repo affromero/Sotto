@@ -2,32 +2,33 @@
 
 ## Page Index
 
-| Path                   | File                                       | Auth Required               | Description                                    |
-| ---------------------- | ------------------------------------------ | --------------------------- | ---------------------------------------------- |
-| `/`                    | `page.tsx`                                 | No                          | Under construction page (public, no password)  |
-| `/romero`              | `romero/page.tsx`                          | No (password-gated)         | Full landing page (alpha testers only)         |
-| `/auth/login`          | `auth/login/page.tsx`                      | No                          | Sign in with OAuth                             |
-| `/auth/signup`         | `auth/signup/page.tsx`                     | No                          | Create account                                 |
-| `/dashboard`           | `(dashboard)/dashboard/page.tsx`           | Yes                         | My podcasts, usage                             |
-| `/settings`            | `(dashboard)/settings/page.tsx`            | Yes                         | Profile & preferences                          |
-| `/billing`             | `(dashboard)/billing/page.tsx`             | Yes                         | Subscription management                        |
-| `/analytics`           | `(dashboard)/analytics/page.tsx`           | Yes                         | Usage analytics dashboard                      |
-| `/settings/api`        | `(dashboard)/settings/api/page.tsx`        | Yes                         | API key management                             |
-| `/settings/voices`     | `(dashboard)/settings/voices/page.tsx`     | Yes                         | Voice clone management                         |
-| `/team`                | `(dashboard)/team/page.tsx`                | Yes                         | Team management                                |
-| `/team/invite/[token]` | `(dashboard)/team/invite/[token]/page.tsx` | Yes                         | Accept team invite                             |
-| `/create`              | `create/page.tsx`                          | Yes                         | Chat-based podcast creation                    |
-| `/podcast/[podcastId]` | `podcast/[podcastId]/page.tsx`             | No (public) / Yes (private) | Podcast player                                 |
-| `/feed`                | `feed/page.tsx`                            | No                          | Public podcast feed                            |
-| `/profile/[userId]`    | `profile/[userId]/page.tsx`                | No                          | User profile                                   |
-| `/pricing`             | `pricing/page.tsx`                         | No                          | Pricing tiers                                  |
-| `/feedback`            | `feedback/page.tsx`                        | No                          | Feedback form (early access)                   |
-| `/admin`               | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                       |
-| `/admin/users`         | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment              |
-| `/admin/podcasts`      | `(admin)/admin/podcasts/page.tsx`          | Yes (ADMIN only)            | Podcast management                             |
-| `/admin/waitlist`      | `(admin)/admin/waitlist/page.tsx`          | Yes (ADMIN only)            | Waitlist entries + CSV export                  |
-| `/admin/analytics`     | `(admin)/admin/analytics/page.tsx`         | Yes (ADMIN only)            | Site analytics (page views, visitors, devices) |
-| `/admin/moderation`    | `(admin)/admin/moderation/page.tsx`        | Yes (ADMIN only)            | Failed podcasts + feedback review              |
+| Path                   | File                                       | Auth Required               | Description                                     |
+| ---------------------- | ------------------------------------------ | --------------------------- | ----------------------------------------------- |
+| `/`                    | `page.tsx`                                 | No                          | Under construction page (public, no password)   |
+| `/romero`              | `romero/page.tsx`                          | No (password-gated)         | Full landing page (alpha testers only)          |
+| `/auth/login`          | `auth/login/page.tsx`                      | No                          | Sign in with OAuth                              |
+| `/auth/signup`         | `auth/signup/page.tsx`                     | No                          | Create account                                  |
+| `/dashboard`           | `(dashboard)/dashboard/page.tsx`           | Yes                         | My podcasts, usage                              |
+| `/settings`            | `(dashboard)/settings/page.tsx`            | Yes                         | Profile & preferences                           |
+| `/billing`             | `(dashboard)/billing/page.tsx`             | Yes                         | Subscription management                         |
+| `/analytics`           | `(dashboard)/analytics/page.tsx`           | Yes                         | Usage analytics dashboard                       |
+| `/settings/api`        | `(dashboard)/settings/api/page.tsx`        | Yes                         | API key management                              |
+| `/settings/voices`     | `(dashboard)/settings/voices/page.tsx`     | Yes                         | Voice clone management                          |
+| `/team`                | `(dashboard)/team/page.tsx`                | Yes                         | Team management                                 |
+| `/team/invite/[token]` | `(dashboard)/team/invite/[token]/page.tsx` | Yes                         | Accept team invite                              |
+| `/onboarding`          | `onboarding/page.tsx`                      | Yes                         | Post-signup interest selection (skippable)      |
+| `/create`              | `create/page.tsx`                          | Yes                         | Chat-based podcast creation + Inspire Me button |
+| `/podcast/[podcastId]` | `podcast/[podcastId]/page.tsx`             | No (public) / Yes (private) | Podcast player                                  |
+| `/feed`                | `feed/page.tsx`                            | No                          | Public podcast feed                             |
+| `/profile/[userId]`    | `profile/[userId]/page.tsx`                | No                          | User profile                                    |
+| `/pricing`             | `pricing/page.tsx`                         | No                          | Pricing tiers                                   |
+| `/feedback`            | `feedback/page.tsx`                        | No                          | Feedback form (early access)                    |
+| `/admin`               | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                        |
+| `/admin/users`         | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment               |
+| `/admin/podcasts`      | `(admin)/admin/podcasts/page.tsx`          | Yes (ADMIN only)            | Podcast management                              |
+| `/admin/waitlist`      | `(admin)/admin/waitlist/page.tsx`          | Yes (ADMIN only)            | Waitlist entries + CSV export                   |
+| `/admin/analytics`     | `(admin)/admin/analytics/page.tsx`         | Yes (ADMIN only)            | Site analytics (page views, visitors, devices)  |
+| `/admin/moderation`    | `(admin)/admin/moderation/page.tsx`        | Yes (ADMIN only)            | Failed podcasts + feedback review               |
 
 ## API Route Index
 
@@ -73,6 +74,9 @@
 | `/api/admin/podcasts/[podcastId]`                                | DELETE           | ADMIN      | Delete podcast (admin removal)                                              |
 | `/api/admin/waitlist/export`                                     | GET              | ADMIN      | Export waitlist as CSV                                                      |
 | `/api/users/me/avatar`                                           | POST             | Yes        | Upload avatar image (multipart/form-data)                                   |
+| `/api/onboarding/interests`                                      | POST             | Yes        | Save onboarding interest selections + mark onboarded                        |
+| `/api/inspire`                                                   | GET              | Yes        | "Inspire Me" topics: personalized, trending, current events                 |
+| `/api/inspire/drill`                                             | POST             | Yes        | Drill down into a category for specific subtopics                           |
 
 ## Route Groups
 

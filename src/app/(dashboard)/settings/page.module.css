@@ -283,6 +283,14 @@
   color: var(--color-text-secondary);
 }
 
+/* Interests */
+
+.interestsDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
 /* Twitter Integration */
 
 .twitterDescription {
