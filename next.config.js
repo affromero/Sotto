@@ -2,6 +2,7 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core'],
   turbopack: {},
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
