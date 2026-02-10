@@ -158,6 +158,22 @@ jobs:
               else
                 HEALTH_LINE="Health: ⚠️ ${LIVE_STATUS} (${LIVE_VERSION} — expected ${COMMIT_SHA})"
               fi
+
+              # Build per-service check lines
+              CHECKS_LINE=""
+              for svc in database redis storage; do
+                SVC_STATUS=$(echo "$HEALTH" | jq -r ".checks.${svc}.status // empty")
+                SVC_MS=$(echo "$HEALTH" | jq -r ".checks.${svc}.latencyMs // empty")
+                if [ -n "$SVC_STATUS" ]; then
+                  if [ "$SVC_STATUS" = "ok" ]; then
+                    CHECKS_LINE="${CHECKS_LINE}  ${svc}: ✅ ${SVC_MS}ms"$'\n'
+                  elif [ "$SVC_STATUS" = "not_configured" ]; then
+                    CHECKS_LINE="${CHECKS_LINE}  ${svc}: ⏭ not configured"$'\n'
+                  else
+                    CHECKS_LINE="${CHECKS_LINE}  ${svc}: ❌ ${SVC_STATUS}"$'\n'
+                  fi
+                fi
+              done
             else
               HEALTH_LINE="Health: ⚠️ unreachable"
             fi
@@ -168,7 +184,7 @@ jobs:
           By: ${AUTHOR}
           ${PITCH_LINE}
           ${HEALTH_LINE}
-          ${FAIL_LINE}
+          ${CHECKS_LINE}${FAIL_LINE}
 
           <a href=\"https://sotto.fm/romero\">sotto.fm</a> · <a href=\"https://sotto.fm/pitch\">Pitch</a> · <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">Run</a>"
 
