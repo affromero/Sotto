@@ -19,23 +19,24 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Sotto — Podcasts That Listen Back',
+    default: 'Sotto — Create. Fork. Share.',
     template: '%s | Sotto',
   },
   description:
-    'Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.',
-  keywords: ['podcast', 'AI', 'interactive', 'learning', 'education', 'voice'],
+    'The open podcast network. Create AI podcasts, import your own, fork and remix, and share knowledge with the world.',
+  keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
   openGraph: {
-    title: 'Sotto — Podcasts That Listen Back',
-    description: 'Generate AI podcasts, interrupt to ask questions, share with the world.',
+    title: 'Sotto — The Open Podcast Network',
+    description:
+      'Podcasts you can remix, question, and share with the world. Create with AI or import your own.',
     type: 'website',
     locale: 'en_US',
     siteName: 'Sotto',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Sotto — Podcasts That Listen Back',
-    description: 'Generate AI podcasts, interrupt to ask questions, share with the world.',
+    title: 'Sotto — Create. Fork. Share.',
+    description: 'The open podcast network. Create AI podcasts, import your own, fork and remix.',
   },
   manifest: '/manifest.json',
   themeColor: '#D97706',

@@ -7,7 +7,7 @@ import styles from './page.module.css';
 export function PricingClient() {
   const [loading, setLoading] = useState(false);
 
-  const handleSelect = async (tier: 'free' | 'starter' | 'pro' | 'studio') => {
+  const handleSelect = async (tier: 'free' | 'starter' | 'pro' | 'studio' | 'power') => {
     if (tier === 'free') {
       window.location.href = '/create';
       return;
@@ -38,7 +38,7 @@ export function PricingClient() {
           tier="free"
           price={0}
           features={[
-            '1 credit per month',
+            '3 credits per month',
             'Up to 5 minutes each',
             'Standard AI voices',
             'Public podcasts only',
@@ -50,7 +50,7 @@ export function PricingClient() {
           tier="starter"
           price={14}
           features={[
-            '3 credits per month',
+            '5 credits per month',
             'Up to 10 minutes each',
             '1 personal voice clone',
             'MP3 download',
@@ -89,6 +89,21 @@ export function PricingClient() {
             '8 credit rollover',
           ]}
           onSelect={() => handleSelect('studio')}
+          loading={loading}
+        />
+        <PricingCard
+          tier="power"
+          price={9}
+          badge="BYOK"
+          features={[
+            '50 credits per month',
+            'Up to 10 minutes each',
+            'Bring your own ElevenLabs key',
+            '10 voice clones (your account)',
+            'All Pro features included',
+            '10 credit rollover',
+          ]}
+          onSelect={() => handleSelect('power')}
           loading={loading}
         />
       </div>

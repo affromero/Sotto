@@ -2,12 +2,13 @@ import { Check } from 'lucide-react';
 import styles from './PricingCard.module.css';
 
 interface PricingCardProps {
-  tier: 'free' | 'starter' | 'pro' | 'studio';
+  tier: 'free' | 'starter' | 'pro' | 'studio' | 'power';
   price: number;
   interval?: string;
   features: string[];
   isCurrentPlan?: boolean;
   isPopular?: boolean;
+  badge?: string;
   onSelect: () => void;
   loading?: boolean;
 }
@@ -17,6 +18,7 @@ const tierLabels: Record<string, string> = {
   starter: 'Starter',
   pro: 'Pro',
   studio: 'Studio',
+  power: 'Power',
 };
 
 export function PricingCard({
@@ -26,16 +28,18 @@ export function PricingCard({
   features,
   isCurrentPlan = false,
   isPopular = false,
+  badge,
   onSelect,
   loading = false,
 }: PricingCardProps) {
   const ctaLabel = isCurrentPlan ? 'Current Plan' : tier === 'free' ? 'Get Started' : 'Subscribe';
+  const badgeText = badge || (isPopular ? 'Most Popular' : undefined);
 
   return (
     <div
       className={`${styles.card} ${isPopular ? styles.popular : ''} ${isCurrentPlan ? styles.current : ''}`}
     >
-      {isPopular && <span className={styles.badge}>Most Popular</span>}
+      {badgeText && <span className={styles.badge}>{badgeText}</span>}
       <div className={styles.header}>
         <h3 className={styles.tierName}>{tierLabels[tier]}</h3>
         <div className={styles.priceRow}>
