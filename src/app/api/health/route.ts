@@ -29,12 +29,29 @@ export async function GET() {
     healthy = false;
   }
 
+  const envKeys = [
+    'DATABASE_URL',
+    'REDIS_URL',
+    'NEXTAUTH_SECRET',
+    'SITE_PASSWORD',
+    'PITCH_PASSWORD',
+    'ANTHROPIC_API_KEY',
+    'ELEVENLABS_API_KEY',
+    'STRIPE_SECRET_KEY',
+  ];
+
+  const env: Record<string, boolean> = {};
+  for (const key of envKeys) {
+    env[key] = !!process.env[key];
+  }
+
   return NextResponse.json(
     {
       status: healthy ? 'healthy' : 'degraded',
       version: process.env.COMMIT_SHA || 'dev',
       timestamp: new Date().toISOString(),
       checks,
+      env,
     },
     { status: healthy ? 200 : 503 }
   );
