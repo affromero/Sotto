@@ -1,15 +1,34 @@
 import { NextResponse } from 'next/server';
+import { execFile } from 'child_process';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
+import { stripe } from '@/lib/stripe';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 
 export const dynamic = 'force-dynamic';
 
+type CheckResult = { status: string; latencyMs?: number; detail?: string };
+
+const QUEUE_NAMES = [
+  'content-extraction',
+  'script-generation',
+  'script-verification',
+  'reference-validation',
+  'audio-generation',
+  'audio-stitching',
+  'interactions',
+  'segment-regeneration',
+  'notifications',
+  'pdf-generation',
+  'twitter-mentions',
+  'twitter-reply',
+];
+
 export async function GET() {
-  const checks: Record<string, { status: string; latencyMs?: number }> = {};
+  const checks: Record<string, CheckResult> = {};
   let healthy = true;
 
-  // Check database
+  // --- Database ---
   const dbStart = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -19,7 +38,7 @@ export async function GET() {
     healthy = false;
   }
 
-  // Check Redis
+  // --- Redis ---
   const redisStart = Date.now();
   try {
     const client = getRedisClient();
@@ -30,7 +49,7 @@ export async function GET() {
     healthy = false;
   }
 
-  // Check R2 storage (non-critical — won't fail the health check)
+  // --- R2 Storage (non-critical) ---
   const r2Start = Date.now();
   try {
     const accountId = process.env.R2_ACCOUNT_ID;
@@ -51,9 +70,115 @@ export async function GET() {
     }
   } catch {
     checks.storage = { status: 'error', latencyMs: Date.now() - r2Start };
-    // Don't set healthy = false — storage issues are degraded, not down
   }
 
+  // --- FFmpeg (non-critical) ---
+  const ffmpegStart = Date.now();
+  try {
+    const version = await new Promise<string>((resolve, reject) => {
+      execFile('ffmpeg', ['-version'], { timeout: 3000 }, (err, stdout) => {
+        if (err) return reject(err);
+        const match = stdout.match(/ffmpeg version (\S+)/);
+        resolve(match ? match[1] : 'unknown');
+      });
+    });
+    checks.ffmpeg = { status: 'ok', latencyMs: Date.now() - ffmpegStart, detail: version };
+  } catch {
+    checks.ffmpeg = { status: 'not_installed', latencyMs: Date.now() - ffmpegStart };
+  }
+
+  // --- Claude Code CLI (non-critical) ---
+  const ccStart = Date.now();
+  try {
+    const ccVersion = await new Promise<string>((resolve, reject) => {
+      execFile('claude', ['--version'], { timeout: 3000 }, (err, stdout) => {
+        if (err) return reject(err);
+        resolve(stdout.trim());
+      });
+    });
+    checks.claudeCode = { status: 'ok', latencyMs: Date.now() - ccStart, detail: ccVersion };
+  } catch {
+    checks.claudeCode = { status: 'not_installed', latencyMs: Date.now() - ccStart };
+  }
+
+  // --- Anthropic API (non-critical) ---
+  const anthropicStart = Date.now();
+  try {
+    if (process.env.ANTHROPIC_API_KEY) {
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+      checks.anthropic = {
+        status: res.ok ? 'ok' : 'error',
+        latencyMs: Date.now() - anthropicStart,
+        ...(!res.ok && { detail: `HTTP ${res.status}` }),
+      };
+    } else {
+      checks.anthropic = { status: 'not_configured', latencyMs: 0 };
+    }
+  } catch {
+    checks.anthropic = { status: 'error', latencyMs: Date.now() - anthropicStart };
+  }
+
+  // --- ElevenLabs API (non-critical) ---
+  const elStart = Date.now();
+  try {
+    if (process.env.ELEVENLABS_API_KEY) {
+      const res = await fetch('https://api.elevenlabs.io/v1/user', {
+        headers: { 'xi-api-key': process.env.ELEVENLABS_API_KEY },
+        signal: AbortSignal.timeout(5000),
+      });
+      checks.elevenlabs = {
+        status: res.ok ? 'ok' : 'error',
+        latencyMs: Date.now() - elStart,
+        ...(!res.ok && { detail: `HTTP ${res.status}` }),
+      };
+    } else {
+      checks.elevenlabs = { status: 'not_configured', latencyMs: 0 };
+    }
+  } catch {
+    checks.elevenlabs = { status: 'error', latencyMs: Date.now() - elStart };
+  }
+
+  // --- Stripe (non-critical) ---
+  const stripeStart = Date.now();
+  try {
+    if (stripe) {
+      await stripe.balance.retrieve();
+      checks.stripe = { status: 'ok', latencyMs: Date.now() - stripeStart };
+    } else {
+      checks.stripe = { status: 'not_configured', latencyMs: 0 };
+    }
+  } catch {
+    checks.stripe = { status: 'error', latencyMs: Date.now() - stripeStart };
+  }
+
+  // --- BullMQ Queues (non-critical, uses existing Redis) ---
+  try {
+    const redis = getRedisClient();
+    const queues: Record<string, { waiting: number; active: number; failed: number }> = {};
+    for (const name of QUEUE_NAMES) {
+      const [waiting, active, failed] = await Promise.all([
+        redis.llen(`bull:${name}:wait`),
+        redis.llen(`bull:${name}:active`),
+        redis.zcard(`bull:${name}:failed`),
+      ]);
+      queues[name] = { waiting, active, failed };
+    }
+    const totalFailed = Object.values(queues).reduce((sum, q) => sum + q.failed, 0);
+    checks.queues = {
+      status: totalFailed > 50 ? 'degraded' : 'ok',
+      detail: JSON.stringify(queues),
+    };
+  } catch {
+    checks.queues = { status: 'error' };
+  }
+
+  // --- Env vars ---
   const envKeys = [
     'DATABASE_URL',
     'REDIS_URL',
@@ -74,12 +199,25 @@ export async function GET() {
     env[key] = !!process.env[key];
   }
 
+  // --- OAuth providers ---
+  const oauth: Record<string, boolean> = {
+    google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+    twitter: !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET),
+    apple: !!(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET),
+  };
+
+  // --- VAPID (Web Push) ---
+  const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+
   return NextResponse.json(
     {
       status: healthy ? 'healthy' : 'degraded',
       version: process.env.COMMIT_SHA || 'dev',
       timestamp: new Date().toISOString(),
       checks,
+      oauth,
+      vapid,
       env,
     },
     { status: healthy ? 200 : 503 }

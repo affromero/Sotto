@@ -1,7 +1,10 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
+import { useEffect, useState } from 'react';
+import { signIn, getProviders } from 'next-auth/react';
 import styles from './login/page.module.css';
+
+type ProviderId = 'google' | 'github' | 'apple';
 
 function GoogleIcon() {
   return (
@@ -52,33 +55,44 @@ interface AuthButtonsProps {
   callbackUrl?: string;
 }
 
+const providerConfig: Record<ProviderId, { icon: React.FC; label: string }> = {
+  google: { icon: GoogleIcon, label: 'Continue with Google' },
+  github: { icon: GitHubIcon, label: 'Continue with GitHub' },
+  apple: { icon: AppleIcon, label: 'Continue with Apple' },
+};
+
 export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
+  const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
+
+  useEffect(() => {
+    getProviders().then((providers) => {
+      if (providers) {
+        const ids = Object.keys(providers).filter((id): id is ProviderId => id in providerConfig);
+        setAvailableProviders(ids);
+      }
+    });
+  }, []);
+
+  if (availableProviders.length === 0) {
+    return null;
+  }
+
   return (
     <div className={styles.providers}>
-      <button
-        className={styles.providerBtn}
-        onClick={() => signIn('google', { callbackUrl })}
-        type="button"
-      >
-        <GoogleIcon />
-        Continue with Google
-      </button>
-      <button
-        className={styles.providerBtn}
-        onClick={() => signIn('github', { callbackUrl })}
-        type="button"
-      >
-        <GitHubIcon />
-        Continue with GitHub
-      </button>
-      <button
-        className={styles.providerBtn}
-        onClick={() => signIn('apple', { callbackUrl })}
-        type="button"
-      >
-        <AppleIcon />
-        Continue with Apple
-      </button>
+      {availableProviders.map((id) => {
+        const { icon: Icon, label } = providerConfig[id];
+        return (
+          <button
+            key={id}
+            className={styles.providerBtn}
+            onClick={() => signIn(id, { callbackUrl })}
+            type="button"
+          >
+            <Icon />
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
