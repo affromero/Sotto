@@ -54,12 +54,13 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: sotto
           key: ${{ secrets.SSH_KEY }}
-          script_stop: true
+          capture_stdout: true
           script: |
             set -e
             cd ~/sotto
 
             echo "Pulling latest code..."
+            git remote set-url origin git@github.com:affromero/Sotto.git
             git pull origin main
 
             echo "Building containers..."
@@ -90,6 +91,7 @@ jobs:
           username: sotto
           key: ${{ secrets.SSH_KEY }}
           command_timeout: 10m
+          capture_stdout: true
           envs: GITHUB_TOKEN
           script: |
             cd ~/sotto
@@ -103,7 +105,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DEPLOY_STATUS: ${{ steps.deploy.outcome || job.status }}
+          DEPLOY_STDOUT: ${{ steps.deploy.outputs.stdout }}
           PITCH_STATUS: ${{ steps.pitch.outcome }}
+          PITCH_STDOUT: ${{ steps.pitch.outputs.stdout }}
         run: |
           COMMIT_MSG=$(git log -1 --format='%s')
           COMMIT_SHA=$(git log -1 --format='%h')
@@ -125,10 +129,26 @@ jobs:
             PITCH_LINE="Pitch: ❌ failed"
           fi
 
+          # Build failure reason from last lines of stdout
+          FAIL_LINE=""
+          if [ "$DEPLOY_STATUS" = "failure" ] && [ -n "$DEPLOY_STDOUT" ]; then
+            LAST_LINES=$(echo "$DEPLOY_STDOUT" | tail -3 | head -c 200)
+            FAIL_LINE="
+          \`\`\`
+          ${LAST_LINES}
+          \`\`\`"
+          elif [ "$PITCH_STATUS" = "failure" ] && [ -n "$PITCH_STDOUT" ]; then
+            LAST_LINES=$(echo "$PITCH_STDOUT" | tail -3 | head -c 200)
+            FAIL_LINE="
+          \`\`\`
+          ${LAST_LINES}
+          \`\`\`"
+          fi
+
           TEXT="${EMOJI} *sotto.fm ${STATUS}*
           Commit: \`${COMMIT_SHA}\` ${COMMIT_MSG}
           By: ${AUTHOR}
-          ${PITCH_LINE}
+          ${PITCH_LINE}${FAIL_LINE}
 
           [sotto.fm](https://sotto.fm/romero) · [Pitch](https://sotto.fm/pitch) · [Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
