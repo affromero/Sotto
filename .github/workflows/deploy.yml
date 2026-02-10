@@ -30,6 +30,10 @@ jobs:
     needs: ci
     runs-on: ubuntu-latest
     environment: production
+    outputs:
+      deploy_status: ${{ steps.deploy.outcome }}
+      pitch_status: ${{ steps.pitch.outcome }}
+      pitch_changed: ${{ steps.pitch_check.outputs.rebuild }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -106,26 +110,40 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.AI_SKILLS_TOKEN }}
           PITCH_FILES_CHANGED: ${{ steps.pitch_check.outputs.rebuild }}
 
+  notify:
+    name: Telegram Notification
+    needs: [ci, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
       - name: Notify via Telegram
-        if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DEPLOY_STATUS: ${{ steps.deploy.outcome || job.status }}
-          PITCH_STATUS: ${{ steps.pitch.outcome }}
-          PITCH_FILES_CHANGED: ${{ steps.pitch_check.outputs.rebuild }}
+          CI_STATUS: ${{ needs.ci.result }}
+          DEPLOY_STATUS: ${{ needs.deploy.outputs.deploy_status || needs.deploy.result }}
+          PITCH_STATUS: ${{ needs.deploy.outputs.pitch_status }}
+          PITCH_FILES_CHANGED: ${{ needs.deploy.outputs.pitch_changed }}
         run: |
           COMMIT_MSG=$(git log -1 --format='%s')
           COMMIT_SHA=$(git log -1 --format='%h')
           PREV_SHA=$(git log -1 --format='%h' HEAD~1)
           AUTHOR=$(git log -1 --format='%an')
 
-          if [ "$DEPLOY_STATUS" = "success" ] || [ "$DEPLOY_STATUS" = "" ]; then
+          # Determine overall status
+          if [ "$CI_STATUS" != "success" ]; then
+            EMOJI="❌"
+            STATUS="CI failed"
+          elif [ "$DEPLOY_STATUS" = "success" ]; then
             EMOJI="✅"
             STATUS="deployed"
           else
             EMOJI="❌"
-            STATUS="failed"
+            STATUS="deploy failed"
           fi
 
           if [ "$PITCH_STATUS" = "success" ] && [ "$PITCH_FILES_CHANGED" = "true" ]; then
@@ -140,7 +158,9 @@ jobs:
 
           # Build failure detail
           FAIL_LINE=""
-          if [ "$DEPLOY_STATUS" = "failure" ]; then
+          if [ "$CI_STATUS" != "success" ]; then
+            FAIL_LINE="Reason: CI checks failed — lint, types, tests, or build"
+          elif [ "$DEPLOY_STATUS" = "failure" ]; then
             FAIL_LINE="Reason: deploy SSH failed — check run logs"
           elif [ "$PITCH_STATUS" = "failure" ]; then
             FAIL_LINE="Reason: pitch rebuild failed — check run logs"

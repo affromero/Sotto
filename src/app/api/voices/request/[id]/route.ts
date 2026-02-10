@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { updateVoiceRequestSchema } from '@/lib/validations';
 
 interface RouteParams {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -12,6 +12,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const { id } = await params;
 
   const body = await request.json();
   const parsed = updateVoiceRequestSchema.safeParse(body);
@@ -22,7 +24,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { status: newStatus } = parsed.data;
 
   const voiceRequest = await prisma.voiceRequest.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       voiceClone: { select: { name: true } },
       requester: { select: { id: true, name: true } },
@@ -53,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const updated = await prisma.voiceRequest.update({
-    where: { id: params.id },
+    where: { id },
     data: { status: newStatus },
   });
 
