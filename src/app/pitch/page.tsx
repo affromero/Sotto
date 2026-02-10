@@ -148,12 +148,21 @@ export default function PitchPage() {
       const absX = Math.abs(e.deltaX);
       const absY = Math.abs(e.deltaY);
 
+      // Any horizontal component: suppress browser back/forward immediately
+      if (absX > 0) {
+        e.preventDefault();
+      }
+
       // Filter out vertical-dominant scrolling
       if (absY > 2 * absX) return;
       // Ignore tiny movements
       if (absX < 2) return;
 
-      e.preventDefault();
+      // Drain events while animating so they don't pile up
+      if (animating) {
+        swipeDeltaRef.current = 0;
+        return;
+      }
 
       swipeDeltaRef.current += e.deltaX;
 
@@ -179,7 +188,7 @@ export default function PitchPage() {
       el.removeEventListener('wheel', handleWheel);
       if (swipeTimerRef.current) clearTimeout(swipeTimerRef.current);
     };
-  }, [state, goNext, goPrev]);
+  }, [state, animating, goNext, goPrev]);
 
   // Touch swipe detection
   useEffect(() => {

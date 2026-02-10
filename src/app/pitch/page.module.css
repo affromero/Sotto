@@ -295,6 +295,8 @@
   min-height: 0;
   position: relative;
   overflow: hidden;
+  overscroll-behavior-x: none;
+  touch-action: pan-y pinch-zoom;
 }
 
 .iframeContainer {
@@ -307,6 +309,8 @@
   inset: 0;
   z-index: 4;
   cursor: grab;
+  overscroll-behavior-x: none;
+  touch-action: pan-y pinch-zoom;
 }
 
 .swipeOverlay:active {
