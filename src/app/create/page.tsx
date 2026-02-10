@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
@@ -11,6 +11,14 @@ import styles from './page.module.css';
 type Step = 'discovery' | 'voice' | 'generating';
 
 export default function CreatePage() {
+  return (
+    <Suspense>
+      <CreatePageContent />
+    </Suspense>
+  );
+}
+
+function CreatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
