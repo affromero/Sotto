@@ -33,7 +33,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 2
+
+      - name: Check if pitch rebuild needed
+        id: pitch_check
+        run: |
+          PITCH_PATHS="docs/ scripts/rebuild-pitch.sh scripts/capture-pitch-screenshots.ts prisma/seed-demo.ts .claude/skills/update-pitch/"
+          if git diff --quiet HEAD~1 HEAD -- $PITCH_PATHS 2>/dev/null; then
+            echo "rebuild=false" >> $GITHUB_OUTPUT
+            echo "No pitch-related files changed"
+          else
+            echo "rebuild=true" >> $GITHUB_OUTPUT
+            echo "Pitch-related files changed — will rebuild after deploy"
+          fi
 
       - name: Deploy via SSH
         id: deploy
@@ -69,12 +81,29 @@ jobs:
 
             echo "Deploy complete!"
 
+      - name: Rebuild pitch deck
+        id: pitch
+        if: steps.deploy.outcome == 'success' && steps.pitch_check.outputs.rebuild == 'true'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: sotto
+          key: ${{ secrets.SSH_KEY }}
+          command_timeout: 10m
+          envs: GITHUB_TOKEN
+          script: |
+            cd ~/sotto
+            GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/rebuild-pitch.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.AI_SKILLS_TOKEN }}
+
       - name: Notify via Telegram
         if: always()
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DEPLOY_STATUS: ${{ steps.deploy.outcome || job.status }}
+          PITCH_STATUS: ${{ steps.pitch.outcome }}
         run: |
           COMMIT_MSG=$(git log -1 --format='%s')
           COMMIT_SHA=$(git log -1 --format='%h')
@@ -88,10 +117,20 @@ jobs:
             STATUS="failed"
           fi
 
+          if [ "$PITCH_STATUS" = "success" ]; then
+            PITCH_LINE="Pitch: ✅ rebuilt"
+          elif [ "$PITCH_STATUS" = "skipped" ] || [ -z "$PITCH_STATUS" ]; then
+            PITCH_LINE="Pitch: ⏭ skipped"
+          else
+            PITCH_LINE="Pitch: ❌ failed"
+          fi
+
           TEXT="${EMOJI} *sotto.fm ${STATUS}*
           Commit: \`${COMMIT_SHA}\` ${COMMIT_MSG}
           By: ${AUTHOR}
-          [View run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          ${PITCH_LINE}
+
+          [sotto.fm](https://sotto.fm/romero) · [Pitch](https://sotto.fm/pitch) · [Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \

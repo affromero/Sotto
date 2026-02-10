@@ -41,6 +41,7 @@ prisma/migrations/
 
 # Documentation
 docs/*.pdf
+docs/99-app-showcase.md
 
 # Cache
 .cache/
