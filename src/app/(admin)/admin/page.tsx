@@ -63,14 +63,16 @@ export default async function AdminOverviewPage() {
 
   const tierCounts = {
     FREE: 0,
+    STARTER: 0,
     PRO: 0,
-    CREATOR: 0,
+    STUDIO: 0,
   };
 
   stats.tierDistribution.forEach((tier) => {
     if (tier.tier === 'FREE') tierCounts.FREE = tier._count;
+    if (tier.tier === 'STARTER') tierCounts.STARTER = tier._count;
     if (tier.tier === 'PRO') tierCounts.PRO = tier._count;
-    if (tier.tier === 'CREATOR') tierCounts.CREATOR = tier._count;
+    if (tier.tier === 'STUDIO') tierCounts.STUDIO = tier._count;
   });
 
   return (
@@ -150,12 +152,16 @@ export default async function AdminOverviewPage() {
             <span className={styles.statValue}>{tierCounts.FREE.toLocaleString()}</span>
           </div>
           <div className={styles.statCard}>
+            <span className={styles.statLabel}>Starter</span>
+            <span className={styles.statValue}>{tierCounts.STARTER.toLocaleString()}</span>
+          </div>
+          <div className={styles.statCard}>
             <span className={styles.statLabel}>Pro</span>
             <span className={styles.statValue}>{tierCounts.PRO.toLocaleString()}</span>
           </div>
           <div className={styles.statCard}>
-            <span className={styles.statLabel}>Creator</span>
-            <span className={styles.statValue}>{tierCounts.CREATOR.toLocaleString()}</span>
+            <span className={styles.statLabel}>Studio</span>
+            <span className={styles.statValue}>{tierCounts.STUDIO.toLocaleString()}</span>
           </div>
         </div>
       </div>

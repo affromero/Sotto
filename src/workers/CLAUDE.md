@@ -30,6 +30,15 @@ content-extraction → script-generation → script-verification ──→ refer
 twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast → kicks off pipeline above
 ```
 
+## Centralized Failure Handler
+
+`queue.ts` includes a centralized `setupQueueEvents()` handler that:
+
+1. Catches all terminal job failures across all queues
+2. Marks the associated podcast as `FAILED`
+3. **Automatically refunds credits** (1 base + premium voice surcharge if applicable) via `refundCredits()`
+4. Queues a notification: "Generation failed. Credit refunded."
+
 ## Adding a New Worker
 
 1. Create `src/workers/new-thing.worker.ts` with `export async function processNewThing(job: Job<Payload>)`

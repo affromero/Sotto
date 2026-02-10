@@ -1,6 +1,9 @@
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { logger } from './logger';
+import { prisma } from './prisma';
+import { refundCredits } from './credits';
+import { TIER_LIMITS, type TierName } from './stripe';
 
 /**
  * Job types for the Sotto queue system
@@ -182,7 +185,7 @@ export function createQueue(name: string, config?: Partial<QueueConfig>): Queue 
   return queue;
 }
 
-function setupQueueEvents(_queue: Queue, queueName: string): void {
+function setupQueueEvents(queue: Queue, queueName: string): void {
   const events = new QueueEvents(queueName, {
     connection: createRedisConnection(`events:${queueName}`),
   });
@@ -191,11 +194,65 @@ function setupQueueEvents(_queue: Queue, queueName: string): void {
     logger.info(`Job completed in ${queueName}:`, { jobId: args.jobId });
   });
 
-  events.on('failed', (args) => {
+  events.on('failed', async (args) => {
     logger.error(`Job failed in ${queueName}:`, {
       jobId: args.jobId,
       failedReason: args.failedReason,
     });
+
+    // Centralized failure handler: refund credits on final failure
+    try {
+      const job = await queue.getJob(args.jobId);
+      const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
+      if (!podcastId) return;
+
+      const podcast = await prisma.podcast.findUnique({
+        where: { id: podcastId },
+        select: {
+          status: true,
+          userId: true,
+          usePremiumVoice: true,
+          user: { select: { subscription: { select: { tier: true } } } },
+        },
+      });
+
+      if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED') return;
+
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { status: 'FAILED' },
+      });
+
+      // Refund credits
+      const tier = (podcast.user.subscription?.tier ?? 'FREE') as TierName;
+      const limits = TIER_LIMITS[tier];
+      const refundAmount = 1 + (podcast.usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
+
+      await refundCredits(podcast.userId, refundAmount, 'generation_failed', podcastId);
+
+      // Queue a notification
+      const notifQueue = queueInstances.get('notifications');
+      if (notifQueue) {
+        await notifQueue.add('send_notification', {
+          userId: podcast.userId,
+          type: 'PODCAST_READY',
+          title: 'Generation Failed',
+          message: `Your podcast generation failed. ${refundAmount} credit${refundAmount > 1 ? 's' : ''} refunded.`,
+          data: { podcastId },
+        });
+      }
+
+      logger.info('Refunded credits after generation failure', {
+        userId: podcast.userId,
+        podcastId,
+        refundAmount,
+      });
+    } catch (err) {
+      logger.error('Failed to process failure handler', {
+        jobId: args.jobId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   });
 
   events.on('error', (err) => {

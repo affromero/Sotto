@@ -23,7 +23,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 | Audio     | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER`                 |
 | Stitching | FFmpeg (segment concatenation + normalization)                                          |
 | Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                        |
-| Payments  | Stripe (Free $0 / Pro $14 / Creator $29) — swappable via `PAYMENT_PROVIDER`             |
+| Payments  | Stripe (Free $0 / Starter $9 / Pro $24 / Studio $49) — swappable via `PAYMENT_PROVIDER` |
 | PDF       | pdfmake (server-side transcript PDF generation)                                         |
 | Hosting   | Vercel (web) + Railway (workers)                                                        |
 
@@ -108,7 +108,8 @@ src/
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
 │   ├── create/                 # GenerationProgress, ScriptPreview
 │   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar
-│   ├── pricing/                # PricingCard, FeatureList, SoonBadge
+│   ├── pricing/                # PricingCard, FeatureList, TierComparison
+│   ├── billing/                # CreditPackCard
 │   ├── profile/                # ProfileHeader, PodcastList, FollowButton
 │   ├── notifications/          # NotificationBell, NotificationList, PushPrompt
 │   ├── settings/               # VoicePreferenceSelector
@@ -121,7 +122,8 @@ src/
 │   ├── auth.ts                 # NextAuth configuration
 │   ├── claude.ts               # Anthropic Claude client (streaming + non-streaming)
 │   ├── elevenlabs.ts           # ElevenLabs TTS client
-│   ├── stripe.ts               # Stripe client + subscription management
+│   ├── stripe.ts               # Stripe client + tier limits + canGenerate/canInteract
+│   ├── credits.ts              # Credit operations (consume, refund, grant, purchase)
 │   ├── r2.ts                   # Cloudflare R2 storage client
 │   ├── discovery-agent.ts      # Chat-based discovery: Claude streaming + chip generation
 │   ├── script-generator.ts     # Claude script generation with [N] citations + revision with feedback
@@ -135,7 +137,7 @@ src/
 │   ├── content-parser.ts       # URL/PDF content extraction
 │   ├── recommendations.ts      # Search similar podcasts, rank by relevance
 │   ├── push-notifications.ts   # Web Push API registration + send
-│   ├── subscription.ts         # Subscription tier management + limits
+│   ├── subscription.ts         # Subscription tier management + credit balance queries
 │   ├── notifications.ts        # In-app notification helpers
 │   ├── validations.ts          # Zod schemas for API validation
 │   ├── twitter.ts              # Twitter API v2 client (mentions, replies, OAuth 1.0a)
@@ -262,7 +264,8 @@ User listening → taps "Ask a Question" → podcast pauses
 | `Interaction`        | Question at timestamp, answer, resolution status                                              |
 | `Like` / `Save`      | Social engagement                                                                             |
 | `Tag` / `PodcastTag` | Discovery taxonomy                                                                            |
-| `Subscription`       | Stripe (FREE/PRO/CREATOR)                                                                     |
+| `Subscription`       | Stripe (FREE/STARTER/PRO/STUDIO) with credit balance + rollover                               |
+| `CreditTransaction`  | Audit trail: credit grants, consumption, refunds, purchases                                   |
 | `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                          |
 | `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                           |
 | `Team`               | Team ownership + member management                                                            |
@@ -275,13 +278,18 @@ User listening → taps "Ask a Question" → podcast pauses
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
 
-## Pricing Tiers
+## Pricing Tiers (Credit-Based)
 
-| Tier    | Price  | Podcasts | Duration | Interactions   | Premium Credits | Voice Clones | Sound Effects            |
-| ------- | ------ | -------- | -------- | -------------- | --------------- | ------------ | ------------------------ |
-| Free    | $0     | 2/month  | 10 min   | 2 per podcast  | 0               | 0            | Standard                 |
-| Pro     | $14/mo | 8/month  | 10 min   | 10 per podcast | 3               | 2            | Standard                 |
-| Creator | $29/mo | 30/month | 10 min   | Unlimited      | 10              | 5            | Premium (ElevenLabs SFX) |
+Each podcast generation costs 1 credit (+ premium voice surcharge where applicable).
+
+| Tier    | Price  | Credits/mo | Rollover | Duration | Interactions  | Voice Clones | Premium Surcharge | Sound Effects            |
+| ------- | ------ | ---------- | -------- | -------- | ------------- | ------------ | ----------------- | ------------------------ |
+| Free    | $0     | 2          | 0        | 10 min   | 2 per podcast | 0            | +1 credit         | Standard                 |
+| Starter | $9/mo  | 5          | 2        | 10 min   | 5 per podcast | 1            | +1 credit         | Standard                 |
+| Pro     | $24/mo | 15         | 5        | 10 min   | Unlimited     | 3            | +1 credit         | Standard                 |
+| Studio  | $49/mo | 50         | 20       | 10 min   | Unlimited     | 10           | 0 (included)      | Premium (ElevenLabs SFX) |
+
+Credit packs available for paid tiers: 3 credits, 10 credits, 25 credits (one-time purchase).
 
 ## Engineering Standards
 

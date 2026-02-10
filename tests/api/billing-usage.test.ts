@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockPrismaUserFindUnique = vi.fn();
-const mockPrismaPodcastCount = vi.fn();
-const mockPrismaInteractionCount = vi.fn();
 const mockPrismaSubscriptionFindUnique = vi.fn();
+const mockPrismaCreditTransactionFindMany = vi.fn();
 const mockAuth = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
@@ -16,14 +15,11 @@ vi.mock('@/lib/prisma', () => ({
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
-    podcast: {
-      count: (...args: unknown[]) => mockPrismaPodcastCount(...args),
-    },
-    interaction: {
-      count: (...args: unknown[]) => mockPrismaInteractionCount(...args),
-    },
     subscription: {
       findUnique: (...args: unknown[]) => mockPrismaSubscriptionFindUnique(...args),
+    },
+    creditTransaction: {
+      findMany: (...args: unknown[]) => mockPrismaCreditTransactionFindMany(...args),
     },
   },
 }));
@@ -39,54 +35,113 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: {
-      podcastsPerMonth: 2,
+      creditsMonthly: 0,
+      maxRollover: 0,
       maxDurationMinutes: 10,
       interactionsPerPodcast: 2,
-      premiumVoiceCredits: 0,
+      maxVoiceClones: 0,
+      premiumVoiceSurcharge: 1.0,
+      canDownload: false,
+      canMakePrivate: false,
+      canExportPdf: false,
+      canViewAnalytics: false,
+      hasPremiumSfx: false,
+    },
+    STARTER: {
+      creditsMonthly: 5,
+      maxRollover: 2,
+      maxDurationMinutes: 10,
+      interactionsPerPodcast: 5,
+      maxVoiceClones: 1,
+      premiumVoiceSurcharge: 0.5,
+      canDownload: true,
+      canMakePrivate: false,
+      canExportPdf: false,
+      canViewAnalytics: false,
+      hasPremiumSfx: false,
     },
     PRO: {
-      podcastsPerMonth: 8,
-      maxDurationMinutes: 10,
-      interactionsPerPodcast: 10,
-      premiumVoiceCredits: 3,
+      creditsMonthly: 15,
+      maxRollover: 5,
+      maxDurationMinutes: 20,
+      interactionsPerPodcast: 15,
+      maxVoiceClones: 3,
+      premiumVoiceSurcharge: 0.25,
+      canDownload: true,
+      canMakePrivate: true,
+      canExportPdf: true,
+      canViewAnalytics: true,
+      hasPremiumSfx: false,
     },
-    CREATOR: {
-      podcastsPerMonth: 30,
-      maxDurationMinutes: 10,
+    STUDIO: {
+      creditsMonthly: 50,
+      maxRollover: 25,
+      maxDurationMinutes: 60,
       interactionsPerPodcast: Infinity,
-      premiumVoiceCredits: 10,
+      maxVoiceClones: 10,
+      premiumVoiceSurcharge: 0,
+      canDownload: true,
+      canMakePrivate: true,
+      canExportPdf: true,
+      canViewAnalytics: true,
+      hasPremiumSfx: true,
+    },
+    ADMIN: {
+      creditsMonthly: Infinity,
+      maxRollover: Infinity,
+      maxDurationMinutes: 120,
+      interactionsPerPodcast: Infinity,
+      maxVoiceClones: Infinity,
+      premiumVoiceSurcharge: 0,
+      canDownload: true,
+      canMakePrivate: true,
+      canExportPdf: true,
+      canViewAnalytics: true,
+      hasPremiumSfx: true,
     },
   },
 }));
 
 import { GET } from '@/app/api/billing/usage/route';
 
-function createRequest(params: Record<string, string> = {}): NextRequest {
+function createRequest(): NextRequest {
   const url = new URL('http://localhost:3000/api/billing/usage');
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
   return new NextRequest(url);
 }
 
 const mockUser = {
   id: 'user-1',
-  email: 'user@example.com',
-  name: 'Test User',
-  podcastsUsed: 3,
-  createdAt: new Date('2026-01-01T00:00:00Z'),
-  updatedAt: new Date('2026-01-15T00:00:00Z'),
+  role: 'USER',
 };
 
 const mockSubscription = {
-  id: 'sub-1',
-  userId: 'user-1',
   tier: 'PRO',
   status: 'ACTIVE',
-  premiumCreditsUsed: 2,
-  currentPeriodStart: new Date('2026-01-01T00:00:00Z'),
-  currentPeriodEnd: new Date('2026-02-01T00:00:00Z'),
+  creditsBalance: 10,
+  creditsMonthly: 15,
+  rolloverCredits: 3,
+  maxRollover: 5,
+  currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
 };
+
+const mockTransactions = [
+  {
+    id: 'tx-1',
+    amount: 15,
+    type: 'MONTHLY_GRANT',
+    description: 'Monthly credit allocation',
+    balanceAfter: 15,
+    createdAt: new Date('2026-02-01T00:00:00Z'),
+  },
+  {
+    id: 'tx-2',
+    amount: -1,
+    type: 'PODCAST_CREATION',
+    description: 'Created podcast "AI Basics"',
+    balanceAfter: 14,
+    createdAt: new Date('2026-02-05T00:00:00Z'),
+  },
+];
 
 describe('GET /api/billing/usage', () => {
   beforeEach(() => {
@@ -116,271 +171,7 @@ describe('GET /api/billing/usage', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns usage data with correct response shape', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(5);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body).toHaveProperty('tier');
-    expect(body).toHaveProperty('podcastsUsed');
-    expect(body).toHaveProperty('podcastsAllowed');
-    expect(body).toHaveProperty('podcastsRemaining');
-    expect(body).toHaveProperty('interactionsThisMonth');
-    expect(body).toHaveProperty('premiumCreditsUsed');
-    expect(body).toHaveProperty('premiumCreditsTotal');
-    expect(body).toHaveProperty('premiumCreditsRemaining');
-    expect(body).toHaveProperty('currentPeriodStart');
-    expect(body).toHaveProperty('currentPeriodEnd');
-  });
-
-  it('returns correct usage data for PRO tier user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(15);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.tier).toBe('PRO');
-    expect(body.podcastsUsed).toBe(3);
-    expect(body.podcastsAllowed).toBe(8);
-    expect(body.podcastsRemaining).toBe(5);
-    expect(body.interactionsThisMonth).toBe(15);
-    expect(body.premiumCreditsUsed).toBe(2);
-    expect(body.premiumCreditsTotal).toBe(3);
-    expect(body.premiumCreditsRemaining).toBe(1);
-  });
-
-  it('returns correct usage data for FREE tier user with no subscription', async () => {
-    const freeUser = { ...mockUser, podcastsUsed: 1 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(freeUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
-    mockPrismaPodcastCount.mockResolvedValue(1);
-    mockPrismaInteractionCount.mockResolvedValue(2);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.tier).toBe('FREE');
-    expect(body.podcastsUsed).toBe(1);
-    expect(body.podcastsAllowed).toBe(2);
-    expect(body.podcastsRemaining).toBe(1);
-    expect(body.interactionsThisMonth).toBe(2);
-    expect(body.premiumCreditsUsed).toBe(0);
-    expect(body.premiumCreditsTotal).toBe(0);
-    expect(body.premiumCreditsRemaining).toBe(0);
-  });
-
-  it('returns correct usage data for CREATOR tier user', async () => {
-    const creatorUser = { ...mockUser, podcastsUsed: 15 };
-    const creatorSubscription = { ...mockSubscription, tier: 'CREATOR', premiumCreditsUsed: 7 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(creatorUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(creatorSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(15);
-    mockPrismaInteractionCount.mockResolvedValue(100);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.tier).toBe('CREATOR');
-    expect(body.podcastsUsed).toBe(15);
-    expect(body.podcastsAllowed).toBe(30);
-    expect(body.podcastsRemaining).toBe(15);
-    expect(body.interactionsThisMonth).toBe(100);
-    expect(body.premiumCreditsUsed).toBe(7);
-    expect(body.premiumCreditsTotal).toBe(10);
-    expect(body.premiumCreditsRemaining).toBe(3);
-  });
-
-  it('handles user at usage limit', async () => {
-    const limitedUser = { ...mockUser, podcastsUsed: 8 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(limitedUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(8);
-    mockPrismaInteractionCount.mockResolvedValue(20);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.podcastsUsed).toBe(8);
-    expect(body.podcastsAllowed).toBe(8);
-    expect(body.podcastsRemaining).toBe(0);
-  });
-
-  it('handles user exceeding usage limit', async () => {
-    const overLimitUser = { ...mockUser, podcastsUsed: 10 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(overLimitUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(10);
-    mockPrismaInteractionCount.mockResolvedValue(25);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.podcastsUsed).toBe(10);
-    expect(body.podcastsAllowed).toBe(8);
-    expect(body.podcastsRemaining).toBe(0);
-  });
-
-  it('includes current billing period dates for active subscription', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(5);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.currentPeriodStart).toBe('2026-01-01T00:00:00.000Z');
-    expect(body.currentPeriodEnd).toBe('2026-02-01T00:00:00.000Z');
-  });
-
-  it('returns null period dates for FREE tier users', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
-    mockPrismaPodcastCount.mockResolvedValue(1);
-    mockPrismaInteractionCount.mockResolvedValue(2);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.currentPeriodStart).toBeNull();
-    expect(body.currentPeriodEnd).toBeNull();
-  });
-
-  it('filters podcast count by period when subscription exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(5);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrismaPodcastCount).toHaveBeenCalledWith({
-      where: {
-        userId: 'user-1',
-        createdAt: {
-          gte: mockSubscription.currentPeriodStart,
-        },
-      },
-    });
-  });
-
-  it('filters interaction count by period when subscription exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(5);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrismaInteractionCount).toHaveBeenCalledWith({
-      where: {
-        podcast: {
-          userId: 'user-1',
-        },
-        createdAt: {
-          gte: mockSubscription.currentPeriodStart,
-        },
-      },
-    });
-  });
-
-  it('counts all podcasts when no subscription period exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
-    mockPrismaPodcastCount.mockResolvedValue(1);
-    mockPrismaInteractionCount.mockResolvedValue(2);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrismaPodcastCount).toHaveBeenCalledWith({
-      where: {
-        userId: 'user-1',
-      },
-    });
-  });
-
-  it('counts all interactions when no subscription period exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
-    mockPrismaPodcastCount.mockResolvedValue(1);
-    mockPrismaInteractionCount.mockResolvedValue(2);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrismaInteractionCount).toHaveBeenCalledWith({
-      where: {
-        podcast: {
-          userId: 'user-1',
-        },
-      },
-    });
-  });
-
-  it('handles zero usage correctly', async () => {
-    const zeroUser = { ...mockUser, podcastsUsed: 0 };
-    const zeroSubscription = { ...mockSubscription, premiumCreditsUsed: 0 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(zeroUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(zeroSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(0);
-    mockPrismaInteractionCount.mockResolvedValue(0);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.podcastsUsed).toBe(0);
-    expect(body.podcastsRemaining).toBe(8);
-    expect(body.interactionsThisMonth).toBe(0);
-    expect(body.premiumCreditsUsed).toBe(0);
-    expect(body.premiumCreditsRemaining).toBe(3);
-  });
-
-  it('handles database errors gracefully', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockRejectedValue(new Error('Database connection failed'));
-
-    const request = createRequest();
-    const response = await GET(request);
-
-    expect(response.status).toBe(500);
-    const body = await response.json();
-    expect(body).toHaveProperty('error');
-  });
-
-  it('handles user not found error', async () => {
+  it('returns 404 when user is not found', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-999' } });
     mockPrismaUserFindUnique.mockResolvedValue(null);
 
@@ -393,35 +184,340 @@ describe('GET /api/billing/usage', () => {
     expect(body.error).toBe('User not found');
   });
 
-  it('calculates remaining podcasts correctly with negative result', async () => {
-    const overUser = { ...mockUser, podcastsUsed: 12 };
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaUserFindUnique.mockResolvedValue(overUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(12);
-    mockPrismaInteractionCount.mockResolvedValue(30);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.podcastsRemaining).toBe(0);
-  });
-
-  it('calculates remaining premium credits correctly with negative result', async () => {
-    const overSubscription = { ...mockSubscription, premiumCreditsUsed: 5 };
+  it('returns usage data with correct response shape', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockPrismaUserFindUnique.mockResolvedValue(mockUser);
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(overSubscription);
-    mockPrismaPodcastCount.mockResolvedValue(3);
-    mockPrismaInteractionCount.mockResolvedValue(10);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue(mockTransactions);
 
     const request = createRequest();
     const response = await GET(request);
     const body = await response.json();
 
-    expect(body.premiumCreditsUsed).toBe(5);
-    expect(body.premiumCreditsTotal).toBe(3);
-    expect(body.premiumCreditsRemaining).toBe(0);
+    expect(response.status).toBe(200);
+    expect(body).toHaveProperty('tier');
+    expect(body).toHaveProperty('status');
+    expect(body).toHaveProperty('creditsBalance');
+    expect(body).toHaveProperty('creditsMonthly');
+    expect(body).toHaveProperty('rolloverCredits');
+    expect(body).toHaveProperty('maxRollover');
+    expect(body).toHaveProperty('currentPeriodEnd');
+    expect(body).toHaveProperty('recentTransactions');
+    expect(body).toHaveProperty('limits');
+    expect(body.limits).toHaveProperty('maxDurationMinutes');
+    expect(body.limits).toHaveProperty('interactionsPerPodcast');
+    expect(body.limits).toHaveProperty('maxVoiceClones');
+    expect(body.limits).toHaveProperty('premiumVoiceSurcharge');
+    expect(body.limits).toHaveProperty('canDownload');
+    expect(body.limits).toHaveProperty('canMakePrivate');
+    expect(body.limits).toHaveProperty('canExportPdf');
+    expect(body.limits).toHaveProperty('canViewAnalytics');
+    expect(body.limits).toHaveProperty('hasPremiumSfx');
+  });
+
+  it('returns correct usage data for PRO tier user', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue(mockTransactions);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('PRO');
+    expect(body.status).toBe('ACTIVE');
+    expect(body.creditsBalance).toBe(10);
+    expect(body.creditsMonthly).toBe(15);
+    expect(body.rolloverCredits).toBe(3);
+    expect(body.maxRollover).toBe(5);
+    expect(body.currentPeriodEnd).toBe('2026-03-01T00:00:00.000Z');
+    expect(body.limits.maxDurationMinutes).toBe(20);
+    expect(body.limits.interactionsPerPodcast).toBe(15);
+    expect(body.limits.canDownload).toBe(true);
+    expect(body.limits.canMakePrivate).toBe(true);
+    expect(body.limits.canExportPdf).toBe(true);
+    expect(body.limits.canViewAnalytics).toBe(true);
+  });
+
+  it('returns correct usage data for FREE tier user with no subscription', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('FREE');
+    expect(body.status).toBe('ACTIVE');
+    expect(body.creditsBalance).toBe(0);
+    expect(body.creditsMonthly).toBe(0);
+    expect(body.rolloverCredits).toBe(0);
+    expect(body.maxRollover).toBe(0);
+    expect(body.currentPeriodEnd).toBeNull();
+    expect(body.recentTransactions).toEqual([]);
+    expect(body.limits.maxDurationMinutes).toBe(10);
+    expect(body.limits.interactionsPerPodcast).toBe(2);
+    expect(body.limits.canDownload).toBe(false);
+    expect(body.limits.canMakePrivate).toBe(false);
+    expect(body.limits.canExportPdf).toBe(false);
+    expect(body.limits.canViewAnalytics).toBe(false);
+  });
+
+  it('returns correct usage data for STARTER tier user', async () => {
+    const starterSubscription = {
+      tier: 'STARTER',
+      status: 'ACTIVE',
+      creditsBalance: 3,
+      creditsMonthly: 5,
+      rolloverCredits: 1,
+      maxRollover: 2,
+      currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
+    };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(starterSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('STARTER');
+    expect(body.creditsBalance).toBe(3);
+    expect(body.creditsMonthly).toBe(5);
+    expect(body.rolloverCredits).toBe(1);
+    expect(body.maxRollover).toBe(2);
+    expect(body.limits.maxDurationMinutes).toBe(10);
+    expect(body.limits.interactionsPerPodcast).toBe(5);
+    expect(body.limits.maxVoiceClones).toBe(1);
+    expect(body.limits.canDownload).toBe(true);
+  });
+
+  it('returns correct usage data for STUDIO tier user', async () => {
+    const studioSubscription = {
+      tier: 'STUDIO',
+      status: 'ACTIVE',
+      creditsBalance: 35,
+      creditsMonthly: 50,
+      rolloverCredits: 10,
+      maxRollover: 25,
+      currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
+    };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(studioSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('STUDIO');
+    expect(body.creditsBalance).toBe(35);
+    expect(body.creditsMonthly).toBe(50);
+    expect(body.rolloverCredits).toBe(10);
+    expect(body.maxRollover).toBe(25);
+    expect(body.limits.maxDurationMinutes).toBe(60);
+    expect(body.limits.interactionsPerPodcast).toBe(null); // Infinity serializes as null in JSON
+    expect(body.limits.maxVoiceClones).toBe(10);
+    expect(body.limits.hasPremiumSfx).toBe(true);
+  });
+
+  it('returns correct limits for ADMIN role user', async () => {
+    const adminUser = { ...mockUser, role: 'ADMIN' };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(adminUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    // Note: limits are not directly exposed in the response, only via TIER_LIMITS
+    // The API returns subscription-level data (creditsMonthly, maxRollover) and a limits object
+    // For ADMIN with no subscription, tier defaults to FREE
+    expect(body.tier).toBe('FREE');
+    expect(body.limits.maxDurationMinutes).toBe(120);
+    expect(body.limits.interactionsPerPodcast).toBe(null); // Infinity serializes as null in JSON
+    expect(body.limits.maxVoiceClones).toBe(null); // Infinity serializes as null in JSON
+  });
+
+  it('includes recent transactions in correct format', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue(mockTransactions);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.recentTransactions).toHaveLength(2);
+    expect(body.recentTransactions[0]).toEqual({
+      id: 'tx-1',
+      amount: 15,
+      type: 'MONTHLY_GRANT',
+      description: 'Monthly credit allocation',
+      balanceAfter: 15,
+      createdAt: '2026-02-01T00:00:00.000Z',
+    });
+    expect(body.recentTransactions[1]).toEqual({
+      id: 'tx-2',
+      amount: -1,
+      type: 'PODCAST_CREATION',
+      description: 'Created podcast "AI Basics"',
+      balanceAfter: 14,
+      createdAt: '2026-02-05T00:00:00.000Z',
+    });
+  });
+
+  it('fetches recent transactions with correct query parameters', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue(mockTransactions);
+
+    const request = createRequest();
+    await GET(request);
+
+    expect(mockPrismaCreditTransactionFindMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        amount: true,
+        type: true,
+        description: true,
+        balanceAfter: true,
+        createdAt: true,
+      },
+    });
+  });
+
+  it('handles user with CANCELED subscription status', async () => {
+    const canceledSubscription = {
+      ...mockSubscription,
+      status: 'CANCELED',
+    };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(canceledSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('FREE');
+    expect(body.status).toBe('CANCELED');
+  });
+
+  it('handles user with PAST_DUE subscription status', async () => {
+    const pastDueSubscription = {
+      ...mockSubscription,
+      status: 'PAST_DUE',
+    };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(pastDueSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.tier).toBe('FREE');
+    expect(body.status).toBe('PAST_DUE');
+  });
+
+  it('handles zero credits balance', async () => {
+    const zeroSubscription = {
+      ...mockSubscription,
+      creditsBalance: 0,
+      rolloverCredits: 0,
+    };
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(zeroSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.creditsBalance).toBe(0);
+    expect(body.rolloverCredits).toBe(0);
+  });
+
+  it('handles database errors gracefully', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockRejectedValue(new Error('Database connection failed'));
+
+    const request = createRequest();
+    const response = await GET(request);
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body).toHaveProperty('error');
+    expect(body.error).toBe('Database connection failed');
+  });
+
+  it('returns null currentPeriodEnd for FREE tier users', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.currentPeriodEnd).toBeNull();
+  });
+
+  it('handles empty transaction history', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(body.recentTransactions).toEqual([]);
+  });
+
+  it('executes all database queries in parallel', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaUserFindUnique.mockResolvedValue(mockUser);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockSubscription);
+    mockPrismaCreditTransactionFindMany.mockResolvedValue(mockTransactions);
+
+    const request = createRequest();
+    await GET(request);
+
+    expect(mockPrismaUserFindUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      select: { id: true, role: true },
+    });
+    expect(mockPrismaSubscriptionFindUnique).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      select: {
+        tier: true,
+        status: true,
+        creditsBalance: true,
+        creditsMonthly: true,
+        rolloverCredits: true,
+        maxRollover: true,
+        currentPeriodEnd: true,
+      },
+    });
+    expect(mockPrismaCreditTransactionFindMany).toHaveBeenCalled();
   });
 });

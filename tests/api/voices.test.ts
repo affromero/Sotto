@@ -164,7 +164,7 @@ describe('GET /api/voices', () => {
     ]);
     mockSubscriptionFindUnique.mockResolvedValue({
       userId: 'user-1',
-      tier: 'CREATOR',
+      tier: 'STUDIO',
       status: 'ACTIVE',
       premiumCreditsUsed: 2,
     });
@@ -191,8 +191,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 0,
-      total: 0,
-      remaining: 0,
+      total: 2,
+      remaining: 2,
     });
   });
 
@@ -211,17 +211,17 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 2,
-      total: 3,
-      remaining: 1,
+      total: 15,
+      remaining: 13,
     });
   });
 
-  it('returns correct credits for CREATOR tier', async () => {
+  it('returns correct credits for STUDIO tier', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindMany.mockResolvedValue([]);
     mockSubscriptionFindUnique.mockResolvedValue({
       userId: 'user-1',
-      tier: 'CREATOR',
+      tier: 'STUDIO',
       status: 'ACTIVE',
       premiumCreditsUsed: 4,
     });
@@ -231,8 +231,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 4,
-      total: 10,
-      remaining: 6,
+      total: 50,
+      remaining: 46,
     });
   });
 });
@@ -279,7 +279,7 @@ describe('POST /api/voices/clone', () => {
     expect(body).toEqual({ error: 'Voice cloning requires a paid subscription' });
   });
 
-  it('returns 403 when PRO tier user reaches clone limit (2)', async () => {
+  it('returns 403 when PRO tier user reaches clone limit (3)', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockSubscriptionFindUnique.mockResolvedValue({
       userId: 'user-1',
@@ -287,7 +287,7 @@ describe('POST /api/voices/clone', () => {
       status: 'ACTIVE',
       premiumCreditsUsed: 0,
     });
-    mockVoiceCloneCount.mockResolvedValue(2);
+    mockVoiceCloneCount.mockResolvedValue(3);
 
     const formData = new FormData();
     formData.append('name', 'Test Voice');
@@ -301,18 +301,18 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Maximum of 2 voice clones allowed for your tier' });
+    expect(body).toEqual({ error: 'Maximum of 3 voice clones allowed for your tier' });
   });
 
-  it('returns 403 when CREATOR tier user reaches clone limit (5)', async () => {
+  it('returns 403 when STUDIO tier user reaches clone limit (10)', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockSubscriptionFindUnique.mockResolvedValue({
       userId: 'user-1',
-      tier: 'CREATOR',
+      tier: 'STUDIO',
       status: 'ACTIVE',
       premiumCreditsUsed: 0,
     });
-    mockVoiceCloneCount.mockResolvedValue(5);
+    mockVoiceCloneCount.mockResolvedValue(10);
 
     const formData = new FormData();
     formData.append('name', 'Test Voice');
@@ -326,7 +326,7 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Maximum of 5 voice clones allowed for your tier' });
+    expect(body).toEqual({ error: 'Maximum of 10 voice clones allowed for your tier' });
   });
 
   it('returns 400 when name is missing', async () => {
@@ -449,21 +449,21 @@ describe('POST /api/voices/clone', () => {
     expect(mockCloneVoice).toHaveBeenCalledWith('My Custom Voice', [expect.any(Buffer)]);
   });
 
-  it('successfully creates voice clone for CREATOR user', async () => {
+  it('successfully creates voice clone for STUDIO user', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockSubscriptionFindUnique.mockResolvedValue({
       userId: 'user-1',
-      tier: 'CREATOR',
+      tier: 'STUDIO',
       status: 'ACTIVE',
       premiumCreditsUsed: 0,
     });
     mockVoiceCloneCount.mockResolvedValue(3);
-    mockCloneVoice.mockResolvedValue({ voiceId: 'el-voice-creator' });
+    mockCloneVoice.mockResolvedValue({ voiceId: 'el-voice-studio' });
     mockVoiceCloneCreate.mockResolvedValue({
-      id: 'clone-creator',
+      id: 'clone-studio',
       userId: 'user-1',
-      name: 'Creator Voice',
-      elevenLabsVoiceId: 'el-voice-creator',
+      name: 'Studio Voice',
+      elevenLabsVoiceId: 'el-voice-studio',
       sourceType: 'RECORD',
       createdAt: new Date('2025-01-20T10:00:00Z'),
       updatedAt: new Date('2025-01-20T10:00:00Z'),
@@ -477,7 +477,7 @@ describe('POST /api/voices/clone', () => {
     } as any as File;
 
     const mockFormData = new Map<string, any>([
-      ['name', 'Creator Voice'],
+      ['name', 'Studio Voice'],
       ['sourceType', 'RECORD'],
       ['audio', mockFile],
     ]);
@@ -493,7 +493,7 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(201);
-    expect(body.id).toBe('clone-creator');
+    expect(body.id).toBe('clone-studio');
     expect(body.sourceType).toBe('RECORD');
   });
 });

@@ -190,7 +190,7 @@ describe('POST /api/teams', () => {
     expect(body).toHaveProperty('error', 'Unauthorized');
   });
 
-  it('returns 403 when user does not have CREATOR subscription', async () => {
+  it('returns 403 when user does not have STUDIO subscription', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockSubscriptionFindUnique.mockResolvedValue({ tier: 'PRO' });
 
@@ -201,7 +201,7 @@ describe('POST /api/teams', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body).toHaveProperty('error', 'Creator subscription required');
+    expect(body).toHaveProperty('error', 'Studio subscription required');
   });
 
   it('returns 403 when subscription is missing', async () => {
@@ -218,7 +218,7 @@ describe('POST /api/teams', () => {
 
   it('returns 400 when user is already in a team', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'CREATOR' });
+    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'STUDIO' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', teamId: 'existing-team' });
 
     const request = createRequest('http://localhost:3000/api/teams', {
@@ -233,7 +233,7 @@ describe('POST /api/teams', () => {
 
   it('returns 400 when name is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'CREATOR' });
+    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'STUDIO' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', teamId: null });
 
     const request = createRequest('http://localhost:3000/api/teams', {
@@ -248,7 +248,7 @@ describe('POST /api/teams', () => {
 
   it('returns 400 when name exceeds 100 characters', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'CREATOR' });
+    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'STUDIO' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', teamId: null });
 
     const request = createRequest('http://localhost:3000/api/teams', {
@@ -261,7 +261,7 @@ describe('POST /api/teams', () => {
 
   it('creates team successfully and adds owner as member', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'CREATOR' });
+    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'STUDIO' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', teamId: null });
     mockTeamCreate.mockResolvedValue({
       id: 'team-new',

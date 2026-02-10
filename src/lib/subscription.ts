@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { TIER_LIMITS, TierName } from './stripe';
+import { grantMonthlyCredits } from './credits';
 
 /**
  * Get the user's current subscription tier
@@ -17,23 +18,29 @@ export async function getUserTier(userId: string): Promise<TierName> {
 }
 
 /**
- * Get user's usage for the current billing period
+ * Get user's credit balance and usage info
  */
 export async function getUserUsage(userId: string): Promise<{
   tier: TierName;
-  podcastsUsed: number;
-  podcastsAllowed: number;
+  creditsBalance: number;
+  creditsMonthly: number;
   canCreate: boolean;
 }> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const tier = await getUserTier(userId);
   const limits = TIER_LIMITS[tier];
 
+  const subscription = await prisma.subscription.findUnique({
+    where: { userId },
+    select: { creditsBalance: true },
+  });
+
+  const creditsBalance = subscription?.creditsBalance ?? 0;
+
   return {
     tier,
-    podcastsUsed: user.podcastsUsed,
-    podcastsAllowed: limits.podcastsPerMonth,
-    canCreate: user.podcastsUsed < limits.podcastsPerMonth,
+    creditsBalance,
+    creditsMonthly: limits.creditsMonthly,
+    canCreate: creditsBalance > 0,
   };
 }
 
@@ -47,7 +54,7 @@ export async function getUserVoiceCredits(userId: string): Promise<{
 }> {
   const tier = await getUserTier(userId);
   const limits = TIER_LIMITS[tier];
-  const total = limits.premiumVoiceCredits;
+  const total = limits.creditsMonthly;
 
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
@@ -64,42 +71,10 @@ export async function getUserVoiceCredits(userId: string): Promise<{
 }
 
 /**
- * Consume one premium voice credit. Throws if no credits remaining.
- */
-export async function consumeVoiceCredit(userId: string): Promise<void> {
-  const credits = await getUserVoiceCredits(userId);
-  if (credits.remaining <= 0) {
-    throw new Error('No premium voice credits remaining this month');
-  }
-
-  await prisma.subscription.update({
-    where: { userId },
-    data: { premiumCreditsUsed: { increment: 1 } },
-  });
-}
-
-/**
- * Increment podcast usage counter
- */
-export async function incrementPodcastUsage(userId: string): Promise<void> {
-  await prisma.user.update({
-    where: { id: userId },
-    data: { podcastsUsed: { increment: 1 } },
-  });
-}
-
-/**
- * Reset monthly usage (called by Stripe webhook on period renewal)
+ * Reset monthly usage via credit grant system.
+ * Called by Stripe webhook on period renewal.
  */
 export async function resetMonthlyUsage(userId: string): Promise<void> {
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: { podcastsUsed: 0 },
-    }),
-    prisma.subscription.updateMany({
-      where: { userId },
-      data: { premiumCreditsUsed: 0 },
-    }),
-  ]);
+  const tier = await getUserTier(userId);
+  await grantMonthlyCredits(userId, tier);
 }

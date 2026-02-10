@@ -5,6 +5,7 @@
 After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmpeg), the user wants to turn the **video/voice creation pipeline** into an independent SaaS product. Modeled after the Quvo company creator at `~/Code/Quvo` (Next.js 14, Prisma, BullMQ, Stripe, CSS Modules).
 
 **Sotto** (from "sotto voce" — soft voice in Italian) is an interactive podcast platform where:
+
 1. User provides a topic/URL/PDF → AI generates a 2-voice conversational podcast
 2. User can **interrupt mid-playback** to ask questions → AI answers in context
 3. If resolved, the podcast can be **updated** with the new explanation baked in
@@ -15,24 +16,25 @@ After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmp
 ## Market Analysis & Competitive Landscape
 
 ### Market Size
+
 - Global podcasting market: **$30.7B** (2024) → **$131B** by 2030 (27% CAGR)
 - 584M podcast listeners in 2025, projected 619M by 2026
 - AI-generated audio is the fastest-growing segment
 
 ### Competitive Landscape
 
-| Company | What They Do | Strengths | Weaknesses | Sotto's Edge |
-|---------|-------------|-----------|------------|-------------|
-| **Google NotebookLM** | Upload docs → AI podcast | Free, Google backing, 76+ languages, 2M token context | No interactivity, no social, no customization, fixed voices | Interactive Q&A, social feed, podcast updates, voice diversity |
+| Company                  | What They Do                    | Strengths                                                     | Weaknesses                                                           | Sotto's Edge                                                                     |
+| ------------------------ | ------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| **Google NotebookLM**    | Upload docs → AI podcast        | Free, Google backing, 76+ languages, 2M token context         | No interactivity, no social, no customization, fixed voices          | Interactive Q&A, social feed, podcast updates, voice diversity                   |
 | **Chatterbox (Hume AI)** | Real-time AI voice conversation | True mid-sentence interruption, emotion detection, web search | Ephemeral (no MP3/URL), no social, no production value, single voice | Persistent content, shareability, production value, social feed, creator economy |
-| **Wondercraft** | AI podcast studio | Full production suite, music, editing ($25-60/mo) | No interactivity, creator-focused, no social feed | Listener-first: interrupt, ask, learn, share |
-| **Descript** | Text-based podcast editing | Edit audio like text, $100M+ raised | Editing tool, not generation. No interactivity | Generate from zero: topic → full podcast |
-| **Podcastle** | AI podcast creation | Revoice cloning, $22.2M funded, $12-40/mo | Traditional workflow, no topic generation, no interactivity | AI-native generation, interactive, social |
-| **Riverside.fm** | Remote podcast recording | Best recording quality, $47M raised | Recording tool, not AI generation | AI generation from scratch, no guests needed |
-| **ElevenLabs** | Voice/audio AI platform | Best TTS quality ($6.6B valuation), API leader | Infrastructure, not a podcast product | We use ElevenLabs as infrastructure |
-| **Podbean AI** | AI podcast hosting | Established since 2006, large user base | Bolt-on AI, not AI-native. No interactivity | Ground-up AI-native, listener-first |
-| **Snipd** | AI podcast player | Great summarization, note-taking integrations | Only works with existing podcasts | Generates new content on-demand |
-| **podcast.ai** | AI celebrity interviews | Viral novelty | Entertainment only, no user-generated content | Educational utility, interactive, social |
+| **Wondercraft**          | AI podcast studio               | Full production suite, music, editing ($25-60/mo)             | No interactivity, creator-focused, no social feed                    | Listener-first: interrupt, ask, learn, share                                     |
+| **Descript**             | Text-based podcast editing      | Edit audio like text, $100M+ raised                           | Editing tool, not generation. No interactivity                       | Generate from zero: topic → full podcast                                         |
+| **Podcastle**            | AI podcast creation             | Revoice cloning, $22.2M funded, $12-40/mo                     | Traditional workflow, no topic generation, no interactivity          | AI-native generation, interactive, social                                        |
+| **Riverside.fm**         | Remote podcast recording        | Best recording quality, $47M raised                           | Recording tool, not AI generation                                    | AI generation from scratch, no guests needed                                     |
+| **ElevenLabs**           | Voice/audio AI platform         | Best TTS quality ($6.6B valuation), API leader                | Infrastructure, not a podcast product                                | We use ElevenLabs as infrastructure                                              |
+| **Podbean AI**           | AI podcast hosting              | Established since 2006, large user base                       | Bolt-on AI, not AI-native. No interactivity                          | Ground-up AI-native, listener-first                                              |
+| **Snipd**                | AI podcast player               | Great summarization, note-taking integrations                 | Only works with existing podcasts                                    | Generates new content on-demand                                                  |
+| **podcast.ai**           | AI celebrity interviews         | Viral novelty                                                 | Entertainment only, no user-generated content                        | Educational utility, interactive, social                                         |
 
 ### Sotto's Competitive Moat
 
@@ -91,17 +93,20 @@ If user explores, they can **follow** creators and browse related podcasts. This
 ### Step 3: Generate — Background Processing
 
 If the user chooses "Create mine":
+
 ```
 Sotto: "On it! I'll have your podcast ready in about 2-3 minutes. I'll ping you when it's done."
 [Shows progress: Writing script... → Generating voices... → Finalizing...]
 ```
 
 User can leave the app — they'll get a **push notification** when the podcast is ready:
+
 > "Your podcast 'Transformers Intuition' is ready to play"
 
 ### Step 4: Listen — Spotify-Style Player
 
 Full audio player with:
+
 - Play / Pause / Skip 15s / Speed control (0.5x-2x)
 - Progress bar with waveform visualization
 - Speaker labels in transcript (Host = amber, Expert = navy)
@@ -112,6 +117,7 @@ Full audio player with:
 An extra button alongside play controls: **"Ask a Question"** (microphone icon or text input).
 
 When tapped:
+
 1. Podcast pauses automatically
 2. Chat interface slides up
 3. User types or voice-inputs their question
@@ -130,11 +136,11 @@ When tapped:
 
 ### Platforms
 
-| Platform | Technology | Priority |
-|----------|-----------|----------|
-| **Web** | Next.js (PWA-capable) | Phase 1 (MVP) |
-| **iOS** | React Native + Expo | Phase 2 |
-| **Android** | React Native + Expo | Phase 3 |
+| Platform    | Technology            | Priority      |
+| ----------- | --------------------- | ------------- |
+| **Web**     | Next.js (PWA-capable) | Phase 1 (MVP) |
+| **iOS**     | React Native + Expo   | Phase 2       |
+| **Android** | React Native + Expo   | Phase 3       |
 
 Web-first for MVP, but designed mobile-first from day one. The chat-based discovery and Spotify-style player work equally well on web and native.
 
@@ -158,45 +164,66 @@ This discovery feeds into the Claude system prompt as structured context, produc
 ## Pricing & Tiers
 
 ### Free
+
 - **$0/month**
-- 2 podcasts/month
+- 2 credits/month (no rollover)
 - Listen unlimited (anyone's public podcasts)
-- Standard voices (OpenAI TTS)
 - Up to 10 min per podcast
 - 2 interactions per podcast
+- 0 voice clones
+- +1 premium voice surcharge
 - Public podcasts only
+- No download, no private, no analytics, no PDF export
 - Community feed access
 
-### Pro — $14/month
-- **Everything in Free, plus:**
-- 8 podcasts/month
-- 10 interactions per podcast
-- 3 premium voice credits/month (ElevenLabs)
-- 2 voice clones
-- Private & unlisted podcasts
-- Download MP3s + PDF transcripts
-- Browse voice library
+### Starter — $9/month
 
-### Creator — $29/month
-- **Everything in Pro, plus:**
-- 30 podcasts/month
+- **Everything in Free, plus:**
+- 5 credits/month (2 rollover)
+- 5 interactions per podcast
+- 1 voice clone
+- +1 premium voice surcharge
+- Download MP3s
+
+### Pro — $24/month
+
+- **Everything in Starter, plus:**
+- 15 credits/month (5 rollover)
 - Unlimited interactions
-- 10 premium voice credits/month
-- 5 voice clones
+- 3 voice clones
+- +1 premium voice surcharge
+- Private & unlisted podcasts
+- Voice library browsing
+- Analytics dashboard
+- PDF transcript export
+
+### Studio — $49/month
+
+- **Everything in Pro, plus:**
+- 50 credits/month (20 rollover)
+- 10 voice clones
+- 0 premium voice surcharge (included)
 - Premium sound effects (ElevenLabs SFX)
 - Voice marketplace listing
-- Creator analytics dashboard
+
+### Credit Packs (One-Time, Paid Tiers Only)
+
+- 3 credits — $5
+- 10 credits — $15
+- 25 credits — $30
+
+Each podcast generation costs **1 credit** (+ premium voice surcharge if applicable and not included in tier).
 
 ### Premium Add-ons (SOON badges on pricing page)
 
-| Feature | Tier | Status | Description |
-|---------|------|--------|-------------|
-| **Video Explainers** | Pro+ | SOON | AI-generated visual companion (Manim/motion graphics) synced to podcast audio |
-| **Course Mode** | Pro+ | SOON | Series of podcasts with knowledge checks, progress tracking, completion certificates |
-| **Multi-Language** | Pro+ | SOON | Generate the same podcast in 29 languages via ElevenLabs multilingual v2 |
-| **Custom Intro/Outro** | Creator | SOON | Branded podcast intro music and outro with your name/company |
-| **Podcast Playlists** | Free | SOON | Curate and share ordered collections of public podcasts |
-| **Embed Widget** | Pro+ | SOON | Embeddable player widget for blogs, docs, and learning platforms |
+| Feature                | Tier    | Status | Description                                                                          |
+| ---------------------- | ------- | ------ | ------------------------------------------------------------------------------------ |
+| **Video Explainers**   | Pro+    | SOON   | AI-generated visual companion (Manim/motion graphics) synced to podcast audio        |
+| **Course Mode**        | Pro+    | SOON   | Series of podcasts with knowledge checks, progress tracking, completion certificates |
+| **Multi-Language**     | Pro+    | SOON   | Generate the same podcast in 29 languages via ElevenLabs multilingual v2             |
+| **Custom Intro/Outro** | Creator | SOON   | Branded podcast intro music and outro with your name/company                         |
+| **Podcast Playlists**  | Free    | SOON   | Curate and share ordered collections of public podcasts                              |
+| **Embed Widget**       | Pro+    | SOON   | Embeddable player widget for blogs, docs, and learning platforms                     |
 
 ---
 
@@ -206,21 +233,21 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Web Frontend | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind), PWA-capable |
-| Mobile (SOON) | React Native + Expo (iOS first, then Android) |
-| Database | PostgreSQL + Prisma ORM |
-| Auth | NextAuth.js v5 (email, Google, GitHub OAuth, Apple Sign In for iOS) |
-| Queue | Redis + BullMQ (6 worker types) |
-| AI | Anthropic Claude (discovery chat, script generation, Q&A interactions) |
-| Audio | ElevenLabs (multi-voice TTS per segment) |
-| Stitching | FFmpeg (segment concatenation + normalization) |
-| Storage | Cloudflare R2 (S3-compatible, podcast audio + assets) |
-| Search | PostgreSQL full-text search (MVP) → vector similarity (later) |
-| Notifications | Web Push API (web) + Expo Push (mobile SOON) |
-| Payments | Stripe (Free $0/Pro $14/Creator $29) |
-| Hosting | Vercel (web) + Railway (workers) |
+| Layer         | Technology                                                                   |
+| ------------- | ---------------------------------------------------------------------------- |
+| Web Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind), PWA-capable |
+| Mobile (SOON) | React Native + Expo (iOS first, then Android)                                |
+| Database      | PostgreSQL + Prisma ORM                                                      |
+| Auth          | NextAuth.js v5 (email, Google, GitHub OAuth, Apple Sign In for iOS)          |
+| Queue         | Redis + BullMQ (6 worker types)                                              |
+| AI            | Anthropic Claude (discovery chat, script generation, Q&A interactions)       |
+| Audio         | ElevenLabs (multi-voice TTS per segment)                                     |
+| Stitching     | FFmpeg (segment concatenation + normalization)                               |
+| Storage       | Cloudflare R2 (S3-compatible, podcast audio + assets)                        |
+| Search        | PostgreSQL full-text search (MVP) → vector similarity (later)                |
+| Notifications | Web Push API (web) + Expo Push (mobile SOON)                                 |
+| Payments      | Stripe (Free $0/Starter $9/Pro $24/Studio $49 + credit packs)                |
+| Hosting       | Vercel (web) + Railway (workers)                                             |
 
 ## Design System: "Warm Intimacy"
 
@@ -319,30 +346,32 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 
 ## Database Schema (Key Models)
 
-| Model | Purpose |
-|-------|---------|
-| `User` | Auth, profile, bio, avatar, usage tracking, team membership |
-| `Follow` | Social: follower → following relationship (unique per pair) |
-| `Podcast` | Title, topic, source, status, audioUrl, visibility, fork tracking, play/like/fork counts |
-| `Discovery` | Chat-based discovery: stores extracted metadata (audience, depth, tone, focus, duration) + full chat transcript |
-| `DiscoveryMessage` | Individual messages in the discovery chat (role, content, chips, timestamp) |
-| `Script` | Structured JSON turns + raw markdown + source context, versioned |
-| `Segment` | Per-speaker audio chunk: text, audioUrl, startTime, duration, order |
-| `Interaction` | Question at timestamp, answer, resolved, incorporated flags |
-| `Like` / `Save` | Social engagement (unique per user+podcast) |
-| `Follow` | Social follow (unique per follower+following pair) |
-| `Tag` / `PodcastTag` | Discovery taxonomy |
-| `Subscription` | Stripe integration (FREE/PRO/CREATOR tiers) |
-| `Job` | BullMQ job tracking |
-| `Notification` | In-app + push notifications (type, read status, push delivery status) |
-| `PushSubscription` | Web Push API subscription endpoints per user/device |
-| `ApiUsageLog` | Cost tracking per service (claude/elevenlabs/ffmpeg) |
+| Model                | Purpose                                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `User`               | Auth, profile, bio, avatar, usage tracking, team membership                                                     |
+| `Follow`             | Social: follower → following relationship (unique per pair)                                                     |
+| `Podcast`            | Title, topic, source, status, audioUrl, visibility, fork tracking, play/like/fork counts                        |
+| `Discovery`          | Chat-based discovery: stores extracted metadata (audience, depth, tone, focus, duration) + full chat transcript |
+| `DiscoveryMessage`   | Individual messages in the discovery chat (role, content, chips, timestamp)                                     |
+| `Script`             | Structured JSON turns + raw markdown + source context, versioned                                                |
+| `Segment`            | Per-speaker audio chunk: text, audioUrl, startTime, duration, order                                             |
+| `Interaction`        | Question at timestamp, answer, resolved, incorporated flags                                                     |
+| `Like` / `Save`      | Social engagement (unique per user+podcast)                                                                     |
+| `Follow`             | Social follow (unique per follower+following pair)                                                              |
+| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                              |
+| `Subscription`       | Stripe integration (FREE/STARTER/PRO/STUDIO tiers + credit balance)                                             |
+| `CreditTransaction`  | Credit audit trail (grants, consumption, refunds, purchases)                                                    |
+| `Job`                | BullMQ job tracking                                                                                             |
+| `Notification`       | In-app + push notifications (type, read status, push delivery status)                                           |
+| `PushSubscription`   | Web Push API subscription endpoints per user/device                                                             |
+| `ApiUsageLog`        | Cost tracking per service (claude/elevenlabs/ffmpeg)                                                            |
 
 **Key enums**: `PodcastStatus` (PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING), `Speaker` (HOST/EXPERT), `InteractionStatus` (PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED), `NotificationType` (PODCAST_READY / PODCAST_LIKED / NEW_FOLLOWER / PODCAST_FORKED / SIMILAR_PODCAST_CREATED)
 
 ## Worker Pipeline
 
 ### Generation Flow
+
 ```
 User chats with Discovery Agent (streaming Claude)
     │
@@ -367,6 +396,7 @@ User chats with Discovery Agent (streaming Claude)
 ```
 
 ### Interactive Playback Flow
+
 ```
 User listening → taps "Ask a Question" → podcast pauses
     │
@@ -381,6 +411,7 @@ User listening → taps "Ask a Question" → podcast pauses
 ```
 
 ### Social Discovery Flow
+
 ```
 User browsing feed → finds interesting podcast → taps play
     │
@@ -393,6 +424,7 @@ User browsing feed → finds interesting podcast → taps play
 ## Implementation Order
 
 ### Phase 1: Foundation
+
 1. Project scaffold (package.json, configs, docker-compose, git init)
 2. Comprehensive docs/ (all 11 docs, like Quvo — full product bible)
 3. Design system (globals.css with Sotto warm palette tokens)
@@ -402,11 +434,13 @@ User browsing feed → finds interesting podcast → taps play
 7. Root layout with DM Serif Display + Inter fonts
 
 ### Phase 2: UI Component Library
+
 8. UI primitives (Button, Input, Card, Modal, Toast, Badge, SoonBadge, Chip, Spinner)
 9. Layout components (Sidebar, TopBar, Footer, MobileNav, MiniPlayer shell)
 10. Dashboard shell with mobile-first responsive design
 
 ### Phase 3: Chat-Based Discovery & Generation Pipeline
+
 11. Discovery chat agent (lib/discovery-agent.ts — Claude streaming + chip generation)
 12. Discovery chat UI (DiscoveryChat, SuggestionChips, ChatMessage, ChatChips)
 13. Recommendation engine (lib/recommendations.ts — search existing podcasts by topic similarity)
@@ -421,6 +455,7 @@ User browsing feed → finds interesting podcast → taps play
 22. API routes: /api/discovery, /api/recommendations, /api/podcasts, /api/podcasts/[id]/generate
 
 ### Phase 4: Interactive Playback
+
 23. Audio player (HTML5 Audio + React state + AudioPlayerProvider context)
 24. MiniPlayer (persists while navigating the app)
 25. Transcript panel with speaker labels + auto-scroll
@@ -430,6 +465,7 @@ User browsing feed → finds interesting podcast → taps play
 29. API routes: /api/podcasts/[id]/interact, /api/podcasts/[id]/regenerate-segment
 
 ### Phase 5: Social Feed & Follow System
+
 30. Feed components (PodcastCard, FeedGrid, TagFilter, SearchBar, TrendingSection)
 31. Feed page (/feed) with search + tag filtering + trending
 32. Profile page (/profile/[userId]) with follow button + podcast list
@@ -439,12 +475,14 @@ User browsing feed → finds interesting podcast → taps play
 36. API routes: /api/feed, /api/users, /api/tags
 
 ### Phase 6: Notifications & Push
+
 37. Web Push API integration (lib/push-notifications.ts, service worker)
 38. PushPrompt component (ask user to enable notifications)
 39. NotificationBell + NotificationList components
 40. API routes: /api/notifications
 
 ### Phase 7: Billing, Pricing & Polish
+
 41. Stripe integration (lib/stripe.ts, lib/subscription.ts)
 42. Pricing page (/pricing) with tiers + SOON badges for premium features
 43. Billing pages + Stripe webhook handler
@@ -454,20 +492,20 @@ User browsing feed → finds interesting podcast → taps play
 
 ## Key Files to Reference from Quvo
 
-| Quvo File | Sotto Equivalent | Adapt How |
-|-----------|-----------------|-----------|
-| `src/lib/queue.ts` | `src/lib/queue.ts` | Same BullMQ pattern, podcast job types + notification queue |
-| `src/lib/r2.ts` | `src/lib/r2.ts` | Same S3 client, `podcasts/` key prefix |
-| `src/lib/claude.ts` | `src/lib/claude.ts` | Same wrapper, add streaming for discovery chat + script gen |
-| `src/workers/index.ts` | `src/workers/index.ts` | Same orchestration, 7 Sotto workers |
-| `prisma/schema.prisma` | `prisma/schema.prisma` | Same conventions, podcast + social models |
-| `src/lib/stripe.ts` | `src/lib/stripe.ts` | Same integration, Sotto pricing tiers |
-| `src/components/chat/` | `src/components/discovery/` | Quvo has chat for project discovery; Sotto adapts for podcast creation chat |
-| `docs/01-product-vision.md` | `docs/01-product-vision.md` | Same depth and rigor, Sotto product |
-| `docs/02-market-analysis.md` | `docs/02-market-analysis.md` | Same structure, podcast market data |
-| `docker-compose.yml` | `docker-compose.yml` | Same PostgreSQL + Redis setup |
-| `src/middleware.ts` | `src/middleware.ts` | Same auth protection pattern |
-| `src/lib/notifications.ts` | `src/lib/push-notifications.ts` | Extend with Web Push API for push delivery |
+| Quvo File                    | Sotto Equivalent                | Adapt How                                                                   |
+| ---------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| `src/lib/queue.ts`           | `src/lib/queue.ts`              | Same BullMQ pattern, podcast job types + notification queue                 |
+| `src/lib/r2.ts`              | `src/lib/r2.ts`                 | Same S3 client, `podcasts/` key prefix                                      |
+| `src/lib/claude.ts`          | `src/lib/claude.ts`             | Same wrapper, add streaming for discovery chat + script gen                 |
+| `src/workers/index.ts`       | `src/workers/index.ts`          | Same orchestration, 7 Sotto workers                                         |
+| `prisma/schema.prisma`       | `prisma/schema.prisma`          | Same conventions, podcast + social models                                   |
+| `src/lib/stripe.ts`          | `src/lib/stripe.ts`             | Same integration, Sotto pricing tiers                                       |
+| `src/components/chat/`       | `src/components/discovery/`     | Quvo has chat for project discovery; Sotto adapts for podcast creation chat |
+| `docs/01-product-vision.md`  | `docs/01-product-vision.md`     | Same depth and rigor, Sotto product                                         |
+| `docs/02-market-analysis.md` | `docs/02-market-analysis.md`    | Same structure, podcast market data                                         |
+| `docker-compose.yml`         | `docker-compose.yml`            | Same PostgreSQL + Redis setup                                               |
+| `src/middleware.ts`          | `src/middleware.ts`             | Same auth protection pattern                                                |
+| `src/lib/notifications.ts`   | `src/lib/push-notifications.ts` | Extend with Web Push API for push delivery                                  |
 
 ## Verification
 

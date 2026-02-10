@@ -21,25 +21,25 @@ Sotto's visual language evokes two physical spaces:
 1. **The podcast studio**: Warm lighting, acoustic panels (soft surfaces), unobtrusive but capable equipment
 2. **The reading nook**: Comfortable seating, good lamp light, a curated bookshelf, a notebook for questions
 
-| Principle | Expression | Anti-pattern |
-|-----------|-----------|-------------|
-| **Warm** | Golden tones, cream backgrounds, soft corners | Cold blues, stark whites, rigid geometry |
-| **Intimate** | Soft shadows, contained spaces, personal feel | Overwhelming dashboards, data-dense enterprise chrome |
-| **Trustworthy** | Deep accents, consistent patterns, clear hierarchy | Flashy gradients, trendy effects, unclear navigation |
-| **Effortless** | Minimal chrome, generous whitespace, obvious actions | Cluttered interfaces, small buttons, hidden features |
+| Principle       | Expression                                           | Anti-pattern                                          |
+| --------------- | ---------------------------------------------------- | ----------------------------------------------------- |
+| **Warm**        | Golden tones, cream backgrounds, soft corners        | Cold blues, stark whites, rigid geometry              |
+| **Intimate**    | Soft shadows, contained spaces, personal feel        | Overwhelming dashboards, data-dense enterprise chrome |
+| **Trustworthy** | Deep accents, consistent patterns, clear hierarchy   | Flashy gradients, trendy effects, unclear navigation  |
+| **Effortless**  | Minimal chrome, generous whitespace, obvious actions | Cluttered interfaces, small buttons, hidden features  |
 
 ### 1.3 Key UI Contexts for the Palette
 
 The palette must serve these specific product surfaces:
 
-| Surface | Description | Color needs |
-|---------|-------------|-------------|
-| **Discovery chat** | User chats with AI to design their podcast; tappable suggestion chips | Primary CTAs, chip states, chat bubbles |
-| **Audio player** | Playback controls, waveform visualization, transcript panel | Speaker differentiation (Host vs. Expert), progress indicators |
-| **Social feed** | Grid of podcast cards with tags, likes, creator avatars | Card backgrounds, metadata text, tag colors, engagement icons |
-| **Transcript** | Alternating turns between Host and Expert with citations | Two distinct speaker colors with readable backgrounds |
-| **Pricing page** | Three tiers (Free / Pro / Creator) with feature comparison | Tier differentiation, CTA hierarchy, "SOON" badges |
-| **Dashboard** | Usage stats, podcast list, settings, billing | Data visualization, status indicators, navigation highlights |
+| Surface            | Description                                                           | Color needs                                                    |
+| ------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Discovery chat** | User chats with AI to design their podcast; tappable suggestion chips | Primary CTAs, chip states, chat bubbles                        |
+| **Audio player**   | Playback controls, waveform visualization, transcript panel           | Speaker differentiation (Host vs. Expert), progress indicators |
+| **Social feed**    | Grid of podcast cards with tags, likes, creator avatars               | Card backgrounds, metadata text, tag colors, engagement icons  |
+| **Transcript**     | Alternating turns between Host and Expert with citations              | Two distinct speaker colors with readable backgrounds          |
+| **Pricing page**   | Three tiers (Free / Pro / Creator) with feature comparison            | Tier differentiation, CTA hierarchy, "SOON" badges             |
+| **Dashboard**      | Usage stats, podcast list, settings, billing                          | Data visualization, status indicators, navigation highlights   |
 
 ---
 
@@ -49,90 +49,90 @@ The current palette is already implemented in CSS. This direction refines and ex
 
 ### 2.1 Current Core Colors
 
-| Name | Hex | RGB | Current role |
-|------|-----|-----|-------------|
-| **Golden Amber** | `#D97706` | 217, 119, 6 | Primary — CTAs, links, Host speaker, active states |
-| **Deep Navy** | `#1E3A5F` | 30, 58, 95 | Accent — Expert speaker, secondary actions, depth |
-| **Soft Cream** | `#FEFCF8` | 254, 252, 248 | Background — page-level warmth |
-| **White** | `#FFFFFF` | 255, 255, 255 | Surface — cards, panels, inputs |
-| **Near-Black** | `#1A1A1A` | 26, 26, 26 | Text primary — headings, body |
-| **Gray** | `#6B7280` | 107, 114, 128 | Text secondary — captions, metadata |
+| Name             | Hex       | RGB           | Current role                                       |
+| ---------------- | --------- | ------------- | -------------------------------------------------- |
+| **Golden Amber** | `#D97706` | 217, 119, 6   | Primary — CTAs, links, Host speaker, active states |
+| **Deep Navy**    | `#1E3A5F` | 30, 58, 95    | Accent — Expert speaker, secondary actions, depth  |
+| **Soft Cream**   | `#FEFCF8` | 254, 252, 248 | Background — page-level warmth                     |
+| **White**        | `#FFFFFF` | 255, 255, 255 | Surface — cards, panels, inputs                    |
+| **Near-Black**   | `#1A1A1A` | 26, 26, 26    | Text primary — headings, body                      |
+| **Gray**         | `#6B7280` | 107, 114, 128 | Text secondary — captions, metadata                |
 
 ### 2.2 Extended Amber Scale (to define)
 
 The current system has 5 amber stops. A production palette needs 9-10 stops for full flexibility:
 
-| Stop | Current hex | Suggested refinement | Usage |
-|------|-----------|---------------------|-------|
-| **50** | `#FFFBEB` | Keep or warm slightly | Lightest tint — hover backgrounds, subtle highlights |
-| **100** | `#FEF3C7` | Keep | Light backgrounds, tags, badges, selection highlight |
-| **200** | — | **Define** | Chip backgrounds, secondary surface tints |
-| **300** | — | **Define** | Border accent, subtle dividers in amber contexts |
-| **400** | — | **Define** | Disabled state for amber buttons, soft icons |
-| **500** | `#D97706` | Keep (this is the brand amber) | Primary CTAs, Host speaker, active states |
-| **600** | `#B45309` | Keep | Hover state |
-| **700** | `#92400E` | Keep | Active/pressed state |
-| **800** | — | **Define** | Dark amber for text-on-light-amber backgrounds |
-| **900** | — | **Define** | Darkest amber for high-contrast text uses |
+| Stop    | Current hex | Suggested refinement           | Usage                                                |
+| ------- | ----------- | ------------------------------ | ---------------------------------------------------- |
+| **50**  | `#FFFBEB`   | Keep or warm slightly          | Lightest tint — hover backgrounds, subtle highlights |
+| **100** | `#FEF3C7`   | Keep                           | Light backgrounds, tags, badges, selection highlight |
+| **200** | —           | **Define**                     | Chip backgrounds, secondary surface tints            |
+| **300** | —           | **Define**                     | Border accent, subtle dividers in amber contexts     |
+| **400** | —           | **Define**                     | Disabled state for amber buttons, soft icons         |
+| **500** | `#D97706`   | Keep (this is the brand amber) | Primary CTAs, Host speaker, active states            |
+| **600** | `#B45309`   | Keep                           | Hover state                                          |
+| **700** | `#92400E`   | Keep                           | Active/pressed state                                 |
+| **800** | —           | **Define**                     | Dark amber for text-on-light-amber backgrounds       |
+| **900** | —           | **Define**                     | Darkest amber for high-contrast text uses            |
 
 ### 2.3 Extended Navy Scale (to define)
 
-| Stop | Current hex | Suggested refinement | Usage |
-|------|-----------|---------------------|-------|
-| **50** | `#EFF6FF` | Keep | Lightest tint — subtle navy backgrounds |
-| **100** | `#DBEAFE` | Keep | Light backgrounds, Expert content areas |
-| **200** | — | **Define** | Chip backgrounds, secondary navy surfaces |
-| **300** | — | **Define** | Border accent, subtle dividers |
-| **400** | — | **Define** | Disabled state, soft icons |
-| **500** | — | **Define** | Mid-range navy for secondary buttons |
-| **600** | `#1E3A5F` | Keep (this is the brand navy) | Expert speaker, secondary actions |
-| **700** | `#162D4A` | Keep | Hover state |
-| **800** | — | **Define** | Dark navy for dark mode surfaces |
-| **900** | — | **Define** | Darkest navy for deep backgrounds |
+| Stop    | Current hex | Suggested refinement          | Usage                                     |
+| ------- | ----------- | ----------------------------- | ----------------------------------------- |
+| **50**  | `#EFF6FF`   | Keep                          | Lightest tint — subtle navy backgrounds   |
+| **100** | `#DBEAFE`   | Keep                          | Light backgrounds, Expert content areas   |
+| **200** | —           | **Define**                    | Chip backgrounds, secondary navy surfaces |
+| **300** | —           | **Define**                    | Border accent, subtle dividers            |
+| **400** | —           | **Define**                    | Disabled state, soft icons                |
+| **500** | —           | **Define**                    | Mid-range navy for secondary buttons      |
+| **600** | `#1E3A5F`   | Keep (this is the brand navy) | Expert speaker, secondary actions         |
+| **700** | `#162D4A`   | Keep                          | Hover state                               |
+| **800** | —           | **Define**                    | Dark navy for dark mode surfaces          |
+| **900** | —           | **Define**                    | Darkest navy for deep backgrounds         |
 
 ### 2.4 Neutral / Cream Scale (to define)
 
 The current system jumps from cream (`#FEFCF8`) to white (`#FFFFFF`) with only two border tones. A full neutral scale is needed:
 
-| Stop | Current hex | Suggested refinement | Usage |
-|------|-----------|---------------------|-------|
-| **50** | `#FEFCF8` | Keep (page background) | Overall page warmth |
-| **100** | `#FFF9F0` | Keep (surface hover) | Interactive surface hover |
-| **200** | — | **Define** | Subtle card differentiation, section backgrounds |
-| **300** | `#E5E1D8` | Keep (borders) | Card borders, dividers, input borders |
-| **400** | `#D1CCC2` | Keep (border hover) | Hover state borders |
-| **500** | — | **Define** | Stronger dividers, disabled backgrounds |
-| **600** | `#9CA3AF` | Keep (tertiary text) | Placeholder text, disabled labels |
-| **700** | `#6B7280` | Keep (secondary text) | Captions, metadata, timestamps |
-| **800** | — | **Define** | Strong secondary text, subtle headings |
-| **900** | `#1A1A1A` | Keep (primary text) | Headings, body text |
+| Stop    | Current hex | Suggested refinement   | Usage                                            |
+| ------- | ----------- | ---------------------- | ------------------------------------------------ |
+| **50**  | `#FEFCF8`   | Keep (page background) | Overall page warmth                              |
+| **100** | `#FFF9F0`   | Keep (surface hover)   | Interactive surface hover                        |
+| **200** | —           | **Define**             | Subtle card differentiation, section backgrounds |
+| **300** | `#E5E1D8`   | Keep (borders)         | Card borders, dividers, input borders            |
+| **400** | `#D1CCC2`   | Keep (border hover)    | Hover state borders                              |
+| **500** | —           | **Define**             | Stronger dividers, disabled backgrounds          |
+| **600** | `#9CA3AF`   | Keep (tertiary text)   | Placeholder text, disabled labels                |
+| **700** | `#6B7280`   | Keep (secondary text)  | Captions, metadata, timestamps                   |
+| **800** | —           | **Define**             | Strong secondary text, subtle headings           |
+| **900** | `#1A1A1A`   | Keep (primary text)    | Headings, body text                              |
 
 ### 2.5 Dark Mode Palette (to define)
 
 Dark mode is planned but not yet implemented. The designer should propose dark mode values that maintain brand warmth:
 
-| Token | Light mode | Dark mode (to define) | Constraint |
-|-------|-----------|----------------------|-----------|
-| **Background** | `#FEFCF8` (cream) | **Define** — suggest a warm dark, not pure black | Must feel warm, not cold or sterile |
-| **Surface** | `#FFFFFF` | **Define** — slightly lighter than background | Cards must visually "lift" off background |
-| **Text primary** | `#1A1A1A` | **Define** — off-white, not pure `#FFFFFF` | Pure white on dark is harsh; soften slightly |
-| **Text secondary** | `#6B7280` | **Define** — lighter gray | Must pass WCAG AA on dark background |
-| **Border** | `#E5E1D8` | **Define** — subtle dark border | Visible but not prominent |
-| **Primary (amber)** | `#D97706` | Keep or lighten slightly | Amber may need to be brighter on dark backgrounds for contrast |
-| **Accent (navy)** | `#1E3A5F` | Lighten significantly | Navy on dark is invisible; needs lighter variant |
-| **Speaker Host** | `#D97706` | **Define** — ensure readability on dark | Must stand out in dark transcript panel |
-| **Speaker Expert** | `#1E3A5F` | **Define** — must be visible on dark | Critical for transcript readability |
+| Token               | Light mode        | Dark mode (to define)                            | Constraint                                                     |
+| ------------------- | ----------------- | ------------------------------------------------ | -------------------------------------------------------------- |
+| **Background**      | `#FEFCF8` (cream) | **Define** — suggest a warm dark, not pure black | Must feel warm, not cold or sterile                            |
+| **Surface**         | `#FFFFFF`         | **Define** — slightly lighter than background    | Cards must visually "lift" off background                      |
+| **Text primary**    | `#1A1A1A`         | **Define** — off-white, not pure `#FFFFFF`       | Pure white on dark is harsh; soften slightly                   |
+| **Text secondary**  | `#6B7280`         | **Define** — lighter gray                        | Must pass WCAG AA on dark background                           |
+| **Border**          | `#E5E1D8`         | **Define** — subtle dark border                  | Visible but not prominent                                      |
+| **Primary (amber)** | `#D97706`         | Keep or lighten slightly                         | Amber may need to be brighter on dark backgrounds for contrast |
+| **Accent (navy)**   | `#1E3A5F`         | Lighten significantly                            | Navy on dark is invisible; needs lighter variant               |
+| **Speaker Host**    | `#D97706`         | **Define** — ensure readability on dark          | Must stand out in dark transcript panel                        |
+| **Speaker Expert**  | `#1E3A5F`         | **Define** — must be visible on dark             | Critical for transcript readability                            |
 
 ### 2.6 Gradient Definitions (to define)
 
 The current system uses no gradients. Subtle gradients may enhance:
 
-| Gradient | Suggested use | Constraint |
-|----------|-------------|-----------|
-| **Amber warm** (amber-50 to amber-100) | Hero section backgrounds, pricing card highlights | Must be barely perceptible — a subtle warmth shift, not a visible gradient |
-| **Navy depth** (navy-600 to navy-900) | Dark section backgrounds, footer | Should feel like depth, not decoration |
-| **Cream-to-white** (cream-50 to white) | Card backgrounds that fade to surface | Almost imperceptible — adds subtle dimension |
-| **Speaker blend** (amber to navy) | Transition indicator in transcript when speakers change | Very subtle, used sparingly |
+| Gradient                               | Suggested use                                           | Constraint                                                                 |
+| -------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Amber warm** (amber-50 to amber-100) | Hero section backgrounds, pricing card highlights       | Must be barely perceptible — a subtle warmth shift, not a visible gradient |
+| **Navy depth** (navy-600 to navy-900)  | Dark section backgrounds, footer                        | Should feel like depth, not decoration                                     |
+| **Cream-to-white** (cream-50 to white) | Card backgrounds that fade to surface                   | Almost imperceptible — adds subtle dimension                               |
+| **Speaker blend** (amber to navy)      | Transition indicator in transcript when speakers change | Very subtle, used sparingly                                                |
 
 ---
 
@@ -144,18 +144,18 @@ Three alternative palettes that could replace the current amber + navy system. E
 
 **Mood**: Earthy, grounded, organic — like a conversation in a sunlit pottery studio or a botanical library.
 
-| Role | Color | Hex | RGB |
-|------|-------|-----|-----|
-| Primary | Warm Clay / Terracotta | `#C2703E` | 194, 112, 62 |
-| Primary hover | Deep Clay | `#A35B2F` | 163, 91, 47 |
-| Primary light | Clay Wash | `#FAEEE5` | 250, 238, 229 |
-| Accent | Sage Green | `#5B7B6A` | 91, 123, 106 |
-| Accent hover | Deep Sage | `#496253` | 73, 98, 83 |
-| Accent light | Sage Mist | `#E8F0EB` | 232, 240, 235 |
-| Background | Warm Linen | `#FBF8F4` | 251, 248, 244 |
-| Surface | White | `#FFFFFF` | 255, 255, 255 |
-| Text primary | Charcoal | `#2D2926` | 45, 41, 38 |
-| Text secondary | Warm Gray | `#7D756E` | 125, 117, 110 |
+| Role           | Color                  | Hex       | RGB           |
+| -------------- | ---------------------- | --------- | ------------- |
+| Primary        | Warm Clay / Terracotta | `#C2703E` | 194, 112, 62  |
+| Primary hover  | Deep Clay              | `#A35B2F` | 163, 91, 47   |
+| Primary light  | Clay Wash              | `#FAEEE5` | 250, 238, 229 |
+| Accent         | Sage Green             | `#5B7B6A` | 91, 123, 106  |
+| Accent hover   | Deep Sage              | `#496253` | 73, 98, 83    |
+| Accent light   | Sage Mist              | `#E8F0EB` | 232, 240, 235 |
+| Background     | Warm Linen             | `#FBF8F4` | 251, 248, 244 |
+| Surface        | White                  | `#FFFFFF` | 255, 255, 255 |
+| Text primary   | Charcoal               | `#2D2926` | 45, 41, 38    |
+| Text secondary | Warm Gray              | `#7D756E` | 125, 117, 110 |
 
 **Why it works**: Terracotta is warmer and more organic than amber. Sage green provides a natural complement that feels calm and knowledgeable. The overall palette reads as "artisanal" and "considered" — aligned with Sotto's quality-over-quantity positioning.
 
@@ -165,18 +165,18 @@ Three alternative palettes that could replace the current amber + navy system. E
 
 **Mood**: Regal, contemplative, literary — like a conversation in a well-appointed study with mahogany shelves and warm lamplight.
 
-| Role | Color | Hex | RGB |
-|------|-------|-----|-----|
-| Primary | Warm Violet | `#7C5CBF` | 124, 92, 191 |
-| Primary hover | Deep Violet | `#6347A0` | 99, 71, 160 |
-| Primary light | Violet Wash | `#F0ECF8` | 240, 236, 248 |
-| Accent | Muted Gold | `#B8922F` | 184, 146, 47 |
-| Accent hover | Deep Gold | `#9A7A22` | 154, 122, 34 |
-| Accent light | Gold Wash | `#FAF5E8` | 250, 245, 232 |
-| Background | Warm Parchment | `#FDFBF7` | 253, 251, 247 |
-| Surface | White | `#FFFFFF` | 255, 255, 255 |
-| Text primary | Deep Charcoal | `#1E1B2E` | 30, 27, 46 |
-| Text secondary | Muted Plum | `#6B6380` | 107, 99, 128 |
+| Role           | Color          | Hex       | RGB           |
+| -------------- | -------------- | --------- | ------------- |
+| Primary        | Warm Violet    | `#7C5CBF` | 124, 92, 191  |
+| Primary hover  | Deep Violet    | `#6347A0` | 99, 71, 160   |
+| Primary light  | Violet Wash    | `#F0ECF8` | 240, 236, 248 |
+| Accent         | Muted Gold     | `#B8922F` | 184, 146, 47  |
+| Accent hover   | Deep Gold      | `#9A7A22` | 154, 122, 34  |
+| Accent light   | Gold Wash      | `#FAF5E8` | 250, 245, 232 |
+| Background     | Warm Parchment | `#FDFBF7` | 253, 251, 247 |
+| Surface        | White          | `#FFFFFF` | 255, 255, 255 |
+| Text primary   | Deep Charcoal  | `#1E1B2E` | 30, 27, 46    |
+| Text secondary | Muted Plum     | `#6B6380` | 107, 99, 128  |
 
 **Why it works**: Violet conveys wisdom, creativity, and thoughtfulness. Gold adds warmth and prestige. The combination feels intellectual without being cold — appropriate for an AI learning tool. This palette would differentiate Sotto strongly from every competitor in the podcast space (which cluster around blue, green, orange, and red).
 
@@ -186,18 +186,18 @@ Three alternative palettes that could replace the current amber + navy system. E
 
 **Mood**: Industrial-warm, confident, precise — like a conversation in a well-lit modern loft with exposed brick and steel beams.
 
-| Role | Color | Hex | RGB |
-|------|-------|-----|-----|
-| Primary | Burnished Copper | `#C27045` | 194, 112, 69 |
-| Primary hover | Deep Copper | `#A35A33` | 163, 90, 51 |
-| Primary light | Copper Wash | `#FAF0E8` | 250, 240, 232 |
-| Accent | Slate Blue | `#4A6274` | 74, 98, 116 |
-| Accent hover | Deep Slate | `#3A4F5F` | 58, 79, 95 |
-| Accent light | Slate Mist | `#E8EEF2` | 232, 238, 242 |
-| Background | Warm Stone | `#FDFCF9` | 253, 252, 249 |
-| Surface | White | `#FFFFFF` | 255, 255, 255 |
-| Text primary | Off-Black | `#1C1C1E` | 28, 28, 30 |
-| Text secondary | Cool Gray | `#6E7781` | 110, 119, 129 |
+| Role           | Color            | Hex       | RGB           |
+| -------------- | ---------------- | --------- | ------------- |
+| Primary        | Burnished Copper | `#C27045` | 194, 112, 69  |
+| Primary hover  | Deep Copper      | `#A35A33` | 163, 90, 51   |
+| Primary light  | Copper Wash      | `#FAF0E8` | 250, 240, 232 |
+| Accent         | Slate Blue       | `#4A6274` | 74, 98, 116   |
+| Accent hover   | Deep Slate       | `#3A4F5F` | 58, 79, 95    |
+| Accent light   | Slate Mist       | `#E8EEF2` | 232, 238, 242 |
+| Background     | Warm Stone       | `#FDFCF9` | 253, 252, 249 |
+| Surface        | White            | `#FFFFFF` | 255, 255, 255 |
+| Text primary   | Off-Black        | `#1C1C1E` | 28, 28, 30    |
+| Text secondary | Cool Gray        | `#6E7781` | 110, 119, 129 |
 
 **Why it works**: Copper retains the warmth of amber but adds more depth and sophistication. Slate blue is a less saturated, more muted alternative to navy that feels more modern. The combination reads as "premium but approachable." This palette would transition well between light and dark mode because copper and slate work naturally on dark backgrounds.
 
@@ -211,37 +211,38 @@ Regardless of which palette direction is chosen, the following semantic colors m
 
 ### 4.1 Status Colors
 
-| Token | Purpose | Constraint |
-|-------|---------|-----------|
-| **Success** | Completed generation, ready status, positive feedback | Must be green-family; pass AA on both light and dark backgrounds |
-| **Success light** | Background for success messages, badges | Tinted version of success; readable with success-colored text on it |
-| **Warning** | Usage limits approaching, rate limit notices, caution states | Must be yellow/amber-family; cannot be confused with the primary brand amber |
-| **Warning light** | Background for warning messages | If primary is amber, this is tricky — warning must be visually distinct from primary-light |
-| **Error** | Failed generation, payment failure, destructive actions | Must be red-family; high urgency signal |
-| **Error light** | Background for error messages, destructive action confirmation | Soft red that does not create alarm when used as a section background |
-| **Info** | Tips, onboarding hints, informational banners | Must be blue-family; lower urgency than warning |
-| **Info light** | Background for informational messages | Must not be confused with accent-light if accent is also blue-family |
+| Token             | Purpose                                                        | Constraint                                                                                 |
+| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Success**       | Completed generation, ready status, positive feedback          | Must be green-family; pass AA on both light and dark backgrounds                           |
+| **Success light** | Background for success messages, badges                        | Tinted version of success; readable with success-colored text on it                        |
+| **Warning**       | Usage limits approaching, rate limit notices, caution states   | Must be yellow/amber-family; cannot be confused with the primary brand amber               |
+| **Warning light** | Background for warning messages                                | If primary is amber, this is tricky — warning must be visually distinct from primary-light |
+| **Error**         | Failed generation, payment failure, destructive actions        | Must be red-family; high urgency signal                                                    |
+| **Error light**   | Background for error messages, destructive action confirmation | Soft red that does not create alarm when used as a section background                      |
+| **Info**          | Tips, onboarding hints, informational banners                  | Must be blue-family; lower urgency than warning                                            |
+| **Info light**    | Background for informational messages                          | Must not be confused with accent-light if accent is also blue-family                       |
 
 ### 4.2 Interactive State Colors
 
-| State | Requirement |
-|-------|------------|
-| **Hover** | Slightly darker or more saturated than default; must be perceptible but not jarring |
-| **Active/Pressed** | Darker than hover; provides tactile feedback |
-| **Focus ring** | High contrast outline (2px solid) visible on all backgrounds; amber is current |
-| **Disabled** | Desaturated and lightened; must still be readable but clearly non-interactive |
-| **Selected/Active** | Filled with primary color (e.g., selected chip, active nav item) |
+| State               | Requirement                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------- |
+| **Hover**           | Slightly darker or more saturated than default; must be perceptible but not jarring |
+| **Active/Pressed**  | Darker than hover; provides tactile feedback                                        |
+| **Focus ring**      | High contrast outline (2px solid) visible on all backgrounds; amber is current      |
+| **Disabled**        | Desaturated and lightened; must still be readable but clearly non-interactive       |
+| **Selected/Active** | Filled with primary color (e.g., selected chip, active nav item)                    |
 
 ### 4.3 Speaker Colors
 
 This is Sotto-specific and critical. Every podcast has two voices:
 
-| Speaker | Current | Requirement |
-|---------|---------|------------|
-| **Host** | Amber `#D97706` on `#FEF3C7` background | Warm, inviting, conversational — the "friendly questioner" |
-| **Expert** | Navy `#1E3A5F` on `#DBEAFE` background | Grounded, authoritative, knowledgeable — the "wise explainer" |
+| Speaker    | Current                                 | Requirement                                                   |
+| ---------- | --------------------------------------- | ------------------------------------------------------------- |
+| **Host**   | Amber `#D97706` on `#FEF3C7` background | Warm, inviting, conversational — the "friendly questioner"    |
+| **Expert** | Navy `#1E3A5F` on `#DBEAFE` background  | Grounded, authoritative, knowledgeable — the "wise explainer" |
 
 Requirements:
+
 - The two speaker colors must be **instantly distinguishable** from each other
 - Each speaker color on its corresponding light background must pass **WCAG AA** for normal text
 - The colors must create a **visual rhythm** in the transcript — alternating warm and cool tones that help the eye track speaker changes
@@ -253,18 +254,19 @@ Requirements:
 
 ### 5.1 WCAG AA Compliance (Minimum)
 
-| Combination | Minimum ratio | Applies to |
-|-------------|-------------|-----------|
-| Normal text (< 18px, < 14px bold) on background | 4.5:1 | All body text, captions, labels |
-| Large text (>= 18px, >= 14px bold) on background | 3:1 | Headings, buttons, large labels |
-| UI components and graphical objects | 3:1 | Icons, borders, form controls, focus indicators |
-| Text on primary-colored buttons | 4.5:1 (preferred) or 3:1 (large) | Button labels on amber/primary fill |
+| Combination                                      | Minimum ratio                    | Applies to                                      |
+| ------------------------------------------------ | -------------------------------- | ----------------------------------------------- |
+| Normal text (< 18px, < 14px bold) on background  | 4.5:1                            | All body text, captions, labels                 |
+| Large text (>= 18px, >= 14px bold) on background | 3:1                              | Headings, buttons, large labels                 |
+| UI components and graphical objects              | 3:1                              | Icons, borders, form controls, focus indicators |
+| Text on primary-colored buttons                  | 4.5:1 (preferred) or 3:1 (large) | Button labels on amber/primary fill             |
 
 ### 5.2 Known Accessibility Challenge
 
 White text (`#FFFFFF`) on amber (`#D97706`) has a contrast ratio of approximately **3.3:1**. This passes for large text (18px+) but fails for normal text. Any palette refinement must address this:
 
 **Options**:
+
 1. Darken the amber slightly for button backgrounds (e.g., `#C06806`) while keeping `#D97706` for non-text uses
 2. Use dark text on amber buttons instead of white
 3. Accept the current ratio and enforce a minimum 15px semibold for text on amber (current approach)
@@ -275,11 +277,11 @@ The designer should evaluate and recommend an approach.
 
 The palette must be tested against these conditions:
 
-| Condition | Prevalence | Risk |
-|-----------|-----------|------|
-| **Protanopia** (no red perception) | ~1% of males | Amber may appear yellowish-green; ensure it does not merge with success green |
-| **Deuteranopia** (no green perception) | ~5% of males | Similar concern — amber and green may converge |
-| **Tritanopia** (no blue perception) | ~0.01% | Navy may appear dark gray; ensure navy and dark text remain distinguishable |
+| Condition                              | Prevalence   | Risk                                                                          |
+| -------------------------------------- | ------------ | ----------------------------------------------------------------------------- |
+| **Protanopia** (no red perception)     | ~1% of males | Amber may appear yellowish-green; ensure it does not merge with success green |
+| **Deuteranopia** (no green perception) | ~5% of males | Similar concern — amber and green may converge                                |
+| **Tritanopia** (no blue perception)    | ~0.01%       | Navy may appear dark gray; ensure navy and dark text remain distinguishable   |
 
 **Requirement**: Speaker colors (Host vs. Expert) must remain distinguishable under protanopia and deuteranopia simulations. If the amber and navy pair fails this test under certain simulations, provide a supplementary differentiation method (icon, label, or position) — but the colors themselves should be as robust as possible.
 
@@ -287,16 +289,16 @@ The palette must be tested against these conditions:
 
 The designer should provide a contrast testing matrix for the final palette. Example format:
 
-| Foreground | Background | Ratio | AA Normal | AA Large | AAA Normal |
-|-----------|-----------|-------|-----------|----------|------------|
-| Text primary | Background | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Text primary | Surface | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Text secondary | Background | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Primary | Background | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Text inverse | Primary | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Text inverse | Accent | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Speaker Host | Speaker Host bg | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
-| Speaker Expert | Speaker Expert bg | ?:1 | Pass/Fail | Pass/Fail | Pass/Fail |
+| Foreground     | Background        | Ratio | AA Normal | AA Large  | AAA Normal |
+| -------------- | ----------------- | ----- | --------- | --------- | ---------- |
+| Text primary   | Background        | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Text primary   | Surface           | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Text secondary | Background        | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Primary        | Background        | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Text inverse   | Primary           | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Text inverse   | Accent            | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Speaker Host   | Speaker Host bg   | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
+| Speaker Expert | Speaker Expert bg | ?:1   | Pass/Fail | Pass/Fail | Pass/Fail  |
 
 ---
 
@@ -338,8 +340,9 @@ These describe how the palette should look in specific product contexts. The des
 
 - **Background**: Page background
 - **Free tier card**: Surface, standard border, no special highlight
-- **Pro tier card**: Primary border or subtle primary background tint — this is the "recommended" tier
-- **Creator tier card**: Accent border or subtle accent background tint
+- **Starter tier card**: Subtle primary background tint — accessible entry point
+- **Pro tier card**: Primary border or stronger primary background tint — this is the "recommended" tier
+- **Studio tier card**: Accent border or subtle accent background tint — premium positioning
 - **CTA buttons**: Primary fill for the recommended tier; outline for others
 - **"SOON" badges**: Primary-light background with primary text, small rounded pill
 - **Feature checkmarks**: Success color
@@ -372,16 +375,19 @@ UI color palette visualization for a podcast app. Light theme: cream background,
 ### 7.2 Direction B Alternatives (Midjourney)
 
 **Warm Clay + Sage**:
+
 ```
 Moodboard for a podcast app brand palette. Warm terracotta clay (#C2703E), sage green (#5B7B6A), warm linen background. Interior reference: botanical library with terracotta pots, sage green book spines, natural linen curtains, wooden reading table. Organic, earthy, grounded. Flat color swatches overlaid. --ar 16:9 --style raw --v 6.1
 ```
 
 **Warm Violet + Gold**:
+
 ```
 Moodboard for a podcast app brand palette. Warm violet (#7C5CBF), muted gold (#B8922F), parchment background. Interior reference: mahogany study with violet velvet chair, gold desk lamp, parchment paper, leather-bound books. Regal, contemplative, literary. Flat color swatches overlaid. --ar 16:9 --style raw --v 6.1
 ```
 
 **Copper + Slate**:
+
 ```
 Moodboard for a podcast app brand palette. Burnished copper (#C27045), slate blue (#4A6274), warm stone background. Interior reference: modern loft with exposed copper pipes, slate-colored concrete, warm stone walls, large windows. Industrial-warm, confident, precise. Flat color swatches overlaid. --ar 16:9 --style raw --v 6.1
 ```
@@ -389,11 +395,13 @@ Moodboard for a podcast app brand palette. Burnished copper (#C27045), slate blu
 ### 7.3 DALL-E Prompts
 
 **Direction A**:
+
 ```
 A flat-design color palette moodboard for a podcast app called "Sotto." The palette features warm golden amber (#D97706), deep navy (#1E3A5F), and soft cream (#FEFCF8). Show large color swatches arranged in a grid alongside a simplified app UI mockup using these colors. The UI has a cream background, white cards with amber buttons, and navy text. Include a dark mode variant with warm charcoal backgrounds. Clean, modern, editorial aesthetic.
 ```
 
 **Alternative — Warm Clay + Sage**:
+
 ```
 A flat-design color palette moodboard for a podcast app. The palette features warm terracotta (#C2703E), sage green (#5B7B6A), and warm linen (#FBF8F4). Show large color swatches alongside a simplified app UI mockup. Cream/linen background, white cards, terracotta buttons, sage green accents. Organic, earthy, warm. Clean modern design.
 ```
@@ -404,18 +412,18 @@ A flat-design color palette moodboard for a podcast app. The palette features wa
 
 ### 8.1 Required Outputs
 
-| Deliverable | Description |
-|------------|------------|
-| **Primary palette** | Full 9-10 stop scale for each core color (primary, accent, neutral) |
-| **Semantic palette** | Success, warning, error, info — each with base, hover, light, and lighter stops |
-| **Speaker palette** | Host and Expert colors with text and background variants |
-| **Dark mode palette** | Full token mapping from light to dark |
-| **Gradient definitions** | 3-4 subtle gradients with specific use cases |
-| **Contrast matrix** | Full WCAG testing results for all foreground/background pairings |
-| **Color blindness report** | Simulations for protanopia, deuteranopia, tritanopia |
-| **Application mockups** | At minimum: discovery chat, player, feed, pricing — in both light and dark |
-| **CSS variable mapping** | Token names and values for developer handoff |
-| **Figma color styles** | If using Figma, organized color style library |
+| Deliverable                | Description                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------- |
+| **Primary palette**        | Full 9-10 stop scale for each core color (primary, accent, neutral)             |
+| **Semantic palette**       | Success, warning, error, info — each with base, hover, light, and lighter stops |
+| **Speaker palette**        | Host and Expert colors with text and background variants                        |
+| **Dark mode palette**      | Full token mapping from light to dark                                           |
+| **Gradient definitions**   | 3-4 subtle gradients with specific use cases                                    |
+| **Contrast matrix**        | Full WCAG testing results for all foreground/background pairings                |
+| **Color blindness report** | Simulations for protanopia, deuteranopia, tritanopia                            |
+| **Application mockups**    | At minimum: discovery chat, player, feed, pricing — in both light and dark      |
+| **CSS variable mapping**   | Token names and values for developer handoff                                    |
+| **Figma color styles**     | If using Figma, organized color style library                                   |
 
 ### 8.2 Token Naming Convention
 
@@ -452,32 +460,32 @@ Examples:
 
 ## 9. Evaluation Criteria
 
-| Criterion | Weight | Description |
-|-----------|--------|-------------|
-| **Brand alignment** | 25% | Does the palette feel warm, intimate, intelligent, and calm? |
-| **Accessibility** | 25% | Does every combination meet WCAG AA? Is the color blindness report clean? |
-| **Dark mode quality** | 15% | Does dark mode feel intentional and warm, not like an afterthought? |
-| **System completeness** | 15% | Are all tokens defined? All scales filled? All semantic colors present? |
-| **Distinctiveness** | 10% | Is this palette visually distinct from competitors (Spotify, Apple Podcasts, NotebookLM)? |
-| **Application fit** | 10% | Do the mockups look cohesive, readable, and inviting across all screens? |
+| Criterion               | Weight | Description                                                                               |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------- |
+| **Brand alignment**     | 25%    | Does the palette feel warm, intimate, intelligent, and calm?                              |
+| **Accessibility**       | 25%    | Does every combination meet WCAG AA? Is the color blindness report clean?                 |
+| **Dark mode quality**   | 15%    | Does dark mode feel intentional and warm, not like an afterthought?                       |
+| **System completeness** | 15%    | Are all tokens defined? All scales filled? All semantic colors present?                   |
+| **Distinctiveness**     | 10%    | Is this palette visually distinct from competitors (Spotify, Apple Podcasts, NotebookLM)? |
+| **Application fit**     | 10%    | Do the mockups look cohesive, readable, and inviting across all screens?                  |
 
 ---
 
 ## 10. Brand Context Summary (for quick reference)
 
-| Item | Value |
-|------|-------|
-| **Brand name** | Sotto |
-| **Tagline** | Podcasts that listen back |
-| **Origin** | Italian: "sotto voce" = soft voice, intimate tone |
-| **Product** | AI-generated interactive podcasts with Q&A |
-| **Design philosophy** | "Warm Intimacy" — podcast studio + reading nook |
-| **Heading font** | DM Serif Display (serif, editorial) |
-| **Body font** | Inter (sans-serif, clean) |
-| **Current primary** | Golden Amber `#D97706` |
-| **Current accent** | Deep Navy `#1E3A5F` |
-| **Current background** | Soft Cream `#FEFCF8` |
-| **Current text** | Near-Black `#1A1A1A` |
-| **Target audience** | Curious learners, busy professionals, educators |
-| **Competitors** | NotebookLM, Spotify, Apple Podcasts, Podbean AI |
-| **Key differentiator** | Mid-playback Q&A that updates the episode |
+| Item                   | Value                                             |
+| ---------------------- | ------------------------------------------------- |
+| **Brand name**         | Sotto                                             |
+| **Tagline**            | Podcasts that listen back                         |
+| **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
+| **Product**            | AI-generated interactive podcasts with Q&A        |
+| **Design philosophy**  | "Warm Intimacy" — podcast studio + reading nook   |
+| **Heading font**       | DM Serif Display (serif, editorial)               |
+| **Body font**          | Inter (sans-serif, clean)                         |
+| **Current primary**    | Golden Amber `#D97706`                            |
+| **Current accent**     | Deep Navy `#1E3A5F`                               |
+| **Current background** | Soft Cream `#FEFCF8`                              |
+| **Current text**       | Near-Black `#1A1A1A`                              |
+| **Target audience**    | Curious learners, busy professionals, educators   |
+| **Competitors**        | NotebookLM, Spotify, Apple Podcasts, Podbean AI   |
+| **Key differentiator** | Mid-playback Q&A that updates the episode         |

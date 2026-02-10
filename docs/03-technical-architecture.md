@@ -95,6 +95,7 @@ User selects "Create mine" (or listens to existing)
 ```
 
 **Key implementation details**:
+
 - The discovery chat uses Claude Haiku 4.5 for speed and cost efficiency
 - Streaming uses the Web Streams API (ReadableStream) via the Next.js route handler
 - Each message is persisted as a DiscoveryMessage for context reconstruction
@@ -217,6 +218,7 @@ audio-stitching.worker.ts
 ```
 
 **FFmpeg command structure**:
+
 ```
 ffmpeg -i intro.mp3 -i seg_001.mp3 -i seg_002.mp3 ... -i outro.mp3 \
   -filter_complex "[0:a][1:a]acrossfade=d=0.1[a01]; \
@@ -324,15 +326,15 @@ segment-regeneration.worker.ts
 
 ### 4.1 Worker Types and Configuration
 
-| Worker | Queue Name | Concurrency | Timeout | Retry | Priority |
-|--------|-----------|-------------|---------|-------|----------|
-| Content Extraction | `content-extraction` | 3 | 60s | 2 | Normal |
-| Script Generation | `script-generation` | 2 | 120s | 2 | Normal |
-| Audio Generation | `audio-generation` | 2 (x5 internal parallel) | 300s | 3 | Normal |
-| Audio Stitching | `audio-stitching` | 2 | 180s | 2 | Normal |
-| Interaction | `interaction` | 5 | 30s | 2 | High |
-| Segment Regeneration | `segment-regen` | 1 | 300s | 2 | Normal |
-| Notification | `notification` | 5 | 10s | 3 | Low |
+| Worker               | Queue Name           | Concurrency              | Timeout | Retry | Priority |
+| -------------------- | -------------------- | ------------------------ | ------- | ----- | -------- |
+| Content Extraction   | `content-extraction` | 3                        | 60s     | 2     | Normal   |
+| Script Generation    | `script-generation`  | 2                        | 120s    | 2     | Normal   |
+| Audio Generation     | `audio-generation`   | 2 (x5 internal parallel) | 300s    | 3     | Normal   |
+| Audio Stitching      | `audio-stitching`    | 2                        | 180s    | 2     | Normal   |
+| Interaction          | `interaction`        | 5                        | 30s     | 2     | High     |
+| Segment Regeneration | `segment-regen`      | 1                        | 300s    | 2     | Normal   |
+| Notification         | `notification`       | 5                        | 10s     | 3     | Low      |
 
 ### 4.2 Worker Orchestration
 
@@ -347,6 +349,7 @@ interaction -> segment-regeneration -> audio-generation -> audio-stitching -----
 ### 4.3 Job Tracking
 
 Every job is tracked in the `Job` database model with:
+
 - `type`: Worker queue name
 - `status`: pending, processing, complete, failed
 - `payload`: Input data (JSON)
@@ -358,13 +361,13 @@ This allows the dashboard to show real-time generation progress and the API to r
 
 ### 4.4 Error Handling and Retries
 
-| Error Type | Handling Strategy |
-|-----------|------------------|
-| ElevenLabs rate limit (429) | Exponential backoff: 5s, 15s, 45s |
-| Claude API timeout | Retry with same payload, max 2 retries |
-| FFmpeg processing failure | Retry once, then mark podcast as FAILED |
-| R2 upload failure | Retry with exponential backoff, max 3 retries |
-| Unrecoverable error | Mark podcast as FAILED, create error notification for user |
+| Error Type                  | Handling Strategy                                          |
+| --------------------------- | ---------------------------------------------------------- |
+| ElevenLabs rate limit (429) | Exponential backoff: 5s, 15s, 45s                          |
+| Claude API timeout          | Retry with same payload, max 2 retries                     |
+| FFmpeg processing failure   | Retry once, then mark podcast as FAILED                    |
+| R2 upload failure           | Retry with exponential backoff, max 3 retries              |
+| Unrecoverable error         | Mark podcast as FAILED, create error notification for user |
 
 Failed jobs update the Podcast status to `FAILED` and create a Notification for the user with a "Retry" action.
 
@@ -372,17 +375,17 @@ Failed jobs update the Podcast status to `FAILED` and create a Notification for 
 
 Workers report progress via `job.updateProgress(percentage)`. The client polls `GET /api/podcasts/{id}` to display real-time progress:
 
-| Status | Progress Display |
-|--------|-----------------|
-| PENDING | "Queued..." |
-| DISCOVERING | "Chatting..." (real-time in UI) |
-| EXTRACTING | "Reading your source..." |
-| SCRIPTING | "Writing the script..." |
+| Status           | Progress Display                         |
+| ---------------- | ---------------------------------------- |
+| PENDING          | "Queued..."                              |
+| DISCOVERING      | "Chatting..." (real-time in UI)          |
+| EXTRACTING       | "Reading your source..."                 |
+| SCRIPTING        | "Writing the script..."                  |
 | GENERATING_AUDIO | "Generating voices... (segment 3 of 48)" |
-| STITCHING | "Putting it all together..." |
-| READY | "Your podcast is ready!" |
-| UPDATING | "Updating with your feedback..." |
-| FAILED | "Something went wrong. Retry?" |
+| STITCHING        | "Putting it all together..."             |
+| READY            | "Your podcast is ready!"                 |
+| UPDATING         | "Updating with your feedback..."         |
+| FAILED           | "Something went wrong. Retry?"           |
 
 ---
 
@@ -411,28 +414,29 @@ User ──< Podcast ──< Segment
 
 ### 5.2 Core Models
 
-| Model | Primary Key | Key Fields | Indexes |
-|-------|------------|-----------|---------|
-| **User** | `id` (cuid) | email (unique), name, image, bio, podcastsUsed, podcastsAllowed, teamId | teamId |
-| **Podcast** | `id` (cuid) | userId, title, topic, status, audioUrl, duration, visibility, forkedFromId, playCount, likeCount, forkCount | userId, status, visibility, createdAt, playCount, likeCount |
-| **Discovery** | `id` (cuid) | podcastId (unique), userId, topic, depth, audienceLevel, focusAreas[], tone, durationTarget, sourceUrl, sourceContent | userId |
-| **DiscoveryMessage** | `id` (cuid) | discoveryId, role, content, chips (JSON) | discoveryId |
-| **Script** | `id` (cuid) | podcastId (unique), turns (JSON), markdown, context, version | |
-| **Segment** | `id` (cuid) | podcastId, speaker (HOST/EXPERT), text, audioUrl, order, startTime, duration, version | podcastId, order |
-| **Interaction** | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, resolved, incorporated | podcastId, userId, status |
-| **Subscription** | `id` (cuid) | userId (unique), stripeCustomerId, stripeSubscriptionId, stripePriceId, status, tier | status, tier |
+| Model                 | Primary Key | Key Fields                                                                                                                                         | Indexes                                                     |
+| --------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **User**              | `id` (cuid) | email (unique), name, image, bio, role (USER/CREATOR/ADMIN), teamId                                                                                | teamId, role                                                |
+| **Podcast**           | `id` (cuid) | userId, title, topic, status, audioUrl, duration, visibility, forkedFromId, playCount, likeCount, forkCount                                        | userId, status, visibility, createdAt, playCount, likeCount |
+| **Discovery**         | `id` (cuid) | podcastId (unique), userId, topic, depth, audienceLevel, focusAreas[], tone, durationTarget, sourceUrl, sourceContent                              | userId                                                      |
+| **DiscoveryMessage**  | `id` (cuid) | discoveryId, role, content, chips (JSON)                                                                                                           | discoveryId                                                 |
+| **Script**            | `id` (cuid) | podcastId (unique), turns (JSON), markdown, context, version                                                                                       |                                                             |
+| **Segment**           | `id` (cuid) | podcastId, speaker (HOST/EXPERT), text, audioUrl, order, startTime, duration, version                                                              | podcastId, order                                            |
+| **Interaction**       | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, resolved, incorporated                                                                     | podcastId, userId, status                                   |
+| **Subscription**      | `id` (cuid) | userId (unique), stripeCustomerId, stripeSubscriptionId, stripePriceId, status, tier, creditsBalance, creditsMonthly, rolloverCredits, maxRollover | status, tier                                                |
+| **CreditTransaction** | `id` (cuid) | userId, amount, type (GRANT/CONSUMPTION/REFUND/PURCHASE), podcastId, description, balanceAfter, createdAt                                          | userId, type, createdAt                                     |
 
 ### 5.3 Key Enums
 
-| Enum | Values | Usage |
-|------|--------|-------|
-| `PodcastStatus` | PENDING, DISCOVERING, EXTRACTING, SCRIPTING, GENERATING_AUDIO, STITCHING, READY, UPDATING, FAILED | Tracks podcast through generation pipeline |
-| `Speaker` | HOST, EXPERT | Identifies speaker in segments |
-| `InteractionStatus` | PENDING, ANSWERING, ANSWERED, RESOLVED, INCORPORATING, INCORPORATED | Tracks Q&A lifecycle |
-| `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE | Access control |
-| `SubscriptionTier` | FREE, PRO, CREATOR | Billing tier |
-| `SubscriptionStatus` | PENDING, ACTIVE, PAST_DUE, CANCELED, UNPAID, TRIALING | Stripe subscription state |
-| `NotificationType` | PODCAST_READY, PODCAST_LIKED, PODCAST_FORKED, NEW_FOLLOWER, SIMILAR_PODCAST_CREATED | Notification categorization |
+| Enum                 | Values                                                                                            | Usage                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `PodcastStatus`      | PENDING, DISCOVERING, EXTRACTING, SCRIPTING, GENERATING_AUDIO, STITCHING, READY, UPDATING, FAILED | Tracks podcast through generation pipeline |
+| `Speaker`            | HOST, EXPERT                                                                                      | Identifies speaker in segments             |
+| `InteractionStatus`  | PENDING, ANSWERING, ANSWERED, RESOLVED, INCORPORATING, INCORPORATED                               | Tracks Q&A lifecycle                       |
+| `PodcastVisibility`  | PUBLIC, UNLISTED, PRIVATE                                                                         | Access control                             |
+| `SubscriptionTier`   | FREE, STARTER, PRO, STUDIO                                                                        | Billing tier                               |
+| `SubscriptionStatus` | PENDING, ACTIVE, PAST_DUE, CANCELED, UNPAID, TRIALING                                             | Stripe subscription state                  |
+| `NotificationType`   | PODCAST_READY, PODCAST_LIKED, PODCAST_FORKED, NEW_FOLLOWER, SIMILAR_PODCAST_CREATED               | Notification categorization                |
 
 ### 5.4 Denormalized Counters
 
@@ -441,7 +445,7 @@ The Podcast model maintains denormalized counters (`playCount`, `likeCount`, `fo
 ```typescript
 await prisma.podcast.update({
   where: { id: podcastId },
-  data: { likeCount: { increment: 1 } }
+  data: { likeCount: { increment: 1 } },
 });
 ```
 
@@ -453,12 +457,12 @@ await prisma.podcast.update({
 
 Sotto uses NextAuth.js v5 with four authentication providers:
 
-| Provider | Use Case | Configuration |
-|----------|---------|--------------|
+| Provider               | Use Case                           | Configuration                           |
+| ---------------------- | ---------------------------------- | --------------------------------------- |
 | **Email (Magic Link)** | Primary signup/login for all users | Resend email provider, 10-minute expiry |
-| **Google OAuth** | One-click login for Google users | Google Cloud Console OAuth 2.0 client |
-| **GitHub OAuth** | Developer-friendly login | GitHub OAuth App |
-| **Apple Sign In** | Required for future iOS app | Apple Developer Program |
+| **Google OAuth**       | One-click login for Google users   | Google Cloud Console OAuth 2.0 client   |
+| **GitHub OAuth**       | Developer-friendly login           | GitHub OAuth App                        |
+| **Apple Sign In**      | Required for future iOS app        | Apple Developer Program                 |
 
 ### 6.2 Auth Flow
 
@@ -474,7 +478,7 @@ Selects provider (Email / Google / GitHub / Apple)
     |
     v
 NextAuth creates Session + Account records
-    |-- If new user: creates User record with defaults (podcastsAllowed: 3, tier: FREE)
+    |-- If new user: creates User record with defaults (tier: FREE) + Subscription (creditsBalance: 2, tier: FREE)
     |-- If existing user: refreshes session token
     |
     v
@@ -494,6 +498,7 @@ Middleware (src/middleware.ts) checks session on protected routes:
 ### 6.3 Session Strategy
 
 NextAuth is configured with a database session strategy (not JWT) for the following reasons:
+
 - Sessions can be revoked server-side (important for subscription changes)
 - Session data stays in sync with User record changes
 - No token size limitations
@@ -505,12 +510,12 @@ NextAuth is configured with a database session strategy (not JWT) for the follow
 
 ### 7.1 Why R2
 
-| Factor | R2 | AWS S3 | Why R2 Wins |
-|--------|-----|--------|-------------|
-| Egress bandwidth | $0 | $0.09/GB | Audio files are served frequently; zero egress is critical |
-| Storage cost | $0.015/GB/month | $0.023/GB/month | 35% cheaper |
-| S3 compatibility | Full | Native | Same SDK, drop-in replacement |
-| CDN integration | Cloudflare CDN (free) | CloudFront (paid) | Built-in global CDN |
+| Factor           | R2                    | AWS S3            | Why R2 Wins                                                |
+| ---------------- | --------------------- | ----------------- | ---------------------------------------------------------- |
+| Egress bandwidth | $0                    | $0.09/GB          | Audio files are served frequently; zero egress is critical |
+| Storage cost     | $0.015/GB/month       | $0.023/GB/month   | 35% cheaper                                                |
+| S3 compatibility | Full                  | Native            | Same SDK, drop-in replacement                              |
+| CDN integration  | Cloudflare CDN (free) | CloudFront (paid) | Built-in global CDN                                        |
 
 ### 7.2 Storage Structure
 
@@ -537,22 +542,22 @@ sotto-audio-bucket/
 
 ### 7.3 Access Control
 
-| Content Type | Access | Mechanism |
-|-------------|--------|-----------|
-| Public podcast audio | Anyone | Direct R2 public URL via Cloudflare CDN |
+| Content Type           | Access           | Mechanism                                |
+| ---------------------- | ---------------- | ---------------------------------------- |
+| Public podcast audio   | Anyone           | Direct R2 public URL via Cloudflare CDN  |
 | Unlisted podcast audio | Anyone with link | Direct R2 URL (not indexed, not on feed) |
-| Private podcast audio | Owner only | Presigned URL (1-hour expiry) via API |
-| Segment audio | Workers only | R2 API with service credentials |
-| User avatars | Anyone | Direct R2 public URL |
+| Private podcast audio  | Owner only       | Presigned URL (1-hour expiry) via API    |
+| Segment audio          | Workers only     | R2 API with service credentials          |
+| User avatars           | Anyone           | Direct R2 public URL                     |
 
 ### 7.4 Cost Projection
 
-| Scale | Audio Files | Storage | Monthly Cost |
-|-------|------------|---------|-------------|
-| 100 podcasts | ~1.5 GB | 1.5 GB | $0.02 |
-| 1,000 podcasts | ~15 GB | 15 GB | $0.23 |
-| 10,000 podcasts | ~150 GB | 150 GB | $2.25 |
-| 100,000 podcasts | ~1.5 TB | 1.5 TB | $22.50 |
+| Scale            | Audio Files | Storage | Monthly Cost |
+| ---------------- | ----------- | ------- | ------------ |
+| 100 podcasts     | ~1.5 GB     | 1.5 GB  | $0.02        |
+| 1,000 podcasts   | ~15 GB      | 15 GB   | $0.23        |
+| 10,000 podcasts  | ~150 GB     | 150 GB  | $2.25        |
+| 100,000 podcasts | ~1.5 TB     | 1.5 TB  | $22.50       |
 
 Average podcast file size: ~15 MB (10 min, 128kbps MP3).
 
@@ -593,32 +598,32 @@ Redis (port 6379)
 
 BullMQ requires separate Redis connections for each worker (one for the worker, one for the queue client). With 7 workers, Sotto uses 14 Redis connections plus 1 for the web application's queue client:
 
-| Component | Connections | Purpose |
-|-----------|-----------|---------|
-| Web app queue client | 1 | Enqueue jobs from API routes |
-| Worker instances (7 workers x 2) | 14 | Process jobs + internal communication |
-| Cache client | 1 | General caching (feed, recommendations) |
-| **Total** | **16** | |
+| Component                        | Connections | Purpose                                 |
+| -------------------------------- | ----------- | --------------------------------------- |
+| Web app queue client             | 1           | Enqueue jobs from API routes            |
+| Worker instances (7 workers x 2) | 14          | Process jobs + internal communication   |
+| Cache client                     | 1           | General caching (feed, recommendations) |
+| **Total**                        | **16**      |                                         |
 
 Redis 7 supports up to 10,000 concurrent connections by default, so this is well within limits.
 
 ### 8.3 Job Priority
 
-| Priority Level | Queues | Rationale |
-|---------------|--------|-----------|
-| High (1) | interaction | User is waiting with podcast paused |
-| Normal (5) | content-extraction, script-generation, audio-generation, audio-stitching, segment-regen | Standard generation pipeline |
-| Low (10) | notification | Notifications can be delayed without user impact |
+| Priority Level | Queues                                                                                  | Rationale                                        |
+| -------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| High (1)       | interaction                                                                             | User is waiting with podcast paused              |
+| Normal (5)     | content-extraction, script-generation, audio-generation, audio-stitching, segment-regen | Standard generation pipeline                     |
+| Low (10)       | notification                                                                            | Notifications can be delayed without user impact |
 
 ### 8.4 Redis Memory Management
 
-| Data Type | Estimated Size | TTL |
-|-----------|---------------|-----|
-| Job data (per job) | ~2 KB | Completed: 24 hours, Failed: 7 days |
-| Cache: feed page | ~50 KB | 5 minutes |
-| Cache: podcast metadata | ~1 KB | 1 hour |
-| Cache: user profile | ~500 bytes | 30 minutes |
-| Cache: recommendations | ~10 KB | 15 minutes |
+| Data Type               | Estimated Size | TTL                                 |
+| ----------------------- | -------------- | ----------------------------------- |
+| Job data (per job)      | ~2 KB          | Completed: 24 hours, Failed: 7 days |
+| Cache: feed page        | ~50 KB         | 5 minutes                           |
+| Cache: podcast metadata | ~1 KB          | 1 hour                              |
+| Cache: user profile     | ~500 bytes     | 30 minutes                          |
+| Cache: recommendations  | ~10 KB         | 15 minutes                          |
 
 Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on Upstash or a standard Redis instance).
 
@@ -628,28 +633,28 @@ Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on U
 
 ### 9.1 Route Map
 
-| Method | Route | Auth | Purpose |
-|--------|-------|------|---------|
-| POST | `/api/discovery` | Required | Send discovery chat message, receive streaming response |
-| GET | `/api/recommendations` | Required | Search similar public podcasts |
-| POST | `/api/podcasts` | Required | Create new podcast |
-| GET | `/api/podcasts/[id]` | Optional | Get podcast details (public or owned) |
-| POST | `/api/podcasts/[id]/generate` | Required | Start generation pipeline |
-| POST | `/api/podcasts/[id]/interact` | Required | Ask a question during playback |
-| POST | `/api/podcasts/[id]/fork` | Required | Fork a public podcast |
-| POST | `/api/podcasts/[id]/like` | Required | Like/unlike a podcast |
-| POST | `/api/podcasts/[id]/save` | Required | Save/unsave a podcast |
-| GET | `/api/feed` | Public | Public feed with search, tags, trending |
-| GET | `/api/users/[id]` | Public | User profile |
-| POST | `/api/users/[id]/follow` | Required | Follow/unfollow a user |
-| POST | `/api/billing/checkout` | Required | Create Stripe checkout session |
-| GET | `/api/billing/subscription` | Required | Get current subscription |
-| POST | `/api/billing/portal` | Required | Create Stripe customer portal session |
-| GET | `/api/notifications` | Required | List notifications |
-| PATCH | `/api/notifications/[id]` | Required | Mark notification as read |
-| POST | `/api/notifications/push/register` | Required | Register push subscription |
-| GET | `/api/tags` | Public | List all tags |
-| POST | `/api/webhooks/stripe` | Webhook | Handle Stripe webhook events |
+| Method | Route                              | Auth     | Purpose                                                 |
+| ------ | ---------------------------------- | -------- | ------------------------------------------------------- |
+| POST   | `/api/discovery`                   | Required | Send discovery chat message, receive streaming response |
+| GET    | `/api/recommendations`             | Required | Search similar public podcasts                          |
+| POST   | `/api/podcasts`                    | Required | Create new podcast                                      |
+| GET    | `/api/podcasts/[id]`               | Optional | Get podcast details (public or owned)                   |
+| POST   | `/api/podcasts/[id]/generate`      | Required | Start generation pipeline                               |
+| POST   | `/api/podcasts/[id]/interact`      | Required | Ask a question during playback                          |
+| POST   | `/api/podcasts/[id]/fork`          | Required | Fork a public podcast                                   |
+| POST   | `/api/podcasts/[id]/like`          | Required | Like/unlike a podcast                                   |
+| POST   | `/api/podcasts/[id]/save`          | Required | Save/unsave a podcast                                   |
+| GET    | `/api/feed`                        | Public   | Public feed with search, tags, trending                 |
+| GET    | `/api/users/[id]`                  | Public   | User profile                                            |
+| POST   | `/api/users/[id]/follow`           | Required | Follow/unfollow a user                                  |
+| POST   | `/api/billing/checkout`            | Required | Create Stripe checkout session                          |
+| GET    | `/api/billing/subscription`        | Required | Get current subscription                                |
+| POST   | `/api/billing/portal`              | Required | Create Stripe customer portal session                   |
+| GET    | `/api/notifications`               | Required | List notifications                                      |
+| PATCH  | `/api/notifications/[id]`          | Required | Mark notification as read                               |
+| POST   | `/api/notifications/push/register` | Required | Register push subscription                              |
+| GET    | `/api/tags`                        | Public   | List all tags                                           |
+| POST   | `/api/webhooks/stripe`             | Webhook  | Handle Stripe webhook events                            |
 
 ### 9.2 API Validation
 
@@ -673,14 +678,14 @@ const interactSchema = z.object({
 
 Rate limiting is applied at the API route level using Redis-backed sliding window counters:
 
-| Route Group | Limit | Window |
-|------------|-------|--------|
-| `/api/discovery` | 30 requests/minute | Per user |
-| `/api/podcasts/*/generate` | 5 requests/hour | Per user |
-| `/api/podcasts/*/interact` | 20 requests/hour | Per user |
-| `/api/feed` | 60 requests/minute | Per IP |
-| `/api/billing/*` | 10 requests/minute | Per user |
-| All other API routes | 100 requests/minute | Per user |
+| Route Group                | Limit               | Window   |
+| -------------------------- | ------------------- | -------- |
+| `/api/discovery`           | 30 requests/minute  | Per user |
+| `/api/podcasts/*/generate` | 5 requests/hour     | Per user |
+| `/api/podcasts/*/interact` | 20 requests/hour    | Per user |
+| `/api/feed`                | 60 requests/minute  | Per IP   |
+| `/api/billing/*`           | 10 requests/minute  | Per user |
+| All other API routes       | 100 requests/minute | Per user |
 
 ---
 
@@ -688,57 +693,57 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 
 ### 10.1 Current Architecture Limits
 
-| Component | Current Limit | Bottleneck |
-|-----------|-------------|-----------|
-| Web app (single Vercel instance) | ~500 concurrent users | Serverless function cold starts |
-| Workers (single Railway instance) | ~10 concurrent podcast generations | CPU + memory for FFmpeg |
-| PostgreSQL (single instance) | ~1,000 queries/second | Connection pool size |
-| Redis (single instance) | ~50,000 operations/second | Memory (queue depth) |
-| ElevenLabs API | ~100 concurrent requests | API rate limits |
-| Claude API | ~50 concurrent requests | API rate limits |
+| Component                         | Current Limit                      | Bottleneck                      |
+| --------------------------------- | ---------------------------------- | ------------------------------- |
+| Web app (single Vercel instance)  | ~500 concurrent users              | Serverless function cold starts |
+| Workers (single Railway instance) | ~10 concurrent podcast generations | CPU + memory for FFmpeg         |
+| PostgreSQL (single instance)      | ~1,000 queries/second              | Connection pool size            |
+| Redis (single instance)           | ~50,000 operations/second          | Memory (queue depth)            |
+| ElevenLabs API                    | ~100 concurrent requests           | API rate limits                 |
+| Claude API                        | ~50 concurrent requests            | API rate limits                 |
 
 ### 10.2 Scaling Strategy by User Count
 
-| User Count | Architecture Change | Estimated Cost |
-|-----------|-------------------|---------------|
-| 0-500 | Single server (Hetzner CPX31): web + workers + DB + Redis | $17/month |
-| 500-2K | Upgrade to CPX41, separate worker process | $27/month |
-| 2K-5K | Dedicated CPU (CCX33), separate PostgreSQL instance, external Redis | $80/month |
-| 5K-10K | Split web and workers to separate servers, connection pooling (PgBouncer) | $150/month |
-| 10K-50K | Multiple worker instances, read replicas for PostgreSQL, Redis cluster | $500/month |
-| 50K+ | Container orchestration (Kubernetes), auto-scaling workers, managed database | $2,000+/month |
+| User Count | Architecture Change                                                          | Estimated Cost |
+| ---------- | ---------------------------------------------------------------------------- | -------------- |
+| 0-500      | Single server (Hetzner CPX31): web + workers + DB + Redis                    | $17/month      |
+| 500-2K     | Upgrade to CPX41, separate worker process                                    | $27/month      |
+| 2K-5K      | Dedicated CPU (CCX33), separate PostgreSQL instance, external Redis          | $80/month      |
+| 5K-10K     | Split web and workers to separate servers, connection pooling (PgBouncer)    | $150/month     |
+| 10K-50K    | Multiple worker instances, read replicas for PostgreSQL, Redis cluster       | $500/month     |
+| 50K+       | Container orchestration (Kubernetes), auto-scaling workers, managed database | $2,000+/month  |
 
 ### 10.3 Performance Optimization Strategies
 
-| Strategy | When to Apply | Impact |
-|----------|-------------|--------|
-| **PostgreSQL read replicas** | >5K users | Offload feed/search queries from primary |
-| **Redis caching for feed** | >1K users | Cache feed pages for 5 minutes, reduce DB queries by 90% |
-| **CDN for audio** | Immediately | Cloudflare CDN in front of R2, global edge delivery |
-| **Connection pooling** | >2K users | PgBouncer to manage PostgreSQL connections |
-| **Worker auto-scaling** | >5K users | Scale worker count based on queue depth |
-| **Script caching** | >10K users | Cache Claude responses for near-identical discovery metadata |
-| **Audio segment caching** | >10K users | If same text + voice + params, reuse cached audio |
-| **PostgreSQL full-text search** | MVP | `to_tsvector` on podcast title + topic for feed search |
-| **Vector similarity search** | >10K podcasts | pgvector extension for semantic podcast discovery |
+| Strategy                        | When to Apply | Impact                                                       |
+| ------------------------------- | ------------- | ------------------------------------------------------------ |
+| **PostgreSQL read replicas**    | >5K users     | Offload feed/search queries from primary                     |
+| **Redis caching for feed**      | >1K users     | Cache feed pages for 5 minutes, reduce DB queries by 90%     |
+| **CDN for audio**               | Immediately   | Cloudflare CDN in front of R2, global edge delivery          |
+| **Connection pooling**          | >2K users     | PgBouncer to manage PostgreSQL connections                   |
+| **Worker auto-scaling**         | >5K users     | Scale worker count based on queue depth                      |
+| **Script caching**              | >10K users    | Cache Claude responses for near-identical discovery metadata |
+| **Audio segment caching**       | >10K users    | If same text + voice + params, reuse cached audio            |
+| **PostgreSQL full-text search** | MVP           | `to_tsvector` on podcast title + topic for feed search       |
+| **Vector similarity search**    | >10K podcasts | pgvector extension for semantic podcast discovery            |
 
 ### 10.4 Monitoring and Observability
 
-| Layer | Tool | Metrics |
-|-------|------|---------|
-| Application | Sentry | Errors, performance traces, user impact |
-| Infrastructure | Netdata / Grafana | CPU, memory, disk, network |
-| Database | pg_stat_statements | Slow queries, connection counts |
-| Queue | BullMQ Dashboard (Bull Board) | Queue depth, processing time, failure rate |
-| External APIs | ApiUsageLog model | Cost per service, latency, error rates |
-| User behavior | PostHog | Funnel analysis, feature usage, retention |
+| Layer          | Tool                          | Metrics                                    |
+| -------------- | ----------------------------- | ------------------------------------------ |
+| Application    | Sentry                        | Errors, performance traces, user impact    |
+| Infrastructure | Netdata / Grafana             | CPU, memory, disk, network                 |
+| Database       | pg_stat_statements            | Slow queries, connection counts            |
+| Queue          | BullMQ Dashboard (Bull Board) | Queue depth, processing time, failure rate |
+| External APIs  | ApiUsageLog model             | Cost per service, latency, error rates     |
+| User behavior  | PostHog                       | Funnel analysis, feature usage, retention  |
 
 ### 10.5 Disaster Recovery
 
-| Scenario | Recovery Strategy | RTO | RPO |
-|----------|------------------|-----|-----|
-| Server failure | Restore from Hetzner snapshot, redeploy | 30 minutes | 24 hours (daily backup) |
-| Database corruption | Restore from PostgreSQL backup | 15 minutes | 1 hour (hourly backup at scale) |
-| Redis data loss | Workers re-process any in-flight jobs (idempotent design) | 5 minutes | 0 (ephemeral queue data) |
-| R2 outage | Cloudflare manages redundancy internally | N/A | N/A |
-| External API outage | Queue jobs with retry, notify users of delay | Automatic | 0 |
+| Scenario            | Recovery Strategy                                         | RTO        | RPO                             |
+| ------------------- | --------------------------------------------------------- | ---------- | ------------------------------- |
+| Server failure      | Restore from Hetzner snapshot, redeploy                   | 30 minutes | 24 hours (daily backup)         |
+| Database corruption | Restore from PostgreSQL backup                            | 15 minutes | 1 hour (hourly backup at scale) |
+| Redis data loss     | Workers re-process any in-flight jobs (idempotent design) | 5 minutes  | 0 (ephemeral queue data)        |
+| R2 outage           | Cloudflare manages redundancy internally                  | N/A        | N/A                             |
+| External API outage | Queue jobs with retry, notify users of delay              | Automatic  | 0                               |

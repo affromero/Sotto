@@ -1,6 +1,8 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { TIER_LIMITS, type TierName } from '@/lib/stripe';
 import { BillingActions } from './BillingActions';
+import { CreditPackCard } from '@/components/billing/CreditPackCard';
 import { Badge } from '@/components/ui/Badge';
 import styles from './page.module.css';
 
@@ -9,36 +11,16 @@ export const metadata = { title: 'Billing' };
 
 const tierPrices: Record<string, number> = {
   FREE: 0,
-  PRO: 19,
-  TEAM: 49,
+  STARTER: 9,
+  PRO: 24,
+  STUDIO: 49,
 };
 
-const tierFeatures: Record<string, string[]> = {
-  FREE: [
-    '3 podcasts per month',
-    'Up to 10 minutes each',
-    '3 interactions per podcast',
-    'Public podcasts only',
-    'Community feed access',
-  ],
-  PRO: [
-    '20 podcasts per month',
-    'Up to 30 minutes each',
-    'Unlimited interactions',
-    'Private & unlisted podcasts',
-    'Download MP3s',
-    'Priority support',
-  ],
-  TEAM: [
-    'Unlimited podcasts',
-    'Up to 30 minutes each',
-    'Unlimited interactions',
-    'Private team feed',
-    '10 team seats',
-    'API access',
-    'Analytics dashboard',
-    'Priority support',
-  ],
+const tierLabels: Record<string, string> = {
+  FREE: 'Free',
+  STARTER: 'Starter',
+  PRO: 'Pro',
+  STUDIO: 'Studio',
 };
 
 function formatDate(date: Date): string {
@@ -46,6 +28,13 @@ function formatDate(date: Date): string {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+  });
+}
+
+function formatTxDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -57,36 +46,72 @@ export default async function BillingPage() {
     return null;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      podcastsUsed: true,
-      podcastsAllowed: true,
-      subscription: {
-        select: {
-          tier: true,
-          status: true,
-          currentPeriodEnd: true,
-          cancelAtPeriodEnd: true,
+  const [user, recentTransactions] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        subscription: {
+          select: {
+            tier: true,
+            status: true,
+            creditsBalance: true,
+            creditsMonthly: true,
+            rolloverCredits: true,
+            maxRollover: true,
+            currentPeriodEnd: true,
+            cancelAtPeriodEnd: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.creditTransaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        id: true,
+        amount: true,
+        type: true,
+        description: true,
+        balanceAfter: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
   if (!user) return null;
 
-  const tier = user.subscription?.tier || 'FREE';
-  const status = user.subscription?.status || 'ACTIVE';
-  const periodEnd = user.subscription?.currentPeriodEnd;
-  const cancelAtPeriodEnd = user.subscription?.cancelAtPeriodEnd ?? false;
-  const podcastsUsed = user.podcastsUsed;
-  const podcastsAllowed = user.podcastsAllowed;
+  const sub = user.subscription;
+  const tier = (sub?.tier || 'FREE') as TierName;
+  const status = sub?.status || 'ACTIVE';
+  const periodEnd = sub?.currentPeriodEnd;
+  const cancelAtPeriodEnd = sub?.cancelAtPeriodEnd ?? false;
+  const creditsBalance = sub?.creditsBalance ?? 0;
+  const creditsMonthly = sub?.creditsMonthly ?? TIER_LIMITS[tier].creditsMonthly;
+  const rolloverCredits = sub?.rolloverCredits ?? 0;
   const price = tierPrices[tier] ?? 0;
-  const features = tierFeatures[tier] ?? [];
 
   return (
     <main className={styles.main}>
       <h1 className={styles.pageTitle}>Billing</h1>
+
+      {/* Credit Balance */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Credit Balance</h2>
+        <div className={styles.creditCard}>
+          <div className={styles.creditBalance}>{creditsBalance}</div>
+          <div className={styles.creditMeta}>
+            <span>{creditsMonthly} credits/month</span>
+            {rolloverCredits > 0 && <span>{rolloverCredits} rolled over</span>}
+            {periodEnd && <span>Renews {formatDate(periodEnd)}</span>}
+          </div>
+        </div>
+        {creditsBalance === 0 && tier !== 'FREE' && (
+          <p className={styles.outOfCredits}>
+            You&apos;re out of credits. Buy a credit pack or wait for your next renewal.
+          </p>
+        )}
+      </section>
 
       {/* Current Plan */}
       <section className={styles.section}>
@@ -94,8 +119,12 @@ export default async function BillingPage() {
           <div className={styles.planInfo}>
             <h2 className={styles.sectionTitle}>Current Plan</h2>
             <div className={styles.planNameRow}>
-              <span className={styles.planName}>{tier.charAt(0) + tier.slice(1).toLowerCase()}</span>
-              <Badge variant={status === 'ACTIVE' ? 'success' : status === 'CANCELED' ? 'error' : 'warning'}>
+              <span className={styles.planName}>{tierLabels[tier] || tier}</span>
+              <Badge
+                variant={
+                  status === 'ACTIVE' ? 'success' : status === 'CANCELED' ? 'error' : 'warning'
+                }
+              >
                 {cancelAtPeriodEnd ? 'Canceling' : status.charAt(0) + status.slice(1).toLowerCase()}
               </Badge>
             </div>
@@ -117,70 +146,49 @@ export default async function BillingPage() {
           <p className={styles.periodInfo}>
             {cancelAtPeriodEnd
               ? `Your plan will be canceled on ${formatDate(periodEnd)}`
-              : `Next billing date: ${formatDate(periodEnd)}`
-            }
+              : `Next billing date: ${formatDate(periodEnd)}`}
           </p>
         )}
-
-        <ul className={styles.featureList} role="list">
-          {features.map((feature) => (
-            <li key={feature} className={styles.featureItem}>
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className={styles.checkIcon}
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              {feature}
-            </li>
-          ))}
-        </ul>
       </section>
 
-      {/* Usage */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Usage This Period</h2>
-        <div className={styles.usageBar}>
-          <div className={styles.usageInfo}>
-            <span className={styles.usageLabel}>Podcasts Created</span>
-            <span className={styles.usageCount}>
-              {podcastsUsed} / {podcastsAllowed === -1 ? 'Unlimited' : podcastsAllowed}
-            </span>
+      {/* Buy More Credits */}
+      {tier !== 'FREE' && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Buy More Credits</h2>
+          <div className={styles.creditPackGrid}>
+            <CreditPackCard credits={3} price={5} />
+            <CreditPackCard credits={10} price={14} />
+            <CreditPackCard credits={25} price={30} />
           </div>
-          {podcastsAllowed > 0 && (
-            <div className={styles.progressOuter}>
-              <div
-                className={styles.progressInner}
-                style={{ width: `${Math.min((podcastsUsed / podcastsAllowed) * 100, 100)}%` }}
-                role="progressbar"
-                aria-valuenow={podcastsUsed}
-                aria-valuemin={0}
-                aria-valuemax={podcastsAllowed}
-                aria-label={`${podcastsUsed} of ${podcastsAllowed} podcasts used`}
-              />
-            </div>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* Credit History */}
+      {recentTransactions.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Credit History</h2>
+          <div className={styles.historyTable}>
+            {recentTransactions.map((tx) => (
+              <div key={tx.id} className={styles.historyRow}>
+                <div className={styles.historyInfo}>
+                  <span className={styles.historyDesc}>{tx.description}</span>
+                  <span className={styles.historyDate}>{formatTxDate(tx.createdAt)}</span>
+                </div>
+                <div className={styles.historyAmount}>
+                  <span className={tx.amount > 0 ? styles.amountPositive : styles.amountNegative}>
+                    {tx.amount > 0 ? '+' : ''}
+                    {tx.amount}
+                  </span>
+                  <span className={styles.historyBalance}>bal: {tx.balanceAfter}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Actions */}
       <BillingActions tier={tier} />
-
-      {/* Billing History */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Billing History</h2>
-        <p className={styles.placeholder}>
-          Your invoices and payment history will appear here once available.
-        </p>
-      </section>
     </main>
   );
 }

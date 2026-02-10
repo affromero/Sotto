@@ -30,13 +30,13 @@ export default async function AnalyticsPage() {
   const tier = subscription?.tier || 'FREE';
   const role = dbUser?.role || 'USER';
 
-  if (tier === 'FREE' && role !== 'CREATOR' && role !== 'ADMIN') {
+  if (tier !== 'STUDIO' && tier !== 'PRO' && role !== 'CREATOR' && role !== 'ADMIN') {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Analytics</h1>
           <p className={styles.upgradeText}>
-            Upgrade to Pro or Team to access usage analytics, cost breakdowns, and generation
+            Upgrade to Pro or Studio to access usage analytics, cost breakdowns, and generation
             statistics.
           </p>
           <Link href="/billing" className={styles.upgradeLink}>

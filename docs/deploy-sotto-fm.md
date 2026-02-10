@@ -2,6 +2,227 @@
 
 A detailed, step-by-step guide for deploying sotto.fm on a Hetzner VPS with password-protected early access. Every click, every command, every thing you need to check.
 
+---
+
+## Key Concepts (Read This First)
+
+If you've only ever worked on code locally (`npm run dev`), deploying means making your app available on the internet so anyone with the URL can use it. Here's what each piece of the puzzle does:
+
+### What is a VPS?
+
+A **VPS (Virtual Private Server)** is a computer in a data center that you rent. It runs 24/7 and has a public IP address, meaning anyone on the internet can reach it. Think of it as your own Linux computer in the cloud — you get full control via SSH (remote terminal access), can install whatever you want, and it stays on even when your laptop is closed. Hetzner is the company renting us this computer. We chose them because they're significantly cheaper than AWS/GCP/Azure for equivalent hardware.
+
+### What is Docker?
+
+**Docker** packages your app and all its dependencies (Node.js, system libraries, etc.) into a self-contained unit called a **container**. Think of it like shipping a meal in a sealed lunchbox instead of giving someone a recipe — everything needed to run is already inside. Without Docker, you'd need to manually install the exact right version of Node.js, PostgreSQL, Redis, and dozens of libraries on the server, and pray nothing conflicts. Docker eliminates "works on my machine" problems.
+
+Key terms:
+
+- **Image** — A snapshot/blueprint of your app (like a frozen copy). Built from a `Dockerfile`.
+- **Container** — A running instance of an image. You can start, stop, and restart containers.
+- **Docker Compose** — A tool that runs multiple containers together (our app needs 4: the web server, the database, Redis, and background workers). Defined in `docker-compose.prod.yml`.
+- **Volume** — Persistent storage that survives container restarts (used for database data).
+
+### What is Caddy?
+
+**Caddy** is a **reverse proxy** — a program that sits between the internet and your app. When someone visits `sotto.fm`, their browser talks to Caddy first, and Caddy forwards the request to your Next.js app running on port 3000.
+
+Why not let Next.js handle traffic directly?
+
+1. **HTTPS/SSL** — Browsers require HTTPS for security. Caddy automatically gets free SSL certificates from Let's Encrypt and renews them. Without this, browsers show a scary "Not Secure" warning.
+2. **Security headers** — Caddy adds headers that protect against common web attacks (clickjacking, MIME sniffing, etc.).
+3. **Compression** — Caddy compresses responses so pages load faster.
+4. **Port hiding** — Your app runs on port 3000 internally, but users access port 443 (standard HTTPS). Caddy bridges this.
+
+### What is DNS?
+
+**DNS (Domain Name System)** translates human-readable names like `sotto.fm` into IP addresses like `46.225.110.252` that computers use. When you type `sotto.fm` in a browser, your computer asks DNS servers "what IP address is this?" and gets directed to our Hetzner server. We configure this by adding **records** at our domain registrar (Namecheap):
+
+- **A Record** — Maps a domain name directly to an IP address (`sotto.fm` → `46.225.110.252`)
+- **CNAME Record** — Maps a domain name to another domain name (`www.sotto.fm` → `sotto.fm`)
+
+### What is SSH?
+
+**SSH (Secure Shell)** is how you remotely control a server from your terminal. Instead of physically sitting at the Hetzner data center, you type `ssh sotto@SERVER_IP` and get a terminal on the remote machine. SSH uses **key pairs** for authentication (more secure than passwords):
+
+- **Private key** — stays on your laptop (never share this)
+- **Public key** — uploaded to the server (it's safe to share)
+
+When you connect, the server checks if your private key matches a public key it knows. If yes, you're in.
+
+### What is CI/CD?
+
+**CI/CD (Continuous Integration / Continuous Deployment)** automates testing and deploying your code:
+
+- **CI (Continuous Integration)** — Every time you push code to GitHub, automated checks run: linting (code style), type checking (TypeScript errors), tests (does it work?), and building (does it compile?). If any check fails, you know immediately.
+- **CD (Continuous Deployment)** — If all CI checks pass, the code is automatically deployed to the server. No manual SSH, no manual `git pull`, no manual Docker rebuild. Push to `main` → tests pass → live on `sotto.fm` in minutes.
+
+### What is a Firewall?
+
+A **firewall** (we use **UFW** — Uncomplicated Firewall) controls which network traffic can reach your server. By default, we block everything and only allow:
+
+- **Port 22** (SSH) — so you can remotely manage the server
+- **Port 80** (HTTP) — needed for Let's Encrypt certificate verification
+- **Port 443** (HTTPS) — the actual web traffic
+
+This means if someone tries to access port 5432 (PostgreSQL) from the internet, the firewall blocks it — your database is only accessible from inside the server.
+
+### What is PostgreSQL?
+
+**PostgreSQL** (often just "Postgres") is a **relational database** — it stores your app's data in structured tables (users, podcasts, subscriptions, etc.). Think of it like a spreadsheet application that's extremely fast, can handle thousands of simultaneous reads/writes, and guarantees your data won't get corrupted. It runs as a separate program (in its own Docker container) and your app talks to it over a local network connection using SQL (Structured Query Language).
+
+### What is Redis?
+
+**Redis** is an **in-memory data store** — it keeps data in RAM instead of on disk, making it extremely fast (microseconds instead of milliseconds). We use it for two things:
+
+1. **Job queue** — When a user creates a podcast, we don't generate it inside the web request (that would take minutes and the browser would time out). Instead, we add a "job" to a Redis queue, and a background worker picks it up.
+2. **Caching** — Storing frequently-accessed data temporarily so we don't hit the database for every request.
+
+### What is Prisma?
+
+**Prisma** is an **ORM (Object-Relational Mapper)** — it lets you interact with the PostgreSQL database using TypeScript instead of writing raw SQL. You define your data model in `prisma/schema.prisma` (e.g., "a User has a name, email, and many Podcasts"), and Prisma generates:
+
+- TypeScript types for every model
+- A client library (`prisma.user.findMany()` instead of `SELECT * FROM users`)
+- Migration tools to create/update database tables
+
+`npx prisma db push` reads the schema file and creates/updates the actual database tables to match. If you add a new field to the User model, `db push` adds that column to the PostgreSQL table.
+
+### What is Next.js?
+
+**Next.js** is a **React framework** that adds server-side features. In plain React, your browser downloads JavaScript and renders everything client-side. Next.js can render pages on the server before sending them to the browser (faster initial load, better SEO). It also provides:
+
+- **App Router** — file-based routing (`src/app/pricing/page.tsx` → `sotto.fm/pricing`)
+- **API Routes** — backend endpoints in the same codebase (`src/app/api/health/route.ts` → `sotto.fm/api/health`)
+- **Server Components** — components that run on the server and send only HTML to the browser (no JavaScript shipped)
+- **Standalone mode** — for production, Next.js compiles into a self-contained Node.js server (what runs inside our Docker container)
+
+### What is BullMQ / Workers?
+
+**BullMQ** is a **job queue library** built on Redis. When a user clicks "Create Podcast," the API route doesn't generate the entire podcast synchronously (that would take 2-5 minutes and the HTTP request would time out). Instead:
+
+1. The API route adds a **job** to a Redis queue: "generate podcast #123"
+2. A **worker** process (running in a separate Docker container) picks up the job
+3. The worker does the heavy lifting: AI script generation, text-to-speech, audio stitching
+4. When done, the worker updates the database status to "READY"
+5. The user gets a notification that their podcast is ready
+
+We have 11 different worker types, each handling a different stage of the pipeline.
+
+### What are Environment Variables?
+
+**Environment variables** (the `.env` file) are configuration values that change between environments. Your local machine might use a test database, but the production server uses the real one. Instead of hardcoding `database_password = "abc123"` in your source code (which would be visible on GitHub), you put it in `.env` which is never committed to git. The app reads these values at startup using `process.env.DATABASE_URL`.
+
+### What is Middleware?
+
+**Middleware** (`src/middleware.ts`) is code that runs _before_ every request reaches your pages or API routes. Ours checks: "Does this visitor have a valid `sotto_access` cookie? If not, redirect them to the password entry page." It's like a bouncer at the door checking IDs before letting people into the club.
+
+### What are Cookies?
+
+**Cookies** are small pieces of data that a website stores in your browser. When you enter the correct password on `/access`, the server responds with a `Set-Cookie` header that tells your browser to store `sotto_access=granted`. On every subsequent request, your browser automatically sends this cookie back, so the middleware knows you've already authenticated. Our cookie expires after 30 days.
+
+### What is npm vs npx?
+
+**npm (Node Package Manager)** manages JavaScript packages (libraries) for your project:
+
+- `npm install` — downloads all dependencies listed in `package.json` into a `node_modules/` folder
+- `npm run dev` — runs a script defined in `package.json` (like a shortcut). `npm run build`, `npm run lint`, `npm test` are all defined there
+- `npm run` is for running project scripts; `npm install` is for downloading packages
+
+**npx** runs a package's binary without installing it globally. For example, `npx prisma db push` runs the `prisma` CLI that was installed as a project dependency. Without `npx`, you'd need to type the full path (`./node_modules/.bin/prisma db push`). Think of `npx` as "run this tool from my project's dependencies."
+
+### What is Cloudflare R2?
+
+**Cloudflare R2** is an object storage service — it stores files (audio files, PDFs, images) in the cloud. Think of it as a giant hard drive accessible via URLs. When a podcast is generated, the final MP3 file is uploaded to R2, and users download it from a URL like `https://pub-xxxxx.r2.dev/podcasts/abc123.mp3`.
+
+Why R2 instead of storing files on our server?
+
+- **CDN** — R2 serves files from Cloudflare's global network (300+ cities), so downloads are fast worldwide. Our server is in one location
+- **Storage limits** — our server has 160GB. Audio files add up fast. R2 has essentially unlimited storage
+- **Durability** — R2 has 99.999999999% durability (11 nines). Files won't be lost. A single server's disk could fail
+- **S3-compatible** — R2 uses the same API as Amazon S3, the industry standard for object storage. This means we can swap to AWS S3 later without changing code
+
+### What is Stripe?
+
+**Stripe** is a payment processing platform. Instead of dealing with credit card numbers directly (which requires PCI compliance — a massive security burden), Stripe handles all the money stuff:
+
+1. **Checkout** — When a user clicks "Subscribe to Starter ($9/mo)", we redirect them to a Stripe-hosted payment page. Stripe collects their credit card info (never touches our server), processes the payment, and redirects them back
+2. **Subscriptions** — Stripe manages recurring billing automatically. Every month, it charges the card and sends us the money (minus their ~2.9% + $0.30 fee)
+3. **Webhooks** — When something happens (payment succeeds, subscription cancels, card declines), Stripe sends an HTTP request to our `/api/webhooks/stripe` endpoint with the details. Our code then updates the database accordingly (e.g., downgrade user to Free tier)
+4. **Customer Portal** — Stripe provides a pre-built page where users can update their credit card, cancel, or change plans. We just redirect them to it
+
+Key Stripe concepts:
+
+- **Secret Key** (`sk_live_...`) — used server-side to create charges and manage subscriptions. Never expose this publicly
+- **Publishable Key** (`pk_live_...`) — used client-side (in the browser) to initialize Stripe's payment form. Safe to expose
+- **Webhook Secret** (`whsec_...`) — used to verify that webhook requests actually came from Stripe, not an impersonator
+
+### What is ElevenLabs?
+
+**ElevenLabs** is a text-to-speech (TTS) API — we send text and a voice ID, and they return an audio file of that text spoken in that voice. Each podcast segment is converted to audio separately (one for the "host" voice, one for the "expert" voice), then our FFmpeg worker stitches them together into a single MP3.
+
+### What is FFmpeg?
+
+**FFmpeg** is an open-source command-line tool for manipulating audio and video. We use it to:
+
+- **Concatenate** audio segments — join 20+ individual TTS clips into one continuous podcast file
+- **Normalize** audio levels — ensure consistent volume throughout (so the host isn't louder than the expert)
+- It's included in our workers Docker container
+
+### What is the Anthropic Claude API?
+
+**Claude** is Anthropic's AI model (like ChatGPT is OpenAI's). We use it for:
+
+- **Discovery chat** — the conversational flow where users describe what podcast they want
+- **Script generation** — turning the discovery metadata into a two-voice podcast script with citations
+- **Script verification** — a "teacher" agent that fact-checks claims and validates sources
+- **Q&A during playback** — when users interrupt to ask questions, Claude answers using the script context
+
+We interact with it via HTTP API calls. Each call costs money based on the number of tokens (roughly words) sent and received.
+
+### What is TypeScript?
+
+**TypeScript** is JavaScript with **types** — annotations that describe what kind of data variables hold. Instead of `function add(a, b)`, you write `function add(a: number, b: number): number`. This catches bugs at compile time rather than runtime. For example, if you accidentally pass a string to `add("hello", 5)`, TypeScript flags it as an error before the code even runs. The `npx tsc --noEmit` command checks all types without producing output files.
+
+### What is ESLint?
+
+**ESLint** is a **linter** — a tool that analyzes your code for potential errors, style violations, and bad practices without running it. It catches things like unused variables, missing `await` on async functions, inconsistent formatting, and patterns that commonly lead to bugs. `npm run lint` runs it across the entire codebase.
+
+### What is an API Route?
+
+In Next.js, an **API route** is a backend endpoint defined as a file. `src/app/api/health/route.ts` becomes accessible at `sotto.fm/api/health`. When someone makes an HTTP request to that URL, the code in `route.ts` runs on the server and returns a response (usually JSON). This is how the frontend communicates with the backend — for example, when you submit the password on `/access`, the browser sends a POST request to `/api/access` which validates it server-side.
+
+### What is a Webhook?
+
+A **webhook** is a "reverse API call" — instead of _us_ calling Stripe to check if a payment went through, _Stripe calls us_ when it happens. Stripe sends an HTTP POST request to our `/api/webhooks/stripe` endpoint with details like "user X's subscription was renewed" or "user Y's card was declined." This is how we keep our database in sync with Stripe's records without polling.
+
+### What is NextAuth?
+
+**NextAuth.js** (v5) is an authentication library for Next.js. It handles the complex OAuth flows for "Sign in with Google/GitHub/Twitter/Apple" so we don't have to implement each one from scratch. It manages:
+
+- **Sessions** — tracking who's logged in (stored in an encrypted cookie)
+- **OAuth flows** — redirecting to Google, handling the callback, exchanging tokens
+- **Database integration** — storing user records in PostgreSQL via Prisma
+
+### What are Server Components vs Client Components?
+
+In Next.js App Router:
+
+- **Server Components** (default) — render on the server and send only HTML to the browser. No JavaScript is shipped. Great for static content, database queries, and faster page loads
+- **Client Components** (marked with `'use client'`) — render in the browser. Required when you need interactivity: click handlers, form state, animations, browser APIs (like audio playback). They ship JavaScript to the browser
+
+We use Server Components by default and only opt into Client Components when we need interactivity. This keeps the JavaScript bundle small and pages fast.
+
+### What is CSS Modules?
+
+**CSS Modules** is a styling approach where each component has its own `.module.css` file. Class names are automatically scoped — so `.button` in `Card.module.css` won't conflict with `.button` in `Header.module.css`. The build system transforms `.button` into something like `.Card_button_a3f2x` to guarantee uniqueness. We use this instead of Tailwind CSS (utility-first classes like `className="flex p-4 bg-blue-500"`) for more readable, maintainable styles.
+
+### What is a PWA?
+
+**PWA (Progressive Web App)** makes a website installable on phones — users can add it to their home screen and it behaves like a native app (full screen, offline support, push notifications). We use this as our mobile strategy instead of building a separate iOS/Android app. The `manifest.json` and `sw.js` (service worker) files make this possible.
+
+---
+
 ## Prerequisites
 
 Before starting, make sure you have these ready:
@@ -50,6 +271,8 @@ Expected output format: `ssh-ed25519 AAAA...long-string... your@email.com`
 
 ## Step 1: Create Hetzner VPS
 
+> **What we're doing:** Renting a Linux computer (Ubuntu 24.04) from Hetzner's data center. After this step, you'll have a server with a public IP address running 24/7 that you can connect to from your terminal. This is where sotto.fm will live.
+
 ### 1.1 Create a project
 
 1. Go to [console.hetzner.cloud](https://console.hetzner.cloud)
@@ -78,24 +301,25 @@ Expected output format: `ssh-ed25519 AAAA...long-string... your@email.com`
 - Select **Ashburn** (ash) — US East, closest to most US users
 - If targeting EU users, choose Falkenstein (fsn1) or Helsinki (hel1)
 
-**Image:**
+**Image (Operating System):**
 
 - Click the **OS Images** tab
 - Select **Ubuntu** → **24.04**
+- Ubuntu is a Linux distribution (like macOS or Windows, but for servers). Version 24.04 is the latest long-term support release
 
 **Type:**
 
-- Click **Shared vCPU** tab (cheaper, fine for our workload)
+- Click **Shared vCPU** tab (cheaper, fine for our workload). "Shared vCPU" means your server shares physical CPU cores with other customers — fine for a small app, much cheaper than dedicated cores
 - Select **x86 (Intel/AMD)** architecture
 - Select **CPX31**: 4 vCPU AMD, 8 GB RAM, 160 GB SSD NVMe
 - Cost: ~€11.49/month (~$12.50/month)
-- Why CPX31: Docker builds need RAM. The 4GB tier will OOM during `npm run build`. 8GB gives headroom for Postgres + Redis + Web + Workers running simultaneously
+- Why CPX31: Docker builds need RAM. The 4GB tier will OOM (Out Of Memory — the OS kills the process when RAM is exhausted) during `npm run build`. 8GB gives headroom for Postgres + Redis + Web + Workers running simultaneously
 
 **Networking:**
 
-- Leave **Public IPv4** checked (you need this)
-- **IPv6** is fine to leave checked (free)
-- Skip **Private Networks** (not needed for a single server)
+- Leave **Public IPv4** checked (you need this). An IPv4 address is the `46.225.110.252`-style address that lets the internet reach your server
+- **IPv6** is fine to leave checked (free). IPv6 is the newer address format — doesn't hurt to have it
+- Skip **Private Networks** (not needed for a single server). Private networks are for connecting multiple servers securely — we only have one
 
 **SSH Keys:**
 
@@ -140,6 +364,8 @@ Server IP: `46.225.110.252`  (write this down!)
 
 ### 1.4 Test SSH connection
 
+Let's verify we can connect to the server. The "fingerprint" prompt appears the first time you connect to a new server — it's SSH asking you to confirm the server's identity (to prevent man-in-the-middle attacks). Type "yes" to trust it; this only happens once per server.
+
 From your local machine:
 
 ```bash
@@ -154,6 +380,8 @@ If this doesn't work, double-check that the SSH key you added to Hetzner matches
 ---
 
 ## Step 2: Point DNS (Namecheap)
+
+> **What we're doing:** Right now, the domain `sotto.fm` doesn't know where to send visitors. We need to tell the internet's phone book (DNS) that `sotto.fm` should point to our Hetzner server's IP address. After this step, when someone types `sotto.fm` in a browser, their request will reach our server.
 
 ### 2.1 Log into Namecheap
 
@@ -174,21 +402,25 @@ If this doesn't work, double-check that the SSH key you added to Hetzner matches
 
 ### 2.4 Add the A record (root domain)
 
+An **A Record** ("Address Record") is the most basic DNS record — it directly maps a domain name to an IPv4 address. This is what tells the internet "when someone asks for `sotto.fm`, send them to IP address `46.225.110.252`."
+
 1. Click **Add New Record**
 2. Set:
    - **Type**: `A Record`
-   - **Host**: `@` (this means the root domain `sotto.fm`)
+   - **Host**: `@` (the `@` symbol means the root domain itself — `sotto.fm` — as opposed to a subdomain like `blog.sotto.fm`)
    - **Value**: `SERVER_IP` (the IP from Step 1)
-   - **TTL**: `Automatic`
+   - **TTL**: `Automatic` (TTL = "Time To Live" — how long DNS servers cache this record before checking for updates. "Automatic" is usually 5-30 minutes)
 3. Click the green checkmark to save
 
 ### 2.5 Add the CNAME record (www subdomain)
+
+A **CNAME Record** ("Canonical Name") maps one domain name to another. Instead of giving `www.sotto.fm` its own IP address, we say "www.sotto.fm is an alias for sotto.fm" — so it inherits whatever IP address the A record points to. If we later change the server IP, we only need to update one record.
 
 1. Click **Add New Record** again
 2. Set:
    - **Type**: `CNAME Record`
    - **Host**: `www`
-   - **Value**: `sotto.fm.` (with trailing dot — this is important!)
+   - **Value**: `sotto.fm.` (with trailing dot — this is a DNS convention meaning "this is a fully qualified domain name, not relative." Without it, some DNS providers would interpret it as `sotto.fm.sotto.fm`)
    - **TTL**: `Automatic`
 3. Click the green checkmark to save
 
@@ -200,6 +432,10 @@ If this doesn't work, double-check that the SSH key you added to Hetzner matches
 | CNAME Record | www  | `sotto.fm.` | Automatic |
 
 ### 2.7 Wait for DNS propagation
+
+**DNS propagation** is the time it takes for your DNS changes to spread across the internet's network of DNS servers. When you update a record at Namecheap, it doesn't instantly reach every DNS server worldwide — it ripples outward as servers' caches expire and they fetch the new record. This typically takes 5-30 minutes but can take up to 48 hours in rare cases.
+
+`dig` (Domain Information Groper) is a command-line tool for querying DNS servers. It's useful for checking whether your DNS changes have propagated.
 
 DNS changes take 5-30 minutes to propagate. Check from your local machine:
 
@@ -232,19 +468,21 @@ sudo systemd-resolve --flush-caches
 
 ## Step 3: Server Setup
 
+> **What we're doing:** The server we rented is a blank Ubuntu machine — it has nothing installed except the operating system. This step installs all the software we need (Docker for running our app, Caddy for handling HTTPS, a firewall for security) and locks down the server so only we can access it. Think of it as furnishing an empty apartment before you can live in it.
+
 This step installs Docker, Caddy, configures the firewall, creates a `sotto` user, and hardens SSH. After this step, root login is permanently disabled.
 
 ### 3.1 What the setup script does
 
 The script `scripts/setup-server.sh` performs 7 actions:
 
-1. **Updates Ubuntu** packages to latest
-2. **Creates `sotto` user** with sudo access and copies root's SSH keys
-3. **Installs Docker** via the official install script and adds `sotto` to the docker group
-4. **Installs Caddy** (reverse proxy with automatic HTTPS via Let's Encrypt)
-5. **Installs utilities** (git, curl, unzip, htop)
-6. **Configures UFW firewall** — allows SSH (22), HTTP (80), HTTPS (443), blocks everything else
-7. **Hardens SSH** — disables password authentication and root login
+1. **Updates Ubuntu** packages to latest — like running Windows Update, ensures all system software has the latest security patches
+2. **Creates `sotto` user** with sudo access and copies root's SSH keys — `root` is the all-powerful admin account on Linux. It's dangerous to use daily because any mistake (like `rm -rf /`) is irreversible. We create a regular user `sotto` that can temporarily elevate to admin with `sudo` (like "Run as Administrator" on Windows)
+3. **Installs Docker** via the official install script and adds `sotto` to the docker group — the "docker group" lets the `sotto` user run Docker commands without `sudo`
+4. **Installs Caddy** (reverse proxy with automatic HTTPS — see Key Concepts above)
+5. **Installs utilities** — `git` (to clone code), `curl` (to make HTTP requests from the command line), `unzip` (to extract archives), `htop` (a visual process monitor, like Activity Monitor/Task Manager for the terminal)
+6. **Configures UFW firewall** — allows SSH (port 22), HTTP (port 80), HTTPS (port 443), blocks everything else. A "port" is like an apartment number — the IP address gets you to the building, the port number gets you to the right service
+7. **Hardens SSH** — disables password authentication (only SSH keys work, which are much harder to brute-force) and disables root login (forces using the `sotto` user)
 
 ### 3.2 Run the setup script
 
@@ -258,7 +496,7 @@ cd ~/Code/Sotto
 ssh root@SERVER_IP "bash -s" < scripts/setup-server.sh
 ```
 
-This pipes the local script into a remote bash session. You'll see output like:
+This pipes the local script into a remote bash session. What's happening: `ssh root@SERVER_IP "bash -s"` opens a remote terminal, and `< scripts/setup-server.sh` sends the contents of that file as input. So the script runs on the remote server, not on your laptop. You'll see output like:
 
 ```
 === Sotto Server Setup ===
@@ -325,6 +563,8 @@ ssh sotto@SERVER_IP "sudo ufw status"
 
 ## Step 4: Clone & Configure
 
+> **What we're doing:** Copying our code from GitHub onto the server and setting up the configuration file (`.env`) that tells the app its secrets — database passwords, encryption keys, and the password gate code. The app reads these values at startup. We generate random strings for passwords/secrets because predictable values are a security risk.
+
 ### 4.1 SSH into the server
 
 ```bash
@@ -332,6 +572,8 @@ ssh sotto@SERVER_IP
 ```
 
 ### 4.2 Clone the repository
+
+`git clone` downloads a complete copy of the code from GitHub onto the server. `~/sotto` means it goes into a folder called `sotto` in the home directory of the `sotto` user.
 
 ```bash
 git clone https://github.com/affromero/Sotto.git ~/sotto
@@ -346,6 +588,8 @@ ls ~/sotto
 ```
 
 ### 4.3 Create the environment file
+
+`.env.example` is a template showing all the environment variables the app needs, with placeholder values. We copy it to `.env` (the actual file the app reads) and then fill in real values.
 
 ```bash
 cp .env.example .env
@@ -438,28 +682,40 @@ R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_STARTER=price_...
+STRIPE_PRICE_ID_PRO=price_...
+STRIPE_PRICE_ID_STUDIO=price_...
+STRIPE_PRICE_ID_CREDITS_3=price_...
+STRIPE_PRICE_ID_CREDITS_10=price_...
+STRIPE_PRICE_ID_CREDITS_25=price_...
 ```
 
 ---
 
 ## Step 5: Build & Deploy
 
+> **What we're doing:** Docker reads our `Dockerfile` (a recipe for building the app) and creates **images** — frozen snapshots that contain our Next.js app, all its npm dependencies, and the compiled production build. Then Docker Compose starts 4 **containers** (running instances) from these images, plus PostgreSQL and Redis. This is the equivalent of running `npm run dev` locally, but in a production-optimized, isolated environment.
+>
+> **Why "build" takes so long:** Docker is doing everything from scratch the first time — downloading base images (Node.js, PostgreSQL, Redis), running `npm install` (downloading all dependencies), and running `npm run build` (compiling Next.js into optimized production files). Subsequent builds are much faster because Docker caches layers that haven't changed.
+
 ### 5.1 Understand the container architecture
 
 `docker-compose.prod.yml` defines 4 services:
 
-| Service    | Image                           | Purpose                                        | Port             |
-| ---------- | ------------------------------- | ---------------------------------------------- | ---------------- |
-| `postgres` | `postgres:16-alpine`            | PostgreSQL database                            | Internal only    |
-| `redis`    | `redis:7-alpine`                | Queue broker + cache (512MB max, LRU eviction) | Internal only    |
-| `web`      | Built from `Dockerfile`         | Next.js app (standalone mode)                  | `127.0.0.1:3000` |
-| `workers`  | Built from `Dockerfile.workers` | BullMQ workers (11 types) + FFmpeg             | Internal only    |
+| Service    | Image                           | Purpose                                                                                                                       | Port             |
+| ---------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `postgres` | `postgres:16-alpine`            | PostgreSQL database — stores all app data (users, podcasts, etc.)                                                             | Internal only    |
+| `redis`    | `redis:7-alpine`                | Job queue + cache — stores temporary data in RAM for speed (512MB max, LRU eviction means oldest data gets deleted when full) | Internal only    |
+| `web`      | Built from `Dockerfile`         | Next.js app (standalone mode) — serves the website and API                                                                    | `127.0.0.1:3000` |
+| `workers`  | Built from `Dockerfile.workers` | Background job processors (11 types) + FFmpeg (audio/video tool) — handles podcast generation, TTS, stitching                 | Internal only    |
 
-The web container only binds to `127.0.0.1:3000` (localhost), not `0.0.0.0:3000`. This means it's not directly accessible from the internet — Caddy handles external traffic and proxies to it.
+"Alpine" in the image names (e.g., `postgres:16-alpine`) means using Alpine Linux as the base — a tiny Linux distribution (~5MB vs ~100MB for regular Ubuntu). Smaller images = faster downloads and less disk usage.
+
+The web container only binds to `127.0.0.1:3000` (localhost), not `0.0.0.0:3000`. `127.0.0.1` means "only accept connections from this same machine." `0.0.0.0` would mean "accept connections from anywhere." Since Caddy runs on the same machine and forwards traffic to port 3000, only local access is needed — this is a security best practice.
 
 ### 5.2 Build and start all containers
 
-> **Important:** The build takes 3-5 minutes and runs in the foreground. If your SSH connection drops mid-build, it gets killed. Use `tmux` or `screen` to protect the session:
+> **Important:** The build takes 3-5 minutes and runs in the **foreground** (it occupies your terminal). If your SSH connection drops mid-build (Wi-Fi hiccup, laptop sleep), the process gets killed and you have to start over. Use `tmux` to protect the session — `tmux` is a **terminal multiplexer** that keeps your session alive on the server even if your SSH connection drops:
 >
 > ```bash
 > # Start a tmux session (already installed by setup script)
@@ -473,7 +729,10 @@ The web container only binds to `127.0.0.1:3000` (localhost), not `0.0.0.0:3000`
 ```bash
 cd ~/sotto
 
-# Build images and start all 4 services in detached mode
+# Build images and start all 4 services in detached mode (-d means "detached" —
+# containers run in the background after starting, so you get your terminal back)
+# --build forces Docker to rebuild images (picks up code changes)
+# -f specifies which compose file to use (we have a separate prod config)
 # First build takes 3-5 minutes (downloads base images, installs deps, builds Next.js)
 docker compose -f docker-compose.prod.yml up -d --build
 ```
@@ -528,9 +787,12 @@ docker compose -f docker-compose.prod.yml logs postgres --tail 50
 
 ### 5.4 Push the database schema
 
-Prisma needs to create the tables in PostgreSQL:
+PostgreSQL is running, but it's an empty database — no tables exist yet. Prisma reads the schema file (`prisma/schema.prisma`) which defines all our models (User, Podcast, etc.) and creates the corresponding database tables, columns, and indexes. Think of it as setting up an empty spreadsheet with all the right column headers before you can start entering data.
 
 ```bash
+# --profile migration: activates the one-off "migrate" service defined in docker-compose
+# run --rm: starts a temporary container that's deleted after the command finishes
+# npx prisma db push: the actual command that syncs the schema to the database
 docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push
 ```
 
@@ -547,6 +809,8 @@ Datasource "db": PostgreSQL database "sotto", schema "public"...
 **If this fails with a connection error**, postgres might not be healthy yet. Wait 10 seconds and retry.
 
 ### 5.5 Verify the app is responding
+
+`curl` is a command-line tool for making HTTP requests — like visiting a URL in your browser, but from the terminal. The `-s` flag means "silent" (don't show download progress). We're hitting the health endpoint which is a simple route that checks if the app, database, and Redis are all reachable.
 
 ```bash
 curl -s http://localhost:3000/api/health
@@ -570,6 +834,10 @@ Look for `✓ Ready in Xms` — that means Next.js has started successfully.
 
 ## Step 6: Configure Caddy (HTTPS)
 
+> **What we're doing:** Our Next.js app is now running on the server, but it's only listening on `localhost:3000` — meaning only programs _on the server itself_ can reach it. We need Caddy to act as the front door: it listens on ports 80 (HTTP) and 443 (HTTPS), handles the SSL certificate (the thing that puts the padlock icon in the browser), and forwards requests to our app. After this step, `https://sotto.fm` will work in any browser.
+>
+> **How SSL/HTTPS works at a high level:** When your browser connects to `https://sotto.fm`, Caddy presents an SSL certificate that proves "I am the real sotto.fm." The browser and Caddy then establish an encrypted connection so nobody can eavesdrop on the traffic. Caddy gets this certificate for free from **Let's Encrypt**, a nonprofit certificate authority. Caddy handles the entire process automatically — requesting, installing, and renewing certificates every 90 days.
+
 Caddy is the reverse proxy that sits between the internet and your Next.js app. It handles:
 
 - **HTTPS** — automatically obtains and renews Let's Encrypt SSL certificates
@@ -590,22 +858,39 @@ sudo cp ~/sotto/Caddyfile /etc/caddy/Caddyfile
 cat /etc/caddy/Caddyfile
 ```
 
-You should see:
+You should see the following. Here's what each line does:
 
 ```
 sotto.fm {
+    # Forward all requests to our Next.js app running on port 3000
     reverse_proxy localhost:3000
+
+    # Compress responses with gzip or zstd (faster page loads, less bandwidth)
     encode gzip zstd
+
+    # Add security headers to every response
     header {
+        # Tell browsers to always use HTTPS for this site (for 1 year)
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        # Prevent MIME type sniffing (a security attack vector)
         X-Content-Type-Options nosniff
+        # Prevent this site from being embedded in iframes (prevents clickjacking)
         X-Frame-Options DENY
+        # Control what URL info is sent when clicking outbound links
         Referrer-Policy strict-origin-when-cross-origin
+        # Restrict which browser features the site can use (no camera, no geolocation, microphone only for voice features)
         Permissions-Policy "camera=(), microphone=(self), geolocation=()"
+        # Remove the "Server" header that would reveal we're using Caddy (security through obscurity)
         -Server
     }
+
+    # For static assets (fonts, compiled JS, favicon, etc.), tell browsers to cache them for 1 year
+    # "immutable" means "this file will never change" — Next.js uses content-hashed filenames
+    # so a new build produces new filenames, and old cached files are simply never requested again
     @static path /fonts/* /_next/static/* /favicon.ico /manifest.json /sw.js
     header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Write access logs to a file, rotating when it exceeds 50MB, keeping the last 5 files
     log {
         output file /var/log/caddy/sotto-access.log {
             roll_size 50MiB
@@ -614,6 +899,8 @@ sotto.fm {
     }
 }
 
+# Redirect www.sotto.fm → sotto.fm (permanent 301 redirect)
+# {uri} preserves the path, so www.sotto.fm/pricing → sotto.fm/pricing
 www.sotto.fm {
     redir https://sotto.fm{uri} permanent
 }
@@ -621,11 +908,15 @@ www.sotto.fm {
 
 ### 6.3 Create the log directory
 
+`sudo` means "run this command as the root/admin user" — needed because `/var/log/` is owned by root. `mkdir -p` creates the directory and any parent directories if they don't exist (the `-p` flag prevents errors if the directory already exists).
+
 ```bash
 sudo mkdir -p /var/log/caddy
 ```
 
 ### 6.4 Reload Caddy
+
+`systemctl` is the Linux service manager. It starts, stops, and restarts programs that run in the background (called "services" or "daemons"). `reload` tells Caddy to re-read its configuration file without fully restarting — meaning zero downtime.
 
 ```bash
 sudo systemctl reload caddy
@@ -672,6 +963,8 @@ If you see errors like `challenge failed` or `DNS not pointing`:
 
 ## Step 7: Verify Everything
 
+> **What we're doing:** Running through a checklist to make sure every piece of the deployment is working: HTTPS, the password gate, security headers, redirects. These commands use `curl` (a command-line HTTP client) from your laptop to simulate what a browser does. `curl -I` fetches only the HTTP headers (metadata about the response, like status code and cookies) without downloading the full page body. The `2>&1 | head -5` part combines error output with regular output and shows only the first 5 lines.
+
 Run all checks from your **local machine** (not the server).
 
 ### 7.1 Check HTTPS is working
@@ -692,7 +985,7 @@ Then test the password-gated alpha landing page:
 curl -I https://sotto.fm/romero 2>&1 | head -5
 ```
 
-Expected: `307` redirect to `/access` (password gate):
+Expected: `307` redirect to `/access` (password gate). A 307 is an HTTP status code meaning "Temporary Redirect" — the server is saying "go to `/access` instead." This is the middleware in action — it detected no `sotto_access` cookie and sent the visitor to the password page:
 
 ```
 HTTP/2 307
@@ -759,6 +1052,8 @@ Open a browser and verify each step:
 
 ### 7.6 Check security headers
 
+These are HTTP response headers that Caddy adds to protect users. They're invisible to normal browsing but browsers read them to enforce security policies.
+
 ```bash
 curl -s -I https://sotto.fm/access | grep -iE "(strict-transport|x-content-type|x-frame|referrer-policy)"
 ```
@@ -772,9 +1067,20 @@ x-frame-options: DENY
 referrer-policy: strict-origin-when-cross-origin
 ```
 
+What each header does:
+
+- **Strict-Transport-Security** — tells browsers "always use HTTPS for this site, even if someone types `http://`." The `max-age=31536000` (1 year) means the browser remembers this for a year
+- **X-Content-Type-Options: nosniff** — prevents browsers from guessing file types (a security attack vector called MIME sniffing)
+- **X-Frame-Options: DENY** — prevents other websites from embedding sotto.fm in an iframe (prevents clickjacking attacks)
+- **Referrer-Policy** — controls how much URL info is shared when clicking links to other sites
+
 ---
 
 ## Step 8: Enable CI/CD (Optional)
+
+> **What we're doing:** Without CI/CD, deploying code changes is manual: SSH into the server, `git pull`, rebuild Docker, restart. This gets tedious fast. CI/CD automates the entire process using **GitHub Actions** — GitHub's built-in automation platform. You define a **workflow** (a YAML file in `.github/workflows/`) that tells GitHub: "every time code is pushed to `main`, run these steps." GitHub provides free servers to run the CI checks, and our deploy step SSHes into our Hetzner server to apply the update.
+>
+> **Why CI before CD?** If someone pushes broken code, CI catches it before it reaches production. Without CI, a typo could take down the live site.
 
 This configures automatic deployment on every push to `main`. The GitHub Actions workflow (`.github/workflows/deploy.yml`) runs CI checks first, then SSHes into the server to pull and rebuild.
 
@@ -782,21 +1088,21 @@ This configures automatic deployment on every push to `main`. The GitHub Actions
 
 On every push to `main`:
 
-1. **CI Job** (runs on GitHub's servers):
+1. **CI Job** (runs on GitHub's free servers — not our Hetzner server):
    - Installs Node.js 20 + npm dependencies
-   - Generates Prisma client
-   - Runs `npm run lint` (ESLint)
-   - Runs `npx tsc --noEmit` (TypeScript type checking)
-   - Runs `npm test` (Vitest)
-   - Runs `npm run build` (Next.js production build)
-2. **Deploy Job** (only if CI passes):
-   - SSHes into the server as `sotto`
-   - `git pull origin main`
-   - `docker compose build`
-   - `docker compose --profile migration run --rm migrate npx prisma db push` (apply any schema changes)
-   - `docker compose up -d` (restart with new images)
-   - Health check
-   - Prunes old Docker images
+   - Generates Prisma client (TypeScript types for the database)
+   - Runs `npm run lint` — **ESLint** checks code style and common mistakes (unused variables, missing imports, etc.)
+   - Runs `npx tsc --noEmit` — **TypeScript compiler** checks all types are correct without producing output files. Catches bugs like passing a string where a number is expected
+   - Runs `npm test` — **Vitest** runs the test suite (unit tests that verify individual functions work correctly)
+   - Runs `npm run build` — compiles the entire Next.js app into production files. This catches import errors, missing dependencies, and build-time issues
+2. **Deploy Job** (only runs if ALL CI checks pass):
+   - SSHes into our Hetzner server as `sotto` (using the deploy key we set up)
+   - `git pull origin main` — downloads the latest code from GitHub
+   - `docker compose build` — rebuilds Docker images with the new code
+   - `docker compose --profile migration run --rm migrate npx prisma db push` — applies any database schema changes (new tables, columns, etc.)
+   - `docker compose up -d` — restarts containers with the new images
+   - Health check — verifies the app is responding after deploy
+   - Prunes old Docker images — cleans up disk space from previous builds
 
 ### 8.2 Generate a deploy SSH key
 
@@ -821,6 +1127,8 @@ exit
 ```
 
 ### 8.3 Add GitHub secrets
+
+**GitHub Secrets** are encrypted environment variables stored in your repository settings. GitHub Actions can access them during workflow runs, but they're never visible in logs or to anyone browsing the repo. This is how we give GitHub Actions the server IP and SSH key without exposing them publicly.
 
 1. Go to your repo on GitHub: `github.com/affromero/Sotto`
 2. Click **Settings** (tab at the top of the repo)
@@ -946,7 +1254,7 @@ Don't just drop a link. Give them a specific action and a reason to try it. Send
 | "Where did you get confused or stuck?"        | Friction points in the flow                  |
 | "Would you use this again? Be honest."        | Core value signal                            |
 | "Would you share this with someone? Who?"     | Organic growth potential                     |
-| "Would you pay $14/month for this?"           | Willingness to pay                           |
+| "Would you pay $9/month for this?"            | Willingness to pay                           |
 | "What would you compare this to?"             | How they categorize you (competitor framing) |
 | "What was the best part? What was the worst?" | Feature prioritization signal                |
 

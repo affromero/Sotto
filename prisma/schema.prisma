@@ -73,6 +73,9 @@ model User {
   // Twitter mentions
   tweetMentions TweetMention[]
 
+  // Credit transactions
+  creditTransactions CreditTransaction[]
+
   @@index([teamId])
   @@index([role])
 }
@@ -143,6 +146,10 @@ model Subscription {
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean            @default(false)
   premiumCreditsUsed   Int                @default(0)
+  creditsBalance       Int                @default(0)
+  creditsMonthly       Int                @default(2)
+  rolloverCredits      Int                @default(0)
+  maxRollover          Int                @default(0)
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -163,8 +170,9 @@ enum SubscriptionStatus {
 
 enum SubscriptionTier {
   FREE
+  STARTER
   PRO
-  CREATOR
+  STUDIO
 }
 
 model SubscriptionEvent {
@@ -180,6 +188,26 @@ model SubscriptionEvent {
   @@index([userId])
   @@index([type])
   @@index([createdAt])
+}
+
+// ============ CREDIT TRANSACTIONS ============
+
+model CreditTransaction {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Int      // positive = add, negative = consume
+  balanceBefore   Int
+  balanceAfter    Int
+  type            String   // 'monthly_grant' | 'generation' | 'refund' | 'purchase' | 'admin'
+  description     String
+  podcastId       String?
+  stripePaymentId String?
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type])
 }
 
 // ============ TEAMS ============

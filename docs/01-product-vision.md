@@ -66,7 +66,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: They already listen to educational podcasts (Lex Fridman, Huberman Lab, Radiolab) and wish they could ask follow-up questions. They value the intimacy and clarity of conversational explanation over reading.
 
-**Conversion path**: Free tier (2 podcasts/month to explore) -> Pro ($14/month for 10 interactions/podcast, private podcasts, and downloads).
+**Conversion path**: Free tier (2 credits/month to explore) -> Starter ($9/month for 5 credits/month, 5 interactions/podcast) -> Pro ($24/month for 15 credits/month, unlimited interactions, private podcasts, and downloads).
 
 ### 3.2 Busy Professionals
 
@@ -76,7 +76,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Their screen time is maxed out. Audio is the only content format that fits into the gaps of a busy day without competing for visual attention. The conversational format makes complex topics feel approachable rather than intimidating.
 
-**Conversion path**: Free tier (try it once during a commute) -> Pro ($14/month for private podcasts, 10 Q&A interactions, downloadable MP3s for offline listening).
+**Conversion path**: Free tier (try it once during a commute) -> Starter ($9/month for 5 credits/month, basic features) -> Pro ($24/month for 15 credits/month, unlimited interactions, private podcasts, downloadable MP3s for offline listening).
 
 ### 3.3 Content Creators and Educators
 
@@ -86,7 +86,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Audio content has higher engagement and completion rates than text. A blog post gets skimmed; a podcast gets listened to from start to finish. Creators want to reach the growing audience that prefers audio. The social feed gives them distribution they do not have to build themselves.
 
-**Conversion path**: Free tier (test with one piece of content) -> Pro ($14/month — 8 episodes/month, voice library, PDF transcripts) -> Creator ($29/month — 30 episodes, unlimited interactions, marketplace, analytics).
+**Conversion path**: Free tier (test with one piece of content) -> Starter ($9/month — 5 credits/month, basic features) -> Pro ($24/month — 15 credits/month, unlimited interactions, voice library, PDF transcripts) -> Studio ($49/month — 50 credits/month, premium SFX, marketplace, analytics).
 
 ---
 
@@ -94,25 +94,27 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 ### 4.1 Priya Nair — The Curious Commuter
 
-| Attribute | Detail |
-|-----------|--------|
-| **Age** | 28 |
-| **Role** | UX Designer at a mid-size SaaS company |
-| **Location** | Austin, TX |
-| **Education** | B.A. in Psychology, self-taught design |
-| **Commute** | 35 minutes each way by car |
+| Attribute          | Detail                                                          |
+| ------------------ | --------------------------------------------------------------- |
+| **Age**            | 28                                                              |
+| **Role**           | UX Designer at a mid-size SaaS company                          |
+| **Location**       | Austin, TX                                                      |
+| **Education**      | B.A. in Psychology, self-taught design                          |
+| **Commute**        | 35 minutes each way by car                                      |
 | **Podcast habits** | Listens to 5-6 podcasts/week (design, psychology, tech culture) |
-| **Tech comfort** | High — early adopter, uses Notion, Figma, ChatGPT daily |
+| **Tech comfort**   | High — early adopter, uses Notion, Figma, ChatGPT daily         |
 
 **Background**: Priya transitioned from psychology research to UX design three years ago. She is naturally curious and regularly dives into topics tangential to her work: behavioral economics, cognitive science, AI ethics, systems thinking. She keeps a running list of "things to learn about" in a Notion doc that grows faster than she can address it.
 
 **Goals**:
+
 - Understand complex topics without dedicating hours to courses or textbooks
 - Fill her commute with personalized learning content, not generic podcast episodes
 - Be able to pause and ask "wait, what does that mean?" when she hits a concept she does not understand
 - Share interesting episodes with colleagues who might benefit
 
 **Pain points**:
+
 - Existing educational podcasts rarely match her exact knowledge level. They are either too basic (she already knows the fundamentals) or too advanced (they assume expertise she does not have)
 - When she does not understand something in a podcast, her only option is to rewind or Google it later, breaking her flow
 - She has tried NotebookLM but found the output too generic and not tailored to her specific angle of interest
@@ -120,31 +122,33 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Monday morning, Priya gets in her car and opens Sotto. She types "I want to understand how design systems scale at large companies." Sotto asks about her background (she selects "working designer"), her focus ("organizational challenges, not just component libraries"), and tone ("casual, with real examples"). Two minutes later, she is listening to a tailored 15-minute episode. At minute 8, the Expert mentions "design tokens" in a way she finds confusing. She taps "Ask a Question," types "Can you explain what design tokens are with a concrete example?", gets a clear answer, taps "Update podcast," and resumes. The next time she shares this episode with her team, the improved version plays.
 
-**Tier**: Pro ($14/month) — she generates 4-6 podcasts per week and uses the Q&A feature constantly.
+**Tier**: Pro ($24/month) — she generates 15+ podcasts per month and uses the Q&A feature constantly with unlimited interactions.
 
 ---
 
 ### 4.2 Marcus Chen — The Time-Pressed Executive
 
-| Attribute | Detail |
-|-----------|--------|
-| **Age** | 42 |
-| **Role** | VP of Engineering at a Series B fintech startup |
-| **Location** | San Francisco, CA |
-| **Education** | M.S. Computer Science, Stanford |
-| **Schedule** | 60+ hour weeks, back-to-back meetings |
+| Attribute          | Detail                                                                |
+| ------------------ | --------------------------------------------------------------------- |
+| **Age**            | 42                                                                    |
+| **Role**           | VP of Engineering at a Series B fintech startup                       |
+| **Location**       | San Francisco, CA                                                     |
+| **Education**      | M.S. Computer Science, Stanford                                       |
+| **Schedule**       | 60+ hour weeks, back-to-back meetings                                 |
 | **Podcast habits** | Listens to 2-3 podcasts/week during morning runs and airport commutes |
-| **Tech comfort** | Very high — former engineer, now in leadership |
+| **Tech comfort**   | Very high — former engineer, now in leadership                        |
 
 **Background**: Marcus manages a team of 45 engineers building a payments platform. His technical depth is strong but narrowing as his role becomes more strategic. His board is asking about AI integration. His team wants to adopt new infrastructure patterns he has not kept up with. His competitors are shipping features faster. He needs to stay technically credible while running a department.
 
 **Goals**:
+
 - Rapidly get up to speed on topics his team is discussing (vector databases, WebAssembly, post-quantum cryptography) without reading 20-page technical papers
 - Prepare for board meetings by understanding business implications of technical decisions
 - Have private podcasts for sensitive strategic topics he cannot discuss openly
 - Download episodes for offline listening during flights
 
 **Pain points**:
+
 - He does not have time to watch conference talks, take courses, or read documentation
 - Generic podcasts waste time on introductions and context he already has. He wants to skip straight to "what an experienced engineer needs to know"
 - Existing AI tools (ChatGPT, NotebookLM) produce text he does not have bandwidth to read during his packed days
@@ -152,30 +156,32 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Marcus has a board meeting Thursday about AI strategy. On his Tuesday morning run, he opens Sotto and says "Explain the current state of AI in fintech payments, including fraud detection, compliance automation, and personalization. I'm a technical executive — skip the basics." Sotto generates a 25-minute deep dive. During his run, he pauses twice to ask questions: "What's the ROI timeline for implementing this?" and "Which vendors are leading in this space?" He marks the podcast as Private, downloads the MP3, and listens again on his Wednesday flight to prepare.
 
-**Tier**: Pro ($14/month) — private podcasts and offline downloads are essential for his use case.
+**Tier**: Pro ($24/month) — private podcasts, unlimited interactions, and offline downloads are essential for his use case.
 
 ---
 
 ### 4.3 Dr. Amara Osei — The Educator Amplifier
 
-| Attribute | Detail |
-|-----------|--------|
-| **Age** | 36 |
-| **Role** | Associate Professor of Molecular Biology, University of Michigan |
-| **Location** | Ann Arbor, MI |
-| **Education** | Ph.D. in Molecular Biology, postdoc at MIT |
-| **Teaching load** | 2 courses/semester, 120 students total |
-| **Tech comfort** | Moderate — uses Canvas LMS, comfortable with AI tools for research |
+| Attribute         | Detail                                                             |
+| ----------------- | ------------------------------------------------------------------ |
+| **Age**           | 36                                                                 |
+| **Role**          | Associate Professor of Molecular Biology, University of Michigan   |
+| **Location**      | Ann Arbor, MI                                                      |
+| **Education**     | Ph.D. in Molecular Biology, postdoc at MIT                         |
+| **Teaching load** | 2 courses/semester, 120 students total                             |
+| **Tech comfort**  | Moderate — uses Canvas LMS, comfortable with AI tools for research |
 
 **Background**: Amara teaches undergraduate biology and a graduate seminar on CRISPR applications. She records her lectures, but students rarely re-watch 75-minute videos. She has written extensive course notes that students skim but do not deeply engage with. She wants her students to arrive at class with foundational knowledge already absorbed so that class time can focus on discussion, not exposition.
 
 **Goals**:
+
 - Convert her course notes and lecture slides into engaging audio content students will actually consume
 - Give students a way to ask questions about the material before class (and see what questions others asked)
 - Build a library of topic-specific episodes that accumulate value semester over semester
 - Reach learners beyond her classroom — she has a public-facing interest in science communication
 
 **Pain points**:
+
 - Recording and editing a traditional podcast is too time-intensive alongside her research and teaching
 - Students do not engage with static content (readings, recorded lectures) at the depth she needs
 - She has no way to know which concepts students struggle with before they arrive in class
@@ -183,7 +189,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Before her Monday lecture on CRISPR delivery mechanisms, Amara creates a Sotto podcast by pasting the URL to her course notes. She specifies: "My students are junior-level biology majors. Focus on the lipid nanoparticle delivery pathway. Keep it at 15 minutes. Professional tone." She shares the podcast link in Canvas. Over the weekend, 40 students listen. Twelve use the Q&A feature: "Why can't we use viral vectors for this?", "What's the size limit for the cargo?", "How does this compare to electroporation?" Amara reviews the questions before class and uses them to shape her lecture. Three of the best Q&A pairs get baked into the episode for next semester's students.
 
-**Tier**: Creator ($29/month) — she generates high volumes of content across two courses, wants the analytics dashboard to track which topics generate the most questions, and uses the marketplace to share her voice profiles with colleagues.
+**Tier**: Studio ($49/month) — she generates high volumes of content across two courses (50+ credits/month), wants the analytics dashboard to track which topics generate the most questions, and uses the marketplace to share her voice profiles with colleagues.
 
 ---
 
@@ -197,26 +203,26 @@ Unlike reading (which requires dedicated visual attention), watching (which requ
 
 ### 5.2 Value by Dimension
 
-| Dimension | What Sotto Delivers | Alternative | Why Sotto Wins |
-|-----------|-------------------|-------------|---------------|
-| **Personalization** | Podcast tailored to your exact background, interests, and depth preference through conversational discovery | Generic content written for an imagined average reader | No two Sotto episodes are the same, even on the same topic |
-| **Format** | Two-voice conversational audio with production value (distinct voices, sound effects, natural pacing) | Monotone AI narration, text articles, video lectures | Conversational format is more engaging and retainable than monologue |
-| **Interactivity** | Pause, ask, get contextual answers, update the content | Static playback with no recourse | Chatterbox offers real-time voice interruption, but only Sotto bakes answers back into a persistent, shareable podcast |
-| **Convenience** | Listen anywhere — commute, workout, walk, cook, clean | Requires a screen, a desk, or dedicated study time | Audio is the only format that fits into existing routines without trade-offs |
-| **Social learning** | Discover what others are learning, fork their podcasts, see community questions | Solo learning in isolation | Knowledge compounds when shared |
-| **Efficiency** | 10-30 minute focused episodes, skip what you know, drill into what you do not | Hours of searching, filtering, reading, watching to extract the same knowledge | Sotto compresses the discovery-to-understanding cycle |
+| Dimension           | What Sotto Delivers                                                                                         | Alternative                                                                    | Why Sotto Wins                                                                                                         |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **Personalization** | Podcast tailored to your exact background, interests, and depth preference through conversational discovery | Generic content written for an imagined average reader                         | No two Sotto episodes are the same, even on the same topic                                                             |
+| **Format**          | Two-voice conversational audio with production value (distinct voices, sound effects, natural pacing)       | Monotone AI narration, text articles, video lectures                           | Conversational format is more engaging and retainable than monologue                                                   |
+| **Interactivity**   | Pause, ask, get contextual answers, update the content                                                      | Static playback with no recourse                                               | Chatterbox offers real-time voice interruption, but only Sotto bakes answers back into a persistent, shareable podcast |
+| **Convenience**     | Listen anywhere — commute, workout, walk, cook, clean                                                       | Requires a screen, a desk, or dedicated study time                             | Audio is the only format that fits into existing routines without trade-offs                                           |
+| **Social learning** | Discover what others are learning, fork their podcasts, see community questions                             | Solo learning in isolation                                                     | Knowledge compounds when shared                                                                                        |
+| **Efficiency**      | 10-30 minute focused episodes, skip what you know, drill into what you do not                               | Hours of searching, filtering, reading, watching to extract the same knowledge | Sotto compresses the discovery-to-understanding cycle                                                                  |
 
 ### 5.3 Positioning Against Alternatives
 
-| Alternative | Sotto's Advantage |
-|-------------|------------------|
-| **Google search + articles** | Audio format frees your eyes and hands. Personalized to your level. No filtering needed. |
-| **YouTube tutorials** | No screen required. No 30-second ads. Tailored to your exact question. Interactive Q&A. |
-| **ChatGPT / Claude chat** | Audio format for passive consumption. Two-voice conversation is more engaging than chat text. Shareable and replayable. |
-| **NotebookLM** | Interactive Q&A during playback. Social feed for discovery. Conversational discovery (not just document upload). Voice diversity (not the same two voices every time). |
-| **Traditional podcasts** | On-demand generation of any topic. Personalized depth. Interactive Q&A. Updatable content. |
-| **Online courses** | 15 minutes vs. 15 hours. Free to start. No commitment. Just-in-time learning, not just-in-case. |
-| **Audiobooks** | Focused on a single topic, not a full book. Interactive. Free tier available. Updated with community Q&A. |
+| Alternative                  | Sotto's Advantage                                                                                                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Google search + articles** | Audio format frees your eyes and hands. Personalized to your level. No filtering needed.                                                                               |
+| **YouTube tutorials**        | No screen required. No 30-second ads. Tailored to your exact question. Interactive Q&A.                                                                                |
+| **ChatGPT / Claude chat**    | Audio format for passive consumption. Two-voice conversation is more engaging than chat text. Shareable and replayable.                                                |
+| **NotebookLM**               | Interactive Q&A during playback. Social feed for discovery. Conversational discovery (not just document upload). Voice diversity (not the same two voices every time). |
+| **Traditional podcasts**     | On-demand generation of any topic. Personalized depth. Interactive Q&A. Updatable content.                                                                             |
+| **Online courses**           | 15 minutes vs. 15 hours. Free to start. No commitment. Just-in-time learning, not just-in-case.                                                                        |
+| **Audiobooks**               | Focused on a single topic, not a full book. Interactive. Free tier available. Updated with community Q&A.                                                              |
 
 ---
 
@@ -228,14 +234,14 @@ The choice of the podcast format is not arbitrary. It is a deliberate product de
 
 Audio is the only content format that does not require dedicated time or attention. It layers onto activities people are already doing:
 
-| Activity | Visual Content | Audio Content |
-|----------|---------------|--------------|
-| Driving | Impossible (dangerous) | Natural fit |
-| Exercising | Awkward (holding a phone, watching while moving) | Natural fit |
-| Cooking | Impractical (wet/dirty hands) | Natural fit |
-| Walking | Socially isolating (face buried in screen) | Natural fit |
-| Commuting (transit) | Possible but fatiguing (small screen, crowds) | Natural fit |
-| Household chores | Impossible (hands occupied) | Natural fit |
+| Activity            | Visual Content                                   | Audio Content |
+| ------------------- | ------------------------------------------------ | ------------- |
+| Driving             | Impossible (dangerous)                           | Natural fit   |
+| Exercising          | Awkward (holding a phone, watching while moving) | Natural fit   |
+| Cooking             | Impractical (wet/dirty hands)                    | Natural fit   |
+| Walking             | Socially isolating (face buried in screen)       | Natural fit   |
+| Commuting (transit) | Possible but fatiguing (small screen, crowds)    | Natural fit   |
+| Household chores    | Impossible (hands occupied)                      | Natural fit   |
 
 The average American spends 52 minutes per day commuting, 30 minutes exercising, and 40 minutes on household tasks. That is over two hours of daily time where audio content is the only viable learning format. Sotto captures this time.
 
@@ -296,15 +302,15 @@ Sotto does not demand a screen, a desk, or dedicated study time. It fits into th
 
 ## 8. Success Metrics
 
-| Metric | Definition | 6-Month Target | 12-Month Target |
-|--------|-----------|---------------|----------------|
-| **Monthly Active Users** | Users who listen to at least 1 episode/month | 500 | 2,000 |
-| **Podcasts Generated** | Total episodes created per month | 1,500 | 8,000 |
-| **Completion Rate** | % of episodes listened to >80% | >60% | >70% |
-| **Interaction Rate** | % of listening sessions where Q&A is used | >15% | >25% |
-| **Update Acceptance** | % of Q&A interactions where user accepts podcast update | >30% | >40% |
-| **Free-to-Pro Conversion** | % of Free users upgrading to Pro within 30 days | >5% | >8% |
-| **Monthly Churn (Pro)** | % of Pro subscribers canceling per month | <12% | <8% |
-| **NPS** | Net Promoter Score from in-app survey | >40 | >50 |
-| **Social Engagement** | Avg likes + saves + forks per public podcast | 3 | 8 |
-| **Feed Discovery Rate** | % of listening sessions initiated from the feed (vs. own content) | >20% | >35% |
+| Metric                     | Definition                                                        | 6-Month Target | 12-Month Target |
+| -------------------------- | ----------------------------------------------------------------- | -------------- | --------------- |
+| **Monthly Active Users**   | Users who listen to at least 1 episode/month                      | 500            | 2,000           |
+| **Podcasts Generated**     | Total episodes created per month                                  | 1,500          | 8,000           |
+| **Completion Rate**        | % of episodes listened to >80%                                    | >60%           | >70%            |
+| **Interaction Rate**       | % of listening sessions where Q&A is used                         | >15%           | >25%            |
+| **Update Acceptance**      | % of Q&A interactions where user accepts podcast update           | >30%           | >40%            |
+| **Free-to-Pro Conversion** | % of Free users upgrading to Pro within 30 days                   | >5%            | >8%             |
+| **Monthly Churn (Pro)**    | % of Pro subscribers canceling per month                          | <12%           | <8%             |
+| **NPS**                    | Net Promoter Score from in-app survey                             | >40            | >50             |
+| **Social Engagement**      | Avg likes + saves + forks per public podcast                      | 3              | 8               |
+| **Feed Discovery Rate**    | % of listening sessions initiated from the feed (vs. own content) | >20%           | >35%            |

@@ -3,13 +3,11 @@ import {
   getUserTier,
   getUserUsage,
   getUserVoiceCredits,
-  consumeVoiceCredit,
-  incrementPodcastUsage,
   resetMonthlyUsage,
 } from '@/lib/subscription';
 import { prisma } from '@/lib/prisma';
 import { TIER_LIMITS } from '@/lib/stripe';
-import type { UserRole } from '@prisma/client';
+import type { SubscriptionStatus, SubscriptionTier } from '@prisma/client';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -25,6 +23,31 @@ vi.mock('@/lib/prisma', () => ({
     $transaction: vi.fn(),
   },
 }));
+
+vi.mock('@/lib/credits', () => ({
+  grantMonthlyCredits: vi.fn(),
+}));
+
+const mockSubscription = (overrides: Record<string, unknown> = {}) => ({
+  id: 'sub1',
+  userId: 'user1',
+  tier: 'PRO' as SubscriptionTier,
+  status: 'ACTIVE' as SubscriptionStatus,
+  stripeSubscriptionId: 'sub_123',
+  stripePriceId: 'price_123',
+  stripeCustomerId: 'cus_123',
+  premiumCreditsUsed: 0,
+  creditsBalance: 10,
+  creditsMonthly: 15,
+  rolloverCredits: 0,
+  maxRollover: 5,
+  cancelAtPeriodEnd: false,
+  currentPeriodStart: new Date(),
+  currentPeriodEnd: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  ...overrides,
+});
 
 describe('getUserTier', () => {
   beforeEach(() => {
@@ -43,21 +66,9 @@ describe('getUserTier', () => {
   });
 
   it('returns FREE when subscription is not active', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'CANCELED',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      mockSubscription({ status: 'CANCELED' as SubscriptionStatus })
+    );
 
     const tier = await getUserTier('user1');
 
@@ -65,47 +76,39 @@ describe('getUserTier', () => {
   });
 
   it('returns PRO when subscription is active with PRO tier', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      mockSubscription({ tier: 'PRO' as SubscriptionTier, status: 'ACTIVE' as SubscriptionStatus })
+    );
 
     const tier = await getUserTier('user1');
 
     expect(tier).toBe('PRO');
   });
 
-  it('returns CREATOR when subscription is active with CREATOR tier', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'CREATOR',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  it('returns STUDIO when subscription is active with STUDIO tier', async () => {
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      mockSubscription({
+        tier: 'STUDIO' as SubscriptionTier,
+        status: 'ACTIVE' as SubscriptionStatus,
+      })
+    );
 
     const tier = await getUserTier('user1');
 
-    expect(tier).toBe('CREATOR');
+    expect(tier).toBe('STUDIO');
+  });
+
+  it('returns STARTER when subscription is active with STARTER tier', async () => {
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      mockSubscription({
+        tier: 'STARTER' as SubscriptionTier,
+        status: 'ACTIVE' as SubscriptionStatus,
+      })
+    );
+
+    const tier = await getUserTier('user1');
+
+    expect(tier).toBe('STARTER');
   });
 });
 
@@ -114,237 +117,76 @@ describe('getUserUsage', () => {
     vi.clearAllMocks();
   });
 
-  it('returns correct usage for FREE tier user', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 1,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
+  it('returns correct usage for FREE tier user (no subscription)', async () => {
+    // getUserTier call
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(null) // getUserTier
+      .mockResolvedValueOnce(null); // getUserUsage creditsBalance lookup
 
     const usage = await getUserUsage('user1');
 
     expect(usage).toEqual({
       tier: 'FREE',
-      podcastsUsed: 1,
-      podcastsAllowed: TIER_LIMITS.FREE.podcastsPerMonth,
-      canCreate: true,
+      creditsBalance: 0,
+      creditsMonthly: TIER_LIMITS.FREE.creditsMonthly,
+      canCreate: false,
     });
   });
 
-  it('returns correct usage for PRO tier user', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 5,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  it('returns correct usage for PRO tier user with credits', async () => {
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(
+        mockSubscription({
+          tier: 'PRO' as SubscriptionTier,
+          status: 'ACTIVE' as SubscriptionStatus,
+        })
+      )
+      .mockResolvedValueOnce(mockSubscription({ creditsBalance: 10 }));
 
     const usage = await getUserUsage('user1');
 
     expect(usage).toEqual({
       tier: 'PRO',
-      podcastsUsed: 5,
-      podcastsAllowed: TIER_LIMITS.PRO.podcastsPerMonth,
+      creditsBalance: 10,
+      creditsMonthly: TIER_LIMITS.PRO.creditsMonthly,
       canCreate: true,
     });
   });
 
-  it('returns correct usage for CREATOR tier user', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 15,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  it('returns canCreate false when zero credits', async () => {
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(
+        mockSubscription({
+          tier: 'PRO' as SubscriptionTier,
+          status: 'ACTIVE' as SubscriptionStatus,
+        })
+      )
+      .mockResolvedValueOnce(mockSubscription({ creditsBalance: 0 }));
 
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'CREATOR',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    const usage = await getUserUsage('user1');
+
+    expect(usage.canCreate).toBe(false);
+    expect(usage.creditsBalance).toBe(0);
+  });
+
+  it('returns STUDIO tier usage correctly', async () => {
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(
+        mockSubscription({
+          tier: 'STUDIO' as SubscriptionTier,
+          status: 'ACTIVE' as SubscriptionStatus,
+        })
+      )
+      .mockResolvedValueOnce(mockSubscription({ creditsBalance: 45 }));
 
     const usage = await getUserUsage('user1');
 
     expect(usage).toEqual({
-      tier: 'CREATOR',
-      podcastsUsed: 15,
-      podcastsAllowed: TIER_LIMITS.CREATOR.podcastsPerMonth,
+      tier: 'STUDIO',
+      creditsBalance: 45,
+      creditsMonthly: TIER_LIMITS.STUDIO.creditsMonthly,
       canCreate: true,
     });
-  });
-
-  it('returns canCreate false when at FREE tier limit', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 2,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
-
-    const usage = await getUserUsage('user1');
-
-    expect(usage.canCreate).toBe(false);
-  });
-
-  it('returns canCreate false when at PRO tier limit', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 8,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const usage = await getUserUsage('user1');
-
-    expect(usage.canCreate).toBe(false);
-  });
-
-  it('returns canCreate false when at CREATOR tier limit', async () => {
-    vi.mocked(prisma.user.findUniqueOrThrow).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 30,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'CREATOR',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const usage = await getUserUsage('user1');
-
-    expect(usage.canCreate).toBe(false);
   });
 });
 
@@ -353,206 +195,59 @@ describe('getUserVoiceCredits', () => {
     vi.clearAllMocks();
   });
 
-  it('returns zero credits for FREE tier', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
+  it('returns credits based on tier creditsMonthly for FREE tier', async () => {
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(null) // getUserTier
+      .mockResolvedValueOnce(null); // getUserVoiceCredits
 
     const credits = await getUserVoiceCredits('user1');
 
     expect(credits).toEqual({
       used: 0,
-      total: 0,
-      remaining: 0,
+      total: TIER_LIMITS.FREE.creditsMonthly,
+      remaining: TIER_LIMITS.FREE.creditsMonthly,
     });
   });
 
   it('returns correct credits for PRO tier with zero used', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 0,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(
+        mockSubscription({
+          tier: 'PRO' as SubscriptionTier,
+          status: 'ACTIVE' as SubscriptionStatus,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockSubscription({ premiumCreditsUsed: 0, tier: 'PRO' as SubscriptionTier })
+      );
 
     const credits = await getUserVoiceCredits('user1');
 
     expect(credits).toEqual({
       used: 0,
-      total: TIER_LIMITS.PRO.premiumVoiceCredits,
-      remaining: TIER_LIMITS.PRO.premiumVoiceCredits,
+      total: TIER_LIMITS.PRO.creditsMonthly,
+      remaining: TIER_LIMITS.PRO.creditsMonthly,
     });
   });
 
-  it('returns correct credits for CREATOR tier with some used', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'CREATOR',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 5,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  it('returns correct credits for STUDIO tier with some used', async () => {
+    vi.mocked(prisma.subscription.findUnique)
+      .mockResolvedValueOnce(
+        mockSubscription({
+          tier: 'STUDIO' as SubscriptionTier,
+          status: 'ACTIVE' as SubscriptionStatus,
+        })
+      )
+      .mockResolvedValueOnce(
+        mockSubscription({ premiumCreditsUsed: 5, tier: 'STUDIO' as SubscriptionTier })
+      );
 
     const credits = await getUserVoiceCredits('user1');
 
     expect(credits).toEqual({
       used: 5,
-      total: TIER_LIMITS.CREATOR.premiumVoiceCredits,
-      remaining: 5,
-    });
-  });
-
-  it('returns zero remaining when all credits used', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 3,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const credits = await getUserVoiceCredits('user1');
-
-    expect(credits).toEqual({
-      used: 3,
-      total: 3,
-      remaining: 0,
-    });
-  });
-});
-
-describe('consumeVoiceCredit', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('increments premium credits used when credits available', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 1,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.update).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 2,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await consumeVoiceCredit('user1');
-
-    expect(prisma.subscription.update).toHaveBeenCalledWith({
-      where: { userId: 'user1' },
-      data: { premiumCreditsUsed: { increment: 1 } },
-    });
-  });
-
-  it('throws error when no credits remaining', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
-      id: 'sub1',
-      userId: 'user1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_123',
-      stripePriceId: 'price_123',
-      stripeCustomerId: 'cus_123',
-      premiumCreditsUsed: 3,
-      cancelAtPeriodEnd: false,
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await expect(consumeVoiceCredit('user1')).rejects.toThrow(
-      'No premium voice credits remaining this month'
-    );
-
-    expect(prisma.subscription.update).not.toHaveBeenCalled();
-  });
-
-  it('throws error when FREE tier user tries to consume credit', async () => {
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
-
-    await expect(consumeVoiceCredit('user1')).rejects.toThrow(
-      'No premium voice credits remaining this month'
-    );
-  });
-});
-
-describe('incrementPodcastUsage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('increments user podcast usage counter', async () => {
-    vi.mocked(prisma.user.update).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 2,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await incrementPodcastUsage('user1');
-
-    expect(prisma.user.update).toHaveBeenCalledWith({
-      where: { id: 'user1' },
-      data: { podcastsUsed: { increment: 1 } },
+      total: TIER_LIMITS.STUDIO.creditsMonthly,
+      remaining: TIER_LIMITS.STUDIO.creditsMonthly - 5,
     });
   });
 });
@@ -562,77 +257,25 @@ describe('resetMonthlyUsage', () => {
     vi.clearAllMocks();
   });
 
-  it('resets both podcast usage and premium credits in transaction', async () => {
-    const mockTransaction = vi.fn().mockImplementation((operations) => {
-      if (Array.isArray(operations)) {
-        return Promise.all(operations);
-      }
-      return operations;
-    });
+  it('calls grantMonthlyCredits with correct tier', async () => {
+    const { grantMonthlyCredits } = await import('@/lib/credits');
 
-    vi.mocked(prisma.$transaction).mockImplementation(mockTransaction as never);
-
-    vi.mocked(prisma.user.update).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 0,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      mockSubscription({ tier: 'PRO' as SubscriptionTier, status: 'ACTIVE' as SubscriptionStatus })
+    );
 
     await resetMonthlyUsage('user1');
 
-    expect(prisma.$transaction).toHaveBeenCalledWith(
-      expect.arrayContaining([expect.anything(), expect.anything()])
-    );
+    expect(grantMonthlyCredits).toHaveBeenCalledWith('user1', 'PRO');
   });
 
-  it('resets usage for user with no subscription', async () => {
-    const mockTransaction = vi.fn().mockImplementation((callback) => {
-      if (Array.isArray(callback)) {
-        return Promise.all(callback);
-      }
-      return callback(prisma);
-    });
+  it('uses FREE tier when no subscription exists', async () => {
+    const { grantMonthlyCredits } = await import('@/lib/credits');
 
-    vi.mocked(prisma.$transaction).mockImplementation(mockTransaction as never);
-
-    vi.mocked(prisma.user.update).mockResolvedValue({
-      id: 'user1',
-      email: 'user@example.com',
-      name: 'Test User',
-      image: null,
-      emailVerified: null,
-      bio: null,
-      podcastsUsed: 0,
-      podcastsAllowed: 2,
-      twitterHandle: null,
-      twitterEnabled: false,
-      preferredHostVoiceId: null,
-      preferredExpertVoiceId: null,
-      teamId: null,
-      role: 'USER' as UserRole,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 0 });
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
 
     await resetMonthlyUsage('user1');
 
-    expect(prisma.$transaction).toHaveBeenCalled();
+    expect(grantMonthlyCredits).toHaveBeenCalledWith('user1', 'FREE');
   });
 });

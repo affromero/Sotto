@@ -42,11 +42,13 @@ Before starting, ensure you have:
 ### Required Database Services
 
 Choose one option for PostgreSQL:
+
 - **Neon** (recommended): Free tier, 0.5GB storage, serverless
 - **Supabase**: Free tier, 500MB storage, includes Redis alternative
 - **Railway**: $5/mo, includes PostgreSQL + Redis together
 
 Choose one option for Redis:
+
 - **Upstash** (recommended): Free tier, 10K commands/day, serverless
 - **Railway**: $5/mo, bundled with PostgreSQL
 
@@ -205,7 +207,7 @@ ANTHROPIC_API_KEY="sk-ant-xxxxx"
 ELEVENLABS_API_KEY="your-elevenlabs-key"
 ```
 
-**Cost estimation**: 10-minute podcast = ~1500 words = ~9K characters. Starter tier = 3 podcasts/month, Creator = 11 podcasts/month. For beta, recommend Creator tier.
+**Cost estimation**: 10-minute podcast = ~1500 words = ~9K characters. ElevenLabs Scale tier ($99/mo) provides sufficient character allocation for Studio-tier users. For beta, recommend Scale tier.
 
 ### Voice Selection
 
@@ -323,28 +325,55 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_xxxxx"
 ### Create Products
 
 1. Go to "Products" → "Add product"
-2. Create three products:
+2. Create six products:
 
-**Free Tier** (for tracking only, no charge):
-- Name: "Sotto Free"
-- Pricing: One-time, $0
+**Subscription Tiers**:
+
+**Starter Tier**:
+
+- Name: "Sotto Starter"
+- Pricing: Recurring, $9/month
+- Billing period: Monthly
 
 **Pro Tier**:
+
 - Name: "Sotto Pro"
-- Pricing: Recurring, $14/month
+- Pricing: Recurring, $24/month
 - Billing period: Monthly
 
-**Creator Tier**:
-- Name: "Sotto Creator"
-- Pricing: Recurring, $29/month
+**Studio Tier**:
+
+- Name: "Sotto Studio"
+- Pricing: Recurring, $49/month
 - Billing period: Monthly
+
+**One-Time Credit Packs**:
+
+**3 Credits Pack**:
+
+- Name: "Sotto 3 Credits"
+- Pricing: One-time, $5
+
+**10 Credits Pack**:
+
+- Name: "Sotto 10 Credits"
+- Pricing: One-time, $15
+
+**25 Credits Pack**:
+
+- Name: "Sotto 25 Credits"
+- Pricing: One-time, $30
 
 3. Copy Price IDs (e.g., `price_xxxxx`)
 4. Add to `.env.production`:
 
 ```env
+STRIPE_PRICE_ID_STARTER="price_xxxxx"
 STRIPE_PRICE_ID_PRO="price_xxxxx"
-STRIPE_PRICE_ID_CREATOR="price_xxxxx"
+STRIPE_PRICE_ID_STUDIO="price_xxxxx"
+STRIPE_PRICE_ID_CREDITS_3="price_xxxxx"
+STRIPE_PRICE_ID_CREDITS_10="price_xxxxx"
+STRIPE_PRICE_ID_CREDITS_25="price_xxxxx"
 ```
 
 ### Webhook Setup
@@ -516,22 +545,23 @@ export default function RootLayout({ children }) {
 
 Monthly costs for MVP with 50 beta users (estimated):
 
-| Service | Tier | Cost | Notes |
-|---------|------|------|-------|
-| **Vercel** | Hobby | $0 | Up to 100GB bandwidth |
-| **Railway** | Starter | $5 | Workers + 512MB RAM |
-| **Neon PostgreSQL** | Free | $0 | 0.5GB storage, 1GB data transfer |
-| **Upstash Redis** | Free | $0 | 10K commands/day |
-| **Cloudflare R2** | Free | $0 | 10GB storage, 10M Class A requests |
-| **Anthropic Claude** | Pay-as-you-go | $15-30 | ~100-300 podcast generations |
-| **ElevenLabs** | Creator | $22 | 100K characters/month (~11 podcasts) |
-| **Stripe** | Pay-as-you-go | $0-10 | 2.9% + $0.30 per transaction |
-| **Domain** | Annual | $1-2/mo | `.com` domain |
-| **Total** | | **$43-69/mo** | Scales with usage |
+| Service              | Tier          | Cost          | Notes                                |
+| -------------------- | ------------- | ------------- | ------------------------------------ |
+| **Vercel**           | Hobby         | $0            | Up to 100GB bandwidth                |
+| **Railway**          | Starter       | $5            | Workers + 512MB RAM                  |
+| **Neon PostgreSQL**  | Free          | $0            | 0.5GB storage, 1GB data transfer     |
+| **Upstash Redis**    | Free          | $0            | 10K commands/day                     |
+| **Cloudflare R2**    | Free          | $0            | 10GB storage, 10M Class A requests   |
+| **Anthropic Claude** | Pay-as-you-go | $15-30        | ~100-300 podcast generations         |
+| **ElevenLabs**       | Creator       | $22           | 100K characters/month (~11 podcasts) |
+| **Stripe**           | Pay-as-you-go | $0-10         | 2.9% + $0.30 per transaction         |
+| **Domain**           | Annual        | $1-2/mo       | `.com` domain                        |
+| **Total**            |               | **$43-69/mo** | Scales with usage                    |
 
 ### Cost Scaling
 
 **At 100 users**:
+
 - Railway: $10 (1GB RAM)
 - Neon: $20 (3GB storage)
 - Upstash: $10 (100K commands/day)
@@ -540,6 +570,7 @@ Monthly costs for MVP with 50 beta users (estimated):
 - **Total: ~$200/mo**
 
 **At 500 users**:
+
 - Vercel: $20 (Pro tier)
 - Railway: $50 (4GB RAM)
 - Neon: $50 (10GB storage)
@@ -673,6 +704,7 @@ It's in beta, so I'd love your feedback!
 Record a 3-5 minute podcast explaining Sotto:
 
 **Script outline**:
+
 - What is Sotto? (30s)
 - How to create your first podcast (1 min)
 - How to interrupt and ask questions (1 min)
@@ -793,14 +825,17 @@ export function logError(error: Error, context?: any) {
 ### Set Up Alerts
 
 **Vercel**:
+
 - Deploy failure notifications (email)
 - Error rate > 5% (email)
 
 **Railway**:
+
 - Worker crash notifications (email)
 - Memory usage > 90% (email)
 
 **Upstash**:
+
 - Commands approaching daily limit (email)
 
 ---
@@ -814,6 +849,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: Invalid `DATABASE_URL` or database not accepting connections
 
 **Fix**:
+
 1. Verify connection string in Neon dashboard
 2. Check IP allowlist (Neon allows all by default)
 3. Test connection: `npx prisma studio`
@@ -823,6 +859,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: Invalid `REDIS_URL` or free tier commands exceeded
 
 **Fix**:
+
 1. Check Upstash dashboard for daily command usage
 2. Upgrade to paid tier if exceeded
 3. Optimize Redis usage (reduce cache TTL, use batch operations)
@@ -832,6 +869,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: ElevenLabs rate limit exceeded or worker crashed
 
 **Fix**:
+
 1. Check ElevenLabs dashboard for quota usage
 2. Check Railway logs for worker errors
 3. Retry failed jobs: Go to BullMQ dashboard, select job, click "Retry"
@@ -841,6 +879,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: Webhook endpoint not accessible or incorrect signing secret
 
 **Fix**:
+
 1. Test webhook: Stripe dashboard → Webhooks → Send test event
 2. Check Vercel logs for incoming webhook requests
 3. Verify `STRIPE_WEBHOOK_SECRET` matches dashboard value
@@ -850,6 +889,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: VAPID keys incorrect or service worker not registered
 
 **Fix**:
+
 1. Verify `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is accessible client-side
 2. Check browser console for service worker errors
 3. Re-register service worker: Clear site data, refresh
@@ -859,6 +899,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: FFmpeg normalization issue or R2 upload incomplete
 
 **Fix**:
+
 1. Check Railway logs for FFmpeg errors
 2. Re-run stitching job
 3. Verify R2 file integrity: Download and play locally
@@ -868,6 +909,7 @@ export function logError(error: Error, context?: any) {
 **Cause**: Database query not optimized or missing index
 
 **Fix**:
+
 1. Add database indexes:
    ```sql
    CREATE INDEX idx_podcasts_visibility ON "Podcast"(visibility, "createdAt");
@@ -887,10 +929,10 @@ Once you have 50+ beta users and stable performance:
 3. **Improve onboarding**: Add tutorial overlay for first-time users
 4. **Add mobile apps**: React Native or PWA enhancement
 5. **Expand OAuth**: Add LinkedIn, Twitter/X
-6. **Creator features**: Voice marketplace, analytics dashboard
+6. **Studio features**: Voice marketplace, analytics dashboard
 7. **Analytics dashboard**: Show creators their podcast stats
 8. **Public API**: Let developers build on Sotto
-9. **Monetization**: Enable Pro/Creator tier conversions with in-app prompts
+9. **Monetization**: Enable Starter/Pro/Studio tier conversions with in-app prompts
 
 ---
 
@@ -920,6 +962,7 @@ Before considering MVP "launched":
 **You're ready to launch Sotto. Good luck!**
 
 For questions or support, refer to:
+
 - `CLAUDE.md` — Codebase overview
 - `docs/00-plan.md` — Full product plan
 - `docs/03-technical-architecture.md` — System design

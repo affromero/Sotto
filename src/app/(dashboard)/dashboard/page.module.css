@@ -79,6 +79,19 @@
   color: var(--color-text-secondary);
 }
 
+.outOfCreditsLink {
+  display: block;
+  margin-top: var(--spacing-xs);
+  font: var(--text-caption);
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.outOfCreditsLink:hover {
+  text-decoration: underline;
+}
+
 /* Creator Stats */
 
 .creatorStats {

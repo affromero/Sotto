@@ -35,13 +35,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Only TEAM tier can create API keys
+  // Only Studio tier can create API keys
   const tier = await getUserTier(session.user.id);
-  if (tier !== 'CREATOR') {
-    return NextResponse.json(
-      { error: 'API keys require a Creator subscription' },
-      { status: 403 }
-    );
+  if (tier !== 'STUDIO') {
+    return NextResponse.json({ error: 'API keys require a Studio subscription' }, { status: 403 });
   }
 
   const body = await request.json();

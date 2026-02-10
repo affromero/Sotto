@@ -73,7 +73,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 +--------------------------------------------------------------+
 |                                                              |
 |  PRICING          [See docs/pricing page for full layout]    |
-|  Embedded PricingCard x3 (Free / Pro / Creator)                 |
+|  Embedded PricingCard x4 (Free / Starter / Pro / Studio)        |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
@@ -98,7 +98,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 **What Makes Sotto Different**: 2x2 grid of feature cards (single column on mobile). Each card has an icon (Lucide), heading, and 2-sentence description.
 
-**Pricing Preview**: Three PricingCard components side-by-side (stacked on mobile). Abbreviated version of the pricing page.
+**Pricing Preview**: Four PricingCard components side-by-side (stacked on mobile, 2x2 on tablet). Abbreviated version of the pricing page.
 
 **Final CTA**: Full-width amber background. White text headline. Single centered button.
 
@@ -106,14 +106,14 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 1.4 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Hero headline | 36px, centered | 48px, centered | 48px, left-aligned |
-| Hero CTAs | Stacked, full width | Side by side | Side by side |
-| How It Works cards | Stacked vertically | 3 columns | 3 columns |
-| Featured Podcasts | Horizontal scroll | 2 columns | 3 columns |
-| Feature grid | Single column | 2 columns | 2 columns |
-| Pricing cards | Stacked vertically | 3 columns | 3 columns |
+| Element            | Mobile              | Tablet         | Desktop            |
+| ------------------ | ------------------- | -------------- | ------------------ |
+| Hero headline      | 36px, centered      | 48px, centered | 48px, left-aligned |
+| Hero CTAs          | Stacked, full width | Side by side   | Side by side       |
+| How It Works cards | Stacked vertically  | 3 columns      | 3 columns          |
+| Featured Podcasts  | Horizontal scroll   | 2 columns      | 3 columns          |
+| Feature grid       | Single column       | 2 columns      | 2 columns          |
+| Pricing cards      | Stacked vertically  | 2 columns      | 4 columns          |
 
 ---
 
@@ -171,9 +171,9 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 2.3 Responsive Behavior
 
-| Element | Mobile | Tablet+ |
-|---------|--------|---------|
-| Card width | Full width, 16px margin | Max 420px, centered |
+| Element                | Mobile                  | Tablet+             |
+| ---------------------- | ----------------------- | ------------------- |
+| Card width             | Full width, 16px margin | Max 420px, centered |
 | Card vertical position | Starts at 80px from top | Centered vertically |
 
 ---
@@ -191,7 +191,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 | [Create] |                                                     |
 | [Feed]   |  USAGE THIS MONTH                                  |
 | [Profile]|  +------------------------------------------------+|
-| [Settings|  | [====........] 2 of 3 podcasts used   [Upgrade]||
+| [Settings|  | [====........] 1 of 2 credits used    [Upgrade]||
 |          |  +------------------------------------------------+|
 |          |                                                     |
 |          |  YOUR PODCASTS                                      |
@@ -229,7 +229,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 **Greeting**: Personalized "Good morning/afternoon/evening, {name}." DM Serif Display, h2.
 
-**Usage meter**: Card with progress bar. Shows "X of Y podcasts used this month." Progress bar fills with amber. If near limit (>80%), shows warning color. Upgrade button (outline) links to pricing page.
+**Usage meter**: Card with progress bar. Shows "X of Y credits used this month." Progress bar fills with amber. If near limit (>80%), shows warning color. Upgrade button (outline) links to pricing page.
 
 **Your Podcasts**: Grid of the user's own podcasts. Each card shows title, status badge (color-coded: READY=green, GENERATING_AUDIO=amber pulsing, FAILED=red), duration, play count. In-progress podcasts show a progress bar instead of play count. Empty state: single "Create New" card with plus icon.
 
@@ -239,15 +239,16 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 3.3 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Sidebar | Hidden, replaced by MobileNav at bottom | Hidden, hamburger menu | Visible, fixed left |
-| TopBar | Simplified, logo + bell + avatar | Full | Full |
-| Podcast grid | 1 column | 2 columns | 2-3 columns |
-| MobileNav | Fixed bottom: Home, Create, Feed, Profile | Hidden | Hidden |
-| MiniPlayer | Above MobileNav | Bottom | Bottom |
+| Element      | Mobile                                    | Tablet                 | Desktop             |
+| ------------ | ----------------------------------------- | ---------------------- | ------------------- |
+| Sidebar      | Hidden, replaced by MobileNav at bottom   | Hidden, hamburger menu | Visible, fixed left |
+| TopBar       | Simplified, logo + bell + avatar          | Full                   | Full                |
+| Podcast grid | 1 column                                  | 2 columns              | 2-3 columns         |
+| MobileNav    | Fixed bottom: Home, Create, Feed, Profile | Hidden                 | Hidden              |
+| MiniPlayer   | Above MobileNav                           | Bottom                 | Bottom              |
 
 **MobileNav structure**:
+
 ```
 +--------+--------+--------+--------+
 |  Home  | Create |  Feed  | Profile|
@@ -350,12 +351,12 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 4.3 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Chat max-width | Full width, 12px padding | 600px, centered | 600px, centered |
-| Chips | Wrap to 2-3 rows | Single row if fits | Single row if fits |
-| Input area | Sticky bottom, above keyboard | Fixed bottom | Fixed bottom |
-| Recommendation cards | Full width | Max 500px | Max 500px |
+| Element              | Mobile                        | Tablet             | Desktop            |
+| -------------------- | ----------------------------- | ------------------ | ------------------ |
+| Chat max-width       | Full width, 12px padding      | 600px, centered    | 600px, centered    |
+| Chips                | Wrap to 2-3 rows              | Single row if fits | Single row if fits |
+| Input area           | Sticky bottom, above keyboard | Fixed bottom       | Fixed bottom       |
+| Recommendation cards | Full width                    | Max 500px          | Max 500px          |
 
 ---
 
@@ -464,13 +465,13 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 5.3 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Layout | Single column, scrollable | Single column, max 800px | Single column, max 800px |
-| Waveform | Full width, 60px height | Full width, 80px height | Full width, 80px height |
-| Transport buttons | Play: 48px, skip: 36px | Play: 56px, skip: 40px | Play: 56px, skip: 40px |
-| Ask Question button | Full width | Full width | Full width |
-| Transcript | Below player, full height | Below player | Side panel option |
+| Element             | Mobile                    | Tablet                   | Desktop                  |
+| ------------------- | ------------------------- | ------------------------ | ------------------------ |
+| Layout              | Single column, scrollable | Single column, max 800px | Single column, max 800px |
+| Waveform            | Full width, 60px height   | Full width, 80px height  | Full width, 80px height  |
+| Transport buttons   | Play: 48px, skip: 36px    | Play: 56px, skip: 40px   | Play: 56px, skip: 40px   |
+| Ask Question button | Full width                | Full width               | Full width               |
+| Transcript          | Below player, full height | Below player             | Side panel option        |
 
 ---
 
@@ -526,6 +527,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 **Tag filter**: Horizontal row of tag chips. Each chip: pill shape, toggleable. Multiple tags can be selected (AND filter). Selected tags are amber filled. Horizontal scroll when tags overflow.
 
 **Podcast grid**: Standard grid layout. Each PodcastCard shows:
+
 - Podcast title (h3, DM Serif Display, truncated to 2 lines)
 - Creator handle (link to profile)
 - Duration badge
@@ -561,13 +563,13 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 6.4 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Search | Below topbar, full width | In topbar | In topbar |
-| Trending | Horizontal scroll, 1 large + peek of next | 1 large + 2 small | 1 large + 2 small |
-| Tag filter | Horizontal scroll | Horizontal scroll | Wrapping row |
-| Podcast grid | 1 column | 2 columns | 3 columns |
-| Card art area | 3:2 aspect ratio | 16:9 | 16:9 |
+| Element       | Mobile                                    | Tablet            | Desktop           |
+| ------------- | ----------------------------------------- | ----------------- | ----------------- |
+| Search        | Below topbar, full width                  | In topbar         | In topbar         |
+| Trending      | Horizontal scroll, 1 large + peek of next | 1 large + 2 small | 1 large + 2 small |
+| Tag filter    | Horizontal scroll                         | Horizontal scroll | Wrapping row      |
+| Podcast grid  | 1 column                                  | 2 columns         | 3 columns         |
+| Card art area | 3:2 aspect ratio                          | 16:9              | 16:9              |
 
 ---
 
@@ -619,12 +621,12 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 7.3 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Avatar size | 64px | 80px | 80px |
-| Profile card | Full width | Max 600px centered | Max 600px centered |
-| Stats | Below bio, centered | Below bio, inline | Below bio, inline |
-| Podcast grid | 1 column | 2 columns | 3 columns |
+| Element      | Mobile              | Tablet             | Desktop            |
+| ------------ | ------------------- | ------------------ | ------------------ |
+| Avatar size  | 64px                | 80px               | 80px               |
+| Profile card | Full width          | Max 600px centered | Max 600px centered |
+| Stats        | Below bio, centered | Below bio, inline  | Below bio, inline  |
+| Podcast grid | 1 column            | 2 columns          | 3 columns          |
 
 ---
 
@@ -640,22 +642,22 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |        Choose your plan                                      |
 |        Start free, upgrade when you need more.               |
 |                                                              |
-|  +----------------+  +----------------+  +----------------+  |
-|  |                |  |  MOST POPULAR  |  |                |  |
-|  |  FREE          |  |  PRO           |  |  CREATOR       |  |
-|  |  $0/month      |  |  $14/month     |  |  $29/month     |  |
-|  |                |  |                |  |                |  |
-|  |  ✓ 2 podcasts  |  |  ✓ 8 podcasts  |  |  ✓ 30 podcasts |  |
-|  |  ✓ 10 min max  |  |  ✓ 10 min max  |  |  ✓ 10 min max  |  |
-|  |  ✓ 2 questions |  |  ✓ 10 Q&As     |  |  ✓ Unlimited Q |  |
-|  |  ✓ Public only |  |  ✓ Private     |  |  ✓ Marketplace |  |
-|  |  ✓ Community   |  |  ✓ Downloads   |  |  ✓ 10 premium  |  |
-|  |    feed        |  |  ✓ 3 premium   |  |  ✓ 5 clones    |  |
-|  |                |  |  ✓ 2 clones    |  |  ✓ Analytics   |  |
-|  |                |  |                |  |  ✓ Premium SFX |  |
-|  |  [Get Started] |  |  [Upgrade Now] |  |  [Go Creator]  |  |
-|  |                |  |                |  |                |  |
-|  +----------------+  +----------------+  +----------------+  |
+|  +-------------+  +-------------+  +-------------+  +-------------+  |
+|  |             |  |             |  | MOST POPULAR|  |             |  |
+|  |  FREE       |  |  STARTER    |  |  PRO        |  |  STUDIO     |  |
+|  |  $0/month   |  |  $9/month   |  |  $24/month  |  |  $49/month  |  |
+|  |             |  |             |  |             |  |             |  |
+|  |  ✓ 2 credits|  |  ✓ 5 credits|  |  ✓ 15 credits|  |  ✓ 50 credits|  |
+|  |  ✓ 10 min   |  |  ✓ 10 min   |  |  ✓ 10 min   |  |  ✓ 10 min   |  |
+|  |  ✓ 2 Q&As   |  |  ✓ 5 Q&As   |  |  ✓ Unlimited|  |  ✓ Unlimited|  |
+|  |  ✓ Public   |  |  ✓ 1 clone  |  |  ✓ Private  |  |  ✓ Premium  |  |
+|  |  ✓ Community|  |  ✓ Download |  |  ✓ Analytics|  |  ✓ Marketplace|
+|  |             |  |             |  |  ✓ 3 clones |  |  ✓ 10 clones|  |
+|  |             |  |             |  |  ✓ PDF export|  |  ✓ 0 premium|  |
+|  |             |  |             |  |             |  |  ✓ Premium SFX|
+|  |  [Start]    |  |  [Upgrade]  |  |  [Upgrade]  |  |  [Go Studio]|  |
+|  |             |  |             |  |             |  |             |  |
+|  +-------------+  +-------------+  +-------------+  +-------------+  |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
@@ -696,7 +698,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 8.2 Section Details
 
-**Pricing cards**: Three cards side by side. Pro card is slightly elevated (larger shadow, "MOST POPULAR" badge at top in amber). Each card: white background, border, tier name (h3), price (display size, DM Serif Display), feature list (checkmarks in amber), CTA button (Free=outline, Pro=primary amber, Creator=secondary accent).
+**Pricing cards**: Four cards side by side. Pro card is slightly elevated (larger shadow, "MOST POPULAR" badge at top in amber). Each card: white background, border, tier name (h3), price (display size, DM Serif Display), feature list (checkmarks in amber), CTA button (Free=outline, Starter=outline, Pro=primary amber, Studio=secondary accent).
 
 **SOON badges**: Small amber pill badges next to feature names. Uses the SoonBadge component.
 
@@ -706,12 +708,12 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 8.3 Responsive Behavior
 
-| Element | Mobile | Tablet | Desktop |
-|---------|--------|--------|---------|
-| Pricing cards | Stacked vertically | 3 columns | 3 columns |
-| Pro card emphasis | Top card, amber top border | Elevated, larger | Elevated, larger |
-| Coming Soon grid | 1 column | 2 columns | 2 columns |
-| FAQ | Full width | Max 700px centered | Max 700px centered |
+| Element           | Mobile             | Tablet             | Desktop            |
+| ----------------- | ------------------ | ------------------ | ------------------ |
+| Pricing cards     | Stacked vertically | 2 columns          | 4 columns          |
+| Pro card emphasis | Amber top border   | Elevated, larger   | Elevated, larger   |
+| Coming Soon grid  | 1 column           | 2 columns          | 2 columns          |
+| FAQ               | Full width         | Max 700px centered | Max 700px centered |
 
 ---
 
@@ -793,11 +795,11 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 9.3 Responsive Behavior
 
-| Element | Mobile | Desktop |
-|---------|--------|---------|
-| Sections | Full width, stacked | Max 600px, centered |
-| Avatar | 64px | 80px |
-| Inputs | Full width | Full width within 600px container |
+| Element  | Mobile              | Desktop                           |
+| -------- | ------------------- | --------------------------------- |
+| Sections | Full width, stacked | Max 600px, centered               |
+| Avatar   | 64px                | 80px                              |
+| Inputs   | Full width          | Full width within 600px container |
 
 ---
 
@@ -815,8 +817,8 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |          |  |  Free Plan                                     ||
 |          |  |  $0/month                                      ||
 |          |  |                                                ||
-|          |  |  2 of 3 podcasts used this month               ||
-|          |  |  [==========..........] 67%                    ||
+|          |  |  1 of 2 credits used this month                ||
+|          |  |  [=====...............] 50%                    ||
 |          |  |                                                ||
 |          |  |  Resets on March 1, 2026                       ||
 |          |  |                                                ||
@@ -826,9 +828,9 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |          |                                                     |
 |          |  USAGE DETAILS                                      |
 |          |  +------------------------------------------------+|
-|          |  |  Podcasts created:  2 / 3                      ||
+|          |  |  Credits used:      1 / 2                      ||
 |          |  |  Max duration:      10 min                     ||
-|          |  |  Interactions used: 4 / 9 (3 per podcast)      ||
+|          |  |  Interactions used: 2 / 4 (2 per podcast)      ||
 |          |  |  Visibility:        Public only                ||
 |          |  +------------------------------------------------+|
 |          |                                                     |
@@ -846,7 +848,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
           |  CURRENT PLAN                                       |
           |  +------------------------------------------------+|
           |  |  Pro Plan                                      ||
-          |  |  $14/month                                     ||
+          |  |  $24/month                                     ||
           |  |                                                ||
           |  |  Next billing date: March 8, 2026              ||
           |  |  Payment method: Visa ending 4242              ||
@@ -857,18 +859,18 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
           |                                                     |
           |  USAGE THIS PERIOD                                  |
           |  +------------------------------------------------+|
-          |  |  Podcasts: 3 / 8                               ||
-          |  |  [=====...............] 38%                     ||
+          |  |  Credits: 8 / 15                               ||
+          |  |  [==========..........] 53%                     ||
           |  |                                                ||
-          |  |  Premium credits: 1 / 3                         ||
-          |  |  Interactions: 12 (10 per podcast)              ||
+          |  |  Rollover: 2 / 5 max                            ||
+          |  |  Interactions: 45 (unlimited per podcast)       ||
           |  +------------------------------------------------+|
           |                                                     |
           |  BILLING HISTORY                                    |
           |  +------------------------------------------------+|
-          |  |  Feb 8, 2026   Pro Plan    $14.00   [Receipt]  ||
-          |  |  Jan 8, 2026   Pro Plan    $14.00   [Receipt]  ||
-          |  |  Dec 8, 2025   Pro Plan    $14.00   [Receipt]  ||
+          |  |  Feb 8, 2026   Pro Plan    $24.00   [Receipt]  ||
+          |  |  Jan 8, 2026   Pro Plan    $24.00   [Receipt]  ||
+          |  |  Dec 8, 2025   Pro Plan    $24.00   [Receipt]  ||
           |  +------------------------------------------------+|
 ```
 
@@ -876,7 +878,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 **Current plan card**: Shows tier name, price, usage progress bar, and billing cycle dates. Free users see upgrade CTA. Paid users see "Manage Subscription" (opens Stripe customer portal) and "Change Plan" options.
 
-**Usage details**: Detailed breakdown of all tier limits with current usage. Progress bars for countable limits (podcasts, interactions). Text for non-countable limits (duration, visibility).
+**Usage details**: Detailed breakdown of all tier limits with current usage. Progress bars for countable limits (credits, rollover). Text for non-countable limits (duration, visibility, interactions).
 
 **Billing history**: Table of past charges with date, description, amount, and receipt link (opens Stripe-hosted receipt). Empty state for free users.
 
@@ -884,11 +886,11 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ### 10.3 Responsive Behavior
 
-| Element | Mobile | Desktop |
-|---------|--------|---------|
-| Plan card | Full width | Max 600px |
-| Usage details | Stacked rows | 2-column grid |
-| Billing history | Card list | Table |
+| Element         | Mobile       | Desktop       |
+| --------------- | ------------ | ------------- |
+| Plan card       | Full width   | Max 600px     |
+| Usage details   | Stacked rows | 2-column grid |
+| Billing history | Card list    | Table         |
 
 ---
 
@@ -897,6 +899,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 This section maps every page to its component tree for developer reference:
 
 ### Landing Page
+
 ```
 LandingPage
 ├── LandingNav (Logo, links, Login button)
@@ -910,6 +913,7 @@ LandingPage
 ```
 
 ### Dashboard
+
 ```
 DashboardLayout
 ├── Sidebar (navigation links)
@@ -925,6 +929,7 @@ DashboardLayout
 ```
 
 ### Create/Discovery
+
 ```
 DashboardLayout
 ├── CreatePage
@@ -939,6 +944,7 @@ DashboardLayout
 ```
 
 ### Podcast Player
+
 ```
 DashboardLayout
 ├── PodcastPage
@@ -954,6 +960,7 @@ DashboardLayout
 ```
 
 ### Feed
+
 ```
 DashboardLayout
 ├── FeedPage
@@ -967,6 +974,7 @@ DashboardLayout
 ```
 
 ### Profile
+
 ```
 DashboardLayout
 ├── ProfilePage
@@ -982,15 +990,15 @@ DashboardLayout
 
 Every list and grid has a designed empty state:
 
-| Context | Empty State Content |
-|---------|-------------------|
-| Dashboard - My Podcasts | Illustration of headphones. "No podcasts yet. Create your first one!" with [Create Podcast] button |
-| Dashboard - Liked & Saved | "Podcasts you like and save will appear here. Explore the feed to discover content." with [Explore Feed] link |
-| Feed - No Results | "No podcasts match your search. Try different keywords or browse by tag." |
-| Feed - No Podcasts | "The feed is empty. Be the first to create a podcast!" with [Create Podcast] button |
-| Profile - No Podcasts | "This creator hasn't published any podcasts yet." (viewing others) or "You haven't created any podcasts yet." (viewing own) |
-| Notifications | "All caught up! You'll see notifications here when someone likes, forks, or follows." |
-| Billing History | "No billing history. You're on the Free plan." |
+| Context                   | Empty State Content                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Dashboard - My Podcasts   | Illustration of headphones. "No podcasts yet. Create your first one!" with [Create Podcast] button                          |
+| Dashboard - Liked & Saved | "Podcasts you like and save will appear here. Explore the feed to discover content." with [Explore Feed] link               |
+| Feed - No Results         | "No podcasts match your search. Try different keywords or browse by tag."                                                   |
+| Feed - No Podcasts        | "The feed is empty. Be the first to create a podcast!" with [Create Podcast] button                                         |
+| Profile - No Podcasts     | "This creator hasn't published any podcasts yet." (viewing others) or "You haven't created any podcasts yet." (viewing own) |
+| Notifications             | "All caught up! You'll see notifications here when someone likes, forks, or follows."                                       |
+| Billing History           | "No billing history. You're on the Free plan."                                                                              |
 
 All empty states use text-secondary color, centered layout, and include a relevant action button or link when applicable.
 
@@ -998,14 +1006,14 @@ All empty states use text-secondary color, centered layout, and include a releva
 
 ## 13. Loading States
 
-| Context | Loading Pattern |
-|---------|----------------|
-| Page load | Skeleton screens: gray pulsing rectangles matching content layout shapes |
-| Podcast cards | Card skeleton with rectangle for art area, 2 line-skeletons for title, 1 short for metadata |
-| Chat message (AI responding) | Three animated dots ("typing indicator") in a Sotto message bubble |
-| Audio generation | Progress bar with percentage + descriptive status text |
-| Button action | Button text replaced with spinner, button disabled |
-| Feed search | Cards fade to 50% opacity during search, then fade in new results |
-| Profile load | Avatar circle skeleton, name line skeleton, bio line skeletons |
+| Context                      | Loading Pattern                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------- |
+| Page load                    | Skeleton screens: gray pulsing rectangles matching content layout shapes                    |
+| Podcast cards                | Card skeleton with rectangle for art area, 2 line-skeletons for title, 1 short for metadata |
+| Chat message (AI responding) | Three animated dots ("typing indicator") in a Sotto message bubble                          |
+| Audio generation             | Progress bar with percentage + descriptive status text                                      |
+| Button action                | Button text replaced with spinner, button disabled                                          |
+| Feed search                  | Cards fade to 50% opacity during search, then fade in new results                           |
+| Profile load                 | Avatar circle skeleton, name line skeleton, bio line skeletons                              |
 
 Skeleton colors: Background `#E5E1D8` with pulse animation cycling opacity 0.5 to 1.0 (uses the `pulse` keyframe from the design system).

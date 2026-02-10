@@ -8,7 +8,7 @@ The schema is organized into logical sections:
 | ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Users & Auth      | User, Account, Session, VerificationToken                        | Authentication + profiles (includes `role`, `twitterHandle`, `twitterEnabled`, voice prefs) |
 | Social            | Follow                                                           | Follower/following relationships                                                            |
-| Subscriptions     | Subscription, SubscriptionEvent, Team                            | Stripe billing                                                                              |
+| Subscriptions     | Subscription, SubscriptionEvent, CreditTransaction, Team         | Stripe billing + credit balance + audit trail                                               |
 | Podcasts          | Podcast (includes `pdfUrl`, `source`, `sourceTweetId`)           | Core content entity                                                                         |
 | Discovery         | Discovery, DiscoveryMessage                                      | Chat-based creation flow                                                                    |
 | Scripts           | Script (includes `verificationAttempts`, `verificationFeedback`) | Generated podcast scripts                                                                   |
@@ -33,7 +33,7 @@ The schema is organized into logical sections:
 | `PodcastStatus`      | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED | Podcast.status               |
 | `Speaker`            | HOST, EXPERT                                                                                                                                         | Segment.speaker              |
 | `InteractionStatus`  | PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED                                                                             | Interaction.status           |
-| `SubscriptionTier`   | FREE, PRO, CREATOR                                                                                                                                   | Subscription.tier            |
+| `SubscriptionTier`   | FREE, STARTER, PRO, STUDIO                                                                                                                           | Subscription.tier            |
 | `UserRole`           | USER, CREATOR, ADMIN                                                                                                                                 | User.role                    |
 | `TeamInviteStatus`   | PENDING, ACCEPTED, EXPIRED, REVOKED                                                                                                                  | TeamInvite.status            |
 | `VoiceCloneSource`   | UPLOAD, RECORD                                                                                                                                       | VoiceClone.sourceType        |

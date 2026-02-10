@@ -4,16 +4,16 @@
 
 Sotto uses a three-tier role system stored on the `User` model:
 
-| Role        | How Assigned                                              | Limits                                        | Dashboard Access                                      |
-| ----------- | --------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------- |
-| **USER**    | Default on signup                                         | Tied to subscription tier (FREE/PRO/CREATOR)  | `/dashboard`                                          |
-| **CREATOR** | Auto-granted with CREATOR subscription, or admin-assigned | Tied to subscription tier                     | `/dashboard` + creator stats, analytics, voices, team |
-| **ADMIN**   | Auto-assigned on sign-in if email is in `ADMIN_EMAILS`    | Unlimited everything (no subscription needed) | `/dashboard` + `/admin`                               |
+| Role        | How Assigned                                             | Limits                                              | Dashboard Access                                      |
+| ----------- | -------------------------------------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| **USER**    | Default on signup                                        | Tied to subscription tier (FREE/STARTER/PRO/STUDIO) | `/dashboard`                                          |
+| **CREATOR** | Auto-granted with STUDIO subscription, or admin-assigned | Tied to subscription tier                           | `/dashboard` + creator stats, analytics, voices, team |
+| **ADMIN**   | Auto-assigned on sign-in if email is in `ADMIN_EMAILS`   | Unlimited everything (no subscription needed)       | `/dashboard` + `/admin`                               |
 
 ### Key Design Decisions
 
 - **Roles and tiers are independent.** A user can be CREATOR with a FREE subscription (admin-granted) or USER with a PRO subscription.
-- **ADMIN bypasses all limits.** The `getEffectiveTier()` helper in `src/lib/stripe.ts` returns ADMIN-tier limits (all Infinity) when the user's role is ADMIN, regardless of their Stripe subscription.
+- **ADMIN bypasses all limits.** The `getEffectiveTier()` helper in `src/lib/stripe.ts` returns ADMIN-tier limits (Infinity credits, 60 min max) when the user's role is ADMIN, regardless of their Stripe subscription.
 - **Roles never auto-downgrade.** If a CREATOR cancels their subscription, the CREATOR role persists (it may have been admin-granted).
 
 ## How to Access Each Dashboard
@@ -38,7 +38,7 @@ Plus access to:
 
 - `/analytics` — usage analytics (also available to PRO+ subscribers)
 - `/settings/voices` — voice clone management
-- `/team` — team management (also available to CREATOR subscribers)
+- `/team` — team management (also available to STUDIO subscribers)
 
 ### Admin Dashboard (`/admin`)
 
@@ -74,25 +74,26 @@ Admin access is **email-based**:
 
 Two paths:
 
-1. **Automatic:** Subscribe to the CREATOR tier via Stripe — the webhook auto-grants CREATOR role
+1. **Automatic:** Subscribe to the STUDIO tier via Stripe — the webhook auto-grants CREATOR role
 2. **Manual:** Admin visits `/admin/users`, finds the user, and changes their role to CREATOR via the dropdown
 
 ## Tier Limits Per Role
 
-| Limit                 | FREE   | PRO    | CREATOR   | ADMIN     |
-| --------------------- | ------ | ------ | --------- | --------- |
-| Podcasts/month        | 2      | 8      | 30        | Unlimited |
-| Max duration          | 10 min | 10 min | 10 min    | 60 min    |
-| Interactions/podcast  | 2      | 10     | Unlimited | Unlimited |
-| Premium voice credits | 0      | 3      | 10        | Unlimited |
-| Voice clones          | 0      | 2      | 5         | Unlimited |
-| Premium SFX           | No     | No     | Yes       | Yes       |
-| Download              | No     | Yes    | Yes       | Yes       |
-| Private podcasts      | No     | Yes    | Yes       | Yes       |
-| Voice library         | No     | Yes    | Yes       | Yes       |
-| Marketplace listing   | No     | No     | Yes       | Yes       |
-| Analytics             | No     | Yes    | Yes       | Yes       |
-| PDF export            | No     | Yes    | Yes       | Yes       |
+| Limit                   | FREE   | STARTER | PRO       | STUDIO    | ADMIN     |
+| ----------------------- | ------ | ------- | --------- | --------- | --------- |
+| Credits/month           | 2      | 5       | 15        | 50        | Infinity  |
+| Rollover credits (max)  | 0      | 2       | 5         | 20        | Infinity  |
+| Max duration            | 10 min | 10 min  | 10 min    | 10 min    | 60 min    |
+| Interactions/podcast    | 2      | 5       | Unlimited | Unlimited | Unlimited |
+| Voice clones            | 0      | 1       | 3         | 10        | Unlimited |
+| Premium voice surcharge | +1     | +1      | +1        | 0         | 0         |
+| Download                | No     | Yes     | Yes       | Yes       | Yes       |
+| Private podcasts        | No     | No      | Yes       | Yes       | Yes       |
+| Voice library           | No     | No      | Yes       | Yes       | Yes       |
+| Marketplace listing     | No     | No      | No        | Yes       | Yes       |
+| Premium SFX             | No     | No      | No        | Yes       | Yes       |
+| Analytics               | No     | No      | Yes       | Yes       | Yes       |
+| PDF export              | No     | No      | Yes       | Yes       | Yes       |
 
 ## Avatar Management
 

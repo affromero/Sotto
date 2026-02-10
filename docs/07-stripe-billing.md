@@ -8,27 +8,30 @@
 
 ## Overview
 
-Sotto uses Stripe for subscription billing with three tiers: Free ($0), Pro ($14/month), and Creator ($29/month). All users start on the Free tier with no Stripe involvement. When a user upgrades, a Stripe Checkout session is created. Stripe webhooks update the local database as subscription state changes (renewals, cancellations, payment failures). The Stripe Customer Portal allows users to manage their own billing, update payment methods, and cancel subscriptions without any custom UI.
+Sotto uses Stripe for subscription billing with four paid tiers: Free ($0), Starter ($9/month), Pro ($24/month), and Studio ($49/month). All users start on the Free tier with no Stripe involvement. When a user upgrades, a Stripe Checkout session is created. Stripe webhooks update the local database as subscription state changes (renewals, cancellations, payment failures). The Stripe Customer Portal allows users to manage their own billing, update payment methods, and cancel subscriptions without any custom UI.
 
-| Component | File | Purpose |
-|-----------|------|---------|
-| Stripe client | `src/lib/stripe.ts` | Stripe SDK init, tier limits, checkout, portal |
-| Subscription management | `src/lib/subscription.ts` | Get tier, check usage, enforce limits |
-| Webhook handler | `src/app/api/webhooks/stripe/route.ts` | Process Stripe events |
-| Billing API | `src/app/api/billing/route.ts` | Checkout + portal session creation |
-| Billing page | `src/app/(dashboard)/billing/page.tsx` | User-facing subscription management |
+**Credit-based pricing**: Each podcast generation costs 1 credit (+ premium voice surcharge if applicable). Monthly credits roll over per-tier limits. One-time credit packs available for paid tiers only.
+
+| Component               | File                                   | Purpose                                        |
+| ----------------------- | -------------------------------------- | ---------------------------------------------- |
+| Stripe client           | `src/lib/stripe.ts`                    | Stripe SDK init, tier limits, checkout, portal |
+| Subscription management | `src/lib/subscription.ts`              | Get tier, check usage, enforce limits          |
+| Webhook handler         | `src/app/api/webhooks/stripe/route.ts` | Process Stripe events                          |
+| Billing API             | `src/app/api/billing/route.ts`         | Checkout + portal session creation             |
+| Billing page            | `src/app/(dashboard)/billing/page.tsx` | User-facing subscription management            |
 
 ---
 
 ## Environment Variables
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `STRIPE_SECRET_KEY` | Yes (for billing) | Stripe API secret key | `sk_test_xxxxxxxxxxxx` |
-| `STRIPE_PUBLISHABLE_KEY` | Yes (for billing) | Stripe publishable key (client-side) | `pk_test_xxxxxxxxxxxx` |
-| `STRIPE_WEBHOOK_SECRET` | Yes (for billing) | Webhook endpoint signing secret | `whsec_xxxxxxxxxxxx` |
-| `STRIPE_PRICE_ID_PRO` | Yes (for billing) | Price ID for Pro tier ($14/mo) | `price_xxxxxxxxxxxx` |
-| `STRIPE_PRICE_ID_CREATOR` | Yes (for billing) | Price ID for Creator tier ($29/mo) | `price_xxxxxxxxxxxx` |
+| Variable                  | Required          | Description                          | Example                |
+| ------------------------- | ----------------- | ------------------------------------ | ---------------------- |
+| `STRIPE_SECRET_KEY`       | Yes (for billing) | Stripe API secret key                | `sk_test_xxxxxxxxxxxx` |
+| `STRIPE_PUBLISHABLE_KEY`  | Yes (for billing) | Stripe publishable key (client-side) | `pk_test_xxxxxxxxxxxx` |
+| `STRIPE_WEBHOOK_SECRET`   | Yes (for billing) | Webhook endpoint signing secret      | `whsec_xxxxxxxxxxxx`   |
+| `STRIPE_PRICE_ID_STARTER` | Yes (for billing) | Price ID for Starter tier ($9/mo)    | `price_xxxxxxxxxxxx`   |
+| `STRIPE_PRICE_ID_PRO`     | Yes (for billing) | Price ID for Pro tier ($24/mo)       | `price_xxxxxxxxxxxx`   |
+| `STRIPE_PRICE_ID_STUDIO`  | Yes (for billing) | Price ID for Studio tier ($49/mo)    | `price_xxxxxxxxxxxx`   |
 
 All variables are optional in the sense that the app starts without them. Billing features are disabled gracefully when `STRIPE_SECRET_KEY` is missing.
 
@@ -44,31 +47,43 @@ All variables are optional in the sense that the app starts without them. Billin
 
 ### Step 2: Create Products and Prices
 
-Create two products in the Stripe Dashboard (or via the API). The Free tier has no Stripe product because there is no charge.
+Create three products in the Stripe Dashboard (or via the API). The Free tier has no Stripe product because there is no charge.
 
-**Product 1: Sotto Pro**
+**Product 1: Sotto Starter**
 
-| Field | Value |
-|-------|-------|
-| Product name | Sotto Pro |
-| Description | 8 podcasts/month, 10 interactions/podcast, 3 premium voice credits, private podcasts, downloads |
-| Pricing model | Standard pricing |
-| Price | $14.00 USD |
-| Billing period | Monthly |
-| Price ID | Copy this into `STRIPE_PRICE_ID_PRO` |
+| Field          | Value                                                                          |
+| -------------- | ------------------------------------------------------------------------------ |
+| Product name   | Sotto Starter                                                                  |
+| Description    | 5 credits/month (2 rollover), 5 interactions/podcast, 1 voice clone, downloads |
+| Pricing model  | Standard pricing                                                               |
+| Price          | $9.00 USD                                                                      |
+| Billing period | Monthly                                                                        |
+| Price ID       | Copy this into `STRIPE_PRICE_ID_STARTER`                                       |
 
-**Product 2: Sotto Creator**
+**Product 2: Sotto Pro**
 
-| Field | Value |
-|-------|-------|
-| Product name | Sotto Creator |
-| Description | 30 podcasts/month, unlimited interactions, 10 premium voice credits, marketplace, analytics |
-| Pricing model | Standard pricing |
-| Price | $29.00 USD |
-| Billing period | Monthly |
-| Price ID | Copy this into `STRIPE_PRICE_ID_CREATOR` |
+| Field          | Value                                                                                                          |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| Product name   | Sotto Pro                                                                                                      |
+| Description    | 15 credits/month (5 rollover), unlimited interactions, 3 voice clones, private podcasts, analytics, PDF export |
+| Pricing model  | Standard pricing                                                                                               |
+| Price          | $24.00 USD                                                                                                     |
+| Billing period | Monthly                                                                                                        |
+| Price ID       | Copy this into `STRIPE_PRICE_ID_PRO`                                                                           |
+
+**Product 3: Sotto Studio**
+
+| Field          | Value                                                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Product name   | Sotto Studio                                                                                                           |
+| Description    | 50 credits/month (20 rollover), unlimited interactions, 10 voice clones, 0 premium surcharge, marketplace, premium SFX |
+| Pricing model  | Standard pricing                                                                                                       |
+| Price          | $49.00 USD                                                                                                             |
+| Billing period | Monthly                                                                                                                |
+| Price ID       | Copy this into `STRIPE_PRICE_ID_STUDIO`                                                                                |
 
 To create via Stripe Dashboard:
+
 1. Navigate to **Products** in the sidebar
 2. Click **Add product**
 3. Fill in the name, description, and monthly price
@@ -85,13 +100,14 @@ The customer portal lets users manage their subscription without custom UI:
    - **Payment methods**: allow updating payment method
    - **Subscriptions**: allow canceling, and switching between Pro and Creator
    - **Cancel subscription**: enable with "Cancel at end of billing period" behavior
-3. Under **Products**, add both Sotto Pro and Sotto Creator so users can switch between them
+3. Under **Products**, add Sotto Starter, Sotto Pro, and Sotto Studio so users can switch between them
 4. Set the **Default return URL** to `https://sotto.fm/billing` (or `http://localhost:3000/billing` for dev)
 5. Save the configuration
 
 ### Step 4: Set Up the Webhook Endpoint
 
 **For production:**
+
 1. Navigate to **Developers > Webhooks**
 2. Click **Add endpoint**
 3. Endpoint URL: `https://sotto.fm/api/webhooks/stripe`
@@ -115,81 +131,135 @@ Tier limits are defined in `src/lib/stripe.ts` and enforced throughout the appli
 ```typescript
 export const TIER_LIMITS = {
   FREE: {
-    podcastsPerMonth: 2,
+    creditsPerMonth: 2,
+    maxRolloverCredits: 0,
     maxDurationMinutes: 10,
     interactionsPerPodcast: 2,
-    premiumVoiceCredits: 0,
     maxVoiceClones: 0,
+    premiumVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
+    hasVoiceLibrary: false,
+    hasMarketplace: false,
+    hasAnalytics: false,
+    hasPdfExport: false,
+  },
+  STARTER: {
+    creditsPerMonth: 5,
+    maxRolloverCredits: 2,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: 5,
+    maxVoiceClones: 1,
+    premiumVoiceSurcharge: 1,
+    hasPremiumSfx: false,
+    canDownload: true,
+    canMakePrivate: false,
+    hasVoiceLibrary: false,
+    hasMarketplace: false,
+    hasAnalytics: false,
+    hasPdfExport: false,
   },
   PRO: {
-    podcastsPerMonth: 8,
+    creditsPerMonth: 15,
+    maxRolloverCredits: 5,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 10,
-    premiumVoiceCredits: 3,
-    maxVoiceClones: 2,
+    interactionsPerPodcast: Infinity,
+    maxVoiceClones: 3,
+    premiumVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
+    hasVoiceLibrary: true,
+    hasMarketplace: false,
+    hasAnalytics: true,
+    hasPdfExport: true,
   },
-  CREATOR: {
-    podcastsPerMonth: 30,
+  STUDIO: {
+    creditsPerMonth: 50,
+    maxRolloverCredits: 20,
     maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
-    premiumVoiceCredits: 10,
-    maxVoiceClones: 5,
+    maxVoiceClones: 10,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
+    hasVoiceLibrary: true,
+    hasMarketplace: true,
+    hasAnalytics: true,
+    hasPdfExport: true,
+  },
+  ADMIN: {
+    creditsPerMonth: Infinity,
+    maxRolloverCredits: Infinity,
+    maxDurationMinutes: 60,
+    interactionsPerPodcast: Infinity,
+    maxVoiceClones: Infinity,
+    premiumVoiceSurcharge: 0,
+    hasPremiumSfx: true,
+    canDownload: true,
+    canMakePrivate: true,
+    hasVoiceLibrary: true,
+    hasMarketplace: true,
+    hasAnalytics: true,
+    hasPdfExport: true,
   },
 } as const;
 ```
 
 ### Tier Comparison
 
-| Feature | Free | Pro ($14/mo) | Creator ($29/mo) |
-|---------|------|-------------|------------------|
-| Podcasts per month | 2 | 8 | 30 |
-| Max duration | 10 min | 10 min | 10 min |
-| Interactions per podcast | 2 | 10 | Unlimited |
-| Premium voice credits | 0 | 3/mo | 10/mo |
-| Voice clones | 0 | 2 | 5 |
-| Sound effects | Standard | Standard | Premium (ElevenLabs SFX) |
-| Download MP3 / PDF | No | Yes | Yes |
-| Private/Unlisted podcasts | No | Yes | Yes |
-| Voice library browsing | No | Yes | Yes |
-| Marketplace / Analytics | No | No | Yes |
+| Feature                   | Free     | Starter ($9/mo) | Pro ($24/mo) | Studio ($49/mo)          | Admin     |
+| ------------------------- | -------- | --------------- | ------------ | ------------------------ | --------- |
+| Credits per month         | 2        | 5               | 15           | 50                       | Infinity  |
+| Rollover credits          | 0        | 2               | 5            | 20                       | Infinity  |
+| Max duration              | 10 min   | 10 min          | 10 min       | 10 min                   | 60 min    |
+| Interactions per podcast  | 2        | 5               | Unlimited    | Unlimited                | Unlimited |
+| Voice clones              | 0        | 1               | 3            | 10                       | Unlimited |
+| Premium voice surcharge   | +1       | +1              | +1           | 0 (included)             | 0         |
+| Sound effects             | Standard | Standard        | Standard     | Premium (ElevenLabs SFX) | Premium   |
+| Download MP3              | No       | Yes             | Yes          | Yes                      | Yes       |
+| PDF transcript export     | No       | No              | Yes          | Yes                      | Yes       |
+| Private/Unlisted podcasts | No       | No              | Yes          | Yes                      | Yes       |
+| Voice library browsing    | No       | No              | Yes          | Yes                      | Yes       |
+| Marketplace               | No       | No              | No           | Yes                      | Yes       |
+| Analytics                 | No       | No              | Yes          | Yes                      | Yes       |
 
 ### Limit Enforcement Points
 
 Limits are checked at the following points in the application:
 
-| Check | Where | What Happens |
-|-------|-------|-------------|
-| Podcast creation limit | `POST /api/podcasts` | Returns 403 with usage message |
-| Duration limit | `script-generation.worker.ts` | Truncates script to max duration |
-| Interaction limit | `POST /api/podcasts/[id]/interact` | Returns 403 after limit reached |
-| Visibility restriction | `PATCH /api/podcasts/[id]` | Returns 403 if trying to set private on Free |
-| Download restriction | `GET /api/podcasts/[id]/download` | Returns 403 for Free tier |
-| Voice count | Discovery agent | Limits voice choices in discovery chat |
+| Check                   | Where                              | What Happens                                         |
+| ----------------------- | ---------------------------------- | ---------------------------------------------------- |
+| Credit availability     | `POST /api/podcasts`               | Returns 403 if insufficient credits                  |
+| Premium voice surcharge | `POST /api/podcasts`               | Deducts extra credits if using premium voices        |
+| Duration limit          | `script-generation.worker.ts`      | Truncates script to max duration                     |
+| Interaction limit       | `POST /api/podcasts/[id]/interact` | Returns 403 after limit reached                      |
+| Visibility restriction  | `PATCH /api/podcasts/[id]`         | Returns 403 if trying to set private on Free/Starter |
+| Download restriction    | `GET /api/podcasts/[id]/download`  | Returns 403 for Free tier                            |
+| PDF export restriction  | `GET /api/podcasts/[id]/pdf`       | Returns 403 for Free/Starter tiers                   |
+| Voice clone limit       | Discovery agent                    | Limits voice choices based on tier                   |
 
 The helper functions for limit checking are in `src/lib/stripe.ts`:
 
 ```typescript
-export function canCreatePodcast(
+export function canGenerate(
   tier: TierName,
-  podcastsUsed: number
-): { allowed: boolean; reason?: string } {
+  creditsAvailable: number,
+  usePremiumVoice: boolean = false
+): { allowed: boolean; reason?: string; cost: number } {
   const limits = TIER_LIMITS[tier];
-  if (podcastsUsed >= limits.podcastsPerMonth) {
+  const cost = 1 + (usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
+
+  if (creditsAvailable < cost) {
     return {
       allowed: false,
-      reason: `You've used all ${limits.podcastsPerMonth} podcasts this month. Upgrade to create more.`,
+      reason: `Insufficient credits. Need ${cost} credit${cost > 1 ? 's' : ''}, you have ${creditsAvailable}.`,
+      cost,
     };
   }
-  return { allowed: true };
+  return { allowed: true, cost };
 }
 
 export function canInteract(
@@ -200,14 +270,21 @@ export function canInteract(
   if (interactionCount >= limits.interactionsPerPodcast) {
     return {
       allowed: false,
-      reason: `Free tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
+      reason: `Your tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for more.`,
     };
   }
   return { allowed: true };
 }
+
+export async function consumeCredit(userId: string, amount: number = 1): Promise<void> {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { creditsAvailable: { decrement: amount } },
+  });
+}
 ```
 
-The subscription tier is resolved by looking up the `Subscription` model:
+The subscription tier and credit balance are resolved by looking up the `Subscription` and `User` models:
 
 ```typescript
 // src/lib/subscription.ts
@@ -221,6 +298,15 @@ export async function getUserTier(userId: string): Promise<TierName> {
   }
 
   return subscription.tier as TierName;
+}
+
+export async function getUserCredits(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { creditsAvailable: true },
+  });
+
+  return user?.creditsAvailable ?? 0;
 }
 ```
 
@@ -310,9 +396,13 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { tier } = checkoutSchema.parse(body);
 
-  const priceId = tier === 'pro'
-    ? process.env.STRIPE_PRICE_ID_PRO
-    : process.env.STRIPE_PRICE_ID_CREATOR;
+  const priceIdMap: Record<string, string | undefined> = {
+    starter: process.env.STRIPE_PRICE_ID_STARTER,
+    pro: process.env.STRIPE_PRICE_ID_PRO,
+    studio: process.env.STRIPE_PRICE_ID_STUDIO,
+  };
+
+  const priceId = priceIdMap[tier];
 
   if (!priceId) {
     return NextResponse.json({ error: 'Price not configured' }, { status: 500 });
@@ -338,10 +428,7 @@ The customer portal allows users to manage their subscription without any custom
 
 ```typescript
 // src/lib/stripe.ts
-export async function createPortalSession(
-  customerId: string,
-  returnUrl: string
-): Promise<string> {
+export async function createPortalSession(customerId: string, returnUrl: string): Promise<string> {
   if (!stripe) {
     throw new Error('Stripe not configured');
   }
@@ -356,9 +443,10 @@ export async function createPortalSession(
 ```
 
 Users access the portal from the `/billing` page. The portal allows:
+
 - Viewing invoice history
 - Updating payment method
-- Switching between Pro and Creator plans
+- Switching between Starter, Pro, and Studio plans
 - Canceling the subscription (takes effect at end of billing period)
 
 ---
@@ -398,13 +486,13 @@ export async function POST(request: NextRequest) {
 
 ### Handled Events
 
-| Event | When It Fires | What the Handler Does |
-|-------|--------------|----------------------|
-| `checkout.session.completed` | User completes payment on Stripe Checkout | Creates `Subscription` record, links Stripe customer ID to user, sets tier to PRO or CREATOR, sets status to ACTIVE |
-| `customer.subscription.updated` | Subscription renews, plan changes, or period updates | Updates tier (if plan changed), updates `currentPeriodStart`/`currentPeriodEnd`, updates status, resets monthly usage on period renewal |
-| `customer.subscription.deleted` | Subscription is canceled (after period end) or immediately deleted | Sets subscription status to CANCELED, downgrades user to FREE tier limits |
-| `invoice.payment_failed` | Payment attempt fails (card declined, insufficient funds) | Sets subscription status to PAST_DUE, creates in-app notification to update payment method |
-| `invoice.paid` | Invoice is successfully paid (includes renewals) | Resets `podcastsUsed` counter to 0 for the new billing period, ensures subscription status is ACTIVE |
+| Event                           | When It Fires                                                      | What the Handler Does                                                                                                                                            |
+| ------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkout.session.completed`    | User completes payment on Stripe Checkout                          | Creates `Subscription` record, links Stripe customer ID to user, sets tier to STARTER/PRO/STUDIO, sets status to ACTIVE, grants monthly credits                  |
+| `customer.subscription.updated` | Subscription renews, plan changes, or period updates               | Updates tier (if plan changed), updates `currentPeriodStart`/`currentPeriodEnd`, updates status, grants monthly credits and processes rollover on period renewal |
+| `customer.subscription.deleted` | Subscription is canceled (after period end) or immediately deleted | Sets subscription status to CANCELED, downgrades user to FREE tier limits, resets credits                                                                        |
+| `invoice.payment_failed`        | Payment attempt fails (card declined, insufficient funds)          | Sets subscription status to PAST_DUE, creates in-app notification to update payment method                                                                       |
+| `invoice.paid`                  | Invoice is successfully paid (includes renewals)                   | Grants monthly credits + rollover (capped at tier limit), ensures subscription status is ACTIVE                                                                  |
 
 ### Event Processing Logic
 
@@ -424,7 +512,9 @@ case 'checkout.session.completed': {
   const priceId = stripeSubscription.items.data[0].price.id;
 
   // Determine tier from price ID
-  const tier = priceId === process.env.STRIPE_PRICE_ID_CREATOR ? 'CREATOR' : 'PRO';
+  let tier: 'STARTER' | 'PRO' | 'STUDIO' = 'PRO';
+  if (priceId === process.env.STRIPE_PRICE_ID_STARTER) tier = 'STARTER';
+  else if (priceId === process.env.STRIPE_PRICE_ID_STUDIO) tier = 'STUDIO';
 
   // Create or update subscription record
   await prisma.subscription.upsert({
@@ -470,7 +560,10 @@ case 'checkout.session.completed': {
 case 'customer.subscription.updated': {
   const subscription = event.data.object;
   const priceId = subscription.items.data[0].price.id;
-  const tier = priceId === process.env.STRIPE_PRICE_ID_CREATOR ? 'CREATOR' : 'PRO';
+
+  let tier: 'STARTER' | 'PRO' | 'STUDIO' = 'PRO';
+  if (priceId === process.env.STRIPE_PRICE_ID_STARTER) tier = 'STARTER';
+  else if (priceId === process.env.STRIPE_PRICE_ID_STUDIO) tier = 'STUDIO';
 
   // Map Stripe status to our enum
   const statusMap: Record<string, string> = {
@@ -501,11 +594,21 @@ case 'customer.subscription.updated': {
       },
     });
 
-    // Reset usage on period renewal
+    // Grant monthly credits + rollover on period renewal
     if (newPeriodEnd.getTime() > previousPeriodEnd.getTime()) {
+      const limits = TIER_LIMITS[tier];
+      const user = await prisma.user.findUnique({
+        where: { id: dbSubscription.userId },
+        select: { creditsAvailable: true },
+      });
+
+      const currentCredits = user?.creditsAvailable ?? 0;
+      const rollover = Math.min(currentCredits, limits.maxRolloverCredits);
+      const newCredits = limits.creditsPerMonth + rollover;
+
       await prisma.user.update({
         where: { id: dbSubscription.userId },
-        data: { podcastsUsed: 0 },
+        data: { creditsAvailable: newCredits },
       });
     }
   }
@@ -533,11 +636,11 @@ case 'customer.subscription.deleted': {
       },
     });
 
-    // Reset user to free tier limits
+    // Reset user to free tier credits
     await prisma.user.update({
       where: { id: dbSubscription.userId },
       data: {
-        podcastsAllowed: 3,
+        creditsAvailable: TIER_LIMITS.FREE.creditsPerMonth,
       },
     });
   }
@@ -599,10 +702,10 @@ case 'invoice.payment_failed': {
       |
       | checkout.session.completed webhook
       v
-[ACTIVE - PRO or CREATOR]
+[ACTIVE - STARTER/PRO/STUDIO]
       |
       +----> [Period renews: invoice.paid]
-      |          Reset podcastsUsed = 0
+      |          Grant monthly credits + rollover via grantMonthlyCredits()
       |          Update currentPeriodEnd
       |          Loop back to ACTIVE
       |
@@ -630,14 +733,26 @@ case 'invoice.payment_failed': {
                  Proration applied by Stripe
 ```
 
-### Usage Reset Logic
+### Credit Grant & Rollover Logic
 
-The `podcastsUsed` counter on the `User` model tracks how many podcasts a user has created in the current billing period. This counter resets to 0 when:
+The `creditsAvailable` counter on the `User` model tracks how many credits a user currently has. Credits are granted and rolled over when:
 
 1. A new billing period starts (detected by comparing `currentPeriodEnd` timestamps in the `customer.subscription.updated` webhook)
 2. An `invoice.paid` event fires for a renewal invoice
 
-For Free tier users, there is no Stripe subscription, so the counter resets on a calendar-month basis. This is handled by checking the `createdAt` dates of podcasts created in the current month rather than relying on a counter reset.
+**Rollover calculation:**
+
+- Current unused credits are carried over up to the tier's `maxRolloverCredits` limit
+- New credits = `creditsPerMonth` + `min(currentCredits, maxRolloverCredits)`
+- Example: Pro user with 8 unused credits → rollover capped at 5 → receives 15 + 5 = 20 credits
+
+**Credit consumption:**
+
+- Each podcast generation costs 1 credit
+- Premium voice usage adds the tier's `premiumVoiceSurcharge` (0 for Studio/Admin, 1 for others)
+- Credits are deducted immediately upon generation start via `consumeCredit()`
+
+For Free tier users, there is no Stripe subscription, so credits reset to 2 on a calendar-month basis (tracked via `lastCreditResetAt` timestamp on the `User` model).
 
 ---
 
@@ -672,8 +787,9 @@ enum SubscriptionStatus {
 
 enum SubscriptionTier {
   FREE
+  STARTER
   PRO
-  CREATOR
+  STUDIO
 }
 
 model SubscriptionEvent {
@@ -743,11 +859,11 @@ stripe trigger invoice.paid
 
 When testing the checkout flow in the browser with Stripe's test mode:
 
-| Card Number | Scenario |
-|-------------|----------|
-| `4242 4242 4242 4242` | Successful payment |
-| `4000 0000 0000 3220` | 3D Secure authentication required |
-| `4000 0000 0000 9995` | Payment declined (insufficient funds) |
+| Card Number           | Scenario                                  |
+| --------------------- | ----------------------------------------- |
+| `4242 4242 4242 4242` | Successful payment                        |
+| `4000 0000 0000 3220` | 3D Secure authentication required         |
+| `4000 0000 0000 9995` | Payment declined (insufficient funds)     |
 | `4000 0000 0000 0341` | Payment fails after attaching to customer |
 
 Use any future expiration date, any 3-digit CVC, and any billing address.
@@ -758,10 +874,10 @@ Use any future expiration date, any 3-digit CVC, and any billing address.
 2. Start the Stripe CLI listener: `stripe listen --forward-to localhost:3000/api/webhooks/stripe`
 3. Copy the `whsec_` signing secret from the CLI output into `.env`
 4. Navigate to `http://localhost:3000/pricing`
-5. Sign in and click "Upgrade to Pro"
+5. Sign in and click "Upgrade to Starter" (or Pro/Studio)
 6. Use test card `4242 4242 4242 4242`
 7. Complete the checkout
-8. Verify in Prisma Studio (`npx prisma studio`) that a `Subscription` record was created with `status: ACTIVE` and `tier: PRO`
+8. Verify in Prisma Studio (`npx prisma studio`) that a `Subscription` record was created with `status: ACTIVE` and `tier: STARTER/PRO/STUDIO`, and that `User.creditsAvailable` was updated
 9. Verify the `SubscriptionEvent` was logged
 10. Check the Stripe CLI terminal for the received webhook events
 
@@ -774,9 +890,10 @@ npx prisma studio
 ```
 
 Check these tables:
+
 - `Subscription`: status, tier, currentPeriodEnd should be updated
 - `SubscriptionEvent`: event should be logged with the Stripe event ID
-- `User`: `podcastsUsed` should reset to 0 on period renewal
+- `User`: `creditsAvailable` should be updated with monthly grant + rollover on period renewal
 
 ---
 
@@ -796,19 +913,22 @@ When a user cancels their subscription through the customer portal, Stripe sets 
 
 The `cancelAtPeriodEnd` flag on the `Subscription` model is used to show a "Your subscription will end on [date]" message on the billing page.
 
-### Subscription Switching (Pro to Creator or Creator to Pro)
+### Subscription Switching (Between Starter/Pro/Studio)
 
 When a user changes their plan through the customer portal, Stripe sends a `customer.subscription.updated` event with the new price ID. The handler maps the price ID to the tier and updates the database. Stripe handles proration automatically (charging or crediting the difference for the remaining period).
+
+**Credit adjustment on plan change:**
+When upgrading mid-cycle, existing credits are preserved and the new tier's monthly grant is prorated. When downgrading, excess credits beyond the new tier's limit are forfeited.
 
 ### Failed Payment Recovery
 
 Stripe automatically retries failed payments according to your retry schedule (configurable in **Settings > Billing > Subscriptions and emails > Manage failed payments**). The recommended retry schedule for Sotto:
 
-| Retry | Timing | After |
-|-------|--------|-------|
-| 1st retry | 3 days after failure | invoice.payment_failed |
-| 2nd retry | 5 days after first retry | invoice.payment_failed |
-| 3rd retry | 7 days after second retry | invoice.payment_failed |
-| Final | Mark subscription as canceled | customer.subscription.deleted |
+| Retry     | Timing                        | After                         |
+| --------- | ----------------------------- | ----------------------------- |
+| 1st retry | 3 days after failure          | invoice.payment_failed        |
+| 2nd retry | 5 days after first retry      | invoice.payment_failed        |
+| 3rd retry | 7 days after second retry     | invoice.payment_failed        |
+| Final     | Mark subscription as canceled | customer.subscription.deleted |
 
 During the retry period, the subscription is `PAST_DUE`. The user sees a banner on the billing page prompting them to update their payment method.

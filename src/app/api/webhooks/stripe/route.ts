@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { resetMonthlyUsage } from '@/lib/subscription';
+import { addPurchasedCredits } from '@/lib/credits';
 import { logger } from '@/lib/logger';
 import type { SubscriptionTier } from '@prisma/client';
 
 function tierFromPriceId(priceId: string): SubscriptionTier {
+  if (priceId === process.env.STRIPE_PRICE_ID_STARTER) return 'STARTER';
   if (priceId === process.env.STRIPE_PRICE_ID_PRO) return 'PRO';
-  if (priceId === process.env.STRIPE_PRICE_ID_CREATOR) return 'CREATOR';
+  if (priceId === process.env.STRIPE_PRICE_ID_STUDIO) return 'STUDIO';
   return 'FREE';
 }
 
@@ -35,7 +37,21 @@ export async function POST(request: NextRequest) {
     case 'checkout.session.completed': {
       const session = event.data.object;
       const userId = session.metadata?.userId;
-      if (userId && session.subscription) {
+
+      if (!userId) break;
+
+      // Handle credit pack purchase (one-time payment)
+      if (session.mode === 'payment') {
+        const credits = parseInt(session.metadata?.credits ?? '0', 10);
+        if (credits > 0) {
+          await addPurchasedCredits(userId, credits, session.payment_intent as string);
+          logger.info('Credit pack purchased', { userId, credits });
+        }
+        break;
+      }
+
+      // Handle subscription checkout
+      if (session.subscription) {
         const subResponse = await stripe.subscriptions.retrieve(session.subscription as string);
         const sub = subResponse as unknown as {
           id: string;
@@ -69,18 +85,21 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Auto-grant CREATOR role when subscribing to CREATOR tier
-        if (tier === 'CREATOR') {
+        // Auto-grant CREATOR role when subscribing to STUDIO tier
+        if (tier === 'STUDIO') {
           await prisma.user.update({
             where: { id: userId },
             data: { role: 'CREATOR' },
           });
-          logger.info('Auto-granted CREATOR role via checkout', { userId });
+          logger.info('Auto-granted CREATOR role via Studio checkout', { userId });
         }
 
         await prisma.subscriptionEvent.create({
           data: { userId, type: event.type, stripeEventId: event.id, data: session as object },
         });
+
+        // Grant initial credits on new subscription
+        await resetMonthlyUsage(userId);
 
         logger.info('Subscription created via checkout', { userId, tier });
       }
@@ -129,8 +148,8 @@ export async function POST(request: NextRequest) {
           logger.info('Monthly usage reset on period renewal', { userId: existing.userId });
         }
 
-        // Auto-grant CREATOR role on upgrade (don't revoke on downgrade)
-        if (tier === 'CREATOR') {
+        // Auto-grant CREATOR role on upgrade to STUDIO
+        if (tier === 'STUDIO') {
           await prisma.user.update({
             where: { id: existing.userId },
             data: { role: 'CREATOR' },

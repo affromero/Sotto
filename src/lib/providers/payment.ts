@@ -1,7 +1,8 @@
 import { logger } from '../logger';
 
 export interface TierLimits {
-  podcastsPerMonth: number;
+  creditsMonthly: number;
+  maxRollover: number;
   maxDurationMinutes: number;
   interactionsPerPodcast: number;
   canDownload: boolean;
@@ -27,9 +28,42 @@ export interface PaymentProvider {
  * Stripe provider — wraps existing stripe.ts.
  */
 const TIER_LIMITS: Record<string, TierLimits> = {
-  FREE: { podcastsPerMonth: 3, maxDurationMinutes: 10, interactionsPerPodcast: 3, canDownload: false, canMakePrivate: false, voiceCount: 2 },
-  PRO: { podcastsPerMonth: 20, maxDurationMinutes: 30, interactionsPerPodcast: Infinity, canDownload: true, canMakePrivate: true, voiceCount: 6 },
-  TEAM: { podcastsPerMonth: Infinity, maxDurationMinutes: 30, interactionsPerPodcast: Infinity, canDownload: true, canMakePrivate: true, voiceCount: 6 },
+  FREE: {
+    creditsMonthly: 2,
+    maxRollover: 0,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: 2,
+    canDownload: false,
+    canMakePrivate: false,
+    voiceCount: 2,
+  },
+  STARTER: {
+    creditsMonthly: 5,
+    maxRollover: 2,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: 5,
+    canDownload: true,
+    canMakePrivate: false,
+    voiceCount: 4,
+  },
+  PRO: {
+    creditsMonthly: 15,
+    maxRollover: 5,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: Infinity,
+    canDownload: true,
+    canMakePrivate: true,
+    voiceCount: 6,
+  },
+  STUDIO: {
+    creditsMonthly: 50,
+    maxRollover: 20,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: Infinity,
+    canDownload: true,
+    canMakePrivate: true,
+    voiceCount: 10,
+  },
 };
 
 class StripeProvider implements PaymentProvider {
@@ -59,12 +93,13 @@ class StripeProvider implements PaymentProvider {
 class NoOpProvider implements PaymentProvider {
   getTierLimits(_tier: string): TierLimits {
     return {
-      podcastsPerMonth: Infinity,
+      creditsMonthly: Infinity,
+      maxRollover: Infinity,
       maxDurationMinutes: 30,
       interactionsPerPodcast: Infinity,
       canDownload: true,
       canMakePrivate: true,
-      voiceCount: 6,
+      voiceCount: 10,
     };
   }
 

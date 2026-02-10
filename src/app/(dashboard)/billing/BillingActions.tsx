@@ -25,14 +25,13 @@ export function BillingActions({ tier }: BillingActionsProps) {
     }
   };
 
-  const handleSelectPlan = async (selectedTier: 'free' | 'pro' | 'creator') => {
-    if (selectedTier === 'free') return;
+  const handleSelectPlan = async (selectedTier: 'starter' | 'pro' | 'studio') => {
     setLoading(true);
     try {
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: selectedTier }),
+        body: JSON.stringify({ type: 'subscription', tier: selectedTier }),
       });
       const data = await response.json();
       if (data.url) {
@@ -48,14 +47,14 @@ export function BillingActions({ tier }: BillingActionsProps) {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Upgrade Your Plan</h2>
         <p className={styles.upgradeText}>
-          Unlock more podcasts, premium voices, and creator features.
+          Unlock more credits, premium voices, and creator features.
         </p>
         <div className={styles.pricingGrid}>
           <PricingCard
             tier="free"
             price={0}
             features={[
-              '2 podcasts/month',
+              '2 credits/month',
               '10 min max',
               '2 interactions',
               'Standard voices',
@@ -65,11 +64,24 @@ export function BillingActions({ tier }: BillingActionsProps) {
             onSelect={() => {}}
           />
           <PricingCard
+            tier="starter"
+            price={9}
+            features={[
+              '5 credits/month',
+              '5 interactions',
+              '1 voice clone',
+              'MP3 download',
+              '2 credit rollover',
+            ]}
+            onSelect={() => handleSelectPlan('starter')}
+            loading={loading}
+          />
+          <PricingCard
             tier="pro"
             price={24}
             features={[
-              '15 podcasts/month',
-              '5 premium voice credits',
+              '15 credits/month',
+              'Unlimited interactions',
               '3 voice clones',
               'Private podcasts',
               'MP3 + PDF export',
@@ -79,16 +91,16 @@ export function BillingActions({ tier }: BillingActionsProps) {
             loading={loading}
           />
           <PricingCard
-            tier="creator"
+            tier="studio"
             price={49}
             features={[
-              'Unlimited podcasts',
-              '20 premium voice credits',
+              '50 credits/month',
+              'Unlimited interactions',
               '10 voice clones',
-              'Marketplace listing',
-              'Full analytics',
+              'Premium SFX included',
+              'Full analytics + API',
             ]}
-            onSelect={() => handleSelectPlan('creator')}
+            onSelect={() => handleSelectPlan('studio')}
             loading={loading}
           />
         </div>
@@ -100,7 +112,8 @@ export function BillingActions({ tier }: BillingActionsProps) {
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>Manage Subscription</h2>
       <p className={styles.manageText}>
-        Update your payment method, change plans, or cancel your subscription through the Stripe customer portal.
+        Update your payment method, change plans, or cancel your subscription through the Stripe
+        customer portal.
       </p>
       <div className={styles.manageActions}>
         <Button onClick={handleManageSubscription} loading={loading}>

@@ -10,13 +10,13 @@
 
 Sotto uses **NextAuth.js v5** (also known as Auth.js) with the Prisma adapter for authentication. Users can sign in with Google, GitHub, or Apple (for iOS). The session strategy is JWT-based for stateless, edge-compatible auth. Protected routes are enforced at the middleware level before any page or API route executes.
 
-| Component | Technology | File |
-|-----------|-----------|------|
-| Auth library | NextAuth.js v5 | `src/lib/auth.ts` |
-| Database adapter | `@auth/prisma-adapter` | `src/lib/auth.ts` |
-| Middleware | Next.js middleware | `src/middleware.ts` |
-| Auth API route | Catch-all handler | `src/app/api/auth/[...nextauth]/route.ts` |
-| Session provider | React context | `src/components/providers/SessionProvider.tsx` |
+| Component        | Technology             | File                                           |
+| ---------------- | ---------------------- | ---------------------------------------------- |
+| Auth library     | NextAuth.js v5         | `src/lib/auth.ts`                              |
+| Database adapter | `@auth/prisma-adapter` | `src/lib/auth.ts`                              |
+| Middleware       | Next.js middleware     | `src/middleware.ts`                            |
+| Auth API route   | Catch-all handler      | `src/app/api/auth/[...nextauth]/route.ts`      |
+| Session provider | React context          | `src/components/providers/SessionProvider.tsx` |
 
 ---
 
@@ -24,16 +24,16 @@ Sotto uses **NextAuth.js v5** (also known as Auth.js) with the Prisma adapter fo
 
 All auth-related environment variables required for the system to function:
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `NEXTAUTH_SECRET` | Yes | Encryption key for JWT tokens and session cookies | `openssl rand -base64 32` output |
-| `NEXTAUTH_URL` | Yes (production) | Canonical URL of the app | `https://sotto.fm` |
-| `GOOGLE_CLIENT_ID` | No | Google OAuth client ID | `123456.apps.googleusercontent.com` |
-| `GOOGLE_CLIENT_SECRET` | No | Google OAuth client secret | `GOCSPX-xxxxxxxxxxxx` |
-| `GITHUB_CLIENT_ID` | No | GitHub OAuth app client ID | `Iv1.xxxxxxxxxxxx` |
-| `GITHUB_CLIENT_SECRET` | No | GitHub OAuth app client secret | `xxxxxxxxxxxxxxxxxxxx` |
-| `APPLE_CLIENT_ID` | No | Apple Services ID | `com.sotto.app` |
-| `APPLE_CLIENT_SECRET` | No | Apple client secret (generated JWT) | `eyJhbGciOi...` |
+| Variable               | Required         | Description                                       | Example                             |
+| ---------------------- | ---------------- | ------------------------------------------------- | ----------------------------------- |
+| `NEXTAUTH_SECRET`      | Yes              | Encryption key for JWT tokens and session cookies | `openssl rand -base64 32` output    |
+| `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://sotto.fm`                  |
+| `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
+| `GITHUB_CLIENT_ID`     | No               | GitHub OAuth app client ID                        | `Iv1.xxxxxxxxxxxx`                  |
+| `GITHUB_CLIENT_SECRET` | No               | GitHub OAuth app client secret                    | `xxxxxxxxxxxxxxxxxxxx`              |
+| `APPLE_CLIENT_ID`      | No               | Apple Services ID                                 | `com.sotto.app`                     |
+| `APPLE_CLIENT_SECRET`  | No               | Apple client secret (generated JWT)               | `eyJhbGciOi...`                     |
 
 OAuth providers are conditionally loaded. If the environment variables for a provider are not set, that provider is simply not available. The app will still start and function with no OAuth providers configured (useful for local development where you only need to test other features).
 
@@ -105,6 +105,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 ### Key Design Decisions
 
 **JWT session strategy:** Sotto uses JWT (`strategy: 'jwt'`) instead of database sessions. This means:
+
 - Sessions are stored in an encrypted cookie, not in the database
 - No database lookup on every request
 - Works at the edge (Vercel Edge Functions, middleware)
@@ -134,9 +135,8 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Usage tracking
-  podcastsUsed    Int @default(0)
-  podcastsAllowed Int @default(3)
+  // Role
+  role          UserRole @default(USER)
 
   // Team membership
   teamId String?
@@ -226,6 +226,7 @@ GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 ```
 
 **Important notes:**
+
 - The redirect URI must match exactly, including protocol and path
 - For development, the consent screen can be in "Testing" mode (limited to test users you add)
 - For production, you will need to verify the app with Google (takes 1-3 weeks)
@@ -250,6 +251,7 @@ GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Important notes:**
+
 - GitHub allows only one callback URL per OAuth app. You will need separate OAuth apps for development and production.
 - GitHub automatically provides `email` and `profile` scopes.
 - Unlike Google, there is no verification process required.
@@ -298,9 +300,9 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
    const fs = require('fs');
 
    const privateKey = fs.readFileSync('AuthKey_XXXXXXXXXX.p8');
-   const teamId = 'YOUR_TEAM_ID';      // From Apple Developer account
-   const clientId = 'com.sotto.web';    // Services ID identifier
-   const keyId = 'XXXXXXXXXX';          // Key ID from step 4
+   const teamId = 'YOUR_TEAM_ID'; // From Apple Developer account
+   const clientId = 'com.sotto.web'; // Services ID identifier
+   const keyId = 'XXXXXXXXXX'; // Key ID from step 4
 
    const token = jwt.sign({}, privateKey, {
      algorithm: 'ES256',
@@ -338,6 +340,7 @@ Apple Sign In is more involved than Google or GitHub. It requires an Apple Devel
    ```
 
 **Important notes:**
+
 - The client secret JWT expires every 6 months. Set a calendar reminder to regenerate it.
 - Apple Sign In on web uses a redirect flow. On native iOS (React Native, future), it uses the native Apple Sign In SDK.
 - Apple may only provide the user's name on the first sign-in. Store it immediately because subsequent sign-ins will not include it.
@@ -356,6 +359,7 @@ export const { GET, POST } = handlers;
 ```
 
 NextAuth v5 exports `handlers` from the main config. This route handles all auth flows including:
+
 - `/api/auth/signin` — Sign in page redirect
 - `/api/auth/callback/google` — Google OAuth callback
 - `/api/auth/callback/github` — GitHub OAuth callback
@@ -388,7 +392,11 @@ export async function middleware(request: NextRequest) {
   }
 
   // Skip static files and webhooks
-  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon') || pathname.startsWith('/fonts')) {
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/fonts')
+  ) {
     return NextResponse.next();
   }
 
@@ -414,19 +422,19 @@ export const config = {
 
 ### Route Protection Summary
 
-| Route Pattern | Auth Required | Behavior |
-|---------------|--------------|----------|
-| `/dashboard` | Yes | Redirect to `/auth/login?callbackUrl=/dashboard` |
-| `/create` | Yes | Redirect to `/auth/login?callbackUrl=/create` |
-| `/settings` | Yes | Redirect to `/auth/login?callbackUrl=/settings` |
-| `/billing` | Yes | Redirect to `/auth/login?callbackUrl=/billing` |
-| `/auth/login` | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated |
-| `/auth/signup` | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated |
-| `/feed` | No | Public access |
-| `/podcast/[id]` | Depends on visibility | Public podcasts: no auth. Private/unlisted: checked in the page/API |
-| `/profile/[id]` | No | Public access |
-| `/pricing` | No | Public access |
-| `/api/*` | Varies | Auth checked per-route in the API handler |
+| Route Pattern   | Auth Required              | Behavior                                                            |
+| --------------- | -------------------------- | ------------------------------------------------------------------- |
+| `/dashboard`    | Yes                        | Redirect to `/auth/login?callbackUrl=/dashboard`                    |
+| `/create`       | Yes                        | Redirect to `/auth/login?callbackUrl=/create`                       |
+| `/settings`     | Yes                        | Redirect to `/auth/login?callbackUrl=/settings`                     |
+| `/billing`      | Yes                        | Redirect to `/auth/login?callbackUrl=/billing`                      |
+| `/auth/login`   | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
+| `/auth/signup`  | No (redirect if logged in) | Redirect to `/dashboard` if already authenticated                   |
+| `/feed`         | No                         | Public access                                                       |
+| `/podcast/[id]` | Depends on visibility      | Public podcasts: no auth. Private/unlisted: checked in the page/API |
+| `/profile/[id]` | No                         | Public access                                                       |
+| `/pricing`      | No                         | Public access                                                       |
+| `/api/*`        | Varies                     | Auth checked per-route in the API handler                           |
 
 ### API Route Auth Pattern
 
@@ -567,14 +575,14 @@ GITHUB_CLIENT_SECRET=your-client-secret
 
 After signing in, verify the following:
 
-| Check | How |
-|-------|-----|
-| Session exists | Visit `http://localhost:3000/api/auth/session` in browser — should return JSON with user data |
-| User created in DB | Open Prisma Studio (`npx prisma studio`) and check the `User` table |
-| Account linked | Check the `Account` table in Prisma Studio for the OAuth provider record |
-| Protected routes work | Navigate to `/dashboard` — should load (not redirect to login) |
-| Auth redirect works | Open an incognito window, navigate to `/create` — should redirect to `/auth/login?callbackUrl=/create` |
-| Callback URL works | After signing in from the redirect, you should land on `/create` |
+| Check                 | How                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------ |
+| Session exists        | Visit `http://localhost:3000/api/auth/session` in browser — should return JSON with user data          |
+| User created in DB    | Open Prisma Studio (`npx prisma studio`) and check the `User` table                                    |
+| Account linked        | Check the `Account` table in Prisma Studio for the OAuth provider record                               |
+| Protected routes work | Navigate to `/dashboard` — should load (not redirect to login)                                         |
+| Auth redirect works   | Open an incognito window, navigate to `/create` — should redirect to `/auth/login?callbackUrl=/create` |
+| Callback URL works    | After signing in from the redirect, you should land on `/create`                                       |
 
 ### Inspecting JWT Tokens
 
@@ -596,14 +604,14 @@ export async function GET(request: NextRequest) {
 
 ### Common Issues
 
-| Issue | Cause | Solution |
-|-------|-------|---------|
-| "CSRF token mismatch" | Missing or wrong `NEXTAUTH_SECRET` | Ensure `NEXTAUTH_SECRET` is set and consistent |
-| "OAuth redirect_uri mismatch" | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/auth/callback/{provider}` |
-| "Access denied" on Google | Account not added as test user | Add your Google account in OAuth consent screen > Test users |
-| Session is `null` in API routes | Using wrong import | Use `import { auth } from '@/lib/auth'`, not from `next-auth` directly |
-| User ID not in session | Callbacks not configured | Ensure the `jwt` and `session` callbacks are in the NextAuth config |
-| Cookie not set | Wrong `NEXTAUTH_URL` | Set `NEXTAUTH_URL=http://localhost:3000` for local dev |
+| Issue                           | Cause                                            | Solution                                                                                |
+| ------------------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| "CSRF token mismatch"           | Missing or wrong `NEXTAUTH_SECRET`               | Ensure `NEXTAUTH_SECRET` is set and consistent                                          |
+| "OAuth redirect_uri mismatch"   | Callback URL in provider settings does not match | Verify the redirect URI is exactly `http://localhost:3000/api/auth/callback/{provider}` |
+| "Access denied" on Google       | Account not added as test user                   | Add your Google account in OAuth consent screen > Test users                            |
+| Session is `null` in API routes | Using wrong import                               | Use `import { auth } from '@/lib/auth'`, not from `next-auth` directly                  |
+| User ID not in session          | Callbacks not configured                         | Ensure the `jwt` and `session` callbacks are in the NextAuth config                     |
+| Cookie not set                  | Wrong `NEXTAUTH_URL`                             | Set `NEXTAUTH_URL=http://localhost:3000` for local dev                                  |
 
 ---
 
