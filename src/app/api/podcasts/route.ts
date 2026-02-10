@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       hostVoiceId: parsed.data.hostVoiceId,
       expertVoiceId: parsed.data.expertVoiceId,
       usePremiumVoice: parsed.data.usePremiumVoice,
+      ttsProvider: parsed.data.ttsProvider ?? null,
     },
   });
 

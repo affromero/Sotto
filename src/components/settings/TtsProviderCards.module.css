@@ -1,0 +1,108 @@
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  background: var(--color-background);
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--color-border-hover, var(--color-border));
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.cardHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.cardInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.cardName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cardQuality {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.statusConnected {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.statusNone {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.addKeyBtn {
+  appearance: none;
+  background: transparent;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  margin-top: var(--spacing-sm);
+  align-self: flex-start;
+}
+
+.addKeyBtn:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.keyForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.keyFormActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.feedbackSuccess {
+  font: var(--text-caption);
+  color: var(--color-success);
+}
+
+.feedbackError {
+  font: var(--text-caption);
+  color: var(--color-error);
+}

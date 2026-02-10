@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo, FormEvent } from 'react';
 import Link from 'next/link';
+import { TtsProviderLogoRow } from '@/components/ui/TtsProviderLogo';
 import styles from './page.module.css';
 
 const VOICES = [
@@ -1087,8 +1088,11 @@ export default function LandingPage() {
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
               Choose from 16 curated AI voices or clone your own. Every podcast pairs a unique host
-              and expert for natural, engaging conversation.
+              and expert for natural, engaging conversation. Bring your own key for any provider.
             </p>
+            <div className={styles.providerLogos}>
+              <TtsProviderLogoRow size={36} />
+            </div>
           </div>
           <div className={styles.voiceGrid}>
             {VOICES.map((v, i) => (

@@ -1,10 +1,8 @@
 import { Job } from 'bullmq';
 import { GenerateAudioPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
-import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
-import { getElevenLabsPerKCharRate, getOpenAiPerKCharRate } from '@/lib/elevenlabs';
-import { getByokKey } from '@/lib/byok';
+import { resolveTtsProvider } from '@/lib/providers';
+import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { logger } from '@/lib/logger';
@@ -32,48 +30,39 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // Fetch podcast to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { userId: true, usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
+    select: {
+      userId: true,
+      usePremiumVoice: true,
+      hostVoiceId: true,
+      expertVoiceId: true,
+      ttsProvider: true,
+    },
   });
 
   const startTime = Date.now();
-  let audioBuffer: Buffer;
-  let service: string;
-  let voiceId: string;
 
-  // Check for BYOK key — user provides their own ElevenLabs API key
-  const byokKey = await getByokKey(podcast.userId);
+  // Resolve provider using the multi-provider system
+  const { provider, source, providerId } = await resolveTtsProvider({
+    userId: podcast.userId,
+    podcastId,
+    requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+    usePremiumVoice: podcast.usePremiumVoice,
+  });
 
-  if (podcast.usePremiumVoice || byokKey) {
-    // Premium path: use ElevenLabs with custom or pool voice selection
-    const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
-    voiceId = customVoiceId || getVoiceId(speaker, podcastId);
-    const profile = getVoiceProfile(voiceId);
+  // Use custom voice ID if set, otherwise let the provider pick from its pool
+  const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
+  const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId);
 
-    logger.info('Using premium voice (ElevenLabs)', {
-      speaker,
-      voiceName: profile?.name ?? 'custom',
-      voiceId,
-      podcastId,
-      byok: !!byokKey,
-    });
+  logger.info('Using TTS provider', {
+    speaker,
+    providerId,
+    source,
+    voiceId,
+    podcastId,
+  });
 
-    const premiumProvider = createPremiumTtsProvider(byokKey ?? undefined);
-    audioBuffer = await premiumProvider.generateSpeech({ text, voiceId });
-    service = byokKey ? 'elevenlabs_byok' : 'elevenlabs';
-  } else {
-    // Standard path: use OpenAI TTS (default, 90% cheaper)
-    const standardProvider = createTtsProvider('openai');
-    voiceId = standardProvider.getVoiceId(speaker, podcastId);
-
-    logger.info('Using standard voice (OpenAI)', {
-      speaker,
-      voiceId,
-      podcastId,
-    });
-
-    audioBuffer = await standardProvider.generateSpeech({ text, voiceId });
-    service = 'openai_tts';
-  }
+  const audioBuffer = await provider.generateSpeech({ text, voiceId });
+  const service = source === 'byok' ? `${providerId}_byok` : providerId;
 
   const durationMs = Date.now() - startTime;
 
@@ -104,11 +93,13 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     data: { audioUrl, duration: segmentDuration },
   });
 
-  // Log TTS cost
+  // Log TTS cost — BYOK = $0 platform cost
   const charCount = text.length;
-  const costPerKChar =
-    service === 'elevenlabs' ? getElevenLabsPerKCharRate() : getOpenAiPerKCharRate();
-  const totalCost = (charCount / 1000) * costPerKChar;
+  let totalCost = 0;
+  if (source === 'platform') {
+    const meta = getProviderMeta(providerId);
+    totalCost = (charCount / 1000) * meta.platformCostPerKChar;
+  }
 
   await prisma.apiUsageLog.create({
     data: {
@@ -119,7 +110,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       inputTokens: charCount,
       totalCost,
       durationMs,
-      metadata: { voiceId, speaker },
+      metadata: { voiceId, speaker, providerId, source },
     },
   });
 

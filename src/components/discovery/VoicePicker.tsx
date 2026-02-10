@@ -35,6 +35,7 @@ export interface VoiceSelection {
   hostVoiceId?: string;
   expertVoiceId?: string;
   usePremiumVoice: boolean;
+  ttsProvider?: string;
 }
 
 interface VoicePickerProps {

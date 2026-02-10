@@ -286,6 +286,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
         topic: 'An introduction to quantum computing principles',
         status: 'PENDING',
         forkedFromId: 'source-pod-1',
+        remixNote: null,
       },
     });
   });

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
+import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
 import { ImportUploader } from '@/components/import/ImportUploader';
 import { ImportProgress } from '@/components/import/ImportProgress';
 import type { DiscoveryMetadata } from '@/types/discovery';
@@ -35,6 +36,7 @@ function CreatePageContent() {
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({
     usePremiumVoice: false,
   });
+  const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
@@ -81,6 +83,7 @@ function CreatePageContent() {
             hostVoiceId: voiceSelection.hostVoiceId,
             expertVoiceId: voiceSelection.expertVoiceId,
             usePremiumVoice: voiceSelection.usePremiumVoice,
+            ttsProvider,
           }),
         });
       }
@@ -96,7 +99,7 @@ function CreatePageContent() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, router, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, router, createAsSotto]);
 
   const handleImportStarted = useCallback((podcastId: string) => {
     setImportingPodcastId(podcastId);
@@ -275,6 +278,7 @@ function CreatePageContent() {
         {step === 'voice' && tabMode === 'create' && (
           <div className={styles.chatArea}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
+            <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
             <div className={styles.voiceActions}>
               <button
                 type="button"

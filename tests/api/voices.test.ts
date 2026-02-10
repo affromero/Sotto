@@ -203,8 +203,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 0,
-      total: 1,
-      remaining: 1,
+      total: 3,
+      remaining: 3,
     });
   });
 

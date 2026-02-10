@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { byokSchema } from '@/lib/validations';
-import { storeByokKey, removeByokKey, hasByokKey, validateElevenLabsKey } from '@/lib/byok';
+import { storeByokKey, removeByokKey, listByokProviders, validateByokKey } from '@/lib/byok';
 
 export async function GET() {
   const session = await auth();
@@ -9,8 +9,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const hasKey = await hasByokKey(session.user.id);
-  return NextResponse.json({ hasKey });
+  const keys = await listByokProviders(session.user.id);
+  return NextResponse.json({ keys });
 }
 
 export async function POST(request: NextRequest) {
@@ -28,27 +28,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { apiKey } = parsed.data;
+  const { provider, apiKey, userId } = parsed.data;
 
-  // Validate the key against ElevenLabs API
-  const isValid = await validateElevenLabsKey(apiKey);
+  const isValid = await validateByokKey(provider, { apiKey, userId });
   if (!isValid) {
     return NextResponse.json(
-      { error: 'Invalid ElevenLabs API key. Please check your key and try again.' },
+      { error: `Invalid ${provider} credentials. Please check and try again.` },
       { status: 422 }
     );
   }
 
-  await storeByokKey(session.user.id, apiKey);
+  await storeByokKey(session.user.id, provider, { apiKey, userId });
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  await removeByokKey(session.user.id);
+  let provider: string | undefined;
+  try {
+    const body = await request.json();
+    provider = body.provider;
+  } catch {
+    // No body — legacy behavior removes elevenlabs
+  }
+
+  const validProviders = ['elevenlabs', 'openai', 'playht', 'cartesia', 'hume'];
+  const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
+
+  await removeByokKey(
+    session.user.id,
+    targetProvider as 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  );
   return NextResponse.json({ success: true });
 }

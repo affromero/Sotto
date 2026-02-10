@@ -8,9 +8,11 @@ const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  userId: 'user-1',
   usePremiumVoice: true,
   hostVoiceId: null,
   expertVoiceId: null,
+  ttsProvider: null,
 });
 
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
@@ -42,32 +44,31 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
-const mockGetVoiceId = vi.fn().mockReturnValue('voice-abc');
-const mockGetVoiceProfile = vi.fn().mockReturnValue({
-  id: 'voice-abc',
-  name: 'Adam',
-  gender: 'male',
-  accent: 'american',
-  ageRange: 'middle',
-  character: 'warm narrator',
-});
-
 vi.mock('@/lib/elevenlabs', () => ({
-  getVoiceId: (...args: unknown[]) => mockGetVoiceId(...args),
-  getVoiceProfile: (...args: unknown[]) => mockGetVoiceProfile(...args),
+  getVoiceId: vi.fn().mockReturnValue('voice-abc'),
+  getVoiceProfile: vi.fn().mockReturnValue({}),
 }));
 
 const mockPremiumGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
 const mockStandardGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
+const mockProviderGetVoiceId = vi.fn().mockReturnValue('voice-abc');
 const mockStandardGetVoiceId = vi.fn().mockReturnValue('openai-voice-abc');
 
+const mockResolveTtsProvider = vi.fn();
+
 vi.mock('@/lib/providers', () => ({
-  createPremiumTtsProvider: () => ({
-    generateSpeech: (...args: unknown[]) => mockPremiumGenerateSpeech(...args),
-  }),
-  createTtsProvider: () => ({
-    generateSpeech: (...args: unknown[]) => mockStandardGenerateSpeech(...args),
-    getVoiceId: (...args: unknown[]) => mockStandardGetVoiceId(...args),
+  resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
+  createPremiumTtsProvider: vi.fn(),
+  createTtsProvider: vi.fn(),
+  createTtsProviderAsync: vi.fn(),
+}));
+
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderMeta: vi.fn().mockReturnValue({
+    id: 'elevenlabs',
+    displayName: 'ElevenLabs',
+    platformCostPerKChar: 0.3,
+    qualityTier: 'premium',
   }),
 }));
 
@@ -136,6 +137,30 @@ const defaultPayload: RegenerateSegmentPayload = {
   speaker: 'EXPERT',
 };
 
+function setupPremiumProvider() {
+  mockResolveTtsProvider.mockResolvedValue({
+    provider: {
+      generateSpeech: (...args: unknown[]) => mockPremiumGenerateSpeech(...args),
+      getVoiceId: (...args: unknown[]) => mockProviderGetVoiceId(...args),
+      providerId: 'elevenlabs',
+    },
+    source: 'platform',
+    providerId: 'elevenlabs',
+  });
+}
+
+function setupStandardProvider() {
+  mockResolveTtsProvider.mockResolvedValue({
+    provider: {
+      generateSpeech: (...args: unknown[]) => mockStandardGenerateSpeech(...args),
+      getVoiceId: (...args: unknown[]) => mockStandardGetVoiceId(...args),
+      providerId: 'openai',
+    },
+    source: 'platform',
+    providerId: 'openai',
+  });
+}
+
 // ---- Tests ----
 
 describe('processSegmentRegeneration', () => {
@@ -143,9 +168,11 @@ describe('processSegmentRegeneration', () => {
     vi.clearAllMocks();
     // Default: premium voice, no custom voice IDs
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+      userId: 'user-1',
       usePremiumVoice: true,
       hostVoiceId: null,
       expertVoiceId: null,
+      ttsProvider: null,
     });
     mockPrismaSegmentCreate.mockResolvedValue({ id: 'segment-new-001' });
     mockPrismaSegmentUpdate.mockResolvedValue({});
@@ -159,16 +186,11 @@ describe('processSegmentRegeneration', () => {
     mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/segments/segment-new-001.mp3');
-    mockGetVoiceId.mockReturnValue('voice-abc');
-    mockGetVoiceProfile.mockReturnValue({
-      id: 'voice-abc',
-      name: 'Adam',
-      gender: 'male',
-      accent: 'american',
-      ageRange: 'middle',
-      character: 'warm narrator',
-    });
+    mockProviderGetVoiceId.mockReturnValue('voice-abc');
+    mockStandardGetVoiceId.mockReturnValue('openai-voice-abc');
     mockGetAudioDuration.mockResolvedValue(5.5);
+    // Default: premium provider via resolveTtsProvider
+    setupPremiumProvider();
   });
 
   describe('podcast lookup', () => {
@@ -178,46 +200,46 @@ describe('processSegmentRegeneration', () => {
 
       expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        select: { usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
+        select: {
+          userId: true,
+          usePremiumVoice: true,
+          hostVoiceId: true,
+          expertVoiceId: true,
+          ttsProvider: true,
+        },
       });
     });
   });
 
   describe('premium voice selection', () => {
-    it('calls getVoiceId with speaker and podcastId for voice diversity', async () => {
+    it('calls provider getVoiceId with speaker and podcastId for voice diversity', async () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
     });
 
     it('passes HOST speaker to getVoiceId when speaker is HOST', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
 
-      expect(mockGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
     });
 
     it('passes EXPERT speaker to getVoiceId when speaker is EXPERT', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processSegmentRegeneration(job);
 
-      expect(mockGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
-    });
-
-    it('calls getVoiceProfile with the returned voiceId', async () => {
-      mockGetVoiceId.mockReturnValue('voice-xyz');
-      const job = createMockJob(defaultPayload);
-      await processSegmentRegeneration(job);
-
-      expect(mockGetVoiceProfile).toHaveBeenCalledWith('voice-xyz');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
     });
 
     it('uses custom hostVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
         usePremiumVoice: true,
         hostVoiceId: 'custom-host-voice',
         expertVoiceId: null,
+        ttsProvider: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
@@ -229,9 +251,11 @@ describe('processSegmentRegeneration', () => {
 
     it('uses custom expertVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
         usePremiumVoice: true,
         hostVoiceId: null,
         expertVoiceId: 'custom-expert-voice',
+        ttsProvider: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processSegmentRegeneration(job);
@@ -244,7 +268,7 @@ describe('processSegmentRegeneration', () => {
 
   describe('premium speech generation', () => {
     it('calls premium provider generateSpeech with correct text and voiceId', async () => {
-      mockGetVoiceId.mockReturnValue('voice-host-123');
+      mockProviderGetVoiceId.mockReturnValue('voice-host-123');
       const job = createMockJob({
         ...defaultPayload,
         newText: 'Let me clarify that point.',
@@ -258,8 +282,8 @@ describe('processSegmentRegeneration', () => {
       });
     });
 
-    it('uses the voice ID returned by getVoiceId', async () => {
-      mockGetVoiceId.mockReturnValue('custom-expert-voice');
+    it('uses the voice ID returned by provider getVoiceId', async () => {
+      mockProviderGetVoiceId.mockReturnValue('custom-expert-voice');
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
@@ -272,10 +296,13 @@ describe('processSegmentRegeneration', () => {
   describe('standard voice path', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
         usePremiumVoice: false,
         hostVoiceId: null,
         expertVoiceId: null,
+        ttsProvider: null,
       });
+      setupStandardProvider();
     });
 
     it('uses standard TTS provider when usePremiumVoice is false', async () => {
@@ -585,7 +612,7 @@ describe('processSegmentRegeneration', () => {
 
   describe('end-to-end flow', () => {
     it('executes the full regeneration pipeline for HOST segment (premium voice)', async () => {
-      mockGetVoiceId.mockReturnValue('host-voice-id');
+      mockProviderGetVoiceId.mockReturnValue('host-voice-id');
       mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('host-audio'));
       mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/host-audio.mp3');
       mockGetAudioDuration.mockResolvedValue(6.2);
@@ -612,11 +639,17 @@ describe('processSegmentRegeneration', () => {
       // Podcast fetched
       expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        select: { usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
+        select: {
+          userId: true,
+          usePremiumVoice: true,
+          hostVoiceId: true,
+          expertVoiceId: true,
+          ttsProvider: true,
+        },
       });
 
-      // Voice selected
-      expect(mockGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
+      // Voice selected via provider
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
 
       // Audio generated via premium provider
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith({
@@ -668,10 +701,13 @@ describe('processSegmentRegeneration', () => {
 
     it('executes the full regeneration pipeline for EXPERT segment (standard voice)', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
         usePremiumVoice: false,
         hostVoiceId: null,
         expertVoiceId: null,
+        ttsProvider: null,
       });
+      setupStandardProvider();
       mockStandardGetVoiceId.mockReturnValue('openai-expert-voice');
       mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('expert-audio'));
       mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/expert-audio.mp3');
@@ -754,10 +790,13 @@ describe('processSegmentRegeneration', () => {
 
     it('propagates errors from standard generateSpeech', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
         usePremiumVoice: false,
         hostVoiceId: null,
         expertVoiceId: null,
+        ttsProvider: null,
       });
+      setupStandardProvider();
       mockStandardGenerateSpeech.mockRejectedValue(new Error('OpenAI TTS error'));
       const job = createMockJob(defaultPayload);
 

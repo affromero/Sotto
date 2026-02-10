@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
+import { listByokProviders } from '@/lib/byok';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -15,7 +16,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, allTags] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, allTags, byokKeys] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -28,7 +29,6 @@ export default async function SettingsPage() {
         twitterEnabled: true,
         preferredHostVoiceId: true,
         preferredExpertVoiceId: true,
-        elevenLabsApiKey: true,
       },
     }),
     prisma.account.findMany({
@@ -53,6 +53,7 @@ export default async function SettingsPage() {
       where: { slug: { in: ONBOARDING_TAG_SLUGS } },
       select: { id: true, name: true, slug: true },
     }),
+    listByokProviders(userId),
   ]);
 
   if (!user) return null;
@@ -63,6 +64,8 @@ export default async function SettingsPage() {
   // Sort tags by the order defined in ONBOARDING_TAG_SLUGS
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
   allTags.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
+
+  const configuredProviders = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
 
   return (
     <main className={styles.main}>
@@ -82,7 +85,7 @@ export default async function SettingsPage() {
         voiceClones={voiceClones}
         interestTags={allTags}
         selectedInterestTagIds={selectedInterestTagIds}
-        hasByokKey={!!user.elevenLabsApiKey}
+        configuredTtsProviders={configuredProviders}
       />
     </main>
   );

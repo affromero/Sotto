@@ -24,6 +24,7 @@ All shared business logic and external service integrations live here.
 | `citation-parser.tsx`    | Parse `[N]` citation markers in text → React CitationMarker components                                                                                                                                     | React                                         |
 | `pdf-generator.ts`       | Generate academic-style PDF transcripts with references via pdfmake                                                                                                                                        | pdfmake                                       |
 | `audio-stitcher.ts`      | FFmpeg segment concatenation + crossfades + SFX overlay (`adelay`, `duration=first`) + loudness normalization. `SfxInsert` includes `delayMs` for positioning. `skipSfx` flag bypasses SFX on re-stitch.   | FFmpeg (CLI)                                  |
+| `byok.ts`                | Multi-provider BYOK key management: encrypt/decrypt (AES-256-GCM), store/retrieve via `UserTtsKey` model, validate keys per provider                                                                       | Uses `prisma.ts`                              |
 | `content-parser.ts`      | URL/PDF text extraction for source material                                                                                                                                                                | fetch + pdf-parse                             |
 | `recommendations.ts`     | Search similar public podcasts (PostgreSQL full-text)                                                                                                                                                      | Uses `prisma.ts`                              |
 | `push-notifications.ts`  | Web Push API: send to user devices, clean expired subs                                                                                                                                                     | web-push                                      |
@@ -33,6 +34,7 @@ All shared business logic and external service integrations live here.
 | `notifications.ts`       | In-app notification helpers                                                                                                                                                                                | Uses `prisma.ts`                              |
 | `twitter.ts`             | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a)                                                                                                                                              | Twitter API v2                                |
 | `tweet-parser.ts`        | Claude-based tweet intent extraction (topic, title, depth, tone)                                                                                                                                           | Uses `claude.ts`                              |
+| `voice-pool.ts`          | Unified voice pool: 16 curated voices with per-provider IDs, deterministic `selectVoicePair(podcastId)` hash, `resolveVoiceId()`, `findByVoiceId()`                                                        | Pure utility                                  |
 | `api-keys.ts`            | API key generation, hashing, validation                                                                                                                                                                    | crypto                                        |
 | `tag-icons.tsx`          | Tag slug → SVG icon mapping (12 categories), `TagIcon` component, `ONBOARDING_TAG_SLUGS` array                                                                                                             | React (SVG)                                   |
 | `inspire-engine.ts`      | "Inspire Me" topic suggestions: `getPersonalizedTopics()`, `getTrendingTopics()`, `getCurrentEvents()` (Claude + web search), `drillDown()`                                                                | Anthropic API + `redis.ts`                    |
@@ -42,15 +44,17 @@ All shared business logic and external service integrations live here.
 
 Modular provider architecture — swap external services via env vars.
 
-| File             | Interface         | Implementations                                                 | Env Var            |
-| ---------------- | ----------------- | --------------------------------------------------------------- | ------------------ |
-| `ai.ts`          | `AIProvider`      | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER`      |
-| `claude-code.ts` | `AIProvider`      | `ClaudeCodeProvider` (standalone)                               | `AI_PROVIDER`      |
-| `tts.ts`         | `TtsProvider`     | `ElevenLabsProvider`, `OpenAITtsProvider`                       | `TTS_PROVIDER`     |
-| `storage.ts`     | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider`                     | `STORAGE_PROVIDER` |
-| `payment.ts`     | `PaymentProvider` | `StripeProvider`, `NoOpProvider`                                | `PAYMENT_PROVIDER` |
-| `index.ts`       | `Providers`       | `getProviders()` singleton factory                              | —                  |
-| `openai.d.ts`    | —                 | Type declarations for optional `openai` dependency              | —                  |
+| File                | Interface         | Implementations                                                                                                                                 | Env Var            |
+| ------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `ai.ts`             | `AIProvider`      | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider`                                                                                 | `AI_PROVIDER`      |
+| `claude-code.ts`    | `AIProvider`      | `ClaudeCodeProvider` (standalone)                                                                                                               | `AI_PROVIDER`      |
+| `tts.ts`            | `TtsProvider`     | `ElevenLabsProvider`, `OpenAITtsProvider`, `PlayHTProvider`, `CartesiaProvider`, `HumeProvider` + `FallbackTtsProvider`, `resolveTtsProvider()` | `TTS_PROVIDER`     |
+| `tts-registry.ts`   | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities                                                              | —                  |
+| `tts/*.provider.ts` | `TtsProvider`     | Per-provider implementations: `elevenlabs`, `openai`, `playht`, `cartesia`, `hume`                                                              | Various TTS APIs   |
+| `storage.ts`        | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider`                                                                                                     | `STORAGE_PROVIDER` |
+| `payment.ts`        | `PaymentProvider` | `StripeProvider`, `NoOpProvider`                                                                                                                | `PAYMENT_PROVIDER` |
+| `index.ts`          | `Providers`       | `getProviders()` singleton factory                                                                                                              | —                  |
+| `openai.d.ts`       | —                 | Type declarations for optional `openai` dependency                                                                                              | —                  |
 
 ## Patterns
 

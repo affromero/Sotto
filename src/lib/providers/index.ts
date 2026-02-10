@@ -43,9 +43,25 @@ export type { MLProvider, RecommendationSignals, ScoredPodcast } from './ml';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
-export { createTtsProvider, createPremiumTtsProvider, createTtsProviderWithFallback } from './tts';
+export {
+  createTtsProvider,
+  createPremiumTtsProvider,
+  createTtsProviderWithFallback,
+  createTtsProviderAsync,
+  resolveTtsProvider,
+} from './tts';
+export type { ResolvedProvider } from './tts';
 export { createSttProvider } from './stt';
 export type { TranscriptionResult, SttProvider } from './stt';
 export { createStorageProvider } from './storage';
 export { createPaymentProvider } from './payment';
 export { createMLProvider } from './ml';
+
+// TTS registry
+export type { TtsProviderId, TtsProviderMeta } from './tts-registry';
+export {
+  getProviderMeta,
+  getAllProviderMeta,
+  getProviderIds,
+  isValidProviderId,
+} from './tts-registry';

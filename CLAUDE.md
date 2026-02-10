@@ -13,19 +13,19 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 
 ## Tech Stack
 
-| Layer     | Technology                                                                               |
-| --------- | ---------------------------------------------------------------------------------------- |
-| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                          |
-| Database  | PostgreSQL 16 + Prisma ORM                                                               |
-| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                           |
-| Queue     | Redis 7 + BullMQ (11 worker types)                                                       |
-| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`  |
-| Audio     | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER`                  |
-| Stitching | FFmpeg (segment concatenation + normalization)                                           |
-| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                         |
-| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69) — swappable via `PAYMENT_PROVIDER` |
-| PDF       | pdfmake (server-side transcript PDF generation)                                          |
-| Hosting   | Vercel (web) + Railway (workers)                                                         |
+| Layer     | Technology                                                                                                            |
+| --------- | --------------------------------------------------------------------------------------------------------------------- |
+| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                                       |
+| Database  | PostgreSQL 16 + Prisma ORM                                                                                            |
+| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                                        |
+| Queue     | Redis 7 + BullMQ (11 worker types)                                                                                    |
+| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                               |
+| Audio     | Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) — BYOK or platform, resolved via `resolveTtsProvider` |
+| Stitching | FFmpeg (segment concatenation + normalization)                                                                        |
+| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                                      |
+| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69) — swappable via `PAYMENT_PROVIDER`                              |
+| PDF       | pdfmake (server-side transcript PDF generation)                                                                       |
+| Hosting   | Vercel (web) + Railway (workers)                                                                                      |
 
 ## Build & Development Commands
 
@@ -132,7 +132,16 @@ src/
 │   ├── script-updater.ts       # Citation cleanup + renumbering after reference removal
 │   ├── citation-parser.tsx     # Parse [N] citation markers → React CitationMarker components
 │   ├── pdf-generator.ts        # pdfmake academic-style PDF generation
+│   ├── voice-pool.ts           # Unified voice pool with per-provider IDs
+│   ├── byok.ts                 # Multi-provider BYOK key encryption + storage
 │   ├── providers/              # Modular provider architecture (ai, tts, storage, payment)
+│   ├── tts-registry.ts         # Provider capability metadata (quality, cost, auth)
+│   └── tts/                    # Per-provider TTS implementations
+│       ├── elevenlabs.provider.ts
+│       ├── openai.provider.ts
+│       ├── playht.provider.ts
+│       ├── cartesia.provider.ts
+│       └── hume.provider.ts
 │   ├── audio-stitcher.ts       # FFmpeg segment concatenation + normalization
 │   ├── content-parser.ts       # URL/PDF content extraction
 │   ├── recommendations.ts      # Search similar podcasts, rank by relevance
@@ -274,6 +283,8 @@ Claude generates natural HOST segment addressing Q&A
 | `CreditTransaction`  | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases                                        |
 | `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                                                                              |
 | `VoiceAllowlist`     | Pre-approved voice access: voice clone → allowed user (Studio + Voice Creator addon)                                                              |
+| `UserTtsKey`         | BYOK encrypted API keys per TTS provider (AES-256-GCM), `@@unique([userId, provider])`                                                            |
+| `PodcastVersion`     | Audio version snapshots: version number, audioUrl, duration, changeType (initial/regeneration/incorporation)                                      |
 | `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                                                                               |
 | `Team`               | Team ownership + member management                                                                                                                |
 | `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                                                                             |

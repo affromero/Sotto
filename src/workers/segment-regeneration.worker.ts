@@ -1,8 +1,8 @@
 import { Job } from 'bullmq';
 import { RegenerateSegmentPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
-import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
+import { resolveTtsProvider } from '@/lib/providers';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { logger } from '@/lib/logger';
@@ -28,42 +28,38 @@ export async function processSegmentRegeneration(
   logger.info('Regenerating segment', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  // Fetch podcast to determine voice configuration (match audio-generation worker path)
+  // Fetch podcast to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
+    select: {
+      userId: true,
+      usePremiumVoice: true,
+      hostVoiceId: true,
+      expertVoiceId: true,
+      ttsProvider: true,
+    },
   });
 
-  // Generate audio using the same TTS path as audio-generation worker
-  let audioBuffer: Buffer;
-  let voiceId: string;
+  // Resolve provider using multi-provider system (matches audio-generation worker)
+  const { provider, source, providerId } = await resolveTtsProvider({
+    userId: podcast.userId,
+    podcastId,
+    requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+    usePremiumVoice: podcast.usePremiumVoice,
+  });
 
-  if (podcast.usePremiumVoice) {
-    const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
-    voiceId = customVoiceId || getVoiceId(speaker, podcastId);
+  const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
+  const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId);
 
-    const profile = getVoiceProfile(voiceId);
-    logger.info('Segment regen: using premium voice (ElevenLabs)', {
-      speaker,
-      voiceName: profile?.name ?? 'custom',
-      voiceId,
-      podcastId,
-    });
+  logger.info('Segment regen: using TTS provider', {
+    speaker,
+    providerId,
+    source,
+    voiceId,
+    podcastId,
+  });
 
-    const premiumProvider = createPremiumTtsProvider();
-    audioBuffer = await premiumProvider.generateSpeech({ text: newText, voiceId });
-  } else {
-    const standardProvider = createTtsProvider('openai');
-    voiceId = standardProvider.getVoiceId(speaker, podcastId);
-
-    logger.info('Segment regen: using standard voice (OpenAI)', {
-      speaker,
-      voiceId,
-      podcastId,
-    });
-
-    audioBuffer = await standardProvider.generateSpeech({ text: newText, voiceId });
-  }
+  const audioBuffer = await provider.generateSpeech({ text: newText, voiceId });
 
   await job.updateProgress(40);
 
