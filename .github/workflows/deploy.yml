@@ -64,6 +64,7 @@ jobs:
             git pull origin main
 
             echo "Building containers..."
+            export COMMIT_SHA=$(git rev-parse --short HEAD)
             docker compose -f docker-compose.prod.yml build
 
             echo "Running database migrations..."
@@ -136,10 +137,28 @@ jobs:
             FAIL_LINE="Reason: pitch rebuild failed — check run logs"
           fi
 
+          # Verify live version via health check
+          HEALTH_LINE=""
+          if [ "$DEPLOY_STATUS" = "success" ]; then
+            HEALTH=$(curl -sf --max-time 5 "https://sotto.fm/api/health" 2>/dev/null || echo "")
+            if [ -n "$HEALTH" ]; then
+              LIVE_VERSION=$(echo "$HEALTH" | jq -r '.version // "unknown"')
+              LIVE_STATUS=$(echo "$HEALTH" | jq -r '.status // "unknown"')
+              if [ "$LIVE_VERSION" = "$COMMIT_SHA" ]; then
+                HEALTH_LINE="Health: ✅ ${LIVE_STATUS} (${LIVE_VERSION})"
+              else
+                HEALTH_LINE="Health: ⚠️ ${LIVE_STATUS} (${LIVE_VERSION} — expected ${COMMIT_SHA})"
+              fi
+            else
+              HEALTH_LINE="Health: ⚠️ unreachable"
+            fi
+          fi
+
           TEXT="${EMOJI} <b>sotto.fm ${STATUS}</b>
           Commit: <code>${COMMIT_SHA}</code> ${COMMIT_MSG}
           By: ${AUTHOR}
           ${PITCH_LINE}
+          ${HEALTH_LINE}
           ${FAIL_LINE}
 
           <a href=\"https://sotto.fm/romero\">sotto.fm</a> · <a href=\"https://sotto.fm/pitch\">Pitch</a> · <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">Run</a>"
