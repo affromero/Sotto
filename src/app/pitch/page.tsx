@@ -125,13 +125,23 @@ export default function PitchPage() {
   useEffect(() => {
     if (state !== 'unlocked') return;
 
+    const SCROLL_STEP = 80;
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      if (e.key === 'ArrowRight') {
         e.preventDefault();
         goNext();
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         goPrev();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const delta = e.key === 'ArrowDown' ? SCROLL_STEP : -SCROLL_STEP;
+        try {
+          getActiveIframe()?.contentWindow?.scrollBy(0, delta);
+        } catch {
+          /* cross-origin guard */
+        }
       } else if (e.key === 'Escape') {
         setTocOpen(false);
       }
@@ -139,7 +149,7 @@ export default function PitchPage() {
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [state, goNext, goPrev]);
+  }, [state, goNext, goPrev, getActiveIframe]);
 
   // Trackpad swipe detection (wheel events)
   useEffect(() => {
