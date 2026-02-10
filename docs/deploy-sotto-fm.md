@@ -976,6 +976,78 @@ When you're done testing and want real money:
 
 ---
 
+## Step 4C: Set Up OAuth Providers (Social Login)
+
+> **What we're doing:** Configuring Google, GitHub, and Apple so users can sign in with their existing accounts instead of creating a new password. Each provider requires you to register an "OAuth app" on their platform and get a **Client ID** + **Client Secret** pair. Our auth buttons only appear for providers that have credentials configured — if you skip a provider, its button won't show.
+
+### Google OAuth
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create a project (or select an existing one)
+3. Click **Create Credentials → OAuth client ID**
+4. Application type: **Web application**
+5. Name: `Sotto`
+6. Authorized JavaScript origins: `https://sotto.fm`
+7. Authorized redirect URIs: `https://sotto.fm/api/auth/callback/google`
+8. Click **Create** — copy the Client ID and Client Secret
+9. Add to `.env`:
+
+```env
+GOOGLE_CLIENT_ID=xxxxxxxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
+```
+
+**Note:** You also need to configure the **OAuth consent screen** (APIs & Services → OAuth consent screen). Set it to "External", add your app name, support email, and the `sotto.fm` domain. For testing, add your email as a test user. Once ready for production, submit for verification.
+
+### GitHub OAuth
+
+1. Go to [GitHub → Developer Settings → OAuth Apps](https://github.com/settings/developers)
+2. Click **New OAuth App**
+3. Application name: `Sotto`
+4. Homepage URL: `https://sotto.fm`
+5. Authorization callback URL: `https://sotto.fm/api/auth/callback/github`
+6. Click **Register application**
+7. Copy the Client ID, then click **Generate a new client secret** and copy it
+8. Add to `.env`:
+
+```env
+GITHUB_CLIENT_ID=Iv1.xxxxxxxxxxxxx
+GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxx
+```
+
+### Apple Sign In (optional)
+
+Apple Sign In requires an Apple Developer account ($99/year).
+
+1. Go to [Apple Developer → Certificates, IDs & Profiles](https://developer.apple.com/account/resources/identifiers/list)
+2. Register an **App ID** with "Sign In with Apple" capability enabled
+3. Register a **Services ID** (this becomes your Client ID):
+   - Identifier: `com.sotto.web` (or similar)
+   - Enable "Sign In with Apple" and configure:
+     - Domains: `sotto.fm`
+     - Return URL: `https://sotto.fm/api/auth/callback/apple`
+4. Create a **Key** with "Sign In with Apple" enabled — download the `.p8` file
+5. Generate the client secret (Apple uses a JWT-based secret — see [Apple's docs](https://developer.apple.com/documentation/sign_in_with_apple/generate_and_validate_tokens) or use a tool like [apple-signin-auth](https://github.com/nicklockwood/apple-signin-auth))
+6. Add to `.env`:
+
+```env
+APPLE_CLIENT_ID=com.sotto.web
+APPLE_CLIENT_SECRET=<generated JWT secret>
+```
+
+### Verify OAuth configuration
+
+After setting credentials and restarting the app, verify which providers are active:
+
+```bash
+curl -s https://sotto.fm/api/auth/providers | python3 -m json.tool
+# Should list only the providers you configured
+```
+
+The login/signup pages automatically show buttons only for configured providers.
+
+---
+
 ## Step 5: Build & Deploy
 
 > **What we're doing:** Docker reads our `Dockerfile` (a recipe for building the app) and creates **images** — frozen snapshots that contain our Next.js app, all its npm dependencies, and the compiled production build. Then Docker Compose starts 4 **containers** (running instances) from these images, plus PostgreSQL and Redis. This is the equivalent of running `npm run dev` locally, but in a production-optimized, isolated environment.
