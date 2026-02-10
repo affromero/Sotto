@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure uv is on PATH (installed to ~/.local/bin by default)
+export PATH="$HOME/.local/bin:$PATH"
+
+# ── Install dependencies if missing ──────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+bash "$SCRIPT_DIR/install-deps.sh"
+
 # ── Configuration ──────────────────────────────────────────────────
 APP_URL="${APP_URL:-http://localhost:3000}"
 TODAY=$(date +%Y-%m-%d)
@@ -116,7 +123,7 @@ HEADER
   )
 
   for name in "${DESKTOP_ORDER[@]}"; do
-    url=$(python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
+    url=$(uv run python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
     label="${DESKTOP_LABELS[$name]}"
     if [ -n "$url" ]; then
       cat >> "$SHOWCASE_FILE" << EOF
@@ -134,7 +141,7 @@ EOF
 
   has_mobile=false
   for name in "${MOBILE_NAMES[@]}"; do
-    url=$(python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
+    url=$(uv run python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
     if [ -n "$url" ]; then
       has_mobile=true
       break
@@ -151,7 +158,7 @@ EOF
     for i in "${!MOBILE_NAMES[@]}"; do
       name="${MOBILE_NAMES[$i]}"
       label="${MOBILE_LABELS[$i]}"
-      url=$(python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
+      url=$(uv run python3 -c "import json,sys; m=json.load(open('$MANIFEST_FILE')); print(m.get('$name',''))" 2>/dev/null || echo "")
       if [ -n "$url" ]; then
         row+="![Mobile ${label}](${url}) | "
       else
@@ -169,11 +176,6 @@ echo ""
 # ── Step 4: Build HTML ────────────────────────────────────────────
 echo "=== Step 4: Build HTML ==="
 
-if ! command -v pandoc &> /dev/null; then
-  echo "Error: pandoc not found. Install with: sudo apt install pandoc"
-  echo "Skipping HTML conversion — manifest will not be generated."
-  exit 1
-fi
 
 mkdir -p "$BUILD_DIR"
 
@@ -298,7 +300,7 @@ for entry in "${DOCS[@]}"; do
     doc_json+=","
   fi
 
-  doc_json+=$(python3 -c "
+  doc_json+=$(uv run python3 -c "
 import json
 print(json.dumps({
     'filename': '$html_name',
@@ -312,7 +314,7 @@ done
 doc_json+="]"
 
 # Create version entry
-new_version=$(python3 -c "
+new_version=$(uv run python3 -c "
 import json
 print(json.dumps({
     'date': '$TODAY',
@@ -323,7 +325,7 @@ print(json.dumps({
 
 # Merge with existing manifest
 if [ -f "$PITCH_MANIFEST" ]; then
-  python3 -c "
+  uv run python3 -c "
 import json, sys
 
 with open('$PITCH_MANIFEST') as f:
@@ -344,7 +346,7 @@ with open('$PITCH_MANIFEST', 'w') as f:
 print('Updated existing manifest')
 "
 else
-  python3 -c "
+  uv run python3 -c "
 import json
 manifest = {
     'versions': [json.loads('''$new_version''')],
