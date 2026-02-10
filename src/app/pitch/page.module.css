@@ -289,22 +289,146 @@
   font-weight: 500;
 }
 
-/* Document content */
+/* Document content — dual-iframe container */
 .content {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  position: relative;
+  overflow: hidden;
 }
 
-.iframe {
-  flex: 1;
+.iframeContainer {
+  position: absolute;
+  inset: 0;
+}
+
+.swipeOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  cursor: grab;
+}
+
+.swipeOverlay:active {
+  cursor: grabbing;
+}
+
+/* Iframe slots (A and B) */
+.iframeSlot {
+  position: absolute;
+  inset: 0;
+  will-change: transform, opacity;
+  background: var(--color-background);
+}
+
+/* Loading spinner inside slot (visible while iframe loads) */
+.iframeSlot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  z-index: 0;
+}
+
+.iframeSlot iframe {
+  position: relative;
   width: 100%;
+  height: 100%;
   border: none;
+  z-index: 1;
+}
+
+.slotActive {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  z-index: 2;
+}
+
+.slotHidden {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Slide animations */
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30%) scale(0.95);
+    opacity: 0.3;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(30%) scale(0.95);
+    opacity: 0.3;
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0.8;
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.15);
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+    box-shadow: none;
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0.8;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.15);
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+    box-shadow: none;
+  }
+}
+
+.slideOutLeft {
+  animation: slideOutLeft 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 2;
+}
+
+.slideOutRight {
+  animation: slideOutRight 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 2;
+}
+
+.slideInFromRight {
+  animation: slideInFromRight 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 3;
+}
+
+.slideInFromLeft {
+  animation: slideInFromLeft 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  z-index: 3;
 }
 
 .emptyState {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;

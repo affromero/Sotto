@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import styles from './page.module.css';
 import type { PitchManifest, PitchDocument } from '@/types/pitch';
+
+const ANIMATION_DURATION = 400;
+const SWIPE_THRESHOLD = 80;
+const SWIPE_TIMEOUT = 200;
+const TOUCH_MIN_DISTANCE = 50;
+
+type SlotId = 'A' | 'B';
+type AnimDirection = 'left' | 'right';
 
 export default function PitchPage() {
   const [state, setState] = useState<'loading' | 'locked' | 'unlocked' | 'empty'>('loading');
@@ -11,10 +19,23 @@ export default function PitchPage() {
   const [docIndex, setDocIndex] = useState(0);
   const [tocOpen, setTocOpen] = useState(false);
 
+  // Dual-iframe slot state
+  const [activeSlot, setActiveSlot] = useState<SlotId>('A');
+  const [slotAIndex, setSlotAIndex] = useState(0);
+  const [slotBIndex, setSlotBIndex] = useState(-1);
+  const [animating, setAnimating] = useState(false);
+  const [animDirection, setAnimDirection] = useState<AnimDirection | null>(null);
+
   // Password gate state
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Refs for swipe detection
+  const contentRef = useRef<HTMLDivElement>(null);
+  const swipeDeltaRef = useRef(0);
+  const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const currentVersion = manifest?.versions.find((v) => v.date === selectedVersion);
   const documents = currentVersion?.documents ?? [];
@@ -22,19 +43,76 @@ export default function PitchPage() {
   const hasPrev = docIndex > 0;
   const hasNext = docIndex < documents.length - 1;
 
+  const navigate = useCallback(
+    (direction: AnimDirection) => {
+      if (animating) return;
+
+      const targetIndex = direction === 'left' ? docIndex + 1 : docIndex - 1;
+      if (targetIndex < 0 || targetIndex >= documents.length) return;
+
+      // Load target page into the inactive slot
+      const inactiveSlot = activeSlot === 'A' ? 'B' : 'A';
+      if (inactiveSlot === 'A') {
+        setSlotAIndex(targetIndex);
+      } else {
+        setSlotBIndex(targetIndex);
+      }
+
+      // Start animation
+      setAnimating(true);
+      setAnimDirection(direction);
+
+      // After animation completes, swap slots and update state
+      setTimeout(() => {
+        setActiveSlot(inactiveSlot);
+        setDocIndex(targetIndex);
+        setAnimating(false);
+        setAnimDirection(null);
+        setTocOpen(false);
+      }, ANIMATION_DURATION);
+    },
+    [animating, docIndex, documents.length, activeSlot]
+  );
+
   const goNext = useCallback(() => {
     if (docIndex < documents.length - 1) {
-      setDocIndex((i) => i + 1);
-      setTocOpen(false);
+      navigate('left');
     }
-  }, [docIndex, documents.length]);
+  }, [docIndex, documents.length, navigate]);
 
   const goPrev = useCallback(() => {
     if (docIndex > 0) {
-      setDocIndex((i) => i - 1);
-      setTocOpen(false);
+      navigate('right');
     }
-  }, [docIndex]);
+  }, [docIndex, navigate]);
+
+  const jumpToDoc = useCallback(
+    (index: number) => {
+      if (animating || index === docIndex) return;
+
+      const direction: AnimDirection = index > docIndex ? 'left' : 'right';
+
+      // Load target page into inactive slot
+      const inactiveSlot = activeSlot === 'A' ? 'B' : 'A';
+      if (inactiveSlot === 'A') {
+        setSlotAIndex(index);
+      } else {
+        setSlotBIndex(index);
+      }
+
+      setAnimating(true);
+      setAnimDirection(direction);
+
+      setTimeout(() => {
+        setActiveSlot(inactiveSlot);
+        setDocIndex(index);
+        setAnimating(false);
+        setAnimDirection(null);
+        setTocOpen(false);
+      }, ANIMATION_DURATION);
+    },
+    [animating, docIndex, activeSlot]
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -54,6 +132,98 @@ export default function PitchPage() {
 
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
+  }, [state, goNext, goPrev]);
+
+  // Trackpad swipe detection (wheel events)
+  useEffect(() => {
+    if (state !== 'unlocked') return;
+
+    const el = contentRef.current;
+    if (!el) return;
+
+    function handleWheel(e: WheelEvent) {
+      // Only handle pixel-based (trackpad), not line-based (mouse wheel)
+      if (e.deltaMode !== 0) return;
+
+      const absX = Math.abs(e.deltaX);
+      const absY = Math.abs(e.deltaY);
+
+      // Filter out vertical-dominant scrolling
+      if (absY > 2 * absX) return;
+      // Ignore tiny movements
+      if (absX < 2) return;
+
+      e.preventDefault();
+
+      swipeDeltaRef.current += e.deltaX;
+
+      // Reset accumulator after inactivity
+      if (swipeTimerRef.current) {
+        clearTimeout(swipeTimerRef.current);
+      }
+      swipeTimerRef.current = setTimeout(() => {
+        swipeDeltaRef.current = 0;
+      }, SWIPE_TIMEOUT);
+
+      if (swipeDeltaRef.current > SWIPE_THRESHOLD) {
+        swipeDeltaRef.current = 0;
+        goNext();
+      } else if (swipeDeltaRef.current < -SWIPE_THRESHOLD) {
+        swipeDeltaRef.current = 0;
+        goPrev();
+      }
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+      if (swipeTimerRef.current) clearTimeout(swipeTimerRef.current);
+    };
+  }, [state, goNext, goPrev]);
+
+  // Touch swipe detection
+  useEffect(() => {
+    if (state !== 'unlocked') return;
+
+    const el = contentRef.current;
+    if (!el) return;
+
+    function handleTouchStart(e: TouchEvent) {
+      if (e.touches.length !== 1) return;
+      touchStartRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+
+    function handleTouchEnd(e: TouchEvent) {
+      if (!touchStartRef.current) return;
+      if (e.changedTouches.length !== 1) return;
+
+      const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
+      const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
+      touchStartRef.current = null;
+
+      const absDx = Math.abs(dx);
+      const absDy = Math.abs(dy);
+
+      // Must be mostly horizontal and meet minimum distance
+      if (absDx < TOUCH_MIN_DISTANCE) return;
+      if (absDy > absDx * 0.577) return; // ~30 degrees from horizontal
+
+      if (dx < 0) {
+        goNext(); // swipe left → next
+      } else {
+        goPrev(); // swipe right → prev
+      }
+    }
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchend', handleTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchend', handleTouchEnd);
+    };
   }, [state, goNext, goPrev]);
 
   useEffect(() => {
@@ -80,6 +250,9 @@ export default function PitchPage() {
       if (data.latest) {
         setSelectedVersion(data.latest);
         setDocIndex(0);
+        setSlotAIndex(0);
+        setSlotBIndex(-1);
+        setActiveSlot('A');
       }
       setState('unlocked');
     } catch {
@@ -116,12 +289,41 @@ export default function PitchPage() {
   function handleVersionChange(date: string) {
     setSelectedVersion(date);
     setDocIndex(0);
+    setSlotAIndex(0);
+    setSlotBIndex(-1);
+    setActiveSlot('A');
+    setAnimating(false);
+    setAnimDirection(null);
     setTocOpen(false);
   }
 
-  function jumpToDoc(index: number) {
-    setDocIndex(index);
-    setTocOpen(false);
+  function getSlotClassName(slot: SlotId): string {
+    const isActive = slot === activeSlot;
+
+    if (!animating) {
+      return `${styles.iframeSlot} ${isActive ? styles.slotActive : styles.slotHidden}`;
+    }
+
+    // During animation
+    if (isActive) {
+      // Current page slides out
+      const outClass = animDirection === 'left' ? styles.slideOutLeft : styles.slideOutRight;
+      return `${styles.iframeSlot} ${outClass}`;
+    } else {
+      // Incoming page slides in
+      const inClass = animDirection === 'left' ? styles.slideInFromRight : styles.slideInFromLeft;
+      return `${styles.iframeSlot} ${inClass}`;
+    }
+  }
+
+  function getIframeSrc(index: number): string {
+    if (index < 0 || index >= documents.length) return 'about:blank';
+    return `/api/pitch/${selectedVersion}/${documents[index].filename}`;
+  }
+
+  function getIframeTitle(index: number): string {
+    if (index < 0 || index >= documents.length) return '';
+    return documents[index].displayName;
   }
 
   if (state === 'loading') {
@@ -242,15 +444,27 @@ export default function PitchPage() {
         </>
       )}
 
-      {/* Document content */}
-      <main className={styles.content}>
-        {selectedDoc ? (
-          <iframe
-            key={`${selectedVersion}-${selectedDoc.filename}`}
-            className={styles.iframe}
-            src={`/api/pitch/${selectedVersion}/${selectedDoc.filename}`}
-            title={selectedDoc.displayName}
-          />
+      {/* Document content — dual-iframe slots */}
+      <main className={styles.content} ref={contentRef}>
+        {documents.length > 0 ? (
+          <div className={styles.iframeContainer}>
+            {/* Swipe overlay captures wheel/touch events above iframes */}
+            <div className={styles.swipeOverlay} />
+
+            {/* Slot A */}
+            <div className={getSlotClassName('A')}>
+              {slotAIndex >= 0 && (
+                <iframe src={getIframeSrc(slotAIndex)} title={getIframeTitle(slotAIndex)} />
+              )}
+            </div>
+
+            {/* Slot B */}
+            <div className={getSlotClassName('B')}>
+              {slotBIndex >= 0 && (
+                <iframe src={getIframeSrc(slotBIndex)} title={getIframeTitle(slotBIndex)} />
+              )}
+            </div>
+          </div>
         ) : (
           <div className={styles.emptyState}>
             No documents in this build. Run /update-pitch to generate.
@@ -264,7 +478,7 @@ export default function PitchPage() {
           <button
             className={`${styles.navButton} ${!hasPrev ? styles.navButtonDisabled : ''}`}
             onClick={goPrev}
-            disabled={!hasPrev}
+            disabled={!hasPrev || animating}
             aria-label="Previous document"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -293,7 +507,7 @@ export default function PitchPage() {
           <button
             className={`${styles.navButton} ${styles.navButtonNext} ${!hasNext ? styles.navButtonDisabled : ''}`}
             onClick={goNext}
-            disabled={!hasNext}
+            disabled={!hasNext || animating}
             aria-label="Next document"
           >
             <span className={styles.navLabel}>
