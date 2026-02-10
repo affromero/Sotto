@@ -10,6 +10,7 @@ import styles from './page.module.css';
 interface ProfileUser {
   id: string;
   name: string | null;
+  handle?: string | null;
   image: string | null;
   bio: string | null;
   createdAt: string;
@@ -24,6 +25,7 @@ interface ProfileClientProps {
   followingCount: number;
   isOwnProfile: boolean;
   initialIsFollowing: boolean;
+  isAuthenticated?: boolean;
 }
 
 export function ProfileClient({
@@ -34,6 +36,7 @@ export function ProfileClient({
   followingCount,
   isOwnProfile,
   initialIsFollowing,
+  isAuthenticated = true,
 }: ProfileClientProps) {
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
@@ -68,6 +71,7 @@ export function ProfileClient({
         followingCount={followingCount}
         isOwnProfile={isOwnProfile}
         isFollowing={isFollowing}
+        isAuthenticated={isAuthenticated}
         onFollow={handleFollow}
         onEdit={handleEdit}
       />

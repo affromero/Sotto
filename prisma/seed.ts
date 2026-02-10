@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding database...');
+  console.warn('🌱 Seeding database...');
 
   // Create default tags
   const tags = [
@@ -29,7 +29,74 @@ async function main() {
     });
   }
 
-  console.log(`✅ Created ${tags.length} tags`);
+  console.warn(`✅ Created ${tags.length} tags`);
+
+  // Upsert @sotto system account
+  await prisma.user.upsert({
+    where: { email: 'system@sotto.fm' },
+    update: {
+      handle: 'sotto',
+      role: 'SYSTEM',
+      name: 'Sotto',
+      bio: 'The official Sotto account. Curated podcasts and platform highlights.',
+    },
+    create: {
+      email: 'system@sotto.fm',
+      handle: 'sotto',
+      role: 'SYSTEM',
+      name: 'Sotto',
+      bio: 'The official Sotto account. Curated podcasts and platform highlights.',
+    },
+  });
+
+  console.warn('✅ Created @sotto system account');
+
+  // Seed reserved handles
+  const reservedHandles = [
+    'sotto',
+    'admin',
+    'support',
+    'help',
+    'official',
+    'system',
+    'api',
+    'feed',
+    'create',
+    'settings',
+    'dashboard',
+    'billing',
+    'pricing',
+    'auth',
+    'login',
+    'signup',
+    'onboarding',
+    'podcast',
+    'profile',
+    'team',
+    'notifications',
+    'analytics',
+    'explore',
+    'search',
+    'trending',
+    'home',
+    'about',
+    'contact',
+    'terms',
+    'privacy',
+  ];
+
+  for (const handle of reservedHandles) {
+    await prisma.reservedHandle.upsert({
+      where: { handle },
+      update: {},
+      create: {
+        handle,
+        reason: 'System reserved',
+      },
+    });
+  }
+
+  console.warn(`✅ Reserved ${reservedHandles.length} handles`);
 }
 
 main()

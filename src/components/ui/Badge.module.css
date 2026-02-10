@@ -48,3 +48,9 @@
   background: rgba(217, 119, 6, 0.1);
   color: var(--color-primary);
 }
+
+.system {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.15), rgba(217, 119, 6, 0.08));
+  color: var(--color-primary);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}

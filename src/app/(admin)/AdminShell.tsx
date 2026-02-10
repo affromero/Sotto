@@ -11,6 +11,7 @@ import {
   Mail,
   BarChart2,
   Shield,
+  AtSign,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const navItems: NavItem[] = [
   { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
   { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/admin/handles', label: 'Handles', icon: AtSign },
   { href: '/admin/moderation', label: 'Moderation', icon: Shield },
 ];
 

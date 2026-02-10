@@ -21,6 +21,7 @@ export default async function SettingsPage() {
       select: {
         name: true,
         email: true,
+        handle: true,
         image: true,
         bio: true,
         twitterHandle: true,
@@ -69,6 +70,7 @@ export default async function SettingsPage() {
       <SettingsForm
         initialName={user.name ?? ''}
         initialBio={user.bio ?? ''}
+        initialHandle={user.handle ?? ''}
         email={user.email}
         image={user.image}
         connectedProviders={connectedProviders}

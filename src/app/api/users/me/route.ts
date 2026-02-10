@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isHandleAvailable } from '@/lib/handles';
+import { handleSchema } from '@/lib/validations';
 import { z } from 'zod';
 
 const updateUserSchema = z
@@ -12,6 +14,7 @@ const updateUserSchema = z
       .optional(),
     bio: z.string().max(500).optional(),
     image: z.string().url().optional(),
+    handle: handleSchema.optional(),
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
     interests: z.array(z.string()).max(12).optional(),
@@ -37,6 +40,7 @@ export async function GET(_request: NextRequest) {
       id: user.id,
       name: user.name,
       email: user.email,
+      handle: user.handle,
       image: user.image,
       bio: user.bio,
       createdAt: user.createdAt.toISOString(),
@@ -65,13 +69,31 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
-    const { interests, ...data } = validation.data;
+    const { interests, handle, ...data } = validation.data;
+
+    // Validate handle availability if changing it
+    if (handle !== undefined) {
+      const currentUser = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { handle: true },
+      });
+      if (currentUser?.handle !== handle) {
+        const availability = await isHandleAvailable(handle);
+        if (!availability.available) {
+          return NextResponse.json(
+            { error: availability.reason || 'Handle is not available' },
+            { status: 409 }
+          );
+        }
+      }
+    }
 
     const updatedUser = await prisma.$transaction(async (tx) => {
-      // Update user profile fields
+      // Update user profile fields (including handle if provided)
+      const updateData = handle !== undefined ? { ...data, handle } : data;
       const user = await tx.user.update({
         where: { id: session.user.id },
-        data,
+        data: updateData,
       });
 
       // Update interests if provided
@@ -112,6 +134,7 @@ export async function PATCH(request: NextRequest) {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
+      handle: updatedUser.handle,
       image: updatedUser.image,
       bio: updatedUser.bio,
       createdAt: updatedUser.createdAt.toISOString(),

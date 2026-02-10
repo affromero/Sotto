@@ -111,6 +111,13 @@
   color: var(--color-text-primary);
 }
 
+/* Handle */
+.handle {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
 /* Bio */
 .bio {
   font: var(--text-body);

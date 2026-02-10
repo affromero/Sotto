@@ -6,7 +6,7 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 
 | Directory        | Components                                                                                                         | Purpose                                              |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
-| `ui/`            | Button, Input, Card, Modal, Toast, Badge (+ creator/admin variants), Chip, Spinner, CitationMarker                 | Shared primitives                                    |
+| `ui/`            | Button, Input, Card, Modal, Toast, Badge (+ creator/admin/system variants), Chip, Spinner, CitationMarker          | Shared primitives                                    |
 | `layout/`        | TopBar, Footer, Sidebar, MobileNav                                                                                 | App shell                                            |
 | `player/`        | AudioPlayer, MiniPlayer, Waveform, PlaybackControls, TranscriptPanel, InterruptButton, ReferenceList, Teleprompter | Podcast playback + transcript                        |
 | `chat/`          | ChatContainer, ChatMessage, ChatChips, ResolutionPrompt                                                            | Chat UI                                              |
