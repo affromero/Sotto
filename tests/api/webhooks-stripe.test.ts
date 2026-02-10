@@ -367,7 +367,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-1',
         userId: 'user-1',
         currentPeriodEnd: new Date(1706745600 * 1000),
@@ -380,6 +381,9 @@ describe('POST /api/webhooks/stripe', () => {
       expect(response.status).toBe(200);
       expect(body).toEqual({ received: true });
 
+      expect(mockSubscriptionFindFirst).toHaveBeenCalledWith({
+        where: { voiceCreatorAddonStripeSubscriptionId: 'sub_123' },
+      });
       expect(mockSubscriptionFindFirst).toHaveBeenCalledWith({
         where: { stripeSubscriptionId: 'sub_123' },
       });
@@ -419,7 +423,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-2',
         userId: 'user-2',
         currentPeriodEnd: new Date(1706745600 * 1000),
@@ -459,7 +464,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-3',
         userId: 'user-3',
         currentPeriodEnd: new Date(1706745600 * 1000),
@@ -494,7 +500,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-4',
         userId: 'user-4',
         currentPeriodEnd: new Date(1706745600 * 1000),
@@ -529,7 +536,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-5',
         userId: 'user-5',
         currentPeriodEnd: new Date(1706745600 * 1000),
@@ -562,7 +570,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue({
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
         id: 'subscription-db-6',
         userId: 'user-6',
         currentPeriodEnd: new Date(1709337600 * 1000),
@@ -591,7 +600,8 @@ describe('POST /api/webhooks/stripe', () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockSubscriptionFindFirst.mockResolvedValue(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
+      mockSubscriptionFindFirst.mockResolvedValueOnce(null);
 
       const response = await POST(createRequest(JSON.stringify(event), 'sig_123'));
       const body = await response.json();
@@ -716,6 +726,106 @@ describe('POST /api/webhooks/stripe', () => {
 
       expect(response.status).toBe(200);
       expect(body).toEqual({ received: true });
+    });
+  });
+
+  describe('voice creator addon lifecycle', () => {
+    it('activates addon on checkout.session.completed with type voice_creator_addon', async () => {
+      const event = {
+        id: 'evt_addon_checkout',
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            customer: 'cus_addon',
+            subscription: 'sub_addon_123',
+            metadata: { userId: 'user-addon', type: 'voice_creator_addon' },
+          },
+        },
+      };
+
+      mockConstructEvent.mockReturnValue(event);
+      mockSubscriptionUpdate.mockResolvedValue({});
+
+      const response = await POST(createRequest(JSON.stringify(event), 'sig_123'));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ received: true });
+      expect(mockSubscriptionUpdate).toHaveBeenCalledWith({
+        where: { userId: 'user-addon' },
+        data: {
+          voiceCreatorAddonActive: true,
+          voiceCreatorAddonStripeSubscriptionId: 'sub_addon_123',
+        },
+      });
+      expect(mockSubscriptionsRetrieve).not.toHaveBeenCalled();
+    });
+
+    it('updates addon active status on subscription.updated', async () => {
+      const event = {
+        id: 'evt_addon_updated',
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            id: 'sub_addon_123',
+            status: 'active',
+            items: { data: [{ price: { id: 'price_addon' } }] },
+            current_period_start: 1706745600,
+            current_period_end: 1709337600,
+            cancel_at_period_end: false,
+          },
+        },
+      };
+
+      mockConstructEvent.mockReturnValue(event);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
+        id: 'subscription-addon-db',
+        userId: 'user-addon',
+      });
+      mockSubscriptionUpdate.mockResolvedValue({});
+
+      const response = await POST(createRequest(JSON.stringify(event), 'sig_123'));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ received: true });
+      expect(mockSubscriptionUpdate).toHaveBeenCalledWith({
+        where: { id: 'subscription-addon-db' },
+        data: { voiceCreatorAddonActive: true },
+      });
+    });
+
+    it('deactivates addon on subscription.deleted', async () => {
+      const event = {
+        id: 'evt_addon_deleted',
+        type: 'customer.subscription.deleted',
+        data: {
+          object: {
+            id: 'sub_addon_123',
+          },
+        },
+      };
+
+      mockConstructEvent.mockReturnValue(event);
+      mockSubscriptionFindFirst.mockResolvedValueOnce({
+        id: 'subscription-addon-db',
+        userId: 'user-addon',
+      });
+      mockSubscriptionUpdate.mockResolvedValue({});
+
+      const response = await POST(createRequest(JSON.stringify(event), 'sig_123'));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({ received: true });
+      expect(mockSubscriptionUpdate).toHaveBeenCalledWith({
+        where: { id: 'subscription-addon-db' },
+        data: {
+          voiceCreatorAddonActive: false,
+          voiceCreatorAddonStripeSubscriptionId: null,
+        },
+      });
+      expect(mockSubscriptionUpdateMany).not.toHaveBeenCalled();
     });
   });
 

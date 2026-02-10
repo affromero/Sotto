@@ -59,6 +59,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // Detect shared voices (voice clones owned by other users)
+  const voiceIdsToCheck = [podcast.hostVoiceId, podcast.expertVoiceId].filter(
+    (id): id is string => !!id
+  );
+  let sharedVoiceCount = 0;
+  if (voiceIdsToCheck.length > 0) {
+    const foreignClones = await prisma.voiceClone.findMany({
+      where: {
+        elevenLabsVoiceId: { in: voiceIdsToCheck },
+        userId: { not: authResult.userId },
+      },
+      select: { elevenLabsVoiceId: true },
+    });
+    sharedVoiceCount = foreignClones.length;
+  }
+
   // Check credit balance and consume credits
   const subscription = await prisma.subscription.findUnique({
     where: { userId: authResult.userId },
@@ -70,16 +86,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     select: { role: true },
   });
 
-  const check = canGenerate(creditsBalance, podcast.usePremiumVoice, tier, user?.role);
+  const check = canGenerate(
+    creditsBalance,
+    podcast.usePremiumVoice,
+    tier,
+    user?.role,
+    sharedVoiceCount
+  );
   if (!check.allowed) {
     return NextResponse.json({ error: check.reason }, { status: 402 });
   }
 
   try {
+    const sharedNote = sharedVoiceCount > 0 ? ` + ${sharedVoiceCount} shared voice surcharge` : '';
     await consumeCredit(
       authResult.userId,
       check.cost,
-      `Podcast generation${podcast.usePremiumVoice ? ' (premium voice)' : ''}`,
+      `Podcast generation${podcast.usePremiumVoice ? ' (premium voice)' : ''}${sharedNote}`,
       podcastId
     );
   } catch {
@@ -88,6 +111,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { status: 402 }
     );
   }
+
+  // Store credit cost on podcast for accurate refunds
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { creditCost: check.cost },
+  });
 
   // For FAILED podcasts, clean up old failed jobs
   if (podcast.status === 'FAILED') {

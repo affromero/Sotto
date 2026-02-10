@@ -218,3 +218,18 @@ export const createVoiceRequestSchema = z.object({
 export const updateVoiceRequestSchema = z.object({
   status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
 });
+
+/**
+ * Voice allowlist validation
+ */
+export const addToAllowlistSchema = z.object({
+  voiceCloneId: z.string().min(1),
+  handle: z.string().min(3).max(30),
+});
+
+/**
+ * User search validation
+ */
+export const userSearchSchema = z.object({
+  handle: z.string().min(2).max(30),
+});

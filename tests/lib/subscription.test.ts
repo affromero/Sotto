@@ -41,6 +41,8 @@ const mockSubscription = (overrides: Record<string, unknown> = {}) => ({
   creditsMonthly: 10,
   rolloverCredits: 0,
   maxRollover: 3,
+  voiceCreatorAddonActive: false,
+  voiceCreatorAddonStripeSubscriptionId: null,
   cancelAtPeriodEnd: false,
   currentPeriodStart: new Date(),
   currentPeriodEnd: new Date(),

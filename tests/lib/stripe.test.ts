@@ -8,6 +8,7 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(5);
     expect(TIER_LIMITS.FREE.maxVoiceClones).toBe(0);
     expect(TIER_LIMITS.FREE.premiumVoiceSurcharge).toBe(0);
+    expect(TIER_LIMITS.FREE.sharedVoiceSurcharge).toBe(0);
     expect(TIER_LIMITS.FREE.canDownload).toBe(false);
     expect(TIER_LIMITS.FREE.canMakePrivate).toBe(false);
     expect(TIER_LIMITS.FREE.canBrowseVoiceLibrary).toBe(false);
@@ -21,6 +22,7 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STARTER.maxRollover).toBe(1);
     expect(TIER_LIMITS.STARTER.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.STARTER.maxVoiceClones).toBe(1);
+    expect(TIER_LIMITS.STARTER.sharedVoiceSurcharge).toBe(1);
     expect(TIER_LIMITS.STARTER.canDownload).toBe(true);
     expect(TIER_LIMITS.STARTER.canMakePrivate).toBe(false);
   });
@@ -30,6 +32,7 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.PRO.maxRollover).toBe(3);
     expect(TIER_LIMITS.PRO.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(3);
+    expect(TIER_LIMITS.PRO.sharedVoiceSurcharge).toBe(1);
     expect(TIER_LIMITS.PRO.canDownload).toBe(true);
     expect(TIER_LIMITS.PRO.canMakePrivate).toBe(true);
     expect(TIER_LIMITS.PRO.canBrowseVoiceLibrary).toBe(true);
@@ -43,6 +46,7 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STUDIO.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.STUDIO.maxVoiceClones).toBe(10);
     expect(TIER_LIMITS.STUDIO.premiumVoiceSurcharge).toBe(0);
+    expect(TIER_LIMITS.STUDIO.sharedVoiceSurcharge).toBe(1);
     expect(TIER_LIMITS.STUDIO.canDownload).toBe(true);
     expect(TIER_LIMITS.STUDIO.canMakePrivate).toBe(true);
     expect(TIER_LIMITS.STUDIO.canBrowseVoiceLibrary).toBe(true);
@@ -50,6 +54,10 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STUDIO.canViewAnalytics).toBe(true);
     expect(TIER_LIMITS.STUDIO.canExportPdf).toBe(true);
     expect(TIER_LIMITS.STUDIO.hasPremiumSfx).toBe(true);
+  });
+
+  it('ADMIN tier has zero sharedVoiceSurcharge', () => {
+    expect(TIER_LIMITS.ADMIN.sharedVoiceSurcharge).toBe(0);
   });
 });
 
@@ -93,6 +101,50 @@ describe('canGenerate', () => {
     it('always allows generation for ADMIN role', () => {
       const result = canGenerate(0, true, 'FREE', 'ADMIN');
       // ADMIN tier has Infinity credits concept — cost is 1 (0 surcharge)
+      expect(result.cost).toBe(1);
+    });
+  });
+
+  describe('shared voice surcharge', () => {
+    it('adds 1 credit surcharge per shared voice on STUDIO tier', () => {
+      const result = canGenerate(5, false, 'STUDIO', undefined, 1);
+      expect(result.allowed).toBe(true);
+      expect(result.cost).toBe(2);
+    });
+
+    it('adds 2 credit surcharge for 2 shared voices on STUDIO tier', () => {
+      const result = canGenerate(5, false, 'STUDIO', undefined, 2);
+      expect(result.allowed).toBe(true);
+      expect(result.cost).toBe(3);
+    });
+
+    it('blocks when insufficient credits for shared voice surcharge', () => {
+      const result = canGenerate(1, false, 'PRO', undefined, 2);
+      expect(result.allowed).toBe(false);
+      expect(result.cost).toBe(3);
+    });
+
+    it('no surcharge for shared voices on FREE tier', () => {
+      const result = canGenerate(1, false, 'FREE', undefined, 1);
+      expect(result.allowed).toBe(true);
+      expect(result.cost).toBe(1);
+    });
+
+    it('no surcharge for shared voices for ADMIN role', () => {
+      const result = canGenerate(1, false, 'FREE', 'ADMIN', 2);
+      expect(result.allowed).toBe(true);
+      expect(result.cost).toBe(1);
+    });
+
+    it('combines premium and shared voice surcharges', () => {
+      const result = canGenerate(5, true, 'STUDIO', undefined, 1);
+      expect(result.allowed).toBe(true);
+      expect(result.cost).toBe(2); // premium surcharge is 0, shared is 1
+    });
+
+    it('defaults to 0 shared voices when omitted', () => {
+      const result = canGenerate(1, false, 'STUDIO');
+      expect(result.allowed).toBe(true);
       expect(result.cost).toBe(1);
     });
   });

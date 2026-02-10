@@ -8,6 +8,9 @@ const mockVoiceCloneFindUnique = vi.fn();
 const mockVoiceCloneCreate = vi.fn();
 const mockVoiceCloneDelete = vi.fn();
 const mockSubscriptionFindUnique = vi.fn();
+const mockVoiceAllowlistFindMany = vi.fn();
+const mockVoiceRequestFindMany = vi.fn();
+const mockVoiceRequestDeleteMany = vi.fn();
 const mockCloneVoice = vi.fn();
 const mockDeleteClonedVoice = vi.fn();
 const mockGenerateSpeech = vi.fn();
@@ -28,6 +31,13 @@ vi.mock('@/lib/prisma', () => ({
     },
     subscription: {
       findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
+    },
+    voiceAllowlist: {
+      findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
+    },
+    voiceRequest: {
+      findMany: (...args: unknown[]) => mockVoiceRequestFindMany(...args),
+      deleteMany: (...args: unknown[]) => mockVoiceRequestDeleteMany(...args),
     },
   },
 }));
@@ -111,6 +121,8 @@ const mockVoiceClone2 = {
 describe('GET /api/voices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockVoiceAllowlistFindMany.mockResolvedValue([]);
+    mockVoiceRequestFindMany.mockResolvedValue([]);
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -234,6 +246,37 @@ describe('GET /api/voices', () => {
       total: 20,
       remaining: 16,
     });
+  });
+
+  it('returns sharedVoices including allowlisted voices', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockVoiceCloneFindMany.mockResolvedValue([]);
+    mockVoiceRequestFindMany.mockResolvedValue([]);
+    mockVoiceAllowlistFindMany.mockResolvedValue([
+      {
+        voiceClone: {
+          id: 'clone-shared',
+          name: 'Shared Voice',
+          elevenLabsVoiceId: 'el-shared-1',
+          sourceType: 'UPLOAD',
+          createdAt: new Date('2026-01-10T00:00:00Z'),
+          user: { id: 'user-other', name: 'Other User' },
+        },
+      },
+    ]);
+    mockSubscriptionFindUnique.mockResolvedValue({
+      userId: 'user-1',
+      tier: 'STUDIO',
+      status: 'ACTIVE',
+      premiumCreditsUsed: 0,
+    });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.sharedVoices).toHaveLength(1);
+    expect(body.sharedVoices[0].name).toBe('Shared Voice');
+    expect(body.sharedVoices[0].owner.id).toBe('user-other');
   });
 });
 
@@ -571,6 +614,7 @@ describe('DELETE /api/voices/clone', () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindUnique.mockResolvedValue(mockVoiceClone);
     mockDeleteClonedVoice.mockResolvedValue(undefined);
+    mockVoiceRequestDeleteMany.mockResolvedValue({ count: 0 });
     mockVoiceCloneDelete.mockResolvedValue(mockVoiceClone);
 
     const request = createRequest('http://localhost:3000/api/voices/clone', {
@@ -583,6 +627,9 @@ describe('DELETE /api/voices/clone', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
     expect(mockDeleteClonedVoice).toHaveBeenCalledWith('el-voice-1');
+    expect(mockVoiceRequestDeleteMany).toHaveBeenCalledWith({
+      where: { voiceCloneId: 'clone-1' },
+    });
     expect(mockVoiceCloneDelete).toHaveBeenCalledWith({
       where: { id: 'clone-1' },
     });

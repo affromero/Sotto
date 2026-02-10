@@ -257,30 +257,31 @@ Claude generates natural HOST segment addressing Q&A
 
 ## Database Schema (Key Models)
 
-| Model                | Purpose                                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `User`               | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs              |
-| `Follow`             | Social: follower → following                                                                               |
-| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking                |
-| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                                     |
-| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                                            |
-| `Script`             | Structured JSON turns + raw markdown, versioned                                                            |
-| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                                     |
-| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                          |
-| `Interaction`        | Question at timestamp, answer, resolution status                                                           |
-| `Like` / `Save`      | Social engagement                                                                                          |
-| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                         |
-| `Subscription`       | Stripe (FREE/STARTER/PRO/STUDIO) with credit balance (Float) + rollover                                    |
-| `CreditTransaction`  | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases |
-| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                                       |
-| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                                        |
-| `Team`               | Team ownership + member management                                                                         |
-| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                                      |
-| `Job`                | BullMQ job tracking                                                                                        |
-| `Notification`       | In-app + push notifications                                                                                |
-| `PushSubscription`   | Web Push API endpoints                                                                                     |
-| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                     |
-| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                   |
+| Model                | Purpose                                                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`               | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs                                                     |
+| `Follow`             | Social: follower → following                                                                                                                      |
+| `Podcast`            | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, creditCost (Float?)                                  |
+| `Discovery`          | Chat metadata (audience, depth, tone, focus, duration)                                                                                            |
+| `DiscoveryMessage`   | Individual chat messages (role, content, chips)                                                                                                   |
+| `Script`             | Structured JSON turns + raw markdown, versioned                                                                                                   |
+| `Segment`            | Per-speaker audio chunk: text, audioUrl, timing, order                                                                                            |
+| `Reference`          | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                                                 |
+| `Interaction`        | Question at timestamp, answer, resolution status                                                                                                  |
+| `Like` / `Save`      | Social engagement                                                                                                                                 |
+| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                                                                |
+| `Subscription`       | Stripe (FREE/STARTER/PRO/STUDIO) with credit balance (Float) + rollover (includes voiceCreatorAddonActive, voiceCreatorAddonStripeSubscriptionId) |
+| `CreditTransaction`  | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases                                        |
+| `VoiceClone`         | User voice clones (name, ElevenLabs ID, source type)                                                                                              |
+| `VoiceAllowlist`     | Pre-approved voice access: voice clone → allowed user (Studio + Voice Creator addon)                                                              |
+| `ApiKey`             | Developer API keys (hashed, prefix, usage tracking)                                                                                               |
+| `Team`               | Team ownership + member management                                                                                                                |
+| `TeamInvite`         | Team invite tokens (PENDING/ACCEPTED/EXPIRED/REVOKED)                                                                                             |
+| `Job`                | BullMQ job tracking                                                                                                                               |
+| `Notification`       | In-app + push notifications                                                                                                                       |
+| `PushSubscription`   | Web Push API endpoints                                                                                                                            |
+| `TweetMention`       | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                                            |
+| `ApiUsageLog`        | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                                                          |
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING
 
@@ -297,6 +298,10 @@ Podcast generation costs 1 credit. Interactions cost 0.25 credits each (no per-p
 | Studio  | $69/mo | 20         | 8        | 10 min   | 10           | Premium (ElevenLabs SFX) |
 
 Credit packs available for paid tiers: 3 credits ($7), 10 credits ($20), 25 credits ($45) (one-time purchase).
+
+**Voice Creator Add-On** ($15/mo, Studio only): Pre-approve users for instant access to your voice clones via allowlist.
+
+**Shared Voice Surcharge**: Using another user's shared voice clone costs +1 credit per shared voice slot. Using your own cloned voices incurs no surcharge — included in your tier.
 
 ## Engineering Standards
 
@@ -396,6 +401,7 @@ See `.env.example` for all required/optional variables. Critical ones:
 - `ANTHROPIC_API_KEY` — Claude API key
 - `ELEVENLABS_API_KEY` — ElevenLabs TTS API key
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Payments
+- `STRIPE_PRICE_ID_VOICE_CREATOR_ADDON` — Voice Creator addon price ID
 - `R2_*` — Cloudflare R2 storage credentials
 
 Apple Sign In (optional):

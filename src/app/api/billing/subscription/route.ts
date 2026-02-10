@@ -22,6 +22,7 @@ export async function GET(_request: NextRequest) {
         currentPeriodStart: null,
         currentPeriodEnd: null,
         premiumCreditsUsed: 0,
+        voiceCreatorAddonActive: false,
         limits: TIER_LIMITS.FREE,
       });
     }
@@ -35,6 +36,7 @@ export async function GET(_request: NextRequest) {
       currentPeriodStart: subscription.currentPeriodStart?.toISOString() || null,
       currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
       premiumCreditsUsed: subscription.premiumCreditsUsed,
+      voiceCreatorAddonActive: subscription.voiceCreatorAddonActive,
       limits: TIER_LIMITS[tier],
     });
   } catch (error: unknown) {

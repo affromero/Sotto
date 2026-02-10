@@ -10,23 +10,103 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const userClones = await prisma.voiceClone.findMany({
-    where: { userId: session.user.id },
-    select: {
-      id: true,
-      name: true,
-      elevenLabsVoiceId: true,
-      sourceType: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
+  const [userClones, credits, approvedRequests, allowlistEntries] = await Promise.all([
+    prisma.voiceClone.findMany({
+      where: { userId: session.user.id },
+      select: {
+        id: true,
+        name: true,
+        elevenLabsVoiceId: true,
+        sourceType: true,
+        requestable: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    getUserVoiceCredits(session.user.id),
+    prisma.voiceRequest.findMany({
+      where: {
+        requesterId: session.user.id,
+        status: 'APPROVED',
+      },
+      select: {
+        voiceClone: {
+          select: {
+            id: true,
+            name: true,
+            elevenLabsVoiceId: true,
+            sourceType: true,
+            createdAt: true,
+            user: { select: { id: true, name: true } },
+          },
+        },
+      },
+    }),
+    prisma.voiceAllowlist.findMany({
+      where: {
+        allowedUserId: session.user.id,
+        voiceClone: {
+          user: { subscription: { voiceCreatorAddonActive: true } },
+        },
+      },
+      select: {
+        voiceClone: {
+          select: {
+            id: true,
+            name: true,
+            elevenLabsVoiceId: true,
+            sourceType: true,
+            createdAt: true,
+            user: { select: { id: true, name: true } },
+          },
+        },
+      },
+    }),
+  ]);
 
-  const credits = await getUserVoiceCredits(session.user.id);
+  // Merge approved-request voices + allowlisted voices, dedup by elevenLabsVoiceId
+  const seenVoiceIds = new Set<string>();
+  const sharedVoices: Array<{
+    id: string;
+    name: string;
+    elevenLabsVoiceId: string;
+    sourceType: string;
+    createdAt: Date;
+    owner: { id: string; name: string | null };
+  }> = [];
+
+  for (const r of approvedRequests) {
+    if (!seenVoiceIds.has(r.voiceClone.elevenLabsVoiceId)) {
+      seenVoiceIds.add(r.voiceClone.elevenLabsVoiceId);
+      sharedVoices.push({
+        id: r.voiceClone.id,
+        name: r.voiceClone.name,
+        elevenLabsVoiceId: r.voiceClone.elevenLabsVoiceId,
+        sourceType: r.voiceClone.sourceType,
+        createdAt: r.voiceClone.createdAt,
+        owner: r.voiceClone.user,
+      });
+    }
+  }
+
+  for (const a of allowlistEntries) {
+    if (!seenVoiceIds.has(a.voiceClone.elevenLabsVoiceId)) {
+      seenVoiceIds.add(a.voiceClone.elevenLabsVoiceId);
+      sharedVoices.push({
+        id: a.voiceClone.id,
+        name: a.voiceClone.name,
+        elevenLabsVoiceId: a.voiceClone.elevenLabsVoiceId,
+        sourceType: a.voiceClone.sourceType,
+        createdAt: a.voiceClone.createdAt,
+        owner: a.voiceClone.user,
+      });
+    }
+  }
 
   return NextResponse.json({
     poolVoices: VOICE_POOL,
     userClones,
+    sharedVoices,
     credits,
   });
 }

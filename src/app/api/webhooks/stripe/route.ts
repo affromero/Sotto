@@ -50,6 +50,19 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      // Handle Voice Creator add-on checkout
+      if (session.metadata?.type === 'voice_creator_addon' && session.subscription) {
+        await prisma.subscription.update({
+          where: { userId },
+          data: {
+            voiceCreatorAddonActive: true,
+            voiceCreatorAddonStripeSubscriptionId: session.subscription as string,
+          },
+        });
+        logger.info('Voice Creator addon activated', { userId });
+        break;
+      }
+
       // Handle subscription checkout
       if (session.subscription) {
         const subResponse = await stripe.subscriptions.retrieve(session.subscription as string);
@@ -114,6 +127,23 @@ export async function POST(request: NextRequest) {
         status: string;
         cancel_at_period_end: boolean;
       };
+
+      // Check if this is an add-on subscription update
+      const addonSub = await prisma.subscription.findFirst({
+        where: { voiceCreatorAddonStripeSubscriptionId: sub.id },
+      });
+      if (addonSub) {
+        await prisma.subscription.update({
+          where: { id: addonSub.id },
+          data: { voiceCreatorAddonActive: sub.status === 'active' },
+        });
+        logger.info('Voice Creator addon subscription updated', {
+          subscriptionId: sub.id,
+          active: sub.status === 'active',
+        });
+        break;
+      }
+
       const priceId = sub.items.data[0]?.price.id || '';
       const tier = tierFromPriceId(priceId);
 
@@ -165,6 +195,23 @@ export async function POST(request: NextRequest) {
     }
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
+
+      // Check if this is an add-on subscription deletion
+      const deletedAddon = await prisma.subscription.findFirst({
+        where: { voiceCreatorAddonStripeSubscriptionId: sub.id },
+      });
+      if (deletedAddon) {
+        await prisma.subscription.update({
+          where: { id: deletedAddon.id },
+          data: {
+            voiceCreatorAddonActive: false,
+            voiceCreatorAddonStripeSubscriptionId: null,
+          },
+        });
+        logger.info('Voice Creator addon subscription deleted', { subscriptionId: sub.id });
+        break;
+      }
+
       await prisma.subscription.updateMany({
         where: { stripeSubscriptionId: sub.id },
         data: { status: 'CANCELED', tier: 'FREE' },

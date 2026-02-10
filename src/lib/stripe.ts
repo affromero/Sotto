@@ -28,6 +28,7 @@ export const TIER_LIMITS = {
     maxDurationMinutes: 5,
     maxVoiceClones: 0,
     premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 0,
     hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
@@ -42,6 +43,7 @@ export const TIER_LIMITS = {
     maxDurationMinutes: 10,
     maxVoiceClones: 1,
     premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: false,
@@ -56,6 +58,7 @@ export const TIER_LIMITS = {
     maxDurationMinutes: 10,
     maxVoiceClones: 3,
     premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
@@ -70,6 +73,7 @@ export const TIER_LIMITS = {
     maxDurationMinutes: 10,
     maxVoiceClones: 10,
     premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 1,
     hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
@@ -84,6 +88,7 @@ export const TIER_LIMITS = {
     maxDurationMinutes: 60,
     maxVoiceClones: Infinity,
     premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 0,
     hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
@@ -107,16 +112,21 @@ export function getEffectiveTier(subscriptionTier: TierName, userRole?: string):
 
 /**
  * Check if user can generate a podcast (has sufficient credits).
+ * sharedVoiceCount: number of voice slots (host/expert) using another user's shared voice clone.
  */
 export function canGenerate(
   creditsBalance: number,
   usePremiumVoice: boolean,
   tier: TierName,
-  userRole?: string
+  userRole?: string,
+  sharedVoiceCount: number = 0
 ): { allowed: boolean; cost: number; reason?: string } {
   const effectiveTier = getEffectiveTier(tier, userRole);
   const limits = TIER_LIMITS[effectiveTier];
-  const cost = 1 + (usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
+  const cost =
+    1 +
+    (usePremiumVoice ? limits.premiumVoiceSurcharge : 0) +
+    sharedVoiceCount * limits.sharedVoiceSurcharge;
 
   if (creditsBalance < cost) {
     return {

@@ -86,6 +86,9 @@ model User {
   voiceRequestsSent     VoiceRequest[] @relation("VoiceRequester")
   voiceRequestsReceived VoiceRequest[] @relation("VoiceOwner")
 
+  // Voice allowlist
+  voiceAllowlistEntries VoiceAllowlist[] @relation("VoiceAllowlisted")
+
   @@index([teamId])
   @@index([role])
   @@index([handle])
@@ -161,6 +164,8 @@ model Subscription {
   creditsMonthly       Int                @default(2)
   rolloverCredits      Int                @default(0)
   maxRollover          Int                @default(0)
+  voiceCreatorAddonActive               Boolean @default(false)
+  voiceCreatorAddonStripeSubscriptionId String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
@@ -282,6 +287,7 @@ model Podcast {
   hostVoiceId     String?
   expertVoiceId   String?
   usePremiumVoice Boolean @default(false)
+  creditCost      Float?
 
   // Source tracking (web, twitter, api)
   source        PodcastSource @default(WEB)
@@ -975,8 +981,9 @@ model VoiceClone {
   requestable       Boolean          @default(false)
   createdAt         DateTime         @default(now())
 
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   voiceRequests VoiceRequest[]
+  allowlist     VoiceAllowlist[]
 
   @@index([userId])
 }
@@ -984,6 +991,21 @@ model VoiceClone {
 enum VoiceCloneSource {
   UPLOAD
   RECORD
+}
+
+// ============ VOICE ALLOWLIST ============
+
+model VoiceAllowlist {
+  id            String   @id @default(cuid())
+  voiceCloneId  String
+  allowedUserId String
+  createdAt     DateTime @default(now())
+
+  voiceClone  VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
+  allowedUser User       @relation("VoiceAllowlisted", fields: [allowedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([voiceCloneId, allowedUserId])
+  @@index([allowedUserId])
 }
 
 // ============ REFERENCES (Citations) ============
