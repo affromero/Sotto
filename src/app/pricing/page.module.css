@@ -44,6 +44,69 @@
   margin: 0 auto;
 }
 
+/* Credit Explainer */
+
+.creditSection {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  text-align: center;
+}
+
+.creditHeading {
+  font: var(--text-h2);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.creditSubheading {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.creditTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  text-align: left;
+}
+
+.creditTable th {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.creditTable td {
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.creditTable tr:last-child td {
+  border-bottom: none;
+}
+
+.creditTable td:last-child,
+.creditTable th:last-child {
+  text-align: right;
+}
+
+.creditFootnote {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-md);
+}
+
 /* Comparison Section */
 
 .comparisonSection {

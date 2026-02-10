@@ -4,27 +4,29 @@
 
 The schema is organized into logical sections:
 
-| Section           | Models                                                           | Purpose                                                                                     |
-| ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Users & Auth      | User, Account, Session, VerificationToken                        | Authentication + profiles (includes `role`, `twitterHandle`, `twitterEnabled`, voice prefs) |
-| Social            | Follow                                                           | Follower/following relationships                                                            |
-| Subscriptions     | Subscription, SubscriptionEvent, CreditTransaction, Team         | Stripe billing + credit balance + audit trail                                               |
-| Podcasts          | Podcast (includes `pdfUrl`, `source`, `sourceTweetId`)           | Core content entity                                                                         |
-| Discovery         | Discovery, DiscoveryMessage                                      | Chat-based creation flow                                                                    |
-| Scripts           | Script (includes `verificationAttempts`, `verificationFeedback`) | Generated podcast scripts                                                                   |
-| Segments          | Segment                                                          | Per-speaker audio chunks                                                                    |
-| References        | Reference                                                        | Per-podcast `[N]` citations with title, authors, year, URL, type, verificationStatus        |
-| Interactions      | Interaction                                                      | Q&A during playback                                                                         |
-| Social Engagement | Like, Save                                                       | User engagement                                                                             |
-| Tags & Interests  | Tag, PodcastTag, UserInterest                                    | Content taxonomy + user interest selections (onboarding/manual/behavioral)                  |
-| Notifications     | Notification, PushSubscription                                   | In-app + push notifications                                                                 |
-| Jobs              | Job                                                              | BullMQ job tracking                                                                         |
-| Voice Clones      | VoiceClone                                                       | User voice clones (name, ElevenLabs ID, source)                                             |
-| API Keys          | ApiKey                                                           | Developer API keys (hashed, prefix, usage)                                                  |
-| Teams             | Team, TeamInvite                                                 | Team ownership, member management, invites                                                  |
-| Twitter           | TweetMention                                                     | Tweet-to-podcast tracking (dedup, status, reply thread)                                     |
-| Analytics         | ApiUsageLog                                                      | Cost tracking                                                                               |
-| Feedback          | Feedback                                                         | Early access user feedback                                                                  |
+| Section           | Models                                                           | Purpose                                                                                                               |
+| ----------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Users & Auth      | User, Account, Session, VerificationToken                        | Authentication + profiles (includes `role`, `handle String? @unique`, `twitterHandle`, `twitterEnabled`, voice prefs) |
+| Social            | Follow                                                           | Follower/following relationships                                                                                      |
+| Subscriptions     | Subscription, SubscriptionEvent, CreditTransaction, Team         | Stripe billing + credit balance (Float for fractional credits) + audit trail                                          |
+| Podcasts          | Podcast (includes `pdfUrl`, `source`, `sourceTweetId`)           | Core content entity                                                                                                   |
+| Discovery         | Discovery, DiscoveryMessage                                      | Chat-based creation flow                                                                                              |
+| Scripts           | Script (includes `verificationAttempts`, `verificationFeedback`) | Generated podcast scripts                                                                                             |
+| Segments          | Segment                                                          | Per-speaker audio chunks                                                                                              |
+| References        | Reference                                                        | Per-podcast `[N]` citations with title, authors, year, URL, type, verificationStatus                                  |
+| Interactions      | Interaction                                                      | Q&A during playback                                                                                                   |
+| Social Engagement | Like, Save                                                       | User engagement                                                                                                       |
+| Tags & Interests  | Tag, PodcastTag, UserInterest                                    | Content taxonomy + user interest selections (onboarding/manual/behavioral)                                            |
+| Notifications     | Notification, PushSubscription                                   | In-app + push notifications                                                                                           |
+| Jobs              | Job                                                              | BullMQ job tracking                                                                                                   |
+| Voice Clones      | VoiceClone (includes `requestable`)                              | User voice clones (name, ElevenLabs ID, source, requestable flag)                                                     |
+| Voice Requests    | VoiceRequest                                                     | Voice clone sharing requests (requester, owner, clone, status, message)                                               |
+| Reserved Handles  | ReservedHandle                                                   | Reserved handles (handle @unique, reason, createdBy)                                                                  |
+| API Keys          | ApiKey                                                           | Developer API keys (hashed, prefix, usage)                                                                            |
+| Teams             | Team, TeamInvite                                                 | Team ownership, member management, invites                                                                            |
+| Twitter           | TweetMention                                                     | Tweet-to-podcast tracking (dedup, status, reply thread)                                                               |
+| Analytics         | ApiUsageLog                                                      | Cost tracking                                                                                                         |
+| Feedback          | Feedback                                                         | Early access user feedback                                                                                            |
 
 ## Key Enums
 
@@ -34,7 +36,7 @@ The schema is organized into logical sections:
 | `Speaker`            | HOST, EXPERT                                                                                                                                         | Segment.speaker              |
 | `InteractionStatus`  | PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED                                                                             | Interaction.status           |
 | `SubscriptionTier`   | FREE, STARTER, PRO, STUDIO                                                                                                                           | Subscription.tier            |
-| `UserRole`           | USER, CREATOR, ADMIN                                                                                                                                 | User.role                    |
+| `UserRole`           | USER, CREATOR, ADMIN, SYSTEM                                                                                                                         | User.role                    |
 | `TeamInviteStatus`   | PENDING, ACCEPTED, EXPIRED, REVOKED                                                                                                                  | TeamInvite.status            |
 | `VoiceCloneSource`   | UPLOAD, RECORD                                                                                                                                       | VoiceClone.sourceType        |
 | `PodcastVisibility`  | PUBLIC, UNLISTED, PRIVATE                                                                                                                            | Podcast.visibility           |
@@ -42,6 +44,8 @@ The schema is organized into logical sections:
 | `TweetMentionStatus` | PENDING, PARSING, GENERATING, READY, REPLIED, FAILED, IGNORED                                                                                        | TweetMention.status          |
 | `ReferenceType`      | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT                                                                                                             | Reference.type               |
 | `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED                                                                                                         | Reference.verificationStatus |
+| `VoiceRequestStatus` | PENDING, APPROVED, DENIED, REVOKED                                                                                                                   | VoiceRequest.status          |
+| `NotificationType`   | Includes VOICE_REQUEST_RECEIVED, VOICE_REQUEST_APPROVED, VOICE_REQUEST_DENIED (+ others)                                                             | Notification.type            |
 
 ## Commands
 

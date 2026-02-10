@@ -23,22 +23,25 @@ vi.mock('@/lib/r2', () => ({
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: {
-      podcastsPerMonth: 3,
-      maxDurationMinutes: 10,
-      interactionsPerPodcast: 3,
+      creditsMonthly: 1,
+      maxRollover: 0,
+      maxDurationMinutes: 5,
+      maxVoiceClones: 0,
+      premiumVoiceSurcharge: 0,
       canDownload: false,
       canMakePrivate: false,
-      voiceCount: 2,
     },
     PRO: {
-      podcastsPerMonth: 20,
-      maxDurationMinutes: 30,
-      interactionsPerPodcast: Infinity,
+      creditsMonthly: 10,
+      maxRollover: 3,
+      maxDurationMinutes: 10,
+      maxVoiceClones: 3,
+      premiumVoiceSurcharge: 0,
       canDownload: true,
       canMakePrivate: true,
-      voiceCount: 6,
     },
   },
+  INTERACTION_CREDIT_COST: 0.25,
   createCheckoutSession: vi.fn().mockResolvedValue('https://checkout.stripe.com/session'),
   createPortalSession: vi.fn().mockResolvedValue('https://billing.stripe.com/portal'),
 }));
@@ -232,7 +235,7 @@ describe('Provider Factories', () => {
     it('stripe provider delegates getTierLimits', () => {
       const provider = createPaymentProvider('stripe');
       const limits = provider.getTierLimits('FREE');
-      expect(limits.creditsMonthly).toBe(2);
+      expect(limits.creditsMonthly).toBe(1);
     });
   });
 });

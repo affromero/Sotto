@@ -18,6 +18,7 @@ enum UserRole {
   USER
   CREATOR
   ADMIN
+  SYSTEM
 }
 
 // ============ USERS & AUTH ============
@@ -26,6 +27,7 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String?
+  handle        String?   @unique
   image         String?
   bio           String?   @db.Text
   role          UserRole  @default(USER)
@@ -80,8 +82,13 @@ model User {
   interests             UserInterest[]
   hasCompletedOnboarding Boolean @default(false)
 
+  // Voice requests
+  voiceRequestsSent     VoiceRequest[] @relation("VoiceRequester")
+  voiceRequestsReceived VoiceRequest[] @relation("VoiceOwner")
+
   @@index([teamId])
   @@index([role])
+  @@index([handle])
 }
 
 model Account {
@@ -150,7 +157,7 @@ model Subscription {
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean            @default(false)
   premiumCreditsUsed   Int                @default(0)
-  creditsBalance       Int                @default(0)
+  creditsBalance       Float              @default(0)
   creditsMonthly       Int                @default(2)
   rolloverCredits      Int                @default(0)
   maxRollover          Int                @default(0)
@@ -199,9 +206,9 @@ model SubscriptionEvent {
 model CreditTransaction {
   id              String   @id @default(cuid())
   userId          String
-  amount          Int      // positive = add, negative = consume
-  balanceBefore   Int
-  balanceAfter    Int
+  amount          Float    // positive = add, negative = consume
+  balanceBefore   Float
+  balanceAfter    Float
   type            String   // 'monthly_grant' | 'generation' | 'refund' | 'purchase' | 'admin'
   description     String
   podcastId       String?
@@ -570,6 +577,9 @@ enum NotificationType {
   SIMILAR_PODCAST_CREATED
   TEAM_INVITE
   TWITTER_PODCAST_READY
+  VOICE_REQUEST_RECEIVED
+  VOICE_REQUEST_APPROVED
+  VOICE_REQUEST_DENIED
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -962,9 +972,11 @@ model VoiceClone {
   elevenLabsVoiceId String           @unique
   sourceType        VoiceCloneSource
   sampleUrl         String?
+  requestable       Boolean          @default(false)
   createdAt         DateTime         @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voiceRequests VoiceRequest[]
 
   @@index([userId])
 }
@@ -1015,4 +1027,42 @@ enum VerificationStatus {
   FAILED
   REPLACED
   REMOVED
+}
+
+// ============ RESERVED HANDLES ============
+
+model ReservedHandle {
+  id        String   @id @default(cuid())
+  handle    String   @unique
+  reason    String?
+  createdBy String?
+  createdAt DateTime @default(now())
+}
+
+// ============ VOICE REQUESTS ============
+
+model VoiceRequest {
+  id           String             @id @default(cuid())
+  requesterId  String
+  voiceOwnerId String
+  voiceCloneId String
+  status       VoiceRequestStatus @default(PENDING)
+  message      String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  requester  User       @relation("VoiceRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  voiceOwner User       @relation("VoiceOwner", fields: [voiceOwnerId], references: [id], onDelete: Cascade)
+  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, voiceCloneId])
+  @@index([voiceOwnerId])
+  @@index([status])
+}
+
+enum VoiceRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+  REVOKED
 }

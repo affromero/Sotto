@@ -1,12 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { canGenerate, canInteract, TIER_LIMITS } from '@/lib/stripe';
+import { canGenerate, canInteract, TIER_LIMITS, INTERACTION_CREDIT_COST } from '@/lib/stripe';
 
 describe('TIER_LIMITS', () => {
   it('FREE tier has correct limits', () => {
     expect(TIER_LIMITS.FREE.creditsMonthly).toBe(1);
     expect(TIER_LIMITS.FREE.maxRollover).toBe(0);
     expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(5);
-    expect(TIER_LIMITS.FREE.interactionsPerPodcast).toBe(2);
     expect(TIER_LIMITS.FREE.maxVoiceClones).toBe(0);
     expect(TIER_LIMITS.FREE.premiumVoiceSurcharge).toBe(0);
     expect(TIER_LIMITS.FREE.canDownload).toBe(false);
@@ -21,7 +20,6 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(3);
     expect(TIER_LIMITS.STARTER.maxRollover).toBe(1);
     expect(TIER_LIMITS.STARTER.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.STARTER.interactionsPerPodcast).toBe(5);
     expect(TIER_LIMITS.STARTER.maxVoiceClones).toBe(1);
     expect(TIER_LIMITS.STARTER.canDownload).toBe(true);
     expect(TIER_LIMITS.STARTER.canMakePrivate).toBe(false);
@@ -31,7 +29,6 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.PRO.creditsMonthly).toBe(10);
     expect(TIER_LIMITS.PRO.maxRollover).toBe(3);
     expect(TIER_LIMITS.PRO.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.PRO.interactionsPerPodcast).toBe(Infinity);
     expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(3);
     expect(TIER_LIMITS.PRO.canDownload).toBe(true);
     expect(TIER_LIMITS.PRO.canMakePrivate).toBe(true);
@@ -44,7 +41,6 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STUDIO.creditsMonthly).toBe(20);
     expect(TIER_LIMITS.STUDIO.maxRollover).toBe(8);
     expect(TIER_LIMITS.STUDIO.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.STUDIO.interactionsPerPodcast).toBe(Infinity);
     expect(TIER_LIMITS.STUDIO.maxVoiceClones).toBe(10);
     expect(TIER_LIMITS.STUDIO.premiumVoiceSurcharge).toBe(0);
     expect(TIER_LIMITS.STUDIO.canDownload).toBe(true);
@@ -54,6 +50,12 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.STUDIO.canViewAnalytics).toBe(true);
     expect(TIER_LIMITS.STUDIO.canExportPdf).toBe(true);
     expect(TIER_LIMITS.STUDIO.hasPremiumSfx).toBe(true);
+  });
+});
+
+describe('INTERACTION_CREDIT_COST', () => {
+  it('is 0.25', () => {
+    expect(INTERACTION_CREDIT_COST).toBe(0.25);
   });
 });
 
@@ -97,66 +99,34 @@ describe('canGenerate', () => {
 });
 
 describe('canInteract', () => {
-  describe('FREE tier', () => {
-    it('allows interaction when under limit', () => {
-      const result = canInteract('FREE', 0);
-      expect(result.allowed).toBe(true);
-      expect(result.reason).toBeUndefined();
-    });
-
-    it('allows interaction at 1 interaction (under limit of 2)', () => {
-      const result = canInteract('FREE', 1);
-      expect(result.allowed).toBe(true);
-    });
-
-    it('blocks interaction when at limit (2 used)', () => {
-      const result = canInteract('FREE', 2);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toBeDefined();
-      expect(result.reason).toContain('2');
-    });
-
-    it('blocks interaction when over limit', () => {
-      const result = canInteract('FREE', 5);
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Upgrade');
-    });
-
-    it('returns descriptive reason message', () => {
-      const result = canInteract('FREE', 2);
-      expect(result.reason).toContain('Free');
-      expect(result.reason).toContain('interactions');
-    });
+  it('allows interaction when sufficient credits', () => {
+    const result = canInteract(1);
+    expect(result.allowed).toBe(true);
+    expect(result.cost).toBe(0.25);
   });
 
-  describe('PRO tier', () => {
-    it('allows interaction with any count (unlimited)', () => {
-      const result = canInteract('PRO', 0);
-      expect(result.allowed).toBe(true);
-    });
-
-    it('allows interaction with high count (unlimited)', () => {
-      const result = canInteract('PRO', 999999);
-      expect(result.allowed).toBe(true);
-    });
+  it('allows interaction with exactly 0.25 credits', () => {
+    const result = canInteract(0.25);
+    expect(result.allowed).toBe(true);
+    expect(result.cost).toBe(0.25);
   });
 
-  describe('STUDIO tier', () => {
-    it('allows interaction with zero count', () => {
-      const result = canInteract('STUDIO', 0);
-      expect(result.allowed).toBe(true);
-    });
-
-    it('allows interaction with high count (unlimited)', () => {
-      const result = canInteract('STUDIO', 100);
-      expect(result.allowed).toBe(true);
-    });
+  it('blocks interaction when insufficient credits', () => {
+    const result = canInteract(0.1);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBeDefined();
+    expect(result.reason).toContain('Insufficient credits');
   });
 
-  describe('ADMIN role override', () => {
-    it('always allows interaction for ADMIN role', () => {
-      const result = canInteract('FREE', 999, 'ADMIN');
-      expect(result.allowed).toBe(true);
-    });
+  it('blocks interaction when zero credits', () => {
+    const result = canInteract(0);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('0.25');
+  });
+
+  it('always allows interaction for ADMIN role', () => {
+    const result = canInteract(0, 'ADMIN');
+    expect(result.allowed).toBe(true);
+    expect(result.cost).toBe(0.25);
   });
 });

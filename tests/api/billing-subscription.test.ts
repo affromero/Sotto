@@ -27,11 +27,11 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/stripe', async () => ({
   TIER_LIMITS: {
     FREE: {
-      podcastsPerMonth: 2,
-      maxDurationMinutes: 10,
-      interactionsPerPodcast: 2,
-      premiumVoiceCredits: 0,
+      creditsMonthly: 1,
+      maxRollover: 0,
+      maxDurationMinutes: 5,
       maxVoiceClones: 0,
+      premiumVoiceSurcharge: 0,
       hasPremiumSfx: false,
       canDownload: false,
       canMakePrivate: false,
@@ -41,25 +41,25 @@ vi.mock('@/lib/stripe', async () => ({
       canExportPdf: false,
     },
     PRO: {
-      podcastsPerMonth: 8,
+      creditsMonthly: 10,
+      maxRollover: 3,
       maxDurationMinutes: 10,
-      interactionsPerPodcast: 10,
-      premiumVoiceCredits: 3,
-      maxVoiceClones: 2,
+      maxVoiceClones: 3,
+      premiumVoiceSurcharge: 0,
       hasPremiumSfx: false,
       canDownload: true,
       canMakePrivate: true,
       canBrowseVoiceLibrary: true,
       canListOnMarketplace: false,
-      canViewAnalytics: false,
+      canViewAnalytics: true,
       canExportPdf: true,
     },
-    CREATOR: {
-      podcastsPerMonth: 30,
+    STUDIO: {
+      creditsMonthly: 20,
+      maxRollover: 8,
       maxDurationMinutes: 10,
-      interactionsPerPodcast: Infinity,
-      premiumVoiceCredits: 10,
-      maxVoiceClones: 5,
+      maxVoiceClones: 10,
+      premiumVoiceSurcharge: 0,
       hasPremiumSfx: true,
       canDownload: true,
       canMakePrivate: true,
@@ -101,11 +101,11 @@ const mockCancelledSubscription = {
   cancelAtPeriodEnd: true,
 };
 
-const mockCreatorSubscription = {
+const mockStudioSubscription = {
   ...mockActiveSubscription,
   id: 'sub-2',
-  tier: 'CREATOR',
-  stripePriceId: 'price_creator',
+  tier: 'STUDIO',
+  stripePriceId: 'price_studio',
   premiumCreditsUsed: 5,
 };
 
@@ -153,16 +153,16 @@ describe('GET /api/billing/subscription', () => {
     expect(body.premiumCreditsUsed).toBe(1);
   });
 
-  it('returns subscription details for active CREATOR subscription', async () => {
+  it('returns subscription details for active STUDIO subscription', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockCreatorSubscription);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockStudioSubscription);
 
     const request = createRequest();
     const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.tier).toBe('CREATOR');
+    expect(body.tier).toBe('STUDIO');
     expect(body.status).toBe('ACTIVE');
     expect(body.premiumCreditsUsed).toBe(5);
   });
@@ -206,9 +206,9 @@ describe('GET /api/billing/subscription', () => {
     const body = await response.json();
 
     expect(body.limits).toEqual(TIER_LIMITS.FREE);
-    expect(body.limits.podcastsPerMonth).toBe(2);
-    expect(body.limits.interactionsPerPodcast).toBe(2);
-    expect(body.limits.premiumVoiceCredits).toBe(0);
+    expect(body.limits.creditsMonthly).toBe(1);
+    expect(body.limits.maxDurationMinutes).toBe(5);
+    expect(body.limits.maxVoiceClones).toBe(0);
   });
 
   it('includes tier limits for PRO tier', async () => {
@@ -220,24 +220,22 @@ describe('GET /api/billing/subscription', () => {
     const body = await response.json();
 
     expect(body.limits).toEqual(TIER_LIMITS.PRO);
-    expect(body.limits.podcastsPerMonth).toBe(8);
-    expect(body.limits.interactionsPerPodcast).toBe(10);
-    expect(body.limits.premiumVoiceCredits).toBe(3);
+    expect(body.limits.creditsMonthly).toBe(10);
+    expect(body.limits.maxVoiceClones).toBe(3);
     expect(body.limits.canDownload).toBe(true);
     expect(body.limits.canExportPdf).toBe(true);
   });
 
-  it('includes tier limits for CREATOR tier', async () => {
+  it('includes tier limits for STUDIO tier', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockCreatorSubscription);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(mockStudioSubscription);
 
     const request = createRequest();
     const response = await GET(request);
     const body = await response.json();
 
-    expect(body.limits.podcastsPerMonth).toBe(30);
-    expect(body.limits.interactionsPerPodcast).toBe(null);
-    expect(body.limits.premiumVoiceCredits).toBe(10);
+    expect(body.limits.creditsMonthly).toBe(20);
+    expect(body.limits.maxVoiceClones).toBe(10);
     expect(body.limits.hasPremiumSfx).toBe(true);
     expect(body.limits.canViewAnalytics).toBe(true);
   });

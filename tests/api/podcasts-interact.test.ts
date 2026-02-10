@@ -5,11 +5,11 @@ import { NextRequest } from 'next/server';
 const mockAuth = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockUserFindUnique = vi.fn();
+const mockSubscriptionFindUnique = vi.fn();
 const mockInteractionCreate = vi.fn();
-const mockInteractionCount = vi.fn();
 const mockAddJob = vi.fn();
-const mockGetUserTier = vi.fn();
 const mockCanInteract = vi.fn();
+const mockConsumeCredit = vi.fn();
 
 // Mock dependencies
 vi.mock('@/lib/auth', () => ({
@@ -24,9 +24,11 @@ vi.mock('@/lib/prisma', () => ({
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
+    subscription: {
+      findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
+    },
     interaction: {
       create: (...args: unknown[]) => mockInteractionCreate(...args),
-      count: (...args: unknown[]) => mockInteractionCount(...args),
     },
   },
 }));
@@ -39,12 +41,13 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
-vi.mock('@/lib/subscription', () => ({
-  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
-}));
-
 vi.mock('@/lib/stripe', () => ({
   canInteract: (...args: unknown[]) => mockCanInteract(...args),
+  INTERACTION_CREDIT_COST: 0.25,
+}));
+
+vi.mock('@/lib/credits', () => ({
+  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
 }));
 
 // Import route after mocks are set up
@@ -110,11 +113,11 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Set up default mocks for interaction limit check
-    mockInteractionCount.mockResolvedValue(0);
-    mockGetUserTier.mockResolvedValue('FREE');
+    // Set up default mocks for credit-based interaction check
     mockUserFindUnique.mockResolvedValue({ role: 'USER' });
-    mockCanInteract.mockReturnValue({ allowed: true });
+    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
+    mockCanInteract.mockReturnValue({ allowed: true, cost: 0.25 });
+    mockConsumeCredit.mockResolvedValue({ balanceBefore: 5, balanceAfter: 4.75 });
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -261,15 +264,15 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     expect(body.error).toBeDefined();
   });
 
-  it('returns 402 when interaction limit is exceeded', async () => {
+  it('returns 402 when insufficient credits for interaction', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCount.mockResolvedValue(2);
-    mockGetUserTier.mockResolvedValue('FREE');
     mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
     mockCanInteract.mockReturnValue({
       allowed: false,
-      reason: 'Interaction limit reached for FREE tier',
+      cost: 0.25,
+      reason: 'Insufficient credits: interactions cost 0.25 credits, you have 0.',
     });
 
     const { request, params } = createRequest('podcast-123', {
@@ -281,8 +284,63 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     const body = await response.json();
 
     expect(response.status).toBe(402);
-    expect(body.error).toBe('Interaction limit reached for FREE tier');
-    expect(mockCanInteract).toHaveBeenCalledWith('FREE', 2, 'USER');
+    expect(body.error).toContain('Insufficient credits');
+    expect(mockCanInteract).toHaveBeenCalledWith(0, 'USER');
+    expect(mockInteractionCreate).not.toHaveBeenCalled();
+  });
+
+  it('consumes 0.25 credits on successful interaction', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
+    mockInteractionCreate.mockResolvedValue(mockInteraction);
+    mockAddJob.mockResolvedValue({ id: 'job-123' });
+
+    const { request, params } = createRequest('podcast-123', {
+      question: 'Valid question',
+      timestamp: 120,
+    });
+
+    await POST(request, params);
+
+    expect(mockConsumeCredit).toHaveBeenCalledWith(
+      'user-123',
+      0.25,
+      'Interaction question',
+      'podcast-123'
+    );
+  });
+
+  it('does not consume credits for ADMIN users', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
+    mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
+    mockCanInteract.mockReturnValue({ allowed: true, cost: 0.25 });
+    mockInteractionCreate.mockResolvedValue(mockInteraction);
+    mockAddJob.mockResolvedValue({ id: 'job-123' });
+
+    const { request, params } = createRequest('podcast-123', {
+      question: 'Admin question',
+      timestamp: 120,
+    });
+
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+    expect(mockConsumeCredit).not.toHaveBeenCalled();
+  });
+
+  it('fails if consumeCredit throws insufficient balance', async () => {
+    mockAuth.mockResolvedValue(mockSession);
+    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
+    mockConsumeCredit.mockRejectedValue(new Error('Insufficient credits: need 0.25, have 0'));
+
+    const { request, params } = createRequest('podcast-123', {
+      question: 'Valid question',
+      timestamp: 120,
+    });
+
+    await expect(POST(request, params)).rejects.toThrow('Insufficient credits');
     expect(mockInteractionCreate).not.toHaveBeenCalled();
   });
 

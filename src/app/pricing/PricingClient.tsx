@@ -38,9 +38,8 @@ export function PricingClient() {
           tier="free"
           price={0}
           features={[
-            '2 credits per month',
-            'Up to 10 minutes each',
-            '2 interactions per podcast',
+            '1 credit per month',
+            'Up to 5 minutes each',
             'Standard AI voices',
             'Public podcasts only',
             'Unlimited listening',
@@ -49,48 +48,45 @@ export function PricingClient() {
         />
         <PricingCard
           tier="starter"
-          price={9}
+          price={14}
           features={[
-            '5 credits per month',
+            '3 credits per month',
             'Up to 10 minutes each',
-            '5 interactions per podcast',
             '1 personal voice clone',
             'MP3 download',
             'Voice library access',
-            '2 credit rollover',
+            '1 credit rollover',
           ]}
           onSelect={() => handleSelect('starter')}
           loading={loading}
         />
         <PricingCard
           tier="pro"
-          price={24}
+          price={34}
           isPopular
           features={[
-            '15 credits per month',
+            '10 credits per month',
             'Up to 10 minutes each',
-            'Unlimited interactions',
             '3 personal voice clones',
             'Private & unlisted podcasts',
             'MP3 download + transcript PDF',
             'Analytics dashboard',
-            '5 credit rollover',
+            '3 credit rollover',
           ]}
           onSelect={() => handleSelect('pro')}
           loading={loading}
         />
         <PricingCard
           tier="studio"
-          price={49}
+          price={69}
           features={[
-            '50 credits per month',
+            '20 credits per month',
             'Up to 10 minutes each',
-            'Unlimited interactions',
             '10 personal voice clones',
             'Premium sound effects included',
             'Marketplace listing',
             'Full analytics + API access',
-            '20 credit rollover',
+            '8 credit rollover',
           ]}
           onSelect={() => handleSelect('studio')}
           loading={loading}
