@@ -22,8 +22,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+ARG COMMIT_SHA=dev
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV COMMIT_SHA=${COMMIT_SHA}
 
 RUN npm run build
 
@@ -32,8 +34,10 @@ FROM node:20-alpine AS runner
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
+ARG COMMIT_SHA=dev
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV COMMIT_SHA=${COMMIT_SHA}
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 

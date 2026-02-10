@@ -32,6 +32,7 @@ export async function GET() {
   return NextResponse.json(
     {
       status: healthy ? 'healthy' : 'degraded',
+      version: process.env.COMMIT_SHA || 'dev',
       timestamp: new Date().toISOString(),
       checks,
     },
