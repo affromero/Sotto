@@ -1716,8 +1716,8 @@
 
 .tiers {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
   margin-top: 8px;
 }
 
@@ -2062,8 +2062,8 @@
   }
 
   .tiers {
-    grid-template-columns: 1fr;
-    max-width: 420px;
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 640px;
     margin-left: auto;
     margin-right: auto;
   }
@@ -2214,6 +2214,12 @@
 
   .twActions {
     gap: 16px;
+  }
+
+  /* Pricing */
+  .tiers {
+    grid-template-columns: 1fr;
+    max-width: 420px;
   }
 
   /* Voice grid */

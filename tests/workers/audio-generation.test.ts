@@ -70,6 +70,24 @@ vi.mock('@/lib/r2', () => ({
   uploadSegmentAudio: (...args: unknown[]) => mockUploadSegmentAudio(...args),
 }));
 
+const mockGetAudioDuration = vi.fn().mockResolvedValue(5.234);
+
+vi.mock('@/lib/audio-stitcher', () => ({
+  getAudioDuration: (...args: unknown[]) => mockGetAudioDuration(...args),
+}));
+
+const mockWriteFile = vi.fn().mockResolvedValue(undefined);
+const mockRm = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('fs/promises', () => ({
+  default: {
+    writeFile: (...args: unknown[]) => mockWriteFile(...args),
+    rm: (...args: unknown[]) => mockRm(...args),
+  },
+  writeFile: (...args: unknown[]) => mockWriteFile(...args),
+  rm: (...args: unknown[]) => mockRm(...args),
+}));
+
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'stitch-job-1' });
 
 vi.mock('@/lib/queue', () => ({
@@ -139,6 +157,9 @@ describe('processAudioGeneration', () => {
       ageRange: 'middle',
       character: 'warm narrator',
     });
+    mockGetAudioDuration.mockResolvedValue(5.234);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockRm.mockResolvedValue(undefined);
   });
 
   describe('podcast lookup', () => {
@@ -295,15 +316,93 @@ describe('processAudioGeneration', () => {
     });
   });
 
-  describe('database updates', () => {
-    it('updates the segment with the audio URL from R2', async () => {
-      mockUploadSegmentAudio.mockResolvedValue('https://cdn.sotto.fm/segments/seg-001.mp3');
+  describe('FFprobe duration extraction', () => {
+    it('measures duration via FFprobe after TTS', async () => {
+      mockGetAudioDuration.mockResolvedValue(6.543);
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockGetAudioDuration).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/)
+      );
+    });
+
+    it('writes audio buffer to temp file for probing', async () => {
+      const audioBuffer = Buffer.from('audio-data-for-probing');
+      mockPremiumGenerateSpeech.mockResolvedValue(audioBuffer);
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockWriteFile).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        audioBuffer
+      );
+    });
+
+    it('cleans up temp file after probing', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockRm).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        { force: true }
+      );
+    });
+
+    it('falls back to text estimation when FFprobe fails', async () => {
+      mockGetAudioDuration.mockRejectedValue(new Error('FFprobe not found'));
+      const job = createMockJob({
+        ...defaultPayload,
+        text: 'A'.repeat(125), // 125 chars ÷ 12.5 chars/sec = 10 sec
+      });
+      await processAudioGeneration(job);
+
+      // Should still update segment with estimated duration
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'segment-001' },
+        data: {
+          audioUrl: expect.any(String),
+          duration: 10, // 125 / 12.5
+        },
+      });
+    });
+
+    it('cleans up temp file even when FFprobe fails', async () => {
+      mockGetAudioDuration.mockRejectedValue(new Error('FFprobe failed'));
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockRm).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        { force: true }
+      );
+    });
+
+    it('stores measured duration in segment update', async () => {
+      mockGetAudioDuration.mockResolvedValue(12.345);
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'segment-001' },
-        data: { audioUrl: 'https://cdn.sotto.fm/segments/seg-001.mp3' },
+        data: {
+          audioUrl: expect.any(String),
+          duration: 12.345,
+        },
+      });
+    });
+  });
+
+  describe('database updates', () => {
+    it('updates the segment with the audio URL and duration', async () => {
+      mockUploadSegmentAudio.mockResolvedValue('https://cdn.sotto.fm/segments/seg-001.mp3');
+      mockGetAudioDuration.mockResolvedValue(7.89);
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
+        where: { id: 'segment-001' },
+        data: { audioUrl: 'https://cdn.sotto.fm/segments/seg-001.mp3', duration: 7.89 },
       });
     });
 
@@ -490,7 +589,7 @@ describe('processAudioGeneration', () => {
       // Segment updated
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'segment-001' },
-        data: { audioUrl: 'https://r2.example.com/host-audio.mp3' },
+        data: { audioUrl: 'https://r2.example.com/host-audio.mp3', duration: expect.any(Number) },
       });
 
       // Cost logged
@@ -537,7 +636,7 @@ describe('processAudioGeneration', () => {
       // Segment updated
       expect(mockPrismaSegmentUpdate).toHaveBeenCalledWith({
         where: { id: 'segment-042' },
-        data: { audioUrl: 'https://r2.example.com/expert-audio.mp3' },
+        data: { audioUrl: 'https://r2.example.com/expert-audio.mp3', duration: expect.any(Number) },
       });
 
       // No stitching (still pending)

@@ -8,6 +8,7 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
     { speaker: 'EXPERT', text: 'Thanks for having me.' },
   ],
 });
+const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
@@ -15,6 +16,9 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
+    },
+    segment: {
+      findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
     },
     interaction: {
       update: (...args: unknown[]) => mockPrismaInteractionUpdate(...args),
@@ -86,6 +90,16 @@ describe('processInteraction', () => {
         { speaker: 'EXPERT', text: 'It is, but it opens new computational possibilities.' },
       ],
     });
+    mockPrismaSegmentFindMany.mockResolvedValue([
+      { order: 0, startTime: 0, duration: 15 },
+      { order: 1, startTime: 15, duration: 12 },
+      { order: 2, startTime: 27, duration: 18 },
+      { order: 3, startTime: 45, duration: 14 },
+      { order: 4, startTime: 59, duration: 16 },
+      { order: 5, startTime: 75, duration: 13 },
+      { order: 6, startTime: 88, duration: 15 },
+      { order: 7, startTime: 103, duration: 12 },
+    ]);
     mockGenerateResponse.mockResolvedValue({
       content: 'Here is the answer to your question.',
       inputTokens: 150,
@@ -123,6 +137,62 @@ describe('processInteraction', () => {
     });
   });
 
+  describe('segment-based timestamp lookup', () => {
+    it('fetches segments for timing data', async () => {
+      const job = createMockJob(defaultPayload);
+      await processInteraction(job);
+
+      expect(mockPrismaSegmentFindMany).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-001' },
+        orderBy: { order: 'asc' },
+        select: { order: true, startTime: true, duration: true },
+      });
+    });
+
+    it('uses segment startTime + duration to find correct turn index', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 50 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      const content = messages[0].content;
+
+      expect(content).toContain('Welcome to the show!');
+      expect(content).toContain('Thanks for having me.');
+      expect(content).toContain('Today we discuss quantum computing.');
+      expect(content).toContain('Quantum computing leverages superposition and entanglement.');
+    });
+
+    it('falls back to text estimation when segments have no startTime', async () => {
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { order: 0, startTime: null, duration: null },
+        { order: 1, startTime: null, duration: null },
+        { order: 2, startTime: null, duration: null },
+        { order: 3, startTime: null, duration: null },
+      ]);
+      const job = createMockJob({ ...defaultPayload, timestamp: 10 });
+      await processInteraction(job);
+
+      expect(mockGenerateResponse).toHaveBeenCalled();
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      expect(messages[0].content).toContain('Recent podcast context:');
+    });
+
+    it('handles timestamp at segment boundary', async () => {
+      const job = createMockJob({ ...defaultPayload, timestamp: 27 });
+      await processInteraction(job);
+
+      const callArgs = mockGenerateResponse.mock.calls[0];
+      const messages = callArgs[1];
+      const content = messages[0].content;
+
+      expect(content).toContain('Welcome to the show!');
+      expect(content).toContain('Thanks for having me.');
+      expect(content).toContain('Today we discuss quantum computing.');
+    });
+  });
+
   describe('context construction from timestamp', () => {
     it('builds context from turns based on timestamp position', async () => {
       const job = createMockJob({ ...defaultPayload, timestamp: 45 });
@@ -146,6 +216,8 @@ describe('processInteraction', () => {
           { speaker: 'EXPERT', text: 'Turn 8' },
         ],
       });
+      // Timestamp 100 is within segment 6 (startTime 88, duration 15, ends at 103)
+      // So turnIndex = 7 (first 7 turns: 0-6), last 5 = turns 2-6
       const job = createMockJob({ ...defaultPayload, timestamp: 100 });
       await processInteraction(job);
 
@@ -153,11 +225,11 @@ describe('processInteraction', () => {
       const messages = callArgs[1];
       const content = messages[0].content;
 
+      expect(content).toContain('Turn 3');
       expect(content).toContain('Turn 4');
       expect(content).toContain('Turn 5');
       expect(content).toContain('Turn 6');
       expect(content).toContain('Turn 7');
-      expect(content).toContain('Turn 8');
       expect(content).not.toContain('Turn 1');
       expect(content).not.toContain('Turn 2');
     });

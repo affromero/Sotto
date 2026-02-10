@@ -504,7 +504,7 @@ describe('audio-stitcher', () => {
       const filterGraphIndex = filterComplexArg.indexOf('-filter_complex') + 1;
       const filterGraph = filterComplexArg[filterGraphIndex];
 
-      expect(filterGraph).toContain('amix=inputs=2:duration=longest');
+      expect(filterGraph).toContain('amix=inputs=2:duration=first');
     });
 
     it('handles maxBuffer option for large files', async () => {

@@ -146,7 +146,7 @@ Why R2 instead of storing files on our server?
 
 **Stripe** is a payment processing platform. Instead of dealing with credit card numbers directly (which requires PCI compliance — a massive security burden), Stripe handles all the money stuff:
 
-1. **Checkout** — When a user clicks "Subscribe to Starter ($9/mo)", we redirect them to a Stripe-hosted payment page. Stripe collects their credit card info (never touches our server), processes the payment, and redirects them back
+1. **Checkout** — When a user clicks "Subscribe to Starter ($14/mo)", we redirect them to a Stripe-hosted payment page. Stripe collects their credit card info (never touches our server), processes the payment, and redirects them back
 2. **Subscriptions** — Stripe manages recurring billing automatically. Every month, it charges the card and sends us the money (minus their ~2.9% + $0.30 fee)
 3. **Webhooks** — When something happens (payment succeeds, subscription cancels, card declines), Stripe sends an HTTP request to our `/api/webhooks/stripe` endpoint with the details. Our code then updates the database accordingly (e.g., downgrade user to Free tier)
 4. **Customer Portal** — Stripe provides a pre-built page where users can update their credit card, cancel, or change plans. We just redirect them to it
@@ -685,10 +685,294 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID_STARTER=price_...
 STRIPE_PRICE_ID_PRO=price_...
 STRIPE_PRICE_ID_STUDIO=price_...
-STRIPE_PRICE_ID_CREDITS_3=price_...
-STRIPE_PRICE_ID_CREDITS_10=price_...
-STRIPE_PRICE_ID_CREDITS_25=price_...
 ```
+
+---
+
+## Step 4A: Set Up Cloudflare R2 (Object Storage)
+
+> **What we're doing:** Our app stores generated podcast audio files, individual voice segments, transcript PDFs, and user avatars. These files can't live on the server itself — it only has 160GB, audio adds up fast, and a single disk failure would lose everything. Cloudflare R2 is cloud storage with a critical advantage: **zero egress fees** (downloading files costs $0, unlike AWS S3 which charges per GB downloaded). Since users stream audio frequently, this saves significant money at scale.
+
+### 4A.1 Create a Cloudflare account
+
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com/) and sign up (or log in)
+2. Verify your email
+3. Add a payment method (required for R2, even though it's nearly free)
+
+### 4A.2 Find your Account ID
+
+1. In the Cloudflare dashboard, look at the URL — it contains your account ID: `dash.cloudflare.com/<ACCOUNT_ID>/...`
+2. Or: click **R2 Object Storage** in the left sidebar → your Account ID is shown on the R2 overview page
+3. **Copy this** — it goes into `R2_ACCOUNT_ID` in your `.env`
+
+### 4A.3 Create the R2 bucket
+
+A **bucket** is a container that holds files (like a top-level folder). All our audio, PDFs, and avatars go in one bucket.
+
+1. Click **R2 Object Storage** in the left sidebar
+2. Click **Create bucket**
+3. Set:
+   - **Bucket name**: `sotto-storage` (must be globally unique — if taken, try `sotto-fm-storage` or similar)
+   - **Location**: **Automatic** (Cloudflare picks the closest region to your users) — or select **Eastern North America** to match your Hetzner server in Ashburn
+4. Click **Create bucket**
+
+### 4A.4 Enable public access
+
+By default, R2 buckets are private — nobody can access files without API credentials. We need public read access so users' browsers can stream audio and download PDFs.
+
+1. Click on your `sotto-storage` bucket
+2. Click the **Settings** tab
+3. Under **Public access**, click **Allow Access**
+4. Cloudflare will generate a public URL like: `https://pub-abc123def456.r2.dev`
+5. **Copy this URL** — it goes into `R2_PUBLIC_URL` in your `.env`
+
+### 4A.5 Configure CORS
+
+**CORS (Cross-Origin Resource Sharing)** controls which websites can load files from your bucket. When a user on `sotto.fm` plays a podcast, the browser fetches the MP3 from `pub-xxx.r2.dev` — a different domain. Without CORS headers, the browser blocks this request for security reasons.
+
+1. In your bucket **Settings**, scroll to **CORS Policy**
+2. Click **Add CORS policy** (or **Edit**)
+3. Add the following rule:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://sotto.fm", "https://www.sotto.fm"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["Content-Length", "Content-Type", "ETag"],
+    "MaxAgeSeconds": 86400
+  }
+]
+```
+
+4. Click **Save**
+
+**What each field means:**
+
+- **AllowedOrigins** — only `sotto.fm` can fetch files (prevents other sites from hotlinking your audio)
+- **AllowedMethods** — `GET` for downloading/streaming, `HEAD` for checking file existence
+- **MaxAgeSeconds** — browsers cache the CORS permission for 24 hours (86400 seconds) so they don't re-check every request
+
+### 4A.6 Create API credentials
+
+The server needs write access to upload files. R2 uses S3-compatible API tokens.
+
+1. Go back to **R2 Object Storage** (left sidebar)
+2. Click **Manage R2 API Tokens** (right side, under your account ID)
+3. Click **Create API token**
+4. Set:
+   - **Token name**: `sotto-prod-rw`
+   - **Permissions**: **Object Read & Write** (the server needs to upload and download)
+   - **Specify bucket(s)**: select **Apply to specific buckets only** → check `sotto-storage`
+   - **TTL**: leave as default (no expiration) or set to 1 year
+5. Click **Create API Token**
+6. You'll see two values:
+   - **Access Key ID** → `R2_ACCESS_KEY_ID`
+   - **Secret Access Key** → `R2_SECRET_ACCESS_KEY`
+7. **Copy both immediately** — the Secret Access Key is only shown once
+
+### 4A.7 Update your .env
+
+SSH into the server and add the R2 variables:
+
+```bash
+ssh sotto@SERVER_IP
+nano ~/sotto/.env
+```
+
+Add these lines:
+
+```env
+# === CLOUDFLARE R2 STORAGE ===
+R2_ACCOUNT_ID=<your Cloudflare account ID from 4A.2>
+R2_ACCESS_KEY_ID=<access key from 4A.6>
+R2_SECRET_ACCESS_KEY=<secret key from 4A.6>
+R2_BUCKET_NAME=sotto-storage
+R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
+```
+
+### 4A.8 What gets stored where
+
+After setup, the app automatically stores files at these paths:
+
+| File                            | Storage Path                             | Created By              |
+| ------------------------------- | ---------------------------------------- | ----------------------- |
+| Podcast audio (final MP3)       | `podcasts/{id}/audio.mp3`                | Audio stitching worker  |
+| Segment audio (per-voice clips) | `podcasts/{id}/segments/{segmentId}.mp3` | Audio generation worker |
+| Transcript PDF                  | `podcasts/{id}/transcript.pdf`           | PDF generation worker   |
+| User avatars                    | `avatars/{userId}/{timestamp}.jpg`       | Avatar upload API       |
+
+**Storage cost estimate:** ~$0.015/GB/month for storage, $0 for downloads. 100 podcasts ≈ 5GB ≈ $0.08/month. Negligible.
+
+---
+
+## Step 4B: Set Up Stripe (Payments)
+
+> **What we're doing:** Stripe handles all money: monthly subscriptions, one-time credit pack purchases, and the customer billing portal. Instead of dealing with credit card numbers directly (which requires PCI compliance — a massive security burden), users enter payment info on Stripe's hosted checkout page. Stripe processes the payment and notifies our server via webhooks. We never see or store credit card numbers.
+
+### 4B.1 Create a Stripe account
+
+1. Go to [dashboard.stripe.com](https://dashboard.stripe.com/) and sign up
+2. Verify your email
+3. **Start in Sandbox** — toggle the **"Sandbox"** switch in the top-right corner (previously called "Test mode"). Sandbox uses fake money so you can verify everything works before going live
+
+### 4B.2 Get your API keys
+
+1. Go to **Developers** → **API keys** (or click the key icon in the top-right)
+2. You'll see two keys:
+   - **Publishable key** (`pk_test_...`) — used in the browser to initialize Stripe checkout. Safe to expose publicly
+   - **Secret key** (`sk_test_...`) — used server-side to create charges. **Never expose this**. Click **Reveal key** to see it
+3. Copy both — they go into your `.env`
+
+### 4B.3 Create subscription products
+
+Sotto has 3 paid tiers. Each needs a **Product** with a **Price** in Stripe.
+
+1. Go to **Products** → **Add product**
+
+**Product 1: Sotto Starter**
+
+- **Name**: `Sotto Starter`
+- **Description**: `3 credits/month, 10 min podcasts, 5 interactions per podcast, 1 voice clone`
+- Under **Pricing**, click **Add price**:
+  - **Price**: `$14.00`
+  - **Billing period**: `Monthly`
+  - **Currency**: `USD`
+- Click **Save product**
+- Copy the **Price ID** (starts with `price_...`) — visible on the product page under the price → `STRIPE_PRICE_ID_STARTER`
+
+**Product 2: Sotto Pro**
+
+- **Name**: `Sotto Pro`
+- **Description**: `10 credits/month, 10 min podcasts, unlimited interactions, 3 voice clones, private podcasts`
+- **Price**: `$34.00` / Monthly / USD
+- Copy the Price ID → `STRIPE_PRICE_ID_PRO`
+
+**Product 3: Sotto Studio**
+
+- **Name**: `Sotto Studio`
+- **Description**: `20 credits/month, 10 min podcasts, unlimited interactions, 10 voice clones, premium SFX`
+- **Price**: `$69.00` / Monthly / USD
+- Copy the Price ID → `STRIPE_PRICE_ID_STUDIO`
+
+### 4B.4 Credit packs (no Stripe setup needed)
+
+Credit packs (3 for $7, 10 for $20, 25 for $45) are one-time purchases for users who need extra credits beyond their monthly allowance. These are created as **inline prices** at checkout time — no Stripe Products or Price IDs needed. The amounts are hardcoded in `src/app/api/billing/checkout/route.ts`.
+
+### 4B.5 Create the webhook endpoint
+
+**Webhooks** are how Stripe tells our server about payment events ("user X subscribed," "user Y's card was declined"). Without webhooks, our database wouldn't know about subscription changes.
+
+1. Go to **Developers** → **Webhooks**
+2. Click **Add endpoint**
+3. Set:
+   - **Endpoint URL**: `https://sotto.fm/api/webhooks/stripe`
+   - (For local testing, use the Stripe CLI instead — see 4B.8)
+4. Under **Events to send**, click **Select events** and check these 5:
+
+| Event                           | When it fires                                        | What our server does                                           |
+| ------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
+| `checkout.session.completed`    | User finishes payment on Stripe checkout page        | Creates subscription record, grants monthly credits            |
+| `customer.subscription.updated` | Subscription renews, plan changes, or status changes | Updates tier, resets credits on renewal, handles plan switches |
+| `customer.subscription.deleted` | Subscription fully canceled                          | Downgrades user to Free tier, resets credits to 2              |
+| `invoice.payment_failed`        | Card declined on renewal                             | Sets status to PAST_DUE, sends in-app notification             |
+| `invoice.paid`                  | Successful renewal payment                           | Grants monthly credits + rollover                              |
+
+5. Click **Add endpoint**
+6. On the endpoint page, click **Reveal** under **Signing secret**
+7. Copy the signing secret (`whsec_...`) → `STRIPE_WEBHOOK_SECRET`
+
+**What is the signing secret?** When Stripe sends a webhook to our server, it includes a cryptographic signature. Our server uses this secret to verify the request actually came from Stripe, not an impersonator trying to fake a subscription.
+
+### 4B.6 Configure the Customer Portal
+
+The **Customer Portal** is a Stripe-hosted page where users can update their credit card, switch plans, cancel, and view invoices — without us building any of that UI.
+
+1. Go to **Settings** → **Billing** → **Customer portal** (or search "Customer portal" in the Stripe dashboard)
+2. Enable these features:
+   - **Invoices**: Allow viewing invoice history ✓
+   - **Payment methods**: Allow updating payment method ✓
+   - **Subscriptions**: Allow canceling and switching plans ✓
+   - **Cancel subscriptions**: Set to **Cancel at end of billing period** (not immediate — users keep access until their paid period ends)
+3. Under **Products**, add all 3 subscription products (Starter, Pro, Studio) so users can switch between them
+4. Set **Default return URL**: `https://sotto.fm/billing`
+5. Click **Save**
+
+### 4B.7 Update your .env
+
+SSH into the server and add the Stripe variables:
+
+```bash
+ssh sotto@SERVER_IP
+nano ~/sotto/.env
+```
+
+Add these lines:
+
+```env
+# === STRIPE PAYMENTS ===
+STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxx
+STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+STRIPE_PRICE_ID_STARTER=price_xxxxxxxxxxxxx
+STRIPE_PRICE_ID_PRO=price_xxxxxxxxxxxxx
+STRIPE_PRICE_ID_STUDIO=price_xxxxxxxxxxxxx
+```
+
+**Note:** Credit pack prices ($5/3 credits, $14/10 credits, $30/25 credits) don't need Stripe Price IDs — they're created as inline prices at checkout time.
+
+**Note:** If `STRIPE_SECRET_KEY` is missing, billing features gracefully disable — the app still runs, users just can't subscribe. Safe to leave unset during early testing.
+
+### 4B.8 Test locally with Stripe CLI (optional but recommended)
+
+The Stripe CLI lets you test webhooks on `localhost` without deploying. It forwards Stripe events to your local dev server.
+
+```bash
+# Install Stripe CLI (macOS)
+brew install stripe/stripe-cli/stripe
+
+# Install Stripe CLI (Linux)
+curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg
+echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee -a /etc/apt/sources.list.d/stripe.list
+sudo apt update && sudo apt install stripe
+
+# Log in to your Stripe account
+stripe login
+
+# Forward webhooks to your local server
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+# Outputs: whsec_xxxxx → use this as STRIPE_WEBHOOK_SECRET for local dev
+```
+
+**Test the full flow:**
+
+1. Start your local dev server (`npm run dev`)
+2. Start Stripe CLI forwarding (command above)
+3. Visit `localhost:3000/pricing` and click "Subscribe to Starter"
+4. Use test card number `4242 4242 4242 4242` (any future date, any CVC)
+5. Complete checkout
+6. Check your terminal — you should see the webhook events arrive
+7. Verify the subscription was created: check the database or visit `/billing`
+
+**Other test card numbers:**
+
+- `4000 0000 0000 9995` — Card declined
+- `4000 0000 0000 3220` — Requires 3D Secure authentication
+
+### 4B.9 Going live (when ready)
+
+When you're done testing and want real money:
+
+1. Complete Stripe's **account activation** (Settings → Account details — requires business info, bank account for payouts)
+2. Toggle off **Sandbox** in the dashboard (switch to live mode)
+3. Create the same 3 products with **live prices** (sandbox prices don't work in live mode)
+4. Get **live API keys** (`sk_live_...`, `pk_live_...`) from Developers → API keys
+5. Create a **live webhook endpoint** at `https://sotto.fm/api/webhooks/stripe` with the same 5 events
+6. Update your production `.env` with the live keys and price IDs
+7. Restart the web container: `docker compose -f docker-compose.prod.yml restart web`
+
+**Important:** Sandbox and live mode are completely separate. Sandbox products, customers, and webhooks don't exist in live mode. You need to recreate everything.
 
 ---
 
@@ -1255,7 +1539,7 @@ Don't just drop a link. Give them a specific action and a reason to try it. Send
 | "Where did you get confused or stuck?"        | Friction points in the flow                  |
 | "Would you use this again? Be honest."        | Core value signal                            |
 | "Would you share this with someone? Who?"     | Organic growth potential                     |
-| "Would you pay $9/month for this?"            | Willingness to pay                           |
+| "Would you pay $14/month for this?"           | Willingness to pay                           |
 | "What would you compare this to?"             | How they categorize you (competitor framing) |
 | "What was the best part? What was the worst?" | Feature prioritization signal                |
 

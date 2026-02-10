@@ -4,6 +4,7 @@ export interface SfxInsert {
   path: string;
   insertAfterSegment: number; // index of the segment after which to insert SFX
   durationMs: number;
+  delayMs?: number; // cumulative offset from start of speech track (computed by worker)
   type: 'intro' | 'transition' | 'outro' | 'ambient';
 }
 
@@ -35,12 +36,18 @@ export async function stitchWithEffects(params: {
   if (segmentPaths.length === 1 && sfxInserts.length === 0) {
     await execFileAsync('ffmpeg', [
       '-y',
-      '-i', segmentPaths[0],
-      '-c:a', 'libmp3lame',
-      '-b:a', '192k',
-      '-ar', '44100',
-      '-ac', '2',
-      '-filter:a', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+      '-i',
+      segmentPaths[0],
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '192k',
+      '-ar',
+      '44100',
+      '-ac',
+      '2',
+      '-filter:a',
+      'loudnorm=I=-16:TP=-1.5:LRA=11',
       outputPath,
     ]);
     const duration = await getAudioDuration(outputPath);
@@ -72,21 +79,19 @@ export async function stitchWithEffects(params: {
 
   // Step 1: Normalize each speech segment to consistent format
   for (let i = 0; i < segmentPaths.length; i++) {
-    filters.push(`[${i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[seg${i}]`);
+    filters.push(
+      `[${i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[seg${i}]`
+    );
   }
 
   // Step 2: Concatenate speech segments with crossfades
   if (segmentPaths.length === 1) {
     filters.push(`[seg0]acopy[speech]`);
   } else if (segmentPaths.length === 2) {
-    filters.push(
-      `[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[speech]`
-    );
+    filters.push(`[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[speech]`);
   } else {
     // Chain crossfades: merge first two, then each subsequent one
-    filters.push(
-      `[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[xf0]`
-    );
+    filters.push(`[seg0][seg1]acrossfade=d=${crossfadeSec}:c1=tri:c2=tri[xf0]`);
     for (let i = 2; i < segmentPaths.length; i++) {
       const prevLabel = i === 2 ? 'xf0' : `xf${i - 2}`;
       const outLabel = i === segmentPaths.length - 1 ? 'speech' : `xf${i - 1}`;
@@ -109,17 +114,23 @@ export async function stitchWithEffects(params: {
       );
     }
 
-    // Calculate delay offsets for each SFX based on segment durations
-    // We need to compute cumulative duration up to each insert point
-    // Since we don't know durations ahead of time in the filter graph,
-    // use adelay with a probe-based approach: read durations first
-    // For simplicity, use amix to overlay all SFX onto the speech track
-    // with proper delays computed externally by the worker
+    // Apply adelay to position each SFX at the correct timestamp
+    for (let i = 0; i < sfxInserts.length; i++) {
+      const sfx = sfxInserts[i];
+      const delayMs = sfx.delayMs ?? 0;
+      if (delayMs > 0) {
+        filters.push(`[sfx${i}]adelay=${delayMs}|${delayMs}[sfxd${i}]`);
+      } else {
+        filters.push(`[sfx${i}]acopy[sfxd${i}]`);
+      }
+    }
+
+    // Mix all SFX onto the speech track; duration=first so speech controls length
     let currentLabel = 'speech';
     for (let i = 0; i < sfxInserts.length; i++) {
       const outLabel = i === sfxInserts.length - 1 ? 'mixed' : `mix${i}`;
       filters.push(
-        `[${currentLabel}][sfx${i}]amix=inputs=2:duration=longest:dropout_transition=0[${outLabel}]`
+        `[${currentLabel}][sfxd${i}]amix=inputs=2:duration=first:dropout_transition=0[${outLabel}]`
       );
       currentLabel = outLabel;
     }
@@ -135,10 +146,14 @@ export async function stitchWithEffects(params: {
   const ffmpegArgs = [
     '-y',
     ...inputArgs,
-    '-filter_complex', filterGraph,
-    '-map', '[out]',
-    '-c:a', 'libmp3lame',
-    '-b:a', '192k',
+    '-filter_complex',
+    filterGraph,
+    '-map',
+    '[out]',
+    '-c:a',
+    'libmp3lame',
+    '-b:a',
+    '192k',
     outputPath,
   ];
 
@@ -165,10 +180,7 @@ export async function stitchWithEffects(params: {
  * Simple segment concatenation with loudness normalization (no SFX).
  * Kept as a fast path for re-stitching after interactions.
  */
-export async function stitchSegments(
-  segmentPaths: string[],
-  outputPath: string
-): Promise<void> {
+export async function stitchSegments(segmentPaths: string[], outputPath: string): Promise<void> {
   const { execFile } = await import('child_process');
   const { promisify } = await import('util');
   const execFileAsync = promisify(execFile);
@@ -182,18 +194,29 @@ export async function stitchSegments(
   try {
     await execFileAsync('ffmpeg', [
       '-y',
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', concatListPath,
-      '-c:a', 'libmp3lame',
-      '-b:a', '192k',
-      '-ar', '44100',
-      '-ac', '2',
-      '-filter:a', 'loudnorm=I=-16:TP=-1.5:LRA=11',
+      '-f',
+      'concat',
+      '-safe',
+      '0',
+      '-i',
+      concatListPath,
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '192k',
+      '-ar',
+      '44100',
+      '-ac',
+      '2',
+      '-filter:a',
+      'loudnorm=I=-16:TP=-1.5:LRA=11',
       outputPath,
     ]);
 
-    logger.info('Audio stitching complete', { outputPath, segmentCount: String(segmentPaths.length) });
+    logger.info('Audio stitching complete', {
+      outputPath,
+      segmentCount: String(segmentPaths.length),
+    });
   } finally {
     await unlink(concatListPath).catch(() => {});
   }
@@ -208,9 +231,12 @@ export async function getAudioDuration(filePath: string): Promise<number> {
   const execFileAsync = promisify(execFile);
 
   const { stdout } = await execFileAsync('ffprobe', [
-    '-v', 'quiet',
-    '-show_entries', 'format=duration',
-    '-of', 'csv=p=0',
+    '-v',
+    'quiet',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'csv=p=0',
     filePath,
   ]);
 

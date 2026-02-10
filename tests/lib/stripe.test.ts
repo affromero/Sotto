@@ -3,12 +3,12 @@ import { canGenerate, canInteract, TIER_LIMITS } from '@/lib/stripe';
 
 describe('TIER_LIMITS', () => {
   it('FREE tier has correct limits', () => {
-    expect(TIER_LIMITS.FREE.creditsMonthly).toBe(2);
+    expect(TIER_LIMITS.FREE.creditsMonthly).toBe(1);
     expect(TIER_LIMITS.FREE.maxRollover).toBe(0);
-    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(10);
+    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(5);
     expect(TIER_LIMITS.FREE.interactionsPerPodcast).toBe(2);
     expect(TIER_LIMITS.FREE.maxVoiceClones).toBe(0);
-    expect(TIER_LIMITS.FREE.premiumVoiceSurcharge).toBe(1);
+    expect(TIER_LIMITS.FREE.premiumVoiceSurcharge).toBe(0);
     expect(TIER_LIMITS.FREE.canDownload).toBe(false);
     expect(TIER_LIMITS.FREE.canMakePrivate).toBe(false);
     expect(TIER_LIMITS.FREE.canBrowseVoiceLibrary).toBe(false);
@@ -18,8 +18,8 @@ describe('TIER_LIMITS', () => {
   });
 
   it('STARTER tier has correct limits', () => {
-    expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(5);
-    expect(TIER_LIMITS.STARTER.maxRollover).toBe(2);
+    expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(3);
+    expect(TIER_LIMITS.STARTER.maxRollover).toBe(1);
     expect(TIER_LIMITS.STARTER.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.STARTER.interactionsPerPodcast).toBe(5);
     expect(TIER_LIMITS.STARTER.maxVoiceClones).toBe(1);
@@ -28,8 +28,8 @@ describe('TIER_LIMITS', () => {
   });
 
   it('PRO tier has correct limits', () => {
-    expect(TIER_LIMITS.PRO.creditsMonthly).toBe(15);
-    expect(TIER_LIMITS.PRO.maxRollover).toBe(5);
+    expect(TIER_LIMITS.PRO.creditsMonthly).toBe(10);
+    expect(TIER_LIMITS.PRO.maxRollover).toBe(3);
     expect(TIER_LIMITS.PRO.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.PRO.interactionsPerPodcast).toBe(Infinity);
     expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(3);
@@ -41,8 +41,8 @@ describe('TIER_LIMITS', () => {
   });
 
   it('STUDIO tier has correct limits', () => {
-    expect(TIER_LIMITS.STUDIO.creditsMonthly).toBe(50);
-    expect(TIER_LIMITS.STUDIO.maxRollover).toBe(20);
+    expect(TIER_LIMITS.STUDIO.creditsMonthly).toBe(20);
+    expect(TIER_LIMITS.STUDIO.maxRollover).toBe(8);
     expect(TIER_LIMITS.STUDIO.maxDurationMinutes).toBe(10);
     expect(TIER_LIMITS.STUDIO.interactionsPerPodcast).toBe(Infinity);
     expect(TIER_LIMITS.STUDIO.maxVoiceClones).toBe(10);
@@ -65,10 +65,10 @@ describe('canGenerate', () => {
       expect(result.cost).toBe(1);
     });
 
-    it('allows generation with premium voice when enough credits', () => {
-      const result = canGenerate(2, true, 'FREE');
+    it('allows generation with premium voice (no surcharge)', () => {
+      const result = canGenerate(1, true, 'FREE');
       expect(result.allowed).toBe(true);
-      expect(result.cost).toBe(2); // 1 + 1 surcharge
+      expect(result.cost).toBe(1); // no surcharge — all tiers use ElevenLabs
     });
 
     it('blocks generation when zero credits', () => {
@@ -76,12 +76,6 @@ describe('canGenerate', () => {
       expect(result.allowed).toBe(false);
       expect(result.reason).toBeDefined();
       expect(result.reason).toContain('Insufficient credits');
-    });
-
-    it('blocks premium voice when only 1 credit left', () => {
-      const result = canGenerate(1, true, 'FREE');
-      expect(result.allowed).toBe(false);
-      expect(result.cost).toBe(2);
     });
   });
 

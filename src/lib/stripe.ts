@@ -14,18 +14,19 @@ export const stripe = STRIPE_SECRET_KEY
 /**
  * Credit-based pricing tiers
  *
- * Free $0 / Starter $9 / Pro $24 / Studio $49
- * All tiers cap at 10 min — the sweet spot for focused, digestible content.
- * Each podcast generation costs 1 credit. Premium voices add a surcharge.
+ * Free $0 / Starter $14 / Pro $34 / Studio $69
+ * All tiers use ElevenLabs TTS (no OpenAI fallback — quality is the product).
+ * Free caps at 5 min. All paid tiers cap at 10 min.
+ * Each podcast generation costs 1 credit. No premium voice surcharge.
  */
 export const TIER_LIMITS = {
   FREE: {
-    creditsMonthly: 2,
+    creditsMonthly: 1,
     maxRollover: 0,
-    maxDurationMinutes: 10,
+    maxDurationMinutes: 5,
     interactionsPerPodcast: 2,
     maxVoiceClones: 0,
-    premiumVoiceSurcharge: 1,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
@@ -35,12 +36,12 @@ export const TIER_LIMITS = {
     canExportPdf: false,
   },
   STARTER: {
-    creditsMonthly: 5,
-    maxRollover: 2,
+    creditsMonthly: 3,
+    maxRollover: 1,
     maxDurationMinutes: 10,
     interactionsPerPodcast: 5,
     maxVoiceClones: 1,
-    premiumVoiceSurcharge: 1,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: false,
@@ -50,12 +51,12 @@ export const TIER_LIMITS = {
     canExportPdf: false,
   },
   PRO: {
-    creditsMonthly: 15,
-    maxRollover: 5,
+    creditsMonthly: 10,
+    maxRollover: 3,
     maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
     maxVoiceClones: 3,
-    premiumVoiceSurcharge: 1,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
@@ -65,8 +66,8 @@ export const TIER_LIMITS = {
     canExportPdf: true,
   },
   STUDIO: {
-    creditsMonthly: 50,
-    maxRollover: 20,
+    creditsMonthly: 20,
+    maxRollover: 8,
     maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
     maxVoiceClones: 10,

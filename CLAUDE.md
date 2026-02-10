@@ -13,19 +13,19 @@ Sotto (from "sotto voce" — soft voice in Italian) is an interactive podcast pl
 
 ## Tech Stack
 
-| Layer     | Technology                                                                              |
-| --------- | --------------------------------------------------------------------------------------- |
-| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                         |
-| Database  | PostgreSQL 16 + Prisma ORM                                                              |
-| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                          |
-| Queue     | Redis 7 + BullMQ (11 worker types)                                                      |
-| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER` |
-| Audio     | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER`                 |
-| Stitching | FFmpeg (segment concatenation + normalization)                                          |
-| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                        |
-| Payments  | Stripe (Free $0 / Starter $9 / Pro $24 / Studio $49) — swappable via `PAYMENT_PROVIDER` |
-| PDF       | pdfmake (server-side transcript PDF generation)                                         |
-| Hosting   | Vercel (web) + Railway (workers)                                                        |
+| Layer     | Technology                                                                               |
+| --------- | ---------------------------------------------------------------------------------------- |
+| Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                          |
+| Database  | PostgreSQL 16 + Prisma ORM                                                               |
+| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                           |
+| Queue     | Redis 7 + BullMQ (11 worker types)                                                       |
+| AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`  |
+| Audio     | ElevenLabs (multi-voice TTS per segment) — swappable via `TTS_PROVIDER`                  |
+| Stitching | FFmpeg (segment concatenation + normalization)                                           |
+| Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                         |
+| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69) — swappable via `PAYMENT_PROVIDER` |
+| PDF       | pdfmake (server-side transcript PDF generation)                                          |
+| Hosting   | Vercel (web) + Railway (workers)                                                         |
 
 ## Build & Development Commands
 
@@ -242,11 +242,17 @@ Creates Podcast (source: TWITTER) → kicks off pipeline above
 ```
 User listening → taps "Ask a Question" → podcast pauses
     ↓
-[interaction] → Claude answers using script context + timestamp position
+[interaction] → Claude answers using segment-based timestamp lookup
     ↓
 "Was that clear?" → Yes → "Update podcast with this?" → Yes
     ↓
-[segment-regeneration] → Insert new segments + re-TTS + re-stitch
+POST /api/podcasts/[id]/interact/[interactionId]/incorporate
+    ↓
+Claude generates natural HOST segment addressing Q&A
+    ↓
+[segment-regeneration] → TTS (matching podcast voice config) → transactional insert → queue re-stitch
+    ↓
+[audio-stitching] (skipSfx) → re-concat + update startTimes → READY
 ```
 
 ## Database Schema (Key Models)
@@ -280,16 +286,17 @@ User listening → taps "Ask a Question" → podcast pauses
 
 ## Pricing Tiers (Credit-Based)
 
-Each podcast generation costs 1 credit (+ premium voice surcharge where applicable).
+All tiers use ElevenLabs TTS — no OpenAI fallback. Quality is the product.
+Each podcast generation costs 1 credit. Free caps at 5 min, all paid tiers at 10 min.
 
-| Tier    | Price  | Credits/mo | Rollover | Duration | Interactions  | Voice Clones | Premium Surcharge | Sound Effects            |
-| ------- | ------ | ---------- | -------- | -------- | ------------- | ------------ | ----------------- | ------------------------ |
-| Free    | $0     | 2          | 0        | 10 min   | 2 per podcast | 0            | +1 credit         | Standard                 |
-| Starter | $9/mo  | 5          | 2        | 10 min   | 5 per podcast | 1            | +1 credit         | Standard                 |
-| Pro     | $24/mo | 15         | 5        | 10 min   | Unlimited     | 3            | +1 credit         | Standard                 |
-| Studio  | $49/mo | 50         | 20       | 10 min   | Unlimited     | 10           | 0 (included)      | Premium (ElevenLabs SFX) |
+| Tier    | Price  | Credits/mo | Rollover | Duration | Interactions  | Voice Clones | Sound Effects            |
+| ------- | ------ | ---------- | -------- | -------- | ------------- | ------------ | ------------------------ |
+| Free    | $0     | 1          | 0        | 5 min    | 2 per podcast | 0            | Standard                 |
+| Starter | $14/mo | 3          | 1        | 10 min   | 5 per podcast | 1            | Standard                 |
+| Pro     | $34/mo | 10         | 3        | 10 min   | Unlimited     | 3            | Standard                 |
+| Studio  | $69/mo | 20         | 8        | 10 min   | Unlimited     | 10           | Premium (ElevenLabs SFX) |
 
-Credit packs available for paid tiers: 3 credits, 10 credits, 25 credits (one-time purchase).
+Credit packs available for paid tiers: 3 credits ($7), 10 credits ($20), 25 credits ($45) (one-time purchase).
 
 ## Engineering Standards
 
