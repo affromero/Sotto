@@ -87,19 +87,24 @@ jobs:
 
       - name: Rebuild pitch deck
         id: pitch
-        if: steps.deploy.outcome == 'success' && steps.pitch_check.outputs.rebuild == 'true'
+        if: steps.deploy.outcome == 'success'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.SERVER_IP }}
           username: sotto
           key: ${{ secrets.SSH_KEY }}
           command_timeout: 10m
-          envs: GITHUB_TOKEN
+          envs: GITHUB_TOKEN,PITCH_FILES_CHANGED
           script: |
             cd ~/sotto
-            GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/rebuild-pitch.sh
+            if [ "$PITCH_FILES_CHANGED" = "true" ] || [ ! -f .pitch/manifest.json ]; then
+              GITHUB_TOKEN="$GITHUB_TOKEN" bash scripts/rebuild-pitch.sh
+            else
+              echo "Pitch build exists and no files changed — skipping"
+            fi
         env:
           GITHUB_TOKEN: ${{ secrets.AI_SKILLS_TOKEN }}
+          PITCH_FILES_CHANGED: ${{ steps.pitch_check.outputs.rebuild }}
 
       - name: Notify via Telegram
         if: always()
@@ -108,6 +113,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DEPLOY_STATUS: ${{ steps.deploy.outcome || job.status }}
           PITCH_STATUS: ${{ steps.pitch.outcome }}
+          PITCH_FILES_CHANGED: ${{ steps.pitch_check.outputs.rebuild }}
         run: |
           COMMIT_MSG=$(git log -1 --format='%s')
           COMMIT_SHA=$(git log -1 --format='%h')
@@ -122,8 +128,10 @@ jobs:
             STATUS="failed"
           fi
 
-          if [ "$PITCH_STATUS" = "success" ]; then
+          if [ "$PITCH_STATUS" = "success" ] && [ "$PITCH_FILES_CHANGED" = "true" ]; then
             PITCH_LINE="Pitch: ✅ rebuilt"
+          elif [ "$PITCH_STATUS" = "success" ]; then
+            PITCH_LINE="Pitch: ✅ up to date"
           elif [ "$PITCH_STATUS" = "skipped" ] || [ -z "$PITCH_STATUS" ]; then
             PITCH_LINE="Pitch: ⏭ skipped"
           else
