@@ -5,33 +5,39 @@ import styles from './page.module.css';
 
 export const metadata: Metadata = {
   title: 'Pricing',
-  description: 'Choose the right Sotto plan for you. Start free, upgrade when you need more podcasts and features.',
+  description:
+    'Choose the right Sotto plan for you. Start free, upgrade when you need more podcasts and features.',
 };
 
 const faqs = [
   {
     question: 'Can I try Sotto for free?',
-    answer: 'Absolutely. The Free plan lets you create up to 2 podcasts per month with up to 10 minutes each. No credit card required.',
+    answer:
+      'The Free plan lets you create 1 podcast per month with up to 5 minutes. No credit card required.',
+  },
+  {
+    question: 'What are credits?',
+    answer:
+      'Each credit lets you generate one podcast. Interactions cost 0.25 credits each. Your plan includes monthly credits that roll over up to your plan\u2019s cap.',
   },
   {
     question: 'What are standard vs premium voices?',
-    answer: 'All podcasts use high-quality standard AI voices by default. Premium voices (powered by ElevenLabs) offer more natural, expressive audio and include access to the full voice library and personal voice cloning.',
-  },
-  {
-    question: 'What are premium voice credits?',
-    answer: 'Each premium voice credit lets you generate one podcast with ElevenLabs premium voices. Pro gets 3 credits per month, Creator gets 10. Standard voice generation is always unlimited.',
+    answer:
+      'All podcasts use high-quality standard AI voices by default. Premium voices (powered by ElevenLabs) offer more natural, expressive audio and include access to the full voice library and personal voice cloning.',
   },
   {
     question: 'Can I clone my own voice?',
-    answer: 'Yes! Pro users can clone up to 2 personal voices, and Creator users can clone up to 5. Upload a short audio sample and your voice becomes available for your podcasts.',
+    answer: 'Starter users can clone 1 voice, Pro gets 3, and Studio gets 10.',
   },
   {
     question: 'What are interactions?',
-    answer: 'Interactions let you pause a podcast and ask a question. The AI answers using the podcast context. Free users get 2 per podcast, Pro gets 10, and Creator users get unlimited.',
+    answer:
+      'Interactions let you pause a podcast and ask a question. Each interaction costs 0.25 credits. The AI answers using the podcast context.',
   },
   {
     question: 'Do you offer refunds?',
-    answer: 'Yes, we offer a full refund within 7 days of subscribing if you are not satisfied. Contact us at support@sotto.fm.',
+    answer:
+      'Yes, we offer a full refund within 7 days of subscribing if you are not satisfied. Contact us at support@sotto.fm.',
   },
 ];
 
@@ -42,12 +48,52 @@ export default function PricingPage() {
       <section className={styles.hero}>
         <h1 className={styles.title}>Choose Your Plan</h1>
         <p className={styles.subtitle}>
-          Start free, upgrade when you need more. All plans include unlimited listening and full feed access.
+          Start free, upgrade when you need more. All plans include unlimited listening and full
+          feed access.
         </p>
       </section>
 
       {/* Pricing Cards */}
       <PricingClient />
+
+      {/* How Credits Work */}
+      <section className={styles.creditSection}>
+        <h2 className={styles.creditHeading}>How Credits Work</h2>
+        <p className={styles.creditSubheading}>1 credit = 1 podcast. Simple.</p>
+        <table className={styles.creditTable}>
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Credit Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Generate a podcast</td>
+              <td>1 credit</td>
+            </tr>
+            <tr>
+              <td>Ask a question (interaction)</td>
+              <td>0.25 credits</td>
+            </tr>
+            <tr>
+              <td>Listen to any podcast</td>
+              <td>Free</td>
+            </tr>
+            <tr>
+              <td>Fork a podcast</td>
+              <td>1 credit</td>
+            </tr>
+            <tr>
+              <td>Download MP3 / PDF</td>
+              <td>Free (tier feature)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className={styles.creditFootnote}>
+          Unused credits roll over each month, up to your plan&apos;s rollover cap.
+        </p>
+      </section>
 
       {/* Tier Comparison */}
       <section className={styles.comparisonSection}>

@@ -38,7 +38,6 @@ vi.mock('@/lib/stripe', () => ({
       creditsMonthly: 1,
       maxRollover: 0,
       maxDurationMinutes: 5,
-      interactionsPerPodcast: 2,
       maxVoiceClones: 0,
       premiumVoiceSurcharge: 0,
       canDownload: false,
@@ -51,7 +50,6 @@ vi.mock('@/lib/stripe', () => ({
       creditsMonthly: 3,
       maxRollover: 1,
       maxDurationMinutes: 10,
-      interactionsPerPodcast: 5,
       maxVoiceClones: 1,
       premiumVoiceSurcharge: 0,
       canDownload: true,
@@ -63,8 +61,7 @@ vi.mock('@/lib/stripe', () => ({
     PRO: {
       creditsMonthly: 10,
       maxRollover: 3,
-      maxDurationMinutes: 20,
-      interactionsPerPodcast: 15,
+      maxDurationMinutes: 10,
       maxVoiceClones: 3,
       premiumVoiceSurcharge: 0,
       canDownload: true,
@@ -76,8 +73,7 @@ vi.mock('@/lib/stripe', () => ({
     STUDIO: {
       creditsMonthly: 20,
       maxRollover: 8,
-      maxDurationMinutes: 60,
-      interactionsPerPodcast: Infinity,
+      maxDurationMinutes: 10,
       maxVoiceClones: 10,
       premiumVoiceSurcharge: 0,
       canDownload: true,
@@ -89,8 +85,7 @@ vi.mock('@/lib/stripe', () => ({
     ADMIN: {
       creditsMonthly: Infinity,
       maxRollover: Infinity,
-      maxDurationMinutes: 120,
-      interactionsPerPodcast: Infinity,
+      maxDurationMinutes: 60,
       maxVoiceClones: Infinity,
       premiumVoiceSurcharge: 0,
       canDownload: true,
@@ -100,6 +95,7 @@ vi.mock('@/lib/stripe', () => ({
       hasPremiumSfx: true,
     },
   },
+  INTERACTION_CREDIT_COST: 0.25,
 }));
 
 import { GET } from '@/app/api/billing/usage/route';
@@ -205,7 +201,7 @@ describe('GET /api/billing/usage', () => {
     expect(body).toHaveProperty('recentTransactions');
     expect(body).toHaveProperty('limits');
     expect(body.limits).toHaveProperty('maxDurationMinutes');
-    expect(body.limits).toHaveProperty('interactionsPerPodcast');
+    expect(body.limits).toHaveProperty('interactionCreditCost');
     expect(body.limits).toHaveProperty('maxVoiceClones');
     expect(body.limits).toHaveProperty('premiumVoiceSurcharge');
     expect(body.limits).toHaveProperty('canDownload');
@@ -232,8 +228,8 @@ describe('GET /api/billing/usage', () => {
     expect(body.rolloverCredits).toBe(3);
     expect(body.maxRollover).toBe(3);
     expect(body.currentPeriodEnd).toBe('2026-03-01T00:00:00.000Z');
-    expect(body.limits.maxDurationMinutes).toBe(20);
-    expect(body.limits.interactionsPerPodcast).toBe(15);
+    expect(body.limits.maxDurationMinutes).toBe(10);
+    expect(body.limits.interactionCreditCost).toBe(0.25);
     expect(body.limits.canDownload).toBe(true);
     expect(body.limits.canMakePrivate).toBe(true);
     expect(body.limits.canExportPdf).toBe(true);
@@ -259,7 +255,7 @@ describe('GET /api/billing/usage', () => {
     expect(body.currentPeriodEnd).toBeNull();
     expect(body.recentTransactions).toEqual([]);
     expect(body.limits.maxDurationMinutes).toBe(5);
-    expect(body.limits.interactionsPerPodcast).toBe(2);
+    expect(body.limits.interactionCreditCost).toBe(0.25);
     expect(body.limits.canDownload).toBe(false);
     expect(body.limits.canMakePrivate).toBe(false);
     expect(body.limits.canExportPdf).toBe(false);
@@ -291,7 +287,7 @@ describe('GET /api/billing/usage', () => {
     expect(body.rolloverCredits).toBe(1);
     expect(body.maxRollover).toBe(1);
     expect(body.limits.maxDurationMinutes).toBe(10);
-    expect(body.limits.interactionsPerPodcast).toBe(5);
+    expect(body.limits.interactionCreditCost).toBe(0.25);
     expect(body.limits.maxVoiceClones).toBe(1);
     expect(body.limits.canDownload).toBe(true);
   });
@@ -320,8 +316,8 @@ describe('GET /api/billing/usage', () => {
     expect(body.creditsMonthly).toBe(20);
     expect(body.rolloverCredits).toBe(5);
     expect(body.maxRollover).toBe(8);
-    expect(body.limits.maxDurationMinutes).toBe(60);
-    expect(body.limits.interactionsPerPodcast).toBe(null); // Infinity serializes as null in JSON
+    expect(body.limits.maxDurationMinutes).toBe(10);
+    expect(body.limits.interactionCreditCost).toBe(0.25);
     expect(body.limits.maxVoiceClones).toBe(10);
     expect(body.limits.hasPremiumSfx).toBe(true);
   });
@@ -341,8 +337,8 @@ describe('GET /api/billing/usage', () => {
     // The API returns subscription-level data (creditsMonthly, maxRollover) and a limits object
     // For ADMIN with no subscription, tier defaults to FREE
     expect(body.tier).toBe('FREE');
-    expect(body.limits.maxDurationMinutes).toBe(120);
-    expect(body.limits.interactionsPerPodcast).toBe(null); // Infinity serializes as null in JSON
+    expect(body.limits.maxDurationMinutes).toBe(60);
+    expect(body.limits.interactionCreditCost).toBe(0.25);
     expect(body.limits.maxVoiceClones).toBe(null); // Infinity serializes as null in JSON
   });
 

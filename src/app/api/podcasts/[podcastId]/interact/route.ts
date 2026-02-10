@@ -3,8 +3,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, addJob, JobType } from '@/lib/queue';
-import { getUserTier } from '@/lib/subscription';
-import { canInteract } from '@/lib/stripe';
+import { canInteract, INTERACTION_CREDIT_COST } from '@/lib/stripe';
+import { consumeCredit } from '@/lib/credits';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -35,16 +35,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const { question, timestamp } = parsed.data;
 
-  // Check interaction limits
-  const interactionCount = await prisma.interaction.count({ where: { podcastId } });
-  const tier = await getUserTier(session.user.id);
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-  const check = canInteract(tier, interactionCount, user?.role);
+  // Check credit balance for interaction
+  const [user, subscription] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    }),
+    prisma.subscription.findUnique({
+      where: { userId: session.user.id },
+      select: { creditsBalance: true },
+    }),
+  ]);
+
+  const creditsBalance = subscription?.creditsBalance ?? 0;
+  const check = canInteract(creditsBalance, user?.role);
   if (!check.allowed) {
     return NextResponse.json({ error: check.reason }, { status: 402 });
+  }
+
+  // Consume interaction credit (ADMIN bypasses)
+  if (user?.role !== 'ADMIN') {
+    await consumeCredit(
+      session.user.id,
+      INTERACTION_CREDIT_COST,
+      'Interaction question',
+      podcastId
+    );
   }
 
   // Create interaction record

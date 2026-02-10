@@ -4,7 +4,6 @@ export interface TierLimits {
   creditsMonthly: number;
   maxRollover: number;
   maxDurationMinutes: number;
-  interactionsPerPodcast: number;
   canDownload: boolean;
   canMakePrivate: boolean;
   voiceCount: number;
@@ -29,37 +28,33 @@ export interface PaymentProvider {
  */
 const TIER_LIMITS: Record<string, TierLimits> = {
   FREE: {
-    creditsMonthly: 2,
+    creditsMonthly: 1,
     maxRollover: 0,
-    maxDurationMinutes: 10,
-    interactionsPerPodcast: 2,
+    maxDurationMinutes: 5,
     canDownload: false,
     canMakePrivate: false,
     voiceCount: 2,
   },
   STARTER: {
-    creditsMonthly: 5,
-    maxRollover: 2,
+    creditsMonthly: 3,
+    maxRollover: 1,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 5,
     canDownload: true,
     canMakePrivate: false,
     voiceCount: 4,
   },
   PRO: {
-    creditsMonthly: 15,
-    maxRollover: 5,
+    creditsMonthly: 10,
+    maxRollover: 3,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: Infinity,
     canDownload: true,
     canMakePrivate: true,
     voiceCount: 6,
   },
   STUDIO: {
-    creditsMonthly: 50,
-    maxRollover: 20,
+    creditsMonthly: 20,
+    maxRollover: 8,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: Infinity,
     canDownload: true,
     canMakePrivate: true,
     voiceCount: 10,
@@ -96,7 +91,6 @@ class NoOpProvider implements PaymentProvider {
       creditsMonthly: Infinity,
       maxRollover: Infinity,
       maxDurationMinutes: 30,
-      interactionsPerPodcast: Infinity,
       canDownload: true,
       canMakePrivate: true,
       voiceCount: 10,

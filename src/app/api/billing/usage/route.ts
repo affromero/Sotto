@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { TIER_LIMITS, type TierName } from '@/lib/stripe';
+import { TIER_LIMITS, INTERACTION_CREDIT_COST, type TierName } from '@/lib/stripe';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -67,7 +67,7 @@ export async function GET(_request: NextRequest) {
       })),
       limits: {
         maxDurationMinutes: limits.maxDurationMinutes,
-        interactionsPerPodcast: limits.interactionsPerPodcast,
+        interactionCreditCost: INTERACTION_CREDIT_COST,
         maxVoiceClones: limits.maxVoiceClones,
         premiumVoiceSurcharge: limits.premiumVoiceSurcharge,
         canDownload: limits.canDownload,

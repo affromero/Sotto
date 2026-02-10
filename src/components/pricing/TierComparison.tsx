@@ -16,24 +16,17 @@ interface ComparisonRow {
 }
 
 const rows: ComparisonRow[] = [
-  { label: 'Credits / month', free: '2', starter: '5', pro: '15', studio: '50' },
-  { label: 'Rollover credits', free: '0', starter: '2', pro: '5', studio: '20' },
-  { label: 'Max duration', free: '10 min', starter: '10 min', pro: '10 min', studio: '10 min' },
+  { label: 'Credits / month', free: '1', starter: '3', pro: '10', studio: '20' },
+  { label: 'Rollover credits', free: '0', starter: '1', pro: '3', studio: '8' },
+  { label: 'Max duration', free: '5 min', starter: '10 min', pro: '10 min', studio: '10 min' },
   {
     label: 'Interactions',
-    free: '2 per podcast',
-    starter: '5 per podcast',
-    pro: 'Unlimited',
-    studio: 'Unlimited',
+    free: '0.25 credits each',
+    starter: '0.25 credits each',
+    pro: '0.25 credits each',
+    studio: '0.25 credits each',
   },
   { label: 'Personal voice clones', free: false, starter: '1', pro: '3', studio: '10' },
-  {
-    label: 'Premium voice surcharge',
-    free: '+1 credit',
-    starter: '+1 credit',
-    pro: '+1 credit',
-    studio: 'Included',
-  },
   {
     label: 'Sound effects',
     free: 'Standard',

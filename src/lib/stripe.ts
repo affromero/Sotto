@@ -18,13 +18,14 @@ export const stripe = STRIPE_SECRET_KEY
  * All tiers use ElevenLabs TTS (no OpenAI fallback — quality is the product).
  * Free caps at 5 min. All paid tiers cap at 10 min.
  * Each podcast generation costs 1 credit. No premium voice surcharge.
+ * Each interaction costs 0.25 credits.
  */
+export const INTERACTION_CREDIT_COST = 0.25;
 export const TIER_LIMITS = {
   FREE: {
     creditsMonthly: 1,
     maxRollover: 0,
     maxDurationMinutes: 5,
-    interactionsPerPodcast: 2,
     maxVoiceClones: 0,
     premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
@@ -39,7 +40,6 @@ export const TIER_LIMITS = {
     creditsMonthly: 3,
     maxRollover: 1,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 5,
     maxVoiceClones: 1,
     premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
@@ -54,7 +54,6 @@ export const TIER_LIMITS = {
     creditsMonthly: 10,
     maxRollover: 3,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: Infinity,
     maxVoiceClones: 3,
     premiumVoiceSurcharge: 0,
     hasPremiumSfx: false,
@@ -69,7 +68,6 @@ export const TIER_LIMITS = {
     creditsMonthly: 20,
     maxRollover: 8,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: Infinity,
     maxVoiceClones: 10,
     premiumVoiceSurcharge: 0,
     hasPremiumSfx: true,
@@ -84,7 +82,6 @@ export const TIER_LIMITS = {
     creditsMonthly: Infinity,
     maxRollover: Infinity,
     maxDurationMinutes: 60,
-    interactionsPerPodcast: Infinity,
     maxVoiceClones: Infinity,
     premiumVoiceSurcharge: 0,
     hasPremiumSfx: true,
@@ -98,14 +95,6 @@ export const TIER_LIMITS = {
 } as const;
 
 export type TierName = keyof typeof TIER_LIMITS;
-
-const TIER_LABELS: Record<TierName, string> = {
-  FREE: 'Free',
-  STARTER: 'Starter',
-  PRO: 'Pro',
-  STUDIO: 'Studio',
-  ADMIN: 'Admin',
-};
 
 /**
  * Get effective tier limits considering user role.
@@ -140,22 +129,25 @@ export function canGenerate(
 }
 
 /**
- * Check interaction limits
+ * Check if user can interact (has sufficient credits for 0.25 cost).
+ * ADMIN role always allowed.
  */
 export function canInteract(
-  tier: TierName,
-  interactionCount: number,
+  creditsBalance: number,
   userRole?: string
-): { allowed: boolean; reason?: string } {
-  const effectiveTier = getEffectiveTier(tier, userRole);
-  const limits = TIER_LIMITS[effectiveTier];
-  if (interactionCount >= limits.interactionsPerPodcast) {
+): { allowed: boolean; cost: number; reason?: string } {
+  if (userRole === 'ADMIN') {
+    return { allowed: true, cost: INTERACTION_CREDIT_COST };
+  }
+
+  if (creditsBalance < INTERACTION_CREDIT_COST) {
     return {
       allowed: false,
-      reason: `${TIER_LABELS[effectiveTier]} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for more.`,
+      cost: INTERACTION_CREDIT_COST,
+      reason: `Insufficient credits: interactions cost ${INTERACTION_CREDIT_COST} credits, you have ${creditsBalance}. Buy more credits or upgrade your plan.`,
     };
   }
-  return { allowed: true };
+  return { allowed: true, cost: INTERACTION_CREDIT_COST };
 }
 
 /**
