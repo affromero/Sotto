@@ -308,9 +308,7 @@
   position: absolute;
   inset: 0;
   z-index: 4;
-  cursor: grab;
-  overscroll-behavior-x: none;
-  touch-action: pan-y pinch-zoom;
+  touch-action: none;
 }
 
 .swipeOverlay:active {
