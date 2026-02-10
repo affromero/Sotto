@@ -1135,10 +1135,11 @@ exit
 3. In the left sidebar, click **Secrets and variables** → **Actions**
 4. Click **New repository secret** for each:
 
-| Secret Name | Value                                          | How to get it                                       |
-| ----------- | ---------------------------------------------- | --------------------------------------------------- |
-| `SERVER_IP` | Your Hetzner server IP (e.g., `5.161.xxx.xxx`) | From Step 1                                         |
-| `SSH_KEY`   | Contents of the **private** key                | `cat ~/.ssh/sotto_deploy` (the file WITHOUT `.pub`) |
+| Secret Name       | Value                                          | How to get it                                            |
+| ----------------- | ---------------------------------------------- | -------------------------------------------------------- |
+| `SERVER_IP`       | Your Hetzner server IP (e.g., `5.161.xxx.xxx`) | From Step 1                                              |
+| `SSH_KEY`         | Contents of the **private** key                | `cat ~/.ssh/sotto_deploy` (the file WITHOUT `.pub`)      |
+| `AI_SKILLS_TOKEN` | GitHub PAT with read access to AI-Skills repo  | From Step 9.5.1 (fine-grained token, Contents read-only) |
 
 For `SSH_KEY`:
 
@@ -1391,6 +1392,159 @@ When `SITE_PASSWORD` is unset, the middleware skips the gate entirely.
 
 ---
 
+## Step 9.5: Set Up AI Skills Repo (Pitch Rebuild Pipeline)
+
+> **What we're doing:** The pitch deck auto-rebuild pipeline (`scripts/rebuild-pitch.sh`) uses Pandoc templates and Lua filters from our [AI-Skills](https://github.com/affromero/AI-Skills) repo. This repo lives at `~/.claude/` and contains reusable Claude Code skills, agents, and document conversion tools. Without it, the pitch rebuild will fall back to plain Pandoc output without the Sotto-branded design system.
+
+### What is the AI-Skills repo?
+
+The `AI-Skills` repo (`github.com/affromero/AI-Skills`) is a collection of Claude Code skills and agents that extend the CLI with slash-command workflows. It's designed to live at `~/.claude/` — the Claude Code configuration directory. The repo's `.gitignore` only tracks `skills/`, `agents/`, and `references/`, ignoring Claude Code's local data (credentials, history, caches).
+
+Key directories used by the pitch pipeline:
+
+| Path                                                          | Purpose                                                                                             |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `~/.claude/skills/md-to-html/templates/default.html`          | Pandoc HTML5 template with Sotto design system (DM Serif Display + Inter fonts, Warm Amber palette) |
+| `~/.claude/skills/md-to-pdf/filters/download-images.lua`      | Lua filter that downloads remote images and inlines them as base64                                  |
+| `~/.claude/skills/md-to-pdf/filters/enhance-tables.lua`       | Lua filter for better table formatting                                                              |
+| `~/.claude/skills/md-to-pdf/filters/render-diagrams.lua`      | Lua filter that renders Mermaid diagrams to inline SVG                                              |
+| `~/.claude/skills/md-to-html/scripts/inject-html-previews.py` | Post-processor for URL preview cards and citation popups                                            |
+
+### 9.5.1 Add the `AI_SKILLS_TOKEN` GitHub secret
+
+The rebuild script needs authenticated access to the private `affromero/AI-Skills` repo. Create a **fine-grained Personal Access Token** (PAT) with read-only access:
+
+1. Go to [github.com/settings/tokens?type=beta](https://github.com/settings/tokens?type=beta) (Fine-grained tokens)
+2. Click **Generate new token**
+3. Name: `sotto-ai-skills-readonly`
+4. Expiration: 1 year (or custom)
+5. Repository access: **Only select repositories** → select `affromero/AI-Skills`
+6. Permissions: **Contents** → Read-only (this is the only permission needed)
+7. Click **Generate token** and copy it
+
+Add it as a GitHub Actions secret:
+
+1. Go to `github.com/affromero/Sotto` → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `AI_SKILLS_TOKEN`
+4. Value: paste the token
+5. Click **Add secret**
+
+The deploy workflow passes this token to the server via SSH. The rebuild script uses it to clone/pull the AI-Skills repo automatically — no manual setup needed on new servers.
+
+### 9.5.2 How auto-cloning works
+
+The rebuild script (`scripts/rebuild-pitch.sh`) handles three scenarios:
+
+| Server state                             | What happens                                                 |
+| ---------------------------------------- | ------------------------------------------------------------ |
+| `~/.claude/` doesn't exist               | Full `git clone` into `~/.claude/`                           |
+| `~/.claude/` exists but isn't a git repo | Initializes git, fetches `skills/` and `agents/` from remote |
+| `~/.claude/.git` exists                  | `git pull origin main` to update                             |
+
+On subsequent deploys, it only pulls changes (fast). The token is passed as `GITHUB_TOKEN` env var by the CI/CD workflow and never written to disk.
+
+For **manual runs** on the server (outside CI/CD), you can either:
+
+- Set the token temporarily: `GITHUB_TOKEN=ghp_xxx bash scripts/rebuild-pitch.sh`
+- Or clone once manually: `GITHUB_TOKEN=ghp_xxx git clone https://x-access-token:ghp_xxx@github.com/affromero/AI-Skills.git ~/.claude`
+
+After the first clone, `git pull` within the repo works without a token (git caches the remote URL with credentials).
+
+### 9.5.2 Install Pandoc 3.x
+
+The pitch pipeline uses Pandoc 3.x features (MathML output, template variables, `--embed-resources`). Ubuntu's default `pandoc` package is often 2.x.
+
+```bash
+# Check if pandoc is installed and version
+pandoc --version 2>/dev/null | head -1
+
+# Install Pandoc 3.x if missing or outdated
+wget -q https://github.com/jgm/pandoc/releases/download/3.6.4/pandoc-3.6.4-1-amd64.deb -O /tmp/pandoc.deb
+sudo dpkg -i /tmp/pandoc.deb
+rm /tmp/pandoc.deb
+
+# Verify
+pandoc --version | head -1
+# pandoc 3.6.4
+```
+
+### 9.5.3 Install Playwright for screenshots
+
+The pitch pipeline captures screenshots of the live app using Playwright (Node.js headless browser).
+
+```bash
+cd ~/sotto
+
+# Install Playwright browsers (Chromium only — ~150MB)
+npx playwright install chromium
+
+# Install system dependencies for headless Chrome
+npx playwright install-deps chromium
+```
+
+### 9.5.4 Install Python tools
+
+The Lua filters and post-processing scripts need Python 3 with Pillow (for image resizing).
+
+```bash
+# Python 3 should already be installed on Ubuntu 24.04
+python3 --version
+
+# Install pip if needed
+sudo apt install -y python3-pip
+
+# Install Pillow (used by screenshot capture and image inlining)
+pip3 install --break-system-packages Pillow requests
+```
+
+### 9.5.5 Test the pitch rebuild
+
+```bash
+cd ~/sotto
+
+# Run the full pipeline
+bash scripts/rebuild-pitch.sh
+```
+
+Expected output:
+
+```
+================================================
+  Sotto Pitch Rebuild — 2026-02-10
+================================================
+
+=== Step 1: Seed demo data ===
+  Demo user: ... (demo@sotto.fm)
+  ...
+=== Step 2: Capture screenshots ===
+  Captured: landing (1440x900)
+  ...
+=== Step 3: Generate app showcase doc ===
+  Generated: docs/99-app-showcase.md
+=== Step 4: Build HTML ===
+  Converting: 99-app-showcase.md → 99-app-showcase.html
+  ...
+  Converted: 21, Skipped: 0
+=== Step 5: Build manifest ===
+  Created new manifest
+================================================
+  Pitch rebuild complete!
+================================================
+```
+
+### 9.5.6 CI/CD integration
+
+The pitch rebuild runs automatically after every deploy via the "Rebuild pitch deck" step in `.github/workflows/deploy.yml`. The workflow:
+
+1. Passes `AI_SKILLS_TOKEN` to the server via SSH environment variable
+2. Runs `scripts/rebuild-pitch.sh` which auto-clones/pulls `AI-Skills` using that token
+3. Falls back to plain Pandoc output if the clone fails (non-fatal)
+
+No manual server setup required for new deployments — the first CI/CD run bootstraps everything.
+
+---
+
 ## Quick Reference
 
 ### SSH Access
@@ -1442,6 +1596,24 @@ sudo systemctl reload caddy                 # Reload config (no downtime)
 sudo systemctl restart caddy                # Full restart
 sudo journalctl -u caddy --no-pager -n 50  # View logs
 cat /var/log/caddy/sotto-access.log         # Access log
+```
+
+### Pitch Deck Rebuild
+
+```bash
+cd ~/sotto
+
+# Full rebuild (screenshots + HTML + manifest)
+bash scripts/rebuild-pitch.sh
+
+# Seed demo data only
+npx tsx prisma/seed-demo.ts
+
+# Capture screenshots only (app must be running)
+npx tsx scripts/capture-pitch-screenshots.ts
+
+# Update AI-Skills repo (pandoc template + lua filters)
+cd ~/.claude && git pull origin main
 ```
 
 ### System Monitoring
