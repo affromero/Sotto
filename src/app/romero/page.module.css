@@ -307,6 +307,71 @@
   animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.35s both;
 }
 
+/* Topic Suggestions — Breath Cycle */
+.topicSuggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 540px;
+  margin: 0 auto 32px;
+  animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.4s both;
+}
+
+.topicPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  background: rgba(217, 119, 6, 0.08);
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: #f6ad55;
+  text-decoration: none;
+  cursor: pointer;
+  will-change: transform, opacity;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+  animation:
+    topicEnter 500ms cubic-bezier(0.16, 1, 0.3, 1) var(--enter-delay) both,
+    breathe var(--breath-duration) ease-in-out var(--breath-delay) infinite;
+}
+
+.topicPill:hover {
+  animation-play-state: paused;
+  background: rgba(217, 119, 6, 0.18);
+  border-color: rgba(217, 119, 6, 0.6);
+  color: #fbbf68;
+  box-shadow: 0 0 16px rgba(217, 119, 6, 0.2);
+}
+
+@keyframes topicEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(0.97);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .heroCtas {
   display: flex;
   gap: 14px;
@@ -2065,6 +2130,16 @@
     margin-bottom: 28px;
   }
 
+  .topicSuggestions {
+    gap: 8px;
+    margin-bottom: 28px;
+  }
+
+  .topicPill {
+    font-size: 13px;
+    padding: 7px 14px;
+  }
+
   .heroCtas {
     flex-direction: column;
     align-items: center;
@@ -2302,6 +2377,15 @@
   .chatSpinner,
   .ripple {
     animation: none;
+  }
+
+  .topicPill {
+    animation: none;
+    opacity: 0.85;
+  }
+
+  .topicPill:hover {
+    transform: none;
   }
 
   .bar {
