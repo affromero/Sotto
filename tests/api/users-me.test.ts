@@ -4,6 +4,18 @@ import { NextRequest } from 'next/server';
 const mockAuth = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockUserUpdate = vi.fn();
+const mockTagFindMany = vi.fn();
+const mockUserInterestDeleteMany = vi.fn();
+const mockUserInterestCreateMany = vi.fn();
+
+const txClient = {
+  user: { update: (...args: unknown[]) => mockUserUpdate(...args) },
+  tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
+  userInterest: {
+    deleteMany: (...args: unknown[]) => mockUserInterestDeleteMany(...args),
+    createMany: (...args: unknown[]) => mockUserInterestCreateMany(...args),
+  },
+};
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -15,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       update: (...args: unknown[]) => mockUserUpdate(...args),
     },
+    $transaction: (fn: (tx: typeof txClient) => Promise<unknown>) => fn(txClient),
   },
 }));
 

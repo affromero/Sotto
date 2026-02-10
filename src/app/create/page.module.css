@@ -36,7 +36,9 @@
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background var(--transition-fast), color var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -96,6 +98,109 @@
   background: var(--color-error-light);
 }
 
+/* Inspire Me Button — breathing glow + snake border effect */
+
+.inspireRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.inspireMeButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 10px 20px;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-surface);
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  z-index: 0;
+  overflow: visible;
+  animation: breathe 3s ease-in-out infinite;
+  transition: transform var(--transition-fast);
+}
+
+/* Animated conic-gradient border (snake effect) */
+.inspireMeButton::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--snake-angle, 0deg),
+    #d97706 0%,
+    #fbbf24 25%,
+    transparent 50%,
+    #fbbf24 75%,
+    #d97706 100%
+  );
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  animation: snakeBorder 3s linear infinite;
+  z-index: -1;
+}
+
+/* Subtle glow behind button */
+.inspireMeButton::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at center, rgba(217, 119, 6, 0.12) 0%, transparent 70%);
+  z-index: -2;
+  animation: breathe 3s ease-in-out infinite;
+}
+
+.inspireMeButton:hover {
+  transform: translateY(-1px);
+}
+
+.inspireMeButton:hover::after {
+  background: radial-gradient(ellipse at center, rgba(217, 119, 6, 0.2) 0%, transparent 70%);
+}
+
+.inspireMeButton:active {
+  transform: translateY(0);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(217, 119, 6, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(217, 119, 6, 0.25);
+  }
+}
+
+@keyframes snakeBorder {
+  0% {
+    --snake-angle: 0deg;
+  }
+  100% {
+    --snake-angle: 360deg;
+  }
+}
+
+@property --snake-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
 /* Chat Area */
 
 .chatArea {
@@ -147,8 +252,12 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Voice Step Actions */

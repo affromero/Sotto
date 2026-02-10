@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
+import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
@@ -17,6 +18,12 @@ export default function CreatePage() {
     usePremiumVoice: false,
   });
   const [error, setError] = useState<string | null>(null);
+  const [inspireMeOpen, setInspireMeOpen] = useState(false);
+  const [initialTopic, setInitialTopic] = useState<string | undefined>();
+
+  const handleInspireTopic = useCallback((topic: string) => {
+    setInitialTopic(topic);
+  }, []);
 
   const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
     setMetadata(meta);
@@ -87,7 +94,8 @@ export default function CreatePage() {
               {step === 'generating' && 'Creating Your Podcast'}
             </h1>
             <p className={styles.subtitle}>
-              {step === 'discovery' && 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'}
+              {step === 'discovery' &&
+                'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'}
               {step === 'voice' && 'Pick voices for your Host and Expert, or use auto-assign.'}
               {step === 'generating' && 'Hang tight while we generate your podcast.'}
             </p>
@@ -103,7 +111,14 @@ export default function CreatePage() {
               aria-label="Dismiss error"
               type="button"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
@@ -123,9 +138,37 @@ export default function CreatePage() {
 
         {step === 'discovery' && (
           <div className={styles.chatArea}>
-            <DiscoveryChat onComplete={handleDiscoveryComplete} />
+            <div className={styles.inspireRow}>
+              <button
+                type="button"
+                className={styles.inspireMeButton}
+                onClick={() => setInspireMeOpen(true)}
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 3l1.6 5.1H19l-4.2 3 1.6 5.1L12 13.2l-4.4 3 1.6-5.1-4.2-3h5.4z" />
+                </svg>
+                Inspire Me
+              </button>
+            </div>
+            <DiscoveryChat onComplete={handleDiscoveryComplete} initialTopic={initialTopic} />
           </div>
         )}
+
+        <InspireMe
+          open={inspireMeOpen}
+          onClose={() => setInspireMeOpen(false)}
+          onSelectTopic={handleInspireTopic}
+        />
 
         {step === 'voice' && (
           <div className={styles.chatArea}>
@@ -138,11 +181,7 @@ export default function CreatePage() {
               >
                 Back
               </button>
-              <button
-                type="button"
-                className={styles.generateButton}
-                onClick={handleGenerate}
-              >
+              <button type="button" className={styles.generateButton} onClick={handleGenerate}>
                 Generate Podcast
               </button>
             </div>

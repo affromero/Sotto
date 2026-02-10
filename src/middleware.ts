@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
-const PROTECTED_ROUTES = ['/dashboard', '/create', '/settings', '/billing', '/analytics', '/admin'];
+const PROTECTED_ROUTES = [
+  '/dashboard',
+  '/create',
+  '/settings',
+  '/billing',
+  '/analytics',
+  '/admin',
+  '/onboarding',
+];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 // Public routes that bypass the password gate (exact match)

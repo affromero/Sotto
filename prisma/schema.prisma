@@ -76,6 +76,10 @@ model User {
   // Credit transactions
   creditTransactions CreditTransaction[]
 
+  // Interests (onboarding + settings)
+  interests             UserInterest[]
+  hasCompletedOnboarding Boolean @default(false)
+
   @@index([teamId])
   @@index([role])
 }
@@ -499,10 +503,11 @@ model Save {
 // ============ TAGS ============
 
 model Tag {
-  id       String       @id @default(cuid())
-  name     String       @unique
-  slug     String       @unique
-  podcasts PodcastTag[]
+  id            String         @id @default(cuid())
+  name          String         @unique
+  slug          String         @unique
+  podcasts      PodcastTag[]
+  userInterests UserInterest[]
 
   @@index([slug])
 }
@@ -516,6 +521,25 @@ model PodcastTag {
   tag     Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([podcastId, tagId])
+  @@index([tagId])
+}
+
+// ============ USER INTERESTS ============
+
+model UserInterest {
+  id        String   @id @default(cuid())
+  userId    String
+  tagId     String
+  source    String   @default("onboarding") // "onboarding" | "behavioral" | "manual"
+  weight    Float    @default(1.0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@index([userId])
   @@index([tagId])
 }
 

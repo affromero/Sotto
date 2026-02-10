@@ -16,7 +16,7 @@ The schema is organized into logical sections:
 | References        | Reference                                                        | Per-podcast `[N]` citations with title, authors, year, URL, type, verificationStatus        |
 | Interactions      | Interaction                                                      | Q&A during playback                                                                         |
 | Social Engagement | Like, Save                                                       | User engagement                                                                             |
-| Tags              | Tag, PodcastTag                                                  | Content taxonomy                                                                            |
+| Tags & Interests  | Tag, PodcastTag, UserInterest                                    | Content taxonomy + user interest selections (onboarding/manual/behavioral)                  |
 | Notifications     | Notification, PushSubscription                                   | In-app + push notifications                                                                 |
 | Jobs              | Job                                                              | BullMQ job tracking                                                                         |
 | Voice Clones      | VoiceClone                                                       | User voice clones (name, ElevenLabs ID, source)                                             |

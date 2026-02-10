@@ -67,7 +67,7 @@ export class SottoMLProvider implements MLProvider {
   }
 
   async computeScore(userId: string, podcastId: string): Promise<ScoredPodcast> {
-    const [userFeature, podcastFeature, podcast] = await Promise.all([
+    const [userFeature, podcastFeature, podcast, userInterests, podcastTags] = await Promise.all([
       prisma.userFeature.findUnique({ where: { userId } }),
       prisma.podcastFeature.findUnique({ where: { podcastId } }),
       prisma.podcast.findUnique({
@@ -80,6 +80,14 @@ export class SottoMLProvider implements MLProvider {
           userId: true,
           playCount: true,
         },
+      }),
+      prisma.userInterest.findMany({
+        where: { userId },
+        select: { tagId: true, weight: true },
+      }),
+      prisma.podcastTag.findMany({
+        where: { podcastId },
+        select: { tagId: true },
       }),
     ]);
 
@@ -108,6 +116,25 @@ export class SottoMLProvider implements MLProvider {
         relevance = result[0]?.similarity ?? 0;
       } catch {
         relevance = 0.3; // Fallback
+      }
+    }
+
+    // Boost relevance with explicit UserInterest matches
+    if (userInterests.length > 0 && podcastTags.length > 0) {
+      const interestMap = new Map(userInterests.map((i) => [i.tagId, i.weight]));
+      const podcastTagIds = new Set(podcastTags.map((t) => t.tagId));
+      let matchWeight = 0;
+      let totalWeight = 0;
+      for (const [tagId, weight] of interestMap) {
+        totalWeight += weight;
+        if (podcastTagIds.has(tagId)) {
+          matchWeight += weight;
+        }
+      }
+      if (totalWeight > 0) {
+        const interestRelevance = matchWeight / totalWeight;
+        // Blend: explicit interests (stronger prior) with embedding similarity
+        relevance = Math.min(relevance * 0.5 + interestRelevance * 0.5, 1);
       }
     }
 
