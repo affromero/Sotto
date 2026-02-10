@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
+import { CreateAsSottoButton } from './CreateAsSottoButton';
 import styles from './page.module.css';
 
 interface PageProps {
@@ -67,6 +68,7 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
           <h1 className={styles.title}>Podcasts</h1>
           <p className={styles.subtitle}>{total.toLocaleString()} total podcasts</p>
         </div>
+        <CreateAsSottoButton />
       </div>
 
       <form className={styles.filters} action="/admin/podcasts" method="get">

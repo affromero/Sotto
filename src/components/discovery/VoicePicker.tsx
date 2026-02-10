@@ -21,6 +21,10 @@ interface VoiceClone {
   createdAt: string;
 }
 
+interface SharedVoice extends VoiceClone {
+  owner: { id: string; name: string | null };
+}
+
 interface VoiceCredits {
   used: number;
   total: number;
@@ -40,6 +44,7 @@ interface VoicePickerProps {
 export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
   const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
+  const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
   const [credits, setCredits] = useState<VoiceCredits>({ used: 0, total: 0, remaining: 0 });
   const [usePremium, setUsePremium] = useState(false);
   const [hostVoiceId, setHostVoiceId] = useState<string | undefined>();
@@ -54,6 +59,7 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
           const data = await res.json();
           setPoolVoices(data.poolVoices || []);
           setUserClones(data.userClones || []);
+          setSharedVoices(data.sharedVoices || []);
           setCredits(data.credits || { used: 0, total: 0, remaining: 0 });
         }
       } catch {
@@ -96,7 +102,16 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
       {!usePremium && (
         <div className={styles.autoAssign}>
           <div className={styles.autoAssignIcon} aria-hidden="true">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="23" />
@@ -118,7 +133,9 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
             <span className={styles.toggleTitle}>Use Premium Voices</span>
             <span className={styles.toggleHint}>
               {hasCredits ? (
-                <span className={styles.creditCount}>{credits.remaining} credit{credits.remaining !== 1 ? 's' : ''} remaining</span>
+                <span className={styles.creditCount}>
+                  {credits.remaining} credit{credits.remaining !== 1 ? 's' : ''} remaining
+                </span>
               ) : (
                 'No credits remaining this month'
               )}
@@ -161,6 +178,26 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                 <div className={styles.separator} />
               </>
             )}
+            {sharedVoices.length > 0 && (
+              <>
+                <span className={styles.clonesLabel}>Shared With You</span>
+                <span className={styles.sharedVoiceNote}>+1 credit per shared voice used</span>
+                <div className={styles.voiceGrid}>
+                  {sharedVoices.map((voice) => (
+                    <VoiceCard
+                      key={voice.elevenLabsVoiceId}
+                      voiceId={voice.elevenLabsVoiceId}
+                      name={voice.name}
+                      accent="shared"
+                      character={`by ${voice.owner.name || 'Unknown'}`}
+                      isSelected={hostVoiceId === voice.elevenLabsVoiceId}
+                      onSelect={() => setHostVoiceId(voice.elevenLabsVoiceId)}
+                    />
+                  ))}
+                </div>
+                <div className={styles.separator} />
+              </>
+            )}
             <div className={styles.voiceGrid}>
               {poolVoices.map((voice) => (
                 <VoiceCard
@@ -191,6 +228,26 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                       character="Cloned voice"
                       isSelected={expertVoiceId === clone.elevenLabsVoiceId}
                       onSelect={() => setExpertVoiceId(clone.elevenLabsVoiceId)}
+                    />
+                  ))}
+                </div>
+                <div className={styles.separator} />
+              </>
+            )}
+            {sharedVoices.length > 0 && (
+              <>
+                <span className={styles.clonesLabel}>Shared With You</span>
+                <span className={styles.sharedVoiceNote}>+1 credit per shared voice used</span>
+                <div className={styles.voiceGrid}>
+                  {sharedVoices.map((voice) => (
+                    <VoiceCard
+                      key={voice.elevenLabsVoiceId}
+                      voiceId={voice.elevenLabsVoiceId}
+                      name={voice.name}
+                      accent="shared"
+                      character={`by ${voice.owner.name || 'Unknown'}`}
+                      isSelected={expertVoiceId === voice.elevenLabsVoiceId}
+                      onSelect={() => setExpertVoiceId(voice.elevenLabsVoiceId)}
                     />
                   ))}
                 </div>

@@ -64,6 +64,53 @@ export async function POST(request: NextRequest) {
   return NextResponse.json(voiceClone, { status: 201 });
 }
 
+export async function PATCH(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { voiceCloneId, requestable } = body;
+
+  if (!voiceCloneId || typeof voiceCloneId !== 'string' || typeof requestable !== 'boolean') {
+    return NextResponse.json(
+      { error: 'voiceCloneId and requestable are required' },
+      { status: 400 }
+    );
+  }
+
+  const voiceClone = await prisma.voiceClone.findUnique({
+    where: { id: voiceCloneId },
+  });
+
+  if (!voiceClone) {
+    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+  }
+
+  if (voiceClone.userId !== session.user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Only Studio tier users can make voices requestable
+  if (requestable) {
+    const tier = await getUserTier(session.user.id);
+    if (tier !== 'STUDIO') {
+      return NextResponse.json(
+        { error: 'Only Studio tier users can share voice clones' },
+        { status: 403 }
+      );
+    }
+  }
+
+  const updated = await prisma.voiceClone.update({
+    where: { id: voiceCloneId },
+    data: { requestable },
+  });
+
+  return NextResponse.json(updated);
+}
+
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -90,6 +137,11 @@ export async function DELETE(request: NextRequest) {
   }
 
   await deleteClonedVoice(voiceClone.elevenLabsVoiceId);
+
+  // Clean up voice requests for this clone
+  await prisma.voiceRequest.deleteMany({
+    where: { voiceCloneId },
+  });
 
   await prisma.voiceClone.delete({
     where: { id: voiceCloneId },

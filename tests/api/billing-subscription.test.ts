@@ -32,6 +32,7 @@ vi.mock('@/lib/stripe', async () => ({
       maxDurationMinutes: 5,
       maxVoiceClones: 0,
       premiumVoiceSurcharge: 0,
+      sharedVoiceSurcharge: 0,
       hasPremiumSfx: false,
       canDownload: false,
       canMakePrivate: false,
@@ -46,6 +47,7 @@ vi.mock('@/lib/stripe', async () => ({
       maxDurationMinutes: 10,
       maxVoiceClones: 3,
       premiumVoiceSurcharge: 0,
+      sharedVoiceSurcharge: 1,
       hasPremiumSfx: false,
       canDownload: true,
       canMakePrivate: true,
@@ -60,6 +62,7 @@ vi.mock('@/lib/stripe', async () => ({
       maxDurationMinutes: 10,
       maxVoiceClones: 10,
       premiumVoiceSurcharge: 0,
+      sharedVoiceSurcharge: 1,
       hasPremiumSfx: true,
       canDownload: true,
       canMakePrivate: true,
@@ -91,6 +94,7 @@ const mockActiveSubscription = {
   currentPeriodEnd: new Date('2026-02-01T00:00:00Z'),
   cancelAtPeriodEnd: false,
   premiumCreditsUsed: 1,
+  voiceCreatorAddonActive: false,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
 };
@@ -99,6 +103,7 @@ const mockCancelledSubscription = {
   ...mockActiveSubscription,
   status: 'CANCELLED',
   cancelAtPeriodEnd: true,
+  voiceCreatorAddonActive: false,
 };
 
 const mockStudioSubscription = {
@@ -107,6 +112,7 @@ const mockStudioSubscription = {
   tier: 'STUDIO',
   stripePriceId: 'price_studio',
   premiumCreditsUsed: 5,
+  voiceCreatorAddonActive: false,
 };
 
 describe('GET /api/billing/subscription', () => {
@@ -291,5 +297,32 @@ describe('GET /api/billing/subscription', () => {
     expect(response.status).toBe(500);
     const body = await response.json();
     expect(body).toHaveProperty('error');
+  });
+
+  it('returns voiceCreatorAddonActive for active subscription', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaSubscriptionFindUnique.mockResolvedValue({
+      ...mockActiveSubscription,
+      voiceCreatorAddonActive: true,
+    });
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.voiceCreatorAddonActive).toBe(true);
+  });
+
+  it('returns voiceCreatorAddonActive false when no subscription', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPrismaSubscriptionFindUnique.mockResolvedValue(null);
+
+    const request = createRequest();
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.voiceCreatorAddonActive).toBe(false);
   });
 });

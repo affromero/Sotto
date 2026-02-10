@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
@@ -12,6 +12,8 @@ type Step = 'discovery' | 'voice' | 'generating';
 
 export default function CreatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const createAsSotto = searchParams.get('as') === 'sotto';
   const [step, setStep] = useState<Step>('discovery');
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({
@@ -41,18 +43,32 @@ export default function CreatePage() {
     setError(null);
 
     try {
-      const response = await fetch('/api/podcasts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: metadata.topic,
-          topic: metadata.topic,
-          metadata,
-          hostVoiceId: voiceSelection.hostVoiceId,
-          expertVoiceId: voiceSelection.expertVoiceId,
-          usePremiumVoice: voiceSelection.usePremiumVoice,
-        }),
-      });
+      let response: Response;
+
+      if (createAsSotto) {
+        // Admin creating as @sotto system account
+        response = await fetch('/api/admin/podcasts/create-as-sotto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: metadata.topic,
+            topic: metadata.topic,
+          }),
+        });
+      } else {
+        response = await fetch('/api/podcasts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: metadata.topic,
+            topic: metadata.topic,
+            metadata,
+            hostVoiceId: voiceSelection.hostVoiceId,
+            expertVoiceId: voiceSelection.expertVoiceId,
+            usePremiumVoice: voiceSelection.usePremiumVoice,
+          }),
+        });
+      }
 
       if (!response.ok) {
         const data = await response.json();
@@ -65,7 +81,7 @@ export default function CreatePage() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, router]);
+  }, [metadata, voiceSelection, router, createAsSotto]);
 
   return (
     <main className={styles.main}>
@@ -94,10 +110,13 @@ export default function CreatePage() {
               {step === 'generating' && 'Creating Your Podcast'}
             </h1>
             <p className={styles.subtitle}>
-              {step === 'discovery' &&
-                'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'}
-              {step === 'voice' && 'Pick voices for your Host and Expert, or use auto-assign.'}
-              {step === 'generating' && 'Hang tight while we generate your podcast.'}
+              {createAsSotto
+                ? 'Creating as @sotto — this podcast will be owned by the official Sotto account.'
+                : step === 'discovery'
+                  ? 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'
+                  : step === 'voice'
+                    ? 'Pick voices for your Host and Expert, or use auto-assign.'
+                    : 'Hang tight while we generate your podcast.'}
             </p>
           </div>
         </header>

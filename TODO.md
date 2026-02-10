@@ -420,3 +420,17 @@ Comprehensive tests to add for full coverage across the app.
 - [x] `tests/hooks/useAuth.test.ts` — auth convenience hook (session data, loading, redirect)
 
 **277/277 items complete. All tests written and passing.**
+
+---
+
+## 28. Voice Marketplace (Future)
+
+- [ ] Revenue sharing — voice owners earn credits/money when others use their voice (Stripe Connect)
+- [ ] Voice discovery page — browse/search public requestable voices by genre, accent, gender
+- [ ] Voice ratings/reviews — users rate shared voices after using them
+- [ ] Voice usage analytics — dashboard showing how many times each voice was used, by whom
+- [ ] Allowlist entry cap — limit to 50 entries per voice to prevent abuse
+- [ ] Follower-only filter — voice owner can restrict allowlist to followers only
+- [ ] Script review before audio generation — manual review step at REVIEWING_SCRIPT status (if revisited should be redesigned from scratch)
+- [ ] Voice clone moderation queue — admin approval before new voices go live
+- [ ] Dedicated voice types file — `src/types/voice.ts` consolidating inline types from VoiceManager/VoicePicker

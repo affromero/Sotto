@@ -213,6 +213,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           status: true,
           userId: true,
           usePremiumVoice: true,
+          creditCost: true,
           user: { select: { subscription: { select: { tier: true } } } },
         },
       });
@@ -224,10 +225,11 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         data: { status: 'FAILED' },
       });
 
-      // Refund credits
+      // Refund credits — use stored creditCost for accuracy (includes shared voice surcharges)
       const tier = (podcast.user.subscription?.tier ?? 'FREE') as TierName;
       const limits = TIER_LIMITS[tier];
-      const refundAmount = 1 + (podcast.usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
+      const refundAmount =
+        podcast.creditCost ?? 1 + (podcast.usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
 
       await refundCredits(podcast.userId, refundAmount, 'generation_failed', podcastId);
 

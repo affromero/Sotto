@@ -15,6 +15,7 @@ const mockPrismaPodcastUpdate = vi.fn();
 const mockPrismaJobUpdateMany = vi.fn();
 const mockPrismaSubscriptionFindUnique = vi.fn();
 const mockPrismaUserFindUnique = vi.fn();
+const mockPrismaVoiceCloneFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -30,6 +31,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
+    },
+    voiceClone: {
+      findMany: (...args: unknown[]) => mockPrismaVoiceCloneFindMany(...args),
     },
     $transaction: (operations: unknown) => mockPrismaTransaction(operations),
   },
@@ -94,6 +98,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     vi.clearAllMocks();
     mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
     mockPrismaUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockPrismaVoiceCloneFindMany.mockResolvedValue([]);
     mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
     mockConsumeCredit.mockResolvedValue(undefined);
   });
@@ -231,7 +236,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     expect(data).toEqual({
       error: 'Insufficient credits: need 2, have 0. Buy more credits or upgrade your plan.',
     });
-    expect(mockCanGenerate).toHaveBeenCalledWith(0, true, 'FREE', 'USER');
+    expect(mockCanGenerate).toHaveBeenCalledWith(0, true, 'FREE', 'USER', 0);
     expect(mockConsumeCredit).not.toHaveBeenCalled();
     expect(mockPrismaPodcastUpdate).not.toHaveBeenCalled();
   });
@@ -369,7 +374,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const response = await POST(request, params);
 
     expect(response.status).toBe(200);
-    expect(mockCanGenerate).toHaveBeenCalledWith(5, true, 'FREE', 'USER');
+    expect(mockCanGenerate).toHaveBeenCalledWith(5, true, 'FREE', 'USER', 0);
     expect(mockConsumeCredit).toHaveBeenCalledWith(
       'user-005',
       2,
@@ -398,7 +403,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const response = await POST(request, params);
 
     expect(response.status).toBe(200);
-    expect(mockCanGenerate).toHaveBeenCalledWith(5, false, 'FREE', 'USER');
+    expect(mockCanGenerate).toHaveBeenCalledWith(5, false, 'FREE', 'USER', 0);
     expect(mockConsumeCredit).toHaveBeenCalledWith(
       'user-006',
       1,
@@ -508,7 +513,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const params = await createMockParams('podcast-016');
     await POST(request, params);
 
-    expect(updateOrder).toEqual(['update', 'addJob']);
+    expect(updateOrder).toEqual(['update', 'update', 'addJob']);
   });
 
   it('validates podcastId parameter is provided', async () => {
@@ -551,6 +556,34 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
           select: { sourceUrl: true, sourceContent: true, durationTarget: true },
         },
       },
+    });
+  });
+
+  it('stores creditCost on podcast after consuming credits', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+    mockPrismaPodcastFindUnique.mockResolvedValue({
+      id: 'podcast-cc',
+      userId: 'user-001',
+      status: 'PENDING',
+      usePremiumVoice: false,
+      hostVoiceId: 'shared-voice-1',
+      expertVoiceId: null,
+      discovery: null,
+    });
+    mockPrismaVoiceCloneFindMany.mockResolvedValue([{ elevenLabsVoiceId: 'shared-voice-1' }]);
+    mockCanGenerate.mockReturnValue({ allowed: true, cost: 2 });
+    mockConsumeCredit.mockResolvedValue(undefined);
+    mockPrismaPodcastUpdate.mockResolvedValue({});
+
+    const request = createMockRequest();
+    const params = await createMockParams('podcast-cc');
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(200);
+    expect(mockCanGenerate).toHaveBeenCalledWith(5, false, 'FREE', 'USER', 1);
+    expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'podcast-cc' },
+      data: { creditCost: 2 },
     });
   });
 });
