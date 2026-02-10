@@ -22,6 +22,8 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     READY: 'success',
     UPDATING: 'warning',
     FAILED: 'error',
+    IMPORTING: 'info',
+    TRANSCRIBING: 'info',
   };
 
 const statusLabels: Record<PodcastStatus, string> = {
@@ -36,6 +38,8 @@ const statusLabels: Record<PodcastStatus, string> = {
   READY: 'Ready',
   UPDATING: 'Updating',
   FAILED: 'Failed',
+  IMPORTING: 'Importing...',
+  TRANSCRIBING: 'Transcribing...',
 };
 
 const tierLabels: Record<string, string> = {

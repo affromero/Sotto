@@ -35,6 +35,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           id: true,
           name: true,
           image: true,
+          handle: true,
         },
       },
       segments: {
@@ -83,6 +84,51 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           verificationDetails: true,
         },
       },
+      forkedFrom: {
+        select: {
+          id: true,
+          title: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              handle: true,
+              image: true,
+            },
+          },
+        },
+      },
+      forks: {
+        take: 10,
+        orderBy: { forkCount: 'desc' },
+        select: {
+          id: true,
+          title: true,
+          remixNote: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              handle: true,
+              image: true,
+            },
+          },
+        },
+      },
+      versions: {
+        orderBy: { version: 'desc' },
+        select: {
+          id: true,
+          version: true,
+          audioUrl: true,
+          duration: true,
+          changeType: true,
+          changeSummary: true,
+          interactionId: true,
+          createdAt: true,
+        },
+      },
     },
   });
 
@@ -126,7 +172,11 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     forkCount: podcast.forkCount,
     saveCount: podcast.saveCount,
     createdAt: podcast.createdAt.toISOString(),
+    source: podcast.source,
+    isHumanContent: podcast.isHumanContent,
     forkedFromId: podcast.forkedFromId,
+    remixNote: podcast.remixNote,
+    currentVersion: podcast.currentVersion,
     user: podcast.user,
     segments: podcast.segments.map((s) => ({
       ...s,
@@ -140,6 +190,30 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     })),
     pdfUrl: podcast.pdfUrl,
     tags: podcast.tags.map((pt) => pt.tag),
+    forkedFrom: podcast.forkedFrom
+      ? {
+          id: podcast.forkedFrom.id,
+          title: podcast.forkedFrom.title,
+          user: podcast.forkedFrom.user,
+        }
+      : null,
+    forks: podcast.forks.map((f) => ({
+      id: f.id,
+      title: f.title,
+      remixNote: f.remixNote,
+      createdAt: f.createdAt.toISOString(),
+      user: f.user,
+    })),
+    versions: podcast.versions.map((v) => ({
+      id: v.id,
+      version: v.version,
+      audioUrl: v.audioUrl,
+      duration: v.duration,
+      changeType: v.changeType,
+      changeSummary: v.changeSummary,
+      interactionId: v.interactionId,
+      createdAt: v.createdAt.toISOString(),
+    })),
     isLiked,
     isSaved,
   };
@@ -147,11 +221,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <PodcastPlayerView
-          podcast={podcastData}
-          isOwner={isOwner}
-          isAuthenticated={!!userId}
-        />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAuthenticated={!!userId} />
       </div>
     </main>
   );

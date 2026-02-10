@@ -17,7 +17,7 @@ interface Pick {
   likeCount: number;
   forkCount: number;
   createdAt: string;
-  user: { id: string; name: string | null; image: string | null };
+  user: { id: string; name: string | null; image: string | null; handle?: string | null };
   tags: Array<{ id: string; name: string; slug: string }>;
   score: number;
   signals: RecommendationSignals;
@@ -49,7 +49,13 @@ function pickToPodcastSummary(pick: Pick): PodcastSummary {
     likeCount: pick.likeCount,
     forkCount: pick.forkCount,
     createdAt: pick.createdAt,
-    user: pick.user,
+    source: 'WEB',
+    isHumanContent: false,
+    forkedFromId: null,
+    user: {
+      ...pick.user,
+      handle: pick.user.handle || null,
+    },
     tags: pick.tags,
   };
 }

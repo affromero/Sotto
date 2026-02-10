@@ -47,6 +47,8 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     READY: 'success',
     UPDATING: 'warning',
     FAILED: 'error',
+    IMPORTING: 'info',
+    TRANSCRIBING: 'info',
   };
 
 function formatDate(dateString: string): string {

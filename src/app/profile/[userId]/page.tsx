@@ -55,8 +55,11 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           likeCount: true,
           forkCount: true,
           createdAt: true,
+          source: true,
+          isHumanContent: true,
+          forkedFromId: true,
           user: {
-            select: { id: true, name: true, image: true },
+            select: { id: true, name: true, image: true, handle: true },
           },
           tags: {
             include: {

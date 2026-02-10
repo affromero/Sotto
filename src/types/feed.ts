@@ -8,7 +8,7 @@ export interface FeedResponse {
   hasMore: boolean;
 }
 
-export type FeedSort = 'recent' | 'popular' | 'trending';
+export type FeedSort = 'recent' | 'popular' | 'trending' | 'most_forked';
 
 export interface FeedFilters {
   search?: string;

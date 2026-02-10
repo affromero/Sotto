@@ -14,16 +14,17 @@ export const stripe = STRIPE_SECRET_KEY
 /**
  * Credit-based pricing tiers
  *
- * Free $0 / Starter $14 / Pro $34 / Studio $69
+ * Free $0 / Starter $14 / Pro $34 / Studio $69 / Power $9 (BYOK)
  * All tiers use ElevenLabs TTS (no OpenAI fallback — quality is the product).
  * Free caps at 5 min. All paid tiers cap at 10 min.
- * Each podcast generation costs 1 credit. No premium voice surcharge.
+ * Each podcast generation costs 1 credit. Imports cost 0.5 credits.
  * Each interaction costs 0.25 credits.
  */
 export const INTERACTION_CREDIT_COST = 0.25;
+export const IMPORT_CREDIT_COST = 0.5;
 export const TIER_LIMITS = {
   FREE: {
-    creditsMonthly: 1,
+    creditsMonthly: 3,
     maxRollover: 0,
     maxDurationMinutes: 5,
     maxVoiceClones: 0,
@@ -36,9 +37,10 @@ export const TIER_LIMITS = {
     canListOnMarketplace: false,
     canViewAnalytics: false,
     canExportPdf: false,
+    requiresByok: false,
   },
   STARTER: {
-    creditsMonthly: 3,
+    creditsMonthly: 5,
     maxRollover: 1,
     maxDurationMinutes: 10,
     maxVoiceClones: 1,
@@ -51,6 +53,7 @@ export const TIER_LIMITS = {
     canListOnMarketplace: false,
     canViewAnalytics: false,
     canExportPdf: false,
+    requiresByok: false,
   },
   PRO: {
     creditsMonthly: 10,
@@ -66,6 +69,7 @@ export const TIER_LIMITS = {
     canListOnMarketplace: false,
     canViewAnalytics: true,
     canExportPdf: true,
+    requiresByok: false,
   },
   STUDIO: {
     creditsMonthly: 20,
@@ -81,6 +85,23 @@ export const TIER_LIMITS = {
     canListOnMarketplace: true,
     canViewAnalytics: true,
     canExportPdf: true,
+    requiresByok: false,
+  },
+  POWER: {
+    creditsMonthly: 50,
+    maxRollover: 10,
+    maxDurationMinutes: 10,
+    maxVoiceClones: 10,
+    premiumVoiceSurcharge: 0,
+    sharedVoiceSurcharge: 1,
+    hasPremiumSfx: true,
+    canDownload: true,
+    canMakePrivate: true,
+    canBrowseVoiceLibrary: true,
+    canListOnMarketplace: true,
+    canViewAnalytics: true,
+    canExportPdf: true,
+    requiresByok: true,
   },
   ADMIN: {
     creditsMonthly: Infinity,
@@ -96,6 +117,7 @@ export const TIER_LIMITS = {
     canListOnMarketplace: true,
     canViewAnalytics: true,
     canExportPdf: true,
+    requiresByok: false,
   },
 } as const;
 

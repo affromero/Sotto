@@ -21,6 +21,7 @@ export enum JobType {
   GENERATE_PDF = 'generate_pdf',
   POLL_TWITTER_MENTIONS = 'poll_twitter_mentions',
   REPLY_TWITTER = 'reply_twitter',
+  IMPORT_AUDIO = 'import_audio',
   INGEST_EVENTS = 'ingest_events',
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
@@ -104,6 +105,14 @@ export interface ReplyTwitterPayload {
   podcastId: string;
   tweetMentionId: string;
   originalTweetId: string;
+}
+
+export interface ImportAudioPayload {
+  podcastId: string;
+  userId: string;
+  audioKey: string;
+  transcriptText?: string;
+  isHumanContent: boolean;
 }
 
 export interface IngestEventsPayload {
@@ -328,5 +337,6 @@ export const eventIngestionQueue = createQueue('event-ingestion', {
   attempts: 2,
   removeOnComplete: { age: 3600, count: 500 },
 });
+export const audioImportQueue = createQueue('audio-import', { attempts: 2 });
 export const featureComputationQueue = createQueue('feature-computation', { attempts: 2 });
 export const dataExportQueue = createQueue('data-export', { attempts: 2 });
