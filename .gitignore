@@ -52,6 +52,10 @@ snap/
 .venv/
 __pycache__/
 
+# Pitch builds (generated HTML)
+.pitch/
+!.pitch/.gitkeep
+
 # Accounting
 accounting/reports/*.html
 accounting/reports/*.pdf
