@@ -6,7 +6,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # ── Install dependencies if missing ──────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-bash "$SCRIPT_DIR/install-deps.sh"
+bash "$SCRIPT_DIR/install-deps.sh" --pitch
 
 # ── Configuration ──────────────────────────────────────────────────
 APP_URL="${APP_URL:-http://localhost:3000}"
