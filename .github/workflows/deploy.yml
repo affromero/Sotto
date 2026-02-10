@@ -49,14 +49,15 @@ jobs:
             docker compose -f docker-compose.prod.yml build
 
             echo "Running database migrations..."
-            docker compose -f docker-compose.prod.yml run --rm web npx prisma db push
+            docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push
 
             echo "Restarting services..."
             docker compose -f docker-compose.prod.yml up -d
 
             echo "Waiting for health check..."
-            sleep 10
-            curl -sf http://localhost:3000/api/health || echo "WARNING: Health check failed"
+            sleep 30
+            curl -sf http://localhost:3000/api/health
+            echo "Health check passed"
 
             echo "Cleaning up old images..."
             docker image prune -f
