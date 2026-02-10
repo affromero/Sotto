@@ -5,10 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
+import { ImportUploader } from '@/components/import/ImportUploader';
+import { ImportProgress } from '@/components/import/ImportProgress';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
 type Step = 'discovery' | 'voice' | 'generating';
+type TabMode = 'create' | 'import';
+type ImportStep = 'upload' | 'importing';
 
 export default function CreatePage() {
   return (
@@ -22,7 +26,11 @@ function CreatePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
+
+  const [tabMode, setTabMode] = useState<TabMode>('create');
   const [step, setStep] = useState<Step>('discovery');
+  const [importStep, setImportStep] = useState<ImportStep>('upload');
+  const [importingPodcastId, setImportingPodcastId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({
     usePremiumVoice: false,
@@ -54,7 +62,6 @@ function CreatePageContent() {
       let response: Response;
 
       if (createAsSotto) {
-        // Admin creating as @sotto system account
         response = await fetch('/api/admin/podcasts/create-as-sotto', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -91,6 +98,54 @@ function CreatePageContent() {
     }
   }, [metadata, voiceSelection, router, createAsSotto]);
 
+  const handleImportStarted = useCallback((podcastId: string) => {
+    setImportingPodcastId(podcastId);
+    setImportStep('importing');
+  }, []);
+
+  const handleTabChange = useCallback((mode: TabMode) => {
+    setTabMode(mode);
+    setError(null);
+    if (mode === 'create') {
+      setStep('discovery');
+      setImportStep('upload');
+      setImportingPodcastId(null);
+    } else {
+      setImportStep('upload');
+    }
+  }, []);
+
+  const getTitle = () => {
+    if (tabMode === 'import') {
+      return importStep === 'importing' ? 'Importing Podcast' : 'Import a Podcast';
+    }
+    if (step === 'discovery') return 'Create a Podcast';
+    if (step === 'voice') return 'Choose Voices';
+    if (step === 'generating') return 'Creating Your Podcast';
+    return 'Create a Podcast';
+  };
+
+  const getSubtitle = () => {
+    if (createAsSotto && tabMode === 'create') {
+      return 'Creating as @sotto — this podcast will be owned by the official Sotto account.';
+    }
+    if (tabMode === 'import') {
+      return importStep === 'importing'
+        ? 'Your podcast is being processed'
+        : 'Upload an existing audio file to share on Sotto';
+    }
+    if (step === 'discovery') {
+      return 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.';
+    }
+    if (step === 'voice') {
+      return 'Pick voices for your Host and Expert, or use auto-assign.';
+    }
+    if (step === 'generating') {
+      return 'Hang tight while we generate your podcast.';
+    }
+    return '';
+  };
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -112,20 +167,8 @@ function CreatePageContent() {
             </svg>
           </a>
           <div className={styles.headerText}>
-            <h1 className={styles.title}>
-              {step === 'discovery' && 'Create a Podcast'}
-              {step === 'voice' && 'Choose Voices'}
-              {step === 'generating' && 'Creating Your Podcast'}
-            </h1>
-            <p className={styles.subtitle}>
-              {createAsSotto
-                ? 'Creating as @sotto — this podcast will be owned by the official Sotto account.'
-                : step === 'discovery'
-                  ? 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.'
-                  : step === 'voice'
-                    ? 'Pick voices for your Host and Expert, or use auto-assign.'
-                    : 'Hang tight while we generate your podcast.'}
-            </p>
+            <h1 className={styles.title}>{getTitle()}</h1>
+            <p className={styles.subtitle}>{getSubtitle()}</p>
           </div>
         </header>
 
@@ -153,7 +196,7 @@ function CreatePageContent() {
           </div>
         )}
 
-        {step === 'generating' && (
+        {step === 'generating' && tabMode === 'create' && (
           <div className={styles.generatingOverlay} role="status">
             <div className={styles.generatingContent}>
               <div className={styles.spinner} aria-hidden="true" />
@@ -163,7 +206,30 @@ function CreatePageContent() {
           </div>
         )}
 
-        {step === 'discovery' && (
+        {(step === 'discovery' || step === 'voice') && (
+          <div className={styles.tabToggle} role="tablist">
+            <button
+              role="tab"
+              aria-selected={tabMode === 'create'}
+              className={`${styles.tabButton} ${tabMode === 'create' ? styles.tabButtonActive : ''}`}
+              onClick={() => handleTabChange('create')}
+              type="button"
+            >
+              Create
+            </button>
+            <button
+              role="tab"
+              aria-selected={tabMode === 'import'}
+              className={`${styles.tabButton} ${tabMode === 'import' ? styles.tabButtonActive : ''}`}
+              onClick={() => handleTabChange('import')}
+              type="button"
+            >
+              Import
+            </button>
+          </div>
+        )}
+
+        {step === 'discovery' && tabMode === 'create' && (
           <div className={styles.chatArea}>
             <div className={styles.inspireRow}>
               <button
@@ -191,13 +257,22 @@ function CreatePageContent() {
           </div>
         )}
 
+        {tabMode === 'import' && (
+          <div className={styles.chatArea}>
+            {importStep === 'upload' && <ImportUploader onImportStarted={handleImportStarted} />}
+            {importStep === 'importing' && importingPodcastId && (
+              <ImportProgress podcastId={importingPodcastId} />
+            )}
+          </div>
+        )}
+
         <InspireMe
           open={inspireMeOpen}
           onClose={() => setInspireMeOpen(false)}
           onSelectTopic={handleInspireTopic}
         />
 
-        {step === 'voice' && (
+        {step === 'voice' && tabMode === 'create' && (
           <div className={styles.chatArea}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
             <div className={styles.voiceActions}>
