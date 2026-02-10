@@ -1345,6 +1345,208 @@
 }
 
 /* ==========================================================================
+   TWITTER / X INTEGRATION
+   ========================================================================== */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.twFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 24px 0;
+}
+
+.twFeature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.twFeature svg {
+  color: var(--color-primary);
+  min-width: 16px;
+}
+
+.twMock {
+  background: #15202b;
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  border: 1px solid #38444d;
+}
+
+.twPost {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid #38444d;
+}
+
+.twPost:last-child {
+  border-bottom: none;
+}
+
+.twPostSotto {
+  background: rgba(217, 119, 6, 0.04);
+}
+
+.twPostLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.twAvatar,
+.twAvatarAlt,
+.twAvatarSotto {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.twAvatar {
+  background: #1d9bf0;
+}
+
+.twAvatarAlt {
+  background: #7856ff;
+}
+
+.twAvatarSotto {
+  background: #d97706;
+}
+
+.twThread {
+  width: 2px;
+  flex: 1;
+  background: #333639;
+  margin-top: 4px;
+  border-radius: 1px;
+}
+
+.twPostBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.twPostHeader {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.twPostHeader span {
+  font-size: 13px;
+  color: #71767b;
+}
+
+.twName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e7e9ea;
+}
+
+.twText {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #e7e9ea;
+  margin-bottom: 10px;
+}
+
+.twMention {
+  color: #1d9bf0;
+}
+
+.twActions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  color: #71767b;
+  font-size: 13px;
+}
+
+.twActions svg {
+  vertical-align: middle;
+}
+
+.twHeartActive {
+  color: #f91880;
+}
+
+.twHeartActive svg {
+  fill: #f91880;
+  stroke: #f91880;
+}
+
+.twCard {
+  display: flex;
+  border: 1px solid #38444d;
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.twCardVisual {
+  width: 68px;
+  min-width: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #d97706, #1e3a5f);
+}
+
+.twCardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.twCardInfo span:first-child {
+  font-size: 11px;
+  color: #71767b;
+}
+
+.twCardInfo span:nth-child(2) {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e7e9ea;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.twCardInfo span:nth-child(3) {
+  font-size: 12px;
+  color: #71767b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==========================================================================
    USE CASES
    ========================================================================== */
 
@@ -1800,6 +2002,11 @@
     margin-left: auto;
     margin-right: auto;
   }
+
+  .twMock {
+    max-width: 480px;
+    margin: 0 auto;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1925,6 +2132,15 @@
     gap: 10px;
   }
 
+  /* Twitter section */
+  .twFeatures {
+    gap: 10px;
+  }
+
+  .twActions {
+    gap: 16px;
+  }
+
   /* Voice grid */
   .voiceGrid {
     grid-template-columns: 1fr;
@@ -1988,6 +2204,28 @@
 
   .pairingLine {
     display: none;
+  }
+
+  .twPost {
+    padding: 12px;
+  }
+
+  .twAvatar,
+  .twAvatarAlt,
+  .twAvatarSotto {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    font-size: 13px;
+  }
+
+  .twText {
+    font-size: 13px;
+  }
+
+  .twCardVisual {
+    width: 52px;
+    min-width: 52px;
   }
 }
 

@@ -27,6 +27,100 @@ const CHECK = (
   </svg>
 );
 
+const TW_ICONS = {
+  reply: (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1 11c0-2.2 1.8-4 4-4h6" />
+      <path d="M8 3l4 4-4 4" />
+    </svg>
+  ),
+  repost: (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M1.5 5.5h10l-2.5-3" />
+      <path d="M14.5 10.5h-10l2.5 3" />
+    </svg>
+  ),
+  heart: (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 14s-5.5-3.5-5.5-7.5C2.5 4 4 2.5 5.5 2.5 6.8 2.5 7.7 3.3 8 4c.3-.7 1.2-1.5 2.5-1.5C12 2.5 13.5 4 13.5 6.5 13.5 10.5 8 14 8 14z" />
+    </svg>
+  ),
+  bookmark: (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 2.5h10v12l-5-3.5-5 3.5v-12z" />
+    </svg>
+  ),
+  share: (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M2 11l6-7 6 7" />
+      <path d="M8 4v10" />
+    </svg>
+  ),
+  verified: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="#1d9bf0" aria-hidden="true">
+      <path d="M8 0l1.8 2.9L13 2l-.1 3.3L16 7l-2.5 2.1.7 3.2-3.1.5L10 15.5 8 13l-2 2.5-1.1-2.7-3.1-.5.7-3.2L0 7l3.1-1.7L3 2l3.2.9L8 0z" />
+      <path
+        d="M5.5 8l1.5 1.5 3.5-3.5"
+        fill="none"
+        stroke="#fff"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+};
+
 type WaitlistStatus = 'idle' | 'submitting' | 'success' | 'error';
 
 function WaitlistForm({
@@ -923,6 +1017,156 @@ export default function LandingPage() {
                         </svg>
                         3 sources added
                       </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== TWITTER ====== */}
+      <section
+        className={`${styles.section} ${styles.sectionAlt}`}
+        aria-label="Twitter integration"
+      >
+        <div className={styles.inner}>
+          <div className={styles.split}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overline}>Twitter Integration</span>
+              <h2 className={styles.h2}>Tweet it. Hear it. Share it.</h2>
+              <p className={styles.bodyLg}>
+                Tag <strong>@sottofm</strong> in any tweet or thread and we&apos;ll turn it into a
+                two-voice podcast. Claude parses your request, generates the script, and replies
+                with a link — all without leaving X.
+              </p>
+              <div className={styles.twFeatures}>
+                <div className={styles.twFeature}>
+                  {CHECK}
+                  <span>Works from any public tweet or thread</span>
+                </div>
+                <div className={styles.twFeature}>
+                  {CHECK}
+                  <span>Claude parses your topic, depth, and tone</span>
+                </div>
+                <div className={styles.twFeature}>
+                  {CHECK}
+                  <span>Two-voice podcast ready in ~2 minutes</span>
+                </div>
+                <div className={styles.twFeature}>
+                  {CHECK}
+                  <span>Reply lands right in your thread</span>
+                </div>
+              </div>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <p className={styles.srOnly}>
+                A mockup of three tweets showing the Sotto Twitter flow: someone asks about quantum
+                computing, a friend tags @sottofm, and Sotto replies with a ready podcast link.
+              </p>
+              <div className={styles.twMock} aria-hidden="true">
+                {/* Tweet 1 — Original poster */}
+                <div className={styles.twPost}>
+                  <div className={styles.twPostLeft}>
+                    <div className={styles.twAvatar}>M</div>
+                    <div className={styles.twThread} />
+                  </div>
+                  <div className={styles.twPostBody}>
+                    <div className={styles.twPostHeader}>
+                      <span className={styles.twName}>Maya</span>
+                      <span>@mayalearns · 2h</span>
+                    </div>
+                    <p className={styles.twText}>
+                      I keep hearing about quantum computing but every explanation either assumes I
+                      have a physics PhD or is so dumbed down it&apos;s useless. Where&apos;s the
+                      middle ground?
+                    </p>
+                    <div className={styles.twActions}>
+                      {TW_ICONS.reply}
+                      <span>4</span>
+                      {TW_ICONS.repost}
+                      <span>2</span>
+                      {TW_ICONS.heart}
+                      <span>18</span>
+                      {TW_ICONS.bookmark}
+                      {TW_ICONS.share}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tweet 2 — Friend tags sotto */}
+                <div className={styles.twPost}>
+                  <div className={styles.twPostLeft}>
+                    <div className={styles.twAvatarAlt}>J</div>
+                    <div className={styles.twThread} />
+                  </div>
+                  <div className={styles.twPostBody}>
+                    <div className={styles.twPostHeader}>
+                      <span className={styles.twName}>Jake</span>
+                      <span>@jakedev_ · 1h</span>
+                    </div>
+                    <p className={styles.twText}>
+                      <span className={styles.twMention}>@sottofm</span> make her a podcast about
+                      this! Beginner-friendly, focus on the practical applications
+                    </p>
+                    <div className={styles.twActions}>
+                      {TW_ICONS.reply}
+                      <span>1</span>
+                      {TW_ICONS.repost}
+                      {TW_ICONS.heart}
+                      <span>7</span>
+                      {TW_ICONS.bookmark}
+                      {TW_ICONS.share}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tweet 3 — Sotto replies */}
+                <div className={`${styles.twPost} ${styles.twPostSotto}`}>
+                  <div className={styles.twPostLeft}>
+                    <div className={styles.twAvatarSotto}>S</div>
+                  </div>
+                  <div className={styles.twPostBody}>
+                    <div className={styles.twPostHeader}>
+                      <span className={styles.twName}>Sotto</span>
+                      {TW_ICONS.verified}
+                      <span>@sottofm · 58m</span>
+                    </div>
+                    <p className={styles.twText}>
+                      Your podcast is ready! &ldquo;Quantum Computing Demystified&rdquo; (8 min)
+                    </p>
+                    <div className={styles.twCard}>
+                      <div className={styles.twCardVisual}>
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                          <path d="M21 19a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h2v4zM3 19a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1H3v4z" />
+                        </svg>
+                      </div>
+                      <div className={styles.twCardInfo}>
+                        <span className={styles.twCardDomain}>sotto.fm</span>
+                        <span>Quantum Computing Demystified</span>
+                        <span>An 8-minute beginner-friendly explainer on quantum computing</span>
+                      </div>
+                    </div>
+                    <div className={styles.twActions}>
+                      {TW_ICONS.reply}
+                      <span>3</span>
+                      {TW_ICONS.repost}
+                      <span>12</span>
+                      <span className={styles.twHeartActive}>{TW_ICONS.heart}</span>
+                      <span>42</span>
+                      {TW_ICONS.bookmark}
+                      {TW_ICONS.share}
                     </div>
                   </div>
                 </div>
