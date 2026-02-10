@@ -41,7 +41,7 @@ const nextConfig = {
               "font-src 'self' data: https://fonts.gstatic.com",
               "connect-src 'self' https:",
               "media-src 'self' https: blob:",
-              "frame-ancestors 'none'",
+              "frame-ancestors 'self'",
               "base-uri 'self'",
               "form-action 'self'",
             ].join('; '),
@@ -52,7 +52,7 @@ const nextConfig = {
           },
           {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN',
           },
           {
             key: 'Referrer-Policy',
