@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo, FormEvent } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 
@@ -209,6 +209,54 @@ function WaitlistForm({
   );
 }
 
+const TOPICS = [
+  'Quantum Computing',
+  'Stoic Philosophy',
+  'Jazz History',
+  'Game Theory',
+  'The Silk Road',
+  'Neural Networks',
+  'Behavioral Economics',
+  'The Art of Fermentation',
+];
+
+function TopicSuggestions() {
+  const timings = useMemo(
+    () =>
+      TOPICS.map((_, i) => {
+        const enterDelay = 0.4 + i * 0.08;
+        const enterEnd = enterDelay + 0.5;
+        return {
+          breathDuration: `${3.2 + ((i * 7 + 3) % 25) / 10}s`,
+          breathDelay: `${enterEnd + ((i * 13 + 5) % 35) / 10}s`,
+          enterDelay: `${enterDelay}s`,
+        };
+      }),
+    []
+  );
+
+  return (
+    <div className={styles.topicSuggestions}>
+      {TOPICS.map((topic, i) => (
+        <a
+          key={topic}
+          href="/create"
+          className={styles.topicPill}
+          style={
+            {
+              '--breath-duration': timings[i].breathDuration,
+              '--breath-delay': timings[i].breathDelay,
+              '--enter-delay': timings[i].enterDelay,
+            } as React.CSSProperties
+          }
+        >
+          {topic}
+        </a>
+      ))}
+    </div>
+  );
+}
+
 const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
 const MAX_RIPPLES = 3;
 
@@ -337,6 +385,7 @@ export default function LandingPage() {
             Generate AI podcasts from any topic. Interrupt mid-playback to ask questions. Share
             knowledge with the world.
           </p>
+          <TopicSuggestions />
           <div className={styles.heroCtas}>
             <a href="/auth/signup" className={styles.btnPrimary}>
               Get Started Free
