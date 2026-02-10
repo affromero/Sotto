@@ -19,7 +19,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const interaction = await prisma.interaction.findUnique({
     where: { id: interactionId },
     include: {
-      podcast: { select: { id: true, userId: true, status: true } },
+      podcast: { select: { id: true, userId: true, status: true, source: true } },
     },
   });
 
@@ -30,6 +30,13 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Only the podcast owner can incorporate
   if (interaction.podcast.userId !== session.user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  if (interaction.podcast.source === 'IMPORT') {
+    return NextResponse.json(
+      { error: 'Incorporation not yet supported for imported podcasts' },
+      { status: 400 }
+    );
   }
 
   // Interaction must be answered or resolved

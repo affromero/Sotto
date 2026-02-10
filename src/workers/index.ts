@@ -16,6 +16,7 @@ import { processTwitterReply } from './twitter-reply.worker';
 import { processEventIngestion } from './event-ingestion.worker';
 import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
+import { processAudioImport } from './audio-import.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -36,6 +37,7 @@ const workers = [
   createWorker('event-ingestion', processEventIngestion, { concurrency: 5 }),
   createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
   createWorker('data-export', processDataExport, { concurrency: 1 }),
+  createWorker('audio-import', processAudioImport, { concurrency: 2 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

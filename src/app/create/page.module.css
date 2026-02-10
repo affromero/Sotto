@@ -98,6 +98,46 @@
   background: var(--color-error-light);
 }
 
+/* Tab Toggle */
+
+.tabToggle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  margin: var(--spacing-md) var(--spacing-md) 0;
+  align-self: flex-start;
+}
+
+.tabButton {
+  padding: var(--spacing-xs) var(--spacing-lg);
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 100px;
+}
+
+.tabButton:hover {
+  color: var(--color-text-primary);
+}
+
+.tabButtonActive {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.tabButtonActive:hover {
+  color: var(--color-text-inverse);
+}
+
 /* Inspire Me Button — breathing glow + snake border effect */
 
 .inspireRow {
