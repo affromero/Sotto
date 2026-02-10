@@ -45,6 +45,9 @@ model User {
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
 
+  // BYOK (Bring Your Own Key) — encrypted ElevenLabs API key
+  elevenLabsApiKey String? @db.Text
+
   // Team membership (dormant — kept for future use)
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id])
@@ -189,6 +192,7 @@ enum SubscriptionTier {
   STARTER
   PRO
   STUDIO
+  POWER
 }
 
 model SubscriptionEvent {
@@ -297,9 +301,14 @@ model Podcast {
   visibility PodcastVisibility @default(PUBLIC)
 
   // Fork tracking
-  forkedFromId String?
-  forkedFrom   Podcast?  @relation("Forks", fields: [forkedFromId], references: [id])
-  forks        Podcast[] @relation("Forks")
+  forkedFromId     String?
+  forkedFrom       Podcast?  @relation("Forks", fields: [forkedFromId], references: [id])
+  forks            Podcast[] @relation("Forks")
+  remixNote        String?   @db.Text
+  parentDiscovery  Json?
+
+  // Versioning
+  currentVersion Int @default(1)
 
   // Counters (denormalized for performance)
   playCount Int @default(0)
@@ -309,6 +318,12 @@ model Podcast {
 
   // PDF export
   pdfUrl String?
+
+  // Import fields
+  importedAudioKey    String?
+  originalFormat      String?
+  transcriptProvided  Boolean @default(false)
+  isHumanContent      Boolean @default(false)
 
   // Relations
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -321,6 +336,7 @@ model Podcast {
   tags         PodcastTag[]
   jobs         Job[]
   references   Reference[]
+  versions     PodcastVersion[]
   tweetMention     TweetMention?
   playbackSessions PlaybackSession[]
   podcastFeature   PodcastFeature?
@@ -346,6 +362,8 @@ enum PodcastStatus {
   READY
   UPDATING
   FAILED
+  IMPORTING
+  TRANSCRIBING
 }
 
 enum PodcastVisibility {
@@ -358,6 +376,7 @@ enum PodcastSource {
   WEB
   TWITTER
   API
+  IMPORT
 }
 
 // ============ DISCOVERY (Chat-Based) ============
@@ -446,6 +465,39 @@ enum Speaker {
   EXPERT
 }
 
+// ============ PODCAST VERSIONS ============
+
+model PodcastVersion {
+  id            String   @id @default(cuid())
+  podcastId     String
+  version       Int
+  audioUrl      String
+  duration      Int?
+  changeType    String   // 'initial' | 'incorporation' | 'regeneration'
+  changeSummary String?  @db.Text
+  interactionId String?
+  createdAt     DateTime @default(now())
+
+  podcast     Podcast      @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  interaction Interaction? @relation(fields: [interactionId], references: [id])
+  segments    PodcastVersionSegment[]
+
+  @@unique([podcastId, version])
+  @@index([podcastId])
+}
+
+model PodcastVersionSegment {
+  id        String @id @default(cuid())
+  versionId String
+  segmentId String
+  order     Int
+  startTime Float?
+
+  version PodcastVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId])
+}
+
 // ============ INTERACTIONS (Q&A during playback) ============
 
 model Interaction {
@@ -468,8 +520,9 @@ model Interaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast  Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions PodcastVersion[]
 
   @@index([podcastId])
   @@index([userId])

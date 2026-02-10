@@ -53,7 +53,7 @@ export const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   search: z.string().max(200).optional(),
   tag: z.string().optional(),
-  sort: z.enum(['recent', 'popular', 'trending']).default('recent'),
+  sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).default('recent'),
   tags: z.string().optional(), // comma-separated tag slugs
   depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
   audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
@@ -78,7 +78,7 @@ export const paginationSchema = z.object({
 export const checkoutSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('subscription'),
-    tier: z.enum(['starter', 'pro', 'studio']),
+    tier: z.enum(['starter', 'pro', 'studio', 'power']),
   }),
   z.object({
     type: z.literal('credit_pack'),
@@ -232,4 +232,31 @@ export const addToAllowlistSchema = z.object({
  */
 export const userSearchSchema = z.object({
   handle: z.string().min(2).max(30),
+});
+
+/**
+ * BYOK API key validation
+ */
+export const byokSchema = z.object({
+  apiKey: z.string().min(10).max(200),
+});
+
+/**
+ * Import podcast validation
+ */
+export const importPodcastSchema = z.object({
+  title: z.string().min(1).max(200),
+  topic: z.string().min(1).max(5000),
+  isHumanContent: z.boolean().default(false),
+});
+
+/**
+ * Fork body validation (optional remix parameters)
+ */
+export const forkBodySchema = z.object({
+  topic: z.string().min(1).max(5000).optional(),
+  remixNote: z.string().max(2000).optional(),
+  focusAreas: z.array(z.string()).max(10).optional(),
+  depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
+  tone: z.enum(['casual', 'professional', 'socratic']).optional(),
 });

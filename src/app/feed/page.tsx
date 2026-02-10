@@ -31,11 +31,15 @@ export default async function FeedPage() {
         likeCount: true,
         forkCount: true,
         createdAt: true,
+        source: true,
+        isHumanContent: true,
+        forkedFromId: true,
         user: {
           select: {
             id: true,
             name: true,
             image: true,
+            handle: true,
           },
         },
         tags: {
@@ -75,11 +79,15 @@ export default async function FeedPage() {
         likeCount: true,
         forkCount: true,
         createdAt: true,
+        source: true,
+        isHumanContent: true,
+        forkedFromId: true,
         user: {
           select: {
             id: true,
             name: true,
             image: true,
+            handle: true,
           },
         },
         tags: {

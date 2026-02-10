@@ -1,5 +1,6 @@
-import { PodcastStatus, PodcastVisibility, Speaker } from '@prisma/client';
+import { PodcastSource, PodcastStatus, PodcastVisibility, Speaker } from '@prisma/client';
 import { ReferenceData } from './reference';
+import { PodcastVersionSummary } from './version';
 
 export interface PodcastSummary {
   id: string;
@@ -13,18 +14,50 @@ export interface PodcastSummary {
   likeCount: number;
   forkCount: number;
   createdAt: string;
+  source: PodcastSource;
+  isHumanContent: boolean;
+  forkedFromId: string | null;
   user: {
     id: string;
     name: string | null;
+    handle: string | null;
     image: string | null;
     role?: string;
   };
   tags: Array<{ id: string; name: string; slug: string }>;
 }
 
+export interface ForkedFromInfo {
+  id: string;
+  title: string;
+  user: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    image: string | null;
+  };
+}
+
+export interface ForkSummary {
+  id: string;
+  title: string;
+  remixNote: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    image: string | null;
+  };
+}
+
 export interface PodcastDetail extends PodcastSummary {
   saveCount: number;
-  forkedFromId: string | null;
+  remixNote: string | null;
+  forkedFrom: ForkedFromInfo | null;
+  forks: ForkSummary[];
+  currentVersion: number;
+  versions: PodcastVersionSummary[];
   segments: SegmentData[];
   interactions: InteractionSummary[];
   references: ReferenceData[];

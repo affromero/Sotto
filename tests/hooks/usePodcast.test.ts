@@ -13,10 +13,16 @@ const mockPodcastData: PodcastDetail = {
   duration: 600,
   visibility: 'PUBLIC',
   createdAt: '2024-01-01T00:00:00Z',
+  source: 'WEB' as const,
+  isHumanContent: false,
+  forkedFromId: null,
+  remixNote: null,
+  currentVersion: 1,
   user: {
     id: 'user-1',
     name: 'Test User',
     image: null,
+    handle: null,
   },
   isLiked: false,
   isSaved: false,
@@ -27,7 +33,9 @@ const mockPodcastData: PodcastDetail = {
   segments: [],
   references: [],
   tags: [],
-  forkedFromId: null,
+  forkedFrom: null,
+  forks: [],
+  versions: [],
   interactions: [],
 };
 

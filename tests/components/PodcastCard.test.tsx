@@ -16,10 +16,14 @@ const mockPodcast: PodcastSummary = {
   visibility: 'PUBLIC',
   status: 'READY',
   createdAt: '2026-02-08T10:00:00Z',
+  source: 'WEB' as const,
+  isHumanContent: false,
+  forkedFromId: null,
   user: {
     id: 'user-1',
     name: 'Jane Smith',
     image: 'https://example.com/avatar.jpg',
+    handle: null,
   },
   tags: [
     { id: 'tag-1', name: 'Science', slug: 'science' },

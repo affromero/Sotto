@@ -17,7 +17,7 @@ interface ExploreResult {
   likeCount: number;
   forkCount: number;
   createdAt: string;
-  user: { id: string; name: string | null; image: string | null };
+  user: { id: string; name: string | null; image: string | null; handle?: string | null };
   tags: Array<{ id: string; name: string; slug: string }>;
   score: number;
   explanation: string;
@@ -40,7 +40,13 @@ function resultToPodcastSummary(result: ExploreResult): PodcastSummary {
     likeCount: result.likeCount,
     forkCount: result.forkCount,
     createdAt: result.createdAt,
-    user: result.user,
+    source: 'WEB',
+    isHumanContent: false,
+    forkedFromId: null,
+    user: {
+      ...result.user,
+      handle: result.user.handle || null,
+    },
     tags: result.tags,
   };
 }

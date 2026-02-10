@@ -5,6 +5,7 @@
   "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "scripts": {
     "build": "next build",
+    "ci": "npm run lint && npm run type-check && npm test && npm run build",
     "dev": "concurrently -n web,workers -c blue,green \"npm run dev:web\" \"npm run dev:workers\"",
     "dev:web": "next dev",
     "dev:workers": "tsx watch src/workers/index.ts",
