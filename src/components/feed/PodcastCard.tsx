@@ -103,7 +103,31 @@ export function PodcastCard({
           {duration && <span className={styles.duration}>{duration}</span>}
         </div>
 
-        <p className={styles.topic}>{podcast.topic}</p>
+        {podcast.forkedFromId && (
+          <p className={styles.remixSubline}>
+            Remix of {(podcast as any).forkedFrom?.title || 'another podcast'}
+          </p>
+        )}
+
+        <div className={styles.topicRow}>
+          <p className={styles.topic}>{podcast.topic}</p>
+          <span
+            className={styles.contentBadge}
+            data-type={
+              podcast.source === 'IMPORT' && podcast.isHumanContent
+                ? 'human'
+                : podcast.source === 'IMPORT'
+                  ? 'imported'
+                  : 'ai'
+            }
+          >
+            {podcast.source === 'IMPORT' && podcast.isHumanContent
+              ? 'Human'
+              : podcast.source === 'IMPORT'
+                ? 'Imported'
+                : 'AI'}
+          </span>
+        </div>
 
         <div className={styles.creator}>
           <div className={styles.avatar}>

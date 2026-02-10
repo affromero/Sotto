@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { forkBodySchema } from '@/lib/validations';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
 
@@ -13,6 +14,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 
   const userId = session.user.id;
+
+  const body = await request.json().catch(() => ({}));
+  const parsed = forkBodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const { topic, remixNote, focusAreas: _focusAreas, depth: _depth, tone: _tone } = parsed.data;
 
   const sourcePodcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
@@ -26,10 +35,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 
   if (sourcePodcast.visibility !== 'PUBLIC') {
-    return NextResponse.json(
-      { error: 'Only public podcasts can be forked' },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: 'Only public podcasts can be forked' }, { status: 403 });
   }
 
   if (sourcePodcast.status !== 'READY') {
@@ -45,7 +51,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       data: {
         userId,
         title: `Fork of ${sourcePodcast.title}`,
-        topic: sourcePodcast.topic,
+        topic: topic || sourcePodcast.topic,
+        remixNote: remixNote || null,
         status: 'PENDING',
         forkedFromId: podcastId,
       },

@@ -1,0 +1,79 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(217, 119, 6, 0.05);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-6);
+  transition: background var(--transition-fast);
+  text-decoration: none;
+  color: var(--color-text-primary);
+}
+
+.banner:hover {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+.forkIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.label {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+
+.userName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.separator {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.podcastTitle {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .banner {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .podcastTitle {
+    flex-basis: 100%;
+    padding-left: calc(16px + var(--space-3));
+  }
+}

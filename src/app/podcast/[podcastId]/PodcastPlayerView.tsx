@@ -19,8 +19,11 @@ import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
 import { InterruptButton } from '@/components/player/InterruptButton';
+import { ForkAttribution } from '@/components/player/ForkAttribution';
+import { ForkLineage } from '@/components/player/ForkLineage';
+import { ForkRemixModal } from '@/components/player/ForkRemixModal';
+import { VersionHistory } from '@/components/player/VersionHistory';
 import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import type { PodcastDetail } from '@/types/podcast';
 import type { PodcastStatus } from '@prisma/client';
@@ -80,8 +83,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [showForkConfirm, setShowForkConfirm] = useState(false);
-  const [forking, setForking] = useState(false);
+  const [showForkRemix, setShowForkRemix] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
   const handleLike = useCallback(async () => {
@@ -111,22 +113,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
       setSaved(!newSaved);
     }
   }, [saved, isAuthenticated, podcast.id]);
-
-  const handleForkConfirm = useCallback(async () => {
-    setForking(true);
-    try {
-      const response = await fetch(`/api/podcasts/${podcast.id}/fork`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        const data = await response.json();
-        window.location.href = `/podcast/${data.id}`;
-      }
-    } catch {
-      setForking(false);
-      setShowForkConfirm(false);
-    }
-  }, [podcast.id]);
 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
@@ -285,6 +271,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
         )}
       </header>
 
+      {/* Fork Attribution */}
+      {podcast.forkedFrom && <ForkAttribution forkedFrom={podcast.forkedFrom} />}
+
       {/* Failed state */}
       {podcast.status === 'FAILED' && isOwner && (
         <div className={styles.failedState}>
@@ -364,8 +353,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
           {!isOwner && isAuthenticated && (
             <button
               className={styles.actionBtn}
-              onClick={() => setShowForkConfirm(true)}
-              aria-label="Fork this podcast"
+              onClick={() => setShowForkRemix(true)}
+              aria-label="Fork & remix this podcast"
               type="button"
             >
               <GitFork size={18} />
@@ -497,33 +486,30 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
         </>
       )}
 
-      {/* Fork Confirmation Modal */}
-      <Modal
-        isOpen={showForkConfirm}
-        onClose={() => setShowForkConfirm(false)}
-        title="Fork this podcast?"
-        size="small"
-      >
-        <p
-          style={{
-            marginBottom: 'var(--spacing-md)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 'var(--font-size-sm)',
-            lineHeight: '1.5',
-          }}
-        >
-          A copy of this podcast will be created in your library with PENDING status. You can then
-          customize and regenerate it.
-        </p>
-        <div style={{ display: 'flex', gap: 'var(--spacing-sm)' }}>
-          <Button onClick={handleForkConfirm} loading={forking} disabled={forking}>
-            Fork Podcast
-          </Button>
-          <Button variant="ghost" onClick={() => setShowForkConfirm(false)} disabled={forking}>
-            Cancel
-          </Button>
-        </div>
-      </Modal>
+      {/* Version History */}
+      {podcast.versions.length > 1 && (
+        <section className={styles.versionSection}>
+          <VersionHistory versions={podcast.versions} currentVersion={podcast.currentVersion} />
+        </section>
+      )}
+
+      {/* Fork Lineage */}
+      {(podcast.forkedFrom || podcast.forks.length > 0) && (
+        <section className={styles.lineageSection}>
+          <ForkLineage
+            ancestors={podcast.forkedFrom ? [podcast.forkedFrom] : []}
+            forks={podcast.forks}
+          />
+        </section>
+      )}
+
+      {/* Fork & Remix Modal */}
+      <ForkRemixModal
+        isOpen={showForkRemix}
+        onClose={() => setShowForkRemix(false)}
+        podcastId={podcast.id}
+        podcastTitle={podcast.title}
+      />
     </div>
   );
 }
