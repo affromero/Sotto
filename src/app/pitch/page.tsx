@@ -31,17 +31,24 @@ export default function PitchPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Refs for swipe detection
+  // Refs for swipe detection and scroll forwarding
   const contentRef = useRef<HTMLDivElement>(null);
+  const slotAIframeRef = useRef<HTMLIFrameElement>(null);
+  const slotBIframeRef = useRef<HTMLIFrameElement>(null);
   const swipeDeltaRef = useRef(0);
   const swipeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTouchRef = useRef<{ x: number; y: number } | null>(null);
 
   const currentVersion = manifest?.versions.find((v) => v.date === selectedVersion);
   const documents = currentVersion?.documents ?? [];
   const selectedDoc: PitchDocument | undefined = documents[docIndex];
   const hasPrev = docIndex > 0;
   const hasNext = docIndex < documents.length - 1;
+
+  const getActiveIframe = useCallback(() => {
+    return activeSlot === 'A' ? slotAIframeRef.current : slotBIframeRef.current;
+  }, [activeSlot]);
 
   const navigate = useCallback(
     (direction: AnimDirection) => {
@@ -153,10 +160,15 @@ export default function PitchPage() {
         e.preventDefault();
       }
 
-      // Filter out vertical-dominant scrolling
-      if (absY > 2 * absX) return;
-      // Ignore tiny movements
-      if (absX < 2) return;
+      // Vertical-dominant scrolling → forward to iframe
+      if (absY > 2 * absX || absX < 2) {
+        try {
+          getActiveIframe()?.contentWindow?.scrollBy(0, e.deltaY);
+        } catch {
+          /* cross-origin guard */
+        }
+        return;
+      }
 
       // Drain events while animating so they don't pile up
       if (animating) {
@@ -188,7 +200,7 @@ export default function PitchPage() {
       el.removeEventListener('wheel', handleWheel);
       if (swipeTimerRef.current) clearTimeout(swipeTimerRef.current);
     };
-  }, [state, animating, goNext, goPrev]);
+  }, [state, animating, goNext, goPrev, getActiveIframe]);
 
   // Touch swipe detection
   useEffect(() => {
@@ -199,10 +211,28 @@ export default function PitchPage() {
 
     function handleTouchStart(e: TouchEvent) {
       if (e.touches.length !== 1) return;
-      touchStartRef.current = {
-        x: e.touches[0].clientX,
-        y: e.touches[0].clientY,
-      };
+      const pos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      touchStartRef.current = pos;
+      lastTouchRef.current = pos;
+    }
+
+    function handleTouchMove(e: TouchEvent) {
+      if (!lastTouchRef.current || e.touches.length !== 1) return;
+
+      const curX = e.touches[0].clientX;
+      const curY = e.touches[0].clientY;
+      const dy = curY - lastTouchRef.current.y;
+
+      lastTouchRef.current = { x: curX, y: curY };
+
+      // Forward vertical movement to iframe scroll
+      if (Math.abs(dy) > 0) {
+        try {
+          getActiveIframe()?.contentWindow?.scrollBy(0, -dy);
+        } catch {
+          /* cross-origin guard */
+        }
+      }
     }
 
     function handleTouchEnd(e: TouchEvent) {
@@ -212,6 +242,7 @@ export default function PitchPage() {
       const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
       const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
       touchStartRef.current = null;
+      lastTouchRef.current = null;
 
       const absDx = Math.abs(dx);
       const absDy = Math.abs(dy);
@@ -228,12 +259,14 @@ export default function PitchPage() {
     }
 
     el.addEventListener('touchstart', handleTouchStart, { passive: true });
+    el.addEventListener('touchmove', handleTouchMove, { passive: true });
     el.addEventListener('touchend', handleTouchEnd, { passive: true });
     return () => {
       el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
       el.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [state, goNext, goPrev]);
+  }, [state, goNext, goPrev, getActiveIframe]);
 
   useEffect(() => {
     fetchManifest();
@@ -463,14 +496,22 @@ export default function PitchPage() {
             {/* Slot A */}
             <div className={getSlotClassName('A')}>
               {slotAIndex >= 0 && (
-                <iframe src={getIframeSrc(slotAIndex)} title={getIframeTitle(slotAIndex)} />
+                <iframe
+                  ref={slotAIframeRef}
+                  src={getIframeSrc(slotAIndex)}
+                  title={getIframeTitle(slotAIndex)}
+                />
               )}
             </div>
 
             {/* Slot B */}
             <div className={getSlotClassName('B')}>
               {slotBIndex >= 0 && (
-                <iframe src={getIframeSrc(slotBIndex)} title={getIframeTitle(slotBIndex)} />
+                <iframe
+                  ref={slotBIframeRef}
+                  src={getIframeSrc(slotBIndex)}
+                  title={getIframeTitle(slotBIndex)}
+                />
               )}
             </div>
           </div>
