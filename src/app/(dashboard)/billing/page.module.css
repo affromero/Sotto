@@ -24,6 +24,37 @@
   margin-bottom: var(--spacing-md);
 }
 
+/* Credit Balance Card */
+
+.creditCard {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.creditBalance {
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.creditMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.outOfCredits {
+  margin-top: var(--spacing-md);
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  font-weight: 500;
+}
+
 /* Plan Header */
 
 .planHeader {
@@ -75,67 +106,72 @@
   margin-bottom: var(--spacing-md);
 }
 
-/* Feature List */
+/* Credit Pack Grid */
 
-.featureList {
-  list-style: none;
+.creditPackGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+/* Credit History */
+
+.historyTable {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 0;
 }
 
-.featureItem {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-}
-
-.checkIcon {
-  color: var(--color-success);
-  flex-shrink: 0;
-}
-
-/* Usage */
-
-.usageBar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-.usageInfo {
+.historyRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
-.usageLabel {
+.historyRow:last-child {
+  border-bottom: none;
+}
+
+.historyInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.historyDesc {
   font: var(--text-body-sm);
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
-.usageCount {
+.historyDate {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.historyAmount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.amountPositive {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.amountNegative {
   font: var(--text-body-sm);
   font-weight: 600;
   color: var(--color-text-primary);
 }
 
-.progressOuter {
-  width: 100%;
-  height: 8px;
-  background: var(--color-border);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-}
-
-.progressInner {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  transition: width var(--transition-slow);
-  min-width: 2px;
+.historyBalance {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
 }
 
 /* Pricing Grid (for free tier upgrade) */
@@ -180,6 +216,10 @@
   }
 
   .pricingGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .creditPackGrid {
     grid-template-columns: repeat(3, 1fr);
   }
 }

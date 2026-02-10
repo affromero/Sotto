@@ -13,6 +13,8 @@ const mockPrismaTransaction = vi.fn();
 const mockPrismaPodcastFindUnique = vi.fn();
 const mockPrismaPodcastUpdate = vi.fn();
 const mockPrismaJobUpdateMany = vi.fn();
+const mockPrismaSubscriptionFindUnique = vi.fn();
+const mockPrismaUserFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -22,6 +24,12 @@ vi.mock('@/lib/prisma', () => ({
     },
     job: {
       updateMany: (...args: unknown[]) => mockPrismaJobUpdateMany(...args),
+    },
+    subscription: {
+      findUnique: (...args: unknown[]) => mockPrismaSubscriptionFindUnique(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
     $transaction: (operations: unknown) => mockPrismaTransaction(operations),
   },
@@ -37,20 +45,27 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
-const mockConsumeVoiceCredit = vi.fn();
+const mockConsumeCredit = vi.fn();
 const mockGetUserTier = vi.fn().mockResolvedValue('FREE');
 
 vi.mock('@/lib/subscription', () => ({
-  consumeVoiceCredit: (...args: unknown[]) => mockConsumeVoiceCredit(...args),
   getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
 }));
+
+const mockCanGenerate = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: { maxDurationMinutes: 10 },
     PRO: { maxDurationMinutes: 10 },
-    CREATOR: { maxDurationMinutes: 10 },
+    STARTER: { maxDurationMinutes: 10 },
+    STUDIO: { maxDurationMinutes: 10 },
   },
+  canGenerate: (...args: unknown[]) => mockCanGenerate(...args),
+}));
+
+vi.mock('@/lib/credits', () => ({
+  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
 }));
 
 // ---- Import under test ----
@@ -77,6 +92,10 @@ async function createMockParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
+    mockPrismaUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
+    mockConsumeCredit.mockResolvedValue(undefined);
   });
 
   it('returns 401 for unauthenticated request', async () => {
@@ -196,7 +215,12 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       usePremiumVoice: true,
       discovery: null,
     });
-    mockConsumeVoiceCredit.mockRejectedValue(new Error('No credits remaining'));
+    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
+    mockCanGenerate.mockReturnValue({
+      allowed: false,
+      cost: 2,
+      reason: 'Insufficient credits: need 2, have 0. Buy more credits or upgrade your plan.',
+    });
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-006');
@@ -205,9 +229,10 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
     expect(response.status).toBe(402);
     expect(data).toEqual({
-      error: 'No premium voice credits remaining. Switch to standard voices or upgrade your plan.',
+      error: 'Insufficient credits: need 2, have 0. Buy more credits or upgrade your plan.',
     });
-    expect(mockConsumeVoiceCredit).toHaveBeenCalledWith('user-001');
+    expect(mockCanGenerate).toHaveBeenCalledWith(0, true, 'FREE', 'USER');
+    expect(mockConsumeCredit).not.toHaveBeenCalled();
     expect(mockPrismaPodcastUpdate).not.toHaveBeenCalled();
   });
 
@@ -325,7 +350,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     expect(mockPrismaJobUpdateMany).not.toHaveBeenCalled();
   });
 
-  it('consumes premium voice credit when usePremiumVoice is true', async () => {
+  it('consumes 2 credits when usePremiumVoice is true', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-005' });
     mockPrismaPodcastFindUnique.mockResolvedValue({
       id: 'podcast-011',
@@ -334,7 +359,9 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       usePremiumVoice: true,
       discovery: null,
     });
-    mockConsumeVoiceCredit.mockResolvedValue(undefined);
+    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
+    mockCanGenerate.mockReturnValue({ allowed: true, cost: 2 });
+    mockConsumeCredit.mockResolvedValue(undefined);
     mockPrismaPodcastUpdate.mockResolvedValue({});
 
     const request = createMockRequest();
@@ -342,11 +369,17 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const response = await POST(request, params);
 
     expect(response.status).toBe(200);
-    expect(mockConsumeVoiceCredit).toHaveBeenCalledWith('user-005');
+    expect(mockCanGenerate).toHaveBeenCalledWith(5, true, 'FREE', 'USER');
+    expect(mockConsumeCredit).toHaveBeenCalledWith(
+      'user-005',
+      2,
+      'Podcast generation (premium voice)',
+      'podcast-011'
+    );
     expect(mockPrismaPodcastUpdate).toHaveBeenCalled();
   });
 
-  it('does not consume credit when usePremiumVoice is false', async () => {
+  it('consumes 1 credit when usePremiumVoice is false', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-006' });
     mockPrismaPodcastFindUnique.mockResolvedValue({
       id: 'podcast-012',
@@ -355,6 +388,9 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       usePremiumVoice: false,
       discovery: null,
     });
+    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
+    mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
+    mockConsumeCredit.mockResolvedValue(undefined);
     mockPrismaPodcastUpdate.mockResolvedValue({});
 
     const request = createMockRequest();
@@ -362,7 +398,13 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const response = await POST(request, params);
 
     expect(response.status).toBe(200);
-    expect(mockConsumeVoiceCredit).not.toHaveBeenCalled();
+    expect(mockCanGenerate).toHaveBeenCalledWith(5, false, 'FREE', 'USER');
+    expect(mockConsumeCredit).toHaveBeenCalledWith(
+      'user-006',
+      1,
+      'Podcast generation',
+      'podcast-012'
+    );
   });
 
   it('queues job with both sourceUrl and sourceContent when available', async () => {

@@ -103,7 +103,8 @@ describe('Sidebar', () => {
     render(<Sidebar currentPath="/dashboard" user={mockUser} />);
     const avatar = screen.getByAltText("John Doe's avatar");
     expect(avatar).toBeInTheDocument();
-    expect(avatar).toHaveAttribute('src', 'https://example.com/avatar.jpg');
+    // Next.js Image component transforms the src to use the image optimization API
+    expect(avatar.getAttribute('src')).toContain('https%3A%2F%2Fexample.com%2Favatar.jpg');
   });
 
   it('displays user initials when no avatar image', () => {

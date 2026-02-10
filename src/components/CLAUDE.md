@@ -13,7 +13,8 @@ All React components, organized by feature domain. CSS Modules only — NO Tailw
 | `discovery/`     | DiscoveryChat, SuggestionChips, RecommendationCard, CreatorSuggestion                                              | Create flow                              |
 | `create/`        | GenerationProgress, ScriptPreview                                                                                  | Generation status                        |
 | `feed/`          | PodcastCard, FeedGrid, TagFilter, SearchBar, TrendingSection                                                       | Public feed                              |
-| `pricing/`       | PricingCard, FeatureList, TierComparison                                                                           | Pricing page                             |
+| `pricing/`       | PricingCard, FeatureList, TierComparison                                                                           | Pricing page (4 tiers)                   |
+| `billing/`       | CreditPackCard                                                                                                     | Credit pack purchase cards               |
 | `profile/`       | ProfileHeader, PodcastList, FollowButton, FollowerCount                                                            | User profiles                            |
 | `notifications/` | NotificationBell, NotificationList, PushPrompt                                                                     | Notifications                            |
 | `settings/`      | VoicePreferenceSelector                                                                                            | Twitter voice preference dropdowns       |

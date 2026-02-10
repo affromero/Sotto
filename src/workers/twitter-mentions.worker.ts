@@ -1,15 +1,11 @@
 import { Job } from 'bullmq';
-import {
-  PollTwitterMentionsPayload,
-  addJob,
-  JobType,
-  contentExtractionQueue,
-} from '@/lib/queue';
+import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent } from '@/lib/tweet-parser';
-import { getUserUsage, incrementPodcastUsage } from '@/lib/subscription';
+import { getUserUsage } from '@/lib/subscription';
+import { consumeCredit } from '@/lib/credits';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet } from '@/types/twitter';
@@ -18,9 +14,7 @@ const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
 const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
 
-export async function processTwitterMentions(
-  job: Job<PollTwitterMentionsPayload>
-): Promise<void> {
+export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload>): Promise<void> {
   const redis = getRedisClient();
 
   const sinceId = await redis.get(REDIS_CURSOR_KEY);
@@ -114,7 +108,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         text: tweet.text,
         status: 'IGNORED',
         userId,
-        errorMessage: `Monthly limit reached (${usage.podcastsUsed}/${usage.podcastsAllowed})`,
+        errorMessage: `No credits remaining (balance: ${usage.creditsBalance}/${usage.creditsMonthly})`,
       },
     });
     return;
@@ -191,8 +185,8 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       data: { podcastId: podcast.id },
     });
 
-    // 11. Increment usage
-    await incrementPodcastUsage(userId);
+    // 11. Consume credit
+    await consumeCredit(userId, 1, 'Twitter podcast generation', podcast.id);
 
     // 12. Kick off the generation pipeline
     await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {

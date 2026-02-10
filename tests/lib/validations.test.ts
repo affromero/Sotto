@@ -349,39 +349,57 @@ describe('feedQuerySchema', () => {
 });
 
 describe('checkoutSchema', () => {
-  it('accepts pro tier', () => {
-    const result = checkoutSchema.safeParse({ tier: 'pro' });
+  it('accepts starter subscription', () => {
+    const result = checkoutSchema.safeParse({ type: 'subscription', tier: 'starter' });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tier).toBe('pro');
+      expect(result.data.type).toBe('subscription');
+      expect((result.data as { type: 'subscription'; tier: string }).tier).toBe('starter');
     }
   });
 
-  it('accepts creator tier', () => {
-    const result = checkoutSchema.safeParse({ tier: 'creator' });
+  it('accepts pro subscription', () => {
+    const result = checkoutSchema.safeParse({ type: 'subscription', tier: 'pro' });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.tier).toBe('creator');
-    }
   });
 
-  it('rejects free tier (not a checkout option)', () => {
-    const result = checkoutSchema.safeParse({ tier: 'free' });
+  it('accepts studio subscription', () => {
+    const result = checkoutSchema.safeParse({ type: 'subscription', tier: 'studio' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts credit pack of 3', () => {
+    const result = checkoutSchema.safeParse({ type: 'credit_pack', credits: 3 });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts credit pack of 10', () => {
+    const result = checkoutSchema.safeParse({ type: 'credit_pack', credits: 10 });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts credit pack of 25', () => {
+    const result = checkoutSchema.safeParse({ type: 'credit_pack', credits: 25 });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects free tier subscription', () => {
+    const result = checkoutSchema.safeParse({ type: 'subscription', tier: 'free' });
     expect(result.success).toBe(false);
   });
 
   it('rejects invalid tier name', () => {
-    const result = checkoutSchema.safeParse({ tier: 'enterprise' });
+    const result = checkoutSchema.safeParse({ type: 'subscription', tier: 'enterprise' });
     expect(result.success).toBe(false);
   });
 
-  it('rejects missing tier', () => {
-    const result = checkoutSchema.safeParse({});
+  it('rejects missing type discriminator', () => {
+    const result = checkoutSchema.safeParse({ tier: 'pro' });
     expect(result.success).toBe(false);
   });
 
-  it('rejects non-string tier', () => {
-    const result = checkoutSchema.safeParse({ tier: 123 });
+  it('rejects invalid credit pack amount', () => {
+    const result = checkoutSchema.safeParse({ type: 'credit_pack', credits: 5 });
     expect(result.success).toBe(false);
   });
 });

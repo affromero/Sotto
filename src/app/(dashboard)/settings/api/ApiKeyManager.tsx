@@ -22,44 +22,47 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
   const [copied, setCopied] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  const handleCreate = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const handleCreate = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!name.trim()) return;
 
-    setCreating(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/keys', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
-      });
+      setCreating(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        });
 
-      if (!response.ok) {
-        const data = await response.json();
-        setError(data.error || 'Failed to create API key');
-        return;
+        if (!response.ok) {
+          const data = await response.json();
+          setError(data.error || 'Failed to create API key');
+          return;
+        }
+
+        const created: ApiKeyCreated = await response.json();
+        setNewKey(created);
+        setName('');
+
+        setKeys((prev) => [
+          {
+            id: created.id,
+            name: created.name,
+            keyPrefix: created.keyPrefix,
+            lastUsedAt: null,
+            createdAt: created.createdAt,
+            revokedAt: null,
+          },
+          ...prev,
+        ]);
+      } finally {
+        setCreating(false);
       }
-
-      const created: ApiKeyCreated = await response.json();
-      setNewKey(created);
-      setName('');
-
-      setKeys((prev) => [
-        {
-          id: created.id,
-          name: created.name,
-          keyPrefix: created.keyPrefix,
-          lastUsedAt: null,
-          createdAt: created.createdAt,
-          revokedAt: null,
-        },
-        ...prev,
-      ]);
-    } finally {
-      setCreating(false);
-    }
-  }, [name]);
+    },
+    [name]
+  );
 
   const handleRevoke = useCallback(async (keyId: string) => {
     setRevokingId(keyId);
@@ -67,9 +70,7 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
       const response = await fetch(`/api/keys/${keyId}`, { method: 'DELETE' });
       if (response.ok || response.status === 204) {
         setKeys((prev) =>
-          prev.map((k) =>
-            k.id === keyId ? { ...k, revokedAt: new Date().toISOString() } : k
-          )
+          prev.map((k) => (k.id === keyId ? { ...k, revokedAt: new Date().toISOString() } : k))
         );
       }
     } finally {
@@ -89,14 +90,17 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
     setCopied(false);
   }, []);
 
-  if (tier !== 'CREATOR') {
+  if (tier !== 'STUDIO') {
     return (
       <div className={styles.upgradeCard}>
         <h2 className={styles.upgradeTitle}>API Access</h2>
         <p className={styles.upgradeText}>
-          API keys are available on the Team plan. Upgrade to access the Sotto API programmatically.
+          API keys are available on the Studio plan. Upgrade to access the Sotto API
+          programmatically.
         </p>
-        <Link href="/billing"><Button>Upgrade to Team</Button></Link>
+        <Link href="/billing">
+          <Button>Upgrade to Studio</Button>
+        </Link>
       </div>
     );
   }
@@ -143,9 +147,7 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
                 <code className={styles.keyPrefix}>{apiKey.keyPrefix}</code>
                 <div className={styles.keyMeta}>
                   <span>Created {formatDate(apiKey.createdAt)}</span>
-                  {apiKey.lastUsedAt && (
-                    <span>Last used {formatDate(apiKey.lastUsedAt)}</span>
-                  )}
+                  {apiKey.lastUsedAt && <span>Last used {formatDate(apiKey.lastUsedAt)}</span>}
                 </div>
               </div>
               <div className={styles.keyActions}>

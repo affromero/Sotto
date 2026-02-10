@@ -11,6 +11,7 @@
 Sotto uses a **chat-based discovery flow** instead of traditional forms or wizards. When a user opens the Create page (`/create`), they enter a conversation with Sotto's AI discovery agent. The agent asks questions one at a time with tappable chip suggestions, adapts its follow-ups based on user responses, extracts structured metadata, searches for existing similar podcasts, and ultimately kicks off podcast generation.
 
 This approach was chosen because:
+
 1. It feels natural and low-friction, especially on mobile
 2. Users often do not know exactly what they want until they talk it through
 3. The conversational format lets the AI adapt (skip questions for experts, probe deeper for vague topics)
@@ -60,14 +61,14 @@ The discovery flow is modeled as a state machine with six states:
 
 ### State Descriptions
 
-| State | What Happens | Transitions To |
-|-------|-------------|----------------|
-| `IDLE` | User opens `/create`. Agent sends the opening greeting. | `EXPLORING` |
-| `EXPLORING` | Agent asks questions one at a time (topic, depth, audience, focus, tone, duration). User responds via chips or free text. Agent adapts follow-ups. | `SEARCHING` (when enough info gathered) or stays in `EXPLORING` |
-| `SEARCHING` | Agent searches public podcasts for similar content using the topic extracted so far. | `RECOMMENDING` (if results found) or `CONFIRMING` (if no results) |
-| `RECOMMENDING` | Agent presents 1-5 similar podcasts with creator info, play counts, and duration. Offers chips to listen, explore creators, or create a new one. | `EXPLORING` (if user wants changes) or `CONFIRMING` (if user says "Create mine") |
-| `CONFIRMING` | Agent summarizes what it will create and emits the `[METADATA]` block. User confirms or requests changes. | `GENERATING` (on confirmation) or `EXPLORING` (if user wants changes) |
-| `GENERATING` | Podcast creation jobs are queued. The UI switches to a progress view showing the pipeline stages. | Complete (user redirected to `/podcast/[id]` when ready) |
+| State          | What Happens                                                                                                                                       | Transitions To                                                                   |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `IDLE`         | User opens `/create`. Agent sends the opening greeting.                                                                                            | `EXPLORING`                                                                      |
+| `EXPLORING`    | Agent asks questions one at a time (topic, depth, audience, focus, tone, duration). User responds via chips or free text. Agent adapts follow-ups. | `SEARCHING` (when enough info gathered) or stays in `EXPLORING`                  |
+| `SEARCHING`    | Agent searches public podcasts for similar content using the topic extracted so far.                                                               | `RECOMMENDING` (if results found) or `CONFIRMING` (if no results)                |
+| `RECOMMENDING` | Agent presents 1-5 similar podcasts with creator info, play counts, and duration. Offers chips to listen, explore creators, or create a new one.   | `EXPLORING` (if user wants changes) or `CONFIRMING` (if user says "Create mine") |
+| `CONFIRMING`   | Agent summarizes what it will create and emits the `[METADATA]` block. User confirms or requests changes.                                          | `GENERATING` (on confirmation) or `EXPLORING` (if user wants changes)            |
+| `GENERATING`   | Podcast creation jobs are queued. The UI switches to a progress view showing the pipeline stages.                                                  | Complete (user redirected to `/podcast/[id]` when ready)                         |
 
 ---
 
@@ -140,6 +141,7 @@ Agent: Last thing — what vibe do you want?
 ### Duration (Optional)
 
 Duration is often inferred from the depth selection:
+
 - Quick overview = 5-8 minutes
 - Standard = 10-15 minutes
 - Deep dive = 20-30 minutes
@@ -168,13 +170,13 @@ export function parseChips(message: string): { text: string; chips: string[] } {
 
 ### Chip Design Rules
 
-| Rule | Rationale |
-|------|-----------|
-| 2-4 chips per message | More than 4 creates decision paralysis on mobile |
-| Short labels (1-4 words) | Chips must fit in a horizontal scrollable row |
-| Mutually exclusive options | Chips represent distinct choices, not overlapping concepts |
-| No "Other" chip | Free text input is always available; an "Other" chip adds noise |
-| Action-oriented language | "Quick overview" not "Short version" |
+| Rule                       | Rationale                                                       |
+| -------------------------- | --------------------------------------------------------------- |
+| 2-4 chips per message      | More than 4 creates decision paralysis on mobile                |
+| Short labels (1-4 words)   | Chips must fit in a horizontal scrollable row                   |
+| Mutually exclusive options | Chips represent distinct choices, not overlapping concepts      |
+| No "Other" chip            | Free text input is always available; an "Other" chip adds noise |
+| Action-oriented language   | "Quick overview" not "Short version"                            |
 
 ### Client-Side Chip Rendering
 
@@ -211,15 +213,15 @@ When the agent has gathered enough information (typically 3-5 exchanges), it pro
 
 ### Field Descriptions
 
-| Field | Type | Values | Description |
-|-------|------|--------|-------------|
-| `topic` | string | Free text | The primary topic for the podcast |
-| `depth` | string | `quick_overview`, `standard`, `deep_dive` | How detailed the coverage should be |
-| `audience_level` | string | `beginner`, `intermediate`, `expert` | The listener's background knowledge |
-| `focus_areas` | string[] | Free text array | Specific angles or subtopics to emphasize |
-| `tone` | string | `casual`, `professional`, `socratic`, `storytelling` | The conversational style |
-| `duration_target` | number | 5-30 | Target duration in minutes |
-| `ready` | boolean | `true` | Signals that metadata is complete |
+| Field             | Type     | Values                                               | Description                               |
+| ----------------- | -------- | ---------------------------------------------------- | ----------------------------------------- |
+| `topic`           | string   | Free text                                            | The primary topic for the podcast         |
+| `depth`           | string   | `quick_overview`, `standard`, `deep_dive`            | How detailed the coverage should be       |
+| `audience_level`  | string   | `beginner`, `intermediate`, `expert`                 | The listener's background knowledge       |
+| `focus_areas`     | string[] | Free text array                                      | Specific angles or subtopics to emphasize |
+| `tone`            | string   | `casual`, `professional`, `socratic`, `storytelling` | The conversational style                  |
+| `duration_target` | number   | 5-30                                                 | Target duration in minutes                |
+| `ready`           | boolean  | `true`                                               | Signals that metadata is complete         |
 
 ### Extraction Function
 
@@ -324,6 +326,7 @@ export async function findSimilarPodcasts(params: {
 The MVP uses PostgreSQL case-insensitive `contains` matching on the `title` and `topic` fields. The search terms are extracted by splitting the topic on whitespace and filtering out short words (2 characters or fewer). Results are ranked by play count and like count.
 
 Future improvements planned:
+
 - PostgreSQL full-text search with `tsvector`/`tsquery` for better relevance ranking
 - Embedding-based semantic similarity using vector storage
 - Tag-based matching (podcasts sharing the same tags)
@@ -346,13 +349,13 @@ Want to check one of these out first, or should I create a fresh one for you?
 
 ### User Actions From Recommendations
 
-| User Action | System Behavior |
-|-------------|----------------|
-| "Listen to Sarah's" | Navigate to `/podcast/[id]` for that podcast |
-| "Create mine" | Proceed to `CONFIRMING` state |
-| "Explore more" | Show more results or navigate to feed with search |
-| Follow a creator | Create `Follow` record, return to chat |
-| Fork a podcast | Create fork, open new discovery chat pre-filled with original's metadata |
+| User Action         | System Behavior                                                          |
+| ------------------- | ------------------------------------------------------------------------ |
+| "Listen to Sarah's" | Navigate to `/podcast/[id]` for that podcast                             |
+| "Create mine"       | Proceed to `CONFIRMING` state                                            |
+| "Explore more"      | Show more results or navigate to feed with search                        |
+| Follow a creator    | Create `Follow` record, return to chat                                   |
+| Fork a podcast      | Create fork, open new discovery chat pre-filled with original's metadata |
 
 ---
 
@@ -367,14 +370,14 @@ interface DiscoveryMessage {
   id: string;
   discoveryId: string;
   role: 'user' | 'assistant' | 'system';
-  content: string;        // Full message text (including chip markers for assistant messages)
-  chips: Chip[] | null;    // Parsed chip options (stored as JSON)
+  content: string; // Full message text (including chip markers for assistant messages)
+  chips: Chip[] | null; // Parsed chip options (stored as JSON)
   createdAt: Date;
 }
 
 interface Chip {
-  label: string;   // Display text on the chip
-  value: string;   // Value sent when tapped (usually same as label)
+  label: string; // Display text on the chip
+  value: string; // Value sent when tapped (usually same as label)
 }
 ```
 
@@ -390,6 +393,7 @@ interface Chip {
 ```
 
 Validated by:
+
 ```typescript
 const discoveryMessageSchema = z.object({
   content: z.string().min(1).max(5000),
@@ -534,7 +538,7 @@ When the user confirms and the metadata is extracted, the following sequence occ
 4. **Update Podcast status** to `DISCOVERING` (then immediately to `EXTRACTING` or `SCRIPTING` depending on whether there is source content)
 5. **Queue content-extraction job** (if a URL/PDF was provided in the chat)
 6. **Queue script-generation job** with the discovery metadata
-7. **Increment user's `podcastsUsed` counter**
+7. **Consume credit via `consumeCredit()` (1 credit standard, +1 if premium voice)**
 8. **Return the podcast ID** to the client so it can show progress and navigate to the playback page when ready
 
 ### Pipeline Trigger
@@ -580,8 +584,8 @@ await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
   discoveryId: discovery.id,
 });
 
-// Increment usage
-await incrementPodcastUsage(session.user.id);
+// Consume credit
+await consumeCredit(session.user.id, 1, 'Podcast generation', podcast.id);
 ```
 
 ---
@@ -623,6 +627,7 @@ Let me check for existing ones first...
 ### User Wants to Fork an Existing Podcast
 
 If the user chooses to fork a recommended podcast, the system:
+
 1. Creates a new Podcast record with `forkedFromId` set to the original
 2. Pre-populates a new Discovery with the original's metadata
 3. Opens a new discovery chat where the agent asks "What would you like to change about this podcast?"

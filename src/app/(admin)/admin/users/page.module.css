@@ -200,9 +200,14 @@
   color: var(--color-primary);
 }
 
-.badgeCREATOR {
-  background: var(--color-accent-light);
-  color: var(--color-accent);
+.badgeSTARTER {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.badgeSTUDIO {
+  background: #ede9fe;
+  color: #8b5cf6;
 }
 
 /* Pagination */

@@ -37,8 +37,8 @@
 | `/api/discovery`                      | POST             | Yes        | Streaming discovery chat                                    |
 | `/api/podcasts`                       | GET/POST         | Yes        | List/create podcasts                                        |
 | `/api/podcasts/[podcastId]`           | GET/PATCH/DELETE | Yes        | Single podcast CRUD                                         |
-| `/api/podcasts/[podcastId]/generate`  | POST             | Yes        | Trigger podcast generation                                  |
-| `/api/podcasts/[podcastId]/interact`  | POST             | Yes        | Submit Q&A interaction                                      |
+| `/api/podcasts/[podcastId]/generate`  | POST             | Yes        | Trigger generation (consumes credit via credits.ts)         |
+| `/api/podcasts/[podcastId]/interact`  | POST             | Yes        | Submit Q&A interaction (tier-based limit enforced)          |
 | `/api/podcasts/[podcastId]/fork`      | POST             | Yes        | Fork a podcast                                              |
 | `/api/podcasts/[podcastId]/like`      | POST/DELETE      | Yes        | Like/unlike                                                 |
 | `/api/podcasts/[podcastId]/save`      | POST/DELETE      | Yes        | Save/unsave                                                 |
@@ -52,10 +52,10 @@
 | `/api/notifications/[notificationId]` | PATCH            | Yes        | Mark notification read                                      |
 | `/api/notifications/mark-all-read`    | POST             | Yes        | Mark all read                                               |
 | `/api/analytics`                      | GET              | Yes        | Usage analytics data                                        |
-| `/api/billing/checkout`               | POST             | Yes        | Stripe checkout session                                     |
+| `/api/billing/checkout`               | POST             | Yes        | Stripe checkout (subscriptions + credit packs)              |
 | `/api/billing/portal`                 | POST             | Yes        | Stripe billing portal                                       |
 | `/api/billing/subscription`           | GET              | Yes        | Current subscription details                                |
-| `/api/billing/usage`                  | GET              | Yes        | Usage tracking                                              |
+| `/api/billing/usage`                  | GET              | Yes        | Credit balance, limits, recent transactions                 |
 | `/api/keys`                           | GET/POST         | Yes        | List/create API keys                                        |
 | `/api/keys/[keyId]`                   | DELETE           | Yes        | Revoke API key                                              |
 | `/api/teams/[teamId]`                 | GET/PATCH/DELETE | Yes        | Team CRUD                                                   |

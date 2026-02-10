@@ -10,11 +10,11 @@
 
 Sotto is designed mobile-first. The primary usage scenario is a user on their commute creating and listening to podcasts on their phone. The platform strategy is:
 
-| Phase | Platform | Technology | Timeline |
-|-------|----------|-----------|----------|
-| Phase 1 (MVP) | Web (mobile + desktop) | Next.js PWA | Launch |
-| Phase 2 | iOS | React Native + Expo | Post-launch |
-| Phase 3 | Android | React Native + Expo | After iOS |
+| Phase         | Platform               | Technology          | Timeline    |
+| ------------- | ---------------------- | ------------------- | ----------- |
+| Phase 1 (MVP) | Web (mobile + desktop) | Next.js PWA         | Launch      |
+| Phase 2       | iOS                    | React Native + Expo | Post-launch |
+| Phase 3       | Android                | React Native + Expo | After iOS   |
 
 The web app is a Progressive Web App (PWA) from day one, providing a near-native experience on mobile browsers with offline support, push notifications, and add-to-homescreen capability. Native apps will be built later using React Native with Expo, sharing API endpoints and design tokens with the web app.
 
@@ -99,6 +99,7 @@ The web app manifest is at `public/manifest.json`:
 ```
 
 Key manifest properties:
+
 - `display: "standalone"` removes the browser chrome, making it feel like a native app
 - `orientation: "portrait"` locks to portrait since podcast listening and chat-based creation are both vertical experiences
 - `theme_color: "#D97706"` sets the status bar color on Android to Sotto's golden amber
@@ -136,18 +137,18 @@ const STATIC_ASSETS = [
 
 // Install: cache static assets
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)));
   self.skipWaiting();
 });
 
 // Activate: clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    )
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      )
   );
   self.clients.claim();
 });
@@ -172,15 +173,14 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static assets: cache first, fall back to network
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request))
-  );
+  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
 });
 ```
 
 #### Offline Support
 
 When offline, the PWA serves cached versions of:
+
 - The app shell (HTML, CSS, JavaScript)
 - Fonts (DM Serif Display, Inter)
 - Previously visited pages (cached on first load)
@@ -302,12 +302,12 @@ self.addEventListener('notificationclick', (event) => {
 
 #### Push Notification Types
 
-| Notification | When | Title | Body Example |
-|-------------|------|-------|-------------|
-| Podcast Ready | Generation complete | "Your podcast is ready!" | "Transformers Intuition is ready to play" |
-| Podcast Liked | Someone likes your podcast | "Someone liked your podcast" | "@sarah liked your podcast 'Quantum Computing'" |
-| New Follower | Someone follows you | "New follower!" | "@deeplearner is now following you" |
-| Podcast Forked | Someone forks your podcast | "Your podcast was forked" | "@student42 created a version of 'Black Holes 101'" |
+| Notification   | When                       | Title                        | Body Example                                        |
+| -------------- | -------------------------- | ---------------------------- | --------------------------------------------------- |
+| Podcast Ready  | Generation complete        | "Your podcast is ready!"     | "Transformers Intuition is ready to play"           |
+| Podcast Liked  | Someone likes your podcast | "Someone liked your podcast" | "@sarah liked your podcast 'Quantum Computing'"     |
+| New Follower   | Someone follows you        | "New follower!"              | "@deeplearner is now following you"                 |
+| Podcast Forked | Someone forks your podcast | "Your podcast was forked"    | "@student42 created a version of 'Black Holes 101'" |
 
 ### Add to Homescreen
 
@@ -355,12 +355,12 @@ All CSS in Sotto follows mobile-first methodology: base styles target mobile scr
 
 ### Breakpoints
 
-| Breakpoint | Variable | Width | Target |
-|------------|----------|-------|--------|
-| Mobile | (default) | 0-639px | Phone portrait |
-| Tablet | `--bp-tablet` | 640px+ | Phone landscape, small tablets |
-| Desktop | `--bp-desktop` | 1024px+ | Laptops, large tablets |
-| Wide | `--bp-wide` | 1440px+ | Desktop monitors |
+| Breakpoint | Variable       | Width   | Target                         |
+| ---------- | -------------- | ------- | ------------------------------ |
+| Mobile     | (default)      | 0-639px | Phone portrait                 |
+| Tablet     | `--bp-tablet`  | 640px+  | Phone landscape, small tablets |
+| Desktop    | `--bp-desktop` | 1024px+ | Laptops, large tablets         |
+| Wide       | `--bp-wide`    | 1440px+ | Desktop monitors               |
 
 Defined in `src/styles/globals.css`:
 
@@ -414,13 +414,13 @@ Defined in `src/styles/globals.css`:
 
 ### Layout Patterns
 
-| Layout | Mobile | Tablet | Desktop |
-|--------|--------|--------|---------|
-| Feed grid | Single column | 2 columns | 3-4 columns |
-| Sidebar | Hidden (hamburger menu) | Hidden (hamburger menu) | Visible (240px fixed) |
-| Player | Full-width bottom bar | Full-width bottom bar | Full-width bottom bar |
-| Discovery chat | Full screen | Full screen | Centered card (640px max) |
-| Pricing cards | Stacked vertically | Stacked vertically | Side by side (3 columns) |
+| Layout         | Mobile                  | Tablet                  | Desktop                   |
+| -------------- | ----------------------- | ----------------------- | ------------------------- |
+| Feed grid      | Single column           | 2 columns               | 3-4 columns               |
+| Sidebar        | Hidden (hamburger menu) | Hidden (hamburger menu) | Visible (240px fixed)     |
+| Player         | Full-width bottom bar   | Full-width bottom bar   | Full-width bottom bar     |
+| Discovery chat | Full screen             | Full screen             | Centered card (640px max) |
+| Pricing cards  | Stacked vertically      | Stacked vertically      | Side by side (3 columns)  |
 
 ---
 
@@ -428,15 +428,15 @@ Defined in `src/styles/globals.css`:
 
 All interactive elements follow accessibility touch target guidelines:
 
-| Element | Minimum Size | Implementation |
-|---------|-------------|----------------|
-| Buttons | 48x48px | `min-height: 48px; min-width: 48px;` |
-| Chip suggestions | 48px height | `height: 48px; padding: 0 20px;` |
-| Icon buttons | 48x48px | `width: 48px; height: 48px;` with icon centered |
-| List items | 48px row height | `min-height: 48px;` |
-| Links in text | 48px tap target | `padding: 8px 0;` to extend vertical hit area |
-| Player controls | 56px | Larger for play/pause: `width: 56px; height: 56px;` |
-| Mini player | 64px height | Entire bar is tappable to expand |
+| Element          | Minimum Size    | Implementation                                      |
+| ---------------- | --------------- | --------------------------------------------------- |
+| Buttons          | 48x48px         | `min-height: 48px; min-width: 48px;`                |
+| Chip suggestions | 48px height     | `height: 48px; padding: 0 20px;`                    |
+| Icon buttons     | 48x48px         | `width: 48px; height: 48px;` with icon centered     |
+| List items       | 48px row height | `min-height: 48px;`                                 |
+| Links in text    | 48px tap target | `padding: 8px 0;` to extend vertical hit area       |
+| Player controls  | 56px            | Larger for play/pause: `width: 56px; height: 56px;` |
+| Mini player      | 64px height     | Entire bar is tappable to expand                    |
 
 ### Spacing Between Touch Targets
 
@@ -508,14 +508,15 @@ function setupMediaSession(metadata: PodcastMetadata) {
 
 The Media Session API provides lock screen controls on both iOS and Android:
 
-| Control | Handler | Behavior |
-|---------|---------|----------|
-| Play/Pause | `play` / `pause` | Toggle playback |
-| Skip backward | `seekbackward` | Jump back 15 seconds |
-| Skip forward | `seekforward` | Jump forward 15 seconds |
-| Seek | `seekto` | Scrub to position |
+| Control       | Handler          | Behavior                |
+| ------------- | ---------------- | ----------------------- |
+| Play/Pause    | `play` / `pause` | Toggle playback         |
+| Skip backward | `seekbackward`   | Jump back 15 seconds    |
+| Skip forward  | `seekforward`    | Jump forward 15 seconds |
+| Seek          | `seekto`         | Scrub to position       |
 
 The lock screen also shows:
+
 - Podcast title
 - Creator name
 - Cover artwork (or Sotto default icon)
@@ -544,23 +545,23 @@ After the first user-initiated play, subsequent play/pause calls can be programm
 
 ```typescript
 const audio = new Audio();
-audio.preload = 'auto';           // Preload metadata and some audio data
-audio.crossOrigin = 'anonymous';  // Required for R2/CDN audio files
-audio.playbackRate = 1.0;         // User-adjustable: 0.5x to 2.0x
+audio.preload = 'auto'; // Preload metadata and some audio data
+audio.crossOrigin = 'anonymous'; // Required for R2/CDN audio files
+audio.playbackRate = 1.0; // User-adjustable: 0.5x to 2.0x
 ```
 
 ### Playback Rate Control
 
 Users can adjust playback speed. The available rates are:
 
-| Rate | Label | Use Case |
-|------|-------|----------|
-| 0.5x | Slow | Language learners, dense content |
-| 0.75x | Slower | Careful listening |
-| 1.0x | Normal | Default |
-| 1.25x | Faster | Casual review |
-| 1.5x | Fast | Experienced podcast listeners |
-| 2.0x | Very fast | Scanning content |
+| Rate  | Label     | Use Case                         |
+| ----- | --------- | -------------------------------- |
+| 0.5x  | Slow      | Language learners, dense content |
+| 0.75x | Slower    | Careful listening                |
+| 1.0x  | Normal    | Default                          |
+| 1.25x | Faster    | Casual review                    |
+| 1.5x  | Fast      | Experienced podcast listeners    |
+| 2.0x  | Very fast | Scanning content                 |
 
 ```css
 .speedButton {
@@ -577,29 +578,29 @@ Users can adjust playback speed. The available rates are:
 
 Sotto targets fast load times on mobile networks. The performance budget is:
 
-| Metric | Budget | Measurement |
-|--------|--------|-------------|
-| First Contentful Paint (FCP) | < 1.5s | 3G connection |
-| Largest Contentful Paint (LCP) | < 2.5s | 3G connection |
-| Time to Interactive (TTI) | < 3.5s | 3G connection |
-| Cumulative Layout Shift (CLS) | < 0.1 | Across page lifetime |
-| Total JavaScript bundle | < 200 KB | gzipped |
-| Initial HTML + CSS | < 50 KB | gzipped |
-| Font files | < 100 KB | woff2 compressed |
-| Image assets | < 500 KB | Per page |
+| Metric                         | Budget   | Measurement          |
+| ------------------------------ | -------- | -------------------- |
+| First Contentful Paint (FCP)   | < 1.5s   | 3G connection        |
+| Largest Contentful Paint (LCP) | < 2.5s   | 3G connection        |
+| Time to Interactive (TTI)      | < 3.5s   | 3G connection        |
+| Cumulative Layout Shift (CLS)  | < 0.1    | Across page lifetime |
+| Total JavaScript bundle        | < 200 KB | gzipped              |
+| Initial HTML + CSS             | < 50 KB  | gzipped              |
+| Font files                     | < 100 KB | woff2 compressed     |
+| Image assets                   | < 500 KB | Per page             |
 
 ### Performance Strategies
 
-| Strategy | Implementation |
-|----------|---------------|
-| Server Components | All pages are Server Components by default; only interactive widgets use `'use client'` |
-| Code splitting | Next.js automatic route-based code splitting |
-| Font optimization | `next/font` for DM Serif Display and Inter with `display: swap` |
-| Image optimization | `next/image` with automatic WebP/AVIF conversion and responsive sizes |
-| Lazy loading | Audio player loads only when needed; feed images use `loading="lazy"` |
-| Streaming SSR | Next.js streaming with `<Suspense>` boundaries for progressive rendering |
-| CSS Modules | No CSS-in-JS runtime cost; styles are statically extracted at build time |
-| Service worker caching | Static assets cached on first visit; subsequent loads are instant |
+| Strategy               | Implementation                                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| Server Components      | All pages are Server Components by default; only interactive widgets use `'use client'` |
+| Code splitting         | Next.js automatic route-based code splitting                                            |
+| Font optimization      | `next/font` for DM Serif Display and Inter with `display: swap`                         |
+| Image optimization     | `next/image` with automatic WebP/AVIF conversion and responsive sizes                   |
+| Lazy loading           | Audio player loads only when needed; feed images use `loading="lazy"`                   |
+| Streaming SSR          | Next.js streaming with `<Suspense>` boundaries for progressive rendering                |
+| CSS Modules            | No CSS-in-JS runtime cost; styles are statically extracted at build time                |
+| Service worker caching | Static assets cached on first visit; subsequent loads are instant                       |
 
 ### Bundle Analysis
 
@@ -610,6 +611,7 @@ ANALYZE=true npm run build
 ```
 
 Key dependencies to keep small:
+
 - No Tailwind runtime (CSS Modules only)
 - Anthropic SDK: server-only, not bundled to client
 - Stripe.js: loaded asynchronously only on billing pages
@@ -641,38 +643,38 @@ The React Native app shares the backend API with the web app. No separate backen
 
 ### Shared Across Web and Native
 
-| Shared | How |
-|--------|-----|
-| API endpoints | Same `/api/*` routes serve both web and native clients |
-| Database | Same PostgreSQL database |
-| Auth tokens | JWT tokens work in both contexts |
-| Design tokens | Colors, spacing, typography values exported as shared constants |
-| Business logic | Tier limits, validation schemas, queue jobs |
+| Shared                     | How                                                                       |
+| -------------------------- | ------------------------------------------------------------------------- |
+| API endpoints              | Same `/api/*` routes serve both web and native clients                    |
+| Database                   | Same PostgreSQL database                                                  |
+| Auth tokens                | JWT tokens work in both contexts                                          |
+| Design tokens              | Colors, spacing, typography values exported as shared constants           |
+| Business logic             | Tier limits, validation schemas, queue jobs                               |
 | Push notification payloads | Same payload format; different delivery mechanism (Web Push vs Expo Push) |
 
 ### Native-Only Features
 
-| Feature | Why Native |
-|---------|-----------|
-| Apple Sign In (native) | Native Apple Sign In SDK provides better UX on iOS |
-| Background audio | iOS AVAudioSession handles background audio natively (more reliable than PWA) |
-| CarPlay integration | iOS CarPlay API for in-car listening (future) |
-| Siri Shortcuts | "Hey Siri, play my latest Sotto podcast" |
-| Haptic feedback | Physical feedback on chip taps, play/pause, like |
-| Voice input | Native speech-to-text for the "Ask a Question" feature |
-| Offline audio download | Robust file management for downloaded podcasts |
-| Widgets | iOS 14+ widgets showing latest podcast or generation progress |
+| Feature                | Why Native                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------- |
+| Apple Sign In (native) | Native Apple Sign In SDK provides better UX on iOS                            |
+| Background audio       | iOS AVAudioSession handles background audio natively (more reliable than PWA) |
+| CarPlay integration    | iOS CarPlay API for in-car listening (future)                                 |
+| Siri Shortcuts         | "Hey Siri, play my latest Sotto podcast"                                      |
+| Haptic feedback        | Physical feedback on chip taps, play/pause, like                              |
+| Voice input            | Native speech-to-text for the "Ask a Question" feature                        |
+| Offline audio download | Robust file management for downloaded podcasts                                |
+| Widgets                | iOS 14+ widgets showing latest podcast or generation progress                 |
 
 ### Implementation Plan
 
-| Phase | Milestone | Features |
-|-------|-----------|----------|
-| 2a | iOS Alpha | Core playback, auth, feed, basic create flow |
-| 2b | iOS Beta | Push notifications, offline downloads, background audio |
-| 2c | iOS Launch | CarPlay, Siri Shortcuts, App Store submission |
-| 3a | Android Alpha | Core playback, auth, feed |
-| 3b | Android Beta | Push notifications, offline downloads |
-| 3c | Android Launch | Android Auto, Play Store submission |
+| Phase | Milestone      | Features                                                |
+| ----- | -------------- | ------------------------------------------------------- |
+| 2a    | iOS Alpha      | Core playback, auth, feed, basic create flow            |
+| 2b    | iOS Beta       | Push notifications, offline downloads, background audio |
+| 2c    | iOS Launch     | CarPlay, Siri Shortcuts, App Store submission           |
+| 3a    | Android Alpha  | Core playback, auth, feed                               |
+| 3b    | Android Beta   | Push notifications, offline downloads                   |
+| 3c    | Android Launch | Android Auto, Play Store submission                     |
 
 ---
 
@@ -680,29 +682,39 @@ The React Native app shares the backend API with the web app. No separate backen
 
 ### PWA vs Native Trade-offs
 
-| Factor | PWA | Native (React Native) |
-|--------|-----|----------------------|
-| Discovery | No app store presence | App Store / Play Store SEO |
-| Install friction | One tap "Add to Home Screen" | Download from app store |
-| Updates | Instant (no app review) | 1-7 day app review process |
-| Push notifications | Web Push API (limited on iOS) | Full native push (APNs/FCM) |
-| Background audio | Inconsistent on iOS | Reliable via native audio session |
-| Payment | Stripe (no Apple/Google cut) | Must use IAP on iOS (30% cut on subscriptions, 15% after year 1) |
-| Performance | Good (modern browsers) | Better (native rendering) |
-| Development cost | Shared with web codebase | Separate codebase (shared API) |
+| Factor             | PWA                           | Native (React Native)                                            |
+| ------------------ | ----------------------------- | ---------------------------------------------------------------- |
+| Discovery          | No app store presence         | App Store / Play Store SEO                                       |
+| Install friction   | One tap "Add to Home Screen"  | Download from app store                                          |
+| Updates            | Instant (no app review)       | 1-7 day app review process                                       |
+| Push notifications | Web Push API (limited on iOS) | Full native push (APNs/FCM)                                      |
+| Background audio   | Inconsistent on iOS           | Reliable via native audio session                                |
+| Payment            | Stripe (no Apple/Google cut)  | Must use IAP on iOS (30% cut on subscriptions, 15% after year 1) |
+| Performance        | Good (modern browsers)        | Better (native rendering)                                        |
+| Development cost   | Shared with web codebase      | Separate codebase (shared API)                                   |
 
 ### iOS App Store Strategy
 
 Apple's App Store guidelines require that apps offering digital content subscriptions use In-App Purchase (IAP), which takes a 30% commission (15% after the first year of a subscription through the Small Business Program).
 
-| Subscription | Direct (Stripe) | IAP Price (covering 30% cut) |
-|-------------|-----------------|------------------------------|
-| Pro $14/mo | $14/mo | $17.99/mo (nearest Apple tier) |
-| Creator $29/mo | $29/mo | $37.99/mo (nearest Apple tier) |
+| Subscription | Direct (Stripe) | IAP Price (covering 30% cut)      |
+| ------------ | --------------- | --------------------------------- |
+| Starter      | $9/mo           | $9.99/mo (exact Apple tier match) |
+| Pro          | $24/mo          | $29.99/mo (nearest Apple tier)    |
+| Studio       | $49/mo          | $59.99/mo (nearest Apple tier)    |
+
+Credit packs would be priced as consumable IAPs:
+
+| Credit Pack | Direct (Stripe) | IAP Price (covering 30% cut) |
+| ----------- | --------------- | ---------------------------- |
+| 3 credits   | $5              | $5.99                        |
+| 10 credits  | $15             | $19.99                       |
+| 25 credits  | $30             | $34.99                       |
 
 Options to mitigate the IAP tax:
+
 1. **Reader rule**: If Sotto qualifies as a "reader" app (consuming pre-existing content), the app can link out to the web for purchases. This is unlikely since Sotto generates content.
-2. **Web-first pricing**: Keep the web app at $14/$29, price the iOS app at $17.99/$37.99 to maintain margin.
+2. **Web-first pricing**: Keep the web app at $9/$24/$49, price the iOS app at $9.99/$29.99/$59.99 to maintain margin.
 3. **Delayed native launch**: Focus on PWA for the first year. By the time a native app is needed, the platform may have better economics to absorb the Apple tax.
 4. **StoreKit 2 external purchase links**: As of 2024-2025, Apple allows apps to link to external purchase pages in certain regions with conditions. Monitor policy changes.
 
@@ -713,6 +725,7 @@ Google Play takes a 15% commission on the first $1M in annual revenue (then 30%)
 ### PWA as Primary
 
 For MVP and early growth, the PWA is the primary mobile distribution channel:
+
 - No app store approval process
 - No revenue share with Apple/Google
 - Instant updates

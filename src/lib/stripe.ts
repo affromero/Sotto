@@ -12,19 +12,20 @@ export const stripe = STRIPE_SECRET_KEY
   : null;
 
 /**
- * Pricing tiers and limits
+ * Credit-based pricing tiers
  *
- * Free $0 / Pro $14 / Creator $29
+ * Free $0 / Starter $9 / Pro $24 / Studio $49
  * All tiers cap at 10 min — the sweet spot for focused, digestible content.
- * Default TTS is OpenAI (standard). Premium voice credits use ElevenLabs.
+ * Each podcast generation costs 1 credit. Premium voices add a surcharge.
  */
 export const TIER_LIMITS = {
   FREE: {
-    podcastsPerMonth: 2,
+    creditsMonthly: 2,
+    maxRollover: 0,
     maxDurationMinutes: 10,
     interactionsPerPodcast: 2,
-    premiumVoiceCredits: 0,
     maxVoiceClones: 0,
+    premiumVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: false,
     canMakePrivate: false,
@@ -33,26 +34,43 @@ export const TIER_LIMITS = {
     canViewAnalytics: false,
     canExportPdf: false,
   },
-  PRO: {
-    podcastsPerMonth: 8,
+  STARTER: {
+    creditsMonthly: 5,
+    maxRollover: 2,
     maxDurationMinutes: 10,
-    interactionsPerPodcast: 10,
-    premiumVoiceCredits: 3,
-    maxVoiceClones: 2,
+    interactionsPerPodcast: 5,
+    maxVoiceClones: 1,
+    premiumVoiceSurcharge: 1,
+    hasPremiumSfx: false,
+    canDownload: true,
+    canMakePrivate: false,
+    canBrowseVoiceLibrary: true,
+    canListOnMarketplace: false,
+    canViewAnalytics: false,
+    canExportPdf: false,
+  },
+  PRO: {
+    creditsMonthly: 15,
+    maxRollover: 5,
+    maxDurationMinutes: 10,
+    interactionsPerPodcast: Infinity,
+    maxVoiceClones: 3,
+    premiumVoiceSurcharge: 1,
     hasPremiumSfx: false,
     canDownload: true,
     canMakePrivate: true,
     canBrowseVoiceLibrary: true,
     canListOnMarketplace: false,
-    canViewAnalytics: false,
+    canViewAnalytics: true,
     canExportPdf: true,
   },
-  CREATOR: {
-    podcastsPerMonth: 30,
+  STUDIO: {
+    creditsMonthly: 50,
+    maxRollover: 20,
     maxDurationMinutes: 10,
     interactionsPerPodcast: Infinity,
-    premiumVoiceCredits: 10,
-    maxVoiceClones: 5,
+    maxVoiceClones: 10,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
@@ -62,11 +80,12 @@ export const TIER_LIMITS = {
     canExportPdf: true,
   },
   ADMIN: {
-    podcastsPerMonth: Infinity,
+    creditsMonthly: Infinity,
+    maxRollover: Infinity,
     maxDurationMinutes: 60,
     interactionsPerPodcast: Infinity,
-    premiumVoiceCredits: Infinity,
     maxVoiceClones: Infinity,
+    premiumVoiceSurcharge: 0,
     hasPremiumSfx: true,
     canDownload: true,
     canMakePrivate: true,
@@ -79,6 +98,14 @@ export const TIER_LIMITS = {
 
 export type TierName = keyof typeof TIER_LIMITS;
 
+const TIER_LABELS: Record<TierName, string> = {
+  FREE: 'Free',
+  STARTER: 'Starter',
+  PRO: 'Pro',
+  STUDIO: 'Studio',
+  ADMIN: 'Admin',
+};
+
 /**
  * Get effective tier limits considering user role.
  * ADMIN role always gets ADMIN tier regardless of subscription.
@@ -89,22 +116,26 @@ export function getEffectiveTier(subscriptionTier: TierName, userRole?: string):
 }
 
 /**
- * Check if user can create a new podcast
+ * Check if user can generate a podcast (has sufficient credits).
  */
-export function canCreatePodcast(
+export function canGenerate(
+  creditsBalance: number,
+  usePremiumVoice: boolean,
   tier: TierName,
-  podcastsUsed: number,
   userRole?: string
-): { allowed: boolean; reason?: string } {
+): { allowed: boolean; cost: number; reason?: string } {
   const effectiveTier = getEffectiveTier(tier, userRole);
   const limits = TIER_LIMITS[effectiveTier];
-  if (podcastsUsed >= limits.podcastsPerMonth) {
+  const cost = 1 + (usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
+
+  if (creditsBalance < cost) {
     return {
       allowed: false,
-      reason: `You've used all ${limits.podcastsPerMonth} podcasts this month. Upgrade to create more.`,
+      cost,
+      reason: `Insufficient credits: need ${cost}, have ${creditsBalance}. Buy more credits or upgrade your plan.`,
     };
   }
-  return { allowed: true };
+  return { allowed: true, cost };
 }
 
 /**
@@ -120,33 +151,61 @@ export function canInteract(
   if (interactionCount >= limits.interactionsPerPodcast) {
     return {
       allowed: false,
-      reason: `${effectiveTier === 'FREE' ? 'Free' : effectiveTier === 'PRO' ? 'Pro' : 'Creator'} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for unlimited.`,
+      reason: `${TIER_LABELS[effectiveTier]} tier allows ${limits.interactionsPerPodcast} interactions per podcast. Upgrade for more.`,
     };
   }
   return { allowed: true };
 }
 
 /**
- * Create Stripe checkout session
+ * Create Stripe checkout session.
+ * Supports both subscription mode and one-time payment mode (credit packs).
  */
 export async function createCheckoutSession(params: {
   userId: string;
   userEmail: string;
-  priceId: string;
+  priceId?: string;
   successUrl: string;
   cancelUrl: string;
+  mode?: 'subscription' | 'payment';
+  unitAmount?: number;
+  productName?: string;
+  metadata?: Record<string, string>;
 }): Promise<string> {
   if (!stripe) {
     throw new Error('Stripe not configured');
   }
 
+  const mode = params.mode ?? 'subscription';
+
+  if (mode === 'payment') {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: params.userEmail,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            unit_amount: params.unitAmount!,
+            product_data: { name: params.productName ?? 'Sotto Credits' },
+          },
+          quantity: 1,
+        },
+      ],
+      success_url: params.successUrl,
+      cancel_url: params.cancelUrl,
+      metadata: { userId: params.userId, ...params.metadata },
+    });
+    return session.url || '';
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer_email: params.userEmail,
-    line_items: [{ price: params.priceId, quantity: 1 }],
+    line_items: [{ price: params.priceId!, quantity: 1 }],
     success_url: params.successUrl,
     cancel_url: params.cancelUrl,
-    metadata: { userId: params.userId },
+    metadata: { userId: params.userId, ...params.metadata },
   });
 
   return session.url || '';

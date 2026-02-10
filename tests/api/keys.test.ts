@@ -230,7 +230,7 @@ describe('POST /api/keys', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body.error).toBe('API keys require a Creator subscription');
+    expect(body.error).toBe('API keys require a Studio subscription');
   });
 
   it('returns 403 when user tier is PRO', async () => {
@@ -245,12 +245,12 @@ describe('POST /api/keys', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body.error).toBe('API keys require a Creator subscription');
+    expect(body.error).toBe('API keys require a Studio subscription');
   });
 
   it('returns 400 for invalid input (missing name)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
 
     const request = createRequest('http://localhost:3000/api/keys', {
       method: 'POST',
@@ -265,7 +265,7 @@ describe('POST /api/keys', () => {
 
   it('returns 400 for invalid input (name too long)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
 
     const request = createRequest('http://localhost:3000/api/keys', {
       method: 'POST',
@@ -278,7 +278,7 @@ describe('POST /api/keys', () => {
 
   it('returns 400 when user has reached MAX_ACTIVE_KEYS limit (10)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(10);
 
     const request = createRequest('http://localhost:3000/api/keys', {
@@ -294,7 +294,7 @@ describe('POST /api/keys', () => {
 
   it('counts only active (non-revoked) keys for limit check', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(5);
 
     const request = createRequest('http://localhost:3000/api/keys', {
@@ -326,9 +326,9 @@ describe('POST /api/keys', () => {
     });
   });
 
-  it('creates API key successfully for CREATOR tier user', async () => {
+  it('creates API key successfully for STUDIO tier user', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(3);
 
     mockGenerateApiKey.mockReturnValue({
@@ -363,7 +363,7 @@ describe('POST /api/keys', () => {
 
   it('returns full API key only on creation (shown once)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
     mockGenerateApiKey.mockReturnValue({
@@ -396,7 +396,7 @@ describe('POST /api/keys', () => {
 
   it('generates API key with sk_sotto_ prefix', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
     mockGenerateApiKey.mockReturnValue({
@@ -429,7 +429,7 @@ describe('POST /api/keys', () => {
 
   it('stores hashed key in database (not plaintext)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('CREATOR');
+    mockGetUserTier.mockResolvedValue('STUDIO');
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
     mockGenerateApiKey.mockReturnValue({

@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import styles from './PricingCard.module.css';
 
 interface PricingCardProps {
-  tier: 'free' | 'pro' | 'creator';
+  tier: 'free' | 'starter' | 'pro' | 'studio';
   price: number;
   interval?: string;
   features: string[];
@@ -14,8 +14,9 @@ interface PricingCardProps {
 
 const tierLabels: Record<string, string> = {
   free: 'Free',
+  starter: 'Starter',
   pro: 'Pro',
-  creator: 'Creator',
+  studio: 'Studio',
 };
 
 export function PricingCard({
@@ -28,27 +29,19 @@ export function PricingCard({
   onSelect,
   loading = false,
 }: PricingCardProps) {
-  const ctaLabel = isCurrentPlan
-    ? 'Current Plan'
-    : tier === 'free'
-      ? 'Get Started'
-      : 'Subscribe';
+  const ctaLabel = isCurrentPlan ? 'Current Plan' : tier === 'free' ? 'Get Started' : 'Subscribe';
 
   return (
     <div
       className={`${styles.card} ${isPopular ? styles.popular : ''} ${isCurrentPlan ? styles.current : ''}`}
     >
-      {isPopular && (
-        <span className={styles.badge}>Most Popular</span>
-      )}
+      {isPopular && <span className={styles.badge}>Most Popular</span>}
       <div className={styles.header}>
         <h3 className={styles.tierName}>{tierLabels[tier]}</h3>
         <div className={styles.priceRow}>
           <span className={styles.currency}>$</span>
           <span className={styles.price}>{price}</span>
-          {price > 0 && (
-            <span className={styles.interval}>{interval}</span>
-          )}
+          {price > 0 && <span className={styles.interval}>{interval}</span>}
         </div>
       </div>
       <ul className={styles.features} role="list">

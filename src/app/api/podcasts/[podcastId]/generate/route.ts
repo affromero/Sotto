@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { consumeVoiceCredit, getUserTier } from '@/lib/subscription';
-import { TIER_LIMITS } from '@/lib/stripe';
+import { getUserTier } from '@/lib/subscription';
+import { TIER_LIMITS, canGenerate } from '@/lib/stripe';
+import { consumeCredit } from '@/lib/credits';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -46,32 +47,46 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Pre-generation duration validation
   const durationTarget = podcast.discovery?.durationTarget;
-  if (durationTarget) {
-    const tier = await getUserTier(authResult.userId);
-    const maxMinutes = TIER_LIMITS[tier].maxDurationMinutes;
-    if (durationTarget > maxMinutes) {
-      return NextResponse.json(
-        {
-          error: `Requested duration (${durationTarget} min) exceeds your plan's limit of ${maxMinutes} minutes. Reduce duration or upgrade your plan.`,
-        },
-        { status: 400 }
-      );
-    }
+  const tier = await getUserTier(authResult.userId);
+  const maxMinutes = TIER_LIMITS[tier].maxDurationMinutes;
+
+  if (durationTarget && durationTarget > maxMinutes) {
+    return NextResponse.json(
+      {
+        error: `Requested duration (${durationTarget} min) exceeds your plan's limit of ${maxMinutes} minutes. Reduce duration or upgrade your plan.`,
+      },
+      { status: 400 }
+    );
   }
 
-  // If using premium voice, consume a credit before generation
-  if (podcast.usePremiumVoice) {
-    try {
-      await consumeVoiceCredit(authResult.userId);
-    } catch {
-      return NextResponse.json(
-        {
-          error:
-            'No premium voice credits remaining. Switch to standard voices or upgrade your plan.',
-        },
-        { status: 402 }
-      );
-    }
+  // Check credit balance and consume credits
+  const subscription = await prisma.subscription.findUnique({
+    where: { userId: authResult.userId },
+    select: { creditsBalance: true },
+  });
+  const creditsBalance = subscription?.creditsBalance ?? 0;
+  const user = await prisma.user.findUnique({
+    where: { id: authResult.userId },
+    select: { role: true },
+  });
+
+  const check = canGenerate(creditsBalance, podcast.usePremiumVoice, tier, user?.role);
+  if (!check.allowed) {
+    return NextResponse.json({ error: check.reason }, { status: 402 });
+  }
+
+  try {
+    await consumeCredit(
+      authResult.userId,
+      check.cost,
+      `Podcast generation${podcast.usePremiumVoice ? ' (premium voice)' : ''}`,
+      podcastId
+    );
+  } catch {
+    return NextResponse.json(
+      { error: 'Insufficient credits to generate this podcast.' },
+      { status: 402 }
+    );
   }
 
   // For FAILED podcasts, clean up old failed jobs

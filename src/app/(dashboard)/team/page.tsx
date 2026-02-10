@@ -32,16 +32,17 @@ export default async function TeamPage() {
   const tier = subscription?.tier || 'FREE';
   const role = dbUser?.role || 'USER';
 
-  if (tier !== 'CREATOR' && role !== 'CREATOR' && role !== 'ADMIN') {
+  if (tier !== 'STUDIO' && role !== 'CREATOR' && role !== 'ADMIN') {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Team</h1>
           <p className={styles.upgradeText}>
-            Upgrade to a Team plan to create a team, invite members, and collaborate on podcasts.
+            Upgrade to the Studio plan to create a team, invite members, and collaborate on
+            podcasts.
           </p>
           <Link href="/billing" className={styles.upgradeLink}>
-            Upgrade to Team
+            Upgrade to Studio
           </Link>
         </div>
       </main>

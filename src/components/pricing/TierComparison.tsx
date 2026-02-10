@@ -2,7 +2,7 @@ import { Check, X } from 'lucide-react';
 import styles from './TierComparison.module.css';
 
 interface TierComparisonProps {
-  currentTier?: 'free' | 'pro' | 'creator';
+  currentTier?: 'free' | 'starter' | 'pro' | 'studio';
 }
 
 type CellValue = string | boolean;
@@ -10,33 +10,54 @@ type CellValue = string | boolean;
 interface ComparisonRow {
   label: string;
   free: CellValue;
+  starter: CellValue;
   pro: CellValue;
-  creator: CellValue;
+  studio: CellValue;
 }
 
 const rows: ComparisonRow[] = [
-  { label: 'Podcasts / month', free: '2', pro: '8', creator: '30' },
-  { label: 'Max duration', free: '10 min', pro: '10 min', creator: '10 min' },
-  { label: 'Interactions', free: '2 per podcast', pro: '10 per podcast', creator: 'Unlimited' },
-  { label: 'Default TTS', free: 'Standard', pro: 'Standard', creator: 'Standard' },
-  { label: 'Premium voice credits', free: '0', pro: '3 / month', creator: '10 / month' },
-  { label: 'Personal voice clones', free: false, pro: '2', creator: '5' },
-  { label: 'Sound effects', free: 'Standard', pro: 'Standard', creator: 'Premium' },
-  { label: 'Voice library browse', free: false, pro: true, creator: true },
-  { label: 'Marketplace listing', free: false, pro: false, creator: true },
-  { label: 'Private podcasts', free: false, pro: true, creator: true },
-  { label: 'MP3 download', free: false, pro: true, creator: true },
-  { label: 'Transcript PDF', free: false, pro: true, creator: true },
-  { label: 'Analytics', free: false, pro: false, creator: true },
+  { label: 'Credits / month', free: '2', starter: '5', pro: '15', studio: '50' },
+  { label: 'Rollover credits', free: '0', starter: '2', pro: '5', studio: '20' },
+  { label: 'Max duration', free: '10 min', starter: '10 min', pro: '10 min', studio: '10 min' },
+  {
+    label: 'Interactions',
+    free: '2 per podcast',
+    starter: '5 per podcast',
+    pro: 'Unlimited',
+    studio: 'Unlimited',
+  },
+  { label: 'Personal voice clones', free: false, starter: '1', pro: '3', studio: '10' },
+  {
+    label: 'Premium voice surcharge',
+    free: '+1 credit',
+    starter: '+1 credit',
+    pro: '+1 credit',
+    studio: 'Included',
+  },
+  {
+    label: 'Sound effects',
+    free: 'Standard',
+    starter: 'Standard',
+    pro: 'Standard',
+    studio: 'Premium',
+  },
+  { label: 'Voice library browse', free: false, starter: true, pro: true, studio: true },
+  { label: 'Marketplace listing', free: false, starter: false, pro: false, studio: true },
+  { label: 'Private podcasts', free: false, starter: false, pro: true, studio: true },
+  { label: 'MP3 download', free: false, starter: true, pro: true, studio: true },
+  { label: 'Transcript PDF', free: false, starter: false, pro: true, studio: true },
+  { label: 'Analytics', free: false, starter: false, pro: true, studio: true },
+  { label: 'API access', free: false, starter: false, pro: false, studio: true },
 ];
 
 const tierLabels: Record<string, string> = {
   free: 'Free',
+  starter: 'Starter',
   pro: 'Pro',
-  creator: 'Creator',
+  studio: 'Studio',
 };
 
-const tiers = ['free', 'pro', 'creator'] as const;
+const tiers = ['free', 'starter', 'pro', 'studio'] as const;
 
 function CellContent({ value }: { value: CellValue }) {
   if (typeof value === 'boolean') {
@@ -70,9 +91,7 @@ export function TierComparison({ currentTier }: TierComparisonProps) {
                   scope="col"
                 >
                   {tierLabels[tier]}
-                  {currentTier === tier && (
-                    <span className={styles.currentLabel}>Current</span>
-                  )}
+                  {currentTier === tier && <span className={styles.currentLabel}>Current</span>}
                 </th>
               ))}
             </tr>

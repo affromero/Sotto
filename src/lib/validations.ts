@@ -73,11 +73,18 @@ export const paginationSchema = z.object({
 });
 
 /**
- * Billing checkout validation
+ * Billing checkout validation — subscription tier selection
  */
-export const checkoutSchema = z.object({
-  tier: z.enum(['pro', 'creator']),
-});
+export const checkoutSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('subscription'),
+    tier: z.enum(['starter', 'pro', 'studio']),
+  }),
+  z.object({
+    type: z.literal('credit_pack'),
+    credits: z.union([z.literal(3), z.literal(10), z.literal(25)]),
+  }),
+]);
 
 /**
  * Analytics query validation

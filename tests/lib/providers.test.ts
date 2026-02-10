@@ -207,7 +207,7 @@ describe('Provider Factories', () => {
     it('none provider returns unlimited limits', () => {
       const provider = createPaymentProvider('none');
       const limits = provider.getTierLimits('FREE');
-      expect(limits.podcastsPerMonth).toBe(Infinity);
+      expect(limits.creditsMonthly).toBe(Infinity);
       expect(limits.canDownload).toBe(true);
     });
 
@@ -232,7 +232,7 @@ describe('Provider Factories', () => {
     it('stripe provider delegates getTierLimits', () => {
       const provider = createPaymentProvider('stripe');
       const limits = provider.getTierLimits('FREE');
-      expect(limits.podcastsPerMonth).toBe(3);
+      expect(limits.creditsMonthly).toBe(2);
     });
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockConstructEvent = vi.fn();
@@ -11,6 +11,7 @@ const mockSubscriptionUpdateMany = vi.fn();
 const mockSubscriptionEventCreate = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockResetMonthlyUsage = vi.fn();
+const mockAddPurchasedCredits = vi.fn();
 const mockLoggerInfo = vi.fn();
 const mockLoggerError = vi.fn();
 const mockLoggerDebug = vi.fn();
@@ -52,6 +53,10 @@ vi.mock('@/lib/subscription', () => ({
   resetMonthlyUsage: (...args: unknown[]) => mockResetMonthlyUsage(...args),
 }));
 
+vi.mock('@/lib/credits', () => ({
+  addPurchasedCredits: (...args: unknown[]) => mockAddPurchasedCredits(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: (...args: unknown[]) => mockLoggerInfo(...args),
@@ -60,8 +65,9 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+process.env.STRIPE_PRICE_ID_STARTER = 'price_starter_789';
 process.env.STRIPE_PRICE_ID_PRO = 'price_pro_123';
-process.env.STRIPE_PRICE_ID_CREATOR = 'price_creator_456';
+process.env.STRIPE_PRICE_ID_STUDIO = 'price_studio_456';
 
 import { POST } from '@/app/api/webhooks/stripe/route';
 
@@ -81,12 +87,27 @@ function createRequest(body: string, signature: string | null = 'valid_sig'): Ne
 }
 
 describe('POST /api/webhooks/stripe', () => {
+  const originalEnv = {
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    STRIPE_PRICE_ID_STARTER: process.env.STRIPE_PRICE_ID_STARTER,
+    STRIPE_PRICE_ID_PRO: process.env.STRIPE_PRICE_ID_PRO,
+    STRIPE_PRICE_ID_STUDIO: process.env.STRIPE_PRICE_ID_STUDIO,
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserUpdate.mockResolvedValue({});
     process.env.STRIPE_WEBHOOK_SECRET = WEBHOOK_SECRET;
+    process.env.STRIPE_PRICE_ID_STARTER = 'price_starter_789';
     process.env.STRIPE_PRICE_ID_PRO = 'price_pro_123';
-    process.env.STRIPE_PRICE_ID_CREATOR = 'price_creator_456';
+    process.env.STRIPE_PRICE_ID_STUDIO = 'price_studio_456';
+  });
+
+  afterEach(() => {
+    process.env.STRIPE_WEBHOOK_SECRET = originalEnv.STRIPE_WEBHOOK_SECRET;
+    process.env.STRIPE_PRICE_ID_STARTER = originalEnv.STRIPE_PRICE_ID_STARTER;
+    process.env.STRIPE_PRICE_ID_PRO = originalEnv.STRIPE_PRICE_ID_PRO;
+    process.env.STRIPE_PRICE_ID_STUDIO = originalEnv.STRIPE_PRICE_ID_STUDIO;
   });
 
   describe('signature verification', () => {
@@ -212,7 +233,7 @@ describe('POST /api/webhooks/stripe', () => {
       });
     });
 
-    it('maps CREATOR price ID to CREATOR tier', async () => {
+    it('maps STUDIO price ID to STUDIO tier and auto-grants CREATOR role', async () => {
       const event = {
         id: 'evt_checkout_456',
         type: 'checkout.session.completed',
@@ -228,7 +249,7 @@ describe('POST /api/webhooks/stripe', () => {
       mockConstructEvent.mockReturnValue(event);
       mockSubscriptionsRetrieve.mockResolvedValue({
         id: 'sub_456',
-        items: { data: [{ price: { id: 'price_creator_456' } }] },
+        items: { data: [{ price: { id: 'price_studio_456' } }] },
         current_period_start: 1704067200,
         current_period_end: 1706745600,
       });
@@ -239,10 +260,14 @@ describe('POST /api/webhooks/stripe', () => {
 
       expect(mockSubscriptionUpsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({ tier: 'CREATOR' }),
-          update: expect.objectContaining({ tier: 'CREATOR' }),
+          create: expect.objectContaining({ tier: 'STUDIO' }),
+          update: expect.objectContaining({ tier: 'STUDIO' }),
         })
       );
+      expect(mockUserUpdate).toHaveBeenCalledWith({
+        where: { id: 'user-2' },
+        data: { role: 'CREATOR' },
+      });
     });
 
     it('defaults to FREE tier for unknown price ID', async () => {
@@ -377,7 +402,7 @@ describe('POST /api/webhooks/stripe', () => {
       });
     });
 
-    it('updates subscription status to PAST_DUE', async () => {
+    it('updates subscription status to PAST_DUE and auto-grants CREATOR role for STUDIO tier', async () => {
       const event = {
         id: 'evt_past_due',
         type: 'customer.subscription.updated',
@@ -385,7 +410,7 @@ describe('POST /api/webhooks/stripe', () => {
           object: {
             id: 'sub_456',
             status: 'past_due',
-            items: { data: [{ price: { id: 'price_creator_456' } }] },
+            items: { data: [{ price: { id: 'price_studio_456' } }] },
             current_period_start: 1706745600,
             current_period_end: 1709337600,
             cancel_at_period_end: false,
@@ -407,9 +432,14 @@ describe('POST /api/webhooks/stripe', () => {
         expect.objectContaining({
           data: expect.objectContaining({
             status: 'PAST_DUE',
+            tier: 'STUDIO',
           }),
         })
       );
+      expect(mockUserUpdate).toHaveBeenCalledWith({
+        where: { id: 'user-2' },
+        data: { role: 'CREATOR' },
+      });
     });
 
     it('updates subscription status to CANCELED when Stripe status is canceled', async () => {
