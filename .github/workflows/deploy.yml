@@ -136,15 +136,15 @@ jobs:
             FAIL_LINE="Reason: pitch rebuild failed — check run logs"
           fi
 
-          TEXT="${EMOJI} *sotto.fm ${STATUS}*
-          Commit: \`${COMMIT_SHA}\` ${COMMIT_MSG}
+          TEXT="${EMOJI} <b>sotto.fm ${STATUS}</b>
+          Commit: <code>${COMMIT_SHA}</code> ${COMMIT_MSG}
           By: ${AUTHOR}
           ${PITCH_LINE}
           ${FAIL_LINE}
 
-          [sotto.fm](https://sotto.fm/romero) · [Pitch](https://sotto.fm/pitch) · [Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          <a href=\"https://sotto.fm/romero\">sotto.fm</a> · <a href=\"https://sotto.fm/pitch\">Pitch</a> · <a href=\"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\">Run</a>"
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$TEXT" \
-              '{chat_id: $chat_id, text: $text, parse_mode: "Markdown", disable_web_page_preview: true}')"
+              '{chat_id: $chat_id, text: $text, parse_mode: "HTML", disable_web_page_preview: true}')"
