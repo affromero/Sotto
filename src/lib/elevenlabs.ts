@@ -228,15 +228,17 @@ export async function generateSpeech(params: {
   stability?: number;
   similarityBoost?: number;
   style?: number;
+  apiKeyOverride?: string;
 }): Promise<Buffer> {
-  if (!getApiKey()) {
+  const apiKey = params.apiKeyOverride || getApiKey();
+  if (!apiKey) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}`, {
     method: 'POST',
     headers: {
-      'xi-api-key': getApiKey()!,
+      'xi-api-key': apiKey,
       'Content-Type': 'application/json',
       Accept: 'audio/mpeg',
     },

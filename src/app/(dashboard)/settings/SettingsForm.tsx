@@ -35,6 +35,7 @@ interface SettingsFormProps {
   voiceClones: VoiceCloneData[];
   interestTags: TagOption[];
   selectedInterestTagIds: string[];
+  hasByokKey: boolean;
 }
 
 const providerLabels: Record<string, string> = {
@@ -58,6 +59,7 @@ export function SettingsForm({
   voiceClones,
   interestTags,
   selectedInterestTagIds,
+  hasByokKey: initialHasByokKey,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -104,6 +106,56 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+
+  // BYOK state
+  const [hasByokKey, setHasByokKey] = useState(initialHasByokKey);
+  const [byokApiKey, setByokApiKey] = useState('');
+  const [byokSaving, setByokSaving] = useState(false);
+  const [byokStatus, setByokStatus] = useState<'idle' | 'saved' | 'removed' | 'error'>('idle');
+  const [byokError, setByokError] = useState('');
+
+  const handleSaveByokKey = async () => {
+    if (!byokApiKey.trim()) return;
+    setByokSaving(true);
+    setByokStatus('idle');
+    setByokError('');
+    try {
+      const res = await fetch('/api/settings/byok', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: byokApiKey.trim() }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setByokError(data.error || 'Failed to save key');
+        setByokStatus('error');
+        return;
+      }
+      setHasByokKey(true);
+      setByokApiKey('');
+      setByokStatus('saved');
+    } catch {
+      setByokError('Network error. Please try again.');
+      setByokStatus('error');
+    } finally {
+      setByokSaving(false);
+    }
+  };
+
+  const handleRemoveByokKey = async () => {
+    setByokSaving(true);
+    setByokStatus('idle');
+    try {
+      await fetch('/api/settings/byok', { method: 'DELETE' });
+      setHasByokKey(false);
+      setByokStatus('removed');
+    } catch {
+      setByokError('Failed to remove key.');
+      setByokStatus('error');
+    } finally {
+      setByokSaving(false);
+    }
+  };
   const [avatarUrl, setAvatarUrl] = useState(image);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -494,6 +546,62 @@ export function SettingsForm({
                 Disconnect Twitter
               </Button>
             </div>
+          </div>
+        )}
+      </section>
+
+      {/* BYOK API Keys */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>API Keys (BYOK)</h2>
+        <p className={styles.sectionDesc}>
+          Bring your own ElevenLabs API key for the Power plan. Your key is encrypted with
+          AES-256-GCM and never stored in plaintext.
+        </p>
+        {hasByokKey ? (
+          <div className={styles.fieldGroup}>
+            <div className={styles.byokStatus}>
+              <span className={styles.byokConnected}>ElevenLabs key configured</span>
+              <Button
+                variant="ghost"
+                onClick={handleRemoveByokKey}
+                loading={byokSaving}
+                disabled={byokSaving}
+              >
+                Remove Key
+              </Button>
+            </div>
+            {byokStatus === 'removed' && (
+              <p className={styles.successText}>Key removed successfully.</p>
+            )}
+          </div>
+        ) : (
+          <div className={styles.fieldGroup}>
+            <label className={styles.label} htmlFor="byok-key">
+              ElevenLabs API Key
+            </label>
+            <div className={styles.byokInputRow}>
+              <Input
+                id="byok-key"
+                type="password"
+                value={byokApiKey}
+                onChange={(e) => {
+                  setByokApiKey(e.target.value);
+                  if (byokStatus !== 'idle') setByokStatus('idle');
+                }}
+                placeholder="xi-xxxxxxxxxxxxxxxxxxxx"
+              />
+              <Button
+                onClick={handleSaveByokKey}
+                loading={byokSaving}
+                disabled={byokSaving || !byokApiKey.trim()}
+              >
+                Save Key
+              </Button>
+            </div>
+            {byokStatus === 'saved' && (
+              <p className={styles.successText}>Key saved and validated.</p>
+            )}
+            {byokStatus === 'error' && <p className={styles.errorText}>{byokError}</p>}
           </div>
         )}
       </section>
