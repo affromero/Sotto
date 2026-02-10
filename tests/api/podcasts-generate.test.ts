@@ -56,7 +56,7 @@ const mockCanGenerate = vi.fn();
 
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
-    FREE: { maxDurationMinutes: 10 },
+    FREE: { maxDurationMinutes: 5 },
     PRO: { maxDurationMinutes: 10 },
     STARTER: { maxDurationMinutes: 10 },
     STUDIO: { maxDurationMinutes: 10 },

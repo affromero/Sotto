@@ -1,9 +1,24 @@
 import { Job } from 'bullmq';
-import { RegenerateSegmentPayload } from '@/lib/queue';
+import { RegenerateSegmentPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { generateSpeech, getVoiceId } from '@/lib/elevenlabs';
+import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
+import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
 import { uploadSegmentAudio } from '@/lib/r2';
+import { getAudioDuration } from '@/lib/audio-stitcher';
 import { logger } from '@/lib/logger';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+import { writeFile, rm } from 'fs/promises';
+
+/**
+ * Estimate audio duration from text length as a fallback.
+ * Average speech rate: ~150 words/min, average word length ~5 chars.
+ * So ~750 chars/min → ~12.5 chars/sec.
+ */
+function estimateDurationFromText(text: string): number {
+  return text.length / 12.5;
+}
 
 export async function processSegmentRegeneration(
   job: Job<RegenerateSegmentPayload>
@@ -13,40 +28,96 @@ export async function processSegmentRegeneration(
   logger.info('Regenerating segment', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  // Create new segment
-  const segment = await prisma.segment.create({
-    data: {
-      podcastId,
+  // Fetch podcast to determine voice configuration (match audio-generation worker path)
+  const podcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { usePremiumVoice: true, hostVoiceId: true, expertVoiceId: true },
+  });
+
+  // Generate audio using the same TTS path as audio-generation worker
+  let audioBuffer: Buffer;
+  let voiceId: string;
+
+  if (podcast.usePremiumVoice) {
+    const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
+    voiceId = customVoiceId || getVoiceId(speaker, podcastId);
+
+    const profile = getVoiceProfile(voiceId);
+    logger.info('Segment regen: using premium voice (ElevenLabs)', {
       speaker,
-      text: newText,
-      order: insertAfterOrder + 0.5, // Will be reordered
-    },
-  });
-
-  // Generate audio
-  const voiceId = getVoiceId(speaker);
-  const audioBuffer = await generateSpeech({ text: newText, voiceId });
-  const audioUrl = await uploadSegmentAudio(podcastId, segment.id, audioBuffer);
-
-  await prisma.segment.update({
-    where: { id: segment.id },
-    data: { audioUrl },
-  });
-
-  await job.updateProgress(70);
-
-  // Reorder all segments
-  const allSegments = await prisma.segment.findMany({
-    where: { podcastId },
-    orderBy: { order: 'asc' },
-  });
-
-  for (let i = 0; i < allSegments.length; i++) {
-    await prisma.segment.update({
-      where: { id: allSegments[i].id },
-      data: { order: i },
+      voiceName: profile?.name ?? 'custom',
+      voiceId,
+      podcastId,
     });
+
+    const premiumProvider = createPremiumTtsProvider();
+    audioBuffer = await premiumProvider.generateSpeech({ text: newText, voiceId });
+  } else {
+    const standardProvider = createTtsProvider('openai');
+    voiceId = standardProvider.getVoiceId(speaker, podcastId);
+
+    logger.info('Segment regen: using standard voice (OpenAI)', {
+      speaker,
+      voiceId,
+      podcastId,
+    });
+
+    audioBuffer = await standardProvider.generateSpeech({ text: newText, voiceId });
   }
+
+  await job.updateProgress(40);
+
+  // Upload to R2
+  const audioUrl = await uploadSegmentAudio(podcastId, `regen-${crypto.randomUUID()}`, audioBuffer);
+
+  // Measure actual audio duration via FFprobe
+  let segmentDuration: number;
+  const tmpPath = path.join(os.tmpdir(), `sotto-regen-probe-${crypto.randomUUID()}.mp3`);
+  try {
+    await writeFile(tmpPath, audioBuffer);
+    segmentDuration = await getAudioDuration(tmpPath);
+  } catch (err) {
+    logger.warn('FFprobe failed for regenerated segment, estimating from text', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    segmentDuration = estimateDurationFromText(newText);
+  } finally {
+    await rm(tmpPath, { force: true }).catch(() => {});
+  }
+
+  await job.updateProgress(60);
+
+  // Insert segment and reorder in a transaction to prevent race conditions
+  const newSegment = await prisma.$transaction(async (tx) => {
+    // Shift all segments with order > insertAfterOrder up by 1
+    // Update in descending order to avoid unique constraint violations
+    const toShift = await tx.segment.findMany({
+      where: { podcastId, order: { gt: insertAfterOrder } },
+      orderBy: { order: 'desc' },
+      select: { id: true, order: true },
+    });
+
+    for (const seg of toShift) {
+      await tx.segment.update({
+        where: { id: seg.id },
+        data: { order: seg.order + 1 },
+      });
+    }
+
+    // Create the new segment at the correct position
+    return tx.segment.create({
+      data: {
+        podcastId,
+        speaker,
+        text: newText,
+        audioUrl,
+        duration: segmentDuration,
+        order: insertAfterOrder + 1,
+      },
+    });
+  });
+
+  await job.updateProgress(75);
 
   // Mark interaction as incorporated
   await prisma.interaction.update({
@@ -54,12 +125,29 @@ export async function processSegmentRegeneration(
     data: { status: 'INCORPORATED', incorporated: true },
   });
 
-  // Update podcast status back to READY
+  // Queue re-stitch with skipSfx (SFX positions are invalid after inserting a segment)
+  const allSegments = await prisma.segment.findMany({
+    where: { podcastId },
+    orderBy: { order: 'asc' },
+    select: { id: true },
+  });
+
+  await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
+    podcastId,
+    segmentIds: allSegments.map((s) => s.id),
+    skipSfx: true,
+  });
+
+  // Set status to STITCHING (the stitching worker will set READY when done)
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'READY' },
+    data: { status: 'STITCHING' },
   });
 
   await job.updateProgress(100);
-  logger.info('Segment regeneration complete', { podcastId, segmentId: segment.id });
+  logger.info('Segment regeneration complete, queued re-stitch', {
+    podcastId,
+    segmentId: newSegment.id,
+    interactionId,
+  });
 }

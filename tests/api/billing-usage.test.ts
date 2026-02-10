@@ -35,12 +35,12 @@ vi.mock('@/lib/logger', () => ({
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
     FREE: {
-      creditsMonthly: 0,
+      creditsMonthly: 1,
       maxRollover: 0,
-      maxDurationMinutes: 10,
+      maxDurationMinutes: 5,
       interactionsPerPodcast: 2,
       maxVoiceClones: 0,
-      premiumVoiceSurcharge: 1.0,
+      premiumVoiceSurcharge: 0,
       canDownload: false,
       canMakePrivate: false,
       canExportPdf: false,
@@ -48,12 +48,12 @@ vi.mock('@/lib/stripe', () => ({
       hasPremiumSfx: false,
     },
     STARTER: {
-      creditsMonthly: 5,
-      maxRollover: 2,
+      creditsMonthly: 3,
+      maxRollover: 1,
       maxDurationMinutes: 10,
       interactionsPerPodcast: 5,
       maxVoiceClones: 1,
-      premiumVoiceSurcharge: 0.5,
+      premiumVoiceSurcharge: 0,
       canDownload: true,
       canMakePrivate: false,
       canExportPdf: false,
@@ -61,12 +61,12 @@ vi.mock('@/lib/stripe', () => ({
       hasPremiumSfx: false,
     },
     PRO: {
-      creditsMonthly: 15,
-      maxRollover: 5,
+      creditsMonthly: 10,
+      maxRollover: 3,
       maxDurationMinutes: 20,
       interactionsPerPodcast: 15,
       maxVoiceClones: 3,
-      premiumVoiceSurcharge: 0.25,
+      premiumVoiceSurcharge: 0,
       canDownload: true,
       canMakePrivate: true,
       canExportPdf: true,
@@ -74,8 +74,8 @@ vi.mock('@/lib/stripe', () => ({
       hasPremiumSfx: false,
     },
     STUDIO: {
-      creditsMonthly: 50,
-      maxRollover: 25,
+      creditsMonthly: 20,
+      maxRollover: 8,
       maxDurationMinutes: 60,
       interactionsPerPodcast: Infinity,
       maxVoiceClones: 10,
@@ -118,9 +118,9 @@ const mockSubscription = {
   tier: 'PRO',
   status: 'ACTIVE',
   creditsBalance: 10,
-  creditsMonthly: 15,
+  creditsMonthly: 10,
   rolloverCredits: 3,
-  maxRollover: 5,
+  maxRollover: 3,
   currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
 };
 
@@ -228,9 +228,9 @@ describe('GET /api/billing/usage', () => {
     expect(body.tier).toBe('PRO');
     expect(body.status).toBe('ACTIVE');
     expect(body.creditsBalance).toBe(10);
-    expect(body.creditsMonthly).toBe(15);
+    expect(body.creditsMonthly).toBe(10);
     expect(body.rolloverCredits).toBe(3);
-    expect(body.maxRollover).toBe(5);
+    expect(body.maxRollover).toBe(3);
     expect(body.currentPeriodEnd).toBe('2026-03-01T00:00:00.000Z');
     expect(body.limits.maxDurationMinutes).toBe(20);
     expect(body.limits.interactionsPerPodcast).toBe(15);
@@ -253,12 +253,12 @@ describe('GET /api/billing/usage', () => {
     expect(body.tier).toBe('FREE');
     expect(body.status).toBe('ACTIVE');
     expect(body.creditsBalance).toBe(0);
-    expect(body.creditsMonthly).toBe(0);
+    expect(body.creditsMonthly).toBe(1);
     expect(body.rolloverCredits).toBe(0);
     expect(body.maxRollover).toBe(0);
     expect(body.currentPeriodEnd).toBeNull();
     expect(body.recentTransactions).toEqual([]);
-    expect(body.limits.maxDurationMinutes).toBe(10);
+    expect(body.limits.maxDurationMinutes).toBe(5);
     expect(body.limits.interactionsPerPodcast).toBe(2);
     expect(body.limits.canDownload).toBe(false);
     expect(body.limits.canMakePrivate).toBe(false);
@@ -271,9 +271,9 @@ describe('GET /api/billing/usage', () => {
       tier: 'STARTER',
       status: 'ACTIVE',
       creditsBalance: 3,
-      creditsMonthly: 5,
+      creditsMonthly: 3,
       rolloverCredits: 1,
-      maxRollover: 2,
+      maxRollover: 1,
       currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
     };
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
@@ -287,9 +287,9 @@ describe('GET /api/billing/usage', () => {
 
     expect(body.tier).toBe('STARTER');
     expect(body.creditsBalance).toBe(3);
-    expect(body.creditsMonthly).toBe(5);
+    expect(body.creditsMonthly).toBe(3);
     expect(body.rolloverCredits).toBe(1);
-    expect(body.maxRollover).toBe(2);
+    expect(body.maxRollover).toBe(1);
     expect(body.limits.maxDurationMinutes).toBe(10);
     expect(body.limits.interactionsPerPodcast).toBe(5);
     expect(body.limits.maxVoiceClones).toBe(1);
@@ -300,10 +300,10 @@ describe('GET /api/billing/usage', () => {
     const studioSubscription = {
       tier: 'STUDIO',
       status: 'ACTIVE',
-      creditsBalance: 35,
-      creditsMonthly: 50,
-      rolloverCredits: 10,
-      maxRollover: 25,
+      creditsBalance: 18,
+      creditsMonthly: 20,
+      rolloverCredits: 5,
+      maxRollover: 8,
       currentPeriodEnd: new Date('2026-03-01T00:00:00Z'),
     };
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
@@ -316,10 +316,10 @@ describe('GET /api/billing/usage', () => {
     const body = await response.json();
 
     expect(body.tier).toBe('STUDIO');
-    expect(body.creditsBalance).toBe(35);
-    expect(body.creditsMonthly).toBe(50);
-    expect(body.rolloverCredits).toBe(10);
-    expect(body.maxRollover).toBe(25);
+    expect(body.creditsBalance).toBe(18);
+    expect(body.creditsMonthly).toBe(20);
+    expect(body.rolloverCredits).toBe(5);
+    expect(body.maxRollover).toBe(8);
     expect(body.limits.maxDurationMinutes).toBe(60);
     expect(body.limits.interactionsPerPodcast).toBe(null); // Infinity serializes as null in JSON
     expect(body.limits.maxVoiceClones).toBe(10);

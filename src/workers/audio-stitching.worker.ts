@@ -29,7 +29,7 @@ const STOCK_SFX: Record<SoundCue['type'], string> = {
 };
 
 export async function processAudioStitching(job: Job<StitchAudioPayload>): Promise<void> {
-  const { podcastId, segmentIds } = job.data;
+  const { podcastId, segmentIds, skipSfx } = job.data;
   const tmpDir = path.join(os.tmpdir(), `sotto-stitch-${crypto.randomUUID()}`);
 
   logger.info('Stitching audio', { podcastId, segmentCount: String(segmentIds.length) });
@@ -87,9 +87,20 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     await job.updateProgress(50);
 
-    // 5. Generate or load SFX files
+    // 4b. Build cumulative duration map for SFX delay computation
+    const cumulativeDurations: number[] = [];
+    let cumDur = 0;
+    for (const seg of segments) {
+      cumDur += (seg.duration ?? 0) * 1000; // convert to ms
+      cumulativeDurations.push(cumDur);
+    }
+
+    // 5. Generate or load SFX files (skip when re-stitching after incorporation)
     const sfxInserts: SfxInsert[] = [];
-    for (let i = 0; i < soundCues.length; i++) {
+    if (skipSfx) {
+      logger.info('Skipping SFX (re-stitch after incorporation)', { podcastId });
+    }
+    for (let i = 0; !skipSfx && i < soundCues.length; i++) {
       const cue = soundCues[i];
       const sfxPath = path.join(tmpDir, `sfx-${i}.mp3`);
 
@@ -120,10 +131,15 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         await copyFile(stockPath, sfxPath);
       }
 
+      // Compute delay from cumulative segment durations
+      const insertIdx = Math.min(cue.insertAfterTurn, cumulativeDurations.length - 1);
+      const delayMs = insertIdx >= 0 ? Math.round(cumulativeDurations[insertIdx] ?? 0) : 0;
+
       sfxInserts.push({
         path: sfxPath,
         insertAfterSegment: cue.insertAfterTurn,
         durationMs: cue.durationSeconds * 1000,
+        delayMs,
         type: cue.type,
       });
 
@@ -189,14 +205,20 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       },
     });
 
-    // 9. Update segment start times based on durations
+    // 9. Update segment start times based on actual durations from FFprobe
+    // Re-fetch segments to get the latest duration values written by audio-generation worker
+    const freshSegments = await prisma.segment.findMany({
+      where: { id: { in: segmentIds } },
+      orderBy: { order: 'asc' },
+      select: { id: true, duration: true },
+    });
     let cumulativeTime = 0;
-    for (const seg of segments) {
+    for (const seg of freshSegments) {
       await prisma.segment.update({
         where: { id: seg.id },
         data: { startTime: cumulativeTime },
       });
-      cumulativeTime += seg.duration || 0;
+      cumulativeTime += seg.duration ?? 0;
     }
 
     await job.updateProgress(95);

@@ -1391,9 +1391,9 @@ export default function LandingPage() {
                 <p className={styles.tierDesc}>Perfect for trying Sotto</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 2 podcasts per month</li>
-                <li>{CHECK} Up to 10 minutes each</li>
-                <li>{CHECK} Standard AI voices</li>
+                <li>{CHECK} 1 credit per month</li>
+                <li>{CHECK} Up to 5 minutes each</li>
+                <li>{CHECK} Premium ElevenLabs voices</li>
                 <li>{CHECK} Public podcasts</li>
                 <li>{CHECK} 2 interactions per podcast</li>
               </ul>
@@ -1401,47 +1401,66 @@ export default function LandingPage() {
                 Sign Up Free
               </a>
             </div>
+            {/* STARTER */}
+            <div className={`${styles.tier} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.tierHead}>
+                <h3>Starter</h3>
+                <div className={styles.tierPrice}>
+                  <span className={styles.tierAmount}>$14</span>
+                  <span className={styles.tierPeriod}>/mo</span>
+                </div>
+                <p className={styles.tierDesc}>For curious learners</p>
+              </div>
+              <ul className={styles.tierFeatures}>
+                <li>{CHECK} 3 credits per month (+1 rollover)</li>
+                <li>{CHECK} Up to 10 minutes each</li>
+                <li>{CHECK} 1 voice clone</li>
+                <li>{CHECK} 5 interactions per podcast</li>
+                <li>{CHECK} MP3 download</li>
+              </ul>
+              <a href="/auth/signup" className={styles.tierBtn}>
+                Get Started
+              </a>
+            </div>
             {/* PRO */}
-            <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d1}`}>
+            <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d2}`}>
               <div className={styles.tierBadge}>Most Popular</div>
               <div className={styles.tierHead}>
                 <h3>Pro</h3>
                 <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$14</span>
+                  <span className={styles.tierAmount}>$34</span>
                   <span className={styles.tierPeriod}>/mo</span>
                 </div>
                 <p className={styles.tierDesc}>For power learners</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 8 podcasts per month</li>
-                <li>{CHECK} 3 premium voice credits</li>
-                <li>{CHECK} Clone up to 2 voices</li>
-                <li>{CHECK} 10 interactions per podcast</li>
-                <li>{CHECK} Private &amp; unlisted podcasts</li>
-                <li>{CHECK} MP3 download + PDF transcript</li>
-                <li>{CHECK} Voice library access</li>
+                <li>{CHECK} 10 credits per month (+3 rollover)</li>
+                <li>{CHECK} Up to 10 minutes each</li>
+                <li>{CHECK} 3 voice clones</li>
+                <li>{CHECK} Unlimited interactions</li>
+                <li>{CHECK} Private podcasts + analytics</li>
+                <li>{CHECK} Everything in Starter</li>
               </ul>
               <a href="/auth/signup" className={styles.tierBtnPrimary}>
                 Get Started
               </a>
             </div>
-            {/* CREATOR */}
-            <div className={`${styles.tier} ${styles.rev} ${styles.d2}`}>
+            {/* STUDIO */}
+            <div className={`${styles.tier} ${styles.rev} ${styles.d3}`}>
               <div className={styles.tierHead}>
-                <h3>Creator</h3>
+                <h3>Studio</h3>
                 <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$29</span>
+                  <span className={styles.tierAmount}>$69</span>
                   <span className={styles.tierPeriod}>/mo</span>
                 </div>
                 <p className={styles.tierDesc}>For serious creators</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 30 podcasts per month</li>
-                <li>{CHECK} 10 premium voice credits</li>
-                <li>{CHECK} Clone up to 5 voices</li>
-                <li>{CHECK} Unlimited interactions</li>
+                <li>{CHECK} 20 credits per month (+8 rollover)</li>
+                <li>{CHECK} Up to 10 minutes each</li>
+                <li>{CHECK} 10 voice clones</li>
                 <li>{CHECK} Premium sound effects</li>
-                <li>{CHECK} Voice marketplace + analytics</li>
+                <li>{CHECK} Analytics + marketplace</li>
                 <li>{CHECK} Everything in Pro</li>
               </ul>
               <a href="/auth/signup" className={styles.tierBtn}>

@@ -1,6 +1,6 @@
 # Sotto — Implementation Status
 
-> Last updated: 2026-02-09 — **277 items (277 complete + 0 remaining)**
+> Last updated: 2026-02-10 — **277 items (277 complete + 0 remaining)**
 
 ## Legend
 
@@ -419,4 +419,4 @@ Comprehensive tests to add for full coverage across the app.
 - [x] `tests/hooks/useNotifications.test.ts` — notification polling (fetch, mark read, badge count)
 - [x] `tests/hooks/useAuth.test.ts` — auth convenience hook (session data, loading, redirect)
 
-**214/277 items complete. 63 tests remaining in backlog.**
+**277/277 items complete. All tests written and passing.**

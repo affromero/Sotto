@@ -1,0 +1,124 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
+import { generateResponse, logApiUsage } from '@/lib/claude';
+import type { RegenerateSegmentPayload } from '@/lib/queue';
+
+type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
+
+export async function POST(_request: NextRequest, { params }: RouteParams) {
+  const { podcastId, interactionId } = await params;
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Fetch the interaction with podcast ownership check
+  const interaction = await prisma.interaction.findUnique({
+    where: { id: interactionId },
+    include: {
+      podcast: { select: { id: true, userId: true, status: true } },
+    },
+  });
+
+  if (!interaction || interaction.podcastId !== podcastId) {
+    return NextResponse.json({ error: 'Interaction not found' }, { status: 404 });
+  }
+
+  // Only the podcast owner can incorporate
+  if (interaction.podcast.userId !== session.user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Interaction must be answered or resolved
+  if (!['ANSWERED', 'RESOLVED'].includes(interaction.status)) {
+    return NextResponse.json(
+      { error: `Cannot incorporate interaction with status "${interaction.status}"` },
+      { status: 409 }
+    );
+  }
+
+  // Podcast must be in READY state
+  if (interaction.podcast.status !== 'READY') {
+    return NextResponse.json(
+      { error: `Podcast is currently "${interaction.podcast.status}", must be READY` },
+      { status: 409 }
+    );
+  }
+
+  // Set interaction to INCORPORATING
+  await prisma.interaction.update({
+    where: { id: interactionId },
+    data: { status: 'INCORPORATING' },
+  });
+
+  // Set podcast to UPDATING
+  await prisma.podcast.update({
+    where: { id: podcastId },
+    data: { status: 'UPDATING' },
+  });
+
+  // Find the segment closest to the interaction timestamp
+  const segments = await prisma.segment.findMany({
+    where: { podcastId },
+    orderBy: { order: 'asc' },
+    select: { order: true, startTime: true, duration: true, speaker: true, text: true },
+  });
+
+  let insertAfterOrder = 0;
+  for (const seg of segments) {
+    const segEnd = (seg.startTime ?? 0) + (seg.duration ?? 0);
+    if (interaction.timestamp <= segEnd) {
+      insertAfterOrder = seg.order;
+      break;
+    }
+    insertAfterOrder = seg.order;
+  }
+
+  // Get surrounding context for generating the incorporation text
+  const contextSegments = segments
+    .filter((s) => Math.abs(s.order - insertAfterOrder) <= 2)
+    .map((s) => `${s.speaker}: ${s.text}`)
+    .join('\n');
+
+  // Generate the explanation segment text via Claude
+  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the HOST speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text.`;
+
+  const response = await generateResponse(systemPrompt, [
+    {
+      role: 'user',
+      content: `Podcast context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural podcast segment that addresses this question and answer.`,
+    },
+  ]);
+
+  await logApiUsage({
+    podcastId,
+    userId: session.user.id,
+    category: 'incorporation',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  });
+
+  // Queue segment regeneration
+  const payload: RegenerateSegmentPayload = {
+    podcastId,
+    interactionId,
+    insertAfterOrder,
+    newText: response.content,
+    speaker: 'HOST',
+  };
+
+  await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload);
+
+  return NextResponse.json(
+    {
+      status: 'incorporating',
+      interactionId,
+      insertAfterOrder,
+      generatedText: response.content,
+    },
+    { status: 202 }
+  );
+}

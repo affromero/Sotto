@@ -16,8 +16,38 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
 
   const turns = script.turns as Array<{ speaker: string; text: string }>;
 
-  // Find approximate position in script based on timestamp
-  const contextTurns = turns.slice(0, Math.min(turns.length, Math.ceil(timestamp / 10)));
+  // Find position in script using segment startTime + duration
+  const segments = await prisma.segment.findMany({
+    where: { podcastId },
+    orderBy: { order: 'asc' },
+    select: { order: true, startTime: true, duration: true },
+  });
+
+  let turnIndex = turns.length;
+  if (segments.length > 0 && segments[0].startTime !== null) {
+    // Use segment timing data to find the turn at the given timestamp
+    for (let i = 0; i < segments.length; i++) {
+      const segStart = segments[i].startTime ?? 0;
+      const segDur = segments[i].duration ?? 0;
+      if (timestamp < segStart + segDur) {
+        turnIndex = i + 1; // include this turn in context
+        break;
+      }
+    }
+  } else {
+    // Fallback: estimate from text length if no timing data yet
+    // Average ~12.5 chars/sec speech rate
+    let elapsed = 0;
+    for (let i = 0; i < turns.length; i++) {
+      elapsed += turns[i].text.length / 12.5;
+      if (elapsed >= timestamp) {
+        turnIndex = i + 1;
+        break;
+      }
+    }
+  }
+
+  const contextTurns = turns.slice(0, Math.min(turns.length, turnIndex));
   const recentContext = contextTurns
     .slice(-5)
     .map((t) => `${t.speaker}: ${t.text}`)

@@ -77,9 +77,9 @@ vi.mock('@/lib/subscription', () => ({
 
 vi.mock('@/lib/stripe', () => ({
   TIER_LIMITS: {
-    FREE: { hasPremiumSfx: false },
-    PRO: { hasPremiumSfx: false },
-    CREATOR: { hasPremiumSfx: true },
+    FREE: { hasPremiumSfx: false, maxDurationMinutes: 5 },
+    PRO: { hasPremiumSfx: false, maxDurationMinutes: 10 },
+    CREATOR: { hasPremiumSfx: true, maxDurationMinutes: 10 },
   },
 }));
 
@@ -139,11 +139,17 @@ describe('processAudioStitching', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default segment data
-    mockPrismaSegmentFindMany.mockResolvedValue([
+    // Default segment data - first call (initial fetch with audioUrl)
+    mockPrismaSegmentFindMany.mockResolvedValueOnce([
       { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
       { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
       { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+    ]);
+    // Default segment data - second call (fresh duration data for startTime)
+    mockPrismaSegmentFindMany.mockResolvedValueOnce([
+      { id: 'seg-1', duration: 100 },
+      { id: 'seg-2', duration: 100 },
+      { id: 'seg-3', duration: 100 },
     ]);
 
     // Default podcast data
@@ -171,6 +177,19 @@ describe('processAudioStitching', () => {
 
   describe('segment fetching', () => {
     it('fetches segments from database by segmentIds', async () => {
+      // Mock for initial fetch (full segment data)
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
+      // Mock for second fetch (fresh duration data for startTime calculation)
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', duration: 100 },
+        { id: 'seg-2', duration: 100 },
+        { id: 'seg-3', duration: 100 },
+      ]);
+
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -181,6 +200,19 @@ describe('processAudioStitching', () => {
     });
 
     it('orders segments by order ascending', async () => {
+      // Mock for initial fetch
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
+      // Mock for second fetch
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', duration: 100 },
+        { id: 'seg-2', duration: 100 },
+        { id: 'seg-3', duration: 100 },
+      ]);
+
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -189,7 +221,7 @@ describe('processAudioStitching', () => {
     });
 
     it('throws error when no segments are found', async () => {
-      mockPrismaSegmentFindMany.mockResolvedValue([]);
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([]);
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow(
@@ -198,7 +230,7 @@ describe('processAudioStitching', () => {
     });
 
     it('throws error when segment is missing audioUrl', async () => {
-      mockPrismaSegmentFindMany.mockResolvedValue([
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: null, order: 1, duration: 100 },
       ]);
@@ -322,12 +354,81 @@ describe('processAudioStitching', () => {
       expect(callArgs.sfxInserts[0]).toMatchObject({
         insertAfterSegment: 0,
         durationMs: 2000,
+        delayMs: 100000, // 100s * 1000ms
         type: 'intro',
       });
       expect(callArgs.sfxInserts[1]).toMatchObject({
         insertAfterSegment: 2,
         durationMs: 1000,
+        delayMs: 300000, // (100s + 100s + 100s) * 1000ms
         type: 'transition',
+      });
+    });
+
+    it('SFX inserts include computed delayMs based on cumulative segment durations', async () => {
+      // Reset and mock initial fetch
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 50 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 75 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
+      // Mock fresh fetch for startTime calculation
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', duration: 50 },
+        { id: 'seg-2', duration: 75 },
+        { id: 'seg-3', duration: 100 },
+      ]);
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        soundCues: [
+          { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
+          { type: 'transition', prompt: 'Transition', durationSeconds: 1, insertAfterTurn: 1 },
+        ],
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      expect(callArgs.sfxInserts).toHaveLength(2);
+      expect(callArgs.sfxInserts[0].delayMs).toBe(50000); // 50s * 1000ms
+      expect(callArgs.sfxInserts[1].delayMs).toBe(125000); // (50s + 75s) * 1000ms
+    });
+  });
+
+  describe('skipSfx option', () => {
+    beforeEach(() => {
+      mockGetUserTier.mockResolvedValue('CREATOR');
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        soundCues: [
+          { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
+        ],
+      });
+    });
+
+    it('skips SFX generation when skipSfx is true', async () => {
+      const job = createMockJob({ ...defaultPayload, skipSfx: true });
+      await processAudioStitching(job);
+
+      expect(mockGenerateSoundEffect).not.toHaveBeenCalled();
+      expect(mockCopyFile).not.toHaveBeenCalled();
+    });
+
+    it('passes empty sfxInserts array to stitchWithEffects when skipSfx is true', async () => {
+      const job = createMockJob({ ...defaultPayload, skipSfx: true });
+      await processAudioStitching(job);
+
+      const callArgs = mockStitchWithEffects.mock.calls[0][0];
+      expect(callArgs.sfxInserts).toEqual([]);
+    });
+
+    it('still stitches audio successfully when skipSfx is true', async () => {
+      const job = createMockJob({ ...defaultPayload, skipSfx: true });
+      await processAudioStitching(job);
+
+      expect(mockStitchWithEffects).toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: expect.objectContaining({ status: 'READY' }),
       });
     });
   });
@@ -429,14 +530,14 @@ describe('processAudioStitching', () => {
     });
 
     it('updates podcast with duration from stitcher', async () => {
-      mockStitchWithEffects.mockResolvedValue({ duration: 450.75 });
+      mockStitchWithEffects.mockResolvedValue({ duration: 250.75 });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
         data: expect.objectContaining({
-          duration: 451, // rounded
+          duration: 251, // rounded
         }),
       });
     });
@@ -457,11 +558,19 @@ describe('processAudioStitching', () => {
 
   describe('segment start times', () => {
     it('updates each segment with cumulative start time', async () => {
-      mockPrismaSegmentFindMany.mockResolvedValue([
+      // Reset and mock initial fetch
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 150 },
         { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 200 },
       ]);
+      // Mock fresh fetch for startTime calculation
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', duration: 100 },
+        { id: 'seg-2', duration: 150 },
+        { id: 'seg-3', duration: 200 },
+      ]);
+
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -480,11 +589,19 @@ describe('processAudioStitching', () => {
     });
 
     it('handles segments with null duration', async () => {
-      mockPrismaSegmentFindMany.mockResolvedValue([
+      // Reset and mock initial fetch
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: null },
         { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 200 },
       ]);
+      // Mock fresh fetch for startTime calculation
+      mockPrismaSegmentFindMany.mockResolvedValueOnce([
+        { id: 'seg-1', duration: 100 },
+        { id: 'seg-2', duration: null },
+        { id: 'seg-3', duration: 200 },
+      ]);
+
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -670,7 +787,13 @@ describe('processAudioStitching', () => {
 
   describe('error handling', () => {
     it('marks podcast as FAILED when stitching fails', async () => {
-      mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      mockStitchWithEffects.mockReset().mockRejectedValue(new Error('FFmpeg error'));
+      // Need to provide segment data since stitching happens after segment fetch
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
@@ -689,7 +812,13 @@ describe('processAudioStitching', () => {
     });
 
     it('propagates error from uploadPodcastAudio', async () => {
-      mockUploadPodcastAudio.mockRejectedValue(new Error('R2 upload failed'));
+      mockUploadPodcastAudio.mockReset().mockRejectedValue(new Error('R2 upload failed'));
+      // Need to provide segment data since upload happens after segment processing
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+      ]);
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow('R2 upload failed');
@@ -725,9 +854,22 @@ describe('processAudioStitching', () => {
 
   describe('end-to-end flow', () => {
     it('executes full pipeline for basic podcast (no SFX)', async () => {
-      mockStitchWithEffects.mockResolvedValue({ duration: 305.5 });
-      mockReadFile.mockResolvedValue(Buffer.alloc(1024 * 256));
-      mockUploadPodcastAudio.mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+      // Reset mocks and set up fresh data
+      mockStitchWithEffects.mockReset().mockResolvedValue({ duration: 305.5 });
+      mockReadFile.mockReset().mockResolvedValue(Buffer.alloc(1024 * 256));
+      mockUploadPodcastAudio.mockReset().mockResolvedValue('https://cdn.sotto.fm/final.mp3');
+      mockPrismaSegmentFindMany
+        .mockReset()
+        .mockResolvedValueOnce([
+          { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+          { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
+          { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'seg-1', duration: 100 },
+          { id: 'seg-2', duration: 100 },
+          { id: 'seg-3', duration: 100 },
+        ]);
 
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);

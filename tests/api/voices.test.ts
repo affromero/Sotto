@@ -191,8 +191,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 0,
-      total: 2,
-      remaining: 2,
+      total: 1,
+      remaining: 1,
     });
   });
 
@@ -211,8 +211,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 2,
-      total: 15,
-      remaining: 13,
+      total: 10,
+      remaining: 8,
     });
   });
 
@@ -231,8 +231,8 @@ describe('GET /api/voices', () => {
 
     expect(body.credits).toEqual({
       used: 4,
-      total: 50,
-      remaining: 46,
+      total: 20,
+      remaining: 16,
     });
   });
 });

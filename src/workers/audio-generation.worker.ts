@@ -5,7 +5,22 @@ import { getVoiceId, getVoiceProfile } from '@/lib/elevenlabs';
 import { createTtsProvider, createPremiumTtsProvider } from '@/lib/providers';
 import { getElevenLabsPerKCharRate, getOpenAiPerKCharRate } from '@/lib/elevenlabs';
 import { uploadSegmentAudio } from '@/lib/r2';
+import { getAudioDuration } from '@/lib/audio-stitcher';
 import { logger } from '@/lib/logger';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+import { writeFile, rm } from 'fs/promises';
+
+/**
+ * Estimate audio duration from text length as a fallback.
+ * Average speech rate: ~150 words/min, average word length ~5 chars.
+ * So ~750 chars/min → ~12.5 chars/sec.
+ */
+function estimateDurationFromText(text: string): number {
+  const charsPerSecond = 12.5;
+  return text.length / charsPerSecond;
+}
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
   const { podcastId, segmentId, speaker, text } = job.data;
@@ -62,15 +77,32 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   // Upload to R2
   const audioUrl = await uploadSegmentAudio(podcastId, segmentId, audioBuffer);
 
-  // Update segment with audio URL
+  // Measure actual audio duration via FFprobe
+  let segmentDuration: number;
+  const tmpPath = path.join(os.tmpdir(), `sotto-probe-${crypto.randomUUID()}.mp3`);
+  try {
+    await writeFile(tmpPath, audioBuffer);
+    segmentDuration = await getAudioDuration(tmpPath);
+  } catch (err) {
+    logger.warn('FFprobe duration extraction failed, estimating from text length', {
+      segmentId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    segmentDuration = estimateDurationFromText(text);
+  } finally {
+    await rm(tmpPath, { force: true }).catch(() => {});
+  }
+
+  // Update segment with audio URL and duration
   await prisma.segment.update({
     where: { id: segmentId },
-    data: { audioUrl },
+    data: { audioUrl, duration: segmentDuration },
   });
 
   // Log TTS cost
   const charCount = text.length;
-  const costPerKChar = service === 'elevenlabs' ? getElevenLabsPerKCharRate() : getOpenAiPerKCharRate();
+  const costPerKChar =
+    service === 'elevenlabs' ? getElevenLabsPerKCharRate() : getOpenAiPerKCharRate();
   const totalCost = (charCount / 1000) * costPerKChar;
 
   await prisma.apiUsageLog.create({

@@ -149,7 +149,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 2, creditsMonthly: 2 });
+      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -186,7 +186,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 2, creditsMonthly: 2 });
+      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',
@@ -222,7 +222,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 2, creditsMonthly: 2 });
+      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
       const mockParseResult: TweetParseResult = {
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -324,7 +324,7 @@ describe('processTwitterMentions', () => {
       mockGetUserUsage.mockResolvedValue({
         canCreate: false,
         creditsBalance: 0,
-        creditsMonthly: 2,
+        creditsMonthly: 1,
       });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
@@ -338,7 +338,7 @@ describe('processTwitterMentions', () => {
           text: tweet.text,
           status: 'IGNORED',
           userId: 'user-001',
-          errorMessage: 'No credits remaining (balance: 0/2)',
+          errorMessage: 'No credits remaining (balance: 0/1)',
         },
       });
       expect(mockParseTweetIntent).not.toHaveBeenCalled();
@@ -411,7 +411,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 2, creditsMonthly: 2 });
+      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
       mockGetTweet.mockResolvedValue(parentTweet);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'AI',
@@ -449,7 +449,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: 'user-host-voice',
         preferredExpertVoiceId: 'user-expert-voice',
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 2, creditsMonthly: 2 });
+      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',

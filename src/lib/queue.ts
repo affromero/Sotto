@@ -53,6 +53,7 @@ export interface GenerateAudioPayload {
 export interface StitchAudioPayload {
   podcastId: string;
   segmentIds: string[];
+  skipSfx?: boolean;
 }
 
 export interface ProcessInteractionPayload {
