@@ -398,6 +398,10 @@ See `.env.example` for all required/optional variables. Critical ones:
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Payments
 - `R2_*` — Cloudflare R2 storage credentials
 
+Apple Sign In (optional):
+
+- `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET` — Apple OAuth credentials
+
 Twitter integration (optional):
 
 - `TWITTER_BEARER_TOKEN` — Twitter API v2 read access
