@@ -431,7 +431,9 @@ export default function PitchPage() {
       {/* Top bar */}
       <header className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <span className={styles.topBarLogo}>Sotto</span>
+          <a href="/romero" className={styles.topBarLogo}>
+            Sotto
+          </a>
           <span className={styles.topBarDivider} />
           {selectedDoc && <span className={styles.topBarTitle}>{selectedDoc.displayName}</span>}
         </div>

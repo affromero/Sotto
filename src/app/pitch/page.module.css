@@ -140,7 +140,13 @@
   font: var(--text-body);
   font-weight: 700;
   color: var(--color-primary);
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
   flex-shrink: 0;
+}
+
+.topBarLogo:hover {
+  opacity: 0.7;
 }
 
 .topBarDivider {
