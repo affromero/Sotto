@@ -188,3 +188,33 @@ export const inspireDrillSchema = z.object({
 export const refreshPicksSchema = z.object({
   refreshBatch: z.number().int().min(0).default(0),
 });
+
+/**
+ * Handle validation
+ */
+export const handleSchema = z
+  .string()
+  .min(3, 'Handle must be at least 3 characters')
+  .max(30, 'Handle must be at most 30 characters')
+  .regex(/^[a-z0-9_]+$/, 'Handle can only contain lowercase letters, numbers, and underscores');
+
+export const updateHandleSchema = z.object({
+  handle: handleSchema,
+});
+
+export const reservedHandleSchema = z.object({
+  handle: handleSchema,
+  reason: z.string().max(200).optional(),
+});
+
+/**
+ * Voice request validation
+ */
+export const createVoiceRequestSchema = z.object({
+  voiceCloneId: z.string().min(1),
+  message: z.string().max(500).optional(),
+});
+
+export const updateVoiceRequestSchema = z.object({
+  status: z.enum(['APPROVED', 'DENIED', 'REVOKED']),
+});

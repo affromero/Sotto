@@ -5,6 +5,7 @@ import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
 import Apple from 'next-auth/providers/apple';
 import { prisma } from './prisma';
+import { generateUniqueHandle } from './handles';
 
 function isAdminEmail(email: string): boolean {
   const adminEmails = (process.env.ADMIN_EMAILS ?? '')
@@ -91,7 +92,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if ((user || trigger === 'update') && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { email: true, role: true },
+          select: { email: true, role: true, handle: true, name: true },
         });
 
         if (dbUser) {
@@ -104,6 +105,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             token.role = 'ADMIN';
           } else {
             token.role = dbUser.role;
+          }
+
+          // Auto-generate handle if missing
+          if (!dbUser.handle) {
+            try {
+              const handle = await generateUniqueHandle(dbUser.name);
+              await prisma.user.update({
+                where: { id: token.sub },
+                data: { handle },
+              });
+            } catch {
+              // Non-fatal — handle will be generated on next sign-in
+            }
           }
         }
       }

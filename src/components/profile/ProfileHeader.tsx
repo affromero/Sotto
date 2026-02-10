@@ -7,6 +7,7 @@ import styles from './ProfileHeader.module.css';
 interface ProfileUser {
   id: string;
   name: string | null;
+  handle?: string | null;
   image: string | null;
   bio: string | null;
   createdAt: string;
@@ -20,6 +21,7 @@ interface ProfileHeaderProps {
   followingCount: number;
   isOwnProfile: boolean;
   isFollowing: boolean;
+  isAuthenticated: boolean;
   onFollow: () => void;
   onEdit?: () => void;
 }
@@ -50,6 +52,7 @@ export function ProfileHeader({
   followingCount,
   isOwnProfile,
   isFollowing,
+  isAuthenticated,
   onFollow,
   onEdit,
 }: ProfileHeaderProps) {
@@ -79,26 +82,27 @@ export function ProfileHeader({
         <div className={styles.nameRow}>
           <h1 className={styles.name}>
             {user.name || 'Anonymous'}
+            {user.role === 'SYSTEM' && <Badge variant="system">Sotto</Badge>}
             {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
             {user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
           </h1>
           <div className={styles.action}>
-            {isOwnProfile ? (
-              onEdit && (
-                <button
-                  className={styles.editButton}
-                  onClick={onEdit}
-                  type="button"
-                  aria-label="Edit profile"
-                >
-                  Edit Profile
-                </button>
-              )
-            ) : (
-              <FollowButton isFollowing={isFollowing} onClick={onFollow} />
-            )}
+            {isOwnProfile
+              ? onEdit && (
+                  <button
+                    className={styles.editButton}
+                    onClick={onEdit}
+                    type="button"
+                    aria-label="Edit profile"
+                  >
+                    Edit Profile
+                  </button>
+                )
+              : isAuthenticated && <FollowButton isFollowing={isFollowing} onClick={onFollow} />}
           </div>
         </div>
+
+        {user.handle && <p className={styles.handle}>@{user.handle}</p>}
 
         {user.bio && <p className={styles.bio}>{user.bio}</p>}
 

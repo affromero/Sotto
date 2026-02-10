@@ -2,33 +2,33 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import type { Metadata } from 'next';
-import { ProfileClient } from './ProfileClient';
+import { ProfileClient } from '../../[userId]/ProfileClient';
 import styles from './page.module.css';
 
-interface ProfilePageProps {
-  params: { userId: string };
+interface HandleProfilePageProps {
+  params: { handle: string };
 }
 
-export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: HandleProfilePageProps): Promise<Metadata> {
   const user = await prisma.user.findUnique({
-    where: { id: params.userId },
-    select: { name: true, bio: true },
+    where: { handle: params.handle.toLowerCase() },
+    select: { name: true, bio: true, handle: true },
   });
 
   if (!user) return { title: 'User Not Found' };
 
   return {
-    title: user.name || 'Profile',
-    description: user.bio || `${user.name || 'User'}'s podcasts on Sotto`,
+    title: user.name || `@${user.handle}`,
+    description: user.bio || `${user.name || `@${user.handle}`}'s podcasts on Sotto`,
   };
 }
 
-export default async function ProfilePage({ params }: ProfilePageProps) {
+export default async function HandleProfilePage({ params }: HandleProfilePageProps) {
   const session = await auth();
   const currentUserId = session?.user?.id;
 
   const user = await prisma.user.findUnique({
-    where: { id: params.userId },
+    where: { handle: params.handle.toLowerCase() },
     select: {
       id: true,
       name: true,
@@ -81,7 +81,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  // Check if current user follows this user
   let isFollowing = false;
   if (currentUserId && currentUserId !== user.id) {
     const follow = await prisma.follow.findUnique({

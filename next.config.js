@@ -26,6 +26,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/@:handle',
+        destination: '/profile/handle/:handle',
+      },
+    ];
+  },
   async headers() {
     return [
       {

@@ -1,0 +1,168 @@
+/* Admin Handles Page */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+/* Add form */
+
+.addForm {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.input {
+  flex: 1;
+  min-width: 180px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  transition: border-color var(--transition-fast);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.addButton {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.addButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.addButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Table */
+
+.tableContainer {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  padding: var(--spacing-md);
+  text-align: left;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.table td {
+  padding: var(--spacing-md);
+  font: var(--text-body);
+  color: var(--color-text-primary);
+}
+
+.handleCell {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.reasonCell {
+  color: var(--color-text-secondary);
+}
+
+.dateCell {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.removeButton {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error-light);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.removeButton:hover:not(:disabled) {
+  background: var(--color-error-lighter);
+}
+
+.removeButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+.error {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-error-lighter);
+  color: var(--color-error);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+}

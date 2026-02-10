@@ -129,6 +129,61 @@
   pointer-events: none;
 }
 
+/* Handle Input */
+
+.handleInputWrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-background);
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+}
+
+.handleInputWrap:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.handlePrefix {
+  padding: var(--spacing-sm) 0 var(--spacing-sm) var(--spacing-md);
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  user-select: none;
+}
+
+.handleInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) 2px;
+  font: var(--text-body);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.handleInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.handleChecking {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.handleAvailable {
+  font: var(--text-caption);
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.handleTaken {
+  font: var(--text-caption);
+  color: var(--color-error);
+  font-weight: 500;
+}
+
 /* Textarea Field */
 
 .fieldGroup {
