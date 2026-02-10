@@ -43,7 +43,9 @@ export type { MLProvider, RecommendationSignals, ScoredPodcast } from './ml';
 
 // Re-export factory functions for direct use
 export { createAIProvider } from './ai';
-export { createTtsProvider, createPremiumTtsProvider } from './tts';
+export { createTtsProvider, createPremiumTtsProvider, createTtsProviderWithFallback } from './tts';
+export { createSttProvider } from './stt';
+export type { TranscriptionResult, SttProvider } from './stt';
 export { createStorageProvider } from './storage';
 export { createPaymentProvider } from './payment';
 export { createMLProvider } from './ml';

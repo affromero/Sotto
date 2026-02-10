@@ -1,4 +1,10 @@
 import { logger } from './logger';
+import {
+  VOICE_POOL as POOL,
+  selectVoicePair as selectPair,
+  findByVoiceId,
+  type VoicePoolEntry,
+} from './voice-pool';
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 
@@ -12,181 +18,36 @@ if (!getApiKey()) {
 }
 
 // ---------------------------------------------------------------------------
-// Voice Pool — diverse voices so every podcast sounds unique
+// Voice Pool — re-exported from voice-pool.ts for backward compatibility
 // ---------------------------------------------------------------------------
-// Each voice entry includes a name for logging, ElevenLabs voice_id, and
-// metadata (gender, accent, age range, character) used for voice assignment.
 
+/** @deprecated Use VoicePoolEntry from voice-pool.ts directly */
 export interface VoiceProfile {
   id: string;
   name: string;
   gender: 'male' | 'female';
   accent: 'american' | 'british' | 'australian' | 'indian' | 'african';
   ageRange: 'young' | 'middle' | 'mature';
-  character: string; // e.g. "warm storyteller", "energetic explainer"
+  character: string;
 }
 
-// Pre-built voice pool — curated for podcast hosting and expert roles.
-// These are public ElevenLabs voices available on all paid plans.
-const VOICE_POOL: VoiceProfile[] = [
-  // --- Male voices ---
-  {
-    id: 'pNInz6obpgDQGcFmaJgB',
-    name: 'Adam',
-    gender: 'male',
-    accent: 'american',
-    ageRange: 'middle',
-    character: 'warm narrator',
-  },
-  {
-    id: 'ErXwobaYiN019PkySvjV',
-    name: 'Antoni',
-    gender: 'male',
-    accent: 'american',
-    ageRange: 'young',
-    character: 'friendly conversationalist',
-  },
-  {
-    id: 'VR6AewLTigWG4xSOukaG',
-    name: 'Arnold',
-    gender: 'male',
-    accent: 'american',
-    ageRange: 'mature',
-    character: 'authoritative expert',
-  },
-  {
-    id: 'yoZ06aMxZJJ28mfd3POQ',
-    name: 'Sam',
-    gender: 'male',
-    accent: 'american',
-    ageRange: 'young',
-    character: 'upbeat storyteller',
-  },
-  {
-    id: 'TxGEqnHWrfWFTfGW9XjX',
-    name: 'Josh',
-    gender: 'male',
-    accent: 'american',
-    ageRange: 'middle',
-    character: 'confident presenter',
-  },
-  {
-    id: 'IKne3meq5aSn9XLyUdCD',
-    name: 'Charlie',
-    gender: 'male',
-    accent: 'australian',
-    ageRange: 'young',
-    character: 'casual and curious',
-  },
-  {
-    id: 'JBFqnCBsd6RMkjVDRZzb',
-    name: 'George',
-    gender: 'male',
-    accent: 'british',
-    ageRange: 'mature',
-    character: 'distinguished professor',
-  },
-  {
-    id: 'N2lVS1w4EtoT3dr4eOWO',
-    name: 'Callum',
-    gender: 'male',
-    accent: 'british',
-    ageRange: 'middle',
-    character: 'articulate intellectual',
-  },
-  // --- Female voices ---
-  {
-    id: 'EXAVITQu4vr4xnSDxMaL',
-    name: 'Bella',
-    gender: 'female',
-    accent: 'american',
-    ageRange: 'young',
-    character: 'engaging storyteller',
-  },
-  {
-    id: '21m00Tcm4TlvDq8ikWAM',
-    name: 'Rachel',
-    gender: 'female',
-    accent: 'american',
-    ageRange: 'middle',
-    character: 'calm and authoritative',
-  },
-  {
-    id: 'MF3mGyEYCl7XYWbV9V6O',
-    name: 'Elli',
-    gender: 'female',
-    accent: 'american',
-    ageRange: 'young',
-    character: 'enthusiastic explainer',
-  },
-  {
-    id: 'AZnzlk1XvdvUeBnXmlld',
-    name: 'Domi',
-    gender: 'female',
-    accent: 'american',
-    ageRange: 'young',
-    character: 'energetic and playful',
-  },
-  {
-    id: 'z9fAnlkpzviPz146aGWa',
-    name: 'Glinda',
-    gender: 'female',
-    accent: 'american',
-    ageRange: 'mature',
-    character: 'wise mentor',
-  },
-  {
-    id: 'jsCqWAovK2LkecY7zXl4',
-    name: 'Freya',
-    gender: 'female',
-    accent: 'british',
-    ageRange: 'young',
-    character: 'witty and sharp',
-  },
-  {
-    id: 'XB0fDUnXU5powFXDhCwa',
-    name: 'Charlotte',
-    gender: 'female',
-    accent: 'british',
-    ageRange: 'middle',
-    character: 'polished professional',
-  },
-  {
-    id: 'oWAxZDx7w5VEj9dCyTzz',
-    name: 'Grace',
-    gender: 'female',
-    accent: 'australian',
-    ageRange: 'middle',
-    character: 'warm and approachable',
-  },
-];
+/** Map VoicePoolEntry to legacy VoiceProfile shape */
+function toLegacy(entry: VoicePoolEntry): VoiceProfile {
+  return {
+    id: entry.ids.elevenlabs,
+    name: entry.name,
+    gender: entry.gender,
+    accent: entry.accent,
+    ageRange: entry.ageRange,
+    character: entry.character,
+  };
+}
 
-/**
- * Select a diverse voice pair for a podcast.
- * Uses a seed (podcast ID hash) for deterministic but varied assignment.
- * Ensures the host and expert always have different voices, and ideally
- * different genders or accents for auditory contrast.
- */
+const VOICE_POOL: VoiceProfile[] = POOL.map(toLegacy);
+
 export function selectVoicePair(podcastId: string): { host: VoiceProfile; expert: VoiceProfile } {
-  // Simple hash from podcast ID for deterministic selection
-  let hash = 0;
-  for (let i = 0; i < podcastId.length; i++) {
-    hash = ((hash << 5) - hash + podcastId.charCodeAt(i)) | 0;
-  }
-  const index = Math.abs(hash);
-
-  // Pick host from the pool
-  const hostIndex = index % VOICE_POOL.length;
-  const host = VOICE_POOL[hostIndex];
-
-  // Pick expert: different voice, prefer different gender for contrast
-  const candidates = VOICE_POOL.filter((v) => v.id !== host.id);
-  const contrastCandidates = candidates.filter((v) => v.gender !== host.gender);
-  const expertPool = contrastCandidates.length > 0 ? contrastCandidates : candidates;
-  const expertIndex = (index >>> 8) % expertPool.length;
-  const expert = expertPool[expertIndex];
-
-  return { host, expert };
+  const pair = selectPair(podcastId);
+  return { host: toLegacy(pair.host), expert: toLegacy(pair.expert) };
 }
 
 /**
@@ -194,7 +55,6 @@ export function selectVoicePair(podcastId: string): { host: VoiceProfile; expert
  * Falls back to env overrides if set, otherwise uses the voice pool.
  */
 export function getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
-  // Allow env overrides for custom setups
   const envHost = process.env.ELEVENLABS_HOST_VOICE_ID;
   const envExpert = process.env.ELEVENLABS_EXPERT_VOICE_ID;
   if (envHost && envExpert) {
@@ -202,7 +62,6 @@ export function getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): stri
   }
 
   if (!podcastId) {
-    // Fallback to first pair if no podcast ID provided
     return speaker === 'HOST' ? VOICE_POOL[0].id : VOICE_POOL[8].id;
   }
 
@@ -214,7 +73,8 @@ export function getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): stri
  * Get the full voice profile for logging and metadata
  */
 export function getVoiceProfile(voiceId: string): VoiceProfile | undefined {
-  return VOICE_POOL.find((v) => v.id === voiceId);
+  const entry = findByVoiceId(voiceId);
+  return entry ? toLegacy(entry) : undefined;
 }
 
 // ---------------------------------------------------------------------------

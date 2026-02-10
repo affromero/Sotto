@@ -1,4 +1,11 @@
 import { logger } from '../logger';
+import {
+  VOICE_POOL,
+  selectVoicePair,
+  resolveVoiceId,
+  findByVoiceId,
+  type VoicePoolEntry,
+} from '../voice-pool';
 
 export interface SpeechParams {
   text: string;
@@ -21,10 +28,10 @@ export interface TtsProvider {
   getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string;
 }
 
-/**
- * ElevenLabs provider — premium voice generation.
- * Used when podcast.usePremiumVoice is true.
- */
+// ---------------------------------------------------------------------------
+// ElevenLabs provider — premium voice generation
+// ---------------------------------------------------------------------------
+
 class ElevenLabsProvider implements TtsProvider {
   private clientPromise: Promise<typeof import('../elevenlabs')> | null = null;
   private byokApiKey: string | undefined;
@@ -51,17 +58,23 @@ class ElevenLabsProvider implements TtsProvider {
     return el.generateSoundEffect(params);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', _podcastId?: string): string {
-    return speaker === 'HOST'
-      ? process.env.ELEVENLABS_VOICE_HOST || 'pNInz6obpgDQGcFmaJgB'
-      : process.env.ELEVENLABS_VOICE_EXPERT || 'ErXwobaYiN019PkySvjV';
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+    if (!podcastId) {
+      return speaker === 'HOST' ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
+    }
+    const pair = selectVoicePair(podcastId);
+    const entry = speaker === 'HOST' ? pair.host : pair.expert;
+    return resolveVoiceId(entry, 'elevenlabs');
   }
 }
 
-/**
- * OpenAI TTS provider — standard voice generation (default).
- * 90% cheaper than ElevenLabs. Good quality for most use cases.
- */
+// ---------------------------------------------------------------------------
+// OpenAI TTS provider — standard voice generation (90 % cheaper)
+// ---------------------------------------------------------------------------
+
+const OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
+type OpenAIVoice = (typeof OPENAI_VOICES)[number];
+
 class OpenAITtsProvider implements TtsProvider {
   private async getClient() {
     const apiKey = process.env.OPENAI_API_KEY;
@@ -70,15 +83,19 @@ class OpenAITtsProvider implements TtsProvider {
     return new OpenAI({ apiKey });
   }
 
-  private readonly voices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
-
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const client = await this.getClient();
-    const voice = (
-      this.voices.includes(params.voiceId as (typeof this.voices)[number])
-        ? params.voiceId
-        : 'alloy'
-    ) as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+
+    // Resolve the ElevenLabs voice ID to its OpenAI counterpart via the pool
+    let openaiVoice: string = params.voiceId;
+    const entry = findByVoiceId(params.voiceId);
+    if (entry?.ids.openai) {
+      openaiVoice = entry.ids.openai;
+    }
+
+    const voice: OpenAIVoice = OPENAI_VOICES.includes(openaiVoice as OpenAIVoice)
+      ? (openaiVoice as OpenAIVoice)
+      : 'alloy';
 
     const response = await client.audio.speech.create({
       model: 'tts-1-hd',
@@ -91,14 +108,75 @@ class OpenAITtsProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT'): string {
-    return speaker === 'HOST' ? 'nova' : 'onyx';
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+    if (!podcastId) {
+      return speaker === 'HOST' ? 'nova' : 'onyx';
+    }
+    const pair = selectVoicePair(podcastId);
+    const entry = speaker === 'HOST' ? pair.host : pair.expert;
+    return resolveVoiceId(entry, 'openai');
   }
 }
 
+// ---------------------------------------------------------------------------
+// Fallback TTS provider — tries primary, then falls back on failure
+// ---------------------------------------------------------------------------
+
+class FallbackTtsProvider implements TtsProvider {
+  constructor(
+    private primary: TtsProvider,
+    private fallback: TtsProvider,
+    private primaryName: string,
+    private fallbackName: string
+  ) {}
+
+  async generateSpeech(params: SpeechParams): Promise<Buffer> {
+    try {
+      return await this.primary.generateSpeech(params);
+    } catch (err) {
+      logger.warn(`${this.primaryName} TTS failed, falling back to ${this.fallbackName}`, {
+        error: err instanceof Error ? err.message : String(err),
+        voiceId: params.voiceId,
+      });
+
+      // Map voice ID to fallback provider's equivalent
+      const entry = findByVoiceId(params.voiceId);
+      const fallbackVoiceId = entry
+        ? resolveVoiceId(entry, this.fallbackName as 'elevenlabs' | 'openai')
+        : params.voiceId;
+
+      return this.fallback.generateSpeech({ ...params, voiceId: fallbackVoiceId });
+    }
+  }
+
+  async generateSoundEffect(params: SfxParams): Promise<Buffer> {
+    if (this.primary.generateSoundEffect) {
+      try {
+        return await this.primary.generateSoundEffect(params);
+      } catch (err) {
+        logger.warn(`${this.primaryName} SFX failed`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+    if (this.fallback.generateSoundEffect) {
+      return this.fallback.generateSoundEffect(params);
+    }
+    throw new Error('No SFX provider available');
+  }
+
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+    return this.primary.getVoiceId(speaker, podcastId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Factory functions
+// ---------------------------------------------------------------------------
+
 /**
  * Create a TTS provider instance.
- * Default is now 'openai' (standard voices). Use 'elevenlabs' for premium.
+ * Default is 'openai' (standard voices). Use 'elevenlabs' for premium.
  */
 export function createTtsProvider(type?: string): TtsProvider {
   const providerType = type || process.env.TTS_PROVIDER || 'openai';
@@ -121,3 +199,22 @@ export function createTtsProvider(type?: string): TtsProvider {
 export function createPremiumTtsProvider(byokApiKey?: string): TtsProvider {
   return new ElevenLabsProvider(byokApiKey);
 }
+
+/**
+ * Create a TTS provider with automatic fallback.
+ *
+ * Primary: ElevenLabs (or user's BYOK key)
+ * Fallback: OpenAI TTS
+ *
+ * If the primary provider fails on any call, the fallback provider is used
+ * with an automatically-mapped voice ID from the voice pool.
+ */
+export function createTtsProviderWithFallback(byokApiKey?: string): TtsProvider {
+  const primary = new ElevenLabsProvider(byokApiKey);
+  const fallback = new OpenAITtsProvider();
+  return new FallbackTtsProvider(primary, fallback, 'elevenlabs', 'openai');
+}
+
+// Re-export voice pool utilities for convenience
+export { VOICE_POOL, selectVoicePair, resolveVoiceId, findByVoiceId };
+export type { VoicePoolEntry };
