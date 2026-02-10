@@ -7,7 +7,7 @@ export default function LoginPage() {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <h1 className={styles.title}>Welcome Back</h1>
+        <h1 className={styles.title}>Welcome Back to Sotto</h1>
         <p className={styles.subtitle}>Sign in to continue creating and listening</p>
         <AuthButtons />
         <p className={styles.footer}>
