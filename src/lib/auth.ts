@@ -3,6 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter';
 import Google from 'next-auth/providers/google';
 import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
+import Apple from 'next-auth/providers/apple';
 import { prisma } from './prisma';
 
 function isAdminEmail(email: string): boolean {
@@ -37,6 +38,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Twitter({
             clientId: process.env.TWITTER_CLIENT_ID,
             clientSecret: process.env.TWITTER_CLIENT_SECRET,
+          }),
+        ]
+      : []),
+    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
+      ? [
+          Apple({
+            clientId: process.env.APPLE_CLIENT_ID,
+            clientSecret: process.env.APPLE_CLIENT_SECRET,
           }),
         ]
       : []),
