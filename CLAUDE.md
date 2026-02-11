@@ -442,6 +442,7 @@ Before declaring any UI work done, verify:
 
 ## Testing & CI
 
+- **Always run `npm run ci` before committing** — this runs lint, type-check, tests, and build (mirrors the GitHub Actions CI pipeline). Fix all failures before staging and committing.
 - When tsc or lint reports multiple errors, collect the FULL error list before fixing anything — then fix all in a single pass
 - If pre-commit hooks fail on files unrelated to your change, use `git commit --no-verify` on the second attempt
 - After any Prisma schema change, run `npx prisma generate` before `npx tsc --noEmit`

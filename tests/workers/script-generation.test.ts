@@ -7,6 +7,7 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
   topic: 'Quantum Computing',
   depth: 'standard',
   audienceLevel: 'intermediate',
+  audience: 'general',
   focusAreas: ['algorithms', 'applications'],
   tone: 'casual',
   durationTarget: 10,
@@ -26,6 +27,10 @@ const mockPrismaSegmentCreate = vi.fn().mockImplementation((args) => ({
 }));
 
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaTagFindUnique = vi
+  .fn()
+  .mockResolvedValue({ id: 'tag-general', slug: 'general-audience' });
+const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -43,6 +48,12 @@ vi.mock('@/lib/prisma', () => ({
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+    },
+    tag: {
+      findUnique: (...args: unknown[]) => mockPrismaTagFindUnique(...args),
+    },
+    podcastTag: {
+      upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
     },
   },
 }));
@@ -127,6 +138,7 @@ describe('processScriptGeneration', () => {
       topic: 'Quantum Computing',
       depth: 'standard',
       audienceLevel: 'intermediate',
+      audience: 'general',
       focusAreas: ['algorithms', 'applications'],
       tone: 'casual',
       durationTarget: 10,
@@ -186,6 +198,7 @@ describe('processScriptGeneration', () => {
         topic: 'AI Safety',
         depth: 'deep_dive',
         audienceLevel: 'expert',
+        audience: 'mature',
         focusAreas: ['alignment', 'interpretability'],
         tone: 'professional',
         durationTarget: 20,
@@ -199,6 +212,7 @@ describe('processScriptGeneration', () => {
         topic: 'AI Safety',
         depth: 'deep_dive',
         audienceLevel: 'expert',
+        audience: 'mature',
         focusAreas: ['alignment', 'interpretability'],
         tone: 'professional',
         durationTarget: 20,
@@ -211,6 +225,7 @@ describe('processScriptGeneration', () => {
         topic: null,
         depth: null,
         audienceLevel: null,
+        audience: null,
         focusAreas: [],
         tone: null,
         durationTarget: null,
@@ -224,6 +239,7 @@ describe('processScriptGeneration', () => {
         topic: '',
         depth: 'standard',
         audienceLevel: 'intermediate',
+        audience: 'general',
         focusAreas: [],
         tone: 'casual',
         durationTarget: 10,
