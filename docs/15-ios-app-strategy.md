@@ -19,6 +19,7 @@ Sotto's iOS strategy prioritizes speed-to-market with a PWA foundation, then pro
 The existing web app is already PWA-ready:
 
 **Manifest**: `/public/manifest.json`
+
 ```json
 {
   "name": "Sotto",
@@ -32,11 +33,13 @@ The existing web app is already PWA-ready:
 ```
 
 **Service Worker**: `/public/sw.js`
+
 - Offline caching for static assets
 - API response caching with stale-while-revalidate
 - Audio file caching for offline playback
 
 **iOS Safari Compatibility**
+
 - Works on iOS 11.3+ (PWA support introduced)
 - Add-to-homescreen prompt via native browser UI
 - Audio playback via `<audio>` element
@@ -44,14 +47,14 @@ The existing web app is already PWA-ready:
 
 ### Limitations on iOS
 
-| Feature | Status | Workaround |
-|---------|--------|------------|
-| Background audio | Not available | User must keep app open |
-| Push notifications | iOS 16.4+ only | Email notifications as fallback |
-| Badge notifications | Not available | None |
-| Share extensions | Not available | Copy-link only |
-| Apple Pay | Not available | Stripe web checkout |
-| Siri integration | Not available | None |
+| Feature             | Status         | Workaround                      |
+| ------------------- | -------------- | ------------------------------- |
+| Background audio    | Not available  | User must keep app open         |
+| Push notifications  | iOS 16.4+ only | Email notifications as fallback |
+| Badge notifications | Not available  | None                            |
+| Share extensions    | Not available  | Copy-link only                  |
+| Apple Pay           | Not available  | Stripe web checkout             |
+| Siri integration    | Not available  | None                            |
 
 ### What Works Well
 
@@ -72,6 +75,7 @@ The existing web app is already PWA-ready:
 ### Conversion Strategy
 
 **In-app prompt**: Show a dismissible banner on iOS Safari:
+
 ```tsx
 // src/components/mobile/PWAInstallPrompt.tsx
 "Add Sotto to your home screen for the best experience"
@@ -86,11 +90,11 @@ The existing web app is already PWA-ready:
 
 ### Why React Native + Expo?
 
-| Option | Pros | Cons | Verdict |
-|--------|------|------|---------|
-| **React Native + Expo** | - 70% code sharing with web<br>- Fast iteration (OTA updates)<br>- Mature podcast app ecosystem<br>- TypeScript-native | - Bundle size larger than native<br>- Some animations less smooth | **Recommended** |
-| Flutter | - Fast rendering<br>- Single codebase (iOS + Android) | - Zero code sharing with existing React/Next.js app<br>- Smaller podcast library ecosystem | Not ideal |
-| SwiftUI | - Best performance<br>- First-class iOS features | - Zero code sharing<br>- iOS-only (need separate Android) | Too slow for v1 |
+| Option                  | Pros                                                                                                                   | Cons                                                                                       | Verdict         |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------- |
+| **React Native + Expo** | - 70% code sharing with web<br>- Fast iteration (OTA updates)<br>- Mature podcast app ecosystem<br>- TypeScript-native | - Bundle size larger than native<br>- Some animations less smooth                          | **Recommended** |
+| Flutter                 | - Fast rendering<br>- Single codebase (iOS + Android)                                                                  | - Zero code sharing with existing React/Next.js app<br>- Smaller podcast library ecosystem | Not ideal       |
+| SwiftUI                 | - Best performance<br>- First-class iOS features                                                                       | - Zero code sharing<br>- iOS-only (need separate Android)                                  | Too slow for v1 |
 
 **Decision**: React Native with Expo managed workflow.
 
@@ -127,12 +131,14 @@ The existing web app is already PWA-ready:
 **No backend rewrites**. The mobile app is a thin client consuming existing Next.js API routes.
 
 **Shared**:
+
 - Authentication (NextAuth tokens via secure storage)
 - Business logic (all in API routes)
 - Data models (same Prisma schema)
 - Worker pipeline (same BullMQ jobs)
 
 **Mobile-specific**:
+
 - Native UI rendering
 - Background audio playback
 - Push notification registration
@@ -144,17 +150,17 @@ The existing web app is already PWA-ready:
 {
   "dependencies": {
     "expo": "~50.0.0",
-    "expo-router": "^3.4.0",           // File-based routing (like Next.js)
-    "react-native-track-player": "^4.0.0",  // Background audio
-    "expo-av": "~13.10.0",              // Audio recording (for voice questions)
-    "expo-notifications": "~0.27.0",    // Push notifications
-    "expo-secure-store": "~12.8.0",     // Token storage
-    "expo-sharing": "~11.10.0",         // Share extension
-    "expo-linking": "~6.2.0",           // Deep links
+    "expo-router": "^3.4.0", // File-based routing (like Next.js)
+    "react-native-track-player": "^4.0.0", // Background audio
+    "expo-av": "~13.10.0", // Audio recording (for voice questions)
+    "expo-notifications": "~0.27.0", // Push notifications
+    "expo-secure-store": "~12.8.0", // Token storage
+    "expo-sharing": "~11.10.0", // Share extension
+    "expo-linking": "~6.2.0", // Deep links
     "react-native-reanimated": "~3.6.0", // Smooth animations
-    "zustand": "^4.5.0",                // State management
-    "axios": "^1.6.0",                  // API client
-    "react-native-svg": "14.1.0"        // Waveforms
+    "zustand": "^4.5.0", // State management
+    "axios": "^1.6.0", // API client
+    "react-native-svg": "14.1.0" // Waveforms
   }
 }
 ```
@@ -164,17 +170,20 @@ The existing web app is already PWA-ready:
 #### 1. Feed Screen (`app/(tabs)/feed.tsx`)
 
 **UI Components**:
+
 - Masonry grid of podcast cards (vertical scroll)
 - Pull-to-refresh
 - Tag filter chips (horizontal scroll)
 - Search bar with debounced input
 
 **API Calls**:
+
 - `GET /api/feed?tags=&search=&sort=trending`
 - `POST /api/podcasts/[id]/like`
 - `POST /api/podcasts/[id]/save`
 
 **Native Features**:
+
 - Share extension: tap Share → opens iOS share sheet
 - Infinite scroll with `FlatList` virtualization
 
@@ -183,6 +192,7 @@ The existing web app is already PWA-ready:
 **Critical**: This is the most complex screen.
 
 **UI Components**:
+
 - Full-screen waveform visualization
 - Playback controls (play/pause, skip 15s, speed)
 - Transcript panel (teleprompter scrolling)
@@ -190,14 +200,10 @@ The existing web app is already PWA-ready:
 - Like, Share, Fork buttons
 
 **Audio Implementation**:
+
 ```typescript
 // lib/audio-player.native.ts
-import TrackPlayer, {
-  Capability,
-  Event,
-  State,
-  RepeatMode
-} from 'react-native-track-player';
+import TrackPlayer, { Capability, Event, State, RepeatMode } from 'react-native-track-player';
 
 export async function setupPlayer() {
   await TrackPlayer.setupPlayer();
@@ -209,10 +215,7 @@ export async function setupPlayer() {
       Capability.SkipBackward,
       Capability.SeekTo,
     ],
-    compactCapabilities: [
-      Capability.Play,
-      Capability.Pause,
-    ],
+    compactCapabilities: [Capability.Play, Capability.Pause],
     progressUpdateEventInterval: 1, // 1 second updates
   });
 }
@@ -230,20 +233,20 @@ export async function loadPodcast(podcast: Podcast) {
 ```
 
 **Background Audio**:
+
 - Continues playing when app is backgrounded
 - Lock screen controls (play/pause, skip)
 - Now Playing widget on lock screen
 - Interruption handling (phone calls, Siri)
 
 **Transcript Sync**:
+
 ```typescript
 // Sync transcript highlighting with playback position
 useEffect(() => {
   const interval = setInterval(async () => {
     const position = await TrackPlayer.getPosition();
-    const currentSegment = segments.find(s =>
-      s.startTime <= position && s.endTime > position
-    );
+    const currentSegment = segments.find((s) => s.startTime <= position && s.endTime > position);
     setActiveSegmentId(currentSegment?.id);
   }, 100); // Update every 100ms for smooth scrolling
 
@@ -252,6 +255,7 @@ useEffect(() => {
 ```
 
 **Ask a Question Flow**:
+
 1. User taps "Ask a Question" → pause audio, open bottom sheet
 2. User types question or uses voice input (expo-av recording)
 3. POST `/api/podcasts/[id]/interact` with `{question, timestamp}`
@@ -262,17 +266,20 @@ useEffect(() => {
 #### 3. Create Screen (`app/create/index.tsx`)
 
 **UI Components**:
+
 - Chat interface (like iMessage)
 - Animated suggestion chips
 - URL/PDF upload button
 - "Create Podcast" CTA (appears after discovery complete)
 
 **API Calls**:
+
 - `POST /api/discovery` (streaming response via EventSource or WebSocket)
 - `GET /api/recommendations`
 - `POST /api/podcasts` (trigger generation)
 
 **Chat Implementation**:
+
 ```typescript
 // Use EventSource for streaming Claude responses
 import EventSource from 'react-native-sse';
@@ -294,6 +301,7 @@ eventSource.addEventListener('message', (event) => {
 ```
 
 **Voice Input**:
+
 - Microphone button → record question
 - `expo-av` audio recording
 - Send audio file to `/api/discovery` (backend handles transcription via Claude)
@@ -301,12 +309,14 @@ eventSource.addEventListener('message', (event) => {
 #### 4. Profile Screen (`app/profile/[userId].tsx`)
 
 **UI Components**:
+
 - Profile header (avatar, bio, follower count)
 - Follow/Unfollow button
 - Grid of user's podcasts
 - Tabs: Created, Liked, Saved
 
 **API Calls**:
+
 - `GET /api/users/[userId]`
 - `GET /api/users/[userId]/podcasts`
 - `POST /api/users/[userId]/follow`
@@ -361,6 +371,7 @@ export async function logout() {
 ```
 
 **Social Login**:
+
 - Google Sign-In: `expo-auth-session` + `expo-google-app-auth`
 - Apple Sign-In: `expo-apple-authentication` (required for App Store)
 - GitHub: Same OAuth flow as web
@@ -368,6 +379,7 @@ export async function logout() {
 ### Push Notifications
 
 **Registration Flow**:
+
 ```typescript
 // lib/notifications.native.ts
 import * as Notifications from 'expo-notifications';
@@ -403,19 +415,21 @@ export async function registerForPushNotifications() {
 ```
 
 **Notification Types**:
+
 - Podcast ready: "Your podcast '[Title]' is ready to listen"
 - Interaction answered: "[User] asked a question on your podcast"
 - New follower: "[User] followed you"
 - Podcast liked/forked: "[User] liked your podcast"
 
 **Handling**:
+
 ```typescript
 // App.tsx
-Notifications.addNotificationReceivedListener(notification => {
+Notifications.addNotificationReceivedListener((notification) => {
   console.log('Notification received:', notification);
 });
 
-Notifications.addNotificationResponseReceivedListener(response => {
+Notifications.addNotificationResponseReceivedListener((response) => {
   const { podcastId } = response.notification.request.content.data;
   // Navigate to podcast screen
   router.push(`/podcast/${podcastId}`);
@@ -440,7 +454,8 @@ export async function downloadPodcast(podcast: Podcast) {
     localUri,
     {},
     (downloadProgress) => {
-      const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+      const progress =
+        downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
       console.log(`Download progress: ${progress * 100}%`);
     }
   );
@@ -448,22 +463,26 @@ export async function downloadPodcast(podcast: Podcast) {
   await downloadResumable.downloadAsync();
 
   // Store metadata
-  await AsyncStorage.setItem(`podcast:${podcast.id}`, JSON.stringify({
-    ...podcast,
-    localAudioUrl: localUri,
-    downloadedAt: new Date().toISOString(),
-  }));
+  await AsyncStorage.setItem(
+    `podcast:${podcast.id}`,
+    JSON.stringify({
+      ...podcast,
+      localAudioUrl: localUri,
+      downloadedAt: new Date().toISOString(),
+    })
+  );
 }
 
 export async function getOfflinePodcasts(): Promise<Podcast[]> {
   const keys = await AsyncStorage.getAllKeys();
-  const podcastKeys = keys.filter(k => k.startsWith('podcast:'));
+  const podcastKeys = keys.filter((k) => k.startsWith('podcast:'));
   const podcasts = await AsyncStorage.multiGet(podcastKeys);
   return podcasts.map(([_, value]) => JSON.parse(value!));
 }
 ```
 
 **UI**:
+
 - Download icon on podcast cards (in feed, on player screen)
 - "Downloads" tab in profile
 - Automatic cleanup after 30 days or 5GB limit
@@ -471,6 +490,7 @@ export async function getOfflinePodcasts(): Promise<Podcast[]> {
 ### Development Workflow
 
 **Setup**:
+
 ```bash
 # Install Expo CLI
 npm install -g expo-cli eas-cli
@@ -492,6 +512,7 @@ npx expo run:ios
 ```
 
 **Folder Structure**:
+
 ```
 sotto-mobile/
 ├── app/                    # Expo Router screens
@@ -504,12 +525,14 @@ sotto-mobile/
 ```
 
 **Shared Code Strategy**:
+
 - Copy type definitions from `src/types/*.ts`
 - Copy validation schemas from `src/lib/validations.ts`
 - Rewrite UI components (CSS Modules → StyleSheet)
 - Share API contract (same endpoints)
 
 **Hot Reloading**:
+
 - Expo offers fast refresh (sub-second updates)
 - Over-the-air (OTA) updates for non-native code changes
 - No App Store approval needed for JS updates
@@ -517,6 +540,7 @@ sotto-mobile/
 ### App Store Submission
 
 **Requirements**:
+
 1. **Apple Developer Account**: $99/year
 2. **App Store Connect**: Create app listing
 3. **Privacy Policy**: Required for App Store (link in app)
@@ -527,19 +551,23 @@ sotto-mobile/
    - No hidden features or undocumented functionality
 
 **AI-Generated Content Policy**:
+
 > Apps that use AI to generate content must include a disclaimer that content is AI-generated and may not be accurate.
 
 **Implementation**:
+
 - Add "AI-Generated" badge to all podcasts
 - Disclaimer on create screen: "This podcast is generated by AI based on your description"
 - Feedback mechanism for inaccurate content
 
 **Review Timeline**:
+
 - First submission: 7-14 days
 - Updates: 1-3 days
 - Expedited review available (1-2 per year)
 
 **Build Process**:
+
 ```bash
 # Configure EAS
 eas build:configure
@@ -552,6 +580,7 @@ eas submit --platform ios
 ```
 
 **Release Strategy**:
+
 - Month 2: Internal TestFlight beta (10-20 users)
 - Month 3: Public TestFlight (100+ users)
 - Month 3 end: App Store v1.0 release
@@ -559,24 +588,27 @@ eas submit --platform ios
 ### Monetization: In-App Purchase vs Web Billing
 
 **Apple's 30% Cut**:
+
 - In-app subscriptions via Apple: Apple takes 30% (15% after year 1)
 - Web subscriptions: Apple takes 0%
 
 **Legal Options**:
 
-| Approach | Legality | Implementation |
-|----------|----------|----------------|
+| Approach                | Legality                                | Implementation                                       |
+| ----------------------- | --------------------------------------- | ---------------------------------------------------- |
 | **Link to web billing** | Allowed since 2022 (after Epic lawsuit) | Show link "Manage subscription at sotto.app/billing" |
-| **In-app purchases** | Always allowed | Use `expo-in-app-purchases` or `react-native-iap` |
-| **Hybrid** | Recommended | Allow both, default to web for existing users |
+| **In-app purchases**    | Always allowed                          | Use `expo-in-app-purchases` or `react-native-iap`    |
+| **Hybrid**              | Recommended                             | Allow both, default to web for existing users        |
 
 **Recommended Strategy**:
+
 1. New iOS users see "Subscribe" button → opens in-app browser to `sotto.app/pricing`
 2. Stripe Checkout in WebView → subscription managed on web
 3. App checks subscription status via existing `/api/billing` endpoint
 4. Apple gets 0%, Stripe takes 2.9% + 30¢
 
 **Alternative**: Implement IAP for iOS-only users, sync with backend:
+
 ```typescript
 // lib/iap.native.ts
 import * as InAppPurchases from 'expo-in-app-purchases';
@@ -599,6 +631,7 @@ export async function purchaseProPlan() {
 ```
 
 **Backend Changes Required**:
+
 - Add `/api/billing/apple-iap` route
 - Validate Apple receipts via `app-store-server-api`
 - Create subscription in Prisma with `provider: 'APPLE'`
@@ -614,12 +647,14 @@ export async function purchaseProPlan() {
 **Goal**: Let users download podcasts for airplane mode.
 
 **Implementation**:
+
 - Background download queue (continue downloads when app is backgrounded)
 - Smart storage limits (5GB max, auto-delete oldest first)
 - Download quality options (High/Medium/Low bitrate)
 - "Download over Wi-Fi only" setting
 
 **UI**:
+
 - Download icon on podcast cards
 - "Downloads" tab in profile
 - Download progress indicator
@@ -630,12 +665,14 @@ export async function purchaseProPlan() {
 **Goal**: Control playback from wrist.
 
 **Features**:
+
 - Now Playing screen (title, artwork, play/pause)
 - Skip forward/backward 15s
 - Volume control
 - Browse recent podcasts
 
 **Tech**:
+
 - WatchOS app (separate target in Xcode)
 - WatchConnectivity framework for sync
 - Complication: "Latest podcast" shortcut
@@ -647,16 +684,19 @@ export async function purchaseProPlan() {
 **Goal**: Safe podcast listening while driving.
 
 **Features**:
+
 - Browse feed (voice-controlled)
 - Now Playing screen
 - Playback controls
 - "What's new?" voice command
 
 **Tech**:
+
 - CarPlay framework (requires entitlement from Apple)
 - Audio app template (provided by Apple)
 
 **Apple Requirements**:
+
 - Must submit CarPlay entitlement request
 - Must follow audio app UI guidelines (limited customization)
 
@@ -667,6 +707,7 @@ export async function purchaseProPlan() {
 **Goal**: "Hey Siri, play my latest Sotto podcast"
 
 **Implementation**:
+
 ```swift
 // Swift code in native module
 import Intents
@@ -681,6 +722,7 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 ```
 
 **Exposed Shortcuts**:
+
 - "Play latest podcast"
 - "Resume current podcast"
 - "Create a podcast about [topic]"
@@ -692,11 +734,13 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Goal**: Quick access to recent podcasts.
 
 **Widget Types**:
+
 - Small: Latest podcast cover art + title
 - Medium: 3 recent podcasts
 - Large: 5 recent podcasts + "Create" button
 
 **Tech**:
+
 - WidgetKit (SwiftUI)
 - Timeline provider (refresh every 15 minutes)
 - Deep links to podcast player
@@ -708,11 +752,13 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Goal**: Lock screen mini-player with live progress bar.
 
 **Implementation**:
+
 - Show now-playing info on lock screen
 - Live-updating progress bar
 - Control buttons (play/pause, skip)
 
 **Tech**:
+
 - ActivityKit framework
 - Push-to-update or app-driven updates
 
@@ -725,6 +771,7 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 ### Month 2: Core App Development
 
 **Week 1-2: Foundation**
+
 - Set up Expo project
 - Configure expo-router navigation
 - Implement authentication (login, signup, token storage)
@@ -732,18 +779,21 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 - Design system setup (colors, fonts, spacing)
 
 **Week 3-4: Core Screens**
+
 - Feed screen (grid, filters, search)
 - Player screen (audio, transcript, controls)
 - Create screen (chat UI, streaming responses)
 - Profile screen
 
 **Week 5-6: Background Features**
+
 - react-native-track-player integration
 - Background audio playback
 - Lock screen controls
 - Push notification setup
 
 **Week 7-8: Polish**
+
 - Animations (page transitions, loading states)
 - Error handling
 - Offline support (AsyncStorage caching)
@@ -754,18 +804,21 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 ### Month 3: Public Beta & Launch
 
 **Week 9-10: Public Beta**
+
 - Expand TestFlight to 100+ users
 - Collect feedback
 - Fix critical bugs
 - Performance optimization
 
 **Week 11-12: App Store Submission**
+
 - Prepare marketing materials (screenshots, preview video)
 - Write app description
 - Submit for review
 - Address App Review feedback
 
 **Week 13-14: Launch**
+
 - App Store release (v1.0.0)
 - Marketing push (Product Hunt, social media)
 - Monitor crash reports (Sentry)
@@ -789,22 +842,26 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 ### Recommended Team
 
 **For Phase 2 (Months 2-3)**:
+
 - 1x React Native Developer (senior, full-time)
 - 1x Backend Developer (existing team, 25% time for mobile API support)
 - 1x Designer (part-time, mobile UI/UX)
 - 1x QA Tester (part-time, TestFlight testing)
 
 **For Phase 3 (Month 4+)**:
+
 - 1x iOS Native Developer (contract, for WatchOS/CarPlay/Widgets)
 - Same React Native developer (maintenance + new features)
 
 **External**:
+
 - App Store asset designer (screenshots, preview video): 1-2 days
 - Legal review (privacy policy, terms): 1-2 days
 
 ### Skills Required
 
 **React Native Developer Must Have**:
+
 - 2+ years React Native experience
 - Expo experience (managed workflow)
 - Background audio implementation (track-player or similar)
@@ -812,6 +869,7 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 - TypeScript proficiency
 
 **Nice to Have**:
+
 - Podcast app development experience
 - WebSocket/SSE streaming experience
 - Animation libraries (Reanimated, Lottie)
@@ -826,12 +884,14 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Decision**: React Native + Expo
 
 **Reasoning**:
+
 - 70% code sharing with existing React/Next.js web app (types, API client, business logic)
 - Faster iteration (OTA updates, hot reload)
 - Rich ecosystem for podcast apps (track-player, notifications)
 - Team familiarity with React/TypeScript
 
 **Trade-offs**:
+
 - Slightly larger bundle size than native (15-20 MB)
 - Some animations less smooth (mitigated with Reanimated)
 - Occasional native module bugs (mitigated with Expo's stable APIs)
@@ -841,12 +901,14 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Decision**: Managed workflow
 
 **Reasoning**:
+
 - Faster development (no Xcode required for most features)
 - OTA updates for JS changes
 - EAS Build handles complex build process
 - Expo SDK covers 90% of needed features
 
 **When to Eject to Bare**:
+
 - If we need custom native modules not available in Expo
 - If we need deep CarPlay customization
 - If bundle size becomes a major issue (unlikely)
@@ -858,12 +920,14 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Decision**: react-native-track-player
 
 **Reasoning**:
+
 - Built specifically for podcast/music apps
 - Excellent background audio support
 - Lock screen controls out-of-the-box
 - Active community (5k+ stars on GitHub)
 
 **Trade-off**:
+
 - Not part of Expo SDK (requires custom development build)
 - Slightly more complex setup than expo-av
 
@@ -874,15 +938,18 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Decision**: Zustand + React Query
 
 **Reasoning**:
+
 - Zustand: Lightweight, simple, perfect for global state (auth, player)
 - React Query: Handles API caching, refetching, optimistic updates
 - Combined: Best of both worlds
 
 **Trade-off**:
+
 - Two libraries instead of one (but both are tiny)
 - Less boilerplate than Redux
 
 **State Architecture**:
+
 ```typescript
 // Global state (Zustand)
 - authStore: { user, token, isAuthenticated }
@@ -900,15 +967,18 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Decision**: StyleSheet (React Native's built-in)
 
 **Reasoning**:
+
 - Best performance (compiled to native)
 - No additional dependencies
 - Familiar to React Native developers
 
 **Trade-off**:
+
 - More verbose than CSS Modules (no cascading)
 - Need to define theme tokens separately
 
 **Theme System**:
+
 ```typescript
 // theme.ts
 export const theme = {
@@ -939,6 +1009,7 @@ export const theme = {
 **Decision**: Universal links (sotto.app/podcast/[id] opens app if installed)
 
 **Implementation**:
+
 ```json
 // app.json
 {
@@ -952,6 +1023,7 @@ export const theme = {
 ```
 
 **Routing**:
+
 ```typescript
 // app/_layout.tsx
 import * as Linking from 'expo-linking';
@@ -978,6 +1050,7 @@ export default function RootLayout() {
 ```
 
 **User Experience**:
+
 - User taps link in iMessage/Email → app opens directly to podcast
 - User without app → opens in Safari PWA
 
@@ -992,6 +1065,7 @@ export default function RootLayout() {
 **Subtitle**: Podcasts that listen back
 
 **Description**:
+
 ```
 Sotto turns any topic into a conversational podcast, powered by AI.
 
@@ -1044,6 +1118,7 @@ Caption: "Build your podcast library and follow creators"
 ### App Preview Video (Required, 15-30 seconds)
 
 **Script**:
+
 ```
 [0:00] Opening shot: Sotto logo on warm background
 [0:02] Tap "Create Podcast" → chat interface appears
@@ -1059,6 +1134,7 @@ Caption: "Build your podcast library and follow creators"
 ```
 
 **Production**:
+
 - Use Figma mockups for UI
 - Screen recording on iPhone 15 Pro Max
 - Add subtle animations (fade in/out)
@@ -1067,31 +1143,38 @@ Caption: "Build your podcast library and follow creators"
 ### App Review Guidelines Compliance
 
 **2.3.8 - AI-Generated Content**
+
 > "Apps that create content using AI must clearly label AI-generated content and provide a mechanism for users to report inaccurate content."
 
 **Implementation**:
+
 - Badge: "AI-Generated" on all podcast cards
 - Disclaimer on create screen
 - "Report inaccurate content" link in player menu
 
 **4.2.2 - Minimum Functionality**
+
 > "Apps should include features, content, and UI that elevate it beyond a repackaged website."
 
 **How Sotto Complies**:
+
 - Background audio playback (not available on web)
 - Push notifications
 - Offline downloads
 - Native UI optimized for iOS
 
 **5.1.1 - Privacy Policy**
+
 > "All apps that collect user or usage data must have a privacy policy."
 
 **Required Disclosures**:
+
 - Email address (authentication)
 - Usage data (analytics)
 - Identifiers (device ID for push notifications)
 
 **Privacy Nutrition Label**:
+
 ```yaml
 Data Used to Track You: None
 Data Linked to You:
@@ -1105,6 +1188,7 @@ Data Not Linked to You:
 ### Launch Checklist
 
 **Pre-Submission**:
+
 - [ ] All features tested on physical device
 - [ ] No console warnings or errors
 - [ ] Privacy policy published at sotto.app/privacy
@@ -1114,6 +1198,7 @@ Data Not Linked to You:
 - [ ] Analytics configured (Mixpanel or Amplitude)
 
 **App Store Connect**:
+
 - [ ] App listing complete (name, subtitle, description, keywords)
 - [ ] Screenshots uploaded (3 device sizes)
 - [ ] App preview video uploaded
@@ -1123,6 +1208,7 @@ Data Not Linked to You:
 - [ ] Marketing URL set (optional)
 
 **Build**:
+
 - [ ] Version number set (1.0.0)
 - [ ] Build number incremented
 - [ ] Release notes written
@@ -1130,6 +1216,7 @@ Data Not Linked to You:
 - [ ] No critical bugs reported
 
 **Post-Submission**:
+
 - [ ] Monitor App Review status daily
 - [ ] Respond to App Review questions within 24h
 - [ ] Prepare launch marketing (Product Hunt, Twitter, email)
@@ -1138,6 +1225,7 @@ Data Not Linked to You:
 ### Rejection Risk Areas
 
 **Common Rejection Reasons**:
+
 1. **AI content not labeled** → Add "AI-Generated" badge
 2. **Missing privacy policy** → Publish at sotto.app/privacy
 3. **Crashes on launch** → Test on multiple devices
@@ -1145,12 +1233,14 @@ Data Not Linked to You:
 5. **Replica app** → Emphasize unique interactive features
 
 **How to Respond to Rejection**:
+
 1. Read rejection reason carefully
 2. Fix the issue (don't argue)
 3. Reply to App Review explaining the fix
 4. Resubmit within 24-48 hours
 
 **Expedited Review**:
+
 - Request only for critical bugs affecting live users
 - Explain severity + urgency
 - Available 1-2 times per year
@@ -1162,6 +1252,7 @@ Data Not Linked to You:
 ### Key Metrics to Track
 
 **Engagement**:
+
 - DAU/MAU (daily/monthly active users)
 - Avg. podcasts created per user
 - Avg. listening time per session
@@ -1169,16 +1260,19 @@ Data Not Linked to You:
 - Completion rate (% of podcast listened)
 
 **Retention**:
+
 - Day 1, 7, 30 retention
 - Churn rate by subscription tier
 - Reactivation rate (lapsed users who return)
 
 **Conversion**:
+
 - Free → Pro conversion rate
 - App Store → signup conversion rate
 - Feature usage (download, share, fork, follow)
 
 **Technical**:
+
 - Crash-free rate (target: >99.5%)
 - App launch time (target: <2s)
 - API response time (target: <500ms)
@@ -1201,6 +1295,7 @@ Data Not Linked to You:
 **Impact**: High (delays launch by 1-2 weeks)
 
 **Mitigation**:
+
 - Study App Review Guidelines thoroughly
 - Test on multiple devices before submission
 - Have legal review privacy policy
@@ -1212,6 +1307,7 @@ Data Not Linked to You:
 **Impact**: High (core feature broken)
 
 **Mitigation**:
+
 - Use battle-tested library (react-native-track-player)
 - Test on real devices (not just simulator)
 - Handle interruptions (phone calls, Siri, alarms)
@@ -1223,6 +1319,7 @@ Data Not Linked to You:
 **Impact**: Medium (need App Store update for critical fix)
 
 **Mitigation**:
+
 - Expo OTA updates only work for JS code (not native)
 - If we add custom native modules, OTA won't work for those
 - Plan for App Store updates every 2-4 weeks
@@ -1233,6 +1330,7 @@ Data Not Linked to You:
 **Impact**: Medium (bad reviews, churn)
 
 **Mitigation**:
+
 - Set minimum iOS version to 14.0 (covers 90%+ devices)
 - Test on older devices (iPhone X, iPhone 8)
 - Optimize bundle size (lazy load components)
@@ -1249,6 +1347,7 @@ Data Not Linked to You:
 **Phase 3 (Month 4+)**: Apple Watch, CarPlay, Siri Shortcuts, offline downloads, widgets.
 
 **Key Decisions**:
+
 - React Native + Expo (not Flutter or native)
 - Web billing (not IAP) to avoid 30% Apple fee
 - Same API backend (no rewrites)

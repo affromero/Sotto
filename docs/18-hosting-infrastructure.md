@@ -9,14 +9,14 @@
 
 ### Option 1: Vercel + Railway (Easiest)
 
-| Component | Service | Cost/Month | Pros | Cons |
-|-----------|---------|-----------|------|------|
-| Web app | Vercel Pro | $20 | Zero config, auto-scaling, CDN | Vendor lock-in, expensive at scale |
-| Workers | Railway | $5-20 | Easy deploy, auto-restart | Limited GPU support |
-| Database | Neon | $0-25 | Serverless Postgres, auto-scaling | Cold starts on free tier |
-| Redis | Upstash | $0-10 | Serverless Redis, pay-per-request | Higher latency than self-hosted |
-| Storage | Cloudflare R2 | $0-5 | No egress fees, S3-compatible | Less tooling than AWS S3 |
-| **Total** | | **$25-80/mo** | | |
+| Component | Service       | Cost/Month    | Pros                              | Cons                               |
+| --------- | ------------- | ------------- | --------------------------------- | ---------------------------------- |
+| Web app   | Vercel Pro    | $20           | Zero config, auto-scaling, CDN    | Vendor lock-in, expensive at scale |
+| Workers   | Railway       | $5-20         | Easy deploy, auto-restart         | Limited GPU support                |
+| Database  | Neon          | $0-25         | Serverless Postgres, auto-scaling | Cold starts on free tier           |
+| Redis     | Upstash       | $0-10         | Serverless Redis, pay-per-request | Higher latency than self-hosted    |
+| Storage   | Cloudflare R2 | $0-5          | No egress fees, S3-compatible     | Less tooling than AWS S3           |
+| **Total** |               | **$25-80/mo** |                                   |                                    |
 
 **Best for**: MVP, first 500 users, solo developer.
 
@@ -24,31 +24,31 @@
 
 Run everything on a single VPS. Cheapest at scale, full control.
 
-| Component | Setup | Cost/Month | Notes |
-|-----------|-------|-----------|-------|
-| VPS | Hetzner CPX31 (4 vCPU, 8GB RAM) | **€10/mo (~$11)** | Runs web + workers + DB + Redis |
-| VPS (bigger) | Hetzner CPX41 (8 vCPU, 16GB RAM) | **€19/mo (~$21)** | For 1K+ users |
-| VPS (scaling) | Hetzner CCX33 (8 vCPU, 32GB, dedicated) | **€50/mo (~$55)** | For 5K+ users |
-| Storage | Hetzner Storage Box 1TB | **€4/mo** | For podcast audio files |
-| Backups | Hetzner automated backups | **20% of VPS price** | Automatic daily snapshots |
-| Domain | Any registrar | **$12/year** | sotto.fm |
-| SSL | Let's Encrypt | **$0** | Auto-renewed via Caddy/Certbot |
-| **Total** | | **~$17-75/mo** | |
+| Component     | Setup                                   | Cost/Month           | Notes                           |
+| ------------- | --------------------------------------- | -------------------- | ------------------------------- |
+| VPS           | Hetzner CPX31 (4 vCPU, 8GB RAM)         | **€10/mo (~$11)**    | Runs web + workers + DB + Redis |
+| VPS (bigger)  | Hetzner CPX41 (8 vCPU, 16GB RAM)        | **€19/mo (~$21)**    | For 1K+ users                   |
+| VPS (scaling) | Hetzner CCX33 (8 vCPU, 32GB, dedicated) | **€50/mo (~$55)**    | For 5K+ users                   |
+| Storage       | Hetzner Storage Box 1TB                 | **€4/mo**            | For podcast audio files         |
+| Backups       | Hetzner automated backups               | **20% of VPS price** | Automatic daily snapshots       |
+| Domain        | Any registrar                           | **$12/year**         | sotto.fm                        |
+| SSL           | Let's Encrypt                           | **$0**               | Auto-renewed via Caddy/Certbot  |
+| **Total**     |                                         | **~$17-75/mo**       |                                 |
 
 **Hetzner pricing**: [hetzner.com/cloud](https://www.hetzner.com/cloud/)
 **DigitalOcean pricing**: [digitalocean.com/pricing](https://www.digitalocean.com/pricing)
 
 ### Option 3: AWS/GCP/Azure (Enterprise)
 
-| Component | Service | Cost/Month | Notes |
-|-----------|---------|-----------|-------|
-| Web app | AWS EC2 t3.medium | $30 | Or ECS/Fargate for containers |
-| Workers | AWS EC2 t3.small | $15 | Or Lambda for serverless |
-| Database | AWS RDS PostgreSQL | $15-50 | Managed, auto-backups |
-| Redis | AWS ElastiCache | $13-25 | Managed Redis |
-| Storage | AWS S3 | $1-10 | Egress fees apply |
-| Load balancer | AWS ALB | $16 | Required for HTTPS |
-| **Total** | | **$90-150/mo** | |
+| Component     | Service            | Cost/Month     | Notes                         |
+| ------------- | ------------------ | -------------- | ----------------------------- |
+| Web app       | AWS EC2 t3.medium  | $30            | Or ECS/Fargate for containers |
+| Workers       | AWS EC2 t3.small   | $15            | Or Lambda for serverless      |
+| Database      | AWS RDS PostgreSQL | $15-50         | Managed, auto-backups         |
+| Redis         | AWS ElastiCache    | $13-25         | Managed Redis                 |
+| Storage       | AWS S3             | $1-10          | Egress fees apply             |
+| Load balancer | AWS ALB            | $16            | Required for HTTPS            |
+| **Total**     |                    | **$90-150/mo** |                               |
 
 **Best for**: Enterprise, compliance requirements, multi-region.
 
@@ -130,7 +130,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://sotto:SECURE_PASSWORD@postgres:5432/sotto
@@ -166,7 +166,7 @@ services:
       POSTGRES_PASSWORD: SECURE_PASSWORD
       POSTGRES_DB: sotto
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sotto"]
+      test: ['CMD-SHELL', 'pg_isready -U sotto']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -178,7 +178,7 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -212,6 +212,7 @@ Caddy automatically obtains and renews HTTPS certificates from Let's Encrypt.
 ### Step 5: DNS Setup
 
 Point your domain to the server:
+
 - `A record`: `sotto.fm` → `YOUR_SERVER_IP`
 - `AAAA record`: `sotto.fm` → `YOUR_SERVER_IPV6`
 - `CNAME record`: `www.sotto.fm` → `sotto.fm`
@@ -294,13 +295,13 @@ Private podcasts are served through the API, which verifies the user owns the po
 
 ## Scaling Roadmap
 
-| Users | Infrastructure | Monthly Cost | Action |
-|-------|---------------|-------------|--------|
-| 0-100 | Hetzner CPX31 (4 vCPU, 8GB) | ~$17 | Single server, everything |
-| 100-1K | Hetzner CPX41 (8 vCPU, 16GB) | ~$27 | Upgrade VPS |
-| 1K-5K | Hetzner CCX33 (dedicated) + Storage Box | ~$60 | Dedicated CPU, separate storage |
-| 5K-10K | 2 servers (web + workers) + managed DB | ~$150 | Split web and workers |
-| 10K+ | Kubernetes or managed containers | ~$300+ | Auto-scaling, multi-region |
+| Users  | Infrastructure                          | Monthly Cost | Action                          |
+| ------ | --------------------------------------- | ------------ | ------------------------------- |
+| 0-100  | Hetzner CPX31 (4 vCPU, 8GB)             | ~$17         | Single server, everything       |
+| 100-1K | Hetzner CPX41 (8 vCPU, 16GB)            | ~$27         | Upgrade VPS                     |
+| 1K-5K  | Hetzner CCX33 (dedicated) + Storage Box | ~$60         | Dedicated CPU, separate storage |
+| 5K-10K | 2 servers (web + workers) + managed DB  | ~$150        | Split web and workers           |
+| 10K+   | Kubernetes or managed containers        | ~$300+       | Auto-scaling, multi-region      |
 
 ---
 
@@ -385,14 +386,14 @@ curl -s https://YOUR_DOMAIN/api/health | jq .
 
 ### Project Files Reference
 
-| File | Purpose |
-|------|---------|
-| `Dockerfile` | Multi-stage Next.js web container (standalone output) |
-| `Dockerfile.workers` | Workers container with FFmpeg |
-| `docker-compose.prod.yml` | Full production stack (web, workers, postgres, redis) |
-| `Caddyfile` | Reverse proxy template (HTTPS + security headers) |
-| `.env.example` | All environment variables documented |
-| `scripts/setup-server.sh` | Automated VPS provisioning (Docker, Caddy, firewall, SSH hardening) |
-| `scripts/backup.sh` | Daily PostgreSQL backup with 30-day retention |
-| `.github/workflows/ci.yml` | CI pipeline (lint, typecheck, test, build) |
-| `.github/workflows/deploy.yml` | Auto-deploy to production on push to main |
+| File                           | Purpose                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `Dockerfile`                   | Multi-stage Next.js web container (standalone output)               |
+| `Dockerfile.workers`           | Workers container with FFmpeg                                       |
+| `docker-compose.prod.yml`      | Full production stack (web, workers, postgres, redis)               |
+| `Caddyfile`                    | Reverse proxy template (HTTPS + security headers)                   |
+| `.env.example`                 | All environment variables documented                                |
+| `scripts/setup-server.sh`      | Automated VPS provisioning (Docker, Caddy, firewall, SSH hardening) |
+| `scripts/backup.sh`            | Daily PostgreSQL backup with 30-day retention                       |
+| `.github/workflows/ci.yml`     | CI pipeline (lint, typecheck, test, build)                          |
+| `.github/workflows/deploy.yml` | Auto-deploy to production on push to main                           |
