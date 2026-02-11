@@ -6,6 +6,31 @@
 
 ---
 
+## Glossary
+
+| Term             | Definition                                                                                                                                                                                                |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ARR**          | Annual Recurring Revenue — total subscription revenue projected over 12 months. $10K MRR = $120K ARR.                                                                                                     |
+| **BYOK**         | Bring Your Own Key — users provide their own API keys for external services (e.g., ElevenLabs, PlayHT) instead of using Sotto's platform keys. Shifts TTS cost from Sotto to the user.                    |
+| **CAC**          | Customer Acquisition Cost — how much it costs to acquire one new user. For Sotto's free tier, CAC = the cost of generating their free podcasts (~$1.65 for 3 credits).                                    |
+| **CAGR**         | Compound Annual Growth Rate — the annualized average rate of revenue or market growth over a period. A 27% CAGR means the market grows ~27% each year, compounding.                                       |
+| **COGS**         | Cost of Goods Sold — the direct cost of producing what you sell. For Sotto, COGS = Claude API + TTS API + storage per podcast. Does not include fixed costs like servers.                                 |
+| **Cold start**   | The chicken-and-egg problem for networks: the platform is useless without content, but no one creates content on an empty platform. Sotto's #1 existential risk.                                          |
+| **Gross margin** | (Revenue - COGS) / Revenue. Sotto's Starter tier at 80% margin means for every $14 paid, $11.20 is gross profit. SaaS benchmark: 70%+ is healthy.                                                         |
+| **LTV**          | Lifetime Value — total revenue from a customer over their entire relationship. LTV = monthly revenue × average months retained. LTV:CAC > 3:1 is the standard target.                                     |
+| **MoS**          | Mean Opinion Score — a 1-5 rating of speech naturalness. Human speech scores ~4.7. ElevenLabs scores ~4.6. OpenAI TTS scores ~4.3. Anything above 4.3 is acceptable for most listeners.                   |
+| **MRR**          | Monthly Recurring Revenue — total subscription revenue per month. 50 Starter subscribers = $700 MRR.                                                                                                      |
+| **PMF**          | Product-Market Fit — the point where the product satisfies a real market demand. Usually measured by retention: if 40%+ of users are still active after 30 days, you likely have PMF.                     |
+| **SAM**          | Serviceable Addressable Market — the slice of the total market you can realistically reach (e.g., English-speaking podcast listeners interested in educational content).                                  |
+| **SOM**          | Serviceable Obtainable Market — the slice of SAM you can realistically capture in 1-3 years with your resources.                                                                                          |
+| **TAM**          | Total Addressable Market — the entire revenue opportunity if you captured 100% of the market. For AI audio: ~$40B.                                                                                        |
+| **TTS**          | Text-to-Speech — converting written text to spoken audio. Sotto's primary cost driver. Providers: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume.                                                             |
+| **STT**          | Speech-to-Text — converting spoken audio to written text. Used for the import pipeline (transcribing uploaded podcasts). Provider: OpenAI Whisper.                                                        |
+| **WAU**          | Weekly Active Users — unique users who performed a meaningful action (listened, created, forked, or interacted) in the last 7 days. The key growth metric for YC applications.                            |
+| **WoW**          | Week-over-Week — the percentage change in a metric from one week to the next. 15% WoW growth means 500 WAU becomes 575 the next week, 661 the week after, etc. At 15% WoW, you reach 1M users in ~1 year. |
+
+---
+
 ## 1. Why the Pivot Was Necessary
 
 ### 1.1 The Original Thesis Collapsed

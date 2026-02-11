@@ -180,28 +180,57 @@ echo "=== Step 4: Build HTML ==="
 mkdir -p "$BUILD_DIR"
 
 # Document order (same as update-pitch skill, with 99-app-showcase prepended)
+# Pitch deck ordering — this IS the investor story.
+# Each section builds on the last. Don't reorder without thinking about the narrative.
+#
+# ACT 1: THE HOOK — "Look at this. It's real."
+# ACT 2: THE OPPORTUNITY — "Here's why it matters."
+# ACT 3: THE PRODUCT — "Here's how it works."
+# ACT 4: THE BUSINESS — "Here's how it makes money."
+# ACT 5: THE HONEST TAKE — "Here's where we really stand."
+# APPENDIX: Deep dives for the curious.
+
 DOCS=(
+  # ── ACT 1: THE HOOK ──────────────────────────────────────────────
+  # Lead with the product. Screenshots speak louder than slides.
   "99-app-showcase.md:App Showcase"
   "01-product-vision.md:Product Vision"
-  "00-plan.md:Product Plan"
-  "02-market-analysis.md:Market Analysis"
-  "11-unit-economics.md:Unit Economics"
-  "05-ui-mockups.md:UI Mockups"
-  "04-design-system.md:Design System"
-  "03-technical-architecture.md:Technical Architecture"
-  "06-authentication-setup.md:Authentication Setup"
-  "07-stripe-billing.md:Stripe Billing"
-  "08-ai-prompts.md:AI Prompts"
-  "09-discovery-chat-flow.md:Discovery Chat Flow"
-  "10-mobile-strategy.md:Mobile Strategy"
-  "12-provider-pricing.md:Provider Pricing"
-  "13-hosting-infrastructure.md:Hosting Infrastructure"
+  "02-ui-mockups.md:UI Mockups"
+
+  # ── ACT 2: THE OPPORTUNITY ───────────────────────────────────────
+  # Now that they've seen it — why does it matter? How big is this?
+  "03-market-analysis.md:Market Analysis"
+  "04-post-pivot-analysis.md:Post-Pivot Analysis"
+
+  # ── ACT 3: THE PRODUCT ──────────────────────────────────────────
+  # Deep dive into what we built. The full plan, the AI, the chat flow.
+  "05-plan.md:Product Plan"
+  "06-discovery-chat-flow.md:Discovery Chat Flow"
+  "07-ai-prompts.md:AI Prompts"
+  "08-design-system.md:Design System"
+
+  # ── ACT 4: THE BUSINESS ─────────────────────────────────────────
+  # Show the numbers. Pricing, costs, economics.
+  "09-unit-economics.md:Unit Economics"
+  "10-stripe-billing.md:Stripe Billing"
+  "11-provider-pricing.md:Provider Pricing"
+
+  # ── ACT 5: THE HONEST TAKE ──────────────────────────────────────
+  # What's left. What's the plan to ship. This builds trust.
+  "12-shipping-roadmap.md:Shipping Roadmap"
   "13-mvp-launch-guide.md:MVP Launch Guide"
-  "14-ios-app-strategy.md:iOS App Strategy"
-  "15-logo-brief.md:Logo Brief"
-  "16-palette-brief.md:Palette Brief"
-  "17-roles-and-dashboards.md:Roles & Dashboards"
-  "deploy-sotto-fm.md:Deployment Guide"
+  "14-mobile-strategy.md:Mobile Strategy"
+  "15-ios-app-strategy.md:iOS App Strategy"
+
+  # ── APPENDIX: TECHNICAL DEEP DIVES ──────────────────────────────
+  # For the partner who wants to read everything. Not required viewing.
+  "16-technical-architecture.md:Technical Architecture"
+  "17-authentication-setup.md:Authentication Setup"
+  "18-hosting-infrastructure.md:Hosting Infrastructure"
+  "19-deploy-sotto-fm.md:Deployment Guide"
+  "20-roles-and-dashboards.md:Roles & Dashboards"
+  "21-logo-brief.md:Logo Brief"
+  "22-palette-brief.md:Palette Brief"
 )
 
 # Build pandoc options (array to preserve quoting)

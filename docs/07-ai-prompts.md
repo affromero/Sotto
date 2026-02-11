@@ -10,12 +10,12 @@
 
 Sotto uses Anthropic Claude (Sonnet 4.5) for four distinct AI tasks. Each task has a carefully designed system prompt optimized for its specific purpose. All prompts flow through the shared client in `src/lib/claude.ts`, which supports both streaming (for discovery chat) and non-streaming (for script generation, Q&A, segment regeneration) modes.
 
-| Prompt | File | Model | Streaming | Max Tokens | Avg Cost |
-|--------|------|-------|-----------|------------|----------|
-| Discovery Chat Agent | `src/lib/discovery-agent.ts` | claude-sonnet-4-5 | Yes | 1,024 | ~$0.01/exchange |
-| Script Generation | `src/lib/script-generator.ts` | claude-sonnet-4-5 | No | 8,192 | ~$0.08/script |
-| Q&A Interaction | `src/workers/interaction.worker.ts` | claude-sonnet-4-5 | No | 4,096 | ~$0.02/question |
-| Segment Regeneration | `src/workers/segment-regeneration.worker.ts` | claude-sonnet-4-5 | No | 4,096 | ~$0.03/regeneration |
+| Prompt               | File                                         | Model             | Streaming | Max Tokens | Avg Cost            |
+| -------------------- | -------------------------------------------- | ----------------- | --------- | ---------- | ------------------- |
+| Discovery Chat Agent | `src/lib/discovery-agent.ts`                 | claude-sonnet-4-5 | Yes       | 1,024      | ~$0.01/exchange     |
+| Script Generation    | `src/lib/script-generator.ts`                | claude-sonnet-4-5 | No        | 8,192      | ~$0.08/script       |
+| Q&A Interaction      | `src/workers/interaction.worker.ts`          | claude-sonnet-4-5 | No        | 4,096      | ~$0.02/question     |
+| Segment Regeneration | `src/workers/segment-regeneration.worker.ts` | claude-sonnet-4-5 | No        | 4,096      | ~$0.03/regeneration |
 
 ---
 
@@ -91,6 +91,7 @@ Great choice! Quantum computing is fascinating. How deep do you want to go?
 ```
 
 Parsed result:
+
 ```json
 {
   "text": "Great choice! Quantum computing is fascinating. How deep do you want to go?",
@@ -213,12 +214,12 @@ Only return the JSON object, nothing else.
 
 The system prompt dynamically injects tone guidance based on the discovery metadata:
 
-| Tone Value | Injected Instruction |
-|------------|---------------------|
-| `casual` | "Keep it light, use humor freely, casual language, pop culture references" |
-| `professional` | "Maintain a professional but warm tone, with occasional humor to keep it engaging" |
-| `socratic` | "Use the Socratic method -- HOST asks probing questions that build on each other, EXPERT guides discovery" |
-| `storytelling` | "Frame everything as a narrative -- characters, conflict, resolution. Make facts feel like plot points." |
+| Tone Value     | Injected Instruction                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------- |
+| `casual`       | "Keep it light, use humor freely, casual language, pop culture references"                                 |
+| `professional` | "Maintain a professional but warm tone, with occasional humor to keep it engaging"                         |
+| `socratic`     | "Use the Socratic method -- HOST asks probing questions that build on each other, EXPERT guides discovery" |
+| `storytelling` | "Frame everything as a narrative -- characters, conflict, resolution. Make facts feel like plot points."   |
 
 ### Design Rationale
 
@@ -325,8 +326,18 @@ If sound cues are missing or empty, default intro and outro cues are injected:
 ```typescript
 if (!parsed.soundCues || parsed.soundCues.length === 0) {
   parsed.soundCues = [
-    { type: 'intro', prompt: 'warm podcast intro jingle with soft chimes', durationSeconds: 3, insertAfterTurn: -1 },
-    { type: 'outro', prompt: 'gentle melodic podcast outro with fade out', durationSeconds: 4, insertAfterTurn: parsed.turns.length - 1 },
+    {
+      type: 'intro',
+      prompt: 'warm podcast intro jingle with soft chimes',
+      durationSeconds: 3,
+      insertAfterTurn: -1,
+    },
+    {
+      type: 'outro',
+      prompt: 'gentle melodic podcast outro with fade out',
+      durationSeconds: 4,
+      insertAfterTurn: parsed.turns.length - 1,
+    },
   ];
 }
 ```
@@ -466,8 +477,8 @@ After segment insertion and reordering, the audio stitching worker re-runs to pr
 export interface RegenerateSegmentPayload {
   podcastId: string;
   interactionId: string;
-  insertAfterOrder: number;  // Position in segment sequence to insert after
-  newText: string;           // The adapted podcast-format text
+  insertAfterOrder: number; // Position in segment sequence to insert after
+  newText: string; // The adapted podcast-format text
   speaker: 'HOST' | 'EXPERT';
 }
 ```
@@ -518,7 +529,7 @@ export async function logApiUsage(params: {
   durationMs?: number;
 }): Promise<void> {
   // Claude Sonnet 4.5 pricing
-  const inputCost = (params.inputTokens / 1_000_000) * 3.0;   // $3.00 per million input tokens
+  const inputCost = (params.inputTokens / 1_000_000) * 3.0; // $3.00 per million input tokens
   const outputCost = (params.outputTokens / 1_000_000) * 15.0; // $15.00 per million output tokens
 
   logger.info('AI API usage', {
@@ -532,13 +543,13 @@ export async function logApiUsage(params: {
 
 ### Cost Per Operation
 
-| Operation | Avg Input Tokens | Avg Output Tokens | Avg Cost |
-|-----------|-----------------|-------------------|----------|
-| Discovery chat (per exchange) | ~500 | ~200 | $0.0045 |
-| Discovery chat (full session, 5 exchanges) | ~2,500 | ~1,000 | $0.0225 |
-| Script generation (10 min podcast) | ~1,500 | ~3,000 | $0.0495 |
-| Script generation (30 min podcast) | ~2,000 | ~8,000 | $0.126 |
-| Q&A interaction | ~800 | ~300 | $0.0069 |
-| Segment regeneration text prep | ~600 | ~400 | $0.0078 |
+| Operation                                  | Avg Input Tokens | Avg Output Tokens | Avg Cost |
+| ------------------------------------------ | ---------------- | ----------------- | -------- |
+| Discovery chat (per exchange)              | ~500             | ~200              | $0.0045  |
+| Discovery chat (full session, 5 exchanges) | ~2,500           | ~1,000            | $0.0225  |
+| Script generation (10 min podcast)         | ~1,500           | ~3,000            | $0.0495  |
+| Script generation (30 min podcast)         | ~2,000           | ~8,000            | $0.126   |
+| Q&A interaction                            | ~800             | ~300              | $0.0069  |
+| Segment regeneration text prep             | ~600             | ~400              | $0.0078  |
 
 These costs are logged to the `ApiUsageLog` table and tracked per user, per podcast, and per operation category for unit economics analysis.
