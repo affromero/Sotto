@@ -10,6 +10,7 @@ export interface DiscoveryMetadata {
   topic: string;
   depth: 'quick_overview' | 'standard' | 'deep_dive';
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
+  audience: 'kids' | 'teens' | 'family' | 'general' | 'mature';
   focusAreas: string[];
   tone: 'casual' | 'professional' | 'socratic';
   durationTarget: number;

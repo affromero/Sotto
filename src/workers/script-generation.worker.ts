@@ -20,6 +20,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
     audienceLevel: discovery.audienceLevel || 'intermediate',
+    audience: discovery.audience || 'general',
     focusAreas: discovery.focusAreas,
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
@@ -54,6 +55,26 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       })),
     });
     logger.info('References saved', { podcastId, count: String(result.references.length) });
+  }
+
+  // Auto-assign audience tag
+  const audienceSlugMap: Record<string, string> = {
+    kids: 'kids',
+    teens: 'teens',
+    family: 'family-friendly',
+    general: 'general-audience',
+    mature: 'mature-topics',
+  };
+  const audienceSlug = audienceSlugMap[discovery.audience || 'general'];
+  if (audienceSlug) {
+    const audienceTag = await prisma.tag.findUnique({ where: { slug: audienceSlug } });
+    if (audienceTag) {
+      await prisma.podcastTag.upsert({
+        where: { podcastId_tagId: { podcastId, tagId: audienceTag.id } },
+        update: {},
+        create: { podcastId, tagId: audienceTag.id },
+      });
+    }
   }
 
   // Route to script verification (handles both with and without references)

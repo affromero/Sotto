@@ -18,6 +18,7 @@ const mockMetadata: DiscoveryMetadata = {
   topic: 'Quantum Computing',
   depth: 'standard',
   audienceLevel: 'intermediate',
+  audience: 'general',
   tone: 'professional',
   focusAreas: ['practical applications'],
   durationTarget: 600,

@@ -205,6 +205,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
     audienceLevel: discovery.audienceLevel || 'intermediate',
+    audience: discovery.audience || 'general',
     focusAreas: discovery.focusAreas,
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
