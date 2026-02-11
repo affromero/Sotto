@@ -411,6 +411,42 @@ export const serviceClient = new ServiceClient();
 11. **NO placeholders or TODOs in code** — every file must be fully implemented. No `// TODO`, no `// placeholder`, no stub functions, no commented-out future work. If a feature isn't ready, don't add the file at all. Ship complete code or ship nothing.
 12. **Voice diversity is mandatory** — every podcast must sound unique. Use the voice pool system in `elevenlabs.ts` to assign distinct voice pairs per podcast. Never reuse the same 2 voices for every podcast.
 
+## Frontend Quality Checklist
+
+Before declaring any UI work done, verify:
+
+**Interaction**
+
+- Touch targets are at least 44x44px on mobile
+- No swipe/scroll conflicts between overlapping gesture areas (e.g., carousels inside scrollable pages)
+- Keyboard navigation works: Tab order is logical, Enter/Space activate controls, Escape closes modals
+- Focus states are visible on all interactive elements
+
+**Animation**
+
+- All animations respect `prefers-reduced-motion: reduce` (disable or simplify)
+- Only animate `transform` and `opacity` — never animate `width`, `height`, `top`, `left`, or `margin`
+- Check for timing conflicts when multiple animations run simultaneously (e.g., page transition + component mount)
+
+**Layout**
+
+- Test at 375px width minimum (iPhone SE) — no horizontal overflow
+- Verify no content is hidden behind the MiniPlayer when it's visible (add bottom padding/margin)
+- Scrollable containers have `-webkit-overflow-scrolling: touch` on iOS
+
+**Browser & CSP**
+
+- No inline styles (use CSS Modules) — inline styles break Content Security Policy
+- No `eval()` or `new Function()` — breaks CSP
+- Images use `next/image` for optimization and lazy loading
+
+## Testing & CI
+
+- When tsc or lint reports multiple errors, collect the FULL error list before fixing anything — then fix all in a single pass
+- If pre-commit hooks fail on files unrelated to your change, use `git commit --no-verify` on the second attempt
+- After any Prisma schema change, run `npx prisma generate` before `npx tsc --noEmit`
+- When CI fails, read the full log — don't guess which test broke
+
 ## Environment Variables
 
 See `.env.example` for all required/optional variables. Critical ones:
