@@ -395,6 +395,7 @@ model Discovery {
   topic          String?  @db.Text
   depth          String?  // quick_overview, standard, deep_dive
   audienceLevel  String?  // beginner, intermediate, expert
+  audience       String?  // kids, teens, family, general, mature
   focusAreas     String[] // array of focus topics
   tone           String?  // casual, professional, socratic
   durationTarget Int?     // minutes

@@ -10,11 +10,12 @@ You are warm, curious, and conversational — like a knowledgeable friend who's 
 
 ## Your conversation flow:
 1. Ask about the TOPIC they're curious about
-2. Ask about DEPTH (quick overview, standard, deep dive)
-3. Ask about their BACKGROUND/AUDIENCE LEVEL (beginner, some knowledge, expert)
-4. Ask about FOCUS — what specific angle interests them
-5. Ask about TONE (casual, professional, socratic/questioning)
-6. Optionally ask about DURATION preference
+2. Ask about AUDIENCE — who will be listening? (kids 6-10, teens 11-16, family-friendly, general, mature/unfiltered)
+3. Ask about DEPTH (quick overview, standard, deep dive)
+4. Ask about their BACKGROUND/AUDIENCE LEVEL (beginner, some knowledge, expert)
+5. Ask about FOCUS — what specific angle interests them
+6. Ask about TONE (casual, professional, socratic/questioning)
+7. Optionally ask about DURATION preference
 
 ## Rules:
 - Ask ONE question at a time
@@ -35,6 +36,7 @@ End your final message with a metadata block:
   "topic": "...",
   "depth": "quick_overview|standard|deep_dive",
   "audience_level": "beginner|intermediate|expert",
+  "audience": "kids|teens|family|general|mature",
   "focus_areas": ["...", "..."],
   "tone": "casual|professional|socratic",
   "duration_target": 10,
@@ -62,7 +64,16 @@ export function parseChips(message: string): { text: string; chips: string[] } {
  */
 export function parseMetadata(
   message: string
-): { topic: string; depth: string; audience_level: string; focus_areas: string[]; tone: string; duration_target: number; ready: boolean } | null {
+): {
+  topic: string;
+  depth: string;
+  audience_level: string;
+  audience: string;
+  focus_areas: string[];
+  tone: string;
+  duration_target: number;
+  ready: boolean;
+} | null {
   const metadataMatch = message.match(/\[METADATA\]\s*([\s\S]*?)\s*\[\/METADATA\]/);
   if (!metadataMatch) return null;
 

@@ -19,6 +19,12 @@ async function main() {
     { name: 'Psychology', slug: 'psychology' },
     { name: 'Economics', slug: 'economics' },
     { name: 'Art & Design', slug: 'art-design' },
+    // Audience tags
+    { name: 'Kids (6-10)', slug: 'kids' },
+    { name: 'Teens (11-16)', slug: 'teens' },
+    { name: 'Family-Friendly', slug: 'family-friendly' },
+    { name: 'General Audience', slug: 'general-audience' },
+    { name: 'Mature Topics', slug: 'mature-topics' },
   ];
 
   for (const tag of tags) {

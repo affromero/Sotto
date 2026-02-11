@@ -29,10 +29,22 @@ export type GeneratedReference = {
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
  */
+const AUDIENCE_GUIDANCE: Record<string, string> = {
+  kids: 'This podcast is for CHILDREN aged 6-10. Use simple vocabulary and short sentences. Rely on playful analogies, fun comparisons, and real-world examples a child would know. Keep energy high and enthusiastic. Absolutely no scary, violent, or mature content. Keep segments punchy and fast-paced — kids lose attention quickly.',
+  teens:
+    "This podcast is for TEENAGERS aged 11-16. Use relatable references (social media, gaming, school life). Don't condescend — teens can handle complex topics but keep language accessible. Light humor works well. You can discuss challenging topics but frame them age-appropriately.",
+  family:
+    'This podcast is FAMILY-FRIENDLY — safe for all ages in the room together. Use inclusive language, no profanity or explicit content. Explain concepts so both kids and adults stay engaged. Think "dinner table conversation" — interesting for everyone.',
+  general: 'Standard adult content with no special restrictions. This is the default audience.',
+  mature:
+    'This podcast is for a MATURE ADULT audience. No content restrictions — you can discuss controversial, sensitive, or complex topics frankly. Assume adult context and full comprehension. Be direct and unfiltered where the topic warrants it.',
+};
+
 export async function generateScript(params: {
   topic: string;
   depth: string;
   audienceLevel: string;
+  audience?: string;
   focusAreas: string[];
   tone: string;
   durationTarget: number;
@@ -62,6 +74,9 @@ export async function generateScript(params: {
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery' : ''}
 - ${params.tone === 'storytelling' ? 'Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.' : ''}
+
+## Audience: ${params.audience || 'general'}
+${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 
 ## Pacing for Maximum Engagement:
 - Start with a HOOK in the first 15 seconds — a surprising fact, provocative question, or bold claim
@@ -189,6 +204,7 @@ export async function generateScriptWithFeedback(params: {
   topic: string;
   depth: string;
   audienceLevel: string;
+  audience?: string;
   focusAreas: string[];
   tone: string;
   durationTarget: number;
@@ -227,6 +243,9 @@ Key rules for this revision:
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}
 - ${params.tone === 'storytelling' ? 'Frame everything as narrative — characters, conflict, resolution' : ''}
+
+## Audience: ${params.audience || 'general'}
+${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 
 ## Pacing:
 - Target approximately ${params.durationTarget} minutes (~${params.durationTarget * 150} words)

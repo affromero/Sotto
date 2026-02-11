@@ -154,6 +154,7 @@ export function useDiscovery(): UseDiscoveryReturn {
                         topic: '',
                         depth: 'standard',
                         audienceLevel: 'intermediate',
+                        audience: 'general',
                         focusAreas: [],
                         tone: 'casual',
                         durationTarget: 10,
