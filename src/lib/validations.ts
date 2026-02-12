@@ -263,3 +263,10 @@ export const forkBodySchema = z.object({
   depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
   tone: z.enum(['casual', 'professional', 'socratic']).optional(),
 });
+
+/**
+ * Resolve interaction validation (helpful feedback)
+ */
+export const resolveInteractionSchema = z.object({
+  helpful: z.boolean(),
+});

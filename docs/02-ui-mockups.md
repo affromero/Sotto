@@ -188,10 +188,10 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 | Sidebar  |=================================================== |
 |          |                                                     |
 | [Home]   |  Good morning, Priya.                              |
-| [Create] |                                                     |
-| [Feed]   |  USAGE THIS MONTH                                  |
-| [Profile]|  +------------------------------------------------+|
-| [Settings|  | [====........] 1 of 2 credits used    [Upgrade]||
+|[Discover]|                                                     |
+| [Create] |  USAGE THIS MONTH                                  |
+|[Billing] |  +------------------------------------------------+|
+|[Settings]|  | [====........] 1 of 2 credits used    [Upgrade]||
 |          |  +------------------------------------------------+|
 |          |                                                     |
 |          |  YOUR PODCASTS                                      |
@@ -216,6 +216,15 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |          |  | [Podcast Card]   |  | [Podcast Card]   |         |
 |          |  +------------------+  +------------------+         |
 |          |                                                     |
+|          |  TRENDING TO FORK                    [See all ->]   |
+|          |                                                     |
+|          |  +------------------+  +------------------+         |
+|          |  | Title            |  | Title            |         |
+|          |  | @creator · 8 min |  | @creator · 12min |         |
+|          |  | 5 forks · 847 ▶  |  | 3 forks · 234 ▶  |         |
+|          |  | [Fork]           |  | [Fork]           |         |
+|          |  +------------------+  +------------------+         |
+|          |                                                     |
 +----------+-----------------------------------------------------+
 |  [MiniPlayer: Now Playing — "Transformers Intuition" ▶ ====]  |
 +---------------------------------------------------------------+
@@ -223,7 +232,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 3.2 Section Details
 
-**Sidebar** (desktop only): Fixed left, 260px wide. Background: white surface. Logo at top, navigation links below. Active link has amber left border and amber text. Links: Home (dashboard), Create, Feed, Profile, Settings, Billing.
+**Sidebar** (desktop only): Fixed left, 260px wide. Background: white surface. Logo at top, navigation links below. Active link has amber left border and amber text. Links: Dashboard, Discover (feed), Create. Role-dependent links follow: Analytics, Voices, Team (CREATOR/ADMIN only). Then Billing (non-admin), Settings. Admin users also see an "Admin Panel" link.
 
 **TopBar**: Fixed top, extends right of sidebar. Page title left, notification bell and user avatar/dropdown right. Bell shows unread count badge (amber circle with white number).
 
@@ -235,25 +244,27 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 **Liked and Saved**: Section showing podcasts the user has liked or saved from the feed. Horizontal scroll on mobile.
 
+**Trending to Fork**: Section below Liked & Saved showing 3-4 trending public podcasts (ordered by fork count descending) with fork buttons. Each card displays title, creator handle, duration, fork count, and play count. "See all" link navigates to `/feed?sort=most_forked`. Gives users a path to fork popular content without leaving the dashboard.
+
 **MiniPlayer**: Fixed bottom bar, full width. Shows current podcast title, play/pause, progress bar. Tapping expands to full player page.
 
 ### 3.3 Responsive Behavior
 
-| Element      | Mobile                                    | Tablet                 | Desktop             |
-| ------------ | ----------------------------------------- | ---------------------- | ------------------- |
-| Sidebar      | Hidden, replaced by MobileNav at bottom   | Hidden, hamburger menu | Visible, fixed left |
-| TopBar       | Simplified, logo + bell + avatar          | Full                   | Full                |
-| Podcast grid | 1 column                                  | 2 columns              | 2-3 columns         |
-| MobileNav    | Fixed bottom: Home, Create, Feed, Profile | Hidden                 | Hidden              |
-| MiniPlayer   | Above MobileNav                           | Bottom                 | Bottom              |
+| Element      | Mobile                                        | Tablet                 | Desktop             |
+| ------------ | --------------------------------------------- | ---------------------- | ------------------- |
+| Sidebar      | Hidden, replaced by MobileNav at bottom       | Hidden, hamburger menu | Visible, fixed left |
+| TopBar       | Simplified, logo + bell + avatar              | Full                   | Full                |
+| Podcast grid | 1 column                                      | 2 columns              | 2-3 columns         |
+| MobileNav    | Fixed bottom: Home, Discover, Create, Profile | Hidden                 | Hidden              |
+| MiniPlayer   | Above MobileNav                               | Bottom                 | Bottom              |
 
 **MobileNav structure**:
 
 ```
-+--------+--------+--------+--------+
-|  Home  | Create |  Feed  | Profile|
-| [icon] | [icon] | [icon] | [icon] |
-+--------+--------+--------+--------+
++--------+----------+--------+---------+
+|  Home  | Discover | Create | Profile |
+| [icon] |  [icon]  | [icon] |  [icon] |
++--------+----------+--------+---------+
 ```
 
 ---
@@ -431,37 +442,42 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 **Speed control**: Row of speed options (0.5x, 1x, 1.5x, 2x). Current speed highlighted with amber background pill. Tapping changes playback rate.
 
-**Ask a Question button**: Full-width, prominent. Amber outline with message-circle-question icon. Positioned below transport controls. When tapped:
+**Ask a Question button**: Full-width, prominent. Amber outline with message-circle-question icon. Positioned below transport controls. When tapped, audio pauses and the InterruptChatPanel opens.
 
-1. Audio pauses
-2. Button transforms into an input field with send button
-3. After submission, a loading state appears
-4. Answer appears in a chat-like bubble below the input
-5. Resolution prompt appears: "Was that clear? [Yes] [No]"
-6. If Yes: "Update the podcast? [Yes, update] [No thanks]"
+**InterruptChatPanel lifecycle** (component: `InterruptChatPanel`):
+
+The panel manages a state machine with these phases:
+
+1. **idle**: Textarea input ("Ask anything about what you just heard...") + "Ask" submit button. Both have 44px minimum touch targets. Enter submits (Shift+Enter for newline). Previous Q&A for this podcast displayed as a scrollable history list above the input.
+2. **submitting**: Spinner replaces input area, input disabled. POST to `/api/podcasts/[id]/interact` with question text and current playback timestamp.
+3. **polling**: Spinner continues. Polls GET `/api/podcasts/[id]/interact/[interactionId]` every 2 seconds until `status=ANSWERED`. Safety timeout at 60 seconds resets to idle with an error message.
+4. **answered**: Displays Claude's answer text + ResolutionPrompt component (helpful/not helpful buttons, and for podcast owners: "incorporate into podcast" option).
+5. **resolved**: If resolved, resets to idle after a brief confirmation message ("Thanks for your feedback!" or "Podcast updated!"). The new Q&A appears in the scrollable history list for reference.
 
 ```
   +------------------------------------------+
-  |  Your question:                          |
-  |  "What does 'attention' actually mean    |
-  |   in this context?"                      |
+  |  Ask a Question                   [X]    |
   |                                          |
-  |  Sotto's answer:                         |
-  |  In the context of transformers,         |
-  |  'attention' refers to a mechanism       |
-  |  that allows the model to weigh the      |
-  |  importance of different parts of the    |
-  |  input when processing each element...   |
+  |  Previous Q&A:                           |
+  |  Q: "What does attention mean?"          |
+  |  A: "In transformers, attention is..."   |
+  |  (resolved)                              |
   |                                          |
-  |  Was that clear?  [Yes ✓]  [Not quite]  |
-  |                                          |
-  |  Update the podcast with this            |
-  |  explanation?                            |
-  |  [Yes, update]  [No thanks]              |
+  |  +--------------------------------------+|
+  |  | Ask anything about what you just     ||
+  |  | heard...                             ||
+  |  +--------------------------------------+|
+  |  [Ask]                                   |
   +------------------------------------------+
 ```
 
-**Transcript panel**: Scrollable list of turns. Each turn shows: speaker label (HOST in amber, EXPERT in navy) with left border in speaker color, timestamp, and text. The currently playing turn is highlighted with a light background (speaker-color-bg). The transcript auto-scrolls to follow playback. Tapping a turn seeks to that timestamp.
+**ShareMenu**: Replaces the single share button in the TopBar. A dropdown menu triggered by a "Share" button (Share2 icon). Options: Copy Link (copies podcast URL, shows "Link copied!" toast), Share on X (opens Twitter intent URL), Embed (public podcasts only -- opens EmbedCodeModal with a copyable iframe snippet), Download MP3 (streams audio from R2 via `/api/podcasts/[id]/download`). Closes on outside click or Escape key.
+
+**ForkGraph**: Visual SVG fork lineage graph. Shows ancestors as a vertical chain at top, the current podcast highlighted (amber border/fill), and forks fanning out horizontally below. Displayed when the lineage has 3+ nodes; falls back to the simpler ForkLineage list component on mobile or for small lineages. Node colors: ancestor = navy, current = amber, fork = neutral surface. Edges use bezier curves with arrowhead markers. Limits display to 3 ancestors and 5 forks. Responsive: recalculates layout on resize, uses smaller node dimensions on mobile (<768px).
+
+**SegmentQuestionBadge**: Small pill badge rendered next to transcript segments, showing "N" with a question-mark icon. Only rendered when count > 0 and only visible to the podcast owner. Provides at-a-glance visibility into which segments are generating the most listener questions.
+
+**Transcript panel**: Scrollable list of turns. Each turn shows: speaker label (HOST in amber, EXPERT in navy) with left border in speaker color, timestamp, and text. The currently playing turn is highlighted with a light background (speaker-color-bg). The transcript auto-scrolls to follow playback. Tapping a turn seeks to that timestamp. Podcast owners see a SegmentQuestionBadge next to each segment that has received questions.
 
 ### 5.3 Responsive Behavior
 
@@ -494,7 +510,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |          |  BROWSE BY TOPIC                                    |
 |          |  [AI/ML] [Science] [Business] [History] [Tech] ... |
 |          |                                                     |
-|          |  ALL PODCASTS                   [Sort: Newest ▼]   |
+|          | [All] [Remixes]    [Recent] [Popular] [Trending] [Most Forked] |
 |          |                                                     |
 |          |  +------------------+  +------------------+         |
 |          |  | [Podcast Card]   |  | [Podcast Card]   |         |
@@ -535,7 +551,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 - Tags (1-3 small tag pills)
 - Play button overlay on hover (amber circle with play icon)
 
-**Sort dropdown**: Right-aligned above grid. Options: Newest, Most Played, Most Liked, Trending.
+**Sort pills**: Pill-style radio group above the grid. Options: Recent, Popular, Trending, Most Forked. Active pill uses amber fill. Alongside the sort pills, a mode toggle (also pill-style radio group) lets users switch between "All" and "Remixes" — the Remixes mode filters to show only forked podcasts.
 
 **Pagination**: "Load More" button at bottom (cursor-based pagination). Loads 12 more podcasts per click.
 
@@ -894,7 +910,72 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ---
 
-## 11. Component Hierarchy Summary
+## 11. Embed Player (`/podcast/[podcastId]/embed`)
+
+### 11.1 Purpose
+
+Lightweight, self-contained player page designed for iframe embedding on external sites (blogs, documentation, newsletters). Served with `robots: noindex` metadata to prevent search engine indexing.
+
+### 11.2 Layout Structure
+
+```
++--------------------------------------------------+
+|  [Play/Pause]  Title of the Podcast     3:42/12:18|
+|                Creator Name                       |
+|  [==============================................] |
+|                                                   |
+|              Powered by Sotto                     |
++--------------------------------------------------+
+```
+
+### 11.3 Section Details
+
+**Page** (`src/app/podcast/[podcastId]/embed/page.tsx`): Server component that fetches the podcast from Prisma. Returns 404 if the podcast is not READY, has no audio URL, or is PRIVATE. Renders the `EmbedPlayer` component with no app chrome (no sidebar, topbar, or navigation).
+
+**EmbedPlayer** (`src/components/player/EmbedPlayer.tsx`): Client component with:
+
+- **Play/pause button**: Single toggle button with play/pause SVG icons
+- **Info area**: Podcast title and creator name
+- **Duration display**: Current time / total duration in `M:SS` format
+- **Progress bar**: Clickable/seekable progress bar. Fill color follows the design system primary
+- **"Powered by Sotto" link**: Opens the full podcast page (`/podcast/[podcastId]`) in a new tab
+
+**EmbedCodeModal** (`src/components/player/EmbedCodeModal.tsx`): Modal accessible from the ShareMenu on the full podcast page. Displays a read-only textarea with the iframe snippet:
+
+```html
+<iframe
+  src="https://sotto.fm/podcast/[id]/embed"
+  width="100%"
+  height="160"
+  frameborder="0"
+  allow="autoplay"
+  loading="lazy"
+  style="border-radius:12px;max-width:600px"
+>
+</iframe>
+```
+
+Includes a "Copy Code" button with "Copied!" feedback state.
+
+### 11.4 Constraints
+
+- Minimum width: 300px, height: ~160px
+- No navigation chrome, no sidebar, no MiniPlayer
+- Only available for public podcasts in READY status
+- `noindex` robots directive to avoid duplicate content in search
+
+### 11.5 Responsive Behavior
+
+| Element       | <300px       | 300px+            |
+| ------------- | ------------ | ----------------- |
+| Title         | Truncated    | Full, single line |
+| Creator name  | Truncated    | Full              |
+| Progress bar  | Full width   | Full width        |
+| Duration text | Smaller font | Standard caption  |
+
+---
+
+## 12. Component Hierarchy Summary
 
 This section maps every page to its component tree for developer reference:
 
@@ -923,7 +1004,8 @@ DashboardLayout
 │   ├── UsageMeter (progress bar, upgrade CTA)
 │   ├── PodcastGrid (PodcastCard[])
 │   │   └── CreateCard (empty state CTA)
-│   └── LikedSavedSection (PodcastCard[])
+│   ├── LikedSavedSection (PodcastCard[])
+│   └── TrendingToFork (trending public podcasts with fork buttons)
 ├── MobileNav (bottom navigation, mobile only)
 └── MiniPlayer (if podcast playing)
 ```
@@ -949,13 +1031,18 @@ DashboardLayout
 DashboardLayout
 ├── PodcastPage
 │   ├── PodcastHeader (title, creator, social buttons)
+│   │   └── ShareMenu (dropdown: Copy Link, Share on X, Embed, Download MP3)
+│   │       └── EmbedCodeModal (iframe snippet with copy button)
+│   ├── ForkGraph (SVG lineage visualization, shown when >=3 nodes)
 │   ├── AudioPlayer
 │   │   ├── Waveform (visualization)
 │   │   ├── TimeDisplay
 │   │   ├── PlaybackControls (skip, play/pause, speed)
 │   │   └── InterruptButton ("Ask a Question")
-│   ├── InteractionPanel (question input, answer, resolution)
+│   ├── InterruptChatPanel (question lifecycle: idle/submitting/polling/answered/resolved)
+│   │   └── ResolutionPrompt (helpful/not helpful + incorporate option)
 │   └── TranscriptPanel (speaker-labeled turns, auto-scroll)
+│       └── SegmentQuestionBadge (per-segment question count, owner-only)
 └── MiniPlayer (hidden when full player visible)
 ```
 
@@ -965,9 +1052,11 @@ DashboardLayout
 DashboardLayout
 ├── FeedPage
 │   ├── SearchBar
-│   ├── TrendingSection (featured PodcastCard[])
 │   ├── TagFilter (chip row)
-│   ├── SortDropdown
+│   ├── FilterPanel (advanced filters: depth, audience, tone, duration, date)
+│   ├── ModeToggle (pill group: All / Remixes)
+│   ├── SortPills (pill group: Recent / Popular / Trending / Most Forked)
+│   ├── TrendingSection (featured PodcastCard[], shown only on default view)
 │   ├── FeedGrid (PodcastCard[])
 │   └── LoadMoreButton
 └── MiniPlayer
@@ -986,7 +1075,7 @@ DashboardLayout
 
 ---
 
-## 12. Empty States
+## 13. Empty States
 
 Every list and grid has a designed empty state:
 
@@ -1004,7 +1093,7 @@ All empty states use text-secondary color, centered layout, and include a releva
 
 ---
 
-## 13. Loading States
+## 14. Loading States
 
 | Context                      | Loading Pattern                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------- |

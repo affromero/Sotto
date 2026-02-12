@@ -39,6 +39,7 @@ All shared business logic and external service integrations live here.
 | `tag-icons.tsx`          | Tag slug → SVG icon mapping (12 categories), `TagIcon` component, `ONBOARDING_TAG_SLUGS` array                                                                                                             | React (SVG)                                   |
 | `inspire-engine.ts`      | "Inspire Me" topic suggestions: `getPersonalizedTopics()`, `getTrendingTopics()`, `getCurrentEvents()` (Claude + web search), `drillDown()`                                                                | Anthropic API + `redis.ts`                    |
 | `handles.ts`             | Handle validation, availability checks, unique generation (reserved handles, format validation)                                                                                                            | Uses `prisma.ts`                              |
+| `rss.ts`                 | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts                                                                                                             | Uses `prisma.ts`                              |
 
 ## Providers (`src/lib/providers/`)
 

@@ -37,8 +37,8 @@ interface NavItem {
 function getNavItems(role: string): NavItem[] {
   const items: NavItem[] = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { href: '/feed', label: 'Discover', icon: Radio },
     { href: '/create', label: 'Create', icon: PlusCircle },
-    { href: '/feed', label: 'Feed', icon: Radio },
   ];
 
   // Analytics - CREATOR and ADMIN

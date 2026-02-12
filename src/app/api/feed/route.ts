@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
       include: {
         user: { select: { id: true, name: true, image: true, role: true } },
         tags: { include: { tag: true } },
+        forkedFrom: { select: { id: true, title: true } },
       },
     }),
     prisma.podcast.count({ where }),

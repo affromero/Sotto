@@ -330,20 +330,11 @@ Import pipeline works but the provider isn't documented or configurable.
 
 ### 16. Automated Test Suite
 
-**Status**: Vitest configured, zero test files.
+**Status**: DONE. 97 test files with 2196 tests passing (vitest). `npm run ci` runs lint + tsc + test + build, mirroring the GitHub Actions CI pipeline.
 
-Before any significant feature work or refactoring, need baseline test coverage.
+Coverage includes: lib unit tests (credits, stripe, claude, script-generator, reference-validator, audio-stitcher, etc.), API route tests (fork, billing, discovery, feed, podcasts CRUD, webhooks), component tests (AudioPlayer, MiniPlayer, DiscoveryChat, FeedGrid, etc.), worker tests (script-generation, audio-generation, audio-stitching, twitter-mentions, etc.), hook tests, and 2 integration tests (generation pipeline, auth flow).
 
-**Action** (prioritized):
-
-1. Credit system tests (consume, refund, grant, balance checks)
-2. BYOK encryption round-trip tests
-3. Fork/lineage API tests
-4. Import pipeline integration tests
-5. Stripe webhook handler tests
-6. Auth middleware tests
-
-**Estimate**: 2-3 days
+**Remaining**: Expand coverage for edge cases and add more integration tests as new features land.
 
 ---
 
@@ -365,16 +356,16 @@ Need to know: Where do users come from? What's the create-to-share conversion? H
 
 ### 18. Social Sharing OG Images
 
-**Status**: Open Graph metadata exists but no per-podcast OG images.
+**Status**: DONE.
 
-When someone shares a podcast on Twitter/LinkedIn, they see the generic Sotto card. No podcast-specific preview.
+Dynamic OG images implemented via `next/og` (Satori):
 
-**Action**: Generate dynamic OG images per podcast using `next/og` (Satori):
-
-- Podcast title, creator name, duration, fork count
-- Waveform visualization or topic icon
-
-**Estimate**: 4 hours
+- `src/app/podcast/[podcastId]/opengraph-image.tsx` — 1200x630, cream background (#FEFCF8), amber accent bar, podcast title, creator name, duration
+- `src/app/podcast/[podcastId]/twitter-image.tsx` — re-exports from opengraph-image
+- `src/app/profile/[userId]/opengraph-image.tsx` — navy accent (#1E3A5F), user name, bio, podcast count, follower count
+- `og:audio` metadata on podcast pages (links to audioUrl when available)
+- `twitter:card: summary_large_image` on podcast pages
+- oEmbed endpoint at `/api/oembed` linked via `<link rel="alternate">` for embed discovery
 
 ---
 
@@ -446,7 +437,7 @@ Until there's traction (1000+ WAU), building monetization is premature. But the 
 | Task                                  | Est.   |
 | ------------------------------------- | ------ |
 | Automated test suite (critical paths) | 2 days |
-| Social sharing OG images              | 4h     |
+| ~~Social sharing OG images~~          | DONE   |
 | Analytics setup                       | 1 day  |
 
 ---
@@ -463,25 +454,30 @@ If the answer is no, nothing else matters. Get 5 people using it this week. The 
 
 ## Feature Completeness vs Ship-Readiness
 
-| Category                    | Code Complete | Ship Ready | Gap                         |
-| --------------------------- | :-----------: | :--------: | --------------------------- |
-| Podcast generation pipeline |      ✅       |     ⚠️     | Needs smoke test on prod    |
-| Twitter @sottofm bot        |      ✅       |     ❌     | Needs activation + E2E test |
-| Audio import                |      ✅       |     ⚠️     | Needs smoke test            |
-| BYOK multi-provider TTS     |      ✅       |     ⚠️     | Needs Stripe POWER product  |
-| Fork/remix flow             |      ✅       |     ⚠️     | Needs smoke test            |
-| Version history             |      ✅       |     ⚠️     | Needs smoke test            |
-| Feed + social               |      ✅       |     ✅     | Working                     |
-| Landing page                |      ✅       |     ✅     | Working                     |
-| Pricing page                |      ✅       |     ⚠️     | POWER tier not purchasable  |
-| Auth + profiles             |      ✅       |     ✅     | Working                     |
-| Push notifications          |      ✅       |     ✅     | Working                     |
-| Voice clones + allowlist    |      ✅       |     ⚠️     | Needs TTS provider keys     |
-| Admin dashboard             |      ✅       |     ✅     | Working                     |
-| CI/CD + deploy              |      ✅       |     ✅     | Working                     |
-| Rate limiting               |      ❌       |     ❌     | Not implemented             |
-| Error tracking              |      ❌       |     ❌     | Not implemented             |
-| Email notifications         |      ❌       |     ❌     | Not implemented             |
-| Legal pages                 |      ❌       |     ❌     | Not implemented             |
-| Automated tests             |      ❌       |     ❌     | Not implemented             |
-| Sitemap                     |      ❌       |     ❌     | Not implemented             |
+| Category                    | Code Complete | Ship Ready | Gap                                                                                        |
+| --------------------------- | :-----------: | :--------: | ------------------------------------------------------------------------------------------ |
+| Podcast generation pipeline |      ✅       |     ⚠️     | Needs smoke test on prod                                                                   |
+| Twitter @sottofm bot        |      ✅       |     ❌     | Needs activation + E2E test                                                                |
+| Audio import                |      ✅       |     ⚠️     | Needs smoke test                                                                           |
+| BYOK multi-provider TTS     |      ✅       |     ⚠️     | Needs Stripe POWER product                                                                 |
+| Fork/remix flow             |      ✅       |     ✅     | Working (credit check, synthetic Discovery, pipeline enqueue, PODCAST_FORKED notification) |
+| Version history             |      ✅       |     ⚠️     | Needs smoke test                                                                           |
+| Feed + social               |      ✅       |     ✅     | Working                                                                                    |
+| Landing page                |      ✅       |     ✅     | Working                                                                                    |
+| Pricing page                |      ✅       |     ⚠️     | POWER tier not purchasable                                                                 |
+| Auth + profiles             |      ✅       |     ✅     | Working                                                                                    |
+| Push notifications          |      ✅       |     ✅     | Working                                                                                    |
+| Voice clones + allowlist    |      ✅       |     ⚠️     | Needs TTS provider keys                                                                    |
+| Admin dashboard             |      ✅       |     ✅     | Working                                                                                    |
+| CI/CD + deploy              |      ✅       |     ✅     | Working                                                                                    |
+| Rate limiting               |      ❌       |     ❌     | Not implemented                                                                            |
+| Error tracking              |      ❌       |     ❌     | Not implemented                                                                            |
+| Email notifications         |      ❌       |     ❌     | Not implemented                                                                            |
+| Legal pages                 |      ❌       |     ❌     | Not implemented                                                                            |
+| Automated tests             |      ✅       |     ✅     | 97 files, 2196 tests passing (vitest + npm run ci)                                         |
+| Social sharing OG images    |      ✅       |     ✅     | Dynamic per-podcast + per-profile OG images                                                |
+| Embeddable player           |      ✅       |     ✅     | iframe embed at /podcast/[id]/embed + oEmbed endpoint                                      |
+| RSS feeds                   |      ✅       |     ✅     | Per-creator RSS at /api/users/[userId]/rss                                                 |
+| Interrupt Q&A               |      ✅       |     ⚠️     | Full InterruptChatPanel lifecycle with resolution feedback — needs smoke test              |
+| Knowledge gap aggregation   |      ✅       |     ⚠️     | Per-segment question density badges for owners — needs smoke test                          |
+| Sitemap                     |      ❌       |     ❌     | Not implemented                                                                            |

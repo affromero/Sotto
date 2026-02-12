@@ -65,12 +65,28 @@ Answer concisely and helpfully, using the podcast context. Keep answers under 20
 
   await job.updateProgress(80);
 
-  // Update interaction with answer
+  // Compute segmentOrder: which segment the question maps to
+  let segmentOrder: number | null = null;
+  if (segments.length > 0 && segments[0].startTime !== null) {
+    for (let i = 0; i < segments.length; i++) {
+      const segStart = segments[i].startTime ?? 0;
+      const segDur = segments[i].duration ?? 0;
+      if (timestamp < segStart + segDur) {
+        segmentOrder = segments[i].order;
+        break;
+      }
+    }
+  } else if (turnIndex > 0 && turnIndex <= segments.length) {
+    segmentOrder = segments[turnIndex - 1].order;
+  }
+
+  // Update interaction with answer and segmentOrder
   await prisma.interaction.update({
     where: { id: interactionId },
     data: {
       answer: response.content,
       status: 'ANSWERED',
+      segmentOrder,
     },
   });
 

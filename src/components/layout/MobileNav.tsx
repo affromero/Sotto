@@ -11,8 +11,8 @@ interface MobileNavProps {
 
 const tabs = [
   { href: '/dashboard', label: 'Home', icon: Home },
+  { href: '/feed', label: 'Discover', icon: Radio },
   { href: '/create', label: 'Create', icon: PlusCircle },
-  { href: '/feed', label: 'Feed', icon: Radio },
   { href: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -23,8 +23,7 @@ export function MobileNav({ currentPath, hasActivePlayer = false }: MobileNavPro
       aria-label="Mobile navigation"
     >
       {tabs.map(({ href, label, icon: Icon }) => {
-        const isActive =
-          currentPath === href || currentPath.startsWith(`${href}/`);
+        const isActive = currentPath === href || currentPath.startsWith(`${href}/`);
         return (
           <Link
             key={href}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import styles from './TranscriptPanel.module.css';
@@ -11,6 +12,7 @@ interface TranscriptPanelProps {
   references?: ReferenceData[];
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
+  questionCounts?: Map<number, number>;
 }
 
 function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
@@ -18,7 +20,13 @@ function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
   return currentTime >= segment.startTime && currentTime < segment.startTime + segment.duration;
 }
 
-export function TranscriptPanel({ segments, references = [], currentTime, onSegmentClick }: TranscriptPanelProps) {
+export function TranscriptPanel({
+  segments,
+  references = [],
+  currentTime,
+  onSegmentClick,
+  questionCounts,
+}: TranscriptPanelProps) {
   const activeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -33,6 +41,7 @@ export function TranscriptPanel({ segments, references = [], currentTime, onSegm
       <div className={styles.segments}>
         {segments.map((segment) => {
           const active = isCurrentSegment(segment, currentTime);
+          const qCount = questionCounts?.get(segment.order) ?? 0;
           return (
             <div
               key={segment.id}
@@ -46,11 +55,10 @@ export function TranscriptPanel({ segments, references = [], currentTime, onSegm
                 className={`${styles.speaker} ${segment.speaker === 'HOST' ? styles.host : styles.expert}`}
               >
                 {segment.speaker === 'HOST' ? 'Host' : 'Expert'}
+                {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
               <p className={styles.text}>
-                {hasRefs
-                  ? parseTextWithCitations(segment.text, references)
-                  : segment.text}
+                {hasRefs ? parseTextWithCitations(segment.text, references) : segment.text}
               </p>
             </div>
           );

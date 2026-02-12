@@ -25,7 +25,7 @@ const PASSWORD_GATE_BYPASS = new Set([
 ]);
 
 // Prefix-based bypasses that skip the gate entirely
-const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth', '/api/pitch'];
+const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
 
 async function verifyAccessCookie(value: string, secret: string): Promise<boolean> {
   const separatorIndex = value.indexOf(':');
@@ -57,6 +57,8 @@ async function verifyAccessCookie(value: string, secret: string): Promise<boolea
 
 function isPasswordGateBypassed(pathname: string): boolean {
   if (PASSWORD_GATE_BYPASS.has(pathname)) return true;
+  // Allow embed pages to bypass password gate (for iframe embedding)
+  if (pathname.match(/^\/podcast\/[^/]+\/embed$/)) return true;
   return PASSWORD_GATE_BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 

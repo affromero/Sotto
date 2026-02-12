@@ -17,9 +17,16 @@ export async function generateMetadata({ params }: HandleProfilePageProps): Prom
 
   if (!user) return { title: 'User Not Found' };
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+
   return {
     title: user.name || `@${user.handle}`,
     description: user.bio || `${user.name || `@${user.handle}`}'s podcasts on Sotto`,
+    alternates: {
+      types: {
+        'application/rss+xml': `${appUrl}/api/users/handle/${params.handle}/rss`,
+      },
+    },
   };
 }
 

@@ -12,14 +12,35 @@ interface PodcastPageProps {
 export async function generateMetadata({ params }: PodcastPageProps): Promise<Metadata> {
   const podcast = await prisma.podcast.findUnique({
     where: { id: params.podcastId },
-    select: { title: true, topic: true },
+    select: { title: true, topic: true, audioUrl: true, user: { select: { name: true } } },
   });
 
   if (!podcast) return { title: 'Podcast Not Found' };
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const podcastUrl = `${appUrl}/podcast/${params.podcastId}`;
+
   return {
     title: podcast.title,
     description: podcast.topic,
+    openGraph: {
+      title: podcast.title,
+      description: podcast.topic,
+      type: 'article',
+      url: podcastUrl,
+      ...(podcast.audioUrl ? { audio: podcast.audioUrl } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: podcast.title,
+      description: podcast.topic,
+    },
+    alternates: {
+      canonical: podcastUrl,
+      types: {
+        'application/json+oembed': `${appUrl}/api/oembed?url=${encodeURIComponent(podcastUrl)}`,
+      },
+    },
   };
 }
 
@@ -59,6 +80,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           timestamp: true,
           status: true,
           answer: true,
+          helpful: true,
+          segmentOrder: true,
         },
       },
       tags: {
