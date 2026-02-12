@@ -74,7 +74,7 @@ export default async function DashboardPage() {
 
   const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
 
-  const [user, podcasts] = await Promise.all([
+  const [user, podcasts, trendingToFork] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -108,6 +108,23 @@ export default async function DashboardPage() {
         forkCount: true,
         createdAt: true,
         audioUrl: true,
+      },
+    }),
+    prisma.podcast.findMany({
+      where: {
+        status: 'READY',
+        visibility: 'PUBLIC',
+        userId: { not: userId },
+      },
+      orderBy: { forkCount: 'desc' },
+      take: 4,
+      select: {
+        id: true,
+        title: true,
+        topic: true,
+        forkCount: true,
+        likeCount: true,
+        user: { select: { name: true } },
       },
     }),
   ]);
@@ -253,6 +270,34 @@ export default async function DashboardPage() {
           </ul>
         )}
       </section>
+
+      {trendingToFork.length > 0 && (
+        <section className={styles.trendingSection} aria-label="Trending podcasts to fork">
+          <div className={styles.trendingSectionHeader}>
+            <h2 className={styles.sectionTitle}>Trending to Fork</h2>
+            <Link href="/feed?sort=most_forked" className={styles.seeAllLink}>
+              See all
+            </Link>
+          </div>
+          <div className={styles.trendingGrid}>
+            {trendingToFork.map((p) => (
+              <div key={p.id} className={styles.trendingCard}>
+                <Link href={`/podcast/${p.id}`} className={styles.trendingCardTitle}>
+                  {p.title}
+                </Link>
+                <span className={styles.trendingCardMeta}>by {p.user.name || 'Anonymous'}</span>
+                <div className={styles.trendingCardStats}>
+                  <span className={styles.trendingCardStat}>{p.forkCount} forks</span>
+                  <span className={styles.trendingCardStat}>{p.likeCount} likes</span>
+                </div>
+                <Link href={`/podcast/${p.id}`} className={styles.trendingForkBtn}>
+                  Fork
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

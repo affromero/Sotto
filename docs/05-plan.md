@@ -216,14 +216,14 @@ Each podcast generation costs **1 credit** (+ premium voice surcharge if applica
 
 ### Premium Add-ons (SOON badges on pricing page)
 
-| Feature                | Tier    | Status | Description                                                                          |
-| ---------------------- | ------- | ------ | ------------------------------------------------------------------------------------ |
-| **Video Explainers**   | Pro+    | SOON   | AI-generated visual companion (Manim/motion graphics) synced to podcast audio        |
-| **Course Mode**        | Pro+    | SOON   | Series of podcasts with knowledge checks, progress tracking, completion certificates |
-| **Multi-Language**     | Pro+    | SOON   | Generate the same podcast in 29 languages via ElevenLabs multilingual v2             |
-| **Custom Intro/Outro** | Creator | SOON   | Branded podcast intro music and outro with your name/company                         |
-| **Podcast Playlists**  | Free    | SOON   | Curate and share ordered collections of public podcasts                              |
-| **Embed Widget**       | Pro+    | SOON   | Embeddable player widget for blogs, docs, and learning platforms                     |
+| Feature                | Tier    | Status  | Description                                                                          |
+| ---------------------- | ------- | ------- | ------------------------------------------------------------------------------------ |
+| **Video Explainers**   | Pro+    | SOON    | AI-generated visual companion (Manim/motion graphics) synced to podcast audio        |
+| **Course Mode**        | Pro+    | SOON    | Series of podcasts with knowledge checks, progress tracking, completion certificates |
+| **Multi-Language**     | Pro+    | SOON    | Generate the same podcast in 29 languages via ElevenLabs multilingual v2             |
+| **Custom Intro/Outro** | Creator | SOON    | Branded podcast intro music and outro with your name/company                         |
+| **Podcast Playlists**  | Free    | SOON    | Curate and share ordered collections of public podcasts                              |
+| **Embed Widget**       | Pro+    | Shipped | Embeddable player at `/podcast/[podcastId]/embed` with oEmbed at `/api/oembed`       |
 
 ---
 
@@ -296,23 +296,32 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
     │   ├── (dashboard)/ (dashboard, billing, settings)
     │   ├── create/ (chat-based discovery → generation)
     │   ├── podcast/[podcastId]/ (playback + interrupt + fork)
+    │   │   └── embed/ (embeddable player widget)
     │   ├── feed/ (public social feed, search, tag browse)
     │   ├── profile/[userId]/ (public profile, follow, their podcasts)
     │   ├── pricing/ (pricing page with SOON badges)
     │   └── api/
     │       ├── auth/[...nextauth]/
     │       ├── podcasts/ (CRUD, generate, interact, fork, like, save)
+    │       │   └── [podcastId]/
+    │       │       ├── interact/[interactionId]/ (GET single interaction)
+    │       │       ├── interact/[interactionId]/resolve/ (PATCH resolve)
+    │       │       ├── knowledge-gaps/ (GET knowledge gaps from interactions)
+    │       │       └── download/ (GET audio download)
     │       ├── discovery/ (chat endpoint: streaming Claude responses + chip suggestions)
     │       ├── recommendations/ (search similar podcasts by topic/metadata)
     │       ├── feed/ (public feed, trending, search)
     │       ├── users/ (profile, follow/unfollow, followers/following)
+    │       │   ├── [userId]/rss/ (GET RSS feed for user)
+    │       │   └── handle/[handle]/rss/ (GET RSS feed by handle)
     │       ├── billing/ (checkout, subscription, portal, usage)
     │       ├── notifications/ (list, mark read, push registration)
     │       ├── tags/
+    │       ├── oembed/ (GET oEmbed JSON for embeddable player)
     │       └── webhooks/stripe/
     ├── components/
     │   ├── ui/ (Button, Input, Card, Modal, Toast, Badge, SoonBadge, Chip, etc.)
-    │   ├── player/ (AudioPlayer, Waveform, PlaybackControls, InterruptButton, MiniPlayer, TranscriptPanel)
+    │   ├── player/ (AudioPlayer, Waveform, PlaybackControls, InterruptButton, MiniPlayer, TranscriptPanel, InterruptChatPanel, SegmentQuestionBadge, ShareMenu, EmbedCodeModal, EmbedPlayer)
     │   ├── chat/ (ChatContainer, ChatMessage, ChatChips, ResolutionPrompt)
     │   ├── discovery/ (DiscoveryChat, SuggestionChips, RecommendationCard, CreatorSuggestion)
     │   ├── create/ (GenerationProgress, ScriptPreview)
@@ -329,6 +338,7 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
     │   ├── discovery-agent.ts        # Chat-based discovery: Claude streaming + chip generation
     │   ├── recommendations.ts        # Search similar podcasts, rank by relevance
     │   ├── push-notifications.ts     # Web Push API registration + send
+    │   ├── rss.ts                    # RSS 2.0 feed generation (per-user podcast feeds)
     │   ├── subscription.ts / notifications.ts / validations.ts
     │   └── hooks/ (useAuth, useAudioPlayer, usePodcast, useDiscovery, useNotifications)
     ├── workers/
@@ -346,25 +356,25 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 
 ## Database Schema (Key Models)
 
-| Model                | Purpose                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `User`               | Auth, profile, bio, avatar, usage tracking, team membership                                                     |
-| `Follow`             | Social: follower → following relationship (unique per pair)                                                     |
-| `Podcast`            | Title, topic, source, status, audioUrl, visibility, fork tracking, play/like/fork counts                        |
-| `Discovery`          | Chat-based discovery: stores extracted metadata (audience, depth, tone, focus, duration) + full chat transcript |
-| `DiscoveryMessage`   | Individual messages in the discovery chat (role, content, chips, timestamp)                                     |
-| `Script`             | Structured JSON turns + raw markdown + source context, versioned                                                |
-| `Segment`            | Per-speaker audio chunk: text, audioUrl, startTime, duration, order                                             |
-| `Interaction`        | Question at timestamp, answer, resolved, incorporated flags                                                     |
-| `Like` / `Save`      | Social engagement (unique per user+podcast)                                                                     |
-| `Follow`             | Social follow (unique per follower+following pair)                                                              |
-| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                              |
-| `Subscription`       | Stripe integration (FREE/STARTER/PRO/STUDIO tiers + credit balance)                                             |
-| `CreditTransaction`  | Credit audit trail (grants, consumption, refunds, purchases)                                                    |
-| `Job`                | BullMQ job tracking                                                                                             |
-| `Notification`       | In-app + push notifications (type, read status, push delivery status)                                           |
-| `PushSubscription`   | Web Push API subscription endpoints per user/device                                                             |
-| `ApiUsageLog`        | Cost tracking per service (claude/elevenlabs/ffmpeg)                                                            |
+| Model                | Purpose                                                                                                                                                                         |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `User`               | Auth, profile, bio, avatar, usage tracking, team membership                                                                                                                     |
+| `Follow`             | Social: follower → following relationship (unique per pair)                                                                                                                     |
+| `Podcast`            | Title, topic, source, status, audioUrl, visibility, fork tracking, play/like/fork counts                                                                                        |
+| `Discovery`          | Chat-based discovery: stores extracted metadata (audience, depth, tone, focus, duration) + full chat transcript                                                                 |
+| `DiscoveryMessage`   | Individual messages in the discovery chat (role, content, chips, timestamp)                                                                                                     |
+| `Script`             | Structured JSON turns + raw markdown + source context, versioned                                                                                                                |
+| `Segment`            | Per-speaker audio chunk: text, audioUrl, startTime, duration, order                                                                                                             |
+| `Interaction`        | Question at timestamp, answer, resolved, incorporated flags, `helpful Boolean?` (user feedback), `segmentOrder Int?` (computed by worker -- which segment the question maps to) |
+| `Like` / `Save`      | Social engagement (unique per user+podcast)                                                                                                                                     |
+| `Follow`             | Social follow (unique per follower+following pair)                                                                                                                              |
+| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                                                                                              |
+| `Subscription`       | Stripe integration (FREE/STARTER/PRO/STUDIO tiers + credit balance)                                                                                                             |
+| `CreditTransaction`  | Credit audit trail (grants, consumption, refunds, purchases)                                                                                                                    |
+| `Job`                | BullMQ job tracking                                                                                                                                                             |
+| `Notification`       | In-app + push notifications (type, read status, push delivery status)                                                                                                           |
+| `PushSubscription`   | Web Push API subscription endpoints per user/device                                                                                                                             |
+| `ApiUsageLog`        | Cost tracking per service (claude/elevenlabs/ffmpeg)                                                                                                                            |
 
 **Key enums**: `PodcastStatus` (PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING), `Speaker` (HOST/EXPERT), `InteractionStatus` (PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED), `NotificationType` (PODCAST_READY / PODCAST_LIKED / NEW_FOLLOWER / PODCAST_FORKED / SIMILAR_PODCAST_CREATED)
 
@@ -418,7 +428,7 @@ User browsing feed → finds interesting podcast → taps play
     ├── Likes → increments count, appears in user's liked list
     ├── Saves → bookmarked for later
     ├── Follows creator → gets notified of their new podcasts
-    └── Forks → creates a copy, user re-runs discovery chat to customize
+    └── Forks → credit check via `canGenerate()`, creates synthetic Discovery record with source metadata + remix params, enqueues content-extraction pipeline, sends PODCAST_FORKED notification to source owner. Source podcast's forkCount is incremented.
 ```
 
 ## Implementation Order

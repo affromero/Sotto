@@ -17,9 +17,16 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
 
   if (!user) return { title: 'User Not Found' };
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+
   return {
     title: user.name || 'Profile',
     description: user.bio || `${user.name || 'User'}'s podcasts on Sotto`,
+    alternates: {
+      types: {
+        'application/rss+xml': `${appUrl}/api/users/${params.userId}/rss`,
+      },
+    },
   };
 }
 

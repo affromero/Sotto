@@ -1,13 +1,12 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
   Heart,
   Bookmark,
   GitFork,
-  Share2,
   Play,
   FileText,
   Download,
@@ -19,9 +18,12 @@ import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
 import { InterruptButton } from '@/components/player/InterruptButton';
+import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
+import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
+import { ShareMenu } from '@/components/player/ShareMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -85,6 +87,47 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
   const [pdfLoading, setPdfLoading] = useState(false);
   const [showForkRemix, setShowForkRemix] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
+  const [lineageData, setLineageData] = useState<{
+    ancestors: Array<{
+      id: string;
+      title: string;
+      user: { name: string | null; handle: string | null };
+    }>;
+    descendants: Array<{
+      id: string;
+      title: string;
+      user: { name: string | null; handle: string | null };
+    }>;
+  } | null>(null);
+
+  // Fetch knowledge gaps for owner
+  useEffect(() => {
+    if (!isOwner || podcast.status !== 'READY') return;
+    fetch(`/api/podcasts/${podcast.id}/knowledge-gaps`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.segments) {
+          const counts = new Map<number, number>();
+          for (const seg of data.segments) {
+            counts.set(seg.segmentOrder, seg.questionCount);
+          }
+          setQuestionCounts(counts);
+        }
+      })
+      .catch(() => {});
+  }, [isOwner, podcast.id, podcast.status]);
+
+  // Fetch fork lineage for ForkGraph
+  useEffect(() => {
+    if (!podcast.forkedFrom && podcast.forks.length === 0) return;
+    fetch(`/api/podcasts/${podcast.id}/lineage`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) setLineageData(data);
+      })
+      .catch(() => {});
+  }, [podcast.id, podcast.forkedFrom, podcast.forks.length]);
 
   const handleLike = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -127,19 +170,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
       setRetrying(false);
     }
   }, [podcast.id]);
-
-  const handleShare = useCallback(async () => {
-    const url = window.location.href;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: podcast.title, url });
-      } catch {
-        // user cancelled
-      }
-    } else {
-      await navigator.clipboard.writeText(url);
-    }
-  }, [podcast.title]);
 
   const handleExportPdf = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -361,15 +391,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
               <span>Fork</span>
             </button>
           )}
-          <button
-            className={styles.actionBtn}
-            onClick={handleShare}
-            aria-label="Share this podcast"
-            type="button"
-          >
-            <Share2 size={18} />
-            <span>Share</span>
-          </button>
+          <ShareMenu
+            podcastId={podcast.id}
+            podcastTitle={podcast.title}
+            audioUrl={podcast.audioUrl}
+            isPublic={podcast.visibility === 'PUBLIC'}
+          />
           {isReady && isAuthenticated && (
             <button
               className={styles.actionBtn}
@@ -408,32 +435,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
 
       {/* Interrupt Chat */}
       {showInterruptChat && (
-        <section className={styles.interruptChat} aria-label="Ask a question about this podcast">
-          <div className={styles.interruptChatHeader}>
-            <h3 className={styles.interruptChatTitle}>Ask a Question</h3>
-            <button
-              className={styles.interruptChatClose}
-              onClick={() => setShowInterruptChat(false)}
-              aria-label="Close question panel"
-              type="button"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-          <p className={styles.interruptChatHint}>
-            Ask anything about what you just heard. Sotto will answer using the podcast context.
-          </p>
-        </section>
+        <InterruptChatPanel
+          podcastId={podcast.id}
+          isOwner={isOwner}
+          currentTime={currentTime}
+          existingInteractions={podcast.interactions}
+          onClose={() => setShowInterruptChat(false)}
+        />
       )}
 
       {/* View Toggle + Transcript/Teleprompter */}
@@ -467,6 +475,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
                 references={podcast.references}
                 currentTime={currentTime}
                 onSegmentClick={setCurrentTime}
+                questionCounts={isOwner ? questionCounts : undefined}
               />
             ) : (
               <Teleprompter
@@ -496,10 +505,22 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
       {/* Fork Lineage */}
       {(podcast.forkedFrom || podcast.forks.length > 0) && (
         <section className={styles.lineageSection}>
-          <ForkLineage
-            ancestors={podcast.forkedFrom ? [podcast.forkedFrom] : []}
-            forks={podcast.forks}
-          />
+          {lineageData && lineageData.ancestors.length + lineageData.descendants.length >= 3 ? (
+            <ForkGraph
+              ancestors={lineageData.ancestors}
+              current={{
+                id: podcast.id,
+                title: podcast.title,
+                user: { name: podcast.user.name, handle: podcast.user.handle ?? null },
+              }}
+              forks={lineageData.descendants}
+            />
+          ) : (
+            <ForkLineage
+              ancestors={podcast.forkedFrom ? [podcast.forkedFrom] : []}
+              forks={podcast.forks}
+            />
+          )}
         </section>
       )}
 

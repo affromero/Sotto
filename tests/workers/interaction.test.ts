@@ -331,6 +331,7 @@ describe('processInteraction', () => {
         data: {
           answer: 'Quantum entanglement is a phenomenon where particles become correlated.',
           status: 'ANSWERED',
+          segmentOrder: 3,
         },
       });
     });
@@ -349,6 +350,7 @@ describe('processInteraction', () => {
         data: {
           answer: 'First paragraph.\n\nSecond paragraph with more detail.',
           status: 'ANSWERED',
+          segmentOrder: 3,
         },
       });
     });
@@ -527,6 +529,7 @@ describe('processInteraction', () => {
         data: {
           answer: '',
           status: 'ANSWERED',
+          segmentOrder: 3,
         },
       });
     });
@@ -581,6 +584,7 @@ describe('processInteraction', () => {
         data: {
           answer: 'AI stands for Artificial Intelligence, which refers to...',
           status: 'ANSWERED',
+          segmentOrder: 2,
         },
       });
 

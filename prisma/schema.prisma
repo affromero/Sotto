@@ -521,6 +521,8 @@ model Interaction {
   // Resolution
   resolved     Boolean @default(false)
   incorporated Boolean @default(false) // baked into podcast
+  helpful      Boolean? // null = no feedback, true/false = user response
+  segmentOrder Int?     // computed by worker: which segment the question maps to
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

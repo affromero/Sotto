@@ -70,7 +70,7 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
         throw new Error(data.error || 'Failed to fork podcast');
       }
 
-      const { podcastId: newPodcastId } = await response.json();
+      const { id: newPodcastId } = await response.json();
       router.push(`/podcast/${newPodcastId}`);
       onClose();
     } catch (err) {

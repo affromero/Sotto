@@ -105,7 +105,7 @@ src/
 │       └── webhooks/stripe/    # Stripe webhook handler
 ├── components/
 │   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner, CitationMarker, TtsProviderLogo
-│   ├── player/                 # AudioPlayer, Waveform, PlaybackControls, MiniPlayer, TranscriptPanel, ReferenceList, Teleprompter, VersionHistory, ForkAttribution, ForkLineage, ForkRemixModal, ForkGraph, ListeningQueue
+│   ├── player/                 # AudioPlayer, Waveform, PlaybackControls, MiniPlayer, TranscriptPanel, ReferenceList, Teleprompter, VersionHistory, ForkAttribution, ForkLineage, ForkRemixModal, ForkGraph, ListeningQueue, InterruptChatPanel, SegmentQuestionBadge, ShareMenu, EmbedCodeModal, EmbedPlayer
 │   ├── chat/                   # ChatContainer, ChatMessage, ChatChips
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
 │   ├── create/                 # GenerationProgress, ScriptPreview, TtsProviderSelector
@@ -157,6 +157,7 @@ src/
 │   ├── twitter.ts              # Twitter API v2 client (mentions, replies, OAuth 1.0a)
 │   ├── tweet-parser.ts         # Claude-based tweet intent extraction
 │   ├── api-keys.ts             # API key generation, hashing, validation
+│   ├── rss.ts                  # RSS 2.0 feed generation with iTunes namespace
 │   └── hooks/                  # React hooks
 │       ├── useAuth.ts
 │       ├── useAudioPlayer.ts
@@ -284,7 +285,7 @@ Claude generates natural HOST segment addressing Q&A
 | `Script`                | Structured JSON turns + raw markdown, versioned                                                                                                                                                                          |
 | `Segment`               | Per-speaker audio chunk: text, audioUrl, timing, order                                                                                                                                                                   |
 | `Reference`             | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                                                                                                                        |
-| `Interaction`           | Question at timestamp, answer, resolution status                                                                                                                                                                         |
+| `Interaction`           | Question at timestamp, answer, resolution status, helpful feedback (`Boolean?`), segment mapping (`segmentOrder Int?`)                                                                                                   |
 | `Like` / `Save`         | Social engagement                                                                                                                                                                                                        |
 | `Tag` / `PodcastTag`    | Discovery taxonomy                                                                                                                                                                                                       |
 | `Subscription`          | Stripe (FREE/STARTER/PRO/STUDIO/POWER) with credit balance (Float) + rollover (includes voiceCreatorAddonActive, voiceCreatorAddonStripeSubscriptionId)                                                                  |
@@ -410,6 +411,8 @@ export const serviceClient = new ServiceClient();
 10. **Accessibility** — proper ARIA labels, keyboard navigation, semantic HTML
 11. **NO placeholders or TODOs in code** — every file must be fully implemented. No `// TODO`, no `// placeholder`, no stub functions, no commented-out future work. If a feature isn't ready, don't add the file at all. Ship complete code or ship nothing.
 12. **Voice diversity is mandatory** — every podcast must sound unique. Use the voice pool system in `elevenlabs.ts` to assign distinct voice pairs per podcast. Never reuse the same 2 voices for every podcast.
+13. **Fix all errors in one pass** — when running tsc or lint, collect ALL errors first, then fix them in a single pass — don't fix one, re-run, fix another, repeat
+14. **No `console.log` in committed code** — unless it's intentional logging (use proper logger)
 
 ## Frontend Quality Checklist
 

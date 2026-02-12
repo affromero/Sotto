@@ -261,7 +261,7 @@ POST /api/podcasts/{id}/interact
     v
 API route:
     |-- Validate session (auth required)
-    |-- Check interaction limits (Free: 3 per podcast)
+    |-- Check credit balance (0.25 credits per interaction)
     |-- Create Interaction record (status: PENDING)
     |-- Enqueue interaction job
     |-- Return interaction ID
@@ -335,6 +335,8 @@ segment-regeneration.worker.ts
 | Interaction          | `interaction`        | 5                        | 30s     | 2     | High     |
 | Segment Regeneration | `segment-regen`      | 1                        | 300s    | 2     | Normal   |
 | Notification         | `notification`       | 5                        | 10s     | 3     | Low      |
+
+**Interaction worker**: In addition to generating the answer via Claude, the interaction worker computes `segmentOrder` — mapping the question's playback timestamp to the corresponding segment order number — and writes it alongside the answer to the Interaction record.
 
 ### 4.2 Worker Orchestration
 
@@ -422,7 +424,7 @@ User ──< Podcast ──< Segment
 | **DiscoveryMessage**  | `id` (cuid) | discoveryId, role, content, chips (JSON)                                                                                                           | discoveryId                                                 |
 | **Script**            | `id` (cuid) | podcastId (unique), turns (JSON), markdown, context, version                                                                                       |                                                             |
 | **Segment**           | `id` (cuid) | podcastId, speaker (HOST/EXPERT), text, audioUrl, order, startTime, duration, version                                                              | podcastId, order                                            |
-| **Interaction**       | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, resolved, incorporated                                                                     | podcastId, userId, status                                   |
+| **Interaction**       | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, resolved, incorporated, helpful (Boolean?), segmentOrder (Int?)                            | podcastId, userId, status                                   |
 | **Subscription**      | `id` (cuid) | userId (unique), stripeCustomerId, stripeSubscriptionId, stripePriceId, status, tier, creditsBalance, creditsMonthly, rolloverCredits, maxRollover | status, tier                                                |
 | **CreditTransaction** | `id` (cuid) | userId, amount, type (GRANT/CONSUMPTION/REFUND/PURCHASE), podcastId, description, balanceAfter, createdAt                                          | userId, type, createdAt                                     |
 
@@ -633,28 +635,35 @@ Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on U
 
 ### 9.1 Route Map
 
-| Method | Route                              | Auth     | Purpose                                                 |
-| ------ | ---------------------------------- | -------- | ------------------------------------------------------- |
-| POST   | `/api/discovery`                   | Required | Send discovery chat message, receive streaming response |
-| GET    | `/api/recommendations`             | Required | Search similar public podcasts                          |
-| POST   | `/api/podcasts`                    | Required | Create new podcast                                      |
-| GET    | `/api/podcasts/[id]`               | Optional | Get podcast details (public or owned)                   |
-| POST   | `/api/podcasts/[id]/generate`      | Required | Start generation pipeline                               |
-| POST   | `/api/podcasts/[id]/interact`      | Required | Ask a question during playback                          |
-| POST   | `/api/podcasts/[id]/fork`          | Required | Fork a public podcast                                   |
-| POST   | `/api/podcasts/[id]/like`          | Required | Like/unlike a podcast                                   |
-| POST   | `/api/podcasts/[id]/save`          | Required | Save/unsave a podcast                                   |
-| GET    | `/api/feed`                        | Public   | Public feed with search, tags, trending                 |
-| GET    | `/api/users/[id]`                  | Public   | User profile                                            |
-| POST   | `/api/users/[id]/follow`           | Required | Follow/unfollow a user                                  |
-| POST   | `/api/billing/checkout`            | Required | Create Stripe checkout session                          |
-| GET    | `/api/billing/subscription`        | Required | Get current subscription                                |
-| POST   | `/api/billing/portal`              | Required | Create Stripe customer portal session                   |
-| GET    | `/api/notifications`               | Required | List notifications                                      |
-| PATCH  | `/api/notifications/[id]`          | Required | Mark notification as read                               |
-| POST   | `/api/notifications/push/register` | Required | Register push subscription                              |
-| GET    | `/api/tags`                        | Public   | List all tags                                           |
-| POST   | `/api/webhooks/stripe`             | Webhook  | Handle Stripe webhook events                            |
+| Method | Route                                       | Auth     | Purpose                                                  |
+| ------ | ------------------------------------------- | -------- | -------------------------------------------------------- |
+| POST   | `/api/discovery`                            | Required | Send discovery chat message, receive streaming response  |
+| GET    | `/api/recommendations`                      | Required | Search similar public podcasts                           |
+| POST   | `/api/podcasts`                             | Required | Create new podcast                                       |
+| GET    | `/api/podcasts/[id]`                        | Optional | Get podcast details (public or owned)                    |
+| POST   | `/api/podcasts/[id]/generate`               | Required | Start generation pipeline                                |
+| POST   | `/api/podcasts/[id]/interact`               | Required | Ask a question during playback                           |
+| GET    | `/api/podcasts/[id]/interact/[iid]`         | Required | Get single interaction (polling for answer)              |
+| PATCH  | `/api/podcasts/[id]/interact/[iid]/resolve` | Required | Resolve interaction with helpful/unhelpful feedback      |
+| GET    | `/api/podcasts/[id]/knowledge-gaps`         | Required | Knowledge gap aggregation by segment (owner/admin)       |
+| GET    | `/api/podcasts/[id]/download`               | Public   | Download podcast audio (Content-Disposition: attachment) |
+| POST   | `/api/podcasts/[id]/fork`                   | Required | Fork a public podcast                                    |
+| POST   | `/api/podcasts/[id]/like`                   | Required | Like/unlike a podcast                                    |
+| POST   | `/api/podcasts/[id]/save`                   | Required | Save/unsave a podcast                                    |
+| GET    | `/api/feed`                                 | Public   | Public feed with search, tags, trending                  |
+| GET    | `/api/users/[id]`                           | Public   | User profile                                             |
+| GET    | `/api/users/[id]/rss`                       | Public   | Per-creator RSS 2.0 feed (public podcasts)               |
+| POST   | `/api/users/[id]/follow`                    | Required | Follow/unfollow a user                                   |
+| GET    | `/api/users/handle/[handle]/rss`            | Public   | Per-creator RSS feed resolved by handle                  |
+| GET    | `/api/oembed`                               | Public   | oEmbed 1.0 JSON for podcast embeds                       |
+| POST   | `/api/billing/checkout`                     | Required | Create Stripe checkout session                           |
+| GET    | `/api/billing/subscription`                 | Required | Get current subscription                                 |
+| POST   | `/api/billing/portal`                       | Required | Create Stripe customer portal session                    |
+| GET    | `/api/notifications`                        | Required | List notifications                                       |
+| PATCH  | `/api/notifications/[id]`                   | Required | Mark notification as read                                |
+| POST   | `/api/notifications/push/register`          | Required | Register push subscription                               |
+| GET    | `/api/tags`                                 | Public   | List all tags                                            |
+| POST   | `/api/webhooks/stripe`                      | Webhook  | Handle Stripe webhook events                             |
 
 ### 9.2 API Validation
 

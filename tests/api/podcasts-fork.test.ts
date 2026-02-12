@@ -6,7 +6,10 @@ const mockPodcastFindUnique = vi.fn();
 const mockPodcastCreate = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockPodcastTagCreateMany = vi.fn();
+const mockDiscoveryCreate = vi.fn();
 const mockTransaction = vi.fn();
+const mockSubscriptionFindUnique = vi.fn();
+const mockUserFindUnique = vi.fn();
 
 // Mock auth
 const mockAuth = vi.fn();
@@ -25,15 +28,62 @@ vi.mock('@/lib/prisma', () => ({
     podcastTag: {
       createMany: (...args: unknown[]) => mockPodcastTagCreateMany(...args),
     },
+    discovery: {
+      create: (...args: unknown[]) => mockDiscoveryCreate(...args),
+    },
+    subscription: {
+      findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+    },
     $transaction: (callback: unknown) => mockTransaction(callback),
   },
 }));
 
+// Mock subscription / credits / stripe
+const mockGetUserTier = vi.fn();
+vi.mock('@/lib/subscription', () => ({
+  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
+}));
+
+const mockCanGenerate = vi.fn();
+vi.mock('@/lib/stripe', () => ({
+  canGenerate: (...args: unknown[]) => mockCanGenerate(...args),
+}));
+
+const mockConsumeCredit = vi.fn();
+vi.mock('@/lib/credits', () => ({
+  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
+}));
+
+// Mock queue
+const mockAddJob = vi.fn();
+vi.mock('@/lib/queue', () => ({
+  contentExtractionQueue: 'content-extraction-queue',
+  notificationQueue: 'notification-queue',
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: {
+    EXTRACT_CONTENT: 'EXTRACT_CONTENT',
+    SEND_NOTIFICATION: 'SEND_NOTIFICATION',
+  },
+}));
+
+// Mock validations — let real schema through
+vi.mock('@/lib/validations', async () => {
+  const actual = await vi.importActual('@/lib/validations');
+  return actual;
+});
+
 import { POST } from '@/app/api/podcasts/[podcastId]/fork/route';
 
-function createRequest(): NextRequest {
+function createRequest(body: Record<string, unknown> = {}): NextRequest {
   const url = new URL('http://localhost:3000/api/podcasts/pod-1/fork');
-  return new NextRequest(url, { method: 'POST' });
+  return new NextRequest(url, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
 const mockSourcePodcast = {
@@ -45,65 +95,62 @@ const mockSourcePodcast = {
   visibility: 'PUBLIC',
   audioUrl: 'https://r2.example.com/audio/source.mp3',
   duration: 600,
-  fileSize: 1024000,
-  playCount: 100,
-  likeCount: 25,
   forkCount: 5,
-  saveCount: 10,
   forkedFromId: null,
-  createdAt: new Date('2025-01-10T10:00:00Z'),
-  updatedAt: new Date('2025-01-10T10:00:00Z'),
-  tags: [
-    {
-      id: 'pt-1',
-      podcastId: 'source-pod-1',
-      tagId: 'tag-science',
-    },
-    {
-      id: 'pt-2',
-      podcastId: 'source-pod-1',
-      tagId: 'tag-tech',
-    },
-  ],
+  tags: [{ tagId: 'tag-science' }, { tagId: 'tag-tech' }],
+  discovery: {
+    durationTarget: 10,
+    audienceLevel: 'intermediate',
+    audience: 'general',
+    depth: 'standard',
+    tone: 'casual',
+    focusAreas: ['qubits'],
+  },
+  script: {
+    markdown: '# Quantum Computing\n\nSome content...',
+  },
+  user: {
+    name: 'Creator',
+  },
 };
 
-const mockForkedPodcast = {
-  id: 'forked-pod-1',
-  userId: 'user-1',
-  title: 'Fork of Quantum Computing 101',
-  topic: 'An introduction to quantum computing principles',
-  status: 'PENDING',
-  visibility: 'PUBLIC',
-  audioUrl: null,
-  duration: null,
-  fileSize: null,
-  playCount: 0,
-  likeCount: 0,
-  forkCount: 0,
-  saveCount: 0,
-  forkedFromId: 'source-pod-1',
-  createdAt: new Date('2025-01-15T12:00:00Z'),
-  updatedAt: new Date('2025-01-15T12:00:00Z'),
-  user: {
-    id: 'user-1',
-    name: 'Alice',
-    image: 'https://example.com/alice.jpg',
-  },
-  tags: [
-    {
-      id: 'pt-3',
-      podcastId: 'forked-pod-1',
-      tagId: 'tag-science',
-      tag: { id: 'tag-science', name: 'Science', slug: 'science' },
-    },
-    {
-      id: 'pt-4',
-      podcastId: 'forked-pod-1',
-      tagId: 'tag-tech',
-      tag: { id: 'tag-tech', name: 'Technology', slug: 'technology' },
-    },
-  ],
-};
+function setupSuccessMocks(userId = 'user-1') {
+  mockAuth.mockResolvedValue({ user: { id: userId, name: 'Alice' } });
+  mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
+  mockGetUserTier.mockResolvedValue('FREE');
+  mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
+  mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+  mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
+  mockConsumeCredit.mockResolvedValue(undefined);
+  mockAddJob.mockResolvedValue(undefined);
+  mockPodcastUpdate.mockResolvedValue({});
+
+  mockTransaction.mockImplementation(async (callback) => {
+    const tx = {
+      podcast: {
+        create: mockPodcastCreate,
+        update: mockPodcastUpdate,
+      },
+      discovery: {
+        create: mockDiscoveryCreate,
+      },
+      podcastTag: {
+        createMany: mockPodcastTagCreateMany,
+      },
+    };
+    return callback(tx);
+  });
+
+  mockPodcastCreate.mockResolvedValue({
+    id: 'forked-pod-1',
+    userId,
+    title: 'Fork of Quantum Computing 101',
+    topic: 'An introduction to quantum computing principles',
+    status: 'PENDING',
+    forkedFromId: 'source-pod-1',
+  });
+  mockDiscoveryCreate.mockResolvedValue({ id: 'discovery-1' });
+}
 
 describe('POST /api/podcasts/[podcastId]/fork', () => {
   beforeEach(() => {
@@ -206,33 +253,26 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
     expect(body.error).toBe('Only podcasts with READY status can be forked');
   });
 
-  it('successfully creates a fork with correct data structure', async () => {
+  it('returns 402 when user has insufficient credits', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
+    mockGetUserTier.mockResolvedValue('FREE');
+    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
+    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockCanGenerate.mockReturnValue({ allowed: false, reason: 'No credits remaining' });
 
-    // Mock transaction to execute callback
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
+    const request = createRequest();
+    const response = await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
 
-    mockPodcastCreate.mockResolvedValue({
-      id: 'forked-pod-1',
-      userId: 'user-1',
-      title: 'Fork of Quantum Computing 101',
-      topic: 'An introduction to quantum computing principles',
-      status: 'PENDING',
-      forkedFromId: 'source-pod-1',
-    });
+    expect(response.status).toBe(402);
+    const body = await response.json();
+    expect(body.error).toBe('No credits remaining');
+  });
+
+  it('successfully creates a fork and returns id', async () => {
+    setupSuccessMocks();
 
     const request = createRequest();
     const response = await POST(request, {
@@ -241,38 +281,11 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
     expect(response.status).toBe(201);
     const body = await response.json();
-
     expect(body.id).toBe('forked-pod-1');
-    expect(body.title).toBe('Fork of Quantum Computing 101');
-    expect(body.topic).toBe('An introduction to quantum computing principles');
-    expect(body.status).toBe('PENDING');
-    expect(body.forkedFromId).toBe('source-pod-1');
   });
 
   it('creates fork with prefixed title "Fork of"', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
-
-    mockPodcastCreate.mockResolvedValue({
-      id: 'forked-pod-1',
-      title: 'Fork of Quantum Computing 101',
-      topic: mockSourcePodcast.topic,
-      userId: 'user-1',
-    });
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -280,34 +293,33 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
     });
 
     expect(mockPodcastCreate).toHaveBeenCalledWith({
-      data: {
-        userId: 'user-1',
+      data: expect.objectContaining({
         title: 'Fork of Quantum Computing 101',
         topic: 'An introduction to quantum computing principles',
         status: 'PENDING',
         forkedFromId: 'source-pod-1',
-        remixNote: null,
-      },
+      }),
     });
   });
 
-  it('copies topic from source podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
+  it('uses custom topic when provided in body', async () => {
+    setupSuccessMocks();
 
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
+    const request = createRequest({ topic: 'My take on quantum' });
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
+
+    expect(mockPodcastCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: 'My take on quantum',
+        topic: 'My take on quantum',
+      }),
+    });
+  });
+
+  it('copies topic from source podcast when no topic provided', async () => {
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -324,22 +336,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('sets forkedFromId to source podcast ID', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -356,22 +353,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('sets fork status to PENDING', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -387,23 +369,30 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
     );
   });
 
-  it('copies tags from source podcast to fork', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
+  it('creates Discovery record in transaction', async () => {
+    setupSuccessMocks();
 
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
+    const request = createRequest();
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
+
+    expect(mockDiscoveryCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        podcastId: 'forked-pod-1',
+        userId: 'user-1',
+        topic: 'An introduction to quantum computing principles',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        audience: 'general',
+        tone: 'casual',
+        durationTarget: 10,
+      }),
+    });
+  });
+
+  it('copies tags from source podcast to fork', async () => {
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -419,24 +408,10 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('does not copy tags when source has no tags', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    setupSuccessMocks();
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       tags: [],
-    });
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
     });
 
     const request = createRequest();
@@ -448,88 +423,90 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('increments source podcast fork count', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
       params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
 
+    // The tx.podcast.update is called inside the transaction
     expect(mockPodcastUpdate).toHaveBeenCalledWith({
       where: { id: 'source-pod-1' },
       data: { forkCount: { increment: 1 } },
     });
   });
 
-  it('returns forked podcast with user and tags included', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
+  it('consumes credit before creating fork', async () => {
+    setupSuccessMocks();
 
     const request = createRequest();
-    const response = await POST(request, {
+    await POST(request, {
       params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
 
-    const body = await response.json();
+    expect(mockConsumeCredit).toHaveBeenCalledWith('user-1', 1, 'Fork generation', undefined);
+  });
 
-    expect(body.user).toEqual({
-      id: 'user-1',
-      name: 'Alice',
-      image: 'https://example.com/alice.jpg',
+  it('enqueues content extraction after fork creation', async () => {
+    setupSuccessMocks();
+
+    const request = createRequest();
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
     });
-    expect(body.tags).toHaveLength(2);
-    expect(body.tags[0].tag.slug).toBe('science');
-    expect(body.tags[1].tag.slug).toBe('technology');
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      'content-extraction-queue',
+      'EXTRACT_CONTENT',
+      expect.objectContaining({
+        podcastId: 'forked-pod-1',
+        userId: 'user-1',
+      })
+    );
+  });
+
+  it('sends notification to source podcast owner', async () => {
+    setupSuccessMocks();
+
+    const request = createRequest();
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
+    });
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      'notification-queue',
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'creator-user-1',
+        type: 'PODCAST_FORKED',
+      })
+    );
+  });
+
+  it('does not notify when user forks their own podcast', async () => {
+    setupSuccessMocks('creator-user-1');
+
+    const request = createRequest();
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
+    });
+
+    // Only content extraction job, no notification
+    expect(mockAddJob).toHaveBeenCalledTimes(1);
+    expect(mockAddJob).toHaveBeenCalledWith(
+      'content-extraction-queue',
+      'EXTRACT_CONTENT',
+      expect.anything()
+    );
   });
 
   it('allows user to fork their own podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'creator-user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue({
-            ...mockForkedPodcast,
-            userId: 'creator-user-1',
-          }),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
+    setupSuccessMocks('creator-user-1');
+    mockPodcastCreate.mockResolvedValue({
+      id: 'forked-pod-1',
+      userId: 'creator-user-1',
+      title: 'Fork of Quantum Computing 101',
     });
 
     const request = createRequest();
@@ -538,27 +515,10 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
     });
 
     expect(response.status).toBe(201);
-    const body = await response.json();
-    expect(body.userId).toBe('creator-user-1');
   });
 
   it('uses transaction for atomicity of fork creation', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: vi.fn().mockResolvedValue({ id: 'forked-pod-1' }),
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
-    });
+    setupSuccessMocks();
 
     const request = createRequest();
     await POST(request, {
@@ -570,21 +530,10 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('assigns fork to authenticated user', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'specific-user-123' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        podcast: {
-          create: mockPodcastCreate,
-          update: mockPodcastUpdate,
-          findUnique: vi.fn().mockResolvedValue(mockForkedPodcast),
-        },
-        podcastTag: {
-          createMany: mockPodcastTagCreateMany,
-        },
-      };
-      return callback(tx);
+    setupSuccessMocks('specific-user-123');
+    mockPodcastCreate.mockResolvedValue({
+      id: 'forked-pod-1',
+      userId: 'specific-user-123',
     });
 
     const request = createRequest();
@@ -599,5 +548,20 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
         }),
       })
     );
+  });
+
+  it('sets status to EXTRACTING after transaction', async () => {
+    setupSuccessMocks();
+
+    const request = createRequest();
+    await POST(request, {
+      params: Promise.resolve({ podcastId: 'source-pod-1' }),
+    });
+
+    // The post-transaction prisma.podcast.update sets EXTRACTING
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'forked-pod-1' },
+      data: { status: 'EXTRACTING' },
+    });
   });
 });
