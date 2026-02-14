@@ -51,20 +51,6 @@
   border-bottom-color: var(--color-primary);
 }
 
-/* Coming Soon */
-
-.comingSoon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--spacing-3xl) var(--spacing-lg);
-}
-
-.comingSoonText {
-  font: var(--text-body-sm);
-  color: var(--color-text-tertiary);
-}
-
 @media (min-width: 769px) {
   .main {
     padding: var(--spacing-xl);

@@ -134,6 +134,7 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
           isOwnProfile={isOwnProfile}
           initialIsFollowing={isFollowing}
           isAuthenticated={!!currentUserId}
+          currentUserId={currentUserId}
         />
       </div>
     </main>

@@ -135,6 +135,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
           isOwnProfile={isOwnProfile}
           initialIsFollowing={isFollowing}
           isAuthenticated={!!currentUserId}
+          currentUserId={currentUserId}
         />
       </div>
     </main>
