@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
+import type { CustomTag } from '@/components/discovery/InterestGrid';
 import { Button } from '@/components/ui/Button';
 import styles from './page.module.css';
 
@@ -26,7 +27,15 @@ interface OnboardingFormProps {
 export function OnboardingForm({ categories }: OnboardingFormProps) {
   const router = useRouter();
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [customTags, setCustomTags] = useState<CustomTag[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const totalCount = selectedTagIds.length + customTags.length;
+
+  const handleChange = (tagIds: string[], custom: CustomTag[]) => {
+    setSelectedTagIds(tagIds);
+    setCustomTags(custom);
+  };
 
   const handleContinue = async () => {
     setSaving(true);
@@ -34,7 +43,7 @@ export function OnboardingForm({ categories }: OnboardingFormProps) {
       const response = await fetch('/api/onboarding/interests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagIds: selectedTagIds }),
+        body: JSON.stringify({ tagIds: selectedTagIds, customTags }),
       });
 
       if (!response.ok) {
@@ -53,7 +62,7 @@ export function OnboardingForm({ categories }: OnboardingFormProps) {
       const response = await fetch('/api/onboarding/interests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tagIds: [] }),
+        body: JSON.stringify({ tagIds: [], customTags: [] }),
       });
 
       if (!response.ok) {
@@ -68,12 +77,17 @@ export function OnboardingForm({ categories }: OnboardingFormProps) {
 
   return (
     <>
-      <InterestGrid categories={categories} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
+      <InterestGrid
+        categories={categories}
+        selectedTagIds={selectedTagIds}
+        customTags={customTags}
+        onChange={handleChange}
+      />
 
       <div className={styles.actions}>
         <Button onClick={handleContinue} loading={saving} disabled={saving}>
-          {selectedTagIds.length > 0
-            ? `Continue with ${selectedTagIds.length} topic${selectedTagIds.length !== 1 ? 's' : ''}`
+          {totalCount > 0
+            ? `Continue with ${totalCount} topic${totalCount !== 1 ? 's' : ''}`
             : 'Continue'}
         </Button>
         <button type="button" className={styles.skipButton} onClick={handleSkip} disabled={saving}>

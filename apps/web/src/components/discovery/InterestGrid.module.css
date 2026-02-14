@@ -256,6 +256,87 @@
   animation: checkPop 0.2s ease-out both;
 }
 
+/* ---- Custom chip (with remove × button) ---- */
+
+.chipCustom {
+  border-style: dashed;
+}
+
+.chipRemove {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 150ms ease;
+}
+
+.chipCustom:hover .chipRemove {
+  opacity: 1;
+}
+
+/* ---- "Other" inline input ---- */
+
+.otherInput {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+}
+
+.otherField {
+  width: 120px;
+  padding: 7px 12px;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  outline: none;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.otherField::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.otherField:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.12);
+}
+
+.otherField:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.otherAdd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease,
+    transform 120ms ease;
+}
+
+.otherAdd:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: #fffbeb;
+  transform: scale(1.05);
+}
+
+.otherAdd:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ---- Animations ---- */
 
 @keyframes cardEntrance {

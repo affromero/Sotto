@@ -115,14 +115,12 @@ describe('InterestGrid', () => {
     const user = userEvent.setup();
     render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
 
-    // Expand Technology
     await user.click(screen.getByRole('button', { name: /Technology/i }));
 
-    // Click Quantum Computing chip
     const chip = screen.getByRole('button', { name: /Quantum Computing/i });
     await user.click(chip);
 
-    expect(handleChange).toHaveBeenCalledWith(['sub-1']);
+    expect(handleChange).toHaveBeenCalledWith(['sub-1'], []);
   });
 
   it('deselecting a chip removes it from onChange', async () => {
@@ -136,7 +134,7 @@ describe('InterestGrid', () => {
     expect(chip).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(chip);
-    expect(handleChange).toHaveBeenCalledWith([]);
+    expect(handleChange).toHaveBeenCalledWith([], []);
   });
 
   it('shows count badge when sub-interests are selected in a category', () => {
@@ -153,7 +151,7 @@ describe('InterestGrid', () => {
     await user.click(screen.getByRole('button', { name: /Technology/i }));
     await user.click(screen.getByText('Select All'));
 
-    expect(handleChange).toHaveBeenCalledWith(['sub-1', 'sub-2', 'sub-3']);
+    expect(handleChange).toHaveBeenCalledWith(['sub-1', 'sub-2', 'sub-3'], []);
   });
 
   it('Clear button deselects all children in the expanded category', async () => {
@@ -164,7 +162,7 @@ describe('InterestGrid', () => {
     await user.click(screen.getByRole('button', { name: /Technology/i }));
     await user.click(screen.getByText('Clear'));
 
-    expect(handleChange).toHaveBeenCalledWith([]);
+    expect(handleChange).toHaveBeenCalledWith([], []);
   });
 
   it('renders TagIcon for each category with correct slug', () => {
@@ -206,5 +204,139 @@ describe('InterestGrid', () => {
 
     // Technology badge should be gone, Science badge should show 2
     expect(screen.getByLabelText('2 selected')).toBeInTheDocument();
+  });
+
+  // ---- "Other" custom sub-interest tests ----
+
+  it('renders "Other" input inside expanded category panel', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute('placeholder', 'Other...');
+  });
+
+  it('typing and clicking add creates a custom tag chip', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'Quantum Biology');
+    await user.click(screen.getByLabelText('Add custom interest'));
+
+    // Custom chip should appear
+    expect(screen.getByText('Quantum Biology')).toBeInTheDocument();
+    // onChange should include custom tag
+    expect(handleChange).toHaveBeenLastCalledWith([], [{ name: 'Quantum Biology', parentSlug: 'technology' }]);
+  });
+
+  it('pressing Enter in the input adds a custom tag', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'Indie Hacking{Enter}');
+
+    expect(screen.getByText('Indie Hacking')).toBeInTheDocument();
+    expect(handleChange).toHaveBeenLastCalledWith([], [{ name: 'Indie Hacking', parentSlug: 'technology' }]);
+  });
+
+  it('clears the input field after adding a custom tag', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'Bioinformatics{Enter}');
+
+    expect(input).toHaveValue('');
+  });
+
+  it('clicking a custom tag chip removes it', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'Quantum Biology{Enter}');
+
+    const removeButton = screen.getByLabelText('Remove Quantum Biology');
+    await user.click(removeButton);
+
+    expect(screen.queryByText('Quantum Biology')).not.toBeInTheDocument();
+    expect(handleChange).toHaveBeenLastCalledWith([], []);
+  });
+
+  it('prevents duplicate custom tags within the same category', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'AI Ethics{Enter}');
+    await user.type(input, 'ai ethics{Enter}');
+
+    // Should only have one chip
+    const chips = screen.getAllByText(/AI Ethics/i);
+    expect(chips).toHaveLength(1);
+  });
+
+  it('rejects custom tag names shorter than 2 characters', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'A{Enter}');
+
+    // onChange should not have been called with custom tags
+    expect(handleChange).not.toHaveBeenCalled();
+  });
+
+  it('includes custom tags in badge count', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1']} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const input = screen.getByLabelText('Add custom Technology interest');
+    await user.type(input, 'Quantum Biology{Enter}');
+
+    // Badge should show 2 (1 predefined + 1 custom)
+    expect(screen.getByLabelText('2 selected')).toBeInTheDocument();
+  });
+
+  it('Clear button also removes custom tags for that category', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <InterestGrid
+        categories={mockCategories}
+        selectedTagIds={['sub-1', 'sub-2', 'sub-3']}
+        customTags={[{ name: 'Custom Tag', parentSlug: 'technology' }]}
+        onChange={handleChange}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+    await user.click(screen.getByText('Clear'));
+
+    expect(handleChange).toHaveBeenLastCalledWith([], []);
   });
 });

@@ -29,8 +29,8 @@ describe('onboardingInterestsSchema', () => {
     }
   });
 
-  it('rejects array over 12 items', () => {
-    const tagIds = Array.from({ length: 13 }, (_, i) => `tag-${i}`);
+  it('rejects array over 20 items', () => {
+    const tagIds = Array.from({ length: 21 }, (_, i) => `tag-${i}`);
     const result = onboardingInterestsSchema.safeParse({ tagIds });
     expect(result.success).toBe(false);
   });
