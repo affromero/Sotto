@@ -56,7 +56,9 @@ export type NotificationType =
   | 'TWITTER_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'
-  | 'VOICE_REQUEST_DENIED';
+  | 'VOICE_REQUEST_DENIED'
+  | 'QUESTION_ON_YOUR_PODCAST'
+  | 'QUESTION_UPVOTED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
 

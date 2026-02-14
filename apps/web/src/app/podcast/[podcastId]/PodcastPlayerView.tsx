@@ -25,6 +25,7 @@ import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
+import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import type { PodcastDetail } from '@/types/podcast';
@@ -493,6 +494,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
             </section>
           )}
         </>
+      )}
+
+      {/* Community Questions */}
+      {isReady && podcast.visibility === 'PUBLIC' && (
+        <section className={styles.questionsSection}>
+          <CommunityQuestions podcastId={podcast.id} />
+        </section>
       )}
 
       {/* Version History */}
