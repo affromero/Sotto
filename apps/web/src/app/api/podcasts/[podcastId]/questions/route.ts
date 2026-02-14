@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { InteractionStatus } from '@prisma/client';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const where = {
     podcastId,
     visibility: 'PUBLIC',
-    status: { in: ['ANSWERED', 'RESOLVED', 'INCORPORATED'] as const },
+    status: { in: [InteractionStatus.ANSWERED, InteractionStatus.RESOLVED, InteractionStatus.INCORPORATED] },
   };
 
   const [questions, total] = await Promise.all([

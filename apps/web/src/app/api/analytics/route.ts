@@ -25,16 +25,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check subscription tier (PRO or TEAM required)
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId: session.user.id },
-    select: { tier: true, status: true },
-  });
-
-  if (!subscription || subscription.tier === 'FREE') {
-    return NextResponse.json({ error: 'Analytics requires Pro or Team subscription' }, { status: 403 });
-  }
-
   const searchParams = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = analyticsQuerySchema.safeParse(searchParams);
   if (!parsed.success) {

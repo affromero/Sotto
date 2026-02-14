@@ -36,11 +36,6 @@ async function getUsers(search: string | undefined, page: number) {
         image: true,
         role: true,
         createdAt: true,
-        subscription: {
-          select: {
-            tier: true,
-          },
-        },
         _count: {
           select: {
             podcasts: true,
@@ -106,7 +101,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
             {users.map((user) => {
               const displayName = user.name || user.email || 'Unknown';
               const initials = displayName.charAt(0).toUpperCase();
-              const tier = user.subscription?.tier ?? 'FREE';
+              const tier = 'FREE';
 
               return (
                 <tr key={user.id}>

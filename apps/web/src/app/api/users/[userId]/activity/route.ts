@@ -103,7 +103,7 @@ export async function GET(
   const collectionMap = new Map(collections.map((c) => [c.id, c]));
 
   const enrichedActivities = activities.map((activity) => {
-    let target: { title?: string; name?: string; handle?: string | null } | null = null;
+    let target: { title?: string | null; name?: string | null; handle?: string | null } | null = null;
 
     if (activity.targetId) {
       switch (activity.targetType) {
