@@ -155,10 +155,23 @@ export const reorderQueueSchema = z.object({
 });
 
 /**
+ * Custom tag input (for "Other" free-text sub-interests)
+ */
+export const customTagSchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Custom interest must be at least 2 characters')
+    .max(60, 'Custom interest must be at most 60 characters')
+    .transform((s) => s.trim()),
+  parentSlug: z.string().min(1, 'Parent category is required'),
+});
+
+/**
  * Onboarding interests validation
  */
 export const onboardingInterestsSchema = z.object({
   tagIds: z.array(z.string()).max(20),
+  customTags: z.array(customTagSchema).max(10).default([]),
 });
 
 /**
