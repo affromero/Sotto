@@ -18,10 +18,17 @@ interface VoiceCloneData {
   elevenLabsVoiceId: string;
 }
 
-interface TagOption {
+interface SubTag {
   id: string;
   name: string;
   slug: string;
+}
+
+interface CategoryTag {
+  id: string;
+  name: string;
+  slug: string;
+  children: SubTag[];
 }
 
 interface SettingsFormProps {
@@ -37,7 +44,7 @@ interface SettingsFormProps {
   preferredHostVoiceId: string | null;
   preferredExpertVoiceId: string | null;
   voiceClones: VoiceCloneData[];
-  interestTags: TagOption[];
+  interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
   configuredTtsProviders: string[];
   configuredAiProviders: string[];
@@ -63,7 +70,7 @@ export function SettingsForm({
   preferredHostVoiceId: initialHostVoiceId,
   preferredExpertVoiceId: initialExpertVoiceId,
   voiceClones,
-  interestTags,
+  interestCategories,
   selectedInterestTagIds,
   configuredTtsProviders,
   configuredAiProviders,
@@ -378,7 +385,7 @@ export function SettingsForm({
         <p className={styles.interestsDescription}>
           Select topics you&apos;re curious about. This helps us recommend better podcasts for you.
         </p>
-        <InterestGrid tags={interestTags} selectedTagIds={interestIds} onChange={setInterestIds} />
+        <InterestGrid categories={interestCategories} selectedTagIds={interestIds} onChange={setInterestIds} />
         <div className={styles.formActions}>
           <Button
             onClick={handleSaveInterests}

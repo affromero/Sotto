@@ -6,17 +6,24 @@ import { InterestGrid } from '@/components/discovery/InterestGrid';
 import { Button } from '@/components/ui/Button';
 import styles from './page.module.css';
 
-interface TagOption {
+interface SubTag {
   id: string;
   name: string;
   slug: string;
 }
 
-interface OnboardingFormProps {
-  tags: TagOption[];
+interface CategoryTag {
+  id: string;
+  name: string;
+  slug: string;
+  children: SubTag[];
 }
 
-export function OnboardingForm({ tags }: OnboardingFormProps) {
+interface OnboardingFormProps {
+  categories: CategoryTag[];
+}
+
+export function OnboardingForm({ categories }: OnboardingFormProps) {
   const router = useRouter();
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -61,7 +68,7 @@ export function OnboardingForm({ tags }: OnboardingFormProps) {
 
   return (
     <>
-      <InterestGrid tags={tags} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
+      <InterestGrid categories={categories} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
 
       <div className={styles.actions}>
         <Button onClick={handleContinue} loading={saving} disabled={saving}>
