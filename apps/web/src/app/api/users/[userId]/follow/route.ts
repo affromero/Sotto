@@ -41,6 +41,16 @@ export async function POST(
     throw error;
   }
 
+  // Fire-and-forget activity record
+  prisma.activity.create({
+    data: {
+      userId: session.user.id,
+      type: 'USER_FOLLOWED',
+      targetId: userId,
+      targetType: 'user',
+    },
+  }).catch(() => {});
+
   return NextResponse.json({ following: true }, { status: 201 });
 }
 

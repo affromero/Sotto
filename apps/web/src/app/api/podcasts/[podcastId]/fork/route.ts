@@ -137,5 +137,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, notifPayload);
   }
 
+  // Fire-and-forget activity record
+  prisma.activity.create({
+    data: {
+      userId,
+      type: 'PODCAST_FORKED',
+      targetId: forkedPodcast.id,
+      targetType: 'podcast',
+      metadata: { parentTitle: sourcePodcast.title },
+    },
+  }).catch(() => {});
+
   return NextResponse.json({ id: forkedPodcast.id }, { status: 201 });
 }

@@ -57,5 +57,15 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  // Fire-and-forget activity record
+  prisma.activity.create({
+    data: {
+      userId: authResult.userId,
+      type: 'PODCAST_CREATED',
+      targetId: podcast.id,
+      targetType: 'podcast',
+    },
+  }).catch(() => {});
+
   return NextResponse.json(podcast, { status: 201 });
 }

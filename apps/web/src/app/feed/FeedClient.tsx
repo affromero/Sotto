@@ -7,6 +7,7 @@ import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel
 import { TrendingSection } from '@/components/feed/TrendingSection';
 import { FeedGrid } from '@/components/feed/FeedGrid';
 import { PodcastCard } from '@/components/feed/PodcastCard';
+import { ActivityFeed } from '@/components/feed/ActivityFeed';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './page.module.css';
 
@@ -16,10 +17,13 @@ interface Tag {
   slug: string;
 }
 
+type FeedTab = 'discover' | 'activity';
+
 interface FeedClientProps {
   initialPodcasts: PodcastSummary[];
   trendingPodcasts: PodcastSummary[];
   tags: Tag[];
+  isAuthenticated?: boolean;
 }
 
 type SortOption = 'recent' | 'popular' | 'trending' | 'most_forked';
@@ -32,7 +36,8 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
   { value: 'most_forked', label: 'Most Forked' },
 ];
 
-export function FeedClient({ initialPodcasts, trendingPodcasts, tags }: FeedClientProps) {
+export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenticated }: FeedClientProps) {
+  const [activeTab, setActiveTab] = useState<FeedTab>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | undefined>(undefined);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({});
@@ -145,91 +150,134 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags }: FeedClie
 
   return (
     <div className={styles.feedContent}>
-      <div className={styles.filters}>
-        <SearchBar
-          value={searchQuery}
-          onChange={handleSearchChange}
-          placeholder="Search podcasts by topic, title, or creator..."
-        />
-        {tags.length > 0 && (
-          <TagFilter tags={tags} activeTag={activeTag} onTagSelect={handleTagSelect} />
-        )}
-        <FilterPanel filters={advancedFilters} onChange={handleFiltersChange} />
-      </div>
-
-      <div className={styles.toggleRow}>
-        <div className={styles.pillGroup} role="radiogroup" aria-label="Feed mode">
+      {isAuthenticated && (
+        <div className={styles.feedTabs} role="tablist" aria-label="Feed tabs">
           <button
-            className={`${styles.pill} ${mode === 'all' ? styles.pillActive : ''}`}
-            onClick={() => handleModeChange('all')}
-            role="radio"
-            aria-checked={mode === 'all'}
+            className={`${styles.feedTab} ${activeTab === 'discover' ? styles.feedTabActive : ''}`}
+            onClick={() => setActiveTab('discover')}
+            role="tab"
+            aria-selected={activeTab === 'discover'}
+            aria-controls="feed-discover-panel"
+            id="feed-discover-tab"
             type="button"
           >
-            All
+            Discover
           </button>
           <button
-            className={`${styles.pill} ${mode === 'remixes' ? styles.pillActive : ''}`}
-            onClick={() => handleModeChange('remixes')}
-            role="radio"
-            aria-checked={mode === 'remixes'}
+            className={`${styles.feedTab} ${activeTab === 'activity' ? styles.feedTabActive : ''}`}
+            onClick={() => setActiveTab('activity')}
+            role="tab"
+            aria-selected={activeTab === 'activity'}
+            aria-controls="feed-activity-panel"
+            id="feed-activity-tab"
             type="button"
           >
-            Remixes
+            Activity
           </button>
         </div>
+      )}
 
-        <span className={styles.toggleLabel}>Sort:</span>
-        <div className={styles.pillGroup} role="radiogroup" aria-label="Sort order">
-          {SORT_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              className={`${styles.pill} ${sort === option.value ? styles.pillActive : ''}`}
-              onClick={() => handleSortChange(option.value)}
-              role="radio"
-              aria-checked={sort === option.value}
-              type="button"
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {showTrending && <TrendingSection podcasts={trendingPodcasts} />}
-
-      <section aria-label="Podcast feed">
-        <FeedGrid
-          loading={loading && podcasts.length === 0}
-          emptyMessage={
-            searchQuery
-              ? `No podcasts found for "${searchQuery}"`
-              : mode === 'remixes'
-                ? 'No remixes yet. Be the first to fork a podcast!'
-                : 'No podcasts yet. Be the first to create one!'
-          }
+      {activeTab === 'discover' ? (
+        <div
+          id="feed-discover-panel"
+          role="tabpanel"
+          aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
         >
-          {podcasts.map((podcast) => (
-            <PodcastCard
-              key={podcast.id}
-              podcast={podcast}
-              feedSort={sort}
-              searchQuery={searchQuery}
+          <div className={styles.filters}>
+            <SearchBar
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder="Search podcasts by topic, title, or creator..."
             />
-          ))}
-        </FeedGrid>
-      </section>
+            {tags.length > 0 && (
+              <TagFilter tags={tags} activeTag={activeTag} onTagSelect={handleTagSelect} />
+            )}
+            <FilterPanel filters={advancedFilters} onChange={handleFiltersChange} />
+          </div>
 
-      {hasMore && podcasts.length > 0 && (
-        <div className={styles.loadMoreRow}>
-          <button
-            className={styles.loadMoreBtn}
-            onClick={handleLoadMore}
-            disabled={loading}
-            type="button"
-          >
-            {loading ? 'Loading...' : 'Load More'}
-          </button>
+          <div className={styles.toggleRow}>
+            <div className={styles.pillGroup} role="radiogroup" aria-label="Feed mode">
+              <button
+                className={`${styles.pill} ${mode === 'all' ? styles.pillActive : ''}`}
+                onClick={() => handleModeChange('all')}
+                role="radio"
+                aria-checked={mode === 'all'}
+                type="button"
+              >
+                All
+              </button>
+              <button
+                className={`${styles.pill} ${mode === 'remixes' ? styles.pillActive : ''}`}
+                onClick={() => handleModeChange('remixes')}
+                role="radio"
+                aria-checked={mode === 'remixes'}
+                type="button"
+              >
+                Remixes
+              </button>
+            </div>
+
+            <span className={styles.toggleLabel}>Sort:</span>
+            <div className={styles.pillGroup} role="radiogroup" aria-label="Sort order">
+              {SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  className={`${styles.pill} ${sort === option.value ? styles.pillActive : ''}`}
+                  onClick={() => handleSortChange(option.value)}
+                  role="radio"
+                  aria-checked={sort === option.value}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {showTrending && <TrendingSection podcasts={trendingPodcasts} />}
+
+          <section aria-label="Podcast feed">
+            <FeedGrid
+              loading={loading && podcasts.length === 0}
+              emptyMessage={
+                searchQuery
+                  ? `No podcasts found for "${searchQuery}"`
+                  : mode === 'remixes'
+                    ? 'No remixes yet. Be the first to fork a podcast!'
+                    : 'No podcasts yet. Be the first to create one!'
+              }
+            >
+              {podcasts.map((podcast) => (
+                <PodcastCard
+                  key={podcast.id}
+                  podcast={podcast}
+                  feedSort={sort}
+                  searchQuery={searchQuery}
+                />
+              ))}
+            </FeedGrid>
+          </section>
+
+          {hasMore && podcasts.length > 0 && (
+            <div className={styles.loadMoreRow}>
+              <button
+                className={styles.loadMoreBtn}
+                onClick={handleLoadMore}
+                disabled={loading}
+                type="button"
+              >
+                {loading ? 'Loading...' : 'Load More'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div
+          id="feed-activity-panel"
+          role="tabpanel"
+          aria-labelledby="feed-activity-tab"
+        >
+          <ActivityFeed />
         </div>
       )}
     </div>

@@ -155,6 +155,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return created;
   });
 
+  // Fire-and-forget activity record
+  prisma.activity.create({
+    data: {
+      userId,
+      type: 'COMMENT_POSTED',
+      targetId: podcastId,
+      targetType: 'podcast',
+      metadata: { commentId: comment.id },
+    },
+  }).catch(() => {});
+
   return NextResponse.json(
     {
       ...comment,
