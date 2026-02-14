@@ -64,3 +64,6 @@ accounting/reports/*.txt
 accounting/imports/*.ofx
 accounting/imports/*.csv
 .fava-cache/
+
+# VS Code
+Sotto.code-workspace

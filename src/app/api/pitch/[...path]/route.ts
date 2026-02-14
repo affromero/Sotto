@@ -13,7 +13,7 @@ async function verifyPitchCookie(value: string, secret: string): Promise<boolean
   if (!timestamp || !signature) return false;
 
   const age = Date.now() - parseInt(timestamp, 10);
-  if (isNaN(age) || age < 0 || age > 30 * 24 * 60 * 60 * 1000) return false;
+  if (isNaN(age) || age < 0 || age > 60 * 60 * 1000) return false;
 
   const key = await crypto.subtle.importKey(
     'raw',
