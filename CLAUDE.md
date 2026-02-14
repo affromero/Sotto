@@ -413,6 +413,7 @@ export const serviceClient = new ServiceClient();
 12. **Voice diversity is mandatory** — every podcast must sound unique. Use the voice pool system in `elevenlabs.ts` to assign distinct voice pairs per podcast. Never reuse the same 2 voices for every podcast.
 13. **Fix all errors in one pass** — when running tsc or lint, collect ALL errors first, then fix them in a single pass — don't fix one, re-run, fix another, repeat
 14. **No `console.log` in committed code** — unless it's intentional logging (use proper logger)
+15. **Prefer small, modular files** — avoid monolithic files. Split large components, utilities, and routes into focused modules. A 200-line file is better than a 1000-line file with 5 responsibilities.
 
 ## Frontend Quality Checklist
 

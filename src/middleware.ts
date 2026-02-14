@@ -12,8 +12,9 @@ const PROTECTED_ROUTES = [
 ];
 const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
-// Public routes that bypass the password gate (exact match)
-const PASSWORD_GATE_BYPASS = new Set([
+// Routes that are always public — no password gate, no auth required
+const PUBLIC_ROUTES = new Set([
+  '/',
   '/access',
   '/api/access',
   '/api/health',
@@ -21,10 +22,10 @@ const PASSWORD_GATE_BYPASS = new Set([
   '/feedback',
   '/api/feedback',
   '/pitch',
+  '/auth/login',
+  '/auth/signup',
 ]);
-
-// Prefix-based bypasses that skip the gate entirely
-const PASSWORD_GATE_BYPASS_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
+const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
 
 async function verifyAccessCookie(value: string, secret: string): Promise<boolean> {
   const separatorIndex = value.indexOf(':');
@@ -54,11 +55,10 @@ async function verifyAccessCookie(value: string, secret: string): Promise<boolea
   return expected === signature;
 }
 
-function isPasswordGateBypassed(pathname: string): boolean {
-  if (PASSWORD_GATE_BYPASS.has(pathname)) return true;
-  // Allow embed pages to bypass password gate (for iframe embedding)
+function isPublicRoute(pathname: string): boolean {
+  if (PUBLIC_ROUTES.has(pathname)) return true;
   if (pathname.match(/^\/podcast\/[^/]+\/embed$/)) return true;
-  return PASSWORD_GATE_BYPASS_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 export async function middleware(request: NextRequest) {
@@ -73,24 +73,35 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Site-wide password gate (early access)
-  // The alpha landing page at /romero is gated because it's not in the bypass set.
-  // To rotate the path: rename src/app/romero/, update robots.txt, update access/page.tsx redirect.
-  if (process.env.SITE_PASSWORD && !isPasswordGateBypassed(pathname)) {
+  // Public routes are always accessible
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Early-access password gate
+  // All non-public routes require the sotto_access cookie when SITE_PASSWORD is set.
+  // Only /romero shows the password form (redirects to /access).
+  // All other gated routes silently redirect to / (under construction) to hide the gate.
+  if (process.env.SITE_PASSWORD) {
     const accessCookie = request.cookies.get('sotto_access');
     const secret = process.env.NEXTAUTH_SECRET;
 
-    let isAuthenticated = false;
+    let hasAccess = false;
     if (accessCookie?.value && secret) {
-      isAuthenticated = await verifyAccessCookie(accessCookie.value, secret);
+      hasAccess = await verifyAccessCookie(accessCookie.value, secret);
     }
 
-    if (!isAuthenticated) {
-      return NextResponse.redirect(new URL('/access', request.url));
+    if (!hasAccess) {
+      // /romero is the secret entry point — show the password form
+      if (pathname.startsWith('/romero')) {
+        return NextResponse.redirect(new URL('/access', request.url));
+      }
+      // Everything else silently redirects to under construction
+      return NextResponse.redirect(new URL('/', request.url));
     }
   }
 
-  // Skip API routes early (handled by individual route handlers)
+  // Skip API routes (handled by individual route handlers)
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
