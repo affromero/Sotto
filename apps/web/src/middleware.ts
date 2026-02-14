@@ -15,7 +15,7 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 // Routes that are always public — no password gate, no auth required
 const PUBLIC_ROUTES = new Set([
   '/',
-  '/access',
+  '/romero',
   '/api/access',
   '/api/health',
   '/api/waitlist',
@@ -84,7 +84,7 @@ export async function middleware(request: NextRequest) {
 
   // Early-access password gate
   // All non-public routes require the sotto_access cookie when SITE_PASSWORD is set.
-  // Only /romero shows the password form (redirects to /access).
+  // /romero handles its own gate inline (shows password form or landing page).
   // All other gated routes silently redirect to / (under construction) to hide the gate.
   if (process.env.SITE_PASSWORD) {
     const accessCookie = request.cookies.get('sotto_access');
@@ -96,11 +96,7 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!hasAccess) {
-      // /romero is the secret entry point — show the password form
-      if (pathname.startsWith('/romero')) {
-        return NextResponse.redirect(new URL('/access', request.url));
-      }
-      // Everything else silently redirects to under construction
+      // Everything non-public silently redirects to landing
       return NextResponse.redirect(new URL('/', request.url));
     }
   }

@@ -16,6 +16,38 @@ function createAccessToken(secret: string): string {
   return `${timestamp}:${hmac}`;
 }
 
+export async function GET(request: NextRequest) {
+  const sitePassword = process.env.SITE_PASSWORD;
+  if (!sitePassword) {
+    return NextResponse.json({ gated: false });
+  }
+
+  const secret = process.env.NEXTAUTH_SECRET;
+  const cookie = request.cookies.get('sotto_access');
+
+  if (!cookie?.value || !secret) {
+    return NextResponse.json({ gated: true, hasAccess: false });
+  }
+
+  const separatorIndex = cookie.value.indexOf(':');
+  if (separatorIndex === -1) {
+    return NextResponse.json({ gated: true, hasAccess: false });
+  }
+
+  const timestamp = cookie.value.substring(0, separatorIndex);
+  const signature = cookie.value.substring(separatorIndex + 1);
+  const age = Date.now() - parseInt(timestamp, 10);
+
+  if (isNaN(age) || age < 0 || age > 60 * 60 * 1000) {
+    return NextResponse.json({ gated: true, hasAccess: false });
+  }
+
+  const expectedSig = crypto.createHmac('sha256', secret).update(timestamp).digest('hex');
+  const hasAccess = expectedSig === signature;
+
+  return NextResponse.json({ gated: true, hasAccess });
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret || !process.env.SITE_PASSWORD) {

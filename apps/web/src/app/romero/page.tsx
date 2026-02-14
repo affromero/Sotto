@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
 import Link from 'next/link';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import styles from './page.module.css';
+import accessStyles from './access.module.css';
 
 const VOICES = [
   { name: 'Adam', accent: 'American', character: 'Warm narrator', gender: 'm' },
@@ -20,10 +21,27 @@ const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="b
 const MAX_RIPPLES = 3;
 
 export default function LandingPage() {
+  const [accessState, setAccessState] = useState<'checking' | 'gated' | 'granted'>('checking');
+  const [password, setPassword] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [accessLoading, setAccessLoading] = useState(false);
   const [navSolid, setNavSolid] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pageRef = useRef<HTMLDivElement>(null);
   const activeRipples = useRef(0);
+
+  useEffect(() => {
+    fetch('/api/access')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.gated || data.hasAccess) {
+          setAccessState('granted');
+        } else {
+          setAccessState('gated');
+        }
+      })
+      .catch(() => setAccessState('granted'));
+  }, []);
 
   const handlePageClick = useCallback((e: MouseEvent) => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -55,6 +73,8 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
+    if (accessState !== 'granted') return;
+
     const onScroll = () => setNavSolid(window.scrollY > 60);
     window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -83,7 +103,59 @@ export default function LandingPage() {
         pageEl.removeEventListener('click', handlePageClick);
       }
     };
-  }, [handlePageClick]);
+  }, [handlePageClick, accessState]);
+
+  async function handleAccessSubmit(e: FormEvent) {
+    e.preventDefault();
+    setAccessError('');
+    setAccessLoading(true);
+    try {
+      const res = await fetch('/api/access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setAccessState('granted');
+      } else {
+        setAccessError('Wrong password. Ask the team for access.');
+      }
+    } catch {
+      setAccessError('Something went wrong. Try again.');
+    } finally {
+      setAccessLoading(false);
+    }
+  }
+
+  if (accessState === 'checking') {
+    return null;
+  }
+
+  if (accessState === 'gated') {
+    return (
+      <main className={accessStyles.main}>
+        <div className={accessStyles.container}>
+          <h1 className={accessStyles.logo}>Sotto</h1>
+          <p className={accessStyles.subtitle}>Early access</p>
+          <form className={accessStyles.form} onSubmit={handleAccessSubmit}>
+            <input
+              className={accessStyles.input}
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoFocus
+              required
+            />
+            <button className={accessStyles.button} type="submit" disabled={accessLoading}>
+              {accessLoading ? 'Checking...' : 'Enter'}
+            </button>
+            {accessError && <p className={accessStyles.error}>{accessError}</p>}
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div ref={pageRef} className={styles.page}>
