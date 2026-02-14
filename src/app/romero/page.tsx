@@ -147,16 +147,16 @@ export default function LandingPage() {
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            Early Access
+            The Open Podcast Network
           </div>
           <h1 className={styles.heroTitle}>
-            Podcasts That
+            Create. Fork.
             <br />
-            Listen <em>Back</em>
+            <em>Share.</em>
           </h1>
           <p className={styles.heroSub}>
-            Generate AI podcasts from any topic. Interrupt mid-playback to ask questions. Share
-            knowledge with the world.
+            Generate AI podcasts, import your own, or fork someone else&apos;s. Ask questions
+            mid-playback. Discover what others are learning on the social feed.
           </p>
           <div className={styles.heroCtas}>
             <Link href="/feed" className={styles.btnPrimary}>
@@ -191,16 +191,16 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
+                  <circle cx="7" cy="5" r="3" />
+                  <circle cx="7" cy="19" r="3" />
+                  <circle cx="19" cy="12" r="3" />
+                  <path d="M7 8v8M10 19h6a3 3 0 0 0 0-6h-6" />
                 </svg>
               </div>
-              <h3>AI-Powered Discovery</h3>
+              <h3>Fork &amp; Remix</h3>
               <p>
-                Chat naturally about what you want to learn. Sotto asks the right questions, then
-                generates a two-voice podcast tailored to your level.
+                Found a podcast you love? Fork it. Change the angle, go deeper on a subtopic,
+                swap the voice. It&apos;s GitHub for podcasts.
               </p>
             </article>
             <article className={`${styles.pillar} ${styles.rev} ${styles.d1}`}>
@@ -216,13 +216,15 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               </div>
-              <h3>Interactive Playback</h3>
+              <h3>Import Any Podcast</h3>
               <p>
-                Pause anytime to ask questions. Get answers in full context. Your curiosity drives
-                the conversation — the podcast actually listens back.
+                Upload human-recorded episodes, lectures, or NotebookLM exports. Sotto adds
+                transcripts, social features, and interactive Q&amp;A on top.
               </p>
             </article>
             <article className={`${styles.pillar} ${styles.rev} ${styles.d2}`}>
@@ -238,15 +240,13 @@ export default function LandingPage() {
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
-              <h3>Voices That Feel Real</h3>
+              <h3>Ask Questions Live</h3>
               <p>
-                16 curated AI voices or clone your own. Every podcast pairs a distinct host and
-                expert — always in contrast, always unique.
+                Pause mid-playback to ask a question. Get an answer in full context. Your Q&amp;A
+                gets woven back into the episode permanently.
               </p>
             </article>
           </div>
@@ -963,10 +963,10 @@ export default function LandingPage() {
             <div className={`${styles.step} ${styles.rev}`}>
               <div className={styles.stepNum}>1</div>
               <div className={styles.stepContent}>
-                <h3>Describe what you want to learn</h3>
+                <h3>Create or import</h3>
                 <p>
-                  Chat naturally with Sotto. Tell us the topic, your background, and what angle
-                  interests you most. Our AI handles the rest.
+                  Chat with Sotto to generate a two-voice podcast from any topic. Or upload an
+                  existing episode — human-recorded, AI-made, anything.
                 </p>
               </div>
             </div>
@@ -974,10 +974,10 @@ export default function LandingPage() {
             <div className={`${styles.step} ${styles.rev} ${styles.d1}`}>
               <div className={styles.stepNum}>2</div>
               <div className={styles.stepContent}>
-                <h3>Listen and interact</h3>
+                <h3>Listen, ask, fork</h3>
                 <p>
-                  A two-voice podcast is generated in under a minute. Listen with an interactive
-                  transcript. Pause to ask questions anytime — Sotto answers in context.
+                  Follow along with an interactive transcript. Pause to ask questions anytime. Fork
+                  any public podcast to remix it with your own angle.
                 </p>
               </div>
             </div>
@@ -985,10 +985,10 @@ export default function LandingPage() {
             <div className={`${styles.step} ${styles.rev} ${styles.d2}`}>
               <div className={styles.stepNum}>3</div>
               <div className={styles.stepContent}>
-                <h3>Share with the world</h3>
+                <h3>Share on the feed</h3>
                 <p>
-                  Your podcasts join a public feed. Discover what others are learning. Fork, remix,
-                  and follow your favorite creators.
+                  Your podcasts join a social feed. Discover what others are learning. Follow
+                  creators, explore fork lineages, and build on each other&apos;s work.
                 </p>
               </div>
             </div>
@@ -1015,21 +1015,21 @@ export default function LandingPage() {
                 <p className={styles.tierDesc}>Perfect for trying Sotto</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 2 podcasts per month</li>
-                <li>{CHECK} Up to 10 minutes each</li>
+                <li>{CHECK} 3 credits per month</li>
+                <li>{CHECK} Up to 5 minutes per podcast</li>
                 <li>{CHECK} Standard AI voices</li>
-                <li>{CHECK} Public podcasts</li>
-                <li>{CHECK} 2 interactions per podcast</li>
+                <li>{CHECK} Public podcasts only</li>
+                <li>{CHECK} Fork, listen, share</li>
               </ul>
               <Link href="/feed" className={styles.tierBtn}>
                 Explore Feed
               </Link>
             </div>
-            {/* PRO */}
+            {/* STARTER */}
             <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d1}`}>
               <div className={styles.tierBadge}>Most Popular</div>
               <div className={styles.tierHead}>
-                <h3>Pro</h3>
+                <h3>Starter</h3>
                 <div className={styles.tierPrice}>
                   <span className={styles.tierAmount}>$14</span>
                   <span className={styles.tierPeriod}>/mo</span>
@@ -1037,36 +1037,33 @@ export default function LandingPage() {
                 <p className={styles.tierDesc}>For power learners</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 8 podcasts per month</li>
-                <li>{CHECK} 3 premium voice credits</li>
-                <li>{CHECK} Clone up to 2 voices</li>
-                <li>{CHECK} 10 interactions per podcast</li>
+                <li>{CHECK} 5 credits per month (+1 rollover)</li>
+                <li>{CHECK} Up to 10 minutes per podcast</li>
+                <li>{CHECK} Clone 1 voice</li>
                 <li>{CHECK} Private &amp; unlisted podcasts</li>
                 <li>{CHECK} MP3 download + PDF transcript</li>
-                <li>{CHECK} Voice library access</li>
+                <li>{CHECK} Credit packs available</li>
               </ul>
               <Link href="/feed" className={styles.tierBtnPrimary}>
                 Explore Feed
               </Link>
             </div>
-            {/* CREATOR */}
+            {/* PRO */}
             <div className={`${styles.tier} ${styles.rev} ${styles.d2}`}>
               <div className={styles.tierHead}>
-                <h3>Creator</h3>
+                <h3>Pro</h3>
                 <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$29</span>
+                  <span className={styles.tierAmount}>$34</span>
                   <span className={styles.tierPeriod}>/mo</span>
                 </div>
                 <p className={styles.tierDesc}>For serious creators</p>
               </div>
               <ul className={styles.tierFeatures}>
-                <li>{CHECK} 30 podcasts per month</li>
-                <li>{CHECK} 10 premium voice credits</li>
-                <li>{CHECK} Clone up to 5 voices</li>
-                <li>{CHECK} Unlimited interactions</li>
+                <li>{CHECK} 10 credits per month (+3 rollover)</li>
+                <li>{CHECK} Clone up to 3 voices</li>
                 <li>{CHECK} Premium sound effects</li>
-                <li>{CHECK} Voice marketplace + analytics</li>
-                <li>{CHECK} Everything in Pro</li>
+                <li>{CHECK} Voice library access</li>
+                <li>{CHECK} Everything in Starter</li>
               </ul>
               <Link href="/feed" className={styles.tierBtn}>
                 Explore Feed
@@ -1074,7 +1071,7 @@ export default function LandingPage() {
             </div>
           </div>
           <p className={styles.tierFootnote}>
-            All plans include unlimited listening. Pricing shown is for launch day.
+            All plans include unlimited listening, forking, and interactions. 1 credit = 1 podcast.
           </p>
         </div>
       </section>
@@ -1083,9 +1080,12 @@ export default function LandingPage() {
       <section className={styles.cta} aria-label="Get started">
         <div className={styles.ctaGlow} aria-hidden="true" />
         <div className={`${styles.ctaContent} ${styles.rev}`}>
-          <h2 className={styles.ctaTitle}>Ready to listen?</h2>
+          <h2 className={styles.ctaTitle}>
+            Create. Fork. <em>Share.</em>
+          </h2>
           <p className={styles.ctaSub}>
-            Explore what others are creating, or sign in to generate your own AI podcast.
+            Generate AI podcasts, import your own, or fork someone else&apos;s. Join the open podcast
+            network.
           </p>
           <div className={styles.heroCtas}>
             <Link href="/feed" className={styles.btnPrimary}>
@@ -1103,7 +1103,7 @@ export default function LandingPage() {
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
             <span className={styles.footerLogo}>Sotto</span>
-            <p>Podcasts that listen back.</p>
+            <p>The open podcast network.</p>
           </div>
           <div className={styles.footerCols}>
             <div>
