@@ -9,7 +9,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `content-extraction`   | `content-extraction`   | 2           | URL/text → extracted content                                                                                     | Updates Discovery.sourceContent                                                        |
 | `script-generation`    | `script-generation`    | 2           | Discovery metadata → 2-voice script with `[N]` citations                                                         | Creates Script + References, routes to script verification                             |
 | `script-verification`  | `script-verification`  | 2           | Script + References → claim extraction + sourcing check (≤3 revision loops)                                      | Passes → routes to ref validation or audio; Fails → regenerates script                 |
-| `reference-validation` | `reference-validation` | 2           | References + Script → source quality filter + 4-layer verification                                               | Verifies/replaces/removes refs, creates Segments, queues audio                         |
+| `reference-validation` | `reference-validation` | 2           | References + Script → source quality filter + 4-layer verification                                               | Verifies/replaces/removes refs, sets SCRIPT_READY (WEB/IMPORT) or creates Segments + queues audio (TWITTER/API) |
 | `audio-generation`     | `audio-generation`     | 5           | Segment text → TTS via `resolveTtsProvider` (BYOK or platform, 5 providers) + FFprobe duration                   | Uploads segment audio to R2, writes `segment.duration`, logs cost to `ApiUsageLog`     |
 | `audio-stitching`      | `audio-stitching`      | 1           | All segments → FFmpeg concat + SFX overlay (with `adelay`) + normalization                                       | Uploads final podcast audio, creates `PodcastVersion`, computes startTimes, sets READY |
 | `interaction`          | `interactions`         | 3           | User question + segment-based timestamp lookup → Claude answer + segmentOrder computation                        | Updates Interaction.answer, status, segmentOrder                                       |
@@ -22,12 +22,18 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 ## Pipeline Flow
 
 ```
-content-extraction → script-generation → script-verification ──→ reference-validation → audio-generation (×N) → audio-stitching → notification
-                                              ↑       │                                                                              ↕
-                                              │  FAIL (≤3)                                                    pdf-generation         twitter-reply
-                                              └───────┘                                                       (on-demand)            (if TWITTER)
+content-extraction → script-generation → script-verification ──→ reference-validation → [SCRIPT_READY] → audio-generation (×N) → audio-stitching → notification
+                                              ↑       │                                      │                                                          ↕
+                                              │  FAIL (≤3)                         WEB/IMPORT: pause      pdf-generation         twitter-reply
+                                              └───────┘                            for user review         (on-demand)            (if TWITTER)
+                                                                                   TWITTER/API: auto-approve
 
 twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast → kicks off pipeline above
+
+Script review (at SCRIPT_READY):
+  User edits script → PATCH /api/podcasts/[id]/script (save edits)
+  User approves    → POST  /api/podcasts/[id]/script/approve (creates Segments, queues audio)
+  User regenerates → POST  /api/podcasts/[id]/script/regenerate (re-queues script-generation)
 
 Incorporation (post-READY):
   incorporate endpoint → segment-regeneration → audio-stitching (skipSfx) → READY

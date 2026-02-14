@@ -50,6 +50,9 @@
 | `/api/podcasts/[podcastId]/knowledge-gaps`                       | GET              | Yes        | Knowledge gap aggregation by segment (owner/admin only)                     |
 | `/api/podcasts/[podcastId]/questions`                            | GET              | No         | List public Q&A questions with vote counts                                  |
 | `/api/podcasts/[podcastId]/interact/[interactionId]/vote`        | POST             | Yes        | Toggle upvote on a public Q&A question                                      |
+| `/api/podcasts/[podcastId]/script`                               | GET/PATCH        | Yes        | Fetch script turns / edit turns (reorder, add, delete, change text)        |
+| `/api/podcasts/[podcastId]/script/approve`                       | POST             | Yes        | Approve script: creates Segments, queues audio generation                  |
+| `/api/podcasts/[podcastId]/script/regenerate`                    | POST             | Yes        | Re-queue script generation from SCRIPT_READY                               |
 | `/api/podcasts/[podcastId]/fork`                                 | POST             | Yes        | Fork a podcast (requires BYOK keys)                                        |
 | `/api/podcasts/[podcastId]/download`                             | GET              | No         | Download podcast audio (Content-Disposition: attachment)                    |
 | `/api/podcasts/[podcastId]/versions`                             | GET              | Yes        | List podcast version history                                                |
