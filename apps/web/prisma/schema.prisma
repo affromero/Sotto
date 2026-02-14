@@ -75,6 +75,10 @@ model User {
   // BYOK AI keys (LLM providers)
   userAiKeys UserAiKey[]
 
+  // Collections
+  collections       Collection[]
+  collectionFollows CollectionFollow[]
+
   // Interests (onboarding + settings)
   interests             UserInterest[]
   hasCompletedOnboarding Boolean @default(false)
@@ -261,6 +265,7 @@ model Podcast {
   podcastFeature   PodcastFeature?
   listeningQueues  ListeningQueue[]
   comments         Comment[]
+  collectionItems  CollectionItem[]
 
   @@index([userId])
   @@index([status])
@@ -1146,4 +1151,51 @@ model UserAiKey {
 
   @@unique([userId, provider])
   @@index([userId])
+}
+
+// ============ COLLECTIONS (Curated Playlists) ============
+
+model Collection {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?  @db.Text
+  userId        String
+  isPublic      Boolean  @default(true)
+  podcastCount  Int      @default(0)
+  followerCount Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CollectionItem[]
+  followers CollectionFollow[]
+
+  @@index([userId])
+}
+
+model CollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  podcastId    String
+  order        Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, podcastId])
+  @@index([collectionId])
+}
+
+model CollectionFollow {
+  id           String   @id @default(cuid())
+  userId       String
+  collectionId String
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, collectionId])
+  @@index([collectionId])
 }

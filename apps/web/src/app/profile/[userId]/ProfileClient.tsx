@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { PodcastList } from '@/components/profile/PodcastList';
 import { FollowListModal } from '@/components/profile/FollowListModal';
+import { CollectionCard } from '@/components/collections/CollectionCard';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './page.module.css';
 
@@ -30,6 +31,17 @@ interface ProfileClientProps {
   currentUserId?: string;
 }
 
+interface CollectionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  podcastCount: number;
+  followerCount: number;
+  createdAt: string;
+  user?: { id: string; name: string | null; handle: string | null };
+}
+
 export function ProfileClient({
   user,
   podcasts,
@@ -44,12 +56,16 @@ export function ProfileClient({
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
-  const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked'>('podcasts');
+  const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked' | 'collections'>('podcasts');
   const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
 
   const [likedPodcasts, setLikedPodcasts] = useState<PodcastSummary[]>([]);
   const [likedLoading, setLikedLoading] = useState(false);
   const likedLoadedRef = useRef(false);
+
+  const [collections, setCollections] = useState<CollectionSummary[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
+  const collectionsLoadedRef = useRef(false);
 
   const loadLikedPodcasts = useCallback(async () => {
     if (likedLoadedRef.current) return;
@@ -63,6 +79,21 @@ export function ProfileClient({
       likedLoadedRef.current = false;
     } finally {
       setLikedLoading(false);
+    }
+  }, [user.id]);
+
+  const loadCollections = useCallback(async () => {
+    if (collectionsLoadedRef.current) return;
+    collectionsLoadedRef.current = true;
+    setCollectionsLoading(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}/collections`);
+      const data = await res.json();
+      setCollections(data.collections || []);
+    } catch {
+      collectionsLoadedRef.current = false;
+    } finally {
+      setCollectionsLoading(false);
     }
   }, [user.id]);
 
@@ -126,6 +157,14 @@ export function ProfileClient({
         >
           Liked
         </button>
+        <button
+          type="button"
+          className={`${styles.tab} ${activeTab === 'collections' ? styles.tabActive : ''}`}
+          onClick={() => { setActiveTab('collections'); loadCollections(); }}
+          aria-pressed={activeTab === 'collections'}
+        >
+          Collections
+        </button>
       </nav>
 
       {activeTab === 'podcasts' && (
@@ -160,6 +199,37 @@ export function ProfileClient({
               : 'This user has not liked any podcasts yet.'
           }
         />
+      )}
+
+      {activeTab === 'collections' && (
+        collectionsLoading ? (
+          <div className={styles.collectionsLoading} role="status" aria-label="Loading collections">
+            <div className={styles.collectionsSpinner} />
+            <span>Loading collections...</span>
+          </div>
+        ) : collections.length === 0 ? (
+          <div className={styles.collectionsEmpty}>
+            <p>
+              {isOwnProfile
+                ? 'You have not created any collections yet.'
+                : 'This user has not created any public collections yet.'}
+            </p>
+          </div>
+        ) : (
+          <div className={styles.collectionsGrid}>
+            {collections.map((c) => (
+              <CollectionCard
+                key={c.id}
+                id={c.id}
+                name={c.name}
+                description={c.description}
+                podcastCount={c.podcastCount}
+                followerCount={c.followerCount}
+                user={c.user}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {followModal && (
