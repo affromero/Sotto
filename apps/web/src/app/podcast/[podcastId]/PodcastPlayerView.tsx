@@ -26,6 +26,7 @@ import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
+import { CommentSection } from '@/components/player/CommentSection';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import type { PodcastDetail } from '@/types/podcast';
@@ -36,6 +37,7 @@ interface PodcastPlayerViewProps {
   podcast: PodcastDetail;
   isOwner: boolean;
   isAuthenticated: boolean;
+  currentUserId?: string;
 }
 
 type ViewMode = 'transcript' | 'teleprompter';
@@ -77,7 +79,7 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId }: PodcastPlayerViewProps) {
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
@@ -500,6 +502,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated }: Podcast
       {isReady && podcast.visibility === 'PUBLIC' && (
         <section className={styles.questionsSection}>
           <CommunityQuestions podcastId={podcast.id} />
+        </section>
+      )}
+
+      {/* Comments */}
+      {isReady && podcast.visibility === 'PUBLIC' && (
+        <section className={styles.commentsSection}>
+          <CommentSection
+            podcastId={podcast.id}
+            podcastOwnerId={podcast.user.id}
+            currentUserId={currentUserId}
+            commentCount={podcast.commentCount}
+          />
         </section>
       )}
 

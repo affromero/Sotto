@@ -58,7 +58,9 @@ export type NotificationType =
   | 'VOICE_REQUEST_APPROVED'
   | 'VOICE_REQUEST_DENIED'
   | 'QUESTION_ON_YOUR_PODCAST'
-  | 'QUESTION_UPVOTED';
+  | 'QUESTION_UPVOTED'
+  | 'COMMENT_ON_YOUR_PODCAST'
+  | 'COMMENT_REPLY';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
 
