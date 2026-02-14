@@ -17,19 +17,32 @@ interface CategoryTag {
   children: SubTag[];
 }
 
+export interface CustomTag {
+  name: string;
+  parentSlug: string;
+}
+
 interface InterestGridProps {
   categories: CategoryTag[];
   selectedTagIds?: string[];
-  onChange?: (tagIds: string[]) => void;
+  customTags?: CustomTag[];
+  onChange?: (tagIds: string[], customTags: CustomTag[]) => void;
 }
 
-export function InterestGrid({ categories, selectedTagIds = [], onChange }: InterestGridProps) {
+export function InterestGrid({
+  categories,
+  selectedTagIds = [],
+  customTags: initialCustomTags = [],
+  onChange,
+}: InterestGridProps) {
   const selectedKey = selectedTagIds.join(',');
   const [selected, setSelected] = useState<Set<string>>(() => new Set(selectedTagIds));
   const [prevKey, setPrevKey] = useState(selectedKey);
   const [expandedSlug, setExpandedSlug] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [panelHeight, setPanelHeight] = useState(0);
+  const [customTags, setCustomTags] = useState<CustomTag[]>(initialCustomTags);
+  const [otherInputs, setOtherInputs] = useState<Record<string, string>>({});
 
   // Sync external selectedTagIds changes
   if (selectedKey !== prevKey) {
@@ -44,13 +57,18 @@ export function InterestGrid({ categories, selectedTagIds = [], onChange }: Inte
     }
   }, []);
 
-  // Re-measure when expanded category or selections change
+  // Re-measure when expanded category, selections, or custom tags change
   useEffect(() => {
     if (expandedSlug) {
-      // Defer to let DOM settle
       requestAnimationFrame(measurePanel);
     }
-  }, [expandedSlug, measurePanel, selected.size]);
+  }, [expandedSlug, measurePanel, selected.size, customTags.length]);
+
+  const totalCount = selected.size + customTags.length;
+
+  const emitChange = (nextSelected: Set<string>, nextCustom: CustomTag[]) => {
+    onChange?.(Array.from(nextSelected), nextCustom);
+  };
 
   const toggleExpand = (slug: string) => {
     setExpandedSlug((prev) => (prev === slug ? null : slug));
@@ -64,35 +82,66 @@ export function InterestGrid({ categories, selectedTagIds = [], onChange }: Inte
       next.add(tagId);
     }
     setSelected(next);
-    onChange?.(Array.from(next));
+    emitChange(next, customTags);
   };
 
   const selectAllInCategory = (children: SubTag[]) => {
     const next = new Set(selected);
     children.forEach((c) => next.add(c.id));
     setSelected(next);
-    onChange?.(Array.from(next));
+    emitChange(next, customTags);
   };
 
-  const clearCategory = (children: SubTag[]) => {
+  const clearCategory = (children: SubTag[], categorySlug: string) => {
     const next = new Set(selected);
     children.forEach((c) => next.delete(c.id));
     setSelected(next);
-    onChange?.(Array.from(next));
+    const nextCustom = customTags.filter((ct) => ct.parentSlug !== categorySlug);
+    setCustomTags(nextCustom);
+    emitChange(next, nextCustom);
   };
 
-  const getSelectedCount = (children: SubTag[]) => {
-    return children.filter((c) => selected.has(c.id)).length;
+  const getSelectedCount = (children: SubTag[], categorySlug: string) => {
+    const predefinedCount = children.filter((c) => selected.has(c.id)).length;
+    const customCount = customTags.filter((ct) => ct.parentSlug === categorySlug).length;
+    return predefinedCount + customCount;
   };
 
-  // Build rows: cards + optional expanded panel after each row that contains the expanded category
+  const addCustomTag = (parentSlug: string) => {
+    const value = (otherInputs[parentSlug] || '').trim();
+    if (!value || value.length < 2) return;
+    if (totalCount >= 20) return;
+
+    // Prevent duplicate custom tags (case-insensitive)
+    const isDuplicate = customTags.some(
+      (ct) => ct.parentSlug === parentSlug && ct.name.toLowerCase() === value.toLowerCase()
+    );
+    if (isDuplicate) return;
+
+    const nextCustom = [...customTags, { name: value, parentSlug }];
+    setCustomTags(nextCustom);
+    setOtherInputs((prev) => ({ ...prev, [parentSlug]: '' }));
+    emitChange(selected, nextCustom);
+  };
+
+  const removeCustomTag = (index: number) => {
+    const nextCustom = customTags.filter((_, i) => i !== index);
+    setCustomTags(nextCustom);
+    emitChange(selected, nextCustom);
+  };
+
   const expandedCategory = categories.find((c) => c.slug === expandedSlug);
+  const categoryCustomTags = expandedCategory
+    ? customTags
+        .map((ct, i) => ({ ...ct, index: i }))
+        .filter((ct) => ct.parentSlug === expandedCategory.slug)
+    : [];
 
   return (
     <div className={styles.grid} role="group" aria-label="Interest categories">
       {categories.map((cat, index) => {
         const isExpanded = expandedSlug === cat.slug;
-        const count = getSelectedCount(cat.children);
+        const count = getSelectedCount(cat.children, cat.slug);
 
         return (
           <div
@@ -147,15 +196,19 @@ export function InterestGrid({ categories, selectedTagIds = [], onChange }: Inte
                 type="button"
                 className={styles.bulkAction}
                 onClick={() => {
-                  const allSelected = getSelectedCount(expandedCategory.children) === expandedCategory.children.length;
+                  const allSelected = getSelectedCount(expandedCategory.children, expandedCategory.slug) ===
+                    expandedCategory.children.length + categoryCustomTags.length;
                   if (allSelected) {
-                    clearCategory(expandedCategory.children);
+                    clearCategory(expandedCategory.children, expandedCategory.slug);
                   } else {
                     selectAllInCategory(expandedCategory.children);
                   }
                 }}
               >
-                {getSelectedCount(expandedCategory.children) === expandedCategory.children.length ? 'Clear' : 'Select All'}
+                {getSelectedCount(expandedCategory.children, expandedCategory.slug) ===
+                expandedCategory.children.length + categoryCustomTags.length
+                  ? 'Clear'
+                  : 'Select All'}
               </button>
             </div>
             <div className={styles.chips} role="group" aria-label={`${expandedCategory.name} sub-interests`}>
@@ -185,6 +238,67 @@ export function InterestGrid({ categories, selectedTagIds = [], onChange }: Inte
                   </button>
                 );
               })}
+
+              {/* Custom tag chips */}
+              {categoryCustomTags.map((ct) => (
+                <button
+                  key={`custom-${ct.index}`}
+                  type="button"
+                  className={`${styles.chip} ${styles.chipSelected} ${styles.chipCustom}`}
+                  onClick={() => removeCustomTag(ct.index)}
+                  aria-label={`Remove ${ct.name}`}
+                >
+                  <svg className={styles.chipCheck} width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                    <path
+                      d="M2.5 7l3 3L11.5 4"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>{ct.name}</span>
+                  <svg className={styles.chipRemove} width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              ))}
+
+              {/* "Other" inline input */}
+              <div className={styles.otherInput}>
+                <input
+                  type="text"
+                  className={styles.otherField}
+                  placeholder="Other..."
+                  value={otherInputs[expandedCategory.slug] || ''}
+                  onChange={(e) =>
+                    setOtherInputs((prev) => ({ ...prev, [expandedCategory.slug]: e.target.value }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addCustomTag(expandedCategory.slug);
+                    }
+                  }}
+                  maxLength={60}
+                  disabled={totalCount >= 20}
+                  aria-label={`Add custom ${expandedCategory.name} interest`}
+                />
+                <button
+                  type="button"
+                  className={styles.otherAdd}
+                  onClick={() => addCustomTag(expandedCategory.slug)}
+                  disabled={
+                    totalCount >= 20 ||
+                    (otherInputs[expandedCategory.slug] || '').trim().length < 2
+                  }
+                  aria-label="Add custom interest"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>

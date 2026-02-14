@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
+import type { CustomTag } from '@/components/discovery/InterestGrid';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
@@ -136,8 +137,14 @@ export function SettingsForm({
 
   // Interests state
   const [interestIds, setInterestIds] = useState<string[]>(selectedInterestTagIds);
+  const [customTags, setCustomTags] = useState<CustomTag[]>([]);
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
+
+  const handleInterestsChange = (tagIds: string[], custom: CustomTag[]) => {
+    setInterestIds(tagIds);
+    setCustomTags(custom);
+  };
 
   const handleSaveInterests = async () => {
     setInterestsSaving(true);
@@ -146,10 +153,11 @@ export function SettingsForm({
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ interests: interestIds }),
+        body: JSON.stringify({ interests: interestIds, customTags }),
       });
       if (response.ok) {
         setInterestsSaved(true);
+        setCustomTags([]);
         setTimeout(() => setInterestsSaved(false), 3000);
       }
     } finally {
@@ -385,7 +393,7 @@ export function SettingsForm({
         <p className={styles.interestsDescription}>
           Select topics you&apos;re curious about. This helps us recommend better podcasts for you.
         </p>
-        <InterestGrid categories={interestCategories} selectedTagIds={interestIds} onChange={setInterestIds} />
+        <InterestGrid categories={interestCategories} selectedTagIds={interestIds} customTags={customTags} onChange={handleInterestsChange} />
         <div className={styles.formActions}>
           <Button
             onClick={handleSaveInterests}
