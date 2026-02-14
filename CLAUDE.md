@@ -27,7 +27,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                         |
 | Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69 / Power $9 BYOK) — swappable via `PAYMENT_PROVIDER` |
 | PDF       | pdfmake (server-side transcript PDF generation)                                                          |
-| Hosting   | Vercel (web) + Railway (workers)                                                                         |
+| Hosting   | Hetzner VPS (Docker Compose + Caddy), deployed via GitHub Actions SSH                                    |
 
 ## Build & Development Commands
 

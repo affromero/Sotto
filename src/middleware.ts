@@ -14,7 +14,6 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 
 // Public routes that bypass the password gate (exact match)
 const PASSWORD_GATE_BYPASS = new Set([
-  '/',
   '/access',
   '/api/access',
   '/api/health',
@@ -91,12 +90,21 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const token = await getToken({ req: request });
-
-  // Skip API routes (handled by individual route handlers)
+  // Skip API routes early (handled by individual route handlers)
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
+
+  // Only fetch token when needed for route protection
+  const needsAuth =
+    PROTECTED_ROUTES.some((route) => pathname.startsWith(route)) ||
+    AUTH_ROUTES.some((route) => pathname.startsWith(route));
+
+  if (!needsAuth) {
+    return NextResponse.next();
+  }
+
+  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
   // Redirect authenticated users away from auth pages
   if (token && AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
