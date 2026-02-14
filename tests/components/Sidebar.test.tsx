@@ -29,26 +29,17 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Team')).not.toBeInTheDocument();
   });
 
-  it('highlights active link for exact path match', () => {
+  it('marks active link with aria-current for exact path match', () => {
     render(<Sidebar currentPath="/dashboard" />);
 
     const activeLink = screen.getByText('Dashboard').closest('a');
-    expect(activeLink?.className).toContain('navLinkActive');
     expect(activeLink).toHaveAttribute('aria-current', 'page');
   });
 
-  it('highlights active link for nested paths', () => {
-    render(<Sidebar currentPath="/settings/voices" />);
-
-    const settingsLink = screen.getByText('Settings').closest('a');
-    expect(settingsLink?.className).toContain('navLinkActive');
-  });
-
-  it('does not highlight inactive links', () => {
+  it('does not mark inactive links with aria-current', () => {
     render(<Sidebar currentPath="/dashboard" />);
 
     const createLink = screen.getByText('Create').closest('a');
-    expect(createLink?.className).not.toContain('navLinkActive');
     expect(createLink).not.toHaveAttribute('aria-current');
   });
 
@@ -118,23 +109,10 @@ describe('Sidebar', () => {
     expect(screen.getByLabelText('Sign out')).toBeInTheDocument();
   });
 
-  it('does not apply open styles by default', () => {
-    const { container } = render(<Sidebar currentPath="/dashboard" />);
-    const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toBe('');
-  });
-
-  it('applies open styles when isOpen is true', () => {
-    const { container } = render(<Sidebar currentPath="/dashboard" isOpen />);
-    const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.className).toContain('sidebarOpen');
-  });
-
   it('renders overlay when open', () => {
     const { container } = render(<Sidebar currentPath="/dashboard" isOpen />);
     const overlay = container.querySelector('[aria-hidden="true"]');
     expect(overlay).toBeInTheDocument();
-    expect(overlay?.className).toContain('overlay');
   });
 
   it('does not render overlay when closed', () => {

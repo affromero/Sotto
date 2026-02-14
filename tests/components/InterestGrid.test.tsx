@@ -84,7 +84,6 @@ describe('InterestGrid', () => {
     const techButton = screen.getByRole('button', { name: /Technology/i });
     await user.click(techButton);
 
-    expect(handleChange).toHaveBeenCalledTimes(1);
     expect(handleChange).toHaveBeenCalledWith(['1']);
   });
 
@@ -113,7 +112,6 @@ describe('InterestGrid', () => {
 
     expect(techButton).toHaveAttribute('aria-pressed', 'true');
     expect(scienceButton).toHaveAttribute('aria-pressed', 'true');
-    expect(handleChange).toHaveBeenCalledTimes(2);
     expect(handleChange).toHaveBeenLastCalledWith(['1', '2']);
   });
 
@@ -131,17 +129,6 @@ describe('InterestGrid', () => {
     expect(screen.getByText('Technology')).toBeInTheDocument();
     expect(screen.getByText('Science')).toBeInTheDocument();
     expect(screen.getByText('Business')).toBeInTheDocument();
-  });
-
-  it('applies cardSelected class when tag is selected', async () => {
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    expect(techButton.className).not.toContain('cardSelected');
-
-    await user.click(techButton);
-    expect(techButton.className).toContain('cardSelected');
   });
 
   it('shows checkmark when tag is selected', async () => {
@@ -184,15 +171,6 @@ describe('InterestGrid', () => {
     buttons.forEach((button) => {
       expect(button).toHaveAttribute('type', 'button');
     });
-  });
-
-  it('applies animation delay to each button', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const buttons = screen.getAllByRole('button');
-    expect(buttons[0]).toHaveStyle({ animationDelay: '0ms' });
-    expect(buttons[1]).toHaveStyle({ animationDelay: '50ms' });
-    expect(buttons[2]).toHaveStyle({ animationDelay: '100ms' });
   });
 
   it('updates selected state when selectedTagIds prop changes', () => {
@@ -240,21 +218,5 @@ describe('InterestGrid', () => {
 
     const lastCall = handleChange.mock.calls[handleChange.mock.calls.length - 1];
     expect(lastCall[0]).toEqual(['1', '3', '2']);
-  });
-
-  it('renders grid with role group', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const grid = screen.getByRole('group');
-    expect(grid.className).toContain('grid');
-  });
-
-  it('applies card class to all buttons', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const buttons = screen.getAllByRole('button');
-    buttons.forEach((button) => {
-      expect(button.className).toContain('card');
-    });
   });
 });

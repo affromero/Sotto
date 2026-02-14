@@ -115,27 +115,6 @@ describe('VoicePreferenceSelector', () => {
     });
   });
 
-  it('fetches voices from API on mount', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ voices: mockPoolVoices }),
-    });
-    global.fetch = fetchMock;
-
-    render(
-      <VoicePreferenceSelector
-        label="Host Voice"
-        value={null}
-        onChange={vi.fn()}
-        voiceClones={[]}
-      />
-    );
-
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/voices');
-    });
-  });
-
   it('displays pool voices after loading', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,

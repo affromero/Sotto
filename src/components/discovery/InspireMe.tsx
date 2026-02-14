@@ -107,7 +107,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         {/* Header */}
         <div className={styles.header}>
           {view === 'drill' ? (
-            <button type="button" className={styles.backButton} onClick={handleBack}>
+            <button type="button" className={styles.backButton} onClick={handleBack} aria-label="Go back">
               <svg
                 width="20"
                 height="20"

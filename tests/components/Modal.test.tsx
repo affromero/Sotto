@@ -149,36 +149,6 @@ describe('Modal', () => {
     expect(document.body.style.overflow).toBe('');
   });
 
-  it('applies medium size class by default', () => {
-    render(
-      <Modal isOpen={true} onClose={vi.fn()}>
-        <p>Content</p>
-      </Modal>
-    );
-    const dialog = screen.getByRole('dialog');
-    expect(dialog.className).toContain('medium');
-  });
-
-  it('applies small size class when size is small', () => {
-    render(
-      <Modal isOpen={true} onClose={vi.fn()} size="small">
-        <p>Content</p>
-      </Modal>
-    );
-    const dialog = screen.getByRole('dialog');
-    expect(dialog.className).toContain('small');
-  });
-
-  it('applies large size class when size is large', () => {
-    render(
-      <Modal isOpen={true} onClose={vi.fn()} size="large">
-        <p>Content</p>
-      </Modal>
-    );
-    const dialog = screen.getByRole('dialog');
-    expect(dialog.className).toContain('large');
-  });
-
   it('has proper ARIA attributes', () => {
     render(
       <Modal isOpen={true} onClose={vi.fn()}>

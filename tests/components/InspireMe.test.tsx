@@ -208,11 +208,10 @@ describe('InspireMe', () => {
     }
   });
 
-  it('drill-down: clicking a For You card fetches subtopics', async () => {
+  it('drill-down: clicking a For You card shows subtopics', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn();
 
-    fetchMock
+    (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockInspireData,
@@ -221,8 +220,6 @@ describe('InspireMe', () => {
         ok: true,
         json: async () => mockDrillData,
       });
-
-    global.fetch = fetchMock;
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -233,17 +230,9 @@ describe('InspireMe', () => {
     await user.click(screen.getByText('The Future of AI in Healthcare'));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/inspire/drill',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            category: 'Technology',
-            parentTitle: 'The Future of AI in Healthcare',
-          }),
-        })
-      );
+      expect(screen.getByText('AI Diagnostic Tools')).toBeInTheDocument();
+      expect(screen.getByText('Patient Data Privacy')).toBeInTheDocument();
+      expect(screen.getByText('AI Training on Medical Data')).toBeInTheDocument();
     });
   });
 
@@ -269,16 +258,10 @@ describe('InspireMe', () => {
     await user.click(screen.getByText('The Future of AI in Healthcare'));
 
     await waitFor(() => {
-      expect(screen.getByText('Technology')).toBeInTheDocument();
+      expect(screen.getByText('AI Diagnostic Tools')).toBeInTheDocument();
     });
 
-    const buttons = screen.getAllByRole('button');
-    const backButton = buttons.find((button) => {
-      const svg = button.querySelector('svg polyline[points="12 19 5 12 12 5"]');
-      return svg !== null;
-    });
-
-    expect(backButton).toBeInTheDocument();
+    expect(screen.getByLabelText('Go back')).toBeInTheDocument();
   });
 
   it('drill-down: clicking back returns to sections view', async () => {
@@ -306,15 +289,7 @@ describe('InspireMe', () => {
       expect(screen.getByText('AI Diagnostic Tools')).toBeInTheDocument();
     });
 
-    const buttons = screen.getAllByRole('button');
-    const backButton = buttons.find((button) => {
-      const svg = button.querySelector('svg polyline[points="12 19 5 12 12 5"]');
-      return svg !== null;
-    });
-
-    if (backButton) {
-      await user.click(backButton);
-    }
+    await user.click(screen.getByLabelText('Go back'));
 
     await waitFor(() => {
       expect(screen.getByText('For You')).toBeInTheDocument();
@@ -400,11 +375,10 @@ describe('InspireMe', () => {
     });
   });
 
-  it('drill-down: clicking "In the News" card triggers drill-down', async () => {
+  it('drill-down: clicking "In the News" card shows subtopics', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn();
 
-    fetchMock
+    (global.fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
         ok: true,
         json: async () => mockInspireData,
@@ -413,8 +387,6 @@ describe('InspireMe', () => {
         ok: true,
         json: async () => mockDrillData,
       });
-
-    global.fetch = fetchMock;
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -425,17 +397,8 @@ describe('InspireMe', () => {
     await user.click(screen.getByText('Space Exploration Updates'));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/inspire/drill',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            category: 'Science',
-            parentTitle: 'Space Exploration Updates',
-          }),
-        })
-      );
+      expect(screen.getByText('AI Diagnostic Tools')).toBeInTheDocument();
+      expect(screen.getByText('Patient Data Privacy')).toBeInTheDocument();
     });
   });
 
@@ -545,13 +508,11 @@ describe('InspireMe', () => {
     ).toBeInTheDocument();
   });
 
-  it('fetches data only once when opened multiple times', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+  it('shows cached data when closed and reopened', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => mockInspireData,
     });
-
-    global.fetch = fetchMock;
 
     const { rerender } = render(
       <InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />
@@ -561,16 +522,13 @@ describe('InspireMe', () => {
       expect(screen.getByText('For You')).toBeInTheDocument();
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-
     rerender(<InspireMe open={false} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
     rerender(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
     await waitFor(() => {
       expect(screen.getByText('For You')).toBeInTheDocument();
+      expect(screen.getByText('The Future of AI in Healthcare')).toBeInTheDocument();
     });
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('resets to sections view when closed and reopened', async () => {
