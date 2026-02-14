@@ -38,7 +38,6 @@ RUN npm run build
 # ---- Stage 3: Production runner ----
 FROM node:20-alpine AS runner
 RUN apk add --no-cache libc6-compat openssl
-WORKDIR /app/apps/web
 
 ARG COMMIT_SHA=dev
 ENV NODE_ENV=production
@@ -51,19 +50,25 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 sotto
 RUN adduser --system --uid 1001 sotto
 
+# Standalone output mirrors monorepo structure (apps/web/server.js + node_modules/)
+# Copy it to /app so paths resolve correctly
+WORKDIR /app
+
 # Copy public assets
-COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 # Copy standalone build output
 COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./.next/static
+COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./apps/web/.next/static
 
 # Copy Prisma schema and generated client for runtime
-COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./prisma
+COPY --from=builder --chown=sotto:sotto /app/apps/web/prisma ./apps/web/prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=deps --chown=sotto:sotto /app/node_modules/@prisma ./node_modules/@prisma
 
 USER sotto
+
+WORKDIR /app/apps/web
 
 EXPOSE 3000
 
