@@ -90,7 +90,7 @@ export async function getDailyPicks(
       createdAt: true,
       userId: true,
       user: { select: { id: true, name: true, image: true } },
-      tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
+      tags: { include: { tag: { select: { id: true, name: true, slug: true, parentId: true } } } },
     },
     orderBy: [{ playCount: 'desc' }, { createdAt: 'desc' }],
     take: 50,
@@ -126,12 +126,16 @@ export async function getDailyPicks(
     }),
     prisma.userInterest.findMany({
       where: { userId },
-      include: { tag: { select: { id: true, name: true } } },
+      include: { tag: { select: { id: true, name: true, parentId: true } } },
     }),
   ]);
   const followedSet = new Set(followedIds.map((f) => f.followingId));
   const interestTagIds = new Set(userInterests.map((i) => i.tag.id));
   const interestTagNames = new Map(userInterests.map((i) => [i.tag.id, i.tag.name]));
+  // Build parent→name map for sibling matching
+  const interestParentIds = new Set(
+    userInterests.map((i) => i.tag.parentId).filter((p): p is string => p !== null)
+  );
 
   const categories: PickCategory[] = [
     { label: 'Continue Learning', podcasts: [] },
@@ -161,9 +165,20 @@ export async function getDailyPicks(
       category: '',
     };
 
-    // Check if podcast matches explicit user interests
+    // Check if podcast matches explicit user interests (exact or sibling via same parent)
     const matchingTag = candidate.tags.find((pt) => interestTagIds.has(pt.tag.id));
-    const matchingInterestName = matchingTag ? interestTagNames.get(matchingTag.tag.id) : null;
+    let matchingInterestName = matchingTag ? interestTagNames.get(matchingTag.tag.id) : null;
+
+    // Sibling match: podcast tag shares a parent with one of the user's interest tags
+    if (!matchingInterestName) {
+      const siblingTag = candidate.tags.find((pt) => {
+        return pt.tag.parentId && interestParentIds.has(pt.tag.parentId);
+      });
+      if (siblingTag) {
+        const relatedInterest = userInterests.find((i) => i.tag.parentId === siblingTag.tag.parentId);
+        matchingInterestName = relatedInterest?.tag.name ?? siblingTag.tag.name;
+      }
+    }
 
     if (followedSet.has(candidate.userId) && categories[2].podcasts.length < 2) {
       rec.category = 'From Your People';
@@ -457,7 +472,7 @@ function applyDiversity(
   candidates: Array<{
     id: string;
     userId: string;
-    tags: Array<{ tag: { id: string; name: string; slug: string } }>;
+    tags: Array<{ tag: { id: string; name: string; slug: string; parentId: string | null } }>;
   }>,
   maxPicks: number
 ): ScoredPodcast[] {

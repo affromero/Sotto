@@ -119,8 +119,20 @@ export class SottoMLProvider implements MLProvider {
       }
     }
 
-    // Boost relevance with explicit UserInterest matches
+    // Boost relevance with explicit UserInterest matches (hierarchical)
+    // Exact sub-tag match = full weight, sibling match (same parent) = 0.4 weight
     if (userInterests.length > 0 && podcastTags.length > 0) {
+      // Look up parentIds for all relevant tags to enable sibling matching
+      const allTagIds = [
+        ...userInterests.map((i) => i.tagId),
+        ...podcastTags.map((t) => t.tagId),
+      ];
+      const tagParents = await prisma.tag.findMany({
+        where: { id: { in: allTagIds } },
+        select: { id: true, parentId: true },
+      });
+      const parentMap = new Map(tagParents.map((t) => [t.id, t.parentId]));
+
       const interestMap = new Map(userInterests.map((i) => [i.tagId, i.weight]));
       const podcastTagIds = new Set(podcastTags.map((t) => t.tagId));
       let matchWeight = 0;
@@ -128,7 +140,20 @@ export class SottoMLProvider implements MLProvider {
       for (const [tagId, weight] of interestMap) {
         totalWeight += weight;
         if (podcastTagIds.has(tagId)) {
+          // Exact match: full weight
           matchWeight += weight;
+        } else {
+          // Sibling match: same parent → 0.4 weight
+          const interestParent = parentMap.get(tagId);
+          if (interestParent) {
+            const hasSibling = podcastTags.some((t) => {
+              const podcastTagParent = parentMap.get(t.tagId);
+              return podcastTagParent === interestParent;
+            });
+            if (hasSibling) {
+              matchWeight += weight * 0.4;
+            }
+          }
         }
       }
       if (totalWeight > 0) {
