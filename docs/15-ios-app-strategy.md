@@ -77,7 +77,7 @@ The existing web app is already PWA-ready:
 **In-app prompt**: Show a dismissible banner on iOS Safari:
 
 ```tsx
-// src/components/mobile/PWAInstallPrompt.tsx
+// apps/web/src/components/mobile/PWAInstallPrompt.tsx
 "Add Sotto to your home screen for the best experience"
 [Show Me How] [Dismiss]
 ```

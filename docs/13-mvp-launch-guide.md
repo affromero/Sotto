@@ -219,7 +219,7 @@ ElevenLabs provides multiple voices. For Sotto's 2-speaker format:
 The `src/lib/elevenlabs.ts` file includes a voice pool system. Update the voice IDs based on your ElevenLabs account:
 
 ```typescript
-// In src/lib/elevenlabs.ts
+// In apps/web/src/lib/elevenlabs.ts
 const VOICE_POOL = {
   hosts: [
     { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
@@ -719,7 +719,7 @@ Pin this podcast to the top of the feed so every new user sees it.
 Create a simple feedback form at `/feedback`:
 
 ```typescript
-// src/app/feedback/page.tsx
+// apps/web/src/app/feedback/page.tsx
 // Form fields:
 // - What did you like?
 // - What was confusing?
@@ -773,7 +773,7 @@ npm install @bull-board/api @bull-board/express
 ```
 
 ```typescript
-// src/app/api/admin/queues/route.ts
+// apps/web/src/app/api/admin/queues/route.ts
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
@@ -802,7 +802,7 @@ npm install @sentry/nextjs
 ```
 
 ```typescript
-// src/lib/logger.ts
+// apps/web/src/lib/logger.ts
 import * as Sentry from '@sentry/nextjs';
 
 export function logError(error: Error, context?: any) {

@@ -3,6 +3,7 @@
 ## Design System: "Warm Intimacy"
 
 All design tokens are CSS custom properties defined in `globals.css`.
+JS equivalents for mobile consumption are in `@sotto/shared` (`packages/shared/src/theme.ts`).
 
 ### Color Palette
 

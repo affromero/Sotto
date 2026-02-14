@@ -219,7 +219,7 @@ Server stores PushSubscription {endpoint, p256dh, auth} in database
 #### Server-Side Sending
 
 ```typescript
-// src/lib/push-notifications.ts
+// apps/web/src/lib/push-notifications.ts
 export async function sendPushNotification(params: {
   userId: string;
   title: string;
