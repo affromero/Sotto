@@ -25,6 +25,7 @@ export default async function SettingsPage() {
         handle: true,
         image: true,
         bio: true,
+        role: true,
         twitterHandle: true,
         twitterEnabled: true,
         preferredHostVoiceId: true,
@@ -79,6 +80,7 @@ export default async function SettingsPage() {
         initialHandle={user.handle ?? ''}
         email={user.email}
         image={user.image}
+        role={user.role}
         connectedProviders={connectedProviders}
         twitterHandle={user.twitterHandle}
         twitterEnabled={user.twitterEnabled}
