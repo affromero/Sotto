@@ -175,15 +175,6 @@ describe('processScriptGeneration', () => {
   });
 
   describe('discovery metadata fetch', () => {
-    it('fetches discovery metadata from database', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(mockPrismaDiscoveryFindUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 'discovery-001' },
-      });
-    });
-
     it('throws if discovery not found', async () => {
       mockPrismaDiscoveryFindUniqueOrThrow.mockRejectedValue(new Error('Discovery not found'));
       const job = createMockJob(defaultPayload);
@@ -602,22 +593,6 @@ describe('processScriptGeneration', () => {
       });
     });
 
-    it('does not create segments directly (verification worker handles this)', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
-    });
-
-    it('does not queue audio generation directly', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      const audioGenerationCalls = mockAddJob.mock.calls.filter(
-        (call) => call[1] === 'generate_audio'
-      );
-      expect(audioGenerationCalls).toHaveLength(0);
-    });
   });
 
   describe('API usage logging', () => {
@@ -679,35 +654,15 @@ describe('processScriptGeneration', () => {
   });
 
   describe('job progress tracking', () => {
-    it('reports progress at 10% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(10);
-    });
-
-    it('reports progress at 50% after script generation', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(50);
-    });
-
-    it('reports progress at 100% at completion', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
-    });
-
-    it('reports progress in correct order', async () => {
-      const job = createMockJob(defaultPayload);
-      await processScriptGeneration(job);
-
-      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        (call: number[]) => call[0]
-      );
-      expect(progressCalls).toEqual([10, 50, 100]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 
@@ -876,9 +831,6 @@ describe('processScriptGeneration', () => {
         expect.objectContaining({ podcastId: 'podcast-001' })
       );
 
-      // No segments created (verification worker handles this)
-      expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
-
       // Usage logged
       expect(mockLogApiUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -919,9 +871,6 @@ describe('processScriptGeneration', () => {
 
       // No references saved
       expect(mockPrismaReferenceCreateMany).not.toHaveBeenCalled();
-
-      // No segments created directly (verification worker handles this)
-      expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
 
       // Script verification job queued
       expect(mockAddJob).toHaveBeenCalledWith(

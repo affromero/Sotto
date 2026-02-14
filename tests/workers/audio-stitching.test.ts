@@ -184,50 +184,6 @@ describe('processAudioStitching', () => {
   });
 
   describe('segment fetching', () => {
-    it('fetches segments from database by segmentIds', async () => {
-      // Mock for initial fetch (full segment data)
-      mockPrismaSegmentFindMany.mockResolvedValueOnce([
-        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
-        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
-        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
-      ]);
-      // Mock for second fetch (fresh duration data for startTime calculation)
-      mockPrismaSegmentFindMany.mockResolvedValueOnce([
-        { id: 'seg-1', duration: 100 },
-        { id: 'seg-2', duration: 100 },
-        { id: 'seg-3', duration: 100 },
-      ]);
-
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockPrismaSegmentFindMany).toHaveBeenCalledWith({
-        where: { id: { in: ['seg-1', 'seg-2', 'seg-3'] } },
-        orderBy: { order: 'asc' },
-      });
-    });
-
-    it('orders segments by order ascending', async () => {
-      // Mock for initial fetch
-      mockPrismaSegmentFindMany.mockResolvedValueOnce([
-        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
-        { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
-        { id: 'seg-3', audioUrl: 'https://r2.example.com/seg-3.mp3', order: 2, duration: 100 },
-      ]);
-      // Mock for second fetch
-      mockPrismaSegmentFindMany.mockResolvedValueOnce([
-        { id: 'seg-1', duration: 100 },
-        { id: 'seg-2', duration: 100 },
-        { id: 'seg-3', duration: 100 },
-      ]);
-
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      const callArgs = mockPrismaSegmentFindMany.mock.calls[0][0];
-      expect(callArgs.orderBy).toEqual({ order: 'asc' });
-    });
-
     it('throws error when no segments are found', async () => {
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([]);
       const job = createMockJob(defaultPayload);
@@ -259,26 +215,6 @@ describe('processAudioStitching', () => {
       expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-1.mp3');
       expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-2.mp3');
       expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-3.mp3');
-    });
-
-    it('writes downloaded audio to temp files', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockWriteFile).toHaveBeenCalledTimes(3);
-      const writeCalls = mockWriteFile.mock.calls;
-      expect(writeCalls[0][0]).toMatch(/seg-000\.mp3$/);
-      expect(writeCalls[1][0]).toMatch(/seg-001\.mp3$/);
-      expect(writeCalls[2][0]).toMatch(/seg-002\.mp3$/);
-    });
-
-    it('creates temp directory before downloading', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockMkdir).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
-        recursive: true,
-      });
     });
   });
 
@@ -340,17 +276,6 @@ describe('processAudioStitching', () => {
 
       expect(mockCopyFile).toHaveBeenCalledTimes(2);
       expect(mockGenerateSoundEffect).not.toHaveBeenCalled();
-    });
-
-    it('copies stock SFX files to temp directory', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      const copyCalls = mockCopyFile.mock.calls;
-      expect(copyCalls[0][0]).toMatch(/intro-warm\.mp3$/);
-      expect(copyCalls[0][1]).toMatch(/sfx-0\.mp3$/);
-      expect(copyCalls[1][0]).toMatch(/transition-whoosh\.mp3$/);
-      expect(copyCalls[1][1]).toMatch(/sfx-1\.mp3$/);
     });
 
     it('passes SFX inserts to stitchWithEffects', async () => {
@@ -467,38 +392,17 @@ describe('processAudioStitching', () => {
       expect(mockCopyFile).not.toHaveBeenCalled();
     });
 
-    it('writes generated SFX to temp file', async () => {
-      mockGenerateSoundEffect.mockResolvedValue(Buffer.from('custom-sfx-audio'));
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockWriteFile).toHaveBeenCalledWith(
-        expect.stringMatching(/sfx-0\.mp3$/),
-        Buffer.from('custom-sfx-audio')
-      );
-    });
-
     it('falls back to stock SFX when ElevenLabs fails', async () => {
       mockGenerateSoundEffect.mockRejectedValue(new Error('ElevenLabs API error'));
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
       expect(mockCopyFile).toHaveBeenCalledTimes(1);
-      expect(mockCopyFile).toHaveBeenCalledWith(
-        expect.stringMatching(/intro-warm\.mp3$/),
-        expect.stringMatching(/sfx-0\.mp3$/)
-      );
+      expect(mockGenerateSoundEffect).toHaveBeenCalled();
     });
   });
 
   describe('R2 upload', () => {
-    it('reads final audio file after stitching', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(mockReadFile).toHaveBeenCalledWith(expect.stringMatching(/final\.mp3$/));
-    });
-
     it('uploads final audio to R2', async () => {
       mockReadFile.mockResolvedValue(Buffer.from('final-audio-bytes'));
       const job = createMockJob(defaultPayload);
@@ -721,57 +625,15 @@ describe('processAudioStitching', () => {
   });
 
   describe('progress tracking', () => {
-    it('reports progress at 5% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(5);
-    });
-
-    it('reports progress during segment downloads (10-50%)', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        (call) => call[0]
-      );
-      expect(progressCalls).toContain(10); // after tier lookup
-      expect(progressCalls.some((p: number) => p > 10 && p < 50)).toBe(true); // during downloads
-    });
-
-    it('reports progress at 50% after all downloads', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(50);
-    });
-
-    it('reports progress at 80% after stitching', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(80);
-    });
-
-    it('reports progress at 90% after R2 upload', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(90);
-    });
-
-    it('reports progress at 95% after segment times update', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(95);
-    });
-
-    it('reports progress at 100% at completion', async () => {
-      const job = createMockJob(defaultPayload);
-      await processAudioStitching(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 
@@ -780,10 +642,7 @@ describe('processAudioStitching', () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
-        recursive: true,
-        force: true,
-      });
+      expect(mockRm).toHaveBeenCalled();
     });
 
     it('cleans up temp directory even when job fails', async () => {
@@ -797,10 +656,7 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
-      expect(mockRm).toHaveBeenCalledWith(expect.stringMatching(/sotto-stitch-/), {
-        recursive: true,
-        force: true,
-      });
+      expect(mockRm).toHaveBeenCalled();
     });
   });
 

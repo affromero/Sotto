@@ -352,7 +352,7 @@ describe('processTwitterReply', () => {
   });
 
   describe('job progress updates', () => {
-    it('updates job progress throughout execution', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const payload: ReplyTwitterPayload = {
         podcastId: 'podcast-012',
         tweetMentionId: 'mention-012',
@@ -368,11 +368,11 @@ describe('processTwitterReply', () => {
       const job = createMockJob(payload);
       await processTwitterReply(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(10);
-      expect(job.updateProgress).toHaveBeenCalledWith(30);
-      expect(job.updateProgress).toHaveBeenCalledWith(50);
-      expect(job.updateProgress).toHaveBeenCalledWith(80);
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 

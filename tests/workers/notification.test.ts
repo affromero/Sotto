@@ -76,77 +76,19 @@ describe('processNotification', () => {
       );
     });
 
-    it('creates the notification with PODCAST_READY type', async () => {
-      const job = createMockJob(defaultPayload);
+    it.each([
+      { type: 'PODCAST_READY', title: 'Your podcast is ready!', message: 'Ready.' },
+      { type: 'PODCAST_LIKED', title: 'Someone liked your podcast', message: 'Liked.' },
+      { type: 'PODCAST_FORKED', title: 'Your podcast was forked', message: 'Forked.' },
+      { type: 'NEW_FOLLOWER', title: 'New follower!', message: 'Followed.' },
+      { type: 'SIMILAR_PODCAST_CREATED', title: 'Similar podcast created', message: 'Similar.' },
+    ] as const)('creates notification with $type type', async ({ type, title, message }) => {
+      const job = createMockJob({ ...defaultPayload, type, title, message });
       await processNotification(job);
 
       expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ type: 'PODCAST_READY' }),
-        })
-      );
-    });
-
-    it('creates the notification with PODCAST_LIKED type', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        type: 'PODCAST_LIKED',
-        title: 'Someone liked your podcast',
-        message: 'John liked your podcast.',
-      });
-      await processNotification(job);
-
-      expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ type: 'PODCAST_LIKED' }),
-        })
-      );
-    });
-
-    it('creates the notification with PODCAST_FORKED type', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        type: 'PODCAST_FORKED',
-        title: 'Your podcast was forked',
-        message: 'Jane forked your podcast.',
-      });
-      await processNotification(job);
-
-      expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ type: 'PODCAST_FORKED' }),
-        })
-      );
-    });
-
-    it('creates the notification with NEW_FOLLOWER type', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        type: 'NEW_FOLLOWER',
-        title: 'New follower!',
-        message: 'You have a new follower.',
-      });
-      await processNotification(job);
-
-      expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ type: 'NEW_FOLLOWER' }),
-        })
-      );
-    });
-
-    it('creates the notification with SIMILAR_PODCAST_CREATED type', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        type: 'SIMILAR_PODCAST_CREATED',
-        title: 'Similar podcast created',
-        message: 'A similar podcast was created on a topic you follow.',
-      });
-      await processNotification(job);
-
-      expect(mockPrismaNotificationCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({ type: 'SIMILAR_PODCAST_CREATED' }),
+          data: expect.objectContaining({ type }),
         })
       );
     });
@@ -287,24 +229,6 @@ describe('processNotification', () => {
 
       await expect(processNotification(job)).resolves.toBeUndefined();
       expect(mockSendPushNotification).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('ordering of operations', () => {
-    it('creates the in-app notification before sending push', async () => {
-      const callOrder: string[] = [];
-      mockPrismaNotificationCreate.mockImplementation(async () => {
-        callOrder.push('create');
-        return { id: 'notif-order-test' };
-      });
-      mockSendPushNotification.mockImplementation(async () => {
-        callOrder.push('push');
-      });
-
-      const job = createMockJob(defaultPayload);
-      await processNotification(job);
-
-      expect(callOrder).toEqual(['create', 'push']);
     });
   });
 

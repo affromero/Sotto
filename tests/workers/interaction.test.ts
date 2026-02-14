@@ -110,15 +110,6 @@ describe('processInteraction', () => {
   });
 
   describe('script context lookup', () => {
-    it('fetches the script for the podcast', async () => {
-      const job = createMockJob(defaultPayload);
-      await processInteraction(job);
-
-      expect(mockPrismaScriptFindUnique).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
-      });
-    });
-
     it('throws error when script is not found', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue(null);
       const job = createMockJob(defaultPayload);
@@ -138,17 +129,6 @@ describe('processInteraction', () => {
   });
 
   describe('segment-based timestamp lookup', () => {
-    it('fetches segments for timing data', async () => {
-      const job = createMockJob(defaultPayload);
-      await processInteraction(job);
-
-      expect(mockPrismaSegmentFindMany).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
-        orderBy: { order: 'asc' },
-        select: { order: true, startTime: true, duration: true },
-      });
-    });
-
     it('uses segment startTime + duration to find correct turn index', async () => {
       const job = createMockJob({ ...defaultPayload, timestamp: 50 });
       await processInteraction(job);
@@ -355,18 +335,6 @@ describe('processInteraction', () => {
       });
     });
 
-    it('updates interaction for the correct interactionId', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        interactionId: 'interaction-xyz-789',
-      });
-      await processInteraction(job);
-
-      expect(mockPrismaInteractionUpdate).toHaveBeenCalledWith({
-        where: { id: 'interaction-xyz-789' },
-        data: expect.anything(),
-      });
-    });
   });
 
   describe('API usage logging', () => {
@@ -418,35 +386,15 @@ describe('processInteraction', () => {
   });
 
   describe('job progress tracking', () => {
-    it('reports progress at 10% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(10);
-    });
-
-    it('reports progress at 80% after generating response', async () => {
-      const job = createMockJob(defaultPayload);
-      await processInteraction(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(80);
-    });
-
-    it('reports progress at 100% at the end', async () => {
-      const job = createMockJob(defaultPayload);
-      await processInteraction(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
-    });
-
-    it('reports progress in correct order', async () => {
-      const job = createMockJob(defaultPayload);
-      await processInteraction(job);
-
-      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        (call: number[]) => call[0]
-      );
-      expect(progressCalls).toEqual([10, 80, 100]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 

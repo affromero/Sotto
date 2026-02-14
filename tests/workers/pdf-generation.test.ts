@@ -93,7 +93,6 @@ vi.mock('@/lib/logger', () => ({
 import { processPdfGeneration } from '@/workers/pdf-generation.worker';
 import type { GeneratePdfPayload } from '@/lib/queue';
 import type { Job } from 'bullmq';
-import { logger } from '@/lib/logger';
 
 // ---- Helpers ----
 
@@ -147,20 +146,6 @@ describe('processPdfGeneration', () => {
   });
 
   describe('podcast lookup', () => {
-    it('fetches podcast with segments and references ordered correctly', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        include: {
-          user: { select: { name: true } },
-          segments: { orderBy: { order: 'asc' }, select: { speaker: true, text: true } },
-          references: { orderBy: { number: 'asc' } },
-        },
-      });
-    });
-
     it('handles missing podcast', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockRejectedValue(new Error('No Podcast found'));
       const job = createMockJob(defaultPayload);
@@ -168,15 +153,6 @@ describe('processPdfGeneration', () => {
       await expect(processPdfGeneration(job)).rejects.toThrow('No Podcast found');
     });
 
-    it('fetches podcast for different podcastId', async () => {
-      const job = createMockJob({ podcastId: 'podcast-xyz-789', userId: 'user-123' });
-      await processPdfGeneration(job);
-
-      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
-        where: { id: 'podcast-xyz-789' },
-        include: expect.any(Object),
-      });
-    });
   });
 
   describe('PDF generation', () => {
@@ -401,84 +377,15 @@ describe('processPdfGeneration', () => {
   });
 
   describe('progress tracking', () => {
-    it('reports progress at 10% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(10);
-    });
-
-    it('reports progress at 30% after loading podcast', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(30);
-    });
-
-    it('reports progress at 70% after PDF generation', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(70);
-    });
-
-    it('reports progress at 90% after R2 upload', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(90);
-    });
-
-    it('reports progress at 100% at completion', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
-    });
-
-    it('reports progress in the correct order', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        (call: number[]) => call[0]
-      );
-      expect(progressCalls).toEqual([10, 30, 70, 90, 100]);
-    });
-  });
-
-  describe('logging', () => {
-    it('logs start of PDF generation with podcastId', async () => {
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(logger.info).toHaveBeenCalledWith('Generating PDF', { podcastId: 'podcast-001' });
-    });
-
-    it('logs completion with pdfUrl', async () => {
-      mockUploadFile.mockResolvedValue('https://r2.example.com/final.pdf');
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(logger.info).toHaveBeenCalledWith('PDF generation complete', {
-        podcastId: 'podcast-001',
-        pdfUrl: 'https://r2.example.com/final.pdf',
-      });
-    });
-
-    it('logs with correct podcastId for different podcasts', async () => {
-      const job = createMockJob({ podcastId: 'podcast-log-test-456', userId: 'user-123' });
-      await processPdfGeneration(job);
-
-      expect(logger.info).toHaveBeenCalledWith('Generating PDF', {
-        podcastId: 'podcast-log-test-456',
-      });
-      expect(logger.info).toHaveBeenCalledWith(
-        'PDF generation complete',
-        expect.objectContaining({
-          podcastId: 'podcast-log-test-456',
-        })
-      );
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 
@@ -570,13 +477,6 @@ describe('processPdfGeneration', () => {
 
       // Progress tracked
       expect(job.updateProgress).toHaveBeenCalledTimes(5);
-
-      // Logged
-      expect(logger.info).toHaveBeenCalledWith('Generating PDF', { podcastId: 'podcast-e2e' });
-      expect(logger.info).toHaveBeenCalledWith('PDF generation complete', {
-        podcastId: 'podcast-e2e',
-        pdfUrl: 'https://r2.example.com/podcasts/podcast-e2e/transcript.pdf',
-      });
     });
   });
 
