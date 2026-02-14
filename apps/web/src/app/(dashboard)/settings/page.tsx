@@ -16,7 +16,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, allTags, byokKeys, aiKeys] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -52,7 +52,15 @@ export default async function SettingsPage() {
     }),
     prisma.tag.findMany({
       where: { slug: { in: ONBOARDING_TAG_SLUGS } },
-      select: { id: true, name: true, slug: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        children: {
+          select: { id: true, name: true, slug: true },
+          orderBy: { name: 'asc' },
+        },
+      },
     }),
     listByokProviders(userId),
     listAiProviders(userId),
@@ -63,9 +71,9 @@ export default async function SettingsPage() {
   const connectedProviders = accounts.map((a) => a.provider);
   const selectedInterestTagIds = userInterests.map((i) => i.tagId);
 
-  // Sort tags by the order defined in ONBOARDING_TAG_SLUGS
+  // Sort categories by the order defined in ONBOARDING_TAG_SLUGS
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
-  allTags.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
+  categories.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
 
   const configuredProviders = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
   const configuredAiProviders = aiKeys.filter((k) => k.isValid).map((k) => k.provider);
@@ -87,7 +95,7 @@ export default async function SettingsPage() {
         preferredHostVoiceId={user.preferredHostVoiceId}
         preferredExpertVoiceId={user.preferredExpertVoiceId}
         voiceClones={voiceClones}
-        interestTags={allTags}
+        interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}

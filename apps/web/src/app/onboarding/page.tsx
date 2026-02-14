@@ -64,15 +64,22 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
     );
   }
 
-  // Interest selection step (default)
-  const tags = await prisma.tag.findMany({
+  // Interest selection step (default) — fetch parent categories with children
+  const categories = await prisma.tag.findMany({
     where: { slug: { in: ONBOARDING_TAG_SLUGS } },
-    select: { id: true, name: true, slug: true },
-    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      children: {
+        select: { id: true, name: true, slug: true },
+        orderBy: { name: 'asc' },
+      },
+    },
   });
 
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
-  tags.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
+  categories.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
 
   return (
     <main className={styles.main}>
@@ -84,7 +91,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
           </p>
         </header>
 
-        <OnboardingForm tags={tags} />
+        <OnboardingForm categories={categories} />
       </div>
     </main>
   );

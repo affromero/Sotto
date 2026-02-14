@@ -18,205 +18,193 @@ vi.mock('@/lib/tag-icons', () => ({
 }));
 
 describe('InterestGrid', () => {
-  const mockTags = [
-    { id: '1', name: 'Technology', slug: 'technology' },
-    { id: '2', name: 'Science', slug: 'science' },
-    { id: '3', name: 'Business', slug: 'business' },
+  const mockCategories = [
+    {
+      id: 'cat-1',
+      name: 'Technology',
+      slug: 'technology',
+      children: [
+        { id: 'sub-1', name: 'Quantum Computing', slug: 'quantum-computing' },
+        { id: 'sub-2', name: 'Cybersecurity', slug: 'cybersecurity' },
+        { id: 'sub-3', name: 'Robotics', slug: 'robotics' },
+      ],
+    },
+    {
+      id: 'cat-2',
+      name: 'Science',
+      slug: 'science',
+      children: [
+        { id: 'sub-4', name: 'Neuroscience', slug: 'neuroscience' },
+        { id: 'sub-5', name: 'Genetics', slug: 'genetics' },
+      ],
+    },
+    {
+      id: 'cat-3',
+      name: 'Business',
+      slug: 'business',
+      children: [
+        { id: 'sub-6', name: 'Startups', slug: 'startups' },
+      ],
+    },
   ];
 
-  it('renders all tag buttons with correct names', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    expect(screen.getByRole('button', { name: /Technology/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Science/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Business/i })).toBeInTheDocument();
-  });
-
-  it('renders with proper ARIA group label', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const group = screen.getByRole('group', { name: 'Interest categories' });
-    expect(group).toBeInTheDocument();
-  });
-
-  it('buttons have aria-pressed=false by default', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    const scienceButton = screen.getByRole('button', { name: /Science/i });
-    const businessButton = screen.getByRole('button', { name: /Business/i });
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'false');
-    expect(scienceButton).toHaveAttribute('aria-pressed', 'false');
-    expect(businessButton).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('clicking a tag toggles selection (aria-pressed=true)', async () => {
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    expect(techButton).toHaveAttribute('aria-pressed', 'false');
-
-    await user.click(techButton);
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('clicking a selected tag deselects it', async () => {
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-
-    await user.click(techButton);
-    expect(techButton).toHaveAttribute('aria-pressed', 'true');
-
-    await user.click(techButton);
-    expect(techButton).toHaveAttribute('aria-pressed', 'false');
-  });
-
-  it('onChange callback receives correct tag IDs', async () => {
-    const handleChange = vi.fn();
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} onChange={handleChange} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    await user.click(techButton);
-
-    expect(handleChange).toHaveBeenCalledWith(['1']);
-  });
-
-  it('renders with pre-selected tags from selectedTagIds', () => {
-    render(<InterestGrid tags={mockTags} selectedTagIds={['1', '3']} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    const scienceButton = screen.getByRole('button', { name: /Science/i });
-    const businessButton = screen.getByRole('button', { name: /Business/i });
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'true');
-    expect(scienceButton).toHaveAttribute('aria-pressed', 'false');
-    expect(businessButton).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('multiple tags can be selected', async () => {
-    const handleChange = vi.fn();
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} onChange={handleChange} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    const scienceButton = screen.getByRole('button', { name: /Science/i });
-
-    await user.click(techButton);
-    await user.click(scienceButton);
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'true');
-    expect(scienceButton).toHaveAttribute('aria-pressed', 'true');
-    expect(handleChange).toHaveBeenLastCalledWith(['1', '2']);
-  });
-
-  it('empty tags array renders empty grid', () => {
-    render(<InterestGrid tags={[]} />);
-
-    const group = screen.getByRole('group', { name: 'Interest categories' });
-    expect(group).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
-  });
-
-  it('tags display their names as labels', () => {
-    render(<InterestGrid tags={mockTags} />);
+  it('renders all category cards with correct names', () => {
+    render(<InterestGrid categories={mockCategories} />);
 
     expect(screen.getByText('Technology')).toBeInTheDocument();
     expect(screen.getByText('Science')).toBeInTheDocument();
     expect(screen.getByText('Business')).toBeInTheDocument();
   });
 
-  it('shows checkmark when tag is selected', async () => {
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} />);
+  it('renders with proper ARIA group label', () => {
+    render(<InterestGrid categories={mockCategories} />);
 
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-
-    let checkmark = techButton.querySelector('div[aria-hidden="true"]');
-    expect(checkmark).toBeNull();
-
-    await user.click(techButton);
-
-    checkmark = screen
-      .getByRole('button', { name: /Technology/i })
-      .querySelector('div[aria-hidden="true"]');
-    expect(checkmark).not.toBeNull();
+    const group = screen.getByRole('group', { name: 'Interest categories' });
+    expect(group).toBeInTheDocument();
   });
 
-  it('renders TagIcon for each tag with correct slug', () => {
-    render(<InterestGrid tags={mockTags} />);
+  it('category cards have aria-expanded=false by default', () => {
+    render(<InterestGrid categories={mockCategories} />);
+
+    const techButton = screen.getByRole('button', { name: /Technology/i });
+    expect(techButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('clicking a category expands it to show sub-interests', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} />);
+
+    const techButton = screen.getByRole('button', { name: /Technology/i });
+    await user.click(techButton);
+
+    expect(techButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Quantum Computing')).toBeInTheDocument();
+    expect(screen.getByText('Cybersecurity')).toBeInTheDocument();
+    expect(screen.getByText('Robotics')).toBeInTheDocument();
+  });
+
+  it('clicking an expanded category collapses it', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} />);
+
+    const techButton = screen.getByRole('button', { name: /Technology/i });
+    await user.click(techButton);
+    expect(techButton).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(techButton);
+    expect(techButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('accordion: expanding one category collapses the previous', async () => {
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} />);
+
+    const techButton = screen.getByRole('button', { name: /Technology/i });
+    const scienceButton = screen.getByRole('button', { name: /Science/i });
+
+    await user.click(techButton);
+    expect(techButton).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(scienceButton);
+    expect(scienceButton).toHaveAttribute('aria-expanded', 'true');
+    expect(techButton).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('selecting a sub-interest chip calls onChange with its ID', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    // Expand Technology
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    // Click Quantum Computing chip
+    const chip = screen.getByRole('button', { name: /Quantum Computing/i });
+    await user.click(chip);
+
+    expect(handleChange).toHaveBeenCalledWith(['sub-1']);
+  });
+
+  it('deselecting a chip removes it from onChange', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1']} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+
+    const chip = screen.getByRole('button', { name: /Quantum Computing/i });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(chip);
+    expect(handleChange).toHaveBeenCalledWith([]);
+  });
+
+  it('shows count badge when sub-interests are selected in a category', () => {
+    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1', 'sub-2']} />);
+
+    expect(screen.getByLabelText('2 selected')).toBeInTheDocument();
+  });
+
+  it('Select All button selects all children in the expanded category', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+    await user.click(screen.getByText('Select All'));
+
+    expect(handleChange).toHaveBeenCalledWith(['sub-1', 'sub-2', 'sub-3']);
+  });
+
+  it('Clear button deselects all children in the expanded category', async () => {
+    const handleChange = vi.fn();
+    const user = userEvent.setup();
+    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-1', 'sub-2', 'sub-3']} onChange={handleChange} />);
+
+    await user.click(screen.getByRole('button', { name: /Technology/i }));
+    await user.click(screen.getByText('Clear'));
+
+    expect(handleChange).toHaveBeenCalledWith([]);
+  });
+
+  it('renders TagIcon for each category with correct slug', () => {
+    render(<InterestGrid categories={mockCategories} />);
 
     expect(screen.getByTestId('tag-icon-technology')).toBeInTheDocument();
     expect(screen.getByTestId('tag-icon-science')).toBeInTheDocument();
     expect(screen.getByTestId('tag-icon-business')).toBeInTheDocument();
   });
 
-  it('TagIcon has correct size of 48', () => {
-    render(<InterestGrid tags={mockTags} />);
+  it('empty categories array renders empty grid', () => {
+    render(<InterestGrid categories={[]} />);
 
-    const icon = screen.getByTestId('tag-icon-technology');
-    expect(icon).toHaveAttribute('width', '48');
-    expect(icon).toHaveAttribute('height', '48');
+    const group = screen.getByRole('group', { name: 'Interest categories' });
+    expect(group).toBeInTheDocument();
   });
 
-  it('buttons have correct type attribute', () => {
-    render(<InterestGrid tags={mockTags} />);
-
-    const buttons = screen.getAllByRole('button');
-    buttons.forEach((button) => {
-      expect(button).toHaveAttribute('type', 'button');
-    });
-  });
-
-  it('updates selected state when selectedTagIds prop changes', () => {
-    const { rerender } = render(<InterestGrid tags={mockTags} selectedTagIds={['1']} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    const scienceButton = screen.getByRole('button', { name: /Science/i });
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'true');
-    expect(scienceButton).toHaveAttribute('aria-pressed', 'false');
-
-    rerender(<InterestGrid tags={mockTags} selectedTagIds={['2']} />);
-
-    expect(techButton).toHaveAttribute('aria-pressed', 'false');
-    expect(scienceButton).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  it('does not call onChange when onChange is not provided', async () => {
+  it('renders with pre-selected sub-interest IDs', async () => {
     const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} />);
+    render(<InterestGrid categories={mockCategories} selectedTagIds={['sub-4']} />);
 
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    await expect(user.click(techButton)).resolves.not.toThrow();
-  });
+    // Science should show badge
+    expect(screen.getByLabelText('1 selected')).toBeInTheDocument();
 
-  it('onChange receives empty array when all tags are deselected', async () => {
-    const handleChange = vi.fn();
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} selectedTagIds={['1']} onChange={handleChange} />);
-
-    const techButton = screen.getByRole('button', { name: /Technology/i });
-    await user.click(techButton);
-
-    expect(handleChange).toHaveBeenCalledWith([]);
-  });
-
-  it('maintains selection order in onChange callback', async () => {
-    const handleChange = vi.fn();
-    const user = userEvent.setup();
-    render(<InterestGrid tags={mockTags} onChange={handleChange} />);
-
-    await user.click(screen.getByRole('button', { name: /Technology/i }));
-    await user.click(screen.getByRole('button', { name: /Business/i }));
+    // Expand Science to verify chip is selected
     await user.click(screen.getByRole('button', { name: /Science/i }));
+    const chip = screen.getByRole('button', { name: /Neuroscience/i });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+  });
 
-    const lastCall = handleChange.mock.calls[handleChange.mock.calls.length - 1];
-    expect(lastCall[0]).toEqual(['1', '3', '2']);
+  it('updates selection when selectedTagIds prop changes', () => {
+    const { rerender } = render(
+      <InterestGrid categories={mockCategories} selectedTagIds={['sub-1']} />
+    );
+
+    expect(screen.getByLabelText('1 selected')).toBeInTheDocument();
+
+    rerender(<InterestGrid categories={mockCategories} selectedTagIds={['sub-4', 'sub-5']} />);
+
+    // Technology badge should be gone, Science badge should show 2
+    expect(screen.getByLabelText('2 selected')).toBeInTheDocument();
   });
 });
