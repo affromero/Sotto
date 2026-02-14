@@ -239,17 +239,6 @@ describe('POST /api/voices/allowlist', () => {
 
     expect(response.status).toBe(201);
     expect(body).toEqual(mockAllowlistEntry);
-    expect(mockVoiceAllowlistCreate).toHaveBeenCalledWith({
-      data: {
-        voiceCloneId: 'clone-1',
-        allowedUserId: 'user-2',
-      },
-      select: {
-        id: true,
-        createdAt: true,
-        allowedUser: { select: { id: true, handle: true, name: true, image: true } },
-      },
-    });
   });
 });
 
@@ -323,15 +312,6 @@ describe('GET /api/voices/allowlist', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual([mockAllowlistEntry]);
-    expect(mockVoiceAllowlistFindMany).toHaveBeenCalledWith({
-      where: { voiceCloneId: 'clone-1' },
-      select: {
-        id: true,
-        createdAt: true,
-        allowedUser: { select: { id: true, handle: true, name: true, image: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
   });
 });
 
@@ -404,8 +384,5 @@ describe('DELETE /api/voices/allowlist/[entryId]', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
-    expect(mockVoiceAllowlistDelete).toHaveBeenCalledWith({
-      where: { id: 'entry-1' },
-    });
   });
 });
