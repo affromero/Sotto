@@ -1140,6 +1140,50 @@
   max-width: 480px;
 }
 
+.creatorStatsCentered {
+  justify-content: center;
+}
+
+/* BYOK Provider Pills (dark background variant) */
+.byokProviders {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.byokProvidersLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.byokProvidersList {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.byokProviderPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 /* Marketplace Mockup */
 .marketplaceMock {
   background: #0f1a2e;
@@ -2256,6 +2300,11 @@
 
   .creatorStatDivider {
     height: 32px;
+  }
+
+  .byokProviders {
+    flex-direction: column;
+    gap: 12px;
   }
 
   .creatorFlow {

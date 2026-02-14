@@ -16,18 +16,6 @@ const VOICES = [
   { name: 'Grace', accent: 'Australian', character: 'Warm & approachable', gender: 'f' },
 ];
 
-const CHECK = (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path
-      d="M3 8.5l3 3 7-7"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
 const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
 const MAX_RIPPLES = 3;
 
@@ -115,9 +103,6 @@ export default function LandingPage() {
             </a>
             <a href="#voices" onClick={() => setMenuOpen(false)}>
               Voices
-            </a>
-            <a href="#pricing" onClick={() => setMenuOpen(false)}>
-              Pricing
             </a>
           </div>
           <div className={styles.navRight}>
@@ -459,224 +444,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== CREATOR ECONOMY ====== */}
-      <section className={styles.creatorSection} aria-label="Creator economy">
-        <div className={styles.creatorGlow} aria-hidden="true" />
-        <div className={styles.inner}>
-          <div className={styles.split}>
-            <div className={`${styles.splitText} ${styles.rev}`}>
-              <span className={styles.overlineLight}>Creator Economy</span>
-              <h2 className={styles.h2Light}>
-                Your voice is an asset.
-                <br />
-                Start earning from it.
-              </h2>
-              <p className={styles.bodyLgLight}>
-                Clone your voice, list it on the Sotto marketplace, and earn every time someone uses
-                it for their podcast. Set your own price. Approve every use. Keep 80% of revenue.
-              </p>
-              <div className={styles.creatorStats}>
-                <div className={styles.creatorStat}>
-                  <span className={styles.creatorStatNum}>80%</span>
-                  <span className={styles.creatorStatLabel}>Creator revenue share</span>
-                </div>
-                <div className={styles.creatorStatDivider} aria-hidden="true" />
-                <div className={styles.creatorStat}>
-                  <span className={styles.creatorStatNum}>$1–10</span>
-                  <span className={styles.creatorStatLabel}>You set the price per use</span>
-                </div>
-                <div className={styles.creatorStatDivider} aria-hidden="true" />
-                <div className={styles.creatorStat}>
-                  <span className={styles.creatorStatNum}>Subs</span>
-                  <span className={styles.creatorStatLabel}>Monthly voice subscriptions</span>
-                </div>
-              </div>
-            </div>
-            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
-              <div className={styles.marketplaceMock}>
-                <div className={styles.marketplaceHeader}>
-                  <span className={styles.marketplaceTitle}>Voice Marketplace</span>
-                  <span className={styles.marketplaceBrowse}>Browse all</span>
-                </div>
-                <div className={styles.marketplaceList}>
-                  <div className={styles.marketplaceVoice}>
-                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarAmber}`}>
-                      S
-                    </div>
-                    <div className={styles.marketplaceInfo}>
-                      <span className={styles.marketplaceName}>Sarah Mitchell</span>
-                      <span className={styles.marketplaceMeta}>British · Warm · Storytelling</span>
-                    </div>
-                    <div className={styles.marketplaceRight}>
-                      <span className={styles.marketplacePrice}>$3/use</span>
-                      <span className={styles.marketplaceUses}>1.2k uses</span>
-                    </div>
-                  </div>
-                  <div className={styles.marketplaceVoice}>
-                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarNavy}`}>
-                      J
-                    </div>
-                    <div className={styles.marketplaceInfo}>
-                      <span className={styles.marketplaceName}>James Chen</span>
-                      <span className={styles.marketplaceMeta}>
-                        American · Deep · Authoritative
-                      </span>
-                    </div>
-                    <div className={styles.marketplaceRight}>
-                      <span className={styles.marketplacePrice}>$5/use</span>
-                      <span className={styles.marketplaceUses}>847 uses</span>
-                    </div>
-                  </div>
-                  <div className={styles.marketplaceVoice}>
-                    <div className={`${styles.marketplaceAvatar} ${styles.marketplaceAvatarAmber}`}>
-                      L
-                    </div>
-                    <div className={styles.marketplaceInfo}>
-                      <span className={styles.marketplaceName}>Lena Rossi</span>
-                      <span className={styles.marketplaceMeta}>Italian · Expressive · Warm</span>
-                    </div>
-                    <div className={styles.marketplaceRight}>
-                      <span className={styles.marketplacePrice}>$4/use</span>
-                      <span className={styles.marketplaceUses}>623 uses</span>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.marketplaceEarnings}>
-                  <div className={styles.earningsHeader}>
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M1 14l3.5-4 3 2.5 4-5.5 3.5 3" />
-                    </svg>
-                    Your Earnings
-                  </div>
-                  <div className={styles.earningsRow}>
-                    <span>This month</span>
-                    <span className={styles.earningsAmount}>$247.80</span>
-                  </div>
-                  <div className={styles.earningsRow}>
-                    <span>Active subscribers</span>
-                    <span className={styles.earningsAmount}>38</span>
-                  </div>
-                  <div className={styles.earningsBar}>
-                    <div className={styles.earningsBarFill} style={{ width: '72%' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.creatorFlow}>
-            <div className={`${styles.creatorFlowStep} ${styles.rev}`}>
-              <div className={styles.creatorFlowIcon}>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                  <line x1="12" y1="19" x2="12" y2="23" />
-                  <line x1="8" y1="23" x2="16" y2="23" />
-                </svg>
-              </div>
-              <h4>Clone your voice</h4>
-              <p>
-                Upload a 30s audio sample. Our AI creates a digital twin of your voice in minutes.
-              </p>
-            </div>
-            <div className={styles.creatorFlowArrow} aria-hidden="true">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </div>
-            <div className={`${styles.creatorFlowStep} ${styles.rev} ${styles.d1}`}>
-              <div className={styles.creatorFlowIcon}>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
-              </div>
-              <h4>List on marketplace</h4>
-              <p>
-                Set your price. Add a description. Your voice appears in the Sotto voice library.
-              </p>
-            </div>
-            <div className={styles.creatorFlowArrow} aria-hidden="true">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-            </div>
-            <div className={`${styles.creatorFlowStep} ${styles.rev} ${styles.d2}`}>
-              <div className={styles.creatorFlowIcon}>
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-                  <line x1="1" y1="10" x2="23" y2="10" />
-                </svg>
-              </div>
-              <h4>Get paid</h4>
-              <p>
-                Approve usage requests. Earn per-use fees or monthly subscriptions. Payouts are
-                automatic.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ====== FORK & REMIX ====== */}
       <section className={styles.section} aria-label="Fork and remix">
         <div className={styles.inner}>
@@ -1011,83 +778,50 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== PRICING ====== */}
-      <section className={styles.section} aria-label="Pricing" id="pricing">
+      {/* ====== BYOK — 100% FREE ====== */}
+      <section className={styles.creatorSection} aria-label="Free with your own keys">
+        <div className={styles.creatorGlow} aria-hidden="true" />
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
-            <span className={styles.overline}>Pricing</span>
-            <h2 className={styles.h2}>Simple, honest pricing</h2>
-            <p className={styles.bodyLg}>Start free. Upgrade when you need more.</p>
+            <span className={styles.overlineLight}>No subscriptions. No credits. No catch.</span>
+            <h2 className={styles.h2Light}>
+              100% free.
+              <br />
+              Bring your own keys.
+            </h2>
+            <p className={styles.bodyLgLight}>
+              Sotto never charges you a cent. You connect your own AI and voice API keys —
+              Anthropic, OpenAI, ElevenLabs, or any of our supported providers — and every feature
+              is yours. Unlimited podcasts, voice clones, private episodes, downloads, everything.
+            </p>
           </div>
-          <div className={styles.tiers}>
-            {/* FREE */}
-            <div className={`${styles.tier} ${styles.rev}`}>
-              <div className={styles.tierHead}>
-                <h3>Free</h3>
-                <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$0</span>
-                </div>
-                <p className={styles.tierDesc}>Perfect for trying Sotto</p>
-              </div>
-              <ul className={styles.tierFeatures}>
-                <li>{CHECK} 3 credits per month</li>
-                <li>{CHECK} Up to 5 minutes per podcast</li>
-                <li>{CHECK} Standard AI voices</li>
-                <li>{CHECK} Public podcasts only</li>
-                <li>{CHECK} Fork, listen, share</li>
-              </ul>
-              <Link href="/feed" className={styles.tierBtn}>
-                Explore Feed
-              </Link>
+          <div className={`${styles.creatorStats} ${styles.creatorStatsCentered}`}>
+            <div className={styles.creatorStat}>
+              <span className={styles.creatorStatNum}>$0</span>
+              <span className={styles.creatorStatLabel}>Forever</span>
             </div>
-            {/* STARTER */}
-            <div className={`${styles.tier} ${styles.tierFeatured} ${styles.rev} ${styles.d1}`}>
-              <div className={styles.tierBadge}>Most Popular</div>
-              <div className={styles.tierHead}>
-                <h3>Starter</h3>
-                <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$14</span>
-                  <span className={styles.tierPeriod}>/mo</span>
-                </div>
-                <p className={styles.tierDesc}>For power learners</p>
-              </div>
-              <ul className={styles.tierFeatures}>
-                <li>{CHECK} 5 credits per month (+1 rollover)</li>
-                <li>{CHECK} Up to 10 minutes per podcast</li>
-                <li>{CHECK} Clone 1 voice</li>
-                <li>{CHECK} Private &amp; unlisted podcasts</li>
-                <li>{CHECK} MP3 download + PDF transcript</li>
-                <li>{CHECK} Credit packs available</li>
-              </ul>
-              <Link href="/feed" className={styles.tierBtnPrimary}>
-                Explore Feed
-              </Link>
+            <div className={styles.creatorStatDivider} aria-hidden="true" />
+            <div className={styles.creatorStat}>
+              <span className={styles.creatorStatNum}>Unlimited</span>
+              <span className={styles.creatorStatLabel}>Podcasts &amp; features</span>
             </div>
-            {/* PRO */}
-            <div className={`${styles.tier} ${styles.rev} ${styles.d2}`}>
-              <div className={styles.tierHead}>
-                <h3>Pro</h3>
-                <div className={styles.tierPrice}>
-                  <span className={styles.tierAmount}>$34</span>
-                  <span className={styles.tierPeriod}>/mo</span>
-                </div>
-                <p className={styles.tierDesc}>For serious creators</p>
-              </div>
-              <ul className={styles.tierFeatures}>
-                <li>{CHECK} 10 credits per month (+3 rollover)</li>
-                <li>{CHECK} Clone up to 3 voices</li>
-                <li>{CHECK} Premium sound effects</li>
-                <li>{CHECK} Voice library access</li>
-                <li>{CHECK} Everything in Starter</li>
-              </ul>
-              <Link href="/feed" className={styles.tierBtn}>
-                Explore Feed
-              </Link>
+            <div className={styles.creatorStatDivider} aria-hidden="true" />
+            <div className={styles.creatorStat}>
+              <span className={styles.creatorStatNum}>Your keys</span>
+              <span className={styles.creatorStatLabel}>You own the costs</span>
             </div>
           </div>
-          <p className={styles.tierFootnote}>
-            All plans include unlimited listening, forking, and interactions. 1 credit = 1 podcast.
-          </p>
+          <div className={`${styles.byokProviders} ${styles.rev}`}>
+            <span className={styles.byokProvidersLabel}>Supported providers</span>
+            <div className={styles.byokProvidersList}>
+              <span className={styles.byokProviderPill}>Anthropic</span>
+              <span className={styles.byokProviderPill}>OpenAI</span>
+              <span className={styles.byokProviderPill}>ElevenLabs</span>
+              <span className={styles.byokProviderPill}>PlayHT</span>
+              <span className={styles.byokProviderPill}>Cartesia</span>
+              <span className={styles.byokProviderPill}>Hume</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1133,7 +867,6 @@ export default function LandingPage() {
               <h4>Product</h4>
               <a href="#features">Features</a>
               <a href="#voices">Voices</a>
-              <a href="#pricing">Pricing</a>
             </div>
             <div>
               <h4>Company</h4>
