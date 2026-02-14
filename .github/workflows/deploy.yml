@@ -78,9 +78,19 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d
 
             echo "Waiting for health check..."
-            sleep 30
-            curl -sf http://localhost:3000/api/health
-            echo "Health check passed"
+            for i in $(seq 1 12); do
+              sleep 10
+              if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "Health check passed (attempt $i)"
+                break
+              fi
+              echo "Attempt $i/12 — not ready yet"
+              if [ "$i" -eq 12 ]; then
+                echo "Health check failed after 120s"
+                docker compose -f docker-compose.prod.yml logs --tail=50 web
+                exit 1
+              fi
+            done
 
             echo "Cleaning up old images..."
             docker image prune -f
