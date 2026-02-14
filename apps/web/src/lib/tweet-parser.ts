@@ -32,7 +32,8 @@ Respond with ONLY valid JSON matching this shape:
  */
 export async function parseTweetIntent(
   tweetText: string,
-  parentTweetText?: string
+  parentTweetText?: string,
+  apiKeyOverride?: string
 ): Promise<TweetParseResult> {
   let userMessage = `Tweet: "${tweetText}"`;
   if (parentTweetText) {
@@ -42,7 +43,7 @@ export async function parseTweetIntent(
   const response = await generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 512 }
+    { maxTokens: 512, apiKeyOverride }
   );
 
   logger.info('Tweet intent parsed', {

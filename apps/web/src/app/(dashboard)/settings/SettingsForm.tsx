@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
+import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import styles from './page.module.css';
 
 interface VoiceCloneData {
@@ -37,6 +38,7 @@ interface SettingsFormProps {
   interestTags: TagOption[];
   selectedInterestTagIds: string[];
   configuredTtsProviders: string[];
+  configuredAiProviders: string[];
 }
 
 const providerLabels: Record<string, string> = {
@@ -61,6 +63,7 @@ export function SettingsForm({
   interestTags,
   selectedInterestTagIds,
   configuredTtsProviders,
+  configuredAiProviders,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -500,6 +503,16 @@ export function SettingsForm({
             </div>
           </div>
         )}
+      </section>
+
+      {/* AI Provider Keys (BYOK) */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>AI Providers (BYOK)</h2>
+        <p className={styles.sectionDesc}>
+          Bring your own LLM API key for podcast generation. At least one AI key is required to
+          create podcasts. Keys are encrypted with AES-256-GCM.
+        </p>
+        <AiProviderCards initialConfigured={configuredAiProviders} />
       </section>
 
       {/* TTS Provider Keys (BYOK) */}

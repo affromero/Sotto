@@ -84,6 +84,9 @@ model User {
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
 
+  // BYOK AI keys (LLM providers)
+  userAiKeys UserAiKey[]
+
   // Interests (onboarding + settings)
   interests             UserInterest[]
   hasCompletedOnboarding Boolean @default(false)
@@ -1157,6 +1160,25 @@ model UserTtsKey {
   provider     String    // 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
   encryptedKey String    @db.Text
   extraData    String?   @db.Text // encrypted JSON for multi-field auth (e.g. PlayHT userId)
+  isValid      Boolean   @default(true)
+  label        String?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+// ============ USER AI KEYS (LLM BYOK) ============
+
+model UserAiKey {
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String    // 'anthropic' | 'openai'
+  encryptedKey String    @db.Text
   isValid      Boolean   @default(true)
   label        String?
   lastUsedAt   DateTime?

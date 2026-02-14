@@ -16,6 +16,7 @@ import {
   type GeneratedReference,
 } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
+import { getAiKey } from '@/lib/byok';
 import { getUserTier } from '@/lib/subscription';
 import { TIER_LIMITS } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
@@ -27,6 +28,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
+
+  const aiKey = await getAiKey(userId);
 
   const [podcast, script, discovery, references] = await Promise.all([
     prisma.podcast.findUniqueOrThrow({
@@ -73,6 +76,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     attemptNumber,
     maxDurationMinutes,
     previousFeedback: script.verificationFeedback || undefined,
+    apiKeyOverride: aiKey?.apiKey,
   });
 
   await job.updateProgress(50);
@@ -213,6 +217,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     previousScript: turns,
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
+    apiKeyOverride: aiKey?.apiKey,
   });
 
   await job.updateProgress(80);

@@ -6,6 +6,11 @@ import {
   validateProviderCredentials,
   getProviderMeta,
 } from './providers/tts-registry';
+import {
+  type AiProviderId,
+  validateAiProviderCredentials,
+  getAiProviderMeta,
+} from './providers/ai-registry';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -265,3 +270,157 @@ export async function validateByokKey(
 
 // Legacy exports for backward compat
 export { validateProviderCredentials as validateElevenLabsKey };
+
+// ---------------------------------------------------------------------------
+// AI (LLM) BYOK operations (UserAiKey model)
+// ---------------------------------------------------------------------------
+
+export interface AiKeyInfo {
+  provider: AiProviderId;
+  isValid: boolean;
+  lastUsedAt: Date | null;
+  label: string | null;
+}
+
+/**
+ * Store (upsert) an AI BYOK key for a specific provider.
+ */
+export async function storeAiKey(
+  userId: string,
+  provider: AiProviderId,
+  apiKey: string
+): Promise<void> {
+  const encryptedKey = encryptApiKey(apiKey);
+
+  await prisma.userAiKey.upsert({
+    where: { userId_provider: { userId, provider } },
+    update: {
+      encryptedKey,
+      isValid: true,
+      updatedAt: new Date(),
+    },
+    create: {
+      userId,
+      provider,
+      encryptedKey,
+      isValid: true,
+      label: getAiProviderMeta(provider).displayName,
+    },
+  });
+
+  logger.info('Stored AI BYOK key', { userId, provider });
+}
+
+/**
+ * Retrieve and decrypt a user's AI BYOK key.
+ * If provider is specified, returns that provider's key.
+ * If not, returns the first available key (anthropic preferred).
+ */
+export async function getAiKey(
+  userId: string,
+  provider?: AiProviderId
+): Promise<{ apiKey: string; provider: AiProviderId } | null> {
+  if (provider) {
+    const record = await prisma.userAiKey.findUnique({
+      where: { userId_provider: { userId, provider } },
+    });
+    if (!record) return null;
+
+    try {
+      await prisma.userAiKey.update({
+        where: { id: record.id },
+        data: { lastUsedAt: new Date() },
+      });
+      return { apiKey: decryptApiKey(record.encryptedKey), provider };
+    } catch (error) {
+      logger.error('Failed to decrypt AI BYOK key', {
+        userId,
+        provider,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  // No provider specified — try anthropic first, then openai
+  const records = await prisma.userAiKey.findMany({
+    where: { userId, isValid: true },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  // Prefer anthropic
+  const preferred = records.find((r) => r.provider === 'anthropic') || records[0];
+  if (!preferred) return null;
+
+  try {
+    await prisma.userAiKey.update({
+      where: { id: preferred.id },
+      data: { lastUsedAt: new Date() },
+    });
+    return {
+      apiKey: decryptApiKey(preferred.encryptedKey),
+      provider: preferred.provider as AiProviderId,
+    };
+  } catch (error) {
+    logger.error('Failed to decrypt AI BYOK key', {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/**
+ * Check if a user has any AI BYOK key configured.
+ */
+export async function hasAiKey(userId: string): Promise<boolean> {
+  const count = await prisma.userAiKey.count({ where: { userId, isValid: true } });
+  return count > 0;
+}
+
+/**
+ * Remove a user's AI BYOK key for a specific provider.
+ */
+export async function removeAiKey(userId: string, provider: AiProviderId): Promise<void> {
+  await prisma.userAiKey
+    .delete({
+      where: { userId_provider: { userId, provider } },
+    })
+    .catch(() => {
+      // Ignore if doesn't exist
+    });
+
+  logger.info('Removed AI BYOK key', { userId, provider });
+}
+
+/**
+ * List all configured AI providers for a user.
+ */
+export async function listAiProviders(userId: string): Promise<AiKeyInfo[]> {
+  const keys = await prisma.userAiKey.findMany({
+    where: { userId },
+    select: {
+      provider: true,
+      isValid: true,
+      lastUsedAt: true,
+      label: true,
+    },
+  });
+
+  return keys.map((k) => ({
+    provider: k.provider as AiProviderId,
+    isValid: k.isValid,
+    lastUsedAt: k.lastUsedAt,
+    label: k.label,
+  }));
+}
+
+/**
+ * Validate an AI BYOK key against the provider's API.
+ */
+export async function validateAiKey(
+  provider: AiProviderId,
+  apiKey: string
+): Promise<boolean> {
+  return validateAiProviderCredentials(provider, { apiKey });
+}

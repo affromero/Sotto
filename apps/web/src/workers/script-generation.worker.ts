@@ -3,6 +3,7 @@ import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from 
 import { prisma } from '@/lib/prisma';
 import { generateScript } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
+import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
@@ -10,6 +11,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   logger.info('Generating script', { podcastId });
   await job.updateProgress(10);
+
+  const aiKey = await getAiKey(userId);
 
   // Get discovery metadata
   const discovery = await prisma.discovery.findUniqueOrThrow({
@@ -25,6 +28,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
     sourceContent: discovery.sourceContent || undefined,
+    apiKeyOverride: aiKey?.apiKey,
   });
 
   await job.updateProgress(50);

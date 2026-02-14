@@ -88,16 +88,18 @@ export function parseMetadata(
  * Generate a discovery chat response (non-streaming)
  */
 export async function getDiscoveryResponse(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  apiKeyOverride?: string
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
-  return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024 });
+  return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024, apiKeyOverride });
 }
 
 /**
  * Stream a discovery chat response
  */
 export function streamDiscoveryResponse(
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  apiKeyOverride?: string
 ): AsyncGenerator<string> {
-  return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024 });
+  return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024, apiKeyOverride });
 }

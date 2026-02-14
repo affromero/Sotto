@@ -66,6 +66,7 @@ export async function verifyScript(params: {
   attemptNumber: number;
   maxDurationMinutes?: number;
   previousFeedback?: string;
+  apiKeyOverride?: string;
 }): Promise<VerificationVerdict> {
   const {
     topic,
@@ -157,6 +158,7 @@ Analyze every factual claim. Return JSON only.`;
 
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 8192,
+    apiKeyOverride: params.apiKeyOverride,
   });
 
   let parsed: {
