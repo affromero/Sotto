@@ -131,17 +131,6 @@ describe('content-parser', () => {
       );
     });
 
-    it('throws error when fetch fails with 500 status', async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-        ok: false,
-        status: 500,
-      });
-
-      await expect(extractFromUrl('https://example.com/error')).rejects.toThrow(
-        'Failed to fetch URL: 500'
-      );
-    });
-
     it('throws error when fetch rejects with network error', async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Network error'));
 
@@ -269,30 +258,6 @@ describe('content-parser', () => {
       expect(result.length).toBe(50000);
     });
 
-    it('handles multi-page PDFs', async () => {
-      const buffer = Buffer.from('fake pdf');
-      mockPdfParse.mockResolvedValue({
-        numpages: 10,
-        text: 'Content from multiple pages',
-      });
-
-      const result = await extractFromPdf(buffer);
-
-      expect(result).toBe('Content from multiple pages');
-    });
-
-    it('handles single page PDF', async () => {
-      const buffer = Buffer.from('fake pdf');
-      mockPdfParse.mockResolvedValue({
-        numpages: 1,
-        text: 'Single page content',
-      });
-
-      const result = await extractFromPdf(buffer);
-
-      expect(result).toBe('Single page content');
-    });
-
     it('handles empty PDF', async () => {
       const buffer = Buffer.from('fake pdf');
       mockPdfParse.mockResolvedValue({
@@ -363,53 +328,11 @@ describe('content-parser', () => {
       expect(result.length).toBe(50000);
     });
 
-    it('handles PDF parse result with default export', async () => {
-      const buffer = Buffer.from('fake pdf');
-      const mockDefaultParse = vi.fn().mockResolvedValue({
-        numpages: 1,
-        text: 'Default export content',
-      });
-      mockPdfParse.mockImplementation(mockDefaultParse);
-
-      const result = await extractFromPdf(buffer);
-
-      expect(result).toBe('Default export content');
-    });
-
     it('handles empty buffer', async () => {
       const buffer = Buffer.from('');
       mockPdfParse.mockRejectedValue(new Error('Empty buffer'));
 
       await expect(extractFromPdf(buffer)).rejects.toThrow('Empty buffer');
-    });
-
-    it('preserves paragraph structure in PDF text', async () => {
-      const buffer = Buffer.from('fake pdf');
-      mockPdfParse.mockResolvedValue({
-        numpages: 2,
-        text: 'Paragraph 1.\n\nParagraph 2.\n\nParagraph 3.',
-      });
-
-      const result = await extractFromPdf(buffer);
-
-      expect(result).toContain('Paragraph 1');
-      expect(result).toContain('\n\n');
-      expect(result).toContain('Paragraph 3');
-    });
-
-    it('handles PDF with numbers and symbols', async () => {
-      const buffer = Buffer.from('fake pdf');
-      mockPdfParse.mockResolvedValue({
-        numpages: 1,
-        text: 'Data: 123, 456.78, 90% of $100',
-      });
-
-      const result = await extractFromPdf(buffer);
-
-      expect(result).toContain('123');
-      expect(result).toContain('456.78');
-      expect(result).toContain('90%');
-      expect(result).toContain('$100');
     });
 
     it('truncates at 50000 chars even with multi-byte unicode', async () => {

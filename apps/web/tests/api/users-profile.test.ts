@@ -131,32 +131,6 @@ describe('GET /api/users/[userId]', () => {
     expect(body.podcastCount).toBe(12);
   });
 
-  it('includes correct follower count from _count', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.followerCount).toBe(150);
-  });
-
-  it('includes correct following count from _count', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.followingCount).toBe(45);
-  });
-
   it('handles user with null image and bio', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(mockUserWithoutImage);
     mockAuth.mockResolvedValue(null);

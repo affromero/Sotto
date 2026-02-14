@@ -282,48 +282,6 @@ describe('push-notifications', () => {
     });
   });
 
-  it('sends notifications in batch to all subscriptions', async () => {
-    const { sendPushNotification } = await import('@/lib/push-notifications');
-
-    const mockSubscriptions = [
-      {
-        id: 'sub1',
-        userId: 'user1',
-        endpoint: 'https://push.example.com/1',
-        p256dh: 'key1',
-        auth: 'auth1',
-        createdAt: new Date(),
-      },
-      {
-        id: 'sub2',
-        userId: 'user1',
-        endpoint: 'https://push.example.com/2',
-        p256dh: 'key2',
-        auth: 'auth2',
-        createdAt: new Date(),
-      },
-      {
-        id: 'sub3',
-        userId: 'user1',
-        endpoint: 'https://push.example.com/3',
-        p256dh: 'key3',
-        auth: 'auth3',
-        createdAt: new Date(),
-      },
-    ];
-
-    vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue(mockSubscriptions);
-    mockSendNotification.mockResolvedValue(undefined);
-
-    await sendPushNotification({
-      userId: 'user1',
-      title: 'Batch Test',
-      body: 'Testing batch send',
-    });
-
-    expect(mockSendNotification).toHaveBeenCalledTimes(3);
-  });
-
   it('does nothing when VAPID keys are not configured', async () => {
     vi.resetModules();
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = '';

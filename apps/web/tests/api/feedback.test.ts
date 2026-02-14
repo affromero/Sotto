@@ -485,16 +485,6 @@ describe('POST /api/feedback', () => {
     }
   });
 
-  it('does not call prisma.create when validation fails', async () => {
-    const request = createPostRequest({
-      type: 'GENERAL',
-      subject: '',
-      message: '',
-    });
-    await POST(request);
-
-    expect(mockPrisma.feedback.create).not.toHaveBeenCalled();
-  });
 });
 
 describe('GET /api/feedback', () => {

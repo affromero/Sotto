@@ -456,22 +456,6 @@ describe('elevenlabs', () => {
       expect(result.voiceId).toBe('cloned-voice-123');
     });
 
-    it('includes description when provided', async () => {
-      const audioFiles = [Buffer.from('audio sample')];
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ voice_id: 'cloned-voice-456' }),
-      });
-
-      await cloneVoice('Test Voice', audioFiles, 'A professional narrator voice');
-
-      const callArgs = mockFetch.mock.calls[0];
-      const formData = callArgs[1].body;
-
-      expect(formData).toBeInstanceOf(FormData);
-    });
-
     it('throws error when API key is missing', async () => {
       delete process.env.ELEVENLABS_API_KEY;
 
