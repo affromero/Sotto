@@ -25,7 +25,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume (multi-provider TTS) — resolved via resolveTtsProvider()      |
 | Stitching | FFmpeg (segment concatenation + normalization)                                                           |
 | Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                         |
-| Payments  | Stripe (Free $0 / Starter $14 / Pro $34 / Studio $69 / Power $9 BYOK) — swappable via `PAYMENT_PROVIDER` |
+| BYOK      | Users bring own LLM keys (Anthropic/OpenAI) + TTS keys (5 providers) — all features free                |
 | PDF       | pdfmake (server-side transcript PDF generation)                                                          |
 | Hosting   | Hetzner VPS (Docker Compose + Caddy), deployed via GitHub Actions SSH                                    |
 
@@ -147,23 +147,26 @@ src/
 │   ├── podcast/[podcastId]/    # Playback + interrupt + fork
 │   ├── feed/                   # Public social feed
 │   ├── profile/[userId]/       # Public profile + follow
-│   ├── pricing/                # Pricing page
+│   ├── collections/            # Collection detail pages
 │   └── api/                    # API routes
 │       ├── auth/[...nextauth]/ # NextAuth handlers
 │       ├── podcasts/           # CRUD, generate, interact, fork, like, save
 │       ├── discovery/          # Streaming Claude chat + chip suggestions
 │       ├── feed/               # Public feed, trending, search
 │       ├── users/              # Profile, follow/unfollow, Twitter settings
-│       ├── billing/            # Stripe checkout, subscription, portal, usage
+│       ├── billing/            # Usage stats, BYOK key status
+│       ├── activity/           # Social activity feed
+│       ├── collections/        # Collection CRUD, items, follow
 │       ├── notifications/      # List, mark read, push registration
-│       ├── admin/              # Admin API — ADMIN only
-│       └── webhooks/stripe/    # Stripe webhook handler
+│       └── admin/              # Admin API — ADMIN only
 ├── components/
 │   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner
-│   ├── player/                 # AudioPlayer, MiniPlayer, TranscriptPanel, InterruptChatPanel
+│   ├── player/                 # AudioPlayer, MiniPlayer, TranscriptPanel, InterruptChatPanel, CommunityQuestions, CommentSection
 │   ├── chat/                   # ChatContainer, ChatMessage, ChatChips
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
-│   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar
+│   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar, ActivityFeed, ActivityItem
+│   ├── profile/                # ProfileHeader, PodcastList, FollowButton, UserCard, FollowListModal
+│   ├── collections/            # CollectionCard, AddToCollectionModal, CollectionDetail
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
 │   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider
 ├── lib/
@@ -172,9 +175,9 @@ src/
 │   ├── queue.ts                # BullMQ job queues
 │   ├── auth.ts                 # NextAuth configuration
 │   ├── claude.ts               # Anthropic Claude client
-│   ├── stripe.ts               # Stripe client + tier limits
+│   ├── byok.ts                 # BYOK key management (AI + TTS, AES-256-GCM encrypted)
 │   ├── validations.ts          # Zod schemas (web-only; shared schemas in @sotto/shared)
-│   ├── providers/              # Modular provider architecture (ai, tts, stt, storage, payment)
+│   ├── providers/              # Modular provider architecture (ai, tts, stt, storage)
 │   └── hooks/                  # React hooks (useAuth, useAudioPlayer, usePodcast, etc.)
 ├── workers/
 │   ├── index.ts                # Worker orchestrator (13 workers)
@@ -272,22 +275,27 @@ Claude generates natural HOST segment addressing Q&A
 
 | Model                   | Purpose                                                                                                                                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), usage tracking, Twitter handle + prefs                                                                                                                            |
+| `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), Twitter handle + prefs                                                                                                                            |
 | `Follow`                | Social: follower → following                                                                                                                                                                                             |
-| `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), creditCost (Float?) |
+| `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), commentCount |
 | `Discovery`             | Chat metadata (audience, depth, tone, focus, duration)                                                                                                                                                                   |
 | `DiscoveryMessage`      | Individual chat messages (role, content, chips)                                                                                                                                                                          |
 | `Script`                | Structured JSON turns + raw markdown, versioned                                                                                                                                                                          |
 | `Segment`               | Per-speaker audio chunk: text, audioUrl, timing, order                                                                                                                                                                   |
 | `Reference`             | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                                                                                                                        |
-| `Interaction`           | Question at timestamp, answer, resolution status, helpful feedback (`Boolean?`), segment mapping (`segmentOrder Int?`)                                                                                                   |
+| `Interaction`           | Question at timestamp, answer, resolution status, helpful feedback, segment mapping, visibility (PUBLIC/PRIVATE), upvoteCount                                                                                            |
+| `InteractionVote`       | Upvote tracking for public Q&A                                                                                                                                                                                           |
+| `Comment`               | Threaded comments on podcasts (parentId self-ref, optional timestamp pin, denormalized replyCount)                                                                                                                       |
 | `Like` / `Save`         | Social engagement                                                                                                                                                                                                        |
 | `Tag` / `PodcastTag`    | Discovery taxonomy                                                                                                                                                                                                       |
-| `Subscription`          | Stripe (FREE/STARTER/PRO/STUDIO/POWER) with credit balance (Float) + rollover (includes voiceCreatorAddonActive, voiceCreatorAddonStripeSubscriptionId)                                                                  |
-| `CreditTransaction`     | Audit trail (Float amounts): grants, consumption (1 per podcast, 0.25 per interaction), refunds, purchases                                                                                                               |
+| `Collection`            | Curated podcast playlists (name, description, isPublic, denormalized counts)                                                                                                                                             |
+| `CollectionItem`        | Podcast membership in a collection (with ordering)                                                                                                                                                                       |
+| `CollectionFollow`      | Users following collections                                                                                                                                                                                              |
+| `Activity`              | Social activity feed events (PODCAST_CREATED, FORKED, LIKED, USER_FOLLOWED, COMMENT_POSTED, COLLECTION_CREATED)                                                                                                         |
 | `VoiceClone`            | User voice clones (name, ElevenLabs ID, source type)                                                                                                                                                                     |
-| `VoiceAllowlist`        | Pre-approved voice access: voice clone → allowed user (Studio + Voice Creator addon)                                                                                                                                     |
+| `VoiceAllowlist`        | Pre-approved voice access: voice clone → allowed user                                                                                                                                                                    |
 | `UserTtsKey`            | BYOK encrypted API keys per TTS provider (AES-256-GCM), `@@unique([userId, provider])`                                                                                                                                   |
+| `UserAiKey`             | BYOK encrypted API keys per AI provider (Anthropic/OpenAI), `@@unique([userId, provider])`                                                                                                                               |
 | `PodcastVersion`        | Version snapshots (immutable segments, stitched audio per version)                                                                                                                                                       |
 | `PodcastVersionSegment` | Segment ordering per version                                                                                                                                                                                             |
 | `ApiKey`                | Developer API keys (hashed, prefix, usage tracking)                                                                                                                                                                      |
@@ -301,24 +309,19 @@ Claude generates natural HOST segment addressing Q&A
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
 
-## Pricing Tiers (Credit-Based)
+## Pricing Model: Free + BYOK
 
-Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). BYOK users bring their own keys.
-Podcast generation costs 1 credit. Interactions cost 0.25 credits each (no per-podcast limits). Imports cost 0.5 credits each (no TTS cost, just storage + optional STT). Free caps at 5 min, all paid tiers at 10 min.
+**100% free. No tiers, no credits, no Stripe.** Users bring their own API keys (BYOK) for both LLM and TTS providers.
 
-| Tier         | Price  | Credits/mo | Rollover | Duration | Voice Clones | Sound Effects            |
-| ------------ | ------ | ---------- | -------- | -------- | ------------ | ------------------------ |
-| Free         | $0     | 3/mo       | 0        | 5 min    | 0            | Standard                 |
-| Starter      | $14/mo | 5/mo       | 1        | 10 min   | 1            | Standard                 |
-| Pro          | $34/mo | 10/mo      | 3        | 10 min   | 3            | Standard                 |
-| Studio       | $69/mo | 20/mo      | 8        | 10 min   | 10           | Premium (ElevenLabs SFX) |
-| Power (BYOK) | $9/mo  | 50/mo      | 10       | 10 min   | 10           | Premium                  |
+| Requirement | Details |
+|-------------|---------|
+| AI key      | Anthropic or OpenAI — required for generation, Q&A, discovery chat |
+| TTS key     | ElevenLabs, OpenAI, PlayHT, Cartesia, or Hume — required for audio generation |
+| All features | Unlimited — voice clones, downloads, private podcasts, collections, everything |
 
-Credit packs available for paid tiers: 3 credits ($7), 10 credits ($20), 25 credits ($45) (one-time purchase).
+**Rate limits** (abuse prevention): 20 generations/hour, 100/day per user. 60 interactions/hour.
 
-**Voice Creator Add-On** ($15/mo, Studio only): Pre-approve users for instant access to your voice clones via allowlist.
-
-**Shared Voice Surcharge**: Using another user's shared voice clone costs +1 credit per shared voice slot. Using your own cloned voices incurs no surcharge — included in your tier.
+**Dev mode**: When `AI_PROVIDER=claude-code`, the Claude CLI is used instead of an API key. Platform-level TTS keys also satisfy the TTS requirement. This means developers can run the full pipeline locally without any BYOK keys.
 
 ## Engineering Standards
 
@@ -456,10 +459,9 @@ See `.env.example` for all required/optional variables. Critical ones:
 - `REDIS_URL` — Redis connection string
 - `NEXTAUTH_SECRET` — Auth encryption key
 - `ANTHROPIC_API_KEY` — Claude API key
-- `ELEVENLABS_API_KEY` — ElevenLabs TTS API key
-- `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Payments
-- `STRIPE_PRICE_ID_VOICE_CREATOR_ADDON` — Voice Creator addon price ID
+- `ELEVENLABS_API_KEY` — ElevenLabs TTS API key (platform default)
 - `R2_*` — Cloudflare R2 storage credentials
+- `BYOK_ENCRYPTION_KEY` — AES-256-GCM key for encrypting user API keys (AI + TTS)
 
 Apple Sign In (optional):
 
@@ -475,12 +477,10 @@ Twitter integration (optional):
 
 Provider selection (swap services via env):
 
-- `AI_PROVIDER` — `anthropic` (default) | `openai`
+- `AI_PROVIDER` — `anthropic` (default) | `openai` | `claude-code` (dev only)
 - `TTS_PROVIDER` — `elevenlabs` (default) | `openai`
 - `STT_PROVIDER` — `openai` (default) | `elevenlabs`
 - `STORAGE_PROVIDER` — `r2` (default) | `s3` | `local`
-- `PAYMENT_PROVIDER` — `stripe` (default) | `none`
-- `BYOK_ENCRYPTION_KEY` — AES-256-GCM key for encrypting user TTS API keys
 
 ## Reference
 
