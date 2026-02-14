@@ -91,6 +91,7 @@
 | `/api/admin/podcasts/[podcastId]`                                | DELETE           | ADMIN      | Delete podcast (admin removal)                                              |
 | `/api/admin/waitlist/export`                                     | GET              | ADMIN      | Export waitlist as CSV                                                      |
 | `/api/admin/costs`                                               | GET              | ADMIN      | Provider cost breakdown dashboard                                           |
+| `/api/admin/traffic-report`                                      | GET              | Bearer key | Full analytics JSON (traffic, users, podcasts, playback, costs)             |
 | `/api/users/me/avatar`                                           | POST             | Yes        | Upload avatar image (multipart/form-data)                                   |
 | `/api/onboarding/interests`                                      | POST             | Yes        | Save onboarding interest selections + mark onboarded                        |
 | `/api/inspire`                                                   | GET              | Yes        | "Inspire Me" topics: personalized, trending, current events                 |

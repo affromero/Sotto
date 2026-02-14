@@ -414,6 +414,7 @@ export const serviceClient = new ServiceClient();
 13. **Fix all errors in one pass** — when running tsc or lint, collect ALL errors first, then fix them in a single pass — don't fix one, re-run, fix another, repeat
 14. **No `console.log` in committed code** — unless it's intentional logging (use proper logger)
 15. **Prefer small, modular files** — avoid monolithic files. Split large components, utilities, and routes into focused modules. A 200-line file is better than a 1000-line file with 5 responsibilities.
+16. **Update `.env.example` when adding env vars** — every new environment variable added to `.env` must also be added (commented out with placeholder) to `.env.example` so other developers and deployments stay in sync.
 
 ## Frontend Quality Checklist
 

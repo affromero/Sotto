@@ -78,6 +78,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // API routes with Authorization headers bypass the password gate
+  // (the route handler is responsible for its own auth)
+  if (pathname.startsWith('/api/') && request.headers.get('authorization')) {
+    return NextResponse.next();
+  }
+
   // Early-access password gate
   // All non-public routes require the sotto_access cookie when SITE_PASSWORD is set.
   // Only /romero shows the password form (redirects to /access).
