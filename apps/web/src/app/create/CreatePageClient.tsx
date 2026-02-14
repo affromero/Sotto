@@ -1,17 +1,19 @@
 'use client';
 
-import { Suspense, useCallback, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
+import { GenerationProgress } from '@/components/create/GenerationProgress';
+import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { ImportUploader } from '@/components/import/ImportUploader';
 import { ImportProgress } from '@/components/import/ImportProgress';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
-type Step = 'discovery' | 'voice' | 'generating';
+type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating';
 type TabMode = 'create' | 'import';
 type ImportStep = 'upload' | 'importing';
 
@@ -38,6 +40,8 @@ function CreatePageContent() {
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
+  const [podcastId, setPodcastId] = useState<string | null>(null);
+  const [pipelineStatus, setPipelineStatus] = useState<string>('PENDING');
 
   const handleInspireTopic = useCallback((topic: string) => {
     setInitialTopic(topic);
@@ -55,7 +59,7 @@ function CreatePageContent() {
   const handleGenerate = useCallback(async () => {
     if (!metadata) return;
 
-    setStep('generating');
+    setStep('scripting');
     setError(null);
 
     try {
@@ -90,16 +94,93 @@ function CreatePageContent() {
         throw new Error(data.error || 'Failed to create podcast');
       }
 
-      const podcast = await response.json();
-      router.push(`/podcast/${podcast.id}`);
+      const data = await response.json();
+      setPodcastId(data.id);
+      setPipelineStatus(data.status || 'EXTRACTING');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, router, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, createAsSotto]);
 
-  const handleImportStarted = useCallback((podcastId: string) => {
-    setImportingPodcastId(podcastId);
+  // Poll during scripting phase (waiting for SCRIPT_READY)
+  const scriptingPollRef = useRef(false);
+  useEffect(() => {
+    if (step !== 'scripting' || !podcastId) return;
+    scriptingPollRef.current = true;
+
+    const interval = setInterval(async () => {
+      if (!scriptingPollRef.current) return;
+      try {
+        const res = await fetch(`/api/podcasts/${podcastId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setPipelineStatus(data.status);
+
+        if (data.status === 'SCRIPT_READY') {
+          scriptingPollRef.current = false;
+          setStep('script-preview');
+        } else if (data.status === 'FAILED') {
+          scriptingPollRef.current = false;
+          setError('Script generation failed. Please try again.');
+          setStep('voice');
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 3000);
+
+    return () => {
+      scriptingPollRef.current = false;
+      clearInterval(interval);
+    };
+  }, [step, podcastId]);
+
+  // Poll during generating phase (waiting for READY)
+  const generatingPollRef = useRef(false);
+  useEffect(() => {
+    if (step !== 'generating' || !podcastId) return;
+    generatingPollRef.current = true;
+
+    const interval = setInterval(async () => {
+      if (!generatingPollRef.current) return;
+      try {
+        const res = await fetch(`/api/podcasts/${podcastId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setPipelineStatus(data.status);
+
+        if (data.status === 'READY') {
+          generatingPollRef.current = false;
+          router.push(`/podcast/${podcastId}`);
+        } else if (data.status === 'FAILED') {
+          generatingPollRef.current = false;
+          setError('Audio generation failed. Please try again.');
+          setStep('script-preview');
+        }
+      } catch {
+        // Silently ignore polling errors
+      }
+    }, 3000);
+
+    return () => {
+      generatingPollRef.current = false;
+      clearInterval(interval);
+    };
+  }, [step, podcastId, router]);
+
+  const handleScriptApprove = useCallback(() => {
+    setStep('generating');
+    setPipelineStatus('GENERATING_AUDIO');
+  }, []);
+
+  const handleScriptRegenerate = useCallback(() => {
+    setStep('scripting');
+    setPipelineStatus('SCRIPTING');
+  }, []);
+
+  const handleImportStarted = useCallback((id: string) => {
+    setImportingPodcastId(id);
     setImportStep('importing');
   }, []);
 
@@ -121,7 +202,9 @@ function CreatePageContent() {
     }
     if (step === 'discovery') return 'Create a Podcast';
     if (step === 'voice') return 'Choose Voices';
-    if (step === 'generating') return 'Creating Your Podcast';
+    if (step === 'scripting') return 'Writing Your Script';
+    if (step === 'script-preview') return 'Review Your Script';
+    if (step === 'generating') return 'Generating Audio';
     return 'Create a Podcast';
   };
 
@@ -140,8 +223,14 @@ function CreatePageContent() {
     if (step === 'voice') {
       return 'Pick voices for your Host and Expert, or use auto-assign.';
     }
+    if (step === 'scripting') {
+      return 'Crafting your podcast script...';
+    }
+    if (step === 'script-preview') {
+      return 'Read through, make edits, then generate audio.';
+    }
     if (step === 'generating') {
-      return 'Hang tight while we generate your podcast.';
+      return 'Creating audio from your approved script...';
     }
     return '';
   };
@@ -193,16 +282,6 @@ function CreatePageContent() {
                 <line x1="6" y1="6" x2="18" y2="18" />
               </svg>
             </button>
-          </div>
-        )}
-
-        {step === 'generating' && tabMode === 'create' && (
-          <div className={styles.generatingOverlay} role="status">
-            <div className={styles.generatingContent}>
-              <div className={styles.spinner} aria-hidden="true" />
-              <p className={styles.generatingText}>Creating your podcast...</p>
-              <p className={styles.generatingHint}>This may take a few moments</p>
-            </div>
           </div>
         )}
 
@@ -285,9 +364,31 @@ function CreatePageContent() {
                 Back
               </button>
               <button type="button" className={styles.generateButton} onClick={handleGenerate}>
-                Generate Podcast
+                Generate Script
               </button>
             </div>
+          </div>
+        )}
+
+        {step === 'scripting' && (
+          <div className={styles.chatArea}>
+            <GenerationProgress status={pipelineStatus} />
+          </div>
+        )}
+
+        {step === 'script-preview' && podcastId && (
+          <div className={styles.chatArea}>
+            <ScriptEditor
+              podcastId={podcastId}
+              onApprove={handleScriptApprove}
+              onRegenerate={handleScriptRegenerate}
+            />
+          </div>
+        )}
+
+        {step === 'generating' && (
+          <div className={styles.chatArea}>
+            <GenerationProgress status={pipelineStatus} />
           </div>
         )}
       </div>
