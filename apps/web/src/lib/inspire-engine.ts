@@ -1,10 +1,10 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { prisma } from './prisma';
 import { cache } from './redis';
 import { getTrending } from './recommendation-engine';
 import { logger } from './logger';
+import { resolveAiProvider } from './providers/ai';
+import type { ResolvedAiProvider } from './providers/ai';
 
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const CACHE_TTL_SECONDS = 3600; // 1 hour
 
 export interface TopicSuggestion {
@@ -21,10 +21,88 @@ export interface InspireResult {
 }
 
 /**
+ * Central helper that resolves the AI provider for a user and generates topics.
+ * Handles BYOK keys, platform keys, claude-code dev mode, and OpenAI.
+ */
+async function generateTopics(
+  userId: string,
+  prompt: string,
+  opts: { webSearch?: boolean; fallback: () => TopicSuggestion[]; cacheKey?: string }
+): Promise<TopicSuggestion[]> {
+  let resolved: ResolvedAiProvider;
+  try {
+    resolved = await resolveAiProvider(userId);
+  } catch {
+    return opts.fallback();
+  }
+
+  try {
+    let responseText: string;
+
+    if (resolved.source === 'claude-code') {
+      const { executeClaudeCode } = await import('./claude-code-client');
+      const result = await executeClaudeCode('', prompt, { model: 'opus' });
+      responseText = result.content;
+    } else if (resolved.provider === 'anthropic') {
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const apiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return opts.fallback();
+      const client = new Anthropic({ apiKey });
+
+      const messages = [{ role: 'user' as const, content: prompt }];
+      const tools = opts.webSearch
+        ? [{ type: 'web_search_20250305' as const, name: 'web_search' as const }]
+        : undefined;
+
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages,
+        ...(tools ? { tools } : {}),
+      });
+
+      const textBlock = response.content.find((block) => block.type === 'text');
+      if (!textBlock || textBlock.type !== 'text') return opts.fallback();
+      responseText = textBlock.text;
+    } else if (resolved.provider === 'openai') {
+      const { default: OpenAI } = await import('openai');
+      const openaiKey = resolved.apiKey || process.env.OPENAI_API_KEY;
+      if (!openaiKey) return opts.fallback();
+      const client = new OpenAI({ apiKey: openaiKey });
+
+      const response = await client.chat.completions.create({
+        model: 'gpt-4o-mini',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      responseText = response.choices[0]?.message?.content || '';
+    } else {
+      return opts.fallback();
+    }
+
+    const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return opts.fallback();
+
+    const topics: TopicSuggestion[] = JSON.parse(jsonMatch[0]);
+
+    if (opts.cacheKey) {
+      await cache.set(opts.cacheKey, topics, CACHE_TTL_SECONDS);
+    }
+
+    return topics;
+  } catch (err) {
+    logger.warn('Failed to generate topics', { error: (err as Error).message });
+    return opts.fallback();
+  }
+}
+
+/**
  * Get personalized topic suggestions based on user interests.
+ * Uses web search to ground topics in real current events.
  * Falls back to popular topics if user has no interests.
  */
-export async function getPersonalizedTopics(userId: string, apiKeyOverride?: string): Promise<TopicSuggestion[]> {
+export async function getPersonalizedTopics(userId: string): Promise<TopicSuggestion[]> {
   const interests = await prisma.userInterest.findMany({
     where: { userId },
     include: { tag: { select: { name: true, slug: true } } },
@@ -42,47 +120,23 @@ export async function getPersonalizedTopics(userId: string, apiKeyOverride?: str
 
   const tagNames = interests.map((i) => i.tag.name);
 
-  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
-  if (!effectiveApiKey) {
-    const fallback = tagNames.map((name) => ({
+  const fallback = () =>
+    tagNames.map((name) => ({
       title: `Deep dive into ${name}`,
       category: name,
       hook: `Explore the latest developments in ${name.toLowerCase()}`,
     }));
-    return fallback;
-  }
 
-  try {
-    const client = new Anthropic({ apiKey: effectiveApiKey });
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `Suggest 4 specific, compelling podcast topics based on these interests: ${tagNames.join(', ')}.
+  const prompt = `Search for recent news, developments, and trending discussions related to: ${tagNames.join(', ')}.
+Based on what's happening RIGHT NOW, suggest 4 specific podcast topics.
+Each should be grounded in a real recent event, discovery, or debate — not generic evergreen content.
 
 Return ONLY a JSON array with this format:
 [{"title": "short topic title", "category": "interest area", "hook": "one engaging sentence description"}]
 
-Make topics specific and current, not generic. Each should be a concrete topic someone could learn about.`,
-        },
-      ],
-    });
+Make topics specific and current, not generic.`;
 
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') return getGenericForYouTopics();
-
-    const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return getGenericForYouTopics();
-
-    const topics: TopicSuggestion[] = JSON.parse(jsonMatch[0]);
-    await cache.set(cacheKey, topics, CACHE_TTL_SECONDS);
-    return topics;
-  } catch (err) {
-    logger.warn('Failed to generate personalized topics', { error: (err as Error).message });
-    return getGenericForYouTopics();
-  }
+  return generateTopics(userId, prompt, { webSearch: true, fallback, cacheKey });
 }
 
 /**
@@ -112,115 +166,66 @@ export async function getTrendingTopics(): Promise<TopicSuggestion[]> {
 }
 
 /**
- * Get current events using Claude with web search.
- * Falls back to generated topic ideas if web search fails.
+ * Get current events using AI with web search (Anthropic only).
+ * Falls back to generated topic ideas if web search fails or provider unavailable.
  */
-export async function getCurrentEvents(interests?: string[], apiKeyOverride?: string): Promise<TopicSuggestion[]> {
+export async function getCurrentEvents(
+  userId: string,
+  interests?: string[]
+): Promise<TopicSuggestion[]> {
   const interestKey = interests?.sort().join(',') ?? 'general';
   const cacheKey = `inspire:news:${interestKey}`;
   const cached = await cache.get<TopicSuggestion[]>(cacheKey);
   if (cached) return cached;
 
-  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
-  if (!effectiveApiKey) {
-    return getGenericNewsSuggestions();
-  }
+  const interestContext =
+    interests && interests.length > 0
+      ? `related to: ${interests.join(', ')}`
+      : 'across science, technology, business, and culture';
 
-  try {
-    const client = new Anthropic({ apiKey: effectiveApiKey });
-
-    const interestContext =
-      interests && interests.length > 0
-        ? `related to: ${interests.join(', ')}`
-        : 'across science, technology, business, and culture';
-
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      tools: [{ type: 'web_search_20250305' as const, name: 'web_search' as const }],
-      messages: [
-        {
-          role: 'user',
-          content: `Find 3-4 notable current events or trending topics from the past week ${interestContext} that would make great podcast topics.
+  const prompt = `Find 3-4 notable current events or trending topics from the past week ${interestContext} that would make great podcast topics.
 
 Return ONLY a JSON array:
-[{"title": "short topic title", "category": "area", "hook": "one-sentence description of why this is interesting now"}]`,
-        },
-      ],
-    });
+[{"title": "short topic title", "category": "area", "hook": "one-sentence description of why this is interesting now"}]`;
 
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') return getGenericNewsSuggestions();
-
-    const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return getGenericNewsSuggestions();
-
-    const topics: TopicSuggestion[] = JSON.parse(jsonMatch[0]);
-    await cache.set(cacheKey, topics, CACHE_TTL_SECONDS);
-    return topics;
-  } catch (err) {
-    logger.warn('Failed to get current events via web search', {
-      error: (err as Error).message,
-    });
-    return getGenericNewsSuggestions();
-  }
+  return generateTopics(userId, prompt, {
+    webSearch: true,
+    fallback: getGenericNewsSuggestions,
+    cacheKey,
+  });
 }
 
 /**
  * Drill down into a broad category to get specific subtopics.
  */
 export async function drillDown(
+  userId: string,
   category: string,
-  parentTitle?: string,
-  apiKeyOverride?: string
+  parentTitle?: string
 ): Promise<TopicSuggestion[]> {
-  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
-  if (!effectiveApiKey) {
-    return [
-      { title: `${category}: Beginner's Guide`, category, hook: 'Start from the fundamentals' },
-      { title: `${category}: Latest Breakthroughs`, category, hook: 'What happened this year' },
-      { title: `${category}: Controversies`, category, hook: 'The debates that matter' },
-      {
-        title: `${category}: Future Predictions`,
-        category,
-        hook: 'Where experts think this is heading',
-      },
-    ];
-  }
+  const context = parentTitle
+    ? `The user tapped on "${parentTitle}" in the "${category}" category.`
+    : `The user wants to explore "${category}".`;
 
-  try {
-    const client = new Anthropic({ apiKey: effectiveApiKey });
-    const context = parentTitle
-      ? `The user tapped on "${parentTitle}" in the "${category}" category.`
-      : `The user wants to explore "${category}".`;
-
-    const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      messages: [
-        {
-          role: 'user',
-          content: `${context}
+  const prompt = `${context}
 
 Suggest 5 specific podcast topics within this area. Each should be concrete enough to generate a focused 5-10 minute podcast.
 
 Return ONLY a JSON array:
-[{"title": "specific topic title", "category": "${category}", "hook": "one engaging sentence"}]`,
-        },
-      ],
-    });
+[{"title": "specific topic title", "category": "${category}", "hook": "one engaging sentence"}]`;
 
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') return [];
+  const fallback = () => [
+    { title: `${category}: Beginner's Guide`, category, hook: 'Start from the fundamentals' },
+    { title: `${category}: Latest Breakthroughs`, category, hook: 'What happened this year' },
+    { title: `${category}: Controversies`, category, hook: 'The debates that matter' },
+    {
+      title: `${category}: Future Predictions`,
+      category,
+      hook: 'Where experts think this is heading',
+    },
+  ];
 
-    const jsonMatch = textBlock.text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
-
-    return JSON.parse(jsonMatch[0]);
-  } catch (err) {
-    logger.warn('Failed to drill down topics', { error: (err as Error).message });
-    return [];
-  }
+  return generateTopics(userId, prompt, { webSearch: false, fallback });
 }
 
 function getGenericForYouTopics(): TopicSuggestion[] {

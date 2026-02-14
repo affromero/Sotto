@@ -24,7 +24,7 @@ export async function GET() {
     const [forYou, trending, inTheNews] = await Promise.all([
       getPersonalizedTopics(userId),
       getTrendingTopics(),
-      getCurrentEvents(interestNames.length > 0 ? interestNames : undefined),
+      getCurrentEvents(userId, interestNames.length > 0 ? interestNames : undefined),
     ]);
 
     return NextResponse.json({ forYou, trending, inTheNews });
