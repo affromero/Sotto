@@ -141,6 +141,23 @@
   color: var(--color-text-tertiary);
 }
 
+/* Paused (SCRIPT_READY) */
+
+.paused .circle {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  animation: none;
+}
+
+.paused .connector {
+  background: var(--color-border);
+}
+
+.paused .label {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 /* Error */
 
 .error .circle {

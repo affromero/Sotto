@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, AlertCircle } from 'lucide-react';
+import { Check, AlertCircle, Pause } from 'lucide-react';
 import styles from './GenerationProgress.module.css';
 
 interface GenerationProgressProps {
@@ -13,22 +13,28 @@ interface GenerationProgressProps {
 const PIPELINE_STEPS = [
   { key: 'EXTRACTING', label: 'Extracting content' },
   { key: 'SCRIPTING', label: 'Writing script' },
+  { key: 'VERIFYING_SCRIPT', label: 'Fact-checking claims' },
   { key: 'VALIDATING_REFERENCES', label: 'Verifying references' },
+  { key: 'SCRIPT_READY', label: 'Script ready for review' },
   { key: 'GENERATING_AUDIO', label: 'Generating audio' },
   { key: 'STITCHING', label: 'Stitching together' },
   { key: 'READY', label: 'Ready!' },
 ] as const;
 
-type StepState = 'completed' | 'current' | 'future' | 'error';
+type StepState = 'completed' | 'current' | 'future' | 'error' | 'paused';
 
 export function GenerationProgress({ status, progress, error }: GenerationProgressProps) {
   const stepStates = useMemo(() => {
     const currentIndex = PIPELINE_STEPS.findIndex((step) => step.key === status);
 
-    return PIPELINE_STEPS.map((_step, index): StepState => {
+    return PIPELINE_STEPS.map((step, index): StepState => {
       if (currentIndex === -1) return 'future';
       if (index < currentIndex) return 'completed';
-      if (index === currentIndex) return error ? 'error' : 'current';
+      if (index === currentIndex) {
+        if (error) return 'error';
+        if (step.key === 'SCRIPT_READY') return 'paused';
+        return 'current';
+      }
       return 'future';
     });
   }, [status, error]);
@@ -44,7 +50,7 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
             <li
               key={step.key}
               className={`${styles.step} ${styles[state]}`}
-              aria-current={state === 'current' ? 'step' : undefined}
+              aria-current={state === 'current' || state === 'paused' ? 'step' : undefined}
             >
               <div className={styles.stepRow}>
                 <div className={styles.indicator}>
@@ -53,6 +59,8 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
                       <Check size={14} strokeWidth={3} aria-hidden="true" />
                     ) : state === 'error' ? (
                       <AlertCircle size={14} strokeWidth={2.5} aria-hidden="true" />
+                    ) : state === 'paused' ? (
+                      <Pause size={14} strokeWidth={2.5} aria-hidden="true" />
                     ) : (
                       <span className={styles.stepNumber} aria-hidden="true">
                         {index + 1}
