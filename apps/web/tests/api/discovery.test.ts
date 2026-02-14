@@ -7,6 +7,7 @@ const mockDiscoveryFindUniqueOrThrow = vi.fn();
 const mockStreamDiscoveryResponse = vi.fn();
 const mockParseChips = vi.fn();
 const mockParseMetadata = vi.fn();
+const mockGetAiKey = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: () => mockAuth(),
@@ -18,6 +19,10 @@ vi.mock('@/lib/prisma', () => ({
       findUniqueOrThrow: (...args: unknown[]) => mockDiscoveryFindUniqueOrThrow(...args),
     },
   },
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
 vi.mock('@/lib/discovery-agent', () => ({
@@ -100,6 +105,7 @@ async function readSSEStream(response: Response): Promise<string[]> {
 describe('POST /api/discovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key' });
   });
 
   describe('Authentication', () => {
@@ -163,9 +169,10 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'user', content: 'I want to learn something new' },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'I want to learn something new' }],
+        'test-ai-key'
+      );
     });
 
     it('does not call prisma when discoveryId is not provided', async () => {
@@ -216,11 +223,14 @@ describe('POST /api/discovery', () => {
       });
       await POST(request);
 
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'assistant', content: 'What topic would you like to explore?' },
-        { role: 'user', content: 'Quantum computing' },
-        { role: 'user', content: 'What is a qubit?' },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [
+          { role: 'assistant', content: 'What topic would you like to explore?' },
+          { role: 'user', content: 'Quantum computing' },
+          { role: 'user', content: 'What is a qubit?' },
+        ],
+        'test-ai-key'
+      );
     });
 
     it('appends new user message to existing history', async () => {
@@ -441,7 +451,10 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([{ role: 'user', content: '' }]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: '' }],
+        'test-ai-key'
+      );
     });
 
     it('handles very long message string', async () => {
@@ -457,9 +470,10 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'user', content: longMessage },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: longMessage }],
+        'test-ai-key'
+      );
     });
 
     it('handles missing message field', async () => {
@@ -495,9 +509,10 @@ describe('POST /api/discovery', () => {
       });
       await POST(request);
 
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'user', content: 'Hello' },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Hello' }],
+        'test-ai-key'
+      );
     });
 
     it('handles streaming error during consumption', async () => {
@@ -554,11 +569,14 @@ describe('POST /api/discovery', () => {
       });
       await POST(request);
 
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'user', content: 'Question 1' },
-        { role: 'assistant', content: 'Answer 1' },
-        { role: 'user', content: 'Question 2' },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [
+          { role: 'user', content: 'Question 1' },
+          { role: 'assistant', content: 'Answer 1' },
+          { role: 'user', content: 'Question 2' },
+        ],
+        'test-ai-key'
+      );
     });
 
     it('handles multiple concurrent streams from different users', async () => {
@@ -585,6 +603,42 @@ describe('POST /api/discovery', () => {
 
       expect(response2.status).toBe(200);
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('BYOK key passthrough', () => {
+    it('passes user AI key to streamDiscoveryResponse', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'user-anthropic-key-123' });
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Test' });
+      await POST(request);
+
+      expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        expect.any(Array),
+        'user-anthropic-key-123'
+      );
+    });
+
+    it('passes undefined when user has no AI key', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue(null);
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Test' });
+      const response = await POST(request);
+
+      expect(response.status).toBe(200);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        expect.any(Array),
+        undefined
+      );
     });
   });
 
@@ -629,9 +683,10 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith([
-        { role: 'user', content: 'Line 1\nLine 2\nLine 3' },
-      ]);
+      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
+        [{ role: 'user', content: 'Line 1\nLine 2\nLine 3' }],
+        'test-ai-key'
+      );
     });
   });
 });
