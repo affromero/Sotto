@@ -30,6 +30,7 @@ const mockPodcastData: PodcastDetail = {
   saveCount: 5,
   forkCount: 2,
   playCount: 100,
+  commentCount: 0,
   segments: [],
   references: [],
   tags: [],

@@ -158,7 +158,7 @@ export const reorderQueueSchema = z.object({
  * Onboarding interests validation
  */
 export const onboardingInterestsSchema = z.object({
-  tagIds: z.array(z.string()).max(12),
+  tagIds: z.array(z.string()).max(20),
 });
 
 /**
