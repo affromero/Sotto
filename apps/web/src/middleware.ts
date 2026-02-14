@@ -16,6 +16,8 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 const PUBLIC_ROUTES = new Set([
   '/',
   '/romero',
+  '/auth/login',
+  '/auth/signup',
   '/api/access',
   '/api/health',
   '/api/waitlist',
