@@ -221,15 +221,13 @@ export interface ResolvedProvider {
  * 1. If `requestedProvider` is specific + user has BYOK key → BYOK
  * 2. If `requestedProvider` is specific + no BYOK + platform has key → platform
  * 3. If 'auto' or null: check user BYOK keys → pick highest quality tier. Fallback to platform default.
- * 4. Legacy: `usePremiumVoice=true` + no `requestedProvider` → ElevenLabs
  */
 export async function resolveTtsProvider(context: {
   userId: string;
   podcastId: string;
   requestedProvider?: TtsProviderId | 'auto' | null;
-  usePremiumVoice?: boolean;
 }): Promise<ResolvedProvider> {
-  const { userId, requestedProvider, usePremiumVoice } = context;
+  const { userId, requestedProvider } = context;
 
   // Case 1+2: Specific provider requested
   if (requestedProvider && requestedProvider !== 'auto') {
@@ -288,25 +286,6 @@ export async function resolveTtsProvider(context: {
         return { provider, source: 'byok', providerId: best.provider };
       }
     }
-  }
-
-  // Case 4: Legacy usePremiumVoice flag
-  if (usePremiumVoice) {
-    // Check for BYOK ElevenLabs key first
-    const byokKey = await getByokKey(userId, 'elevenlabs');
-    if (byokKey) {
-      return {
-        provider: createPremiumTtsProvider(byokKey),
-        source: 'byok',
-        providerId: 'elevenlabs',
-      };
-    }
-    // Platform ElevenLabs
-    return {
-      provider: createPremiumTtsProvider(),
-      source: 'platform',
-      providerId: 'elevenlabs',
-    };
   }
 
   // Default: platform OpenAI

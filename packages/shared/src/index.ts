@@ -8,8 +8,6 @@ export type {
   PodcastSource,
   Speaker,
   InteractionStatus,
-  SubscriptionTier,
-  SubscriptionStatus,
   ReferenceType,
   VerificationStatus,
   TweetMentionStatus,

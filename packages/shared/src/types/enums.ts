@@ -31,16 +31,6 @@ export type InteractionStatus =
   | 'INCORPORATING'
   | 'INCORPORATED';
 
-export type SubscriptionTier = 'FREE' | 'STARTER' | 'PRO' | 'STUDIO' | 'POWER';
-
-export type SubscriptionStatus =
-  | 'PENDING'
-  | 'ACTIVE'
-  | 'PAST_DUE'
-  | 'CANCELED'
-  | 'UNPAID'
-  | 'TRIALING';
-
 export type ReferenceType = 'WEB' | 'PAPER' | 'BOOK' | 'ARTICLE' | 'VIDEO' | 'REPORT';
 
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'FAILED' | 'REPLACED' | 'REMOVED';

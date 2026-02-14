@@ -123,7 +123,6 @@ const mockPodcast = {
   forkedFromId: null,
   hostVoiceId: 'voice-host-1',
   expertVoiceId: 'voice-expert-1',
-  usePremiumVoice: false,
   createdAt: new Date('2025-01-15T10:00:00Z'),
   updatedAt: new Date('2025-01-15T10:00:00Z'),
   tags: [
@@ -276,7 +275,6 @@ describe('POST /api/podcasts', () => {
       topic: 'Test topic',
       hostVoiceId: 'voice-host-custom',
       expertVoiceId: 'voice-expert-custom',
-      usePremiumVoice: true,
     };
 
     const request = createPostRequest('/api/podcasts', body);
@@ -290,7 +288,6 @@ describe('POST /api/podcasts', () => {
         status: 'PENDING',
         hostVoiceId: 'voice-host-custom',
         expertVoiceId: 'voice-expert-custom',
-        usePremiumVoice: true,
         ttsProvider: null,
       },
     });
