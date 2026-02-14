@@ -75,8 +75,6 @@ vi.mock('@/lib/credits', () => ({
 // ---- Import under test ----
 import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
 
-const mockContentExtractionQueue = {};
-
 // ---- Helpers ----
 
 function createMockRequest(): NextRequest {
