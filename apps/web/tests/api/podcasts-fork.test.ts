@@ -29,6 +29,9 @@ vi.mock('@/lib/prisma', () => ({
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
     },
+    activity: {
+      create: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    },
     $transaction: (callback: unknown) => mockTransaction(callback),
   },
 }));

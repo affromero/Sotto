@@ -22,6 +22,9 @@ vi.mock('@/lib/prisma', () => ({
       create: (...args: unknown[]) => mockPrismaFollowCreate(...args),
       delete: (...args: unknown[]) => mockPrismaFollowDelete(...args),
     },
+    activity: {
+      create: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    },
   },
 }));
 

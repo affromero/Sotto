@@ -13,6 +13,9 @@ const mockPrismaScriptUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({
   topic: 'Quantum Computing',
 });
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  source: 'TWITTER',
+});
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
 
@@ -29,6 +32,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     podcast: {
       findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
     },
     segment: {
@@ -96,6 +100,10 @@ vi.mock('@/lib/queue', () => ({
   },
   audioGenerationQueue: { name: 'audio-generation' },
   notificationQueue: { name: 'notifications' },
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -357,7 +365,8 @@ describe('processReferenceValidation', () => {
           }),
         ]),
         expect.any(Map),
-        'Quantum Computing Basics'
+        'Quantum Computing Basics',
+        undefined
       );
     });
 
@@ -388,7 +397,8 @@ describe('processReferenceValidation', () => {
       expect(mockAiEvaluateReferences).toHaveBeenCalledWith(
         expect.anything(),
         expect.any(Map),
-        expect.anything()
+        expect.anything(),
+        undefined
       );
     });
 
