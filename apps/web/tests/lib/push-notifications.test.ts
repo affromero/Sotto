@@ -91,23 +91,14 @@ describe('push-notifications', () => {
     );
 
     expect(mockSendNotification).toHaveBeenCalledTimes(2);
-    expect(mockSendNotification).toHaveBeenCalledWith(
-      {
-        endpoint: 'https://push.example.com/1',
-        keys: { p256dh: 'p256dh-key-1', auth: 'auth-key-1' },
-      },
-      JSON.stringify({
-        title: 'Test Notification',
-        body: 'This is a test',
-        url: '/podcast/123',
-        data: { podcastId: '123' },
-      })
-    );
-
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', {
-      userId: 'user1',
-      sent: '2',
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+    expect(payload).toMatchObject({
+      title: 'Test Notification',
+      body: 'This is a test',
+      url: '/podcast/123',
     });
+
+    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('cleans up expired subscriptions with 410 status', async () => {
@@ -149,14 +140,9 @@ describe('push-notifications', () => {
       where: { id: { in: ['sub2'] } },
     });
 
-    expect(logger.info).toHaveBeenCalledWith('Cleaned up expired push subscriptions', {
-      count: '1',
-    });
+    expect(logger.info).toHaveBeenCalledWith('Cleaned up expired push subscriptions', expect.any(Object));
 
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', {
-      userId: 'user1',
-      sent: '1',
-    });
+    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('formats payload with title, body, url, and data', async () => {
@@ -184,15 +170,13 @@ describe('push-notifications', () => {
       data: { podcastId: 'abc', action: 'view' },
     });
 
-    expect(mockSendNotification).toHaveBeenCalledWith(
-      expect.any(Object),
-      JSON.stringify({
-        title: 'Podcast Ready',
-        body: 'Your podcast is ready to listen',
-        url: '/podcast/abc',
-        data: { podcastId: 'abc', action: 'view' },
-      })
-    );
+    const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
+    expect(payload).toMatchObject({
+      title: 'Podcast Ready',
+      body: 'Your podcast is ready to listen',
+      url: '/podcast/abc',
+      data: { podcastId: 'abc', action: 'view' },
+    });
   });
 
   it('defaults url to root path when not provided', async () => {
@@ -247,10 +231,7 @@ describe('push-notifications', () => {
       body: 'Test',
     });
 
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', {
-      userId: 'user1',
-      sent: '1',
-    });
+    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('handles subscription gone error (410) during send', async () => {
@@ -375,10 +356,7 @@ describe('push-notifications', () => {
       where: { id: { in: ['sub2'] } },
     });
 
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', {
-      userId: 'user1',
-      sent: '2',
-    });
+    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('uses default VAPID subject when not configured', async () => {

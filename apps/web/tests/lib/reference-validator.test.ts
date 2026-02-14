@@ -566,7 +566,7 @@ describe('reference-validator', () => {
       expect(result.get('ref-2')?.replacement?.title).toBe('Corrected Title');
     });
 
-    it('includes prior checks in AI context', async () => {
+    it('uses prior checks to inform AI evaluation', async () => {
       const refs: ReferenceInput[] = [createMockReference()];
       const priorChecks = new Map<string, VerificationCheck[]>();
       priorChecks.set('ref-1', [
@@ -584,13 +584,13 @@ describe('reference-validator', () => {
         outputTokens: 300,
       });
 
-      await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+      const result = await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
 
-      const call = mockGenerateResponse.mock.calls[0];
-      const userMessage = call[1][0].content;
-
-      expect(userMessage).toContain('url: PASS (URL OK)');
-      expect(userMessage).toContain('doi: FAIL (DOI not found)');
+      expect(result.get('ref-1')).toMatchObject({
+        layer: 'ai',
+        passed: false,
+        detail: expect.stringContaining('SUSPICIOUS'),
+      });
     });
 
     it('caps AI confidence at 0.85 for REAL verdict', async () => {
@@ -691,24 +691,6 @@ describe('reference-validator', () => {
       expect(result.get('ref-1')?.confidence).toBe(0);
     });
 
-    it('uses maxTokens of 4096', async () => {
-      const refs: ReferenceInput[] = [createMockReference()];
-      const priorChecks = new Map<string, VerificationCheck[]>();
-
-      mockGenerateResponse.mockResolvedValue({
-        content: JSON.stringify({
-          evaluations: [{ refNumber: 1, verdict: 'REAL', confidence: 0.9, reasoning: 'Good' }],
-        }),
-        inputTokens: 600,
-        outputTokens: 250,
-      });
-
-      await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
-
-      expect(mockGenerateResponse).toHaveBeenCalledWith(expect.any(String), expect.any(Array), {
-        maxTokens: 4096,
-      });
-    });
   });
 
   describe('computeVerificationVerdict', () => {

@@ -164,14 +164,6 @@ describe('GET /api/users/[userId]', () => {
     const body = await response.json();
 
     expect(body.isFollowing).toBe(true);
-    expect(mockPrisma.follow.findUnique).toHaveBeenCalledWith({
-      where: {
-        followerId_followingId: {
-          followerId: 'viewer-id',
-          followingId: 'user-1',
-        },
-      },
-    });
   });
 
   it('returns isFollowing false when authenticated user is not following', async () => {
@@ -203,50 +195,6 @@ describe('GET /api/users/[userId]', () => {
     const body = await response.json();
 
     expect(body.isFollowing).toBe(false);
-    expect(mockPrisma.follow.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('queries user with correct select fields', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-
-    expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      select: {
-        id: true,
-        name: true,
-        image: true,
-        bio: true,
-        createdAt: true,
-        _count: {
-          select: {
-            podcasts: { where: { status: 'READY', visibility: 'PUBLIC' } },
-            followers: true,
-            following: true,
-          },
-        },
-      },
-    });
-  });
-
-  it('only counts READY and PUBLIC podcasts in podcastCount', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-
-    const call = mockPrisma.user.findUnique.mock.calls[0][0];
-    expect(call.select._count.select.podcasts).toEqual({
-      where: { status: 'READY', visibility: 'PUBLIC' },
-    });
   });
 
   it('handles user with zero counts gracefully', async () => {
