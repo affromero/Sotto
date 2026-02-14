@@ -445,9 +445,22 @@ Before declaring any UI work done, verify:
 - No `eval()` or `new Function()` — breaks CSP
 - Images use `next/image` for optimization and lazy loading
 
-## Testing & CI
+## Commit Checklist
 
-- **Always run `npm run ci` before committing** — this runs lint, type-check, tests, and build (mirrors the GitHub Actions CI pipeline). Fix all failures before staging and committing.
+Every commit **must** pass this checklist. Do not commit until every item is verified.
+
+- [ ] `npm run lint` — no errors (warnings OK)
+- [ ] `npm run type-check` — clean pass
+- [ ] `npm run test` — all tests pass (no new failures; pre-existing failures in unrelated files are acceptable but must not increase)
+- [ ] `npm run build` — successful production build
+- [ ] No `console.log` or debug statements in staged files
+- [ ] No secrets or `.env` values in staged files
+- [ ] `git diff --cached` reviewed — only intended changes are staged
+
+Run `npm run ci` to execute lint, type-check, test, and build in sequence.
+
+### Additional rules
+
 - When tsc or lint reports multiple errors, collect the FULL error list before fixing anything — then fix all in a single pass
 - If pre-commit hooks fail on files unrelated to your change, use `git commit --no-verify` on the second attempt
 - After any Prisma schema change, run `npx prisma generate --schema=apps/web/prisma/schema.prisma` before type-checking
