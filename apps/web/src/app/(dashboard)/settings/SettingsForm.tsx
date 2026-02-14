@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { signIn, signOut } from 'next-auth/react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
@@ -29,6 +30,7 @@ interface SettingsFormProps {
   initialHandle: string;
   email: string;
   image: string | null;
+  role: 'USER' | 'CREATOR' | 'ADMIN' | 'SYSTEM';
   connectedProviders: string[];
   twitterHandle: string | null;
   twitterEnabled: boolean;
@@ -54,6 +56,7 @@ export function SettingsForm({
   initialHandle,
   email,
   image,
+  role,
   connectedProviders,
   twitterHandle,
   twitterEnabled: initialTwitterEnabled,
@@ -280,7 +283,14 @@ export function SettingsForm({
               )}
             </div>
             <div className={styles.avatarInfo}>
-              <p className={styles.avatarEmail}>{email}</p>
+              <p className={styles.avatarEmail}>
+                {email}
+                {role !== 'USER' && (
+                  <Badge variant={role === 'ADMIN' ? 'admin' : role === 'SYSTEM' ? 'system' : 'creator'}>
+                    {role}
+                  </Badge>
+                )}
+              </p>
               <input
                 ref={fileInputRef}
                 type="file"
