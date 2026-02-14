@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { category, parentTitle } = validation.data;
-    const subtopics = await drillDown(category, parentTitle);
+    const subtopics = await drillDown(session.user.id, category, parentTitle);
 
     return NextResponse.json({ subtopics });
   } catch (error: unknown) {

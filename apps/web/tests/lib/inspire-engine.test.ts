@@ -9,6 +9,7 @@ import { prisma } from '@/lib/prisma';
 import { cache } from '@/lib/redis';
 import { getTrending } from '@/lib/recommendation-engine';
 import { logger } from '@/lib/logger';
+import { resolveAiProvider } from '@/lib/providers/ai';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -41,10 +42,37 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/providers/ai', () => ({
+  resolveAiProvider: vi.fn(),
+}));
+
+const { mockMessagesCreate, mockExecuteClaudeCode, mockChatCompletionsCreate } = vi.hoisted(
+  () => ({
+    mockMessagesCreate: vi.fn(),
+    mockExecuteClaudeCode: vi.fn(),
+    mockChatCompletionsCreate: vi.fn(),
+  })
+);
+
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class MockAnthropic {
+    messages = { create: mockMessagesCreate };
+  },
+}));
+
+vi.mock('@/lib/claude-code-client', () => ({
+  executeClaudeCode: mockExecuteClaudeCode,
+}));
+
+vi.mock('openai', () => ({
+  default: class MockOpenAI {
+    chat = { completions: { create: mockChatCompletionsCreate } };
+  },
+}));
+
 describe('getPersonalizedTopics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.ANTHROPIC_API_KEY;
   });
 
   it('returns generic topics when user has no interests', async () => {
@@ -80,7 +108,7 @@ describe('getPersonalizedTopics', () => {
     expect(cache.get).toHaveBeenCalledWith('inspire:foryou:user-123');
   });
 
-  it('returns fallback topics when ANTHROPIC_API_KEY is not set', async () => {
+  it('returns fallback topics when no AI provider is available', async () => {
     vi.mocked(prisma.userInterest.findMany).mockResolvedValue([
       {
         userId: 'user-123',
@@ -96,6 +124,9 @@ describe('getPersonalizedTopics', () => {
       } as any,
     ]);
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(
+      new Error('No AI provider available. Configure an API key in settings.')
+    );
 
     const result = await getPersonalizedTopics('user-123');
 
@@ -123,12 +154,103 @@ describe('getPersonalizedTopics', () => {
       } as any,
     ]);
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
 
     const result = await getPersonalizedTopics('user-123');
 
     // Higher-weighted topic should appear first in fallback results
     expect(result[0].category).toBe('Topic A');
     expect(result[1].category).toBe('Topic B');
+  });
+
+  it('uses Anthropic with web search when BYOK key resolves to anthropic', async () => {
+    vi.mocked(prisma.userInterest.findMany).mockResolvedValue([
+      {
+        userId: 'user-123',
+        tagId: 'tag-1',
+        weight: 1.0,
+        tag: { name: 'AI', slug: 'ai' },
+      } as any,
+    ]);
+    vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockResolvedValue({
+      provider: 'anthropic',
+      source: 'byok',
+      apiKey: 'sk-ant-byok-key',
+    });
+
+    const topics = [{ title: 'AI News', category: 'AI', hook: 'Breaking AI developments' }];
+    mockMessagesCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify(topics) }],
+    });
+
+    const result = await getPersonalizedTopics('user-123');
+
+    expect(result).toEqual(topics);
+    expect(mockMessagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: 'claude-haiku-4-5-20251001',
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
+    expect(cache.set).toHaveBeenCalledWith('inspire:foryou:user-123', topics, 3600);
+  });
+
+  it('uses claude-code with opus model in dev mode', async () => {
+    vi.mocked(prisma.userInterest.findMany).mockResolvedValue([
+      {
+        userId: 'user-123',
+        tagId: 'tag-1',
+        weight: 1.0,
+        tag: { name: 'Science', slug: 'science' },
+      } as any,
+    ]);
+    vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockResolvedValue({
+      provider: 'anthropic',
+      source: 'claude-code',
+    });
+
+    const topics = [
+      { title: 'Quantum Breakthrough', category: 'Science', hook: 'New discovery' },
+    ];
+    mockExecuteClaudeCode.mockResolvedValue({ content: JSON.stringify(topics) });
+
+    const result = await getPersonalizedTopics('user-123');
+
+    expect(result).toEqual(topics);
+    expect(mockExecuteClaudeCode).toHaveBeenCalledWith('', expect.any(String), { model: 'opus' });
+  });
+
+  it('uses OpenAI without web search when resolved to openai', async () => {
+    vi.mocked(prisma.userInterest.findMany).mockResolvedValue([
+      {
+        userId: 'user-123',
+        tagId: 'tag-1',
+        weight: 1.0,
+        tag: { name: 'Tech', slug: 'tech' },
+      } as any,
+    ]);
+    vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockResolvedValue({
+      provider: 'openai',
+      source: 'byok',
+      apiKey: 'sk-openai-key',
+    });
+
+    const topics = [{ title: 'Tech Topic', category: 'Tech', hook: 'Interesting tech' }];
+    mockChatCompletionsCreate.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify(topics) } }],
+    });
+
+    const result = await getPersonalizedTopics('user-123');
+
+    expect(result).toEqual(topics);
+    expect(mockChatCompletionsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'gpt-4o-mini' })
+    );
+    // OpenAI should not have web search tools
+    expect(mockMessagesCreate).not.toHaveBeenCalled();
   });
 });
 
@@ -254,13 +376,13 @@ describe('getTrendingTopics', () => {
 describe('getCurrentEvents', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.ANTHROPIC_API_KEY;
   });
 
-  it('returns generic suggestions when ANTHROPIC_API_KEY is not set', async () => {
+  it('returns generic suggestions when no AI provider is available', async () => {
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
 
-    const result = await getCurrentEvents();
+    const result = await getCurrentEvents('user-123');
 
     expect(result).toHaveLength(3);
     expect(result[0]).toHaveProperty('title');
@@ -275,7 +397,7 @@ describe('getCurrentEvents', () => {
 
     vi.mocked(cache.get).mockResolvedValue(cachedEvents);
 
-    const result = await getCurrentEvents(['Technology']);
+    const result = await getCurrentEvents('user-123', ['Technology']);
 
     expect(result).toEqual(cachedEvents);
     expect(cache.get).toHaveBeenCalledWith('inspire:news:Technology');
@@ -283,38 +405,65 @@ describe('getCurrentEvents', () => {
 
   it('generates cache key from sorted interests', async () => {
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
 
-    await getCurrentEvents(['Science', 'Technology', 'Art']);
+    await getCurrentEvents('user-123', ['Science', 'Technology', 'Art']);
 
     expect(cache.get).toHaveBeenCalledWith('inspire:news:Art,Science,Technology');
   });
 
   it('uses general cache key when no interests provided', async () => {
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
 
-    await getCurrentEvents();
+    await getCurrentEvents('user-123');
 
     expect(cache.get).toHaveBeenCalledWith('inspire:news:general');
   });
 
   it('returns generic suggestions for empty interests array', async () => {
     vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
 
-    const result = await getCurrentEvents([]);
+    const result = await getCurrentEvents('user-123', []);
 
     expect(result).toHaveLength(3);
     expect(result[0].title).toBe('Latest in Space Exploration');
+  });
+
+  it('uses web search when resolved to anthropic', async () => {
+    vi.mocked(cache.get).mockResolvedValue(null);
+    vi.mocked(resolveAiProvider).mockResolvedValue({
+      provider: 'anthropic',
+      source: 'platform',
+      apiKey: 'sk-ant-platform-key',
+    });
+
+    const topics = [{ title: 'News Topic', category: 'Tech', hook: 'Breaking' }];
+    mockMessagesCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify(topics) }],
+    });
+
+    const result = await getCurrentEvents('user-123', ['Technology']);
+
+    expect(result).toEqual(topics);
+    expect(mockMessagesCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
   });
 });
 
 describe('drillDown', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.ANTHROPIC_API_KEY;
   });
 
-  it('returns fallback subtopics when ANTHROPIC_API_KEY is not set', async () => {
-    const result = await drillDown('Technology');
+  it('returns fallback subtopics when no AI provider is available', async () => {
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
+
+    const result = await drillDown('user-123', 'Technology');
 
     expect(result).toHaveLength(4);
     expect(result[0].title).toBe("Technology: Beginner's Guide");
@@ -326,7 +475,9 @@ describe('drillDown', () => {
   });
 
   it('includes category in all fallback subtopics', async () => {
-    const result = await drillDown('Quantum Physics');
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
+
+    const result = await drillDown('user-123', 'Quantum Physics');
 
     expect(result).toHaveLength(4);
     result.forEach((topic) => {
@@ -336,7 +487,9 @@ describe('drillDown', () => {
   });
 
   it('generates fallback subtopics without parentTitle', async () => {
-    const result = await drillDown('Biology');
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
+
+    const result = await drillDown('user-123', 'Biology');
 
     expect(result).toHaveLength(4);
     expect(result[0]).toHaveProperty('title');
@@ -345,14 +498,18 @@ describe('drillDown', () => {
   });
 
   it('generates fallback subtopics with parentTitle', async () => {
-    const result = await drillDown('Machine Learning', 'Deep Learning Basics');
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
+
+    const result = await drillDown('user-123', 'Machine Learning', 'Deep Learning Basics');
 
     expect(result).toHaveLength(4);
     expect(result[0].category).toBe('Machine Learning');
   });
 
   it('returns fallback with special characters in category', async () => {
-    const result = await drillDown('C++ & Low-Level Programming');
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
+
+    const result = await drillDown('user-123', 'C++ & Low-Level Programming');
 
     expect(result).toHaveLength(4);
     expect(result[0].title).toBe("C++ & Low-Level Programming: Beginner's Guide");
@@ -360,12 +517,33 @@ describe('drillDown', () => {
   });
 
   it('returns fallback with very long category name', async () => {
+    vi.mocked(resolveAiProvider).mockRejectedValue(new Error('No AI provider'));
     const longCategory = 'a'.repeat(200);
-    const result = await drillDown(longCategory);
+    const result = await drillDown('user-123', longCategory);
 
     expect(result).toHaveLength(4);
     result.forEach((topic) => {
       expect(topic.category).toBe(longCategory);
     });
+  });
+
+  it('does not use web search when drilling down', async () => {
+    vi.mocked(resolveAiProvider).mockResolvedValue({
+      provider: 'anthropic',
+      source: 'platform',
+      apiKey: 'sk-ant-platform-key',
+    });
+
+    const topics = [{ title: 'Sub Topic', category: 'Tech', hook: 'Deep dive' }];
+    mockMessagesCreate.mockResolvedValue({
+      content: [{ type: 'text', text: JSON.stringify(topics) }],
+    });
+
+    const result = await drillDown('user-123', 'Tech');
+
+    expect(result).toEqual(topics);
+    expect(mockMessagesCreate).toHaveBeenCalledWith(
+      expect.not.objectContaining({ tools: expect.anything() })
+    );
   });
 });
