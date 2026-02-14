@@ -52,11 +52,20 @@ The schema is organized into logical sections:
 
 ## Commands
 
+From repo root (monorepo):
+
+```bash
+npx prisma db push --schema=apps/web/prisma/schema.prisma     # Push schema changes (dev)
+npx prisma generate --schema=apps/web/prisma/schema.prisma     # Regenerate client
+npx prisma studio --schema=apps/web/prisma/schema.prisma       # Visual database browser
+```
+
+From `apps/web/` directory:
+
 ```bash
 npx prisma db push     # Push schema changes (dev)
 npx prisma generate    # Regenerate client
 npx prisma studio      # Visual database browser
-npx prisma db seed     # Run seed.ts
 ```
 
 ## Modifying the Schema
@@ -66,3 +75,4 @@ npx prisma db seed     # Run seed.ts
 3. Run `npx prisma generate`
 4. Update this CLAUDE.md if models/enums changed
 5. Update `src/types/` if API response shapes changed
+6. If adding/changing enums, also update `packages/shared/src/types/enums.ts` (string union equivalents)

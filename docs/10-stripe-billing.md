@@ -287,7 +287,7 @@ export async function consumeCredit(userId: string, amount: number = 1): Promise
 The subscription tier and credit balance are resolved by looking up the `Subscription` and `User` models:
 
 ```typescript
-// src/lib/subscription.ts
+// apps/web/src/lib/subscription.ts
 export async function getUserTier(userId: string): Promise<TierName> {
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
@@ -358,7 +358,7 @@ User is redirected to /billing?success=true
 ### Checkout Session Creation
 
 ```typescript
-// src/lib/stripe.ts
+// apps/web/src/lib/stripe.ts
 export async function createCheckoutSession(params: {
   userId: string;
   userEmail: string;
@@ -386,7 +386,7 @@ export async function createCheckoutSession(params: {
 ### API Route
 
 ```typescript
-// src/app/api/billing/checkout/route.ts
+// apps/web/src/app/api/billing/checkout/route.ts
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
 The customer portal allows users to manage their subscription without any custom billing UI:
 
 ```typescript
-// src/lib/stripe.ts
+// apps/web/src/lib/stripe.ts
 export async function createPortalSession(customerId: string, returnUrl: string): Promise<string> {
   if (!stripe) {
     throw new Error('Stripe not configured');

@@ -280,7 +280,7 @@ Before committing to podcast generation, the system searches for existing public
 ### Search Logic
 
 ```typescript
-// src/lib/recommendations.ts
+// apps/web/src/lib/recommendations.ts
 export async function findSimilarPodcasts(params: {
   topic: string;
   excludeUserId?: string;

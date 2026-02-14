@@ -472,7 +472,7 @@ When an unauthenticated user tries to access a protected route, the middleware a
 Client components need access to the session. The `SessionProvider` wraps the app in the root layout:
 
 ```typescript
-// src/components/providers/SessionProvider.tsx
+// apps/web/src/components/providers/SessionProvider.tsx
 'use client';
 
 import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react';

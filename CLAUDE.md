@@ -29,23 +29,33 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | PDF       | pdfmake (server-side transcript PDF generation)                                                          |
 | Hosting   | Hetzner VPS (Docker Compose + Caddy), deployed via GitHub Actions SSH                                    |
 
+## Monorepo Structure
+
+npm workspaces monorepo with two apps and one shared package:
+
+| Workspace | Path | Description |
+|-----------|------|-------------|
+| `@sotto/web` | `apps/web/` | Next.js web app (App Router, Prisma, BullMQ workers) |
+| `@sotto/mobile` | `apps/mobile/` | React Native + Expo iOS app |
+| `@sotto/shared` | `packages/shared/` | Shared types, Zod validations, design tokens |
+
+Root `package.json` is a workspace orchestrator — all scripts proxy to `@sotto/web`.
+`tsconfig.base.json` at root holds shared compiler options; each app extends it.
+
 ## Build & Development Commands
 
 ```bash
-# Install dependencies
+# Install dependencies (all workspaces)
 npm install
 
 # Start PostgreSQL + Redis
 docker-compose up -d
 
 # Push database schema
-npx prisma db push
+npx prisma db push --schema=apps/web/prisma/schema.prisma
 
 # Generate Prisma client
-npx prisma generate
-
-# Seed database (optional)
-npx prisma db seed
+npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 # Development (web + workers concurrently)
 npm run dev
@@ -60,7 +70,7 @@ npm run dev:workers
 npm run lint
 
 # Type checking
-npx tsc --noEmit
+npm run type-check
 
 # Tests
 npm run test
@@ -68,9 +78,62 @@ npm run test:watch
 
 # Build for production
 npm run build
+
+# Full CI pipeline (lint + type-check + test + build)
+npm run ci
 ```
 
 ## Project Structure
+
+```
+Sotto/
+├── apps/
+│   ├── web/                    # Next.js web app (@sotto/web)
+│   │   ├── src/
+│   │   │   ├── app/            # Next.js App Router (pages + API routes)
+│   │   │   ├── components/     # UI components (CSS Modules)
+│   │   │   ├── lib/            # Core libraries + external service clients
+│   │   │   ├── workers/        # BullMQ workers (13 types)
+│   │   │   ├── styles/         # globals.css (design system tokens)
+│   │   │   └── types/          # TypeScript types (re-exports from @sotto/shared)
+│   │   ├── prisma/             # Prisma schema + seeds
+│   │   ├── public/             # Static assets
+│   │   ├── tests/              # Vitest test suites
+│   │   ├── package.json
+│   │   ├── tsconfig.json       # extends ../../tsconfig.base.json, keeps @/* → ./src/*
+│   │   ├── next.config.js
+│   │   ├── vitest.config.ts
+│   │   ├── eslint.config.mjs
+│   │   ├── Dockerfile
+│   │   └── Dockerfile.workers
+│   └── mobile/                 # React Native + Expo iOS app (@sotto/mobile)
+│       ├── app/                # expo-router screens
+│       ├── components/         # RN components
+│       ├── lib/                # API client, auth, audio player
+│       ├── assets/             # Icons, splash screen
+│       ├── package.json
+│       ├── tsconfig.json
+│       ├── app.json
+│       └── eas.json
+├── packages/
+│   └── shared/                 # Shared package (@sotto/shared)
+│       └── src/
+│           ├── types/          # String union enums, interfaces (Prisma-free)
+│           ├── validations.ts  # Shared Zod schemas
+│           ├── theme.ts        # Design tokens (colors, spacing, typography)
+│           └── index.ts        # Barrel export
+├── scripts/                    # Setup, deploy, pitch rebuild scripts
+├── docs/                       # Product docs, architecture, guides
+├── .github/                    # CI/CD workflows
+├── package.json                # Root workspace orchestrator
+├── tsconfig.base.json          # Shared TypeScript compiler options
+├── docker-compose.yml          # Dev: PostgreSQL + Redis
+├── docker-compose.prod.yml     # Prod: web + workers + postgres + redis
+├── Caddyfile                   # Reverse proxy config
+└── .prettierrc                 # Shared formatter config
+```
+
+### Web App Detail (`apps/web/src/`)
 
 ```
 src/
@@ -79,122 +142,54 @@ src/
 │   ├── page.tsx                # Landing page
 │   ├── auth/                   # Login, signup pages
 │   ├── (dashboard)/            # Dashboard, billing, settings, analytics, team (auth required)
-│   ├── (admin)/                # Admin dashboard: overview, users, podcasts, waitlist, analytics, moderation (ADMIN only)
+│   ├── (admin)/                # Admin dashboard (ADMIN only)
 │   ├── create/                 # Chat-based discovery → generation
 │   ├── podcast/[podcastId]/    # Playback + interrupt + fork
 │   ├── feed/                   # Public social feed
 │   ├── profile/[userId]/       # Public profile + follow
-│   ├── pricing/                # Pricing page with SOON badges
+│   ├── pricing/                # Pricing page
 │   └── api/                    # API routes
 │       ├── auth/[...nextauth]/ # NextAuth handlers
 │       ├── podcasts/           # CRUD, generate, interact, fork, like, save
 │       ├── discovery/          # Streaming Claude chat + chip suggestions
-│       ├── recommendations/    # Search similar podcasts
 │       ├── feed/               # Public feed, trending, search
 │       ├── users/              # Profile, follow/unfollow, Twitter settings
 │       ├── billing/            # Stripe checkout, subscription, portal, usage
 │       ├── notifications/      # List, mark read, push registration
-│       ├── tags/               # Tag taxonomy
-│       ├── keys/               # API key management (CRUD, rotate)
-│       ├── teams/              # Team management + invites
-│       ├── voices/             # Voice clone + preview
-│       ├── analytics/          # Usage analytics
-│       ├── admin/              # Admin API (user role, podcast delete, waitlist export) — ADMIN only
-│       ├── waitlist/           # Waitlist signup
-│       ├── health/             # Health check
+│       ├── admin/              # Admin API — ADMIN only
 │       └── webhooks/stripe/    # Stripe webhook handler
 ├── components/
-│   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner, CitationMarker, TtsProviderLogo
-│   ├── player/                 # AudioPlayer, Waveform, PlaybackControls, MiniPlayer, TranscriptPanel, ReferenceList, Teleprompter, VersionHistory, ForkAttribution, ForkLineage, ForkRemixModal, ForkGraph, ListeningQueue, InterruptChatPanel, SegmentQuestionBadge, ShareMenu, EmbedCodeModal, EmbedPlayer
+│   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner
+│   ├── player/                 # AudioPlayer, MiniPlayer, TranscriptPanel, InterruptChatPanel
 │   ├── chat/                   # ChatContainer, ChatMessage, ChatChips
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
-│   ├── create/                 # GenerationProgress, ScriptPreview, TtsProviderSelector
-│   ├── import/                 # ImportUploader, ImportProgress
 │   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar
-│   ├── pricing/                # PricingCard, FeatureList, TierComparison
-│   ├── billing/                # CreditPackCard
-│   ├── profile/                # ProfileHeader, PodcastList, FollowButton
-│   ├── notifications/          # NotificationBell, NotificationList, PushPrompt
-│   ├── settings/               # VoicePreferenceSelector, TtsProviderCards — Voice preferences + TTS provider BYOK key management
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
-│   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider, EventProvider, PageViewTracker
+│   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider
 ├── lib/
-│   ├── prisma.ts               # Prisma client (PostgreSQL required)
+│   ├── prisma.ts               # Database client
 │   ├── redis.ts                # Redis connection + cache helpers
-│   ├── queue.ts                # BullMQ queues for all job types
+│   ├── queue.ts                # BullMQ job queues
 │   ├── auth.ts                 # NextAuth configuration
-│   ├── claude.ts               # Anthropic Claude client (streaming + non-streaming)
-│   ├── elevenlabs.ts           # ElevenLabs TTS client
-│   ├── stripe.ts               # Stripe client + tier limits + canGenerate/canInteract
-│   ├── credits.ts              # Credit operations (consume, refund, grant, purchase)
-│   ├── r2.ts                   # Cloudflare R2 storage client
-│   ├── discovery-agent.ts      # Chat-based discovery: Claude streaming + chip generation
-│   ├── script-generator.ts     # Claude script generation with [N] citations + revision with feedback
-│   ├── script-verifier.ts     # "Teacher" agent: claim extraction, sourcing evaluation, duration check
-│   ├── reference-validator.ts  # Source quality filter + 4-layer reference verification
-│   ├── script-updater.ts       # Citation cleanup + renumbering after reference removal
-│   ├── citation-parser.tsx     # Parse [N] citation markers → React CitationMarker components
-│   ├── pdf-generator.ts        # pdfmake academic-style PDF generation
-│   ├── voice-pool.ts           # Unified voice pool with per-provider IDs
-│   ├── cost-monitor.ts         # Provider cost tracking + budget warnings
-│   ├── transcript-parser.ts    # Parse SRT/VTT/JSON transcripts → Segment[] for imports
+│   ├── claude.ts               # Anthropic Claude client
+│   ├── stripe.ts               # Stripe client + tier limits
+│   ├── validations.ts          # Zod schemas (web-only; shared schemas in @sotto/shared)
 │   ├── providers/              # Modular provider architecture (ai, tts, stt, storage, payment)
-│   │   ├── stt.ts              # Speech-to-text provider interface
-│   │   ├── tts-registry.ts     # Provider capability metadata (quality, cost, auth)
-│   │   └── tts/                # Per-provider TTS implementations
-│   │       ├── elevenlabs.provider.ts
-│   │       ├── openai.provider.ts
-│   │       ├── playht.provider.ts
-│   │       ├── cartesia.provider.ts
-│   │       └── hume.provider.ts
-│   ├── audio-stitcher.ts       # FFmpeg segment concatenation + normalization
-│   ├── content-parser.ts       # URL/PDF content extraction
-│   ├── recommendations.ts      # Search similar podcasts, rank by relevance
-│   ├── push-notifications.ts   # Web Push API registration + send
-│   ├── subscription.ts         # Subscription tier management + credit balance queries
-│   ├── notifications.ts        # In-app notification helpers
-│   ├── validations.ts          # Zod schemas for API validation
-│   ├── twitter.ts              # Twitter API v2 client (mentions, replies, OAuth 1.0a)
-│   ├── tweet-parser.ts         # Claude-based tweet intent extraction
-│   ├── api-keys.ts             # API key generation, hashing, validation
-│   ├── rss.ts                  # RSS 2.0 feed generation with iTunes namespace
-│   └── hooks/                  # React hooks
-│       ├── useAuth.ts
-│       ├── useAudioPlayer.ts
-│       ├── usePodcast.ts
-│       ├── useDiscovery.ts
-│       └── useNotifications.ts
+│   └── hooks/                  # React hooks (useAuth, useAudioPlayer, usePodcast, etc.)
 ├── workers/
-│   ├── index.ts                         # Worker orchestrator (13 workers)
-│   ├── content-extraction.worker.ts
-│   ├── script-generation.worker.ts      # Persists References, routes to script verification
-│   ├── script-verification.worker.ts    # "Teacher" agent: claim extraction, sourcing check, ≤3 revision loops
-│   ├── reference-validation.worker.ts   # Source quality filter + 4-layer verification pipeline
+│   ├── index.ts                # Worker orchestrator (13 workers)
+│   ├── script-generation.worker.ts
 │   ├── audio-generation.worker.ts
 │   ├── audio-stitching.worker.ts
-│   ├── audio-import.worker.ts           # STT + transcript parsing for imported podcasts
-│   ├── interaction.worker.ts
-│   ├── segment-regeneration.worker.ts
-│   ├── notification.worker.ts
-│   ├── pdf-generation.worker.ts         # Async PDF generation → R2 upload
-│   ├── twitter-mentions.worker.ts       # Poll @sottofm mentions → parse → generate
-│   └── twitter-reply.worker.ts          # Reply to tweet when podcast is ready
+│   └── ...                     # See apps/web/src/workers/CLAUDE.md for full list
 ├── styles/
 │   └── globals.css             # Design system tokens + global styles
-└── types/
-    ├── podcast.ts              # Includes references: ReferenceData[], pdfUrl: string | null
-    ├── player.ts
-    ├── interaction.ts
-    ├── feed.ts
-    ├── discovery.ts
-    ├── notification.ts
-    ├── reference.ts            # ReferenceData type (id, number, title, authors, year, url, type, verificationStatus)
-    ├── version.ts              # PodcastVersion + version history types
-    ├── import.ts               # Import job types (audio upload, STT, transcript parsing)
-    ├── analytics.ts            # Usage analytics types
-    ├── api-key.ts              # API key types
-    ├── team.ts                 # Team + invite types
-    └── twitter.ts              # TweetParseResult, TwitterTweet, TwitterSettingsData
+└── types/                      # Re-exports from @sotto/shared (+ Prisma-dependent types)
+    ├── podcast.ts              # Uses Prisma enums (PodcastStatus, Speaker, etc.)
+    ├── reference.ts            # Uses Prisma enums (ReferenceType, VerificationStatus)
+    ├── twitter.ts              # Uses Prisma enums (TweetMentionStatus)
+    ├── next-auth.d.ts          # NextAuth module augmentation (UserRole)
+    └── *.ts                    # All others re-export from @sotto/shared
 ```
 
 ## Design System: "Warm Intimacy"
@@ -346,7 +341,7 @@ export function ComponentName({ variant = 'primary', children }: ComponentNamePr
 ### API Route Pattern
 
 ```tsx
-// src/app/api/resource/route.ts
+// apps/web/src/app/api/resource/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -363,7 +358,7 @@ export async function GET(request: NextRequest) {
 ### Worker Pattern
 
 ```tsx
-// src/workers/example.worker.ts
+// apps/web/src/workers/example.worker.ts
 import { Job } from 'bullmq';
 
 export async function processJob(job: Job) {
@@ -378,7 +373,7 @@ export async function processJob(job: Job) {
 ### Lib Pattern
 
 ```tsx
-// src/lib/service.ts
+// apps/web/src/lib/service.ts
 // External service client with retry logic and error handling
 import { env } from './env';
 
@@ -450,7 +445,7 @@ Before declaring any UI work done, verify:
 - **Always run `npm run ci` before committing** — this runs lint, type-check, tests, and build (mirrors the GitHub Actions CI pipeline). Fix all failures before staging and committing.
 - When tsc or lint reports multiple errors, collect the FULL error list before fixing anything — then fix all in a single pass
 - If pre-commit hooks fail on files unrelated to your change, use `git commit --no-verify` on the second attempt
-- After any Prisma schema change, run `npx prisma generate` before `npx tsc --noEmit`
+- After any Prisma schema change, run `npx prisma generate --schema=apps/web/prisma/schema.prisma` before type-checking
 - When CI fails, read the full log — don't guess which test broke
 
 ## Environment Variables
