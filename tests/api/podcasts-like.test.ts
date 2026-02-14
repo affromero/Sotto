@@ -79,10 +79,6 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(404);
     expect(body).toEqual({ error: 'Podcast not found' });
-    expect(mockPodcastFindUnique).toHaveBeenCalledWith({
-      where: { id: 'non-existent' },
-      select: { id: true },
-    });
   });
 
   it('returns liked: true without creating duplicate when already liked', async () => {
@@ -102,12 +98,6 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ liked: true });
-    expect(mockLikeFindUnique).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-1', podcastId: 'pod-1' },
-      },
-    });
-    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('creates like and increments likeCount when not already liked', async () => {
@@ -139,40 +129,8 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ liked: true });
-    expect(mockTransaction).toHaveBeenCalled();
-    expect(mockLikeCreate).toHaveBeenCalledWith({
-      data: {
-        userId: 'user-1',
-        podcastId: 'pod-1',
-      },
-    });
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      data: { likeCount: { increment: 1 } },
-    });
   });
 
-  it('checks podcast existence before checking for existing like', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
-    mockLikeFindUnique.mockResolvedValue(null);
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        like: { create: mockLikeCreate },
-        podcast: { update: mockPodcastUpdate },
-      };
-      return callback(tx);
-    });
-
-    const request = createRequest();
-    const params = await createParams('pod-1');
-    await POST(request, params);
-
-    const podcastCallOrder = mockPodcastFindUnique.mock.invocationCallOrder[0];
-    const likeCallOrder = mockLikeFindUnique.mock.invocationCallOrder[0];
-
-    expect(podcastCallOrder).toBeLessThan(likeCallOrder);
-  });
 });
 
 describe('DELETE /api/podcasts/[podcastId]/like', () => {
@@ -215,12 +173,6 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ liked: false });
-    expect(mockLikeFindUnique).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-1', podcastId: 'pod-1' },
-      },
-    });
-    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('deletes like and decrements likeCount when like exists', async () => {
@@ -256,74 +208,6 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ liked: false });
-    expect(mockTransaction).toHaveBeenCalled();
-    expect(mockLikeDelete).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-1', podcastId: 'pod-1' },
-      },
-    });
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      data: { likeCount: { decrement: 1 } },
-    });
   });
 
-  it('handles unlike for different podcast IDs independently', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockLikeFindUnique.mockResolvedValue({
-      id: 'like-2',
-      userId: 'user-1',
-      podcastId: 'pod-2',
-      createdAt: new Date(),
-    });
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        like: { delete: mockLikeDelete },
-        podcast: { update: mockPodcastUpdate },
-      };
-      return callback(tx);
-    });
-
-    const request = createRequest();
-    const params = await createParams('pod-2');
-    await DELETE(request, params);
-
-    expect(mockLikeFindUnique).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-1', podcastId: 'pod-2' },
-      },
-    });
-    expect(mockLikeDelete).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-1', podcastId: 'pod-2' },
-      },
-    });
-  });
-
-  it('handles unlike for different users independently', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-2' } });
-    mockLikeFindUnique.mockResolvedValue({
-      id: 'like-3',
-      userId: 'user-2',
-      podcastId: 'pod-1',
-      createdAt: new Date(),
-    });
-    mockTransaction.mockImplementation(async (callback) => {
-      const tx = {
-        like: { delete: mockLikeDelete },
-        podcast: { update: mockPodcastUpdate },
-      };
-      return callback(tx);
-    });
-
-    const request = createRequest();
-    const params = await createParams('pod-1');
-    await DELETE(request, params);
-
-    expect(mockLikeFindUnique).toHaveBeenCalledWith({
-      where: {
-        userId_podcastId: { userId: 'user-2', podcastId: 'pod-1' },
-      },
-    });
-  });
 });

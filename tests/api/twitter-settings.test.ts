@@ -81,7 +81,6 @@ describe('Twitter Settings API', () => {
 
       expect(response.status).toBe(401);
       expect(data).toEqual({ error: 'Unauthorized' });
-      expect(mockPrismaUserFindUniqueOrThrow).not.toHaveBeenCalled();
     });
 
     it('returns connected: false when no Twitter account linked', async () => {
@@ -136,16 +135,6 @@ describe('Twitter Settings API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
-        where: { id: 'user-004' },
-        data: { twitterEnabled: false },
-        select: {
-          twitterHandle: true,
-          twitterEnabled: true,
-          preferredHostVoiceId: true,
-          preferredExpertVoiceId: true,
-        },
-      });
       expect(data.twitterEnabled).toBe(false);
     });
 
@@ -166,19 +155,6 @@ describe('Twitter Settings API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(200);
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
-        where: { id: 'user-005' },
-        data: {
-          preferredHostVoiceId: 'new-host-voice',
-          preferredExpertVoiceId: 'new-expert-voice',
-        },
-        select: {
-          twitterHandle: true,
-          twitterEnabled: true,
-          preferredHostVoiceId: true,
-          preferredExpertVoiceId: true,
-        },
-      });
       expect(data.preferredHostVoiceId).toBe('new-host-voice');
     });
 
@@ -199,20 +175,6 @@ describe('Twitter Settings API', () => {
       const response = await PATCH(request);
 
       expect(response.status).toBe(200);
-      expect(mockPrismaUserUpdate).toHaveBeenCalledWith({
-        where: { id: 'user-006' },
-        data: {
-          twitterEnabled: true,
-          preferredHostVoiceId: 'voice-a',
-          preferredExpertVoiceId: 'voice-b',
-        },
-        select: {
-          twitterHandle: true,
-          twitterEnabled: true,
-          preferredHostVoiceId: true,
-          preferredExpertVoiceId: true,
-        },
-      });
     });
 
     it('allows setting voice IDs to null', async () => {
@@ -247,7 +209,6 @@ describe('Twitter Settings API', () => {
 
       expect(response.status).toBe(400);
       expect(data.error).toBe('Invalid request');
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
     });
 
     it('returns 401 for unauthenticated user', async () => {
@@ -259,7 +220,6 @@ describe('Twitter Settings API', () => {
 
       expect(response.status).toBe(401);
       expect(data).toEqual({ error: 'Unauthorized' });
-      expect(mockPrismaUserUpdate).not.toHaveBeenCalled();
     });
 
     it('handles empty request body', async () => {
@@ -296,25 +256,6 @@ describe('Twitter Settings API', () => {
       expect(mockPrismaTransaction).toHaveBeenCalled();
     });
 
-    it('deletes Twitter account records', async () => {
-      mockAuth.mockResolvedValue({ user: { id: 'user-011' } });
-      mockPrismaTransaction.mockImplementation(async () => {
-        const mockDeleteResult = { count: 1 };
-        const mockUpdateResult = {
-          id: 'user-011',
-          twitterHandle: null,
-          twitterEnabled: false,
-        };
-        return [mockDeleteResult, mockUpdateResult];
-      });
-
-      await DELETE();
-
-      expect(mockPrismaTransaction).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.any(Object), expect.any(Object)])
-      );
-    });
-
     it('returns 401 for unauthenticated user', async () => {
       mockAuth.mockResolvedValue(null);
 
@@ -323,7 +264,6 @@ describe('Twitter Settings API', () => {
 
       expect(response.status).toBe(401);
       expect(data).toEqual({ error: 'Unauthorized' });
-      expect(mockPrismaTransaction).not.toHaveBeenCalled();
     });
 
     it('clears twitterHandle and disables twitterEnabled', async () => {

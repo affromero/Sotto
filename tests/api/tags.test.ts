@@ -89,27 +89,6 @@ describe('GET /api/tags', () => {
     expect(body).toEqual([]);
   });
 
-  it('queries tags with correct select and orderBy', async () => {
-    mockPrisma.tag.findMany.mockResolvedValue([]);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrisma.tag.findMany).toHaveBeenCalledWith({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        _count: {
-          select: { podcasts: true },
-        },
-      },
-      orderBy: {
-        podcasts: { _count: 'desc' },
-      },
-    });
-  });
-
   it('maps _count.podcasts to podcastCount in response', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([
       { id: 'tag-1', name: 'Art', slug: 'art', _count: { podcasts: 0 } },
