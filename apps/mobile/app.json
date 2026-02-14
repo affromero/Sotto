@@ -16,6 +16,7 @@
     "ios": {
       "bundleIdentifier": "fm.sotto.app",
       "supportsTablet": true,
+      "buildNumber": "1",
       "associatedDomains": [
         "applinks:sotto.fm"
       ],
