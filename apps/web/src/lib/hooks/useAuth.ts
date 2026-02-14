@@ -36,7 +36,7 @@ export function useAuth(): UseAuthReturn {
     : null;
 
   const signIn = useCallback(() => {
-    nextAuthSignIn(undefined, { callbackUrl: '/auth/login' });
+    nextAuthSignIn(undefined, { callbackUrl: '/dashboard' });
   }, []);
 
   const signOut = useCallback(() => {
