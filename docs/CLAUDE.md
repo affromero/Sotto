@@ -30,6 +30,7 @@ Docs are numbered to match the investor pitch order in `scripts/rebuild-pitch.sh
 | 20  | `20-roles-and-dashboards.md`   |                     | User roles, admin capabilities                         |
 | 21  | `21-logo-brief.md`             |                     | Logo design brief                                      |
 | 22  | `22-palette-brief.md`          |                     | Color palette brief                                    |
+| 23  | `23-local-development.md`      |                     | Local dev setup, env vars, what works without API keys |
 | —   | `accounting/`                  | —                   | Beancount ledger, import scripts, monthly close        |
 
 ```bash

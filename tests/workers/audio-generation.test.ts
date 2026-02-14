@@ -1,3 +1,4 @@
+import os from 'os';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks (must be declared before any import that touches the modules) ----
@@ -337,13 +338,16 @@ describe('processAudioGeneration', () => {
   });
 
   describe('FFprobe duration extraction', () => {
+    const tmpDir = os.tmpdir().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const tmpProbeRegex = new RegExp(`^${tmpDir}[/\\\\]sotto-probe-[a-f0-9-]+\\.mp3$`);
+
     it('measures duration via FFprobe after TTS', async () => {
       mockGetAudioDuration.mockResolvedValue(6.543);
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
       expect(mockGetAudioDuration).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/)
+        expect.stringMatching(tmpProbeRegex)
       );
     });
 
@@ -354,7 +358,7 @@ describe('processAudioGeneration', () => {
       await processAudioGeneration(job);
 
       expect(mockWriteFile).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        expect.stringMatching(tmpProbeRegex),
         audioBuffer
       );
     });
@@ -364,7 +368,7 @@ describe('processAudioGeneration', () => {
       await processAudioGeneration(job);
 
       expect(mockRm).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        expect.stringMatching(tmpProbeRegex),
         { force: true }
       );
     });
@@ -393,7 +397,7 @@ describe('processAudioGeneration', () => {
       await processAudioGeneration(job);
 
       expect(mockRm).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/tmp\/sotto-probe-[a-f0-9-]+\.mp3$/),
+        expect.stringMatching(tmpProbeRegex),
         { force: true }
       );
     });

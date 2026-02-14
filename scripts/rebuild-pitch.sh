@@ -231,6 +231,7 @@ DOCS=(
   "20-roles-and-dashboards.md:Roles & Dashboards"
   "21-logo-brief.md:Logo Brief"
   "22-palette-brief.md:Palette Brief"
+  "23-local-development.md:Local Development"
 )
 
 # Build pandoc options (array to preserve quoting)
