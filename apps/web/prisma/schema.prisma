@@ -86,6 +86,9 @@ model User {
   // Voice allowlist
   voiceAllowlistEntries VoiceAllowlist[] @relation("VoiceAllowlisted")
 
+  // Interaction votes
+  interactionVotes InteractionVote[]
+
   @@index([teamId])
   @@index([role])
   @@index([handle])
@@ -432,16 +435,34 @@ model Interaction {
   helpful      Boolean? // null = no feedback, true/false = user response
   segmentOrder Int?     // computed by worker: which segment the question maps to
 
+  // Public Q&A
+  visibility   String  @default("PUBLIC") // PUBLIC or PRIVATE
+  upvoteCount  Int     @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast  Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast  Podcast            @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   versions PodcastVersion[]
+  votes    InteractionVote[]
 
   @@index([podcastId])
   @@index([userId])
   @@index([status])
+}
+
+model InteractionVote {
+  id            String   @id @default(cuid())
+  userId        String
+  interactionId String
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interaction Interaction @relation(fields: [interactionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, interactionId])
+  @@index([interactionId])
 }
 
 enum InteractionStatus {
@@ -554,6 +575,8 @@ enum NotificationType {
   VOICE_REQUEST_RECEIVED
   VOICE_REQUEST_APPROVED
   VOICE_REQUEST_DENIED
+  QUESTION_ON_YOUR_PODCAST
+  QUESTION_UPVOTED
 }
 
 // ============ PUSH SUBSCRIPTIONS ============

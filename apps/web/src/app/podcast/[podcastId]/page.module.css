@@ -369,6 +369,10 @@
   margin-top: var(--spacing-sm);
 }
 
+.questionsSection {
+  margin-top: var(--spacing-lg);
+}
+
 .versionSection {
   margin-top: var(--spacing-lg);
 }
