@@ -6,7 +6,6 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Image,
   Alert,
   StyleSheet,
 } from 'react-native';
@@ -16,6 +15,11 @@ import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { deleteToken } from '../../lib/auth';
+import { globalStyles } from '../../lib/theme';
+import { formatDuration, formatCount } from '../../lib/formatters';
+import { Avatar } from '../../components/Avatar';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
 
 interface UserProfile {
   id: string;
@@ -30,19 +34,6 @@ interface UserProfile {
 
 interface UserPodcastsResponse {
   podcasts: PodcastSummary[];
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '--:--';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function formatCount(count: number): string {
-  if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
-  if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
-  return count.toString();
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -211,34 +202,21 @@ export default function ProfileScreen() {
 
   if (isProfileError) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>
-          {profileError instanceof Error
+      <ErrorState
+        message={
+          profileError instanceof Error
             ? profileError.message
-            : 'Failed to load profile'}
-        </Text>
-        <Pressable
-          style={styles.retryButton}
-          onPress={() => refetchProfile()}
-        >
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </Pressable>
-      </View>
+            : 'Failed to load profile'
+        }
+        onRetry={() => refetchProfile()}
+      />
     );
   }
 
   const profileHeader = (
     <View style={styles.profileSection}>
       <View style={styles.profileTopRow}>
-        {profile?.image ? (
-          <Image source={{ uri: profile.image }} style={styles.profileAvatar} />
-        ) : (
-          <View style={[styles.profileAvatar, styles.profileAvatarFallback]}>
-            <Text style={styles.profileAvatarFallbackText}>
-              {(profile?.name ?? '?')[0].toUpperCase()}
-            </Text>
-          </View>
-        )}
+        <Avatar uri={profile?.image} name={profile?.name} size={80} />
         <Pressable
           style={styles.settingsButton}
           onPress={handleSettingsPress}
@@ -288,7 +266,7 @@ export default function ProfileScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={globalStyles.screenContainer}>
       <FlatList
         data={podcasts}
         renderItem={renderPodcastItem}
@@ -305,22 +283,19 @@ export default function ProfileScreen() {
         }
         ListEmptyComponent={
           isPodcastsError ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptySubtitle}>
-                Failed to load your podcasts
-              </Text>
-            </View>
+            <EmptyState
+              title="Error"
+              subtitle="Failed to load your podcasts"
+            />
           ) : isPodcastsLoading ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No podcasts yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Create your first podcast from the Create tab
-              </Text>
-            </View>
+            <EmptyState
+              title="No podcasts yet"
+              subtitle="Create your first podcast from the Create tab"
+            />
           )
         }
         ListFooterComponent={
@@ -342,10 +317,6 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -365,21 +336,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: spacing.md,
-  },
-  profileAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-  },
-  profileAvatarFallback: {
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileAvatarFallbackText: {
-    fontFamily: typography.fontHeading,
-    fontSize: 32,
-    color: colors.primary,
   },
   settingsButton: {
     width: 44,
@@ -536,18 +492,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
     paddingHorizontal: spacing.xl,
   },
-  emptyTitle: {
-    fontFamily: typography.fontHeading,
-    fontSize: 20,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  emptySubtitle: {
-    fontFamily: typography.fontBody,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
   footer: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
@@ -569,24 +513,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.error,
-  },
-  errorText: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.lg,
-  },
-  retryButtonText: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textInverse,
   },
 });

@@ -18,14 +18,9 @@ import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
+import { formatTime } from '../../lib/formatters';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
 function findCurrentSegmentIndex(
   segments: SegmentData[],
