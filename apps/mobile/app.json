@@ -16,9 +16,13 @@
     "ios": {
       "bundleIdentifier": "fm.sotto.app",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:sotto.fm"],
+      "associatedDomains": [
+        "applinks:sotto.fm"
+      ],
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -37,7 +41,9 @@
           "icon": "./assets/icon.png",
           "color": "#D97706"
         }
-      ]
+      ],
+      "expo-apple-authentication",
+      "expo-web-browser"
     ]
   }
 }
