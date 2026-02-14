@@ -24,6 +24,8 @@ interface ProfileHeaderProps {
   isAuthenticated: boolean;
   onFollow: () => void;
   onEdit?: () => void;
+  onFollowerClick?: () => void;
+  onFollowingClick?: () => void;
 }
 
 function getInitials(name: string | null): string {
@@ -55,6 +57,8 @@ export function ProfileHeader({
   isAuthenticated,
   onFollow,
   onEdit,
+  onFollowerClick,
+  onFollowingClick,
 }: ProfileHeaderProps) {
   return (
     <section className={styles.root} aria-label="User profile">
@@ -108,8 +112,8 @@ export function ProfileHeader({
 
         <div className={styles.stats} role="group" aria-label="Profile statistics">
           <FollowerCount count={podcastCount} label="podcasts" />
-          <FollowerCount count={followerCount} label="followers" />
-          <FollowerCount count={followingCount} label="following" />
+          <FollowerCount count={followerCount} label="followers" onClick={onFollowerClick} />
+          <FollowerCount count={followingCount} label="following" onClick={onFollowingClick} />
         </div>
 
         <p className={styles.memberSince}>

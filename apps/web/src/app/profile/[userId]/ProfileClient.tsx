@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { PodcastList } from '@/components/profile/PodcastList';
+import { FollowListModal } from '@/components/profile/FollowListModal';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './page.module.css';
 
@@ -26,6 +27,7 @@ interface ProfileClientProps {
   isOwnProfile: boolean;
   initialIsFollowing: boolean;
   isAuthenticated?: boolean;
+  currentUserId?: string;
 }
 
 export function ProfileClient({
@@ -37,11 +39,32 @@ export function ProfileClient({
   isOwnProfile,
   initialIsFollowing,
   isAuthenticated = true,
+  currentUserId,
 }: ProfileClientProps) {
   const router = useRouter();
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [followerCount, setFollowerCount] = useState(initialFollowerCount);
   const [activeTab, setActiveTab] = useState<'podcasts' | 'remixes' | 'liked'>('podcasts');
+  const [followModal, setFollowModal] = useState<'followers' | 'following' | null>(null);
+
+  const [likedPodcasts, setLikedPodcasts] = useState<PodcastSummary[]>([]);
+  const [likedLoading, setLikedLoading] = useState(false);
+  const likedLoadedRef = useRef(false);
+
+  const loadLikedPodcasts = useCallback(async () => {
+    if (likedLoadedRef.current) return;
+    likedLoadedRef.current = true;
+    setLikedLoading(true);
+    try {
+      const res = await fetch(`/api/users/${user.id}/liked`);
+      const data = await res.json();
+      setLikedPodcasts(data.podcasts || []);
+    } catch {
+      likedLoadedRef.current = false;
+    } finally {
+      setLikedLoading(false);
+    }
+  }, [user.id]);
 
   const handleFollow = useCallback(async () => {
     const newFollowing = !isFollowing;
@@ -74,6 +97,8 @@ export function ProfileClient({
         isAuthenticated={isAuthenticated}
         onFollow={handleFollow}
         onEdit={handleEdit}
+        onFollowerClick={() => setFollowModal('followers')}
+        onFollowingClick={() => setFollowModal('following')}
       />
 
       <nav className={styles.tabs} aria-label="Profile sections">
@@ -96,7 +121,7 @@ export function ProfileClient({
         <button
           type="button"
           className={`${styles.tab} ${activeTab === 'liked' ? styles.tabActive : ''}`}
-          onClick={() => setActiveTab('liked')}
+          onClick={() => { setActiveTab('liked'); loadLikedPodcasts(); }}
           aria-pressed={activeTab === 'liked'}
         >
           Liked
@@ -126,9 +151,25 @@ export function ProfileClient({
       )}
 
       {activeTab === 'liked' && (
-        <div className={styles.comingSoon}>
-          <p className={styles.comingSoonText}>Liked podcasts coming soon.</p>
-        </div>
+        <PodcastList
+          podcasts={likedPodcasts}
+          loading={likedLoading}
+          emptyMessage={
+            isOwnProfile
+              ? 'You have not liked any podcasts yet.'
+              : 'This user has not liked any podcasts yet.'
+          }
+        />
+      )}
+
+      {followModal && (
+        <FollowListModal
+          type={followModal}
+          userId={user.id}
+          isAuthenticated={isAuthenticated}
+          currentUserId={currentUserId}
+          onClose={() => setFollowModal(null)}
+        />
       )}
     </div>
   );
