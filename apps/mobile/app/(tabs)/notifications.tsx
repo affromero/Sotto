@@ -13,6 +13,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { NotificationData } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { globalStyles } from '../../lib/theme';
+import { timeAgo } from '../../lib/formatters';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
 
 const NOTIFICATION_ICONS: Record<string, string> = {
   PODCAST_READY: '\u{1F3A7}',
@@ -27,23 +31,6 @@ const NOTIFICATION_ICONS: Record<string, string> = {
 
 function getNotificationIcon(type: string): string {
   return NOTIFICATION_ICONS[type] ?? '\u{1F514}';
-}
-
-function timeAgo(dateString: string): string {
-  const now = Date.now();
-  const then = new Date(dateString).getTime();
-  const diffMs = now - then;
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  const diffWeeks = Math.floor(diffDays / 7);
-  if (diffWeeks < 4) return `${diffWeeks}w ago`;
-  const diffMonths = Math.floor(diffDays / 30);
-  return `${diffMonths}mo ago`;
 }
 
 function NotificationItem({
@@ -164,7 +151,7 @@ export default function NotificationsScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={globalStyles.screenContainer}>
       {hasUnread ? (
         <View style={styles.headerBar}>
           <Pressable
@@ -190,16 +177,14 @@ export default function NotificationsScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : isError ? (
-        <View style={styles.centered}>
-          <Text style={styles.errorText}>
-            {error instanceof Error
+        <ErrorState
+          message={
+            error instanceof Error
               ? error.message
-              : 'Failed to load notifications'}
-          </Text>
-          <Pressable style={styles.retryButton} onPress={() => refetch()}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </Pressable>
-        </View>
+              : 'Failed to load notifications'
+          }
+          onRetry={() => refetch()}
+        />
       ) : (
         <FlatList
           data={notifications}
@@ -219,14 +204,11 @@ export default function NotificationsScreen() {
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>{'\u{1F514}'}</Text>
-              <Text style={styles.emptyTitle}>No notifications yet</Text>
-              <Text style={styles.emptySubtitle}>
-                When someone likes your podcast, follows you, or your podcast
-                finishes generating, you will see it here.
-              </Text>
-            </View>
+            <EmptyState
+              icon={'\u{1F514}'}
+              title="No notifications yet"
+              subtitle="When someone likes your podcast, follows you, or your podcast finishes generating, you will see it here."
+            />
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
@@ -236,10 +218,6 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -347,45 +325,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: spacing.xl,
-  },
-  errorText: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.lg,
-  },
-  retryButtonText: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textInverse,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
-  emptyTitle: {
-    fontFamily: typography.fontHeading,
-    fontSize: 22,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  emptySubtitle: {
-    fontFamily: typography.fontBody,
-    fontSize: 15,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
   },
 });

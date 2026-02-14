@@ -12,19 +12,15 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
+import { formatTime } from '../../lib/formatters';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
 
 function findCurrentSegmentIndex(
   segments: SegmentData[],
@@ -42,9 +38,11 @@ function findCurrentSegmentIndex(
 export default function PodcastScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const transcriptRef = useRef<FlatList<SegmentData>>(null);
 
   const [playerReady, setPlayerReady] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
   const [speedIndex, setSpeedIndex] = useState(1); // default 1x
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
   const [questionText, setQuestionText] = useState('');
@@ -115,7 +113,10 @@ export default function PodcastScreen() {
   useEffect(() => {
     setupPlayer()
       .then(() => setPlayerReady(true))
-      .catch(() => setPlayerReady(false));
+      .catch((err: Error) => {
+        setPlayerError(err.message ?? 'Audio player failed to initialize');
+        setPlayerReady(false);
+      });
   }, []);
 
   // Load track when podcast data arrives and player is ready
@@ -389,10 +390,22 @@ export default function PodcastScreen() {
         }
       />
 
+      {/* Player Error */}
+      {playerError && (
+        <View style={styles.playerErrorContainer}>
+          <Text style={styles.playerErrorText}>
+            Audio unavailable: {playerError}
+          </Text>
+        </View>
+      )}
+
       {/* Ask a Question FAB */}
       <Pressable
         onPress={() => setQuestionModalVisible(true)}
-        style={styles.askButton}
+        style={[
+          styles.askButton,
+          { bottom: Math.max(spacing.lg, insets.bottom + spacing.sm) },
+        ]}
         accessibilityLabel="Ask a question about this podcast"
         accessibilityRole="button"
       >
@@ -669,7 +682,7 @@ const styles = StyleSheet.create({
   transcriptContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: 80, // room for the FAB
+    paddingBottom: 100, // room for the FAB + safe area
   },
   segmentRow: {
     paddingVertical: spacing.sm + 2,
@@ -724,10 +737,22 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
 
+  // Player Error
+  playerErrorContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.warningLighter,
+  },
+  playerErrorText: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.warning,
+    textAlign: 'center',
+  },
+
   // Ask FAB
   askButton: {
     position: 'absolute',
-    bottom: spacing.lg,
     left: spacing.lg,
     right: spacing.lg,
     backgroundColor: colors.accent,

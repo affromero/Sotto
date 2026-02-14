@@ -29,26 +29,14 @@ npm run mobile:ios
 |-------|-----------|--------|
 | Framework | React Native 0.81 + Expo SDK 54 | Installed |
 | Navigation | expo-router (file-based) | Installed |
-| State | Zustand (local) + React Query (server) | Installed |
+| State | React Query (server state) | Installed |
 | API | Axios → EXPO_PUBLIC_API_URL | Installed |
-| Auth | expo-secure-store (token storage) | Installed |
+| Auth | expo-secure-store + expo-auth-session + expo-apple-authentication | Installed |
 | Fonts | expo-font + @expo-google-fonts (DM Serif Display, Inter) | Installed |
 | Animations | react-native-reanimated | Installed |
 | Types | @sotto/shared (shared with web) | Installed |
-| Audio | react-native-track-player (background playback) | **Not yet installed** — needs dev client build |
-| Notifications | expo-notifications (push) | **Not yet installed** — needs dev client build |
-
-### Adding native packages (audio, notifications)
-
-These require a custom dev client (can't use Expo Go):
-
-```bash
-cd apps/mobile
-npx expo install react-native-track-player expo-notifications
-npm run ios:build   # builds custom dev client with native modules
-```
-
-Then update `lib/audio-player.ts` and `lib/notifications.ts` with real implementations.
+| Audio | react-native-track-player (background playback) | Installed |
+| Notifications | expo-notifications (push) | Installed |
 
 ## Architecture
 
@@ -68,49 +56,77 @@ The mobile app is a **thin client** — all business logic lives in the web back
 │   Web Backend (Next.js)  │
 │   /api/podcasts, /feed   │
 │   /api/discovery, etc.   │
-│   (no changes needed)    │
+│   /api/auth/mobile       │
 └──────────────────────────┘
 ```
+
+## Auth Flow
+
+Mobile uses API key-based auth (`sk_sotto_` tokens), not NextAuth sessions.
+
+**Dev mode** (`__DEV__`): Email-only login → `POST /api/auth/mobile` with `{email}` → receives `{token, user}`.
+
+**Production**: OAuth buttons (Apple, Google, GitHub, Twitter) → native/browser OAuth flow → sends `{provider, idToken}` to `POST /api/auth/mobile` → receives `{token, user}`.
+
+Token lifecycle:
+1. Token stored in `expo-secure-store` via `lib/auth.ts`
+2. Axios interceptor in `lib/api.ts` attaches `Authorization: Bearer sk_sotto_...` to every request
+3. Backend's `authenticateRequest()` validates via SHA-256 hash lookup in `ApiKey` model
+4. On 401, `api.ts` clears token and fires `onAuthRevoked()` event
+5. `_layout.tsx`'s `useProtectedRoute()` hook listens for auth revocation → redirects to `/auth/login`
 
 ## Navigation Structure
 
 ```
 app/
-├── _layout.tsx            # Root layout (fonts, providers, QueryClient)
+├── _layout.tsx            # Root layout (fonts, providers, QueryClient, auth gate)
 ├── (tabs)/
-│   ├── _layout.tsx        # Tab navigator
-│   ├── index.tsx          # Feed (home)
-│   ├── create.tsx         # Create podcast
-│   ├── notifications.tsx  # Notifications
-│   └── profile.tsx        # Current user profile
+│   ├── _layout.tsx        # Tab navigator (Ionicons icons)
+│   ├── index.tsx          # Feed (home) — infinite scroll, sort chips
+│   ├── create.tsx         # Create podcast — chat-based discovery
+│   ├── notifications.tsx  # Notifications — mark read, mark all read
+│   └── profile.tsx        # Current user profile — podcasts list, logout
 ├── auth/
-│   └── login.tsx          # Login screen
+│   └── login.tsx          # Login screen (dev: email, prod: OAuth)
 ├── podcast/
-│   └── [id].tsx           # Full-screen player
+│   └── [id].tsx           # Full-screen player — audio, transcript, Q&A
 └── user/
-    └── [userId].tsx       # Public profile
+    └── [userId].tsx       # Public profile — follow/unfollow, podcasts
 ```
 
 ## Lib Files
 
-| File | Purpose | Status |
-|------|---------|--------|
-| `api.ts` | Axios client — reads `EXPO_PUBLIC_API_URL` from env, attaches Bearer token | Working |
-| `auth.ts` | SecureStore token management (get, set, delete, isAuthenticated) | Working |
-| `theme.ts` | Imports @sotto/shared tokens → RN StyleSheet helpers | Working |
-| `audio-player.ts` | react-native-track-player setup and controls | Stub — needs package install |
-| `notifications.ts` | expo-notifications handler + push token registration | Stub — needs package install |
+| File | Purpose |
+|------|---------|
+| `api.ts` | Axios client — reads `EXPO_PUBLIC_API_URL` from env, attaches Bearer token, fires `onAuthRevoked()` on 401 |
+| `auth.ts` | SecureStore token management (get, set, delete, isAuthenticated) |
+| `theme.ts` | Imports @sotto/shared tokens → `globalStyles` RN StyleSheet helpers |
+| `formatters.ts` | Shared formatting: `formatDuration`, `formatCount`, `timeAgo`, `formatTime`, `formatDurationMinutes` |
+| `audio-player.ts` | react-native-track-player setup (`setupPlayer`) and track loading (`loadTrack`) |
+| `notifications.ts` | expo-notifications handler + push token registration via `POST /notifications/push` |
+
+## Components
+
+| File | Purpose |
+|------|---------|
+| `Avatar.tsx` | Image with fallback initial circle (`<Avatar uri={...} name={...} size={36} />`) |
+| `EmptyState.tsx` | Centered icon + title + subtitle pattern |
+| `ErrorState.tsx` | Error message + optional retry button |
+| `PodcastCard.tsx` | Unified podcast card with `variant="feed"` (full card with avatar, tags, stats) and `variant="compact"` (list row) |
 
 ## Environment Variables
 
-See `.env.example`. The critical one:
+See `.env.example`. Key variables:
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
 | `EXPO_PUBLIC_API_URL` | Yes (dev) | `https://sotto.fm/api` | Backend API base URL |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | For builds | — | EAS Build project ID |
+| `EXPO_PUBLIC_GOOGLE_CLIENT_ID` | For prod auth | — | Google OAuth client ID |
+| `EXPO_PUBLIC_GITHUB_CLIENT_ID` | For prod auth | — | GitHub OAuth client ID |
+| `EXPO_PUBLIC_TWITTER_CLIENT_ID` | For prod auth | — | Twitter OAuth client ID |
 
-In dev, set this to your machine's LAN IP so the iOS Simulator can reach the web backend.
+In dev, set `EXPO_PUBLIC_API_URL` to your machine's LAN IP so the iOS Simulator can reach the web backend.
 
 ## Commands
 
@@ -144,6 +160,8 @@ eas update --branch production --message "fix: description"  # OTA update
 - **No web code** — this app calls the web API, it doesn't import web app code
 - **Shared types** — import from `@sotto/shared`, never duplicate type definitions
 - **Design tokens** — use `lib/theme.ts` which bridges @sotto/shared to React Native
+- **Shared formatters** — use `lib/formatters.ts` for all display formatting, never define local format functions
+- **Shared components** — use `components/` for reusable UI (Avatar, EmptyState, ErrorState, PodcastCard)
 - **Screen files** — one screen per file in the `app/` directory (expo-router convention)
 - **StyleSheet only** — no styled-components, no NativeWind. Use `StyleSheet.create()`
 - **No inline styles** — define all styles in a `styles` const at the bottom of the file
@@ -153,8 +171,10 @@ eas update --branch production --message "fix: description"  # OTA update
 1. Create the file in `app/` following expo-router conventions
 2. Import types from `@sotto/shared`
 3. Use `lib/api.ts` for API calls (auth token attached automatically)
-4. Use `lib/theme.ts` for colors/spacing/typography
-5. Add navigation entry in the appropriate layout file if needed
+4. Use `lib/theme.ts` for colors/spacing/typography and `globalStyles` for common containers
+5. Use `lib/formatters.ts` for display formatting
+6. Use shared components from `components/` (Avatar, EmptyState, ErrorState, PodcastCard)
+7. Add navigation entry in the appropriate layout file if needed
 
 ## Troubleshooting
 
@@ -165,4 +185,5 @@ eas update --branch production --message "fix: description"  # OTA update
 | Fonts not rendering | Check `_layout.tsx` — fonts load async via `useFonts` hook |
 | SecureStore error in simulator | SecureStore works in simulators, but clear app data if tokens get stale |
 | Build fails on EAS | Run `eas build --platform ios --profile development --local` for local debug |
-| "Cannot find module react-native-track-player" | Package not yet installed — see "Adding native packages" above |
+| Auth redirect loop | Check that `_layout.tsx` auth gate is working — `useProtectedRoute()` hook |
+| 401 errors on all API calls | Token may be expired/invalid — clear SecureStore and re-login |

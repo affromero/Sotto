@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { SendNotificationPayload } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { sendPushNotification } from '@/lib/push-notifications';
+import { sendPushNotification, sendExpoPushNotification } from '@/lib/push-notifications';
 import { logger } from '@/lib/logger';
 
 export async function processNotification(job: Job<SendNotificationPayload>): Promise<void> {
@@ -20,8 +20,11 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
     },
   });
 
-  // Send push notification
-  await sendPushNotification({ userId, title, body: message, data });
+  // Send push notifications (web + mobile) in parallel
+  await Promise.all([
+    sendPushNotification({ userId, title, body: message, data }),
+    sendExpoPushNotification({ userId, title, body: message, data }),
+  ]);
 
   logger.info('Notification sent', { userId, type });
 }

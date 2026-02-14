@@ -6,13 +6,18 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { globalStyles } from '../../lib/theme';
+import { formatCount } from '../../lib/formatters';
+import { Avatar } from '../../components/Avatar';
+import { PodcastCard } from '../../components/PodcastCard';
+import { EmptyState } from '../../components/EmptyState';
+import { ErrorState } from '../../components/ErrorState';
 
 interface UserProfile {
   id: string;
@@ -24,66 +29,6 @@ interface UserProfile {
   followerCount: number;
   followingCount: number;
   isFollowing: boolean;
-}
-
-function formatCount(count: number): string {
-  if (count >= 1_000_000) {
-    return `${(count / 1_000_000).toFixed(1)}M`;
-  }
-  if (count >= 1_000) {
-    return `${(count / 1_000).toFixed(1)}K`;
-  }
-  return count.toString();
-}
-
-function formatDuration(seconds: number | null): string {
-  if (!seconds) return '';
-  const mins = Math.floor(seconds / 60);
-  return `${mins} min`;
-}
-
-function PodcastCard({
-  podcast,
-  onPress,
-}: {
-  podcast: PodcastSummary;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={styles.podcastCard}
-      accessibilityLabel={`${podcast.title} by ${podcast.user?.name ?? 'Unknown'}`}
-      accessibilityRole="button"
-    >
-      <View style={styles.podcastCardContent}>
-        <Text style={styles.podcastTitle} numberOfLines={2}>
-          {podcast.title}
-        </Text>
-        <Text style={styles.podcastTopic} numberOfLines={1}>
-          {podcast.topic}
-        </Text>
-        <View style={styles.podcastMeta}>
-          {podcast.duration !== null && (
-            <Text style={styles.podcastMetaText}>
-              {formatDuration(podcast.duration)}
-            </Text>
-          )}
-          <Text style={styles.podcastMetaDot}>{'\u00B7'}</Text>
-          <Text style={styles.podcastMetaText}>
-            {podcast.likeCount} {podcast.likeCount === 1 ? 'like' : 'likes'}
-          </Text>
-          {podcast.status !== 'READY' && (
-            <>
-              <Text style={styles.podcastMetaDot}>{'\u00B7'}</Text>
-              <Text style={styles.podcastStatusText}>{podcast.status}</Text>
-            </>
-          )}
-        </View>
-      </View>
-      <Text style={styles.chevron}>{'\u203A'}</Text>
-    </Pressable>
-  );
 }
 
 export default function UserProfileScreen() {
@@ -163,13 +108,9 @@ export default function UserProfileScreen() {
 
   if (userError || !user) {
     return (
-      <View style={styles.centered}>
+      <View style={globalStyles.screenContainer}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Text style={styles.errorIcon}>!</Text>
-        <Text style={styles.errorText}>Profile not found</Text>
-        <Text style={styles.errorSubtext}>
-          This user may not exist or the page could not be loaded.
-        </Text>
+        <ErrorState message="This user may not exist or the page could not be loaded." />
       </View>
     );
   }
@@ -177,7 +118,7 @@ export default function UserProfileScreen() {
   const displayName = user.name ?? 'Anonymous';
 
   return (
-    <View style={styles.container}>
+    <View style={globalStyles.screenContainer}>
       <Stack.Screen
         options={{
           headerShown: true,
@@ -193,35 +134,18 @@ export default function UserProfileScreen() {
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View style={styles.profileSection}>
-            {/* Avatar */}
             <View style={styles.avatarContainer}>
-              {user.image ? (
-                <Image
-                  source={{ uri: user.image }}
-                  style={styles.avatar}
-                  accessibilityLabel={`${displayName}'s avatar`}
-                />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarInitial}>
-                    {displayName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-              )}
+              <Avatar uri={user.image} name={displayName} size={88} />
             </View>
 
-            {/* Name + Handle */}
             <Text style={styles.name}>{displayName}</Text>
-            {user.handle && (
+            {user.handle ? (
               <Text style={styles.handle}>@{user.handle}</Text>
-            )}
-
-            {/* Bio */}
-            {user.bio && (
+            ) : null}
+            {user.bio ? (
               <Text style={styles.bio}>{user.bio}</Text>
-            )}
+            ) : null}
 
-            {/* Stats */}
             <View style={styles.statsRow}>
               <View style={styles.statItem}>
                 <Text style={styles.statValue}>
@@ -245,7 +169,6 @@ export default function UserProfileScreen() {
               </View>
             </View>
 
-            {/* Follow Button */}
             <Pressable
               onPress={() => followMutation.mutate()}
               style={[
@@ -277,7 +200,6 @@ export default function UserProfileScreen() {
               )}
             </Pressable>
 
-            {/* Podcasts Section Header */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Podcasts</Text>
             </View>
@@ -286,6 +208,7 @@ export default function UserProfileScreen() {
         renderItem={({ item }) => (
           <PodcastCard
             podcast={item}
+            variant="compact"
             onPress={() => handleNavigateToPodcast(item.id)}
           />
         )}
@@ -295,9 +218,7 @@ export default function UserProfileScreen() {
               <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No podcasts yet</Text>
-            </View>
+            <EmptyState title="No podcasts yet" />
           )
         }
       />
@@ -306,10 +227,6 @@ export default function UserProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -323,36 +240,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.md,
   },
-  errorIcon: {
-    fontFamily: typography.fontHeading,
-    fontSize: 48,
-    color: colors.error,
-    width: 72,
-    height: 72,
-    lineHeight: 72,
-    textAlign: 'center',
-    backgroundColor: colors.errorLight,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  errorText: {
-    fontFamily: typography.fontHeading,
-    fontSize: 20,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  errorSubtext: {
-    fontFamily: typography.fontBody,
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
   listContent: {
     paddingBottom: spacing.xl,
   },
-
-  // Profile Section
   profileSection: {
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
@@ -360,25 +250,6 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     marginBottom: spacing.md,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.border,
-  },
-  avatarPlaceholder: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontFamily: typography.fontHeading,
-    fontSize: 36,
-    color: colors.primary,
   },
   name: {
     fontFamily: typography.fontHeading,
@@ -401,8 +272,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
   },
-
-  // Stats
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -436,8 +305,6 @@ const styles = StyleSheet.create({
     height: 32,
     backgroundColor: colors.border,
   },
-
-  // Follow
   followButton: {
     marginTop: spacing.md,
     paddingVertical: spacing.sm + 4,
@@ -461,8 +328,6 @@ const styles = StyleSheet.create({
   followButtonTextActive: {
     color: colors.textSecondary,
   },
-
-  // Section Header
   sectionHeader: {
     width: '100%',
     marginTop: spacing.xl,
@@ -475,68 +340,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: colors.textPrimary,
   },
-
-  // Podcast Card
-  podcastCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
-  },
-  podcastCardContent: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  podcastTitle: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    lineHeight: 22,
-  },
-  podcastTopic: {
-    fontFamily: typography.fontBody,
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
-  podcastMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    gap: spacing.xs,
-  },
-  podcastMetaText: {
-    fontFamily: typography.fontBody,
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  podcastMetaDot: {
-    fontFamily: typography.fontBody,
-    fontSize: 12,
-    color: colors.textTertiary,
-  },
-  podcastStatusText: {
-    fontFamily: typography.fontBody,
-    fontSize: 11,
-    color: colors.warning,
-    fontWeight: '600',
-  },
-  chevron: {
-    fontSize: 24,
-    color: colors.textTertiary,
-  },
-
-  // Empty state
   emptyContainer: {
     paddingVertical: spacing['2xl'],
     alignItems: 'center',
-  },
-  emptyText: {
-    fontFamily: typography.fontBody,
-    fontSize: 14,
-    color: colors.textTertiary,
   },
 });
