@@ -328,6 +328,7 @@ model Podcast {
   originalFormat      String?
   transcriptProvided  Boolean @default(false)
   isHumanContent      Boolean @default(false)
+  sourcePlatform      String?  // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
 
   // Relations
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)

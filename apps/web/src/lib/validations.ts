@@ -251,6 +251,7 @@ export const importPodcastSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
   isHumanContent: z.boolean().default(false),
+  sourcePlatform: z.string().max(50).optional(),
 });
 
 /**
