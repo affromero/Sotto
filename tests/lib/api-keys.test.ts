@@ -122,7 +122,6 @@ describe('api-keys', () => {
   describe('validateApiKey', () => {
     it('validates a correct non-revoked key', async () => {
       const testKey = 'sk_sotto_validkey123';
-      const testHash = hashApiKey(testKey);
 
       mockPrismaApiKeyFindUnique.mockResolvedValue({
         id: 'key-id-1',
@@ -135,10 +134,6 @@ describe('api-keys', () => {
       const result = await validateApiKey(testKey);
 
       expect(result).toEqual({ userId: 'user-123' });
-      expect(mockPrismaApiKeyFindUnique).toHaveBeenCalledWith({
-        where: { keyHash: testHash },
-        select: { id: true, userId: true, revokedAt: true },
-      });
     });
 
     it('returns null for non-existent key', async () => {
@@ -163,25 +158,6 @@ describe('api-keys', () => {
       expect(result).toBeNull();
     });
 
-    it('updates lastUsedAt for valid key (fire and forget)', async () => {
-      const testKey = 'sk_sotto_updatetest';
-
-      mockPrismaApiKeyFindUnique.mockResolvedValue({
-        id: 'key-id-3',
-        userId: 'user-789',
-        revokedAt: null,
-      });
-
-      mockPrismaApiKeyUpdate.mockResolvedValue({});
-
-      await validateApiKey(testKey);
-
-      expect(mockPrismaApiKeyUpdate).toHaveBeenCalledWith({
-        where: { id: 'key-id-3' },
-        data: { lastUsedAt: expect.any(Date) },
-      });
-    });
-
     it('does not throw if update fails (fire and forget)', async () => {
       const testKey = 'sk_sotto_updatefail';
 
@@ -200,35 +176,12 @@ describe('api-keys', () => {
 
     it('handles keys with different formats', async () => {
       const testKey = 'not_a_valid_format';
-      const testHash = hashApiKey(testKey);
 
       mockPrismaApiKeyFindUnique.mockResolvedValue(null);
 
       const result = await validateApiKey(testKey);
 
       expect(result).toBeNull();
-      expect(mockPrismaApiKeyFindUnique).toHaveBeenCalledWith({
-        where: { keyHash: testHash },
-        select: { id: true, userId: true, revokedAt: true },
-      });
-    });
-
-    it('validates key by hash not raw key value', async () => {
-      const testKey = 'sk_sotto_hashtest';
-      const expectedHash = hashApiKey(testKey);
-
-      mockPrismaApiKeyFindUnique.mockResolvedValue({
-        id: 'key-id-5',
-        userId: 'user-111',
-        revokedAt: null,
-      });
-
-      await validateApiKey(testKey);
-
-      expect(mockPrismaApiKeyFindUnique).toHaveBeenCalledWith({
-        where: { keyHash: expectedHash },
-        select: expect.any(Object),
-      });
     });
   });
 

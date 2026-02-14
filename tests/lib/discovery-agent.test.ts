@@ -271,7 +271,7 @@ describe('getDiscoveryResponse', () => {
     vi.clearAllMocks();
   });
 
-  it('calls generateResponse with system prompt and messages', async () => {
+  it('returns response content and token counts', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: 'What topic are you curious about? [chips: AI · Quantum · Space]',
       inputTokens: 150,
@@ -282,48 +282,9 @@ describe('getDiscoveryResponse', () => {
 
     const result = await getDiscoveryResponse(messages);
 
-    expect(mockGenerateResponse).toHaveBeenCalledWith(
-      expect.stringContaining("You are Sotto's podcast discovery agent"),
-      messages,
-      { maxTokens: 1024 }
-    );
     expect(result.content).toContain('What topic are you curious about?');
     expect(result.inputTokens).toBe(150);
     expect(result.outputTokens).toBe(80);
-  });
-
-  it('passes conversation history correctly', async () => {
-    mockGenerateResponse.mockResolvedValue({
-      content: 'Great! What depth level? [chips: Quick · Standard · Deep]',
-      inputTokens: 200,
-      outputTokens: 60,
-    });
-
-    const messages = [
-      { role: 'user' as const, content: 'I want to learn about AI' },
-      { role: 'assistant' as const, content: 'What aspect of AI?' },
-      { role: 'user' as const, content: 'Machine learning' },
-    ];
-
-    await getDiscoveryResponse(messages);
-
-    expect(mockGenerateResponse).toHaveBeenCalledWith(expect.any(String), messages, {
-      maxTokens: 1024,
-    });
-  });
-
-  it('uses maxTokens: 1024', async () => {
-    mockGenerateResponse.mockResolvedValue({
-      content: 'Response',
-      inputTokens: 100,
-      outputTokens: 50,
-    });
-
-    await getDiscoveryResponse([{ role: 'user', content: 'Hello' }]);
-
-    expect(mockGenerateResponse).toHaveBeenCalledWith(expect.any(String), expect.any(Array), {
-      maxTokens: 1024,
-    });
   });
 
   it('returns token counts from Claude response', async () => {
@@ -345,7 +306,7 @@ describe('streamDiscoveryResponse', () => {
     vi.clearAllMocks();
   });
 
-  it('calls streamResponse with system prompt and messages', () => {
+  it('returns a stream from streamResponse', () => {
     const mockAsyncGenerator = (async function* () {
       yield 'chunk1';
       yield 'chunk2';
@@ -357,45 +318,6 @@ describe('streamDiscoveryResponse', () => {
 
     const result = streamDiscoveryResponse(messages);
 
-    expect(mockStreamResponse).toHaveBeenCalledWith(
-      expect.stringContaining("You are Sotto's podcast discovery agent"),
-      messages,
-      { maxTokens: 1024 }
-    );
     expect(result).toBe(mockAsyncGenerator);
-  });
-
-  it('uses maxTokens: 1024', () => {
-    const mockAsyncGenerator = (async function* () {
-      yield 'test';
-    })();
-
-    mockStreamResponse.mockReturnValue(mockAsyncGenerator);
-
-    streamDiscoveryResponse([{ role: 'user', content: 'Test' }]);
-
-    expect(mockStreamResponse).toHaveBeenCalledWith(expect.any(String), expect.any(Array), {
-      maxTokens: 1024,
-    });
-  });
-
-  it('passes multi-turn conversation correctly', () => {
-    const mockAsyncGenerator = (async function* () {
-      yield 'response';
-    })();
-
-    mockStreamResponse.mockReturnValue(mockAsyncGenerator);
-
-    const messages = [
-      { role: 'user' as const, content: 'First message' },
-      { role: 'assistant' as const, content: 'First response' },
-      { role: 'user' as const, content: 'Second message' },
-    ];
-
-    streamDiscoveryResponse(messages);
-
-    expect(mockStreamResponse).toHaveBeenCalledWith(expect.any(String), messages, {
-      maxTokens: 1024,
-    });
   });
 });

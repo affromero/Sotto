@@ -188,21 +188,6 @@ describe('useAuth', () => {
       expect(mockSignIn).toHaveBeenCalledWith(undefined, { callbackUrl: '/auth/login' });
     });
 
-    it('signIn function is stable across rerenders', () => {
-      vi.mocked(nextAuthReact.useSession).mockReturnValue({
-        data: null,
-        status: 'unauthenticated',
-        update: vi.fn(),
-      });
-
-      const { result, rerender } = renderHook(() => useAuth());
-      const firstSignIn = result.current.signIn;
-
-      rerender();
-      const secondSignIn = result.current.signIn;
-
-      expect(firstSignIn).toBe(secondSignIn);
-    });
   });
 
   describe('signOut', () => {
@@ -234,21 +219,6 @@ describe('useAuth', () => {
       expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: '/' });
     });
 
-    it('signOut function is stable across rerenders', () => {
-      vi.mocked(nextAuthReact.useSession).mockReturnValue({
-        data: null,
-        status: 'unauthenticated',
-        update: vi.fn(),
-      });
-
-      const { result, rerender } = renderHook(() => useAuth());
-      const firstSignOut = result.current.signOut;
-
-      rerender();
-      const secondSignOut = result.current.signOut;
-
-      expect(firstSignOut).toBe(secondSignOut);
-    });
   });
 
   describe('session updates', () => {

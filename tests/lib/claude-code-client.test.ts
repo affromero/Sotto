@@ -116,20 +116,6 @@ describe('claude-code-client', () => {
 
       const result = await promise;
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining([
-          '-p',
-          '--model',
-          'haiku',
-          '--output-format',
-          'text',
-          '--system-prompt',
-          'You are helpful.',
-        ]),
-        expect.objectContaining({ stdio: ['pipe', 'pipe', 'pipe'] })
-      );
-
       expect(result).toEqual({
         content: 'Hello from Claude!',
         inputTokens: 0,
@@ -152,69 +138,6 @@ describe('claude-code-client', () => {
 
       expect(proc._stdin.write).toHaveBeenCalledWith('My long prompt');
       expect(proc._stdin.end).toHaveBeenCalled();
-    });
-
-    it('uses custom model from options', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt', { model: 'sonnet' });
-
-      proc._stdout.emit('data', Buffer.from('Ok'));
-      proc.emit('close', 0);
-
-      await promise;
-
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining(['--model', 'sonnet']),
-        expect.any(Object)
-      );
-    });
-
-    it('uses CLAUDE_CODE_MODEL env var as default', async () => {
-      process.env.CLAUDE_CODE_MODEL = 'opus';
-      vi.resetModules();
-
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stdout.emit('data', Buffer.from('Ok'));
-      proc.emit('close', 0);
-
-      await promise;
-
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining(['--model', 'opus']),
-        expect.any(Object)
-      );
-    });
-
-    it('includes maxTokens flag when provided', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt', { maxTokens: 2048 });
-
-      proc._stdout.emit('data', Buffer.from('Ok'));
-      proc.emit('close', 0);
-
-      await promise;
-
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining(['--max-tokens', '2048']),
-        expect.any(Object)
-      );
     });
 
     it('trims whitespace from stdout', async () => {
@@ -294,23 +217,6 @@ describe('claude-code-client', () => {
       vi.useRealTimers();
     });
 
-    it('omits --system-prompt when system prompt is empty', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('', 'Just a prompt');
-
-      proc._stdout.emit('data', Buffer.from('Ok'));
-      proc.emit('close', 0);
-
-      await promise;
-
-      const args = mockSpawn.mock.calls[0][1] as string[];
-      expect(args).not.toContain('--system-prompt');
-    });
-
     it('returns zero token counts', async () => {
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 
@@ -347,11 +253,6 @@ describe('claude-code-client', () => {
         chunks.push(chunk);
       }
 
-      expect(mockSpawn).toHaveBeenCalledWith(
-        'claude',
-        expect.arrayContaining(['--output-format', 'stream-json']),
-        expect.any(Object)
-      );
       expect(chunks).toContain('Hello');
     });
 

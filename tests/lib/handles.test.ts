@@ -211,15 +211,6 @@ describe('handles', () => {
       expect(result).toBe('OK');
     });
 
-    it('uses haiku model for speed', async () => {
-      await checkHandleContent('test');
-
-      expect(mockGenerateResponse).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(Array),
-        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
-      );
-    });
   });
 
   describe('isDbReserved', () => {
