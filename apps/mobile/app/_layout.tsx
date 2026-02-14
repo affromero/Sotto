@@ -1,3 +1,4 @@
+import '../service';
 import { useEffect, useState } from 'react';
 import { Stack, useSegments, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
