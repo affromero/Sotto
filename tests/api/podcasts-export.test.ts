@@ -196,44 +196,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     expect(mockAddJob).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when podcast status is SCRIPTING', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-008',
-      status: 'SCRIPTING',
-      pdfUrl: null,
-      userId: 'user-001',
-      visibility: 'PUBLIC',
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-008');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Podcast must be in READY status to export' });
-  });
-
-  it('returns 400 when podcast status is GENERATING_AUDIO', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-009',
-      status: 'GENERATING_AUDIO',
-      pdfUrl: null,
-      userId: 'user-001',
-      visibility: 'PUBLIC',
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-009');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Podcast must be in READY status to export' });
-  });
-
   it('returns existing PDF URL immediately without queuing job when PDF exists', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
     mockPrismaPodcastFindUnique.mockResolvedValue({

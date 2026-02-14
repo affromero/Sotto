@@ -73,13 +73,6 @@ describe('redis.ts', () => {
       expect(client.on).toHaveBeenCalled();
     });
 
-    it('uses TLS for rediss:// URLs', () => {
-      // This test verifies the getBaseRedisOptions function includes TLS config
-      // when REDIS_URL starts with rediss://. Since REDIS_URL is read at module load,
-      // we can't dynamically test this in the current test setup.
-      // The implementation correctly adds { tls: {} } when URL starts with rediss://
-      expect(true).toBe(true);
-    });
   });
 
   describe('getRedisClient', () => {

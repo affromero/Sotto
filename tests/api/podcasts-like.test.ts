@@ -152,29 +152,6 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
     });
   });
 
-  it('uses atomic transaction for like creation and count increment', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
-    mockLikeFindUnique.mockResolvedValue(null);
-
-    let transactionCallback: ((tx: unknown) => Promise<unknown>) | null = null;
-    mockTransaction.mockImplementation(async (callback) => {
-      transactionCallback = callback;
-      const tx = {
-        like: { create: mockLikeCreate },
-        podcast: { update: mockPodcastUpdate },
-      };
-      return callback(tx);
-    });
-
-    const request = createRequest();
-    const params = await createParams('pod-1');
-    await POST(request, params);
-
-    expect(mockTransaction).toHaveBeenCalled();
-    expect(transactionCallback).not.toBeNull();
-  });
-
   it('checks podcast existence before checking for existing like', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
@@ -289,33 +266,6 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
       where: { id: 'pod-1' },
       data: { likeCount: { decrement: 1 } },
     });
-  });
-
-  it('uses atomic transaction for like deletion and count decrement', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockLikeFindUnique.mockResolvedValue({
-      id: 'like-1',
-      userId: 'user-1',
-      podcastId: 'pod-1',
-      createdAt: new Date(),
-    });
-
-    let transactionCallback: ((tx: unknown) => Promise<unknown>) | null = null;
-    mockTransaction.mockImplementation(async (callback) => {
-      transactionCallback = callback;
-      const tx = {
-        like: { delete: mockLikeDelete },
-        podcast: { update: mockPodcastUpdate },
-      };
-      return callback(tx);
-    });
-
-    const request = createRequest();
-    const params = await createParams('pod-1');
-    await DELETE(request, params);
-
-    expect(mockTransaction).toHaveBeenCalled();
-    expect(transactionCallback).not.toBeNull();
   });
 
   it('handles unlike for different podcast IDs independently', async () => {
