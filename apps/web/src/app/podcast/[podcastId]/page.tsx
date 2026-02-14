@@ -194,6 +194,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     likeCount: podcast.likeCount,
     forkCount: podcast.forkCount,
     saveCount: podcast.saveCount,
+    commentCount: podcast.commentCount,
     createdAt: podcast.createdAt.toISOString(),
     source: podcast.source,
     isHumanContent: podcast.isHumanContent,
@@ -244,7 +245,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAuthenticated={!!userId} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAuthenticated={!!userId} currentUserId={userId} />
       </div>
     </main>
   );

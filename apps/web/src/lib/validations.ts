@@ -269,3 +269,12 @@ export const forkBodySchema = z.object({
 export const resolveInteractionSchema = z.object({
   helpful: z.boolean(),
 });
+
+/**
+ * Comment creation validation
+ */
+export const createCommentSchema = z.object({
+  content: z.string().min(1).max(2000),
+  parentId: z.string().optional(),
+  timestamp: z.number().min(0).optional(),
+});

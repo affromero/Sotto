@@ -53,6 +53,7 @@ export interface ForkSummary {
 
 export interface PodcastDetail extends PodcastSummary {
   saveCount: number;
+  commentCount: number;
   remixNote: string | null;
   forkedFrom: ForkedFromInfo | null;
   forks: ForkSummary[];

@@ -373,6 +373,10 @@
   margin-top: var(--spacing-lg);
 }
 
+.commentsSection {
+  margin-top: var(--spacing-lg);
+}
+
 .versionSection {
   margin-top: var(--spacing-lg);
 }

@@ -89,6 +89,9 @@ model User {
   // Interaction votes
   interactionVotes InteractionVote[]
 
+  // Comments
+  comments Comment[]
+
   @@index([teamId])
   @@index([role])
   @@index([handle])
@@ -226,10 +229,11 @@ model Podcast {
   currentVersion Int @default(1)
 
   // Counters (denormalized for performance)
-  playCount Int @default(0)
-  likeCount Int @default(0)
-  forkCount Int @default(0)
-  saveCount Int @default(0)
+  playCount    Int @default(0)
+  likeCount    Int @default(0)
+  forkCount    Int @default(0)
+  saveCount    Int @default(0)
+  commentCount Int @default(0)
 
   // PDF export
   pdfUrl String?
@@ -256,6 +260,7 @@ model Podcast {
   playbackSessions PlaybackSession[]
   podcastFeature   PodcastFeature?
   listeningQueues  ListeningQueue[]
+  comments         Comment[]
 
   @@index([userId])
   @@index([status])
@@ -474,6 +479,28 @@ enum InteractionStatus {
   INCORPORATED
 }
 
+// ============ COMMENTS (Threaded) ============
+
+model Comment {
+  id         String    @id @default(cuid())
+  content    String    @db.Text
+  userId     String
+  podcastId  String
+  parentId   String?
+  timestamp  Float?    // optional podcast playback timestamp pin
+  replyCount Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast   @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([podcastId, createdAt])
+  @@index([parentId])
+}
+
 // ============ SOCIAL: LIKES & SAVES ============
 
 model Like {
@@ -577,6 +604,8 @@ enum NotificationType {
   VOICE_REQUEST_DENIED
   QUESTION_ON_YOUR_PODCAST
   QUESTION_UPVOTED
+  COMMENT_ON_YOUR_PODCAST
+  COMMENT_REPLY
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
