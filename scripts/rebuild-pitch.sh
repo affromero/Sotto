@@ -232,6 +232,7 @@ DOCS=(
   "21-logo-brief.md:Logo Brief"
   "22-palette-brief.md:Palette Brief"
   "23-local-development.md:Local Development"
+  "24-ios-testflight-appstore-guide.md:iOS TestFlight & App Store Guide"
 )
 
 # Build pandoc options (array to preserve quoting)

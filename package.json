@@ -20,7 +20,14 @@
     "test": "npm run test --workspace=@sotto/web",
     "test:coverage": "npm run test:coverage --workspace=@sotto/web",
     "test:watch": "npm run test:watch --workspace=@sotto/web",
-    "type-check": "npm run type-check --workspace=@sotto/web"
+    "type-check": "npm run type-check --workspace=@sotto/web",
+    "mobile": "npm run start --workspace=@sotto/mobile",
+    "mobile:ios": "npm run ios --workspace=@sotto/mobile",
+    "mobile:xcode": "npm run ios:open --workspace=@sotto/mobile",
+    "mobile:build": "npm run ios:build --workspace=@sotto/mobile",
+    "mobile:build:preview": "npm run ios:build:preview --workspace=@sotto/mobile",
+    "mobile:build:production": "npm run ios:build:production --workspace=@sotto/mobile",
+    "mobile:submit": "npm run ios:submit --workspace=@sotto/mobile"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

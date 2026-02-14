@@ -31,6 +31,7 @@ Docs are numbered to match the investor pitch order in `scripts/rebuild-pitch.sh
 | 21  | `21-logo-brief.md`             |                     | Logo design brief                                      |
 | 22  | `22-palette-brief.md`          |                     | Color palette brief                                    |
 | 23  | `23-local-development.md`      |                     | Local dev setup, env vars, what works without API keys |
+| 24  | `24-ios-testflight-appstore-guide.md` |              | TestFlight builds, App Store submission, OTA updates   |
 | —   | `accounting/`                  | —                   | Beancount ledger, import scripts, monthly close        |
 
 ```bash
