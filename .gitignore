@@ -57,6 +57,9 @@ __pycache__/
 .pitch/
 !.pitch/.gitkeep
 
+# Generated reports (traffic, analytics)
+reports/
+
 # Accounting
 accounting/reports/*.html
 accounting/reports/*.pdf
