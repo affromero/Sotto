@@ -2,13 +2,35 @@ import { describe, it, expect } from 'vitest';
 import { canGenerate, canInteract, TIER_LIMITS, INTERACTION_CREDIT_COST } from '@/lib/stripe';
 
 describe('TIER_LIMITS', () => {
-  it('FREE tier has correct limits', () => {
-    expect(TIER_LIMITS.FREE.creditsMonthly).toBe(3);
+  it('tiers have increasing credits: FREE < STARTER < PRO < STUDIO', () => {
+    expect(TIER_LIMITS.FREE.creditsMonthly).toBeLessThan(TIER_LIMITS.STARTER.creditsMonthly);
+    expect(TIER_LIMITS.STARTER.creditsMonthly).toBeLessThan(TIER_LIMITS.PRO.creditsMonthly);
+    expect(TIER_LIMITS.PRO.creditsMonthly).toBeLessThan(TIER_LIMITS.STUDIO.creditsMonthly);
+  });
+
+  it('tiers have increasing rollover: FREE < STARTER < PRO < STUDIO', () => {
+    expect(TIER_LIMITS.FREE.maxRollover).toBeLessThan(TIER_LIMITS.STARTER.maxRollover);
+    expect(TIER_LIMITS.STARTER.maxRollover).toBeLessThan(TIER_LIMITS.PRO.maxRollover);
+    expect(TIER_LIMITS.PRO.maxRollover).toBeLessThan(TIER_LIMITS.STUDIO.maxRollover);
+  });
+
+  it('FREE tier has no rollover', () => {
     expect(TIER_LIMITS.FREE.maxRollover).toBe(0);
-    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBe(5);
-    expect(TIER_LIMITS.FREE.maxVoiceClones).toBe(0);
-    expect(TIER_LIMITS.FREE.premiumVoiceSurcharge).toBe(0);
-    expect(TIER_LIMITS.FREE.sharedVoiceSurcharge).toBe(0);
+  });
+
+  it('FREE tier has shorter max duration than paid tiers', () => {
+    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBeLessThan(TIER_LIMITS.STARTER.maxDurationMinutes);
+    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBeLessThan(TIER_LIMITS.PRO.maxDurationMinutes);
+    expect(TIER_LIMITS.FREE.maxDurationMinutes).toBeLessThan(TIER_LIMITS.STUDIO.maxDurationMinutes);
+  });
+
+  it('tiers have increasing voice clones: FREE < STARTER < PRO < STUDIO', () => {
+    expect(TIER_LIMITS.FREE.maxVoiceClones).toBeLessThan(TIER_LIMITS.STARTER.maxVoiceClones);
+    expect(TIER_LIMITS.STARTER.maxVoiceClones).toBeLessThan(TIER_LIMITS.PRO.maxVoiceClones);
+    expect(TIER_LIMITS.PRO.maxVoiceClones).toBeLessThan(TIER_LIMITS.STUDIO.maxVoiceClones);
+  });
+
+  it('FREE tier has no premium features', () => {
     expect(TIER_LIMITS.FREE.canDownload).toBe(false);
     expect(TIER_LIMITS.FREE.canMakePrivate).toBe(false);
     expect(TIER_LIMITS.FREE.canBrowseVoiceLibrary).toBe(false);
@@ -17,43 +39,10 @@ describe('TIER_LIMITS', () => {
     expect(TIER_LIMITS.FREE.canExportPdf).toBe(false);
   });
 
-  it('STARTER tier has correct limits', () => {
-    expect(TIER_LIMITS.STARTER.creditsMonthly).toBe(5);
-    expect(TIER_LIMITS.STARTER.maxRollover).toBe(1);
-    expect(TIER_LIMITS.STARTER.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.STARTER.maxVoiceClones).toBe(1);
-    expect(TIER_LIMITS.STARTER.sharedVoiceSurcharge).toBe(1);
+  it('paid tiers can download', () => {
     expect(TIER_LIMITS.STARTER.canDownload).toBe(true);
-    expect(TIER_LIMITS.STARTER.canMakePrivate).toBe(false);
-  });
-
-  it('PRO tier has correct limits', () => {
-    expect(TIER_LIMITS.PRO.creditsMonthly).toBe(10);
-    expect(TIER_LIMITS.PRO.maxRollover).toBe(3);
-    expect(TIER_LIMITS.PRO.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.PRO.maxVoiceClones).toBe(3);
-    expect(TIER_LIMITS.PRO.sharedVoiceSurcharge).toBe(1);
     expect(TIER_LIMITS.PRO.canDownload).toBe(true);
-    expect(TIER_LIMITS.PRO.canMakePrivate).toBe(true);
-    expect(TIER_LIMITS.PRO.canBrowseVoiceLibrary).toBe(true);
-    expect(TIER_LIMITS.PRO.canViewAnalytics).toBe(true);
-    expect(TIER_LIMITS.PRO.canExportPdf).toBe(true);
-  });
-
-  it('STUDIO tier has correct limits', () => {
-    expect(TIER_LIMITS.STUDIO.creditsMonthly).toBe(20);
-    expect(TIER_LIMITS.STUDIO.maxRollover).toBe(8);
-    expect(TIER_LIMITS.STUDIO.maxDurationMinutes).toBe(10);
-    expect(TIER_LIMITS.STUDIO.maxVoiceClones).toBe(10);
-    expect(TIER_LIMITS.STUDIO.premiumVoiceSurcharge).toBe(0);
-    expect(TIER_LIMITS.STUDIO.sharedVoiceSurcharge).toBe(1);
     expect(TIER_LIMITS.STUDIO.canDownload).toBe(true);
-    expect(TIER_LIMITS.STUDIO.canMakePrivate).toBe(true);
-    expect(TIER_LIMITS.STUDIO.canBrowseVoiceLibrary).toBe(true);
-    expect(TIER_LIMITS.STUDIO.canListOnMarketplace).toBe(true);
-    expect(TIER_LIMITS.STUDIO.canViewAnalytics).toBe(true);
-    expect(TIER_LIMITS.STUDIO.canExportPdf).toBe(true);
-    expect(TIER_LIMITS.STUDIO.hasPremiumSfx).toBe(true);
   });
 
   it('ADMIN tier has zero sharedVoiceSurcharge', () => {

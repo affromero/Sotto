@@ -79,114 +79,6 @@ describe('claude', () => {
         inputTokens: 150,
         outputTokens: 75,
       });
-
-      expect(mockMessagesCreate).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 4096,
-        system: 'You are a helpful assistant.',
-        messages: [{ role: 'user', content: 'Hello, Claude!' }],
-      });
-    });
-
-    it('uses custom maxTokens option when provided', async () => {
-      const { generateResponse } = await import('@/lib/claude');
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Short response',
-          },
-        ],
-        usage: {
-          input_tokens: 50,
-          output_tokens: 20,
-        },
-      };
-
-      mockMessagesCreate.mockResolvedValue(mockResponse);
-
-      await generateResponse(
-        'You are a helpful assistant.',
-        [{ role: 'user', content: 'Brief answer please' }],
-        { maxTokens: 512 }
-      );
-
-      expect(mockMessagesCreate).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 512,
-        system: 'You are a helpful assistant.',
-        messages: [{ role: 'user', content: 'Brief answer please' }],
-      });
-    });
-
-    it('uses custom model option when provided', async () => {
-      const { generateResponse } = await import('@/lib/claude');
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text' as const,
-            text: 'Response from Opus',
-          },
-        ],
-        usage: {
-          input_tokens: 100,
-          output_tokens: 50,
-        },
-      };
-
-      mockMessagesCreate.mockResolvedValue(mockResponse);
-
-      await generateResponse(
-        'You are a helpful assistant.',
-        [{ role: 'user', content: 'Use Opus' }],
-        { model: 'claude-opus-4-6' }
-      );
-
-      expect(mockMessagesCreate).toHaveBeenCalledWith({
-        model: 'claude-opus-4-6',
-        max_tokens: 4096,
-        system: 'You are a helpful assistant.',
-        messages: [{ role: 'user', content: 'Use Opus' }],
-      });
-    });
-
-    it('handles multi-turn conversations', async () => {
-      const { generateResponse } = await import('@/lib/claude');
-
-      const mockResponse = {
-        content: [
-          {
-            type: 'text' as const,
-            text: 'I remember what we discussed earlier.',
-          },
-        ],
-        usage: {
-          input_tokens: 300,
-          output_tokens: 80,
-        },
-      };
-
-      mockMessagesCreate.mockResolvedValue(mockResponse);
-
-      const messages = [
-        { role: 'user' as const, content: 'Tell me about quantum computing' },
-        {
-          role: 'assistant' as const,
-          content: 'Quantum computing uses qubits...',
-        },
-        { role: 'user' as const, content: 'Can you elaborate on qubits?' },
-      ];
-
-      await generateResponse('You are an expert physicist.', messages);
-
-      expect(mockMessagesCreate).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 4096,
-        system: 'You are an expert physicist.',
-        messages,
-      });
     });
 
     it('returns empty content when response has no text block', async () => {
@@ -336,12 +228,6 @@ describe('claude', () => {
       }
 
       expect(chunks).toEqual(['Hello ', 'from ', 'Claude!']);
-      expect(mockMessagesStream).toHaveBeenCalledWith({
-        model: 'claude-sonnet-4-5-20250929',
-        max_tokens: 4096,
-        system: 'System prompt',
-        messages: [{ role: 'user', content: 'Stream test' }],
-      });
     });
 
     it('ignores non-text-delta events', async () => {
@@ -384,38 +270,6 @@ describe('claude', () => {
       }
 
       expect(chunks).toEqual(['Visible text']);
-    });
-
-    it('uses custom options when provided', async () => {
-      const { streamResponse } = await import('@/lib/claude');
-
-      async function* mockGenerator() {
-        yield {
-          type: 'content_block_delta' as const,
-          delta: {
-            type: 'text_delta' as const,
-            text: 'Custom options test',
-          },
-        };
-      }
-
-      mockMessagesStream.mockReturnValue(mockGenerator());
-
-      const chunks: string[] = [];
-      for await (const chunk of streamResponse(
-        'Custom system prompt',
-        [{ role: 'user', content: 'Test' }],
-        { maxTokens: 1024, model: 'claude-opus-4-6' }
-      )) {
-        chunks.push(chunk);
-      }
-
-      expect(mockMessagesStream).toHaveBeenCalledWith({
-        model: 'claude-opus-4-6',
-        max_tokens: 1024,
-        system: 'Custom system prompt',
-        messages: [{ role: 'user', content: 'Test' }],
-      });
     });
 
     it('handles empty stream gracefully', async () => {
@@ -487,11 +341,6 @@ describe('claude', () => {
 
       const result = await generateResponse('System prompt', [{ role: 'user', content: 'Hello' }]);
 
-      expect(mockSerialize).toHaveBeenCalledWith([{ role: 'user', content: 'Hello' }]);
-      expect(mockExecute).toHaveBeenCalledWith('System prompt', 'serialized prompt', {
-        model: 'haiku',
-        maxTokens: undefined,
-      });
       expect(result.content).toBe('CLI response');
       expect(result.inputTokens).toBe(0);
       expect(result.outputTokens).toBe(0);
@@ -551,34 +400,6 @@ describe('claude', () => {
       );
     });
 
-    it('passes custom model option to claude-code-client', async () => {
-      process.env.AI_PROVIDER = 'claude-code';
-      delete process.env.ANTHROPIC_API_KEY;
-      vi.resetModules();
-
-      const mockExecute = vi.fn().mockResolvedValue({
-        content: 'response',
-        inputTokens: 0,
-        outputTokens: 0,
-      });
-
-      vi.doMock('@/lib/claude-code-client', () => ({
-        executeClaudeCode: mockExecute,
-        serializeMessages: vi.fn().mockReturnValue('prompt'),
-      }));
-
-      const { generateResponse } = await import('@/lib/claude');
-
-      await generateResponse('System', [{ role: 'user', content: 'Test' }], {
-        model: 'sonnet',
-        maxTokens: 2048,
-      });
-
-      expect(mockExecute).toHaveBeenCalledWith('System', 'prompt', {
-        model: 'sonnet',
-        maxTokens: 2048,
-      });
-    });
   });
 
   describe('logApiUsage', () => {

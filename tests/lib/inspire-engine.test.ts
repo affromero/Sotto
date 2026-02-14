@@ -124,14 +124,11 @@ describe('getPersonalizedTopics', () => {
     ]);
     vi.mocked(cache.get).mockResolvedValue(null);
 
-    await getPersonalizedTopics('user-123');
+    const result = await getPersonalizedTopics('user-123');
 
-    expect(prisma.userInterest.findMany).toHaveBeenCalledWith({
-      where: { userId: 'user-123' },
-      include: { tag: { select: { name: true, slug: true } } },
-      orderBy: { weight: 'desc' },
-      take: 6,
-    });
+    // Higher-weighted topic should appear first in fallback results
+    expect(result[0].category).toBe('Topic A');
+    expect(result[1].category).toBe('Topic B');
   });
 });
 

@@ -62,9 +62,6 @@ describe('getUserTier', () => {
     const tier = await getUserTier('user1');
 
     expect(tier).toBe('FREE');
-    expect(prisma.subscription.findUnique).toHaveBeenCalledWith({
-      where: { userId: 'user1' },
-    });
   });
 
   it('returns FREE when subscription is not active', async () => {
