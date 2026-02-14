@@ -96,6 +96,9 @@ model User {
   // Comments
   comments Comment[]
 
+  // Activity feed
+  activities Activity[]
+
   @@index([teamId])
   @@index([role])
   @@index([handle])
@@ -1198,4 +1201,21 @@ model CollectionFollow {
 
   @@unique([userId, collectionId])
   @@index([collectionId])
+}
+
+// ============ ACTIVITY FEED ============
+
+model Activity {
+  id         String   @id @default(cuid())
+  userId     String
+  type       String   // PODCAST_CREATED, PODCAST_FORKED, PODCAST_LIKED, USER_FOLLOWED, COMMENT_POSTED, COLLECTION_CREATED
+  targetId   String?  // The ID of the target entity (podcast, user, collection, comment)
+  targetType String?  // 'podcast', 'user', 'collection', 'comment'
+  metadata   Json?    // Any extra context (e.g., fork parent title, comment snippet)
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
 }

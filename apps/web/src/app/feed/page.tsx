@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 import type { Metadata } from 'next';
 import { FeedClient } from './FeedClient';
 import styles from './page.module.css';
@@ -11,6 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function FeedPage() {
+  const session = await auth();
+  const isAuthenticated = !!session?.user?.id;
+
   const [podcasts, tags, trending] = await Promise.all([
     prisma.podcast.findMany({
       where: {
@@ -122,6 +126,7 @@ export default async function FeedPage() {
           initialPodcasts={serializePodcasts(podcasts)}
           trendingPodcasts={serializePodcasts(trending)}
           tags={tags}
+          isAuthenticated={isAuthenticated}
         />
       </div>
     </main>

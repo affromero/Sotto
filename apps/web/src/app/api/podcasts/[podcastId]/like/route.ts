@@ -49,6 +49,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     });
   });
 
+  // Fire-and-forget activity record
+  prisma.activity.create({
+    data: {
+      userId,
+      type: 'PODCAST_LIKED',
+      targetId: podcastId,
+      targetType: 'podcast',
+    },
+  }).catch(() => {});
+
   return NextResponse.json({ liked: true });
 }
 
