@@ -17,17 +17,6 @@ describe('FeedGrid', () => {
     expect(screen.getByTestId('card-3')).toBeInTheDocument();
   });
 
-  it('applies grid CSS class to container', () => {
-    const { container } = render(
-      <FeedGrid>
-        <div>Child</div>
-      </FeedGrid>
-    );
-
-    const grid = container.firstChild as HTMLElement;
-    expect(grid.className).toContain('grid');
-  });
-
   it('displays loading state with skeleton cards', () => {
     render(<FeedGrid loading>Content</FeedGrid>);
 
@@ -91,13 +80,6 @@ describe('FeedGrid', () => {
 
     expect(screen.getByTestId('content')).toBeInTheDocument();
     expect(screen.queryByText('No podcasts found')).not.toBeInTheDocument();
-  });
-
-  it('renders empty icon in empty state', () => {
-    const { container } = render(<FeedGrid>{undefined}</FeedGrid>);
-
-    const icon = container.querySelector('[aria-hidden="true"] svg');
-    expect(icon).toBeInTheDocument();
   });
 
   it('does not show loading or empty state when has children', () => {

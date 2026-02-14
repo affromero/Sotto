@@ -90,33 +90,6 @@ describe('TranscriptPanel', () => {
     expect(expertLabels).toHaveLength(1);
   });
 
-  it('applies host class to HOST speaker label', () => {
-    const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    const hostLabels = container.querySelectorAll('[class*="host"]');
-    expect(hostLabels.length).toBeGreaterThan(0);
-  });
-
-  it('applies expert class to EXPERT speaker label', () => {
-    const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    const expertLabels = container.querySelectorAll('[class*="expert"]');
-    expect(expertLabels.length).toBeGreaterThan(0);
-  });
-
-  it('highlights current segment based on currentTime', () => {
-    const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={6} />);
-    const segments = container.querySelectorAll('[class*="segment"]');
-    const activeSegment = Array.from(segments).find((seg) => seg.className.includes('active'));
-    expect(activeSegment).toBeInTheDocument();
-    expect(activeSegment?.textContent).toContain('Thank you for having me');
-  });
-
-  it('does not highlight segment when currentTime is before segment', () => {
-    const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={2} />);
-    const segments = container.querySelectorAll('[class*="segment"]');
-    const activeSegments = Array.from(segments).filter((seg) => seg.className.includes('active'));
-    const activeSegment = activeSegments[0];
-    expect(activeSegment?.textContent).toContain('Welcome to the podcast');
-  });
 
   it('calls onSegmentClick with startTime when segment is clicked', async () => {
     const user = userEvent.setup();

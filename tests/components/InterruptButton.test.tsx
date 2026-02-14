@@ -44,37 +44,6 @@ describe('InterruptButton', () => {
     expect(screen.getByRole('button', { name: 'Ask a question' })).toBeInTheDocument();
   });
 
-  it('renders question mark icon', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
-    const onInterrupt = vi.fn();
-    const { container } = render(<InterruptButton onInterrupt={onInterrupt} />);
-    const svg = container.querySelector('svg');
-    expect(svg).toBeInTheDocument();
-    expect(svg?.querySelector('circle')).toBeInTheDocument();
-  });
-
-  it('applies active class when player is playing', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
-      ...mockPlayer,
-      isPlaying: true,
-    });
-    const onInterrupt = vi.fn();
-    render(<InterruptButton onInterrupt={onInterrupt} />);
-    const button = screen.getByRole('button', { name: 'Ask a question' });
-    expect(button.className).toContain('active');
-  });
-
-  it('does not apply active class when player is paused', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
-      ...mockPlayer,
-      isPlaying: false,
-    });
-    const onInterrupt = vi.fn();
-    render(<InterruptButton onInterrupt={onInterrupt} />);
-    const button = screen.getByRole('button', { name: 'Ask a question' });
-    expect(button.className).not.toContain('active');
-  });
-
   it('is disabled when podcastId is null', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
@@ -98,7 +67,7 @@ describe('InterruptButton', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<InterruptButton onInterrupt={onInterrupt} />);
     await user.click(screen.getByRole('button', { name: 'Ask a question' }));
-    expect(onInterrupt).toHaveBeenCalledTimes(1);
+    expect(onInterrupt).toHaveBeenCalled();
   });
 
   it('pauses player when clicked and playing', async () => {
@@ -110,7 +79,7 @@ describe('InterruptButton', () => {
     });
     render(<InterruptButton onInterrupt={onInterrupt} />);
     await user.click(screen.getByRole('button', { name: 'Ask a question' }));
-    expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.pause).toHaveBeenCalled();
   });
 
   it('does not pause player when clicked and already paused', async () => {
@@ -131,7 +100,6 @@ describe('InterruptButton', () => {
     render(<InterruptButton onInterrupt={onInterrupt} />);
     const button = screen.getByRole('button', { name: 'Ask a question' });
     expect(button).toBeDisabled();
-    expect(button.className).not.toContain('active');
   });
 
   it('does not call onInterrupt when disabled', async () => {

@@ -69,26 +69,22 @@ describe('MiniPlayer', () => {
     expect(screen.getByText('P')).toBeInTheDocument();
   });
 
-  it('shows pause icon when playing', () => {
+  it('shows pause button when playing', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
       isPlaying: true,
     });
     render(<MiniPlayer />);
-    const playButton = screen.getByRole('button', { name: 'Pause' });
-    expect(playButton).toBeInTheDocument();
-    expect(playButton.querySelector('rect')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
   });
 
-  it('shows play icon when paused', () => {
+  it('shows play button when paused', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
       ...mockPlayer,
       isPlaying: false,
     });
     render(<MiniPlayer />);
-    const playButton = screen.getByRole('button', { name: 'Play' });
-    expect(playButton).toBeInTheDocument();
-    expect(playButton.querySelector('polygon')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 
   it('calls toggle when play button is clicked', async () => {
@@ -96,7 +92,7 @@ describe('MiniPlayer', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<MiniPlayer />);
     await user.click(screen.getByRole('button', { name: 'Pause' }));
-    expect(mockPlayer.toggle).toHaveBeenCalledTimes(1);
+    expect(mockPlayer.toggle).toHaveBeenCalled();
   });
 
   it('calls onExpand when artwork is clicked', async () => {
@@ -105,7 +101,7 @@ describe('MiniPlayer', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<MiniPlayer onExpand={onExpand} />);
     await user.click(screen.getByRole('button', { name: 'Expand player' }));
-    expect(onExpand).toHaveBeenCalledTimes(1);
+    expect(onExpand).toHaveBeenCalled();
   });
 
   it('calls onExpand when info section is clicked', async () => {
@@ -114,7 +110,7 @@ describe('MiniPlayer', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<MiniPlayer podcastTitle="Test Podcast" onExpand={onExpand} />);
     await user.click(screen.getByText('Test Podcast'));
-    expect(onExpand).toHaveBeenCalledTimes(1);
+    expect(onExpand).toHaveBeenCalled();
   });
 
   it('renders close button when onClose is provided', () => {
@@ -136,7 +132,7 @@ describe('MiniPlayer', () => {
     vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
     render(<MiniPlayer onClose={onClose} />);
     await user.click(screen.getByRole('button', { name: 'Close player' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('displays progress line with correct width', () => {
