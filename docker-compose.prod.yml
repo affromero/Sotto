@@ -45,7 +45,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/web/Dockerfile
       args:
         COMMIT_SHA: ${COMMIT_SHA:-dev}
     container_name: sotto-prod-web
@@ -53,7 +53,7 @@ services:
     ports:
       - '127.0.0.1:3000:3000'
     volumes:
-      - ./.pitch:/app/.pitch:ro
+      - ./.pitch:/app/apps/web/.pitch:ro
     env_file:
       - .env
     environment:
@@ -83,7 +83,7 @@ services:
   workers:
     build:
       context: .
-      dockerfile: Dockerfile.workers
+      dockerfile: apps/web/Dockerfile.workers
     container_name: sotto-prod-workers
     restart: unless-stopped
     env_file:
@@ -108,7 +108,7 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/web/Dockerfile
       target: builder
     env_file:
       - .env

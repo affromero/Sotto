@@ -23,13 +23,13 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: npx prisma generate --schema=apps/web/prisma/schema.prisma
 
       - name: Run linting
         run: npm run lint
 
       - name: Run type checking
-        run: npx tsc --noEmit
+        run: npm run type-check
 
       - name: Run tests
         run: npm test

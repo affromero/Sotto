@@ -39,10 +39,10 @@ fi
 
 # Push database schema
 echo "Pushing database schema..."
-npx prisma db push
+npx prisma db push --schema=apps/web/prisma/schema.prisma
 
 # Generate Prisma client
-npx prisma generate
+npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 echo ""
 echo "Sotto is ready!"

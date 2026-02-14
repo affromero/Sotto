@@ -19,9 +19,9 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - run: npx prisma generate
+      - run: npx prisma generate --schema=apps/web/prisma/schema.prisma
       - run: npm run lint
-      - run: npx tsc --noEmit
+      - run: npm run type-check
       - run: npm test
       - run: npm run build
 
@@ -42,7 +42,7 @@ jobs:
       - name: Check if pitch rebuild needed
         id: pitch_check
         run: |
-          PITCH_PATHS="docs/ scripts/rebuild-pitch.sh scripts/capture-pitch-screenshots.ts prisma/seed-demo.ts .claude/skills/update-pitch/"
+          PITCH_PATHS="docs/ scripts/rebuild-pitch.sh scripts/capture-pitch-screenshots.ts apps/web/prisma/seed-demo.ts .claude/skills/update-pitch/"
           if git diff --quiet HEAD~1 HEAD -- $PITCH_PATHS 2>/dev/null; then
             echo "rebuild=false" >> $GITHUB_OUTPUT
             echo "No pitch-related files changed"
@@ -72,7 +72,7 @@ jobs:
             docker compose -f docker-compose.prod.yml build
 
             echo "Running database migrations..."
-            docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push
+            docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db push --schema=apps/web/prisma/schema.prisma
 
             echo "Restarting services..."
             docker compose -f docker-compose.prod.yml up -d
