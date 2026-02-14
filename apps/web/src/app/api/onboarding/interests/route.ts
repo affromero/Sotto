@@ -20,15 +20,23 @@ export async function POST(request: NextRequest) {
     const { tagIds } = validation.data;
     const userId = session.user.id;
 
-    // Verify all tag IDs exist
+    // Verify all tag IDs exist and are sub-tags (have a parentId)
     if (tagIds.length > 0) {
       const existingTags = await prisma.tag.findMany({
         where: { id: { in: tagIds } },
-        select: { id: true },
+        select: { id: true, parentId: true },
       });
 
       if (existingTags.length !== tagIds.length) {
         return NextResponse.json({ error: 'One or more tag IDs are invalid' }, { status: 400 });
+      }
+
+      const topLevelTags = existingTags.filter((t) => !t.parentId);
+      if (topLevelTags.length > 0) {
+        return NextResponse.json(
+          { error: 'Only sub-interest tags can be selected, not top-level categories' },
+          { status: 400 }
+        );
       }
     }
 

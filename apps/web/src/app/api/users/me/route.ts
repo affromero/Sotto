@@ -98,14 +98,18 @@ export async function PATCH(request: NextRequest) {
 
       // Update interests if provided
       if (interests !== undefined) {
-        // Verify all tag IDs exist
+        // Verify all tag IDs exist and are sub-tags (have a parentId)
         if (interests.length > 0) {
           const existingTags = await tx.tag.findMany({
             where: { id: { in: interests } },
-            select: { id: true },
+            select: { id: true, parentId: true },
           });
           if (existingTags.length !== interests.length) {
             throw new Error('One or more tag IDs are invalid');
+          }
+          const topLevelTags = existingTags.filter((t) => !t.parentId);
+          if (topLevelTags.length > 0) {
+            throw new Error('Only sub-interest tags can be selected, not top-level categories');
           }
         }
 
