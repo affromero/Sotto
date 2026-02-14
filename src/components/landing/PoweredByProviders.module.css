@@ -1,0 +1,201 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+}
+
+/* ==========================================================================
+   TRACK
+   ========================================================================== */
+
+.track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
+
+.trackLabel {
+  font: var(--text-overline);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* ==========================================================================
+   VIEWPORT — narrow peephole, ~2 names visible
+   ========================================================================== */
+
+.viewport {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.viewport:active {
+  cursor: grabbing;
+}
+
+/* Edge fades — names dissolve in/out */
+.fadeLeft,
+.fadeRight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.fadeLeft {
+  left: 0;
+  background: linear-gradient(to right, var(--color-surface) 0%, transparent 100%);
+}
+
+.fadeRight {
+  right: 0;
+  background: linear-gradient(to left, var(--color-surface) 0%, transparent 100%);
+}
+
+/* ==========================================================================
+   TICKER — JS drives transform, no CSS animation
+   ========================================================================== */
+
+.ticker {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+.tickerGroup {
+  display: flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   WORDMARK
+   ========================================================================== */
+
+.wordmark {
+  font-family: var(--font-body);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  padding: 8px 4px;
+  cursor: default;
+  user-select: none;
+  transition: color 0.35s ease;
+}
+
+.wordmark:hover {
+  color: var(--brand);
+}
+
+/* ==========================================================================
+   SEPARATOR
+   ========================================================================== */
+
+.sep {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-border);
+  margin: 0 24px;
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   SECURITY CALLOUT
+   ========================================================================== */
+
+.security {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+}
+
+.lockIcon {
+  color: var(--color-text-tertiary);
+  min-width: 16px;
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 480px) {
+  .viewport {
+    max-width: 260px;
+  }
+
+  .wordmark {
+    font-size: 17px;
+  }
+
+  .sep {
+    margin: 0 18px;
+  }
+
+  .fadeLeft,
+  .fadeRight {
+    width: 50px;
+  }
+}
+
+@media (max-width: 360px) {
+  .viewport {
+    max-width: 220px;
+  }
+
+  .wordmark {
+    font-size: 15px;
+  }
+
+  .sep {
+    margin: 0 14px;
+  }
+
+  .fadeLeft,
+  .fadeRight {
+    width: 36px;
+  }
+}
+
+/* ==========================================================================
+   REDUCED MOTION — static centered layout
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker {
+    width: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .viewport {
+    max-width: none;
+    overflow: visible;
+    cursor: default;
+  }
+
+  .tickerGroup:not(:first-child) {
+    display: none;
+  }
+
+  .fadeLeft,
+  .fadeRight {
+    display: none;
+  }
+}
