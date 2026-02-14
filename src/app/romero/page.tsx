@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import styles from './page.module.css';
 
 const VOICES = [
@@ -1096,6 +1097,14 @@ export default function LandingPage() {
             </Link>
           </div>
         </div>
+      </section>
+
+      {/* ====== POWERED BY ====== */}
+      <section
+        className={`${styles.section} ${styles.sectionAlt} ${styles.rev}`}
+        aria-label="Powered by"
+      >
+        <PoweredByProviders />
       </section>
 
       {/* ====== FOOTER ====== */}
