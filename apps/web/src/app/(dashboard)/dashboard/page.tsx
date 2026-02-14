@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { canResolveAi } from '@/lib/providers/ai';
+import { canResolveTts } from '@/lib/providers/tts';
 import { Badge } from '@/components/ui/Badge';
+import { KeysRequiredBanner } from '@/components/ui/KeysRequiredBanner';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
 
@@ -66,7 +69,7 @@ export default async function DashboardPage() {
 
   const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
 
-  const [user, podcasts, trendingToFork] = await Promise.all([
+  const [user, podcasts, trendingToFork, hasAi, hasTts] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -111,6 +114,8 @@ export default async function DashboardPage() {
         user: { select: { name: true } },
       },
     }),
+    canResolveAi(userId),
+    canResolveTts(userId),
   ]);
 
   const displayName = user?.name || 'there';
@@ -119,8 +124,12 @@ export default async function DashboardPage() {
   const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
   const followerCount = user?._count?.followers ?? 0;
 
+  const needsKeys = !hasAi || !hasTts;
+
   return (
     <main className={styles.main}>
+      {needsKeys && <KeysRequiredBanner />}
+
       <section className={styles.header}>
         <h1 className={styles.greeting}>Welcome back, {displayName}</h1>
         <Link href="/create" className={styles.createButton}>
