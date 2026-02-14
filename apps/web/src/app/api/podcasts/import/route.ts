@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string | null;
     const topic = formData.get('topic') as string | null;
     const isHumanContentStr = formData.get('isHumanContent') as string | null;
+    const sourcePlatform = formData.get('sourcePlatform') as string | null;
     const audioFile = formData.get('audio') as File | null;
     const transcriptFile = formData.get('transcript') as File | null;
 
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       title,
       topic,
       isHumanContent: isHumanContentStr === 'true',
+      sourcePlatform: sourcePlatform || undefined,
     });
 
     if (!validation.success) {
@@ -73,7 +75,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title: validatedTitle, topic: validatedTopic, isHumanContent } = validation.data;
+    const {
+      title: validatedTitle,
+      topic: validatedTopic,
+      isHumanContent,
+      sourcePlatform: validatedSourcePlatform,
+    } = validation.data;
 
     const podcast = await prisma.podcast.create({
       data: {
@@ -83,6 +90,7 @@ export async function POST(request: NextRequest) {
         status: 'IMPORTING',
         source: 'IMPORT',
         isHumanContent,
+        sourcePlatform: validatedSourcePlatform ?? null,
         visibility: 'PRIVATE',
       },
     });

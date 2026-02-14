@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Upload, FileAudio, FileText, X, AlertCircle } from 'lucide-react';
+import { Upload, FileAudio, FileText, X, AlertCircle, ChevronDown, Info } from 'lucide-react';
+import { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from '@sotto/shared';
+import type { SourcePlatformValue } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
 import styles from './ImportUploader.module.css';
 
@@ -18,6 +20,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
   const [topic, setTopic] = useState('');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
+  const [sourcePlatform, setSourcePlatform] = useState('');
   const [isHumanContent, setIsHumanContent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +110,10 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
         formData.append('audio', audioFile);
         formData.append('isHumanContent', String(isHumanContent));
 
+        if (sourcePlatform) {
+          formData.append('sourcePlatform', sourcePlatform);
+        }
+
         if (transcriptFile) {
           formData.append('transcript', transcriptFile);
         }
@@ -128,7 +135,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
         setLoading(false);
       }
     },
-    [title, topic, audioFile, transcriptFile, isHumanContent, onImportStarted]
+    [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, onImportStarted]
   );
 
   const formatFileSize = (bytes: number): string => {
@@ -184,6 +191,43 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
           disabled={loading}
           required
         />
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="sourcePlatform" className={styles.label}>
+          Source Platform
+        </label>
+        <div className={styles.selectWrapper}>
+          <select
+            id="sourcePlatform"
+            className={styles.select}
+            value={sourcePlatform}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSourcePlatform(value);
+              const platform = SOURCE_PLATFORMS.find((p) => p.value === value);
+              if (platform?.isAiGenerated) {
+                setIsHumanContent(false);
+              }
+            }}
+            disabled={loading}
+          >
+            <option value="">Select a platform (optional)</option>
+            {SOURCE_PLATFORMS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} className={styles.selectIcon} aria-hidden="true" />
+        </div>
+        {sourcePlatform &&
+          SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue] && (
+            <div className={styles.platformHelp}>
+              <Info size={16} aria-hidden="true" />
+              <p>{SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue]}</p>
+            </div>
+          )}
       </div>
 
       <div className={styles.field}>
@@ -306,7 +350,10 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
             checked={isHumanContent}
             onChange={(e) => setIsHumanContent(e.target.checked)}
             className={styles.checkbox}
-            disabled={loading}
+            disabled={
+              loading ||
+              SOURCE_PLATFORMS.some((p) => p.value === sourcePlatform && p.isAiGenerated)
+            }
           />
           <span className={styles.toggleSwitch} aria-hidden="true" />
           <span className={styles.toggleText}>
