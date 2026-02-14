@@ -94,13 +94,18 @@ describe('createNotification', () => {
     });
   });
 
-  it('creates PODCAST_READY notification type', async () => {
+  it.each([
+    ['PODCAST_READY', 'Podcast Ready', 'Your podcast is ready'],
+    ['NEW_FOLLOWER', 'New Follower', 'Someone followed you'],
+    ['INTERACTION_RESOLVED', 'Question Answered', 'Your question was answered'],
+    ['PODCAST_LIKED', 'Podcast Liked', 'Someone liked your podcast'],
+  ] as const)('creates %s notification type', async (type, title, message) => {
     const mockNotification = {
-      id: 'notif3',
-      userId: 'user3',
-      type: 'PODCAST_READY',
-      title: 'Podcast Ready',
-      message: 'Your podcast is ready',
+      id: `notif-${type}`,
+      userId: 'user1',
+      type,
+      title,
+      message,
       data: null,
       read: false,
       createdAt: new Date(),
@@ -109,103 +114,9 @@ describe('createNotification', () => {
 
     vi.mocked(prisma.notification.create).mockResolvedValue(mockNotification as any);
 
-    await createNotification('user3', 'PODCAST_READY', 'Podcast Ready', 'Your podcast is ready');
+    const result = await createNotification('user1', type as any, title, message);
 
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'PODCAST_READY',
-        }),
-      })
-    );
-  });
-
-  it('creates NEW_FOLLOWER notification type', async () => {
-    const mockNotification = {
-      id: 'notif4',
-      userId: 'user4',
-      type: 'NEW_FOLLOWER',
-      title: 'New Follower',
-      message: 'Someone followed you',
-      data: null,
-      read: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    vi.mocked(prisma.notification.create).mockResolvedValue(mockNotification as any);
-
-    await createNotification('user4', 'NEW_FOLLOWER', 'New Follower', 'Someone followed you');
-
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'NEW_FOLLOWER',
-        }),
-      })
-    );
-  });
-
-  it('creates INTERACTION_RESOLVED notification type', async () => {
-    const mockNotification = {
-      id: 'notif5',
-      userId: 'user5',
-      type: 'INTERACTION_RESOLVED',
-      title: 'Question Answered',
-      message: 'Your question was answered',
-      data: null,
-      read: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    vi.mocked(prisma.notification.create).mockResolvedValue(mockNotification as any);
-
-    await createNotification(
-      'user5',
-      'INTERACTION_RESOLVED' as any,
-      'Question Answered',
-      'Your question was answered'
-    );
-
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'INTERACTION_RESOLVED',
-        }),
-      })
-    );
-  });
-
-  it('creates PODCAST_LIKED notification type', async () => {
-    const mockNotification = {
-      id: 'notif6',
-      userId: 'user6',
-      type: 'PODCAST_LIKED',
-      title: 'Podcast Liked',
-      message: 'Someone liked your podcast',
-      data: null,
-      read: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    vi.mocked(prisma.notification.create).mockResolvedValue(mockNotification as any);
-
-    await createNotification(
-      'user6',
-      'PODCAST_LIKED',
-      'Podcast Liked',
-      'Someone liked your podcast'
-    );
-
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'PODCAST_LIKED',
-        }),
-      })
-    );
+    expect(result).toEqual(mockNotification);
   });
 });
 

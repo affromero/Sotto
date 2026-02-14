@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import type { ReferenceData } from '@/types/reference';
 
 // ---- Import under test ----
@@ -365,6 +366,16 @@ describe('citation-parser', () => {
         expect(result).toHaveLength(3);
         expect(React.isValidElement(result[1])).toBe(true);
       });
+    });
+  });
+
+  describe('server-side rendering', () => {
+    it('renders to HTML without errors', () => {
+      const result = parseTextWithCitations('Study [1] confirmed.', mockReferences);
+      const html = renderToString(React.createElement('span', null, ...result));
+      expect(html).toContain('Citation 1');
+      expect(html).toContain('Study');
+      expect(html).toContain('confirmed.');
     });
   });
 

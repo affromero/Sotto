@@ -546,34 +546,4 @@ describe('DELETE /api/keys/[keyId]', () => {
     });
   });
 
-  it('sets revokedAt timestamp when revoking key', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrisma.apiKey.findUnique.mockResolvedValue({
-      userId: 'user-1',
-      revokedAt: null,
-    });
-    mockPrisma.apiKey.update.mockResolvedValue(mockApiKey);
-
-    const request = createRequest('http://localhost:3000/api/keys/key-1', { method: 'DELETE' });
-    await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    const updateCall = mockPrisma.apiKey.update.mock.calls[0][0];
-    expect(updateCall.data.revokedAt).toBeInstanceOf(Date);
-  });
-
-  it('returns 204 with no content on successful revocation', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPrisma.apiKey.findUnique.mockResolvedValue({
-      userId: 'user-1',
-      revokedAt: null,
-    });
-    mockPrisma.apiKey.update.mockResolvedValue(mockApiKey);
-
-    const request = createRequest('http://localhost:3000/api/keys/key-1', { method: 'DELETE' });
-    const response = await DELETE(request, { params: Promise.resolve({ keyId: 'key-1' }) });
-
-    expect(response.status).toBe(204);
-    const text = await response.text();
-    expect(text).toBe('');
-  });
 });

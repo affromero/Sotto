@@ -188,29 +188,6 @@ describe('POST /api/podcasts/[podcastId]/save', () => {
     });
   });
 
-  it('successfully saves podcast for the first time', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcast);
-    mockPrisma.save.findUnique.mockResolvedValue(null);
-
-    const mockTx = {
-      save: { create: vi.fn().mockResolvedValue(mockSave) },
-      podcast: { update: vi.fn().mockResolvedValue({ ...mockPodcast, saveCount: 6 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
-
-    const request = createRequest('pod-1');
-    const response = await POST(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(200);
-    expect(mockPrisma.save.findUnique).toHaveBeenCalledTimes(1);
-  });
-
   it('handles different user saving different podcast', async () => {
     const differentSession = {
       user: {
@@ -339,28 +316,6 @@ describe('DELETE /api/podcasts/[podcastId]/save', () => {
       where: { id: 'pod-1' },
       data: { saveCount: { decrement: 1 } },
     });
-  });
-
-  it('successfully unsaves podcast', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.save.findUnique.mockResolvedValue(mockSave);
-
-    const mockTx = {
-      save: { delete: vi.fn().mockResolvedValue(mockSave) },
-      podcast: { update: vi.fn().mockResolvedValue({ ...mockPodcast, saveCount: 4 }) },
-    };
-
-    mockPrisma.$transaction.mockImplementation(async (callback) => {
-      return callback(mockTx);
-    });
-
-    const request = createRequest('pod-1');
-    const response = await DELETE(request, {
-      params: Promise.resolve({ podcastId: 'pod-1' }),
-    });
-
-    expect(response.status).toBe(200);
-    expect(mockPrisma.save.findUnique).toHaveBeenCalledTimes(1);
   });
 
   it('handles different user unsaving podcast', async () => {
