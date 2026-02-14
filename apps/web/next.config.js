@@ -1,9 +1,13 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared'],
-  turbopack: {},
+  turbopack: {
+    root: path.resolve(__dirname, '../..'),
+  },
   env: {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },
