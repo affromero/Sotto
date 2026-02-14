@@ -542,13 +542,19 @@ model Save {
 // ============ TAGS ============
 
 model Tag {
-  id            String         @id @default(cuid())
-  name          String         @unique
-  slug          String         @unique
+  id       String  @id @default(cuid())
+  name     String  @unique
+  slug     String  @unique
+  parentId String?
+
+  parent   Tag?    @relation("TagHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Tag[]   @relation("TagHierarchy")
+
   podcasts      PodcastTag[]
   userInterests UserInterest[]
 
   @@index([slug])
+  @@index([parentId])
 }
 
 model PodcastTag {

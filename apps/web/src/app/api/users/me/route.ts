@@ -17,7 +17,7 @@ const updateUserSchema = z
     handle: handleSchema.optional(),
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
-    interests: z.array(z.string()).max(12).optional(),
+    interests: z.array(z.string()).max(20).optional(),
   })
   .strict();
 
