@@ -439,6 +439,81 @@ function Paintbrush({ size = 48, className }: IconProps) {
   );
 }
 
+function MusicNote({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <circle cx="16" cy="36" r="5" stroke="currentColor" strokeWidth="2" />
+      <circle cx="36" cy="32" r="5" stroke="currentColor" strokeWidth="2" />
+      <line x1="21" y1="36" x2="21" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="41" y1="32" x2="41" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="21" y1="10" x2="41" y2="6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Globe({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <circle cx="24" cy="24" r="16" stroke="currentColor" strokeWidth="2" />
+      <ellipse cx="24" cy="24" rx="8" ry="16" stroke="currentColor" strokeWidth="2" />
+      <line x1="8" y1="24" x2="40" y2="24" stroke="currentColor" strokeWidth="2" />
+      <path d="M10 16h28M10 32h28" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function Leaf({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M12 40C12 40 12 24 24 16c12-8 16-10 16-10s0 16-12 24c-4 2.7-8 4-12 4"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path d="M12 40c4-4 10-10 18-16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BookOpen({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M6 10c4-2 8-2 12-1s8 3 6 5v22c2-2-2-4-6-5s-8-1-12 1V10z"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path
+        d="M42 10c-4-2-8-2-12-1s-8 3-6 5v22c-2-2 2-4 6-5s8-1 12 1V10z"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function Trophy({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <path
+        d="M16 8h16v12a8 8 0 01-16 0V8z"
+        stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      />
+      <path d="M16 12H10a4 4 0 000 8h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M32 12h6a4 4 0 010 8h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <line x1="24" y1="28" x2="24" y2="34" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M16 38h16M18 34h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GradCap({ size = 48, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" className={className} aria-hidden="true">
+      <path d="M24 10L6 20l18 10 18-10L24 10z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M36 26v10c0 2-5.4 4-12 4s-12-2-12-4V26" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="42" y1="20" x2="42" y2="36" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const TAG_ICON_MAP: Record<string, React.ComponentType<IconProps>> = {
   technology: Microchip,
   science: Flask,
@@ -452,6 +527,12 @@ const TAG_ICON_MAP: Record<string, React.ComponentType<IconProps>> = {
   psychology: HeadGears,
   economics: TrendLine,
   'art-design': Paintbrush,
+  music: MusicNote,
+  'politics-society': Globe,
+  environment: Leaf,
+  'language-literature': BookOpen,
+  'sports-fitness': Trophy,
+  education: GradCap,
 };
 
 export function getTagIcon(slug: string): React.ComponentType<IconProps> | null {
@@ -485,4 +566,10 @@ export const ONBOARDING_TAG_SLUGS = [
   'psychology',
   'economics',
   'art-design',
+  'music',
+  'politics-society',
+  'environment',
+  'language-literature',
+  'sports-fitness',
+  'education',
 ];
