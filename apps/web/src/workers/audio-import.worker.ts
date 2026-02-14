@@ -35,7 +35,8 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     });
     await job.updateProgress(5);
 
-    const originalPath = path.join(tmpDir, 'original.mp3');
+    const ext = path.extname(audioKey) || '.mp3';
+    const originalPath = path.join(tmpDir, `original${ext}`);
     const normalizedPath = path.join(tmpDir, 'normalized.mp3');
 
     logger.info('Downloading audio from R2', { audioKey });

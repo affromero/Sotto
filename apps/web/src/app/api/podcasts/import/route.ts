@@ -16,8 +16,11 @@ const ALLOWED_AUDIO_TYPES = [
   'audio/m4a',
   'audio/x-m4a',
   'audio/mp4',
+  'audio/aac',
   'audio/webm',
 ];
+
+const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'mp4', 'aac', 'webm', 'opus'];
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -65,7 +68,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!ALLOWED_AUDIO_TYPES.includes(audioFile.type)) {
+    const fileExt = audioFile.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_AUDIO_TYPES.includes(audioFile.type) && (!fileExt || !ALLOWED_AUDIO_EXTENSIONS.includes(fileExt))) {
       return NextResponse.json(
         {
           error: `Unsupported audio type: ${audioFile.type}`,
