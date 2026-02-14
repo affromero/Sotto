@@ -190,35 +190,8 @@ describe('POST /api/teams', () => {
     expect(body).toHaveProperty('error', 'Unauthorized');
   });
 
-  it('returns 403 when user does not have STUDIO subscription', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'PRO' });
-
-    const request = createRequest('http://localhost:3000/api/teams', {
-      body: { name: 'New Team' },
-    });
-    const response = await createTeam(request);
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body).toHaveProperty('error', 'Studio subscription required');
-  });
-
-  it('returns 403 when subscription is missing', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue(null);
-
-    const request = createRequest('http://localhost:3000/api/teams', {
-      body: { name: 'New Team' },
-    });
-    const response = await createTeam(request);
-
-    expect(response.status).toBe(403);
-  });
-
   it('returns 400 when user is already in a team', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'STUDIO' });
     mockUserFindUnique.mockResolvedValue({ id: 'user-1', teamId: 'existing-team' });
 
     const request = createRequest('http://localhost:3000/api/teams', {

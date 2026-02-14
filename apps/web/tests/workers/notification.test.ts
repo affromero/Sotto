@@ -13,9 +13,11 @@ vi.mock('@/lib/prisma', () => ({
 }));
 
 const mockSendPushNotification = vi.fn().mockResolvedValue(undefined);
+const mockSendExpoPushNotification = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/push-notifications', () => ({
   sendPushNotification: (...args: unknown[]) => mockSendPushNotification(...args),
+  sendExpoPushNotification: (...args: unknown[]) => mockSendExpoPushNotification(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -55,6 +57,7 @@ describe('processNotification', () => {
     vi.clearAllMocks();
     mockPrismaNotificationCreate.mockResolvedValue({ id: 'notif-001' });
     mockSendPushNotification.mockResolvedValue(undefined);
+    mockSendExpoPushNotification.mockResolvedValue(undefined);
   });
 
   describe('in-app notification creation', () => {

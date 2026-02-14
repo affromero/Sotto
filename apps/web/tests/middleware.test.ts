@@ -88,9 +88,9 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/');
     });
 
-    it('silently redirects /auth/login to / (hides gate existence)', async () => {
+    it('/auth/login passes through as a public route', async () => {
       const res = await middleware(createRequest('/auth/login'));
-      expect(getRedirectLocation(res)).toBe('/');
+      expect(isPassThrough(res)).toBe(true);
     });
 
     it('silently redirects /feed to / (hides gate existence)', async () => {
@@ -103,14 +103,14 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/');
     });
 
-    it('only /romero reveals the password form by redirecting to /access', async () => {
+    it('/romero passes through as a public route', async () => {
       const res = await middleware(createRequest('/romero'));
-      expect(getRedirectLocation(res)).toBe('/access');
+      expect(isPassThrough(res)).toBe(true);
     });
 
-    it('does NOT reveal gate on /romero subpaths', async () => {
+    it('redirects /romero subpaths to / (not in PUBLIC_ROUTES)', async () => {
       const res = await middleware(createRequest('/romero/settings'));
-      expect(getRedirectLocation(res)).toBe('/access');
+      expect(getRedirectLocation(res)).toBe('/');
     });
   });
 
@@ -267,7 +267,6 @@ describe('Middleware — Evil Agent Security Tests', () => {
   describe('Public Routes — Always Accessible', () => {
     const publicPaths = [
       '/',
-      '/access',
       '/api/access',
       '/api/health',
       '/api/waitlist',
@@ -362,20 +361,20 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(fullLocation).toContain('callbackUrl=%2Fcreate');
     });
 
-    it('redirects authenticated user away from /auth/login to /dashboard', async () => {
+    it('/auth/login passes through as public (even with cookie)', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(
         createRequest('/auth/login', { cookies: { sotto_access: validCookie } })
       );
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(isPassThrough(res)).toBe(true);
     });
 
-    it('redirects authenticated user away from /auth/signup to /dashboard', async () => {
+    it('/auth/signup passes through as public (even with cookie)', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(
         createRequest('/auth/signup', { cookies: { sotto_access: validCookie } })
       );
-      expect(getRedirectLocation(res)).toBe('/dashboard');
+      expect(isPassThrough(res)).toBe(true);
     });
 
     it('allows authenticated user to access /dashboard', async () => {

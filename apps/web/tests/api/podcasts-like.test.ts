@@ -24,6 +24,9 @@ vi.mock('@/lib/prisma', () => ({
       create: (...args: unknown[]) => mockLikeCreate(...args),
       delete: (...args: unknown[]) => mockLikeDelete(...args),
     },
+    activity: {
+      create: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));

@@ -97,6 +97,10 @@ vi.mock('@/lib/queue', () => ({
   audioGenerationQueue: { name: 'audio-generation' },
 }));
 
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),

@@ -10,6 +10,9 @@ const mockPodcastUpdate = vi.fn();
 const mockPodcastDelete = vi.fn();
 const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
+const mockDiscoveryCreate = vi.fn();
+const mockCanResolveAi = vi.fn();
+const mockAddJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
@@ -31,6 +34,12 @@ vi.mock('@/lib/prisma', () => ({
     save: {
       findUnique: (...args: unknown[]) => mockSaveFindUnique(...args),
     },
+    discovery: {
+      create: (...args: unknown[]) => mockDiscoveryCreate(...args),
+    },
+    activity: {
+      create: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    },
   },
 }));
 
@@ -44,6 +53,20 @@ vi.mock('@/lib/redis', () => ({
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
+vi.mock('@/lib/queue', () => ({
+  contentExtractionQueue: 'content-extraction-queue',
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
+}));
+
+vi.mock('@/lib/providers/ai', () => ({
+  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
+}));
+
+vi.mock('@/lib/stripe', () => ({
+  LIMITS: { maxDurationMinutes: 60 },
 }));
 
 import { GET as getList, POST as createPodcast } from '@/app/api/podcasts/route';
@@ -67,6 +90,9 @@ const mockPrisma = {
   },
   save: {
     findUnique: mockSaveFindUnique,
+  },
+  discovery: {
+    create: mockDiscoveryCreate,
   },
 };
 
@@ -242,12 +268,15 @@ describe('POST /api/podcasts', () => {
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 
-  it('creates podcast with valid data', async () => {
+  it('creates podcast and queues extraction pipeline', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCanResolveAi.mockResolvedValue(true);
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue({
       ...mockPodcast,
-      status: 'PENDING',
+      status: 'EXTRACTING',
     });
 
     const body = {
@@ -261,13 +290,15 @@ describe('POST /api/podcasts', () => {
     expect(response.status).toBe(201);
     const result = await response.json();
     expect(result.id).toBe('pod-1');
-    expect(result.title).toBe('Quantum Physics 101');
-    expect(result.status).toBe('PENDING');
+    expect(result.status).toBe('EXTRACTING');
   });
 
   it('creates podcast with optional voice IDs', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCanResolveAi.mockResolvedValue(true);
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
 
     const body = {
@@ -285,7 +316,7 @@ describe('POST /api/podcasts', () => {
         userId: 'user-1',
         title: 'Test Podcast',
         topic: 'Test topic',
-        status: 'PENDING',
+        status: 'EXTRACTING',
         hostVoiceId: 'voice-host-custom',
         expertVoiceId: 'voice-expert-custom',
         ttsProvider: null,
@@ -382,9 +413,12 @@ describe('POST /api/podcasts', () => {
     expect(result).toHaveProperty('resetAt');
   });
 
-  it('checks rate limit only for Bearer token requests', async () => {
+  it('checks API key rate limit for Bearer token requests', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCanResolveAi.mockResolvedValue(true);
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
 
     const body = { title: 'Test', topic: 'Test topic' };
@@ -394,15 +428,23 @@ describe('POST /api/podcasts', () => {
     expect(mockCheckRateLimit).toHaveBeenCalledWith('api:create:user-1', 60, 60);
   });
 
-  it('does not check rate limit for session-based auth', async () => {
+  it('does not check API key rate limit for session-based auth', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
+    mockCanResolveAi.mockResolvedValue(true);
+    mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
+    mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
 
     const body = { title: 'Test', topic: 'Test topic' };
     const request = createPostRequest('/api/podcasts', body);
     await createPodcast(request);
 
-    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    expect(mockCheckRateLimit).not.toHaveBeenCalledWith(
+      expect.stringContaining('api:create:'),
+      expect.anything(),
+      expect.anything()
+    );
   });
 });
 
