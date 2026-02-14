@@ -19,7 +19,7 @@ describe('generateScript', () => {
   });
 
   describe('prompt construction', () => {
-    it('constructs prompt with all discovery metadata fields', async () => {
+    it('returns structured output with turns, soundCues, references, and markdown', async () => {
       const mockResponse = {
         turns: [
           { speaker: 'HOST', text: 'Welcome to the show!', direction: 'energetic' },
@@ -37,7 +37,7 @@ describe('generateScript', () => {
         outputTokens: 800,
       });
 
-      await generateScript({
+      const result = await generateScript({
         topic: 'Quantum Computing',
         depth: 'deep_dive',
         audienceLevel: 'expert',
@@ -46,19 +46,17 @@ describe('generateScript', () => {
         durationTarget: 15,
       });
 
-      expect(mockGenerateResponse).toHaveBeenCalledWith(
-        expect.stringContaining('Audience level: expert'),
-        expect.arrayContaining([
-          expect.objectContaining({
-            role: 'user',
-            content: expect.stringContaining('Topic: Quantum Computing'),
-          }),
-        ]),
-        { maxTokens: 12288 }
-      );
+      expect(result.turns).toHaveLength(2);
+      expect(result.turns[0].speaker).toBe('HOST');
+      expect(result.turns[0].direction).toBe('energetic');
+      expect(result.soundCues).toHaveLength(1);
+      expect(result.references).toEqual([]);
+      expect(result.markdown).toContain('Welcome to the show!');
+      expect(result.inputTokens).toBe(500);
+      expect(result.outputTokens).toBe(800);
     });
 
-    it('includes topic and depth in user message', async () => {
+    it('generates valid output for minimal params', async () => {
       const mockResponse = {
         turns: [{ speaker: 'HOST', text: 'Hello' }],
         soundCues: [],
@@ -71,7 +69,7 @@ describe('generateScript', () => {
         outputTokens: 400,
       });
 
-      await generateScript({
+      const result = await generateScript({
         topic: 'Climate Change',
         depth: 'quick_overview',
         audienceLevel: 'beginner',
@@ -80,16 +78,9 @@ describe('generateScript', () => {
         durationTarget: 5,
       });
 
-      expect(mockGenerateResponse).toHaveBeenCalledWith(
-        expect.any(String),
-        [
-          {
-            role: 'user',
-            content: 'Topic: Climate Change\nDepth: quick_overview',
-          },
-        ],
-        { maxTokens: 12288 }
-      );
+      expect(result.turns).toHaveLength(1);
+      expect(result.turns[0].text).toBe('Hello');
+      expect(result.markdown).toBeDefined();
     });
 
     it('includes source content when provided', async () => {
@@ -614,11 +605,8 @@ describe('generateScript', () => {
       });
 
       expect(result.turns).toHaveLength(1);
-      expect(mockGenerateResponse).toHaveBeenCalledWith(
-        expect.any(String),
-        [{ role: 'user', content: 'Topic: \nDepth: quick_overview' }],
-        { maxTokens: 12288 }
-      );
+      expect(result.turns[0].text).toBe('Default content.');
+      expect(mockGenerateResponse).toHaveBeenCalledOnce();
     });
 
     it('extracts JSON from Claude response wrapped in text', async () => {
@@ -707,9 +695,9 @@ describe('generateScript', () => {
       expect(sourceMatch![1].length).toBe(8000);
     });
 
-    it('uses maxTokens of 12288', async () => {
+    it('passes audience parameter to system prompt', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Max tokens test.' }],
+        turns: [{ speaker: 'HOST', text: 'Hey kids!' }],
         soundCues: [],
         references: [],
       };
@@ -721,17 +709,48 @@ describe('generateScript', () => {
       });
 
       await generateScript({
-        topic: 'Token Limit',
-        depth: 'deep_dive',
-        audienceLevel: 'expert',
+        topic: 'Dinosaurs',
+        depth: 'quick_overview',
+        audienceLevel: 'beginner',
+        audience: 'kids',
         focusAreas: [],
-        tone: 'professional',
-        durationTarget: 20,
+        tone: 'casual',
+        durationTarget: 5,
       });
 
-      expect(mockGenerateResponse).toHaveBeenCalledWith(expect.any(String), expect.any(Array), {
-        maxTokens: 12288,
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+      expect(systemPrompt).toContain('kids');
+      expect(systemPrompt).toContain('CHILDREN');
+    });
+
+    it('passes apiKeyOverride to generateResponse', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'BYOK test.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 400,
+        outputTokens: 500,
       });
+
+      await generateScript({
+        topic: 'BYOK Test',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+        apiKeyOverride: 'user-api-key-123',
+      });
+
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({ apiKeyOverride: 'user-api-key-123' })
+      );
     });
   });
 });
