@@ -4,6 +4,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
+import { SOURCE_PLATFORMS } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { Badge } from '@/components/ui/Badge';
 import type { PodcastSummary } from '@/types/podcast';
@@ -38,6 +39,11 @@ function formatCount(count: number): string {
     return `${(count / 1000).toFixed(1)}K`;
   }
   return count.toString();
+}
+
+function platformLabel(slug: string): string {
+  const platform = SOURCE_PLATFORMS.find((p) => p.value === slug);
+  return platform?.label ?? slug;
 }
 
 function formatDate(dateString: string): string {
@@ -124,7 +130,9 @@ export function PodcastCard({
             {podcast.source === 'IMPORT' && podcast.isHumanContent
               ? 'Human'
               : podcast.source === 'IMPORT'
-                ? 'Imported'
+                ? podcast.sourcePlatform
+                  ? platformLabel(podcast.sourcePlatform)
+                  : 'Imported'
                 : 'AI'}
           </span>
         </div>
