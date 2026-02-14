@@ -16,6 +16,7 @@ export interface PodcastSummary {
   createdAt: string;
   source: PodcastSource;
   isHumanContent: boolean;
+  sourcePlatform?: string | null;
   forkedFromId: string | null;
   user: {
     id: string;

@@ -82,7 +82,11 @@ export type {
   ImportPodcastRequest,
   ImportProgress,
   TranscriptionResult,
+  SourcePlatformValue,
+  SourcePlatformInfo,
 } from './types/import';
+
+export { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from './types/import';
 
 export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 
