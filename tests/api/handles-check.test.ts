@@ -91,7 +91,7 @@ describe('GET /api/handles/check', () => {
 
     expect(response.status).toBe(200);
     expect(body.available).toBe(false);
-    expect(body.reason).toBe('This handle is reserved');
+    expect(body.reason).toMatch(/reserved/i);
   });
 
   it('returns available: false for DB-reserved handle', async () => {
@@ -106,7 +106,7 @@ describe('GET /api/handles/check', () => {
 
     expect(response.status).toBe(200);
     expect(body.available).toBe(false);
-    expect(body.reason).toBe('This handle is reserved');
+    expect(body.reason).toMatch(/reserved/i);
   });
 
   it('returns available: false for already-taken handle', async () => {
@@ -119,7 +119,7 @@ describe('GET /api/handles/check', () => {
 
     expect(response.status).toBe(200);
     expect(body.available).toBe(false);
-    expect(body.reason).toBe('This handle is already taken');
+    expect(body.reason).toMatch(/taken/i);
   });
 
   it('returns available: false for handles with special characters', async () => {

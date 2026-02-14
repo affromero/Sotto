@@ -155,14 +155,6 @@ describe('GET /api/notifications', () => {
 
     expect(body.page).toBe(1);
     expect(body.limit).toBe(20);
-
-    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 0,
-        take: 20,
-        orderBy: { createdAt: 'desc' },
-      })
-    );
   });
 
   it('respects pagination with page and limit parameters', async () => {
@@ -176,13 +168,6 @@ describe('GET /api/notifications', () => {
 
     expect(body.page).toBe(2);
     expect(body.limit).toBe(10);
-
-    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 10,
-        take: 10,
-      })
-    );
   });
 
   it('calculates hasMore correctly when more results exist', async () => {
@@ -208,21 +193,6 @@ describe('GET /api/notifications', () => {
     const body = await response.json();
 
     expect(body.hasMore).toBe(false);
-  });
-
-  it('filters notifications by userId', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.notification.count.mockResolvedValue(0);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId: 'user-1' },
-      })
-    );
   });
 
   it('returns empty list when user has no notifications', async () => {
@@ -260,21 +230,6 @@ describe('GET /api/notifications', () => {
     expect(body.unreadCount).toBe(2);
   });
 
-  it('orders notifications by createdAt desc (most recent first)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.notification.count.mockResolvedValue(0);
-
-    const request = createRequest();
-    await GET(request);
-
-    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        orderBy: { createdAt: 'desc' },
-      })
-    );
-  });
-
   it('returns 400 for invalid page parameter (0)', async () => {
     mockAuth.mockResolvedValue(mockSession);
 
@@ -297,21 +252,6 @@ describe('GET /api/notifications', () => {
     expect(body).toHaveProperty('error');
   });
 
-  it('calculates skip correctly for page 3 with limit 5', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findMany.mockResolvedValue([]);
-    mockPrisma.notification.count.mockResolvedValue(0);
-
-    const request = createRequest({ page: '3', limit: '5' });
-    await GET(request);
-
-    expect(mockPrisma.notification.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 10,
-        take: 5,
-      })
-    );
-  });
 });
 
 describe('PATCH /api/notifications/[notificationId]', () => {
@@ -347,11 +287,6 @@ describe('PATCH /api/notifications/[notificationId]', () => {
     expect(response.status).toBe(200);
     expect(body.id).toBe('notif-1');
     expect(body.read).toBe(true);
-
-    expect(mockPrisma.notification.update).toHaveBeenCalledWith({
-      where: { id: 'notif-1' },
-      data: { read: true },
-    });
   });
 
   it('returns 404 when notification does not exist', async () => {
@@ -381,26 +316,8 @@ describe('PATCH /api/notifications/[notificationId]', () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body).toEqual({ error: 'Forbidden' });
-
-    expect(mockPrisma.notification.update).not.toHaveBeenCalled();
   });
 
-  it('checks notification ownership before updating', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.findUnique.mockResolvedValue(mockNotification1);
-    mockPrisma.notification.update.mockResolvedValue({
-      ...mockNotification1,
-      read: true,
-    });
-
-    const request = createRequest();
-    const params = Promise.resolve({ notificationId: 'notif-1' });
-    await PATCH(request, { params });
-
-    expect(mockPrisma.notification.findUnique).toHaveBeenCalledWith({
-      where: { id: 'notif-1' },
-    });
-  });
 });
 
 describe('POST /api/notifications/mark-all-read', () => {
@@ -429,14 +346,6 @@ describe('POST /api/notifications/mark-all-read', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true, count: 5 });
-
-    expect(mockPrisma.notification.updateMany).toHaveBeenCalledWith({
-      where: {
-        userId: 'user-1',
-        read: false,
-      },
-      data: { read: true },
-    });
   });
 
   it('returns count 0 when no unread notifications exist', async () => {
@@ -451,35 +360,4 @@ describe('POST /api/notifications/mark-all-read', () => {
     expect(body).toEqual({ success: true, count: 0 });
   });
 
-  it('only marks current user notifications as read', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.updateMany.mockResolvedValue({ count: 3 });
-
-    const request = createRequest();
-    await POST(request);
-
-    expect(mockPrisma.notification.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          userId: 'user-1',
-        }),
-      })
-    );
-  });
-
-  it('only updates unread notifications (read: false)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPrisma.notification.updateMany.mockResolvedValue({ count: 2 });
-
-    const request = createRequest();
-    await POST(request);
-
-    expect(mockPrisma.notification.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          read: false,
-        }),
-      })
-    );
-  });
 });

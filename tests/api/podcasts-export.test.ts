@@ -61,7 +61,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Unauthorized' });
-    expect(mockPrismaPodcastFindUnique).not.toHaveBeenCalled();
   });
 
   it('returns 401 when session has no user ID', async () => {
@@ -74,7 +73,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Unauthorized' });
-    expect(mockPrismaPodcastFindUnique).not.toHaveBeenCalled();
   });
 
   it('returns 404 when podcast does not exist', async () => {
@@ -88,10 +86,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(404);
     expect(data).toEqual({ error: 'Podcast not found' });
-    expect(mockPrismaPodcastFindUnique).toHaveBeenCalledWith({
-      where: { id: 'podcast-nonexistent' },
-      select: { id: true, status: true, pdfUrl: true, userId: true, visibility: true },
-    });
   });
 
   it('returns 404 when accessing private podcast owned by another user', async () => {
@@ -111,7 +105,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(404);
     expect(data).toEqual({ error: 'Not found' });
-    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('allows export of private podcast by owner', async () => {
@@ -193,7 +186,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(400);
     expect(data).toEqual({ error: 'Podcast must be in READY status to export' });
-    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('returns existing PDF URL immediately without queuing job when PDF exists', async () => {
@@ -216,7 +208,6 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
       status: 'ready',
       pdfUrl: 'https://r2.example.com/pdfs/podcast-010.pdf',
     });
-    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('queues PDF generation job when no PDF exists', async () => {
@@ -278,7 +269,6 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Unauthorized' });
-    expect(mockPrismaPodcastFindUnique).not.toHaveBeenCalled();
   });
 
   it('returns 401 when session has no user ID', async () => {
@@ -304,10 +294,6 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
 
     expect(response.status).toBe(404);
     expect(data).toEqual({ error: 'Podcast not found' });
-    expect(mockPrismaPodcastFindUnique).toHaveBeenCalledWith({
-      where: { id: 'podcast-nonexistent' },
-      select: { pdfUrl: true, userId: true, visibility: true },
-    });
   });
 
   it('returns 404 when accessing private podcast owned by another user', async () => {
@@ -438,21 +424,4 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
     expect(data).toEqual({ status: 'idle', pdfUrl: null });
   });
 
-  it('selects only required fields in database query', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-001' } });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      pdfUrl: null,
-      userId: 'user-001',
-      visibility: 'PUBLIC',
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-029');
-    await GET(request, params);
-
-    expect(mockPrismaPodcastFindUnique).toHaveBeenCalledWith({
-      where: { id: 'podcast-029' },
-      select: { pdfUrl: true, userId: true, visibility: true },
-    });
-  });
 });

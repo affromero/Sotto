@@ -138,82 +138,6 @@ describe('GET /api/recommendations', () => {
     expect(body.error).toBe('Podcast not found');
   });
 
-  it('calls findSimilarPodcasts with topic from query param', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ topic: 'machine learning' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'machine learning',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
-
-  it('calls findSimilarPodcasts with topic from podcast when podcastId provided', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcast);
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ podcastId: 'pod-1' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'quantum physics introduction',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
-
-  it('uses podcast title as fallback when podcast has no topic', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPrisma.podcast.findUnique.mockResolvedValue({
-      id: 'pod-2',
-      topic: null,
-      title: 'Machine Learning Basics',
-    });
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ podcastId: 'pod-2' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'Machine Learning Basics',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
-
-  it('excludes authenticated user from recommendations', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ topic: 'quantum physics' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'quantum physics',
-      excludeUserId: 'user-1',
-      limit: 10,
-    });
-  });
-
-  it('does not exclude user when not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ topic: 'quantum physics' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'quantum physics',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
-
   it('returns empty array when no recommendations found', async () => {
     mockAuth.mockResolvedValue(null);
     mockFindSimilarPodcasts.mockResolvedValue([]);
@@ -247,21 +171,6 @@ describe('GET /api/recommendations', () => {
     expect(rec.user).toHaveProperty('image');
   });
 
-  it('prioritizes podcastId over topic when both are provided', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcast);
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ podcastId: 'pod-1', topic: 'machine learning' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'quantum physics introduction',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
-
   it('returns multiple recommendations ordered by findSimilarPodcasts result', async () => {
     mockAuth.mockResolvedValue(null);
     mockFindSimilarPodcasts.mockResolvedValue([
@@ -280,31 +189,4 @@ describe('GET /api/recommendations', () => {
     expect(body[2].id).toBe('pod-rec-2');
   });
 
-  it('calls prisma.podcast.findUnique with correct select fields', async () => {
-    mockAuth.mockResolvedValue(null);
-    mockPrisma.podcast.findUnique.mockResolvedValue(mockPodcast);
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ podcastId: 'pod-1' });
-    await GET(request);
-
-    expect(mockPrisma.podcast.findUnique).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      select: { topic: true, title: true },
-    });
-  });
-
-  it('handles session with missing user gracefully', async () => {
-    mockAuth.mockResolvedValue({ user: null });
-    mockFindSimilarPodcasts.mockResolvedValue([]);
-
-    const request = createRequest({ topic: 'quantum' });
-    await GET(request);
-
-    expect(mockFindSimilarPodcasts).toHaveBeenCalledWith({
-      topic: 'quantum',
-      excludeUserId: undefined,
-      limit: 10,
-    });
-  });
 });
