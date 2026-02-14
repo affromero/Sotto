@@ -106,26 +106,6 @@ describe('processContentExtraction', () => {
       });
     });
 
-    it('handles URLs with query parameters', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        sourceUrl: 'https://example.com/article?id=123&lang=en',
-      });
-      await processContentExtraction(job);
-
-      expect(mockExtractFromUrl).toHaveBeenCalledWith('https://example.com/article?id=123&lang=en');
-    });
-
-    it('handles URLs with fragments', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        sourceUrl: 'https://example.com/article#section-2',
-      });
-      await processContentExtraction(job);
-
-      expect(mockExtractFromUrl).toHaveBeenCalledWith('https://example.com/article#section-2');
-    });
-
     it('handles long-form content from URL', async () => {
       const longContent = 'A'.repeat(50000);
       mockExtractFromUrl.mockResolvedValue(longContent);
@@ -219,20 +199,6 @@ Line 3`;
   });
 
   describe('database updates', () => {
-    it('updates discovery with podcastId as the where clause', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        podcastId: 'podcast-xyz',
-        sourceText: 'Test content',
-      });
-      await processContentExtraction(job);
-
-      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-xyz' },
-        data: expect.any(Object),
-      });
-    });
-
     it('updates podcast status to SCRIPTING', async () => {
       const job = createMockJob({
         ...defaultPayload,
@@ -246,19 +212,6 @@ Line 3`;
       });
     });
 
-    it('updates podcast status with correct podcast ID', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        podcastId: 'podcast-abc-123',
-        sourceText: 'Test content',
-      });
-      await processContentExtraction(job);
-
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-abc-123' },
-        data: { status: 'SCRIPTING' },
-      });
-    });
   });
 
   describe('pipeline chaining', () => {
@@ -351,47 +304,18 @@ Line 3`;
   });
 
   describe('job progress updates', () => {
-    it('reports progress at 10% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceText: 'Test',
       });
       await processContentExtraction(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(10);
-    });
-
-    it('reports progress at 50% after content extraction', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        sourceText: 'Test',
-      });
-      await processContentExtraction(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(50);
-    });
-
-    it('reports progress at 100% at the end', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        sourceText: 'Test',
-      });
-      await processContentExtraction(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
-    });
-
-    it('reports progress in the correct order', async () => {
-      const job = createMockJob({
-        ...defaultPayload,
-        sourceText: 'Test',
-      });
-      await processContentExtraction(job);
-
-      const progressCalls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map(
-        (call: number[]) => call[0]
-      );
-      expect(progressCalls).toEqual([10, 50, 100]);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 

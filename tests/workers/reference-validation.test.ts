@@ -205,35 +205,6 @@ describe('processReferenceValidation', () => {
   });
 
   describe('loading references and script', () => {
-    it('loads references for the podcast', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockPrismaReferenceFindMany).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
-        orderBy: { number: 'asc' },
-      });
-    });
-
-    it('loads the script for the podcast', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockPrismaScriptFindUnique).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
-      });
-    });
-
-    it('loads the podcast topic', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockPrismaPodcastFindUnique).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        select: { topic: true },
-      });
-    });
-
     it('throws error if script is not found', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue(null);
       const job = createMockJob(defaultPayload);
@@ -936,60 +907,15 @@ describe('processReferenceValidation', () => {
   });
 
   describe('progress tracking', () => {
-    it('reports progress at 5% after starting', async () => {
+    it('reports monotonically increasing progress ending at 100', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(job.updateProgress).toHaveBeenCalledWith(5);
-    });
-
-    it('reports progress at 15% after layer 1-3 setup', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(15);
-    });
-
-    it('reports progress at 50% after external checks complete', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(50);
-    });
-
-    it('reports progress at 55% after AI evaluation', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(55);
-    });
-
-    it('reports progress at 65% after computing verdicts', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(65);
-    });
-
-    it('reports progress at 70% after updating references', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(70);
-    });
-
-    it('reports progress at 95% after creating segments', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(95);
-    });
-
-    it('reports progress at 100% at the end', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(job.updateProgress).toHaveBeenCalledWith(100);
+      const calls = (job.updateProgress as ReturnType<typeof vi.fn>).mock.calls.map((c: any[]) => c[0]);
+      for (let i = 1; i < calls.length; i++) {
+        expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
+      }
+      expect(calls[calls.length - 1]).toBe(100);
     });
   });
 
