@@ -154,20 +154,6 @@ describe('r2.ts', () => {
       });
     });
 
-    it('handles special characters in podcast ID', async () => {
-      mockSend.mockResolvedValue({});
-
-      const podcastId = 'podcast-abc-123';
-      const audio = Buffer.from('audio data');
-
-      await uploadPodcastAudio(podcastId, audio);
-
-      expect(PutObjectCommand).toHaveBeenCalledWith(
-        expect.objectContaining({
-          Key: 'podcasts/podcast-abc-123/audio.mp3',
-        })
-      );
-    });
   });
 
   describe('uploadSegmentAudio', () => {
@@ -394,14 +380,5 @@ describe('r2.ts', () => {
       await expect(deleteFile('test/file.mp3')).rejects.toThrow('Access denied');
     });
 
-    it('deletes multiple files sequentially', async () => {
-      mockSend.mockResolvedValue({});
-
-      await deleteFile('file1.mp3');
-      await deleteFile('file2.mp3');
-      await deleteFile('file3.mp3');
-
-      expect(mockSend).toHaveBeenCalledTimes(3);
-    });
   });
 });

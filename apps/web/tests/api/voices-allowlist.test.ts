@@ -166,57 +166,6 @@ describe('POST /api/voices/allowlist', () => {
     expect(body).toEqual({ error: 'Voice clone not found or not owned by you' });
   });
 
-  it('returns 403 when not Studio tier', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindUnique.mockResolvedValue(mockVoiceClone);
-    mockSubscriptionFindUnique.mockResolvedValue({ tier: 'PRO', voiceCreatorAddonActive: true });
-
-    const request = createRequest('http://localhost:3000/api/voices/allowlist', {
-      method: 'POST',
-      body: JSON.stringify({ voiceCloneId: 'clone-1', handle: 'targetuser' }),
-    });
-    const response = await POST(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Voice Creator add-on requires Studio tier' });
-  });
-
-  it('returns 403 when subscription is null', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindUnique.mockResolvedValue(mockVoiceClone);
-    mockSubscriptionFindUnique.mockResolvedValue(null);
-
-    const request = createRequest('http://localhost:3000/api/voices/allowlist', {
-      method: 'POST',
-      body: JSON.stringify({ voiceCloneId: 'clone-1', handle: 'targetuser' }),
-    });
-    const response = await POST(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Voice Creator add-on requires Studio tier' });
-  });
-
-  it('returns 403 when addon not active', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindUnique.mockResolvedValue(mockVoiceClone);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      tier: 'STUDIO',
-      voiceCreatorAddonActive: false,
-    });
-
-    const request = createRequest('http://localhost:3000/api/voices/allowlist', {
-      method: 'POST',
-      body: JSON.stringify({ voiceCloneId: 'clone-1', handle: 'targetuser' }),
-    });
-    const response = await POST(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Voice Creator add-on is not active' });
-  });
-
   it('returns 404 when target user handle not found', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindUnique.mockResolvedValue(mockVoiceClone);

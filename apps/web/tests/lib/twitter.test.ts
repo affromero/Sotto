@@ -109,12 +109,6 @@ describe('twitter', () => {
       expect(result).toEqual([]);
     });
 
-    // Note: This test is skipped because the module loads env vars at import time.
-    // To test missing credentials, you would need to use dynamic imports or test in isolation.
-    it.skip('throws error when credentials are not configured', async () => {
-      // This test cannot work as written since env vars are captured at module load
-    });
-
     it('throws error on API error response', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
@@ -275,11 +269,6 @@ describe('twitter', () => {
       await getTweet('reset-call');
     });
 
-    // Note: This test is skipped because the module loads env vars at import time.
-    it.skip('throws error when credentials are not configured', async () => {
-      // This test cannot work as written since env vars are captured at module load
-    });
-
     it('updates rate limit tracking from response headers', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
@@ -360,11 +349,6 @@ describe('twitter', () => {
       expect(authHeader).toContain('oauth_signature');
       expect(authHeader).toContain('oauth_timestamp');
       expect(authHeader).toContain('oauth_token');
-    });
-
-    // Note: This test is skipped because the module loads env vars at import time.
-    it.skip('throws error when OAuth credentials are not configured', async () => {
-      // This test cannot work as written since env vars are captured at module load
     });
 
     it('logs successful reply', async () => {
@@ -452,18 +436,6 @@ describe('twitter', () => {
       expect(isTwitterConfigured()).toBe(true);
     });
 
-    // Note: These tests are skipped because the module loads env vars at import time.
-    it.skip('returns false when TWITTER_BEARER_TOKEN is missing', () => {
-      // This test cannot work as written since env vars are captured at module load
-    });
-
-    it.skip('returns false when TWITTER_SOTTO_USER_ID is missing', () => {
-      // This test cannot work as written since env vars are captured at module load
-    });
-
-    it.skip('returns false when both credentials are missing', () => {
-      // This test cannot work as written since env vars are captured at module load
-    });
   });
 
   describe('rate limit handling', () => {

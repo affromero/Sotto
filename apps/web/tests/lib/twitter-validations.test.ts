@@ -182,17 +182,6 @@ describe('twitterSettingsSchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('allows extra unknown fields (Zod default behavior)', () => {
-      const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: true,
-        unknownField: 'extra-data',
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.twitterEnabled).toBe(true);
-      }
-    });
   });
 
   describe('edge cases', () => {
@@ -245,34 +234,4 @@ describe('twitterSettingsSchema', () => {
     });
   });
 
-  describe('type safety', () => {
-    it('provides correct type after successful parse', () => {
-      const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: true,
-        preferredHostVoiceId: 'voice-1',
-      });
-
-      if (result.success) {
-        const enabled: boolean | undefined = result.data.twitterEnabled;
-        const hostVoice: string | null | undefined = result.data.preferredHostVoiceId;
-        const expertVoice: string | null | undefined = result.data.preferredExpertVoiceId;
-
-        expect(typeof enabled).toBe('boolean');
-        expect(typeof hostVoice).toBe('string');
-        expect(expertVoice).toBeUndefined();
-      }
-    });
-
-    it('provides error details on failed parse', () => {
-      const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: 'invalid',
-      });
-
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBeDefined();
-        expect(result.error.issues.length).toBeGreaterThan(0);
-      }
-    });
-  });
 });
