@@ -25,16 +25,9 @@ interface SharedVoice extends VoiceClone {
   owner: { id: string; name: string | null };
 }
 
-interface VoiceCredits {
-  used: number;
-  total: number;
-  remaining: number;
-}
-
 export interface VoiceSelection {
   hostVoiceId?: string;
   expertVoiceId?: string;
-  usePremiumVoice: boolean;
   ttsProvider?: string;
 }
 
@@ -46,8 +39,7 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
   const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
-  const [credits, setCredits] = useState<VoiceCredits>({ used: 0, total: 0, remaining: 0 });
-  const [usePremium, setUsePremium] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
   const [hostVoiceId, setHostVoiceId] = useState<string | undefined>();
   const [expertVoiceId, setExpertVoiceId] = useState<string | undefined>();
   const [loaded, setLoaded] = useState(false);
@@ -61,7 +53,6 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
           setPoolVoices(data.poolVoices || []);
           setUserClones(data.userClones || []);
           setSharedVoices(data.sharedVoices || []);
-          setCredits(data.credits || { used: 0, total: 0, remaining: 0 });
         }
       } catch {
         // Non-critical — defaults to auto-assign
@@ -74,22 +65,18 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
 
   useEffect(() => {
     onSelectionChange({
-      hostVoiceId: usePremium ? hostVoiceId : undefined,
-      expertVoiceId: usePremium ? expertVoiceId : undefined,
-      usePremiumVoice: usePremium,
+      hostVoiceId: customMode ? hostVoiceId : undefined,
+      expertVoiceId: customMode ? expertVoiceId : undefined,
     });
-  }, [usePremium, hostVoiceId, expertVoiceId, onSelectionChange]);
+  }, [customMode, hostVoiceId, expertVoiceId, onSelectionChange]);
 
-  function handleTogglePremium() {
-    if (credits.remaining <= 0 && !usePremium) return;
-    setUsePremium((prev) => !prev);
-    if (usePremium) {
+  function handleToggleCustom() {
+    setCustomMode((prev) => !prev);
+    if (customMode) {
       setHostVoiceId(undefined);
       setExpertVoiceId(undefined);
     }
   }
-
-  const hasCredits = credits.remaining > 0;
 
   return (
     <div className={styles.container}>
@@ -100,7 +87,7 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
         </p>
       </div>
 
-      {!usePremium && (
+      {!customMode && (
         <div className={styles.autoAssign}>
           <div className={styles.autoAssignIcon} aria-hidden="true">
             <svg
@@ -120,9 +107,9 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
             </svg>
           </div>
           <div className={styles.autoAssignText}>
-            <span className={styles.autoAssignTitle}>Auto-assign (Standard Voices)</span>
+            <span className={styles.autoAssignTitle}>Auto-assign Voices</span>
             <span className={styles.autoAssignHint}>
-              Two complementary AI voices will be selected automatically. Free with every podcast.
+              Two complementary AI voices will be selected automatically.
             </span>
           </div>
         </div>
@@ -131,32 +118,25 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
       {loaded && (
         <div className={styles.toggleRow}>
           <div className={styles.toggleLabel}>
-            <span className={styles.toggleTitle}>Use Premium Voices</span>
+            <span className={styles.toggleTitle}>Choose Custom Voices</span>
             <span className={styles.toggleHint}>
-              {hasCredits ? (
-                <span className={styles.creditCount}>
-                  {credits.remaining} credit{credits.remaining !== 1 ? 's' : ''} remaining
-                </span>
-              ) : (
-                'No credits remaining this month'
-              )}
+              Pick specific voices for host and expert
             </span>
           </div>
           <button
             type="button"
             role="switch"
-            aria-checked={usePremium}
-            className={`${styles.toggle} ${!hasCredits && !usePremium ? styles.toggleDisabled : ''}`}
-            onClick={handleTogglePremium}
-            disabled={!hasCredits && !usePremium}
-            aria-label="Toggle premium voices"
+            aria-checked={customMode}
+            className={styles.toggle}
+            onClick={handleToggleCustom}
+            aria-label="Toggle custom voice selection"
           >
             <span className={styles.toggleKnob} />
           </button>
         </div>
       )}
 
-      {usePremium && (
+      {customMode && (
         <>
           <div className={`${styles.roleSection} ${styles.roleHost}`}>
             <span className={styles.roleLabel}>Host Voice</span>
@@ -182,7 +162,6 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
             {sharedVoices.length > 0 && (
               <>
                 <span className={styles.clonesLabel}>Shared With You</span>
-                <span className={styles.sharedVoiceNote}>+1 credit per shared voice used</span>
                 <div className={styles.voiceGrid}>
                   {sharedVoices.map((voice) => (
                     <VoiceCard
@@ -238,7 +217,6 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
             {sharedVoices.length > 0 && (
               <>
                 <span className={styles.clonesLabel}>Shared With You</span>
-                <span className={styles.sharedVoiceNote}>+1 credit per shared voice used</span>
                 <div className={styles.voiceGrid}>
                   {sharedVoices.map((voice) => (
                     <VoiceCard

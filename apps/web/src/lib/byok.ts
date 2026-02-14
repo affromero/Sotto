@@ -128,23 +128,6 @@ export async function getByokKey(userId: string, provider?: TtsProviderId): Prom
   });
 
   if (!record) {
-    // Fallback: check legacy column for elevenlabs
-    if (targetProvider === 'elevenlabs') {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { elevenLabsApiKey: true },
-      });
-      if (!user?.elevenLabsApiKey) return null;
-      try {
-        return decryptApiKey(user.elevenLabsApiKey);
-      } catch (error) {
-        logger.error('Failed to decrypt legacy BYOK key', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return null;
-      }
-    }
     return null;
   }
 
@@ -200,14 +183,6 @@ export async function removeByokKey(userId: string, provider?: TtsProviderId): P
       // Ignore if doesn't exist
     });
 
-  // Also clear legacy column for elevenlabs
-  if (targetProvider === 'elevenlabs') {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { elevenLabsApiKey: null },
-    });
-  }
-
   logger.info('Removed BYOK key', { userId, provider: targetProvider });
 }
 
@@ -246,14 +221,7 @@ export async function hasByokKey(userId: string, provider?: TtsProviderId): Prom
 
   // Any provider
   const count = await prisma.userTtsKey.count({ where: { userId } });
-  if (count > 0) return true;
-
-  // Legacy fallback
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { elevenLabsApiKey: true },
-  });
-  return !!user?.elevenLabsApiKey;
+  return count > 0;
 }
 
 /**

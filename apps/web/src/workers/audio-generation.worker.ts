@@ -32,7 +32,6 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     where: { id: podcastId },
     select: {
       userId: true,
-      usePremiumVoice: true,
       hostVoiceId: true,
       expertVoiceId: true,
       ttsProvider: true,
@@ -46,7 +45,6 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     userId: podcast.userId,
     podcastId,
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
-    usePremiumVoice: podcast.usePremiumVoice,
   });
 
   // Use custom voice ID if set, otherwise let the provider pick from its pool

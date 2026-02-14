@@ -35,18 +35,11 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  // Usage tracking
-  podcastsUsed    Int @default(0)
-  podcastsAllowed Int @default(2) // 2 free podcasts for all users
-
   // Twitter integration
   twitterHandle          String?   @unique
   twitterEnabled         Boolean   @default(false)
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
-
-  // BYOK (Bring Your Own Key) — encrypted ElevenLabs API key (legacy, migrated to UserTtsKey)
-  elevenLabsApiKey String? @db.Text
 
   // Team membership (dormant — kept for future use)
   teamId String?
@@ -58,9 +51,7 @@ model User {
   podcasts           Podcast[]
   discoveries        Discovery[]
   interactions       Interaction[]
-  subscription       Subscription?
   notifications      Notification[]
-  subscriptionEvents SubscriptionEvent[]
   ownedTeams         Team[]              @relation("TeamOwner")
   apiUsageLogs       ApiUsageLog[]
   pushSubscriptions  PushSubscription[]
@@ -77,9 +68,6 @@ model User {
 
   // Twitter mentions
   tweetMentions TweetMention[]
-
-  // Credit transactions
-  creditTransactions CreditTransaction[]
 
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
@@ -155,87 +143,6 @@ model Follow {
   @@index([followingId])
 }
 
-// ============ SUBSCRIPTIONS ============
-
-model Subscription {
-  id                   String             @id @default(cuid())
-  userId               String             @unique
-  stripeCustomerId     String             @unique
-  stripeSubscriptionId String             @unique
-  stripePriceId        String
-  status               SubscriptionStatus @default(PENDING)
-  tier                 SubscriptionTier   @default(FREE)
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime
-  cancelAtPeriodEnd    Boolean            @default(false)
-  premiumCreditsUsed   Int                @default(0)
-  creditsBalance       Float              @default(0)
-  creditsMonthly       Int                @default(2)
-  rolloverCredits      Int                @default(0)
-  maxRollover          Int                @default(0)
-  voiceCreatorAddonActive               Boolean @default(false)
-  voiceCreatorAddonStripeSubscriptionId String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([status])
-  @@index([tier])
-}
-
-enum SubscriptionStatus {
-  PENDING
-  ACTIVE
-  PAST_DUE
-  CANCELED
-  UNPAID
-  TRIALING
-}
-
-enum SubscriptionTier {
-  FREE
-  STARTER
-  PRO
-  STUDIO
-  POWER
-}
-
-model SubscriptionEvent {
-  id            String   @id @default(cuid())
-  userId        String
-  type          String
-  stripeEventId String   @unique
-  data          Json
-  createdAt     DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([type])
-  @@index([createdAt])
-}
-
-// ============ CREDIT TRANSACTIONS ============
-
-model CreditTransaction {
-  id              String   @id @default(cuid())
-  userId          String
-  amount          Float    // positive = add, negative = consume
-  balanceBefore   Float
-  balanceAfter    Float
-  type            String   // 'monthly_grant' | 'generation' | 'refund' | 'purchase' | 'admin'
-  description     String
-  podcastId       String?
-  stripePaymentId String?
-  createdAt       DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@index([type])
-}
-
 // ============ TEAMS ============
 
 model Team {
@@ -296,9 +203,7 @@ model Podcast {
   // Voice selection
   hostVoiceId     String?
   expertVoiceId   String?
-  usePremiumVoice Boolean @default(false)
   ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
-  creditCost      Float?
 
   // Source tracking (web, twitter, api)
   source        PodcastSource @default(WEB)

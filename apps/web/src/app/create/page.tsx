@@ -33,9 +33,7 @@ function CreatePageContent() {
   const [importStep, setImportStep] = useState<ImportStep>('upload');
   const [importingPodcastId, setImportingPodcastId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
-  const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({
-    usePremiumVoice: false,
-  });
+  const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
@@ -82,7 +80,6 @@ function CreatePageContent() {
             metadata,
             hostVoiceId: voiceSelection.hostVoiceId,
             expertVoiceId: voiceSelection.expertVoiceId,
-            usePremiumVoice: voiceSelection.usePremiumVoice,
             ttsProvider,
           }),
         });

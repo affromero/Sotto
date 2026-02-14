@@ -33,7 +33,6 @@ export async function processSegmentRegeneration(
     where: { id: podcastId },
     select: {
       userId: true,
-      usePremiumVoice: true,
       hostVoiceId: true,
       expertVoiceId: true,
       ttsProvider: true,
@@ -45,7 +44,6 @@ export async function processSegmentRegeneration(
     userId: podcast.userId,
     podcastId,
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
-    usePremiumVoice: podcast.usePremiumVoice,
   });
 
   const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;

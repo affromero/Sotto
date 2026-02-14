@@ -8,7 +8,6 @@ export const createPodcastSchema = z.object({
   discoveryId: z.string().optional(),
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
-  usePremiumVoice: z.boolean().default(false),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
 });
 

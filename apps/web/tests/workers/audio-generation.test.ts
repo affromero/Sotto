@@ -9,7 +9,6 @@ const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
-  usePremiumVoice: true,
   hostVoiceId: null,
   expertVoiceId: null,
   ttsProvider: null,
@@ -156,10 +155,8 @@ function setupStandardProvider() {
 describe('processAudioGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: premium voice, no custom voice IDs
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
-      usePremiumVoice: true,
       hostVoiceId: null,
       expertVoiceId: null,
       ttsProvider: null,
@@ -190,7 +187,6 @@ describe('processAudioGeneration', () => {
         where: { id: 'podcast-001' },
         select: {
           userId: true,
-          usePremiumVoice: true,
           hostVoiceId: true,
           expertVoiceId: true,
           ttsProvider: true,
@@ -224,7 +220,6 @@ describe('processAudioGeneration', () => {
     it('uses custom hostVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: true,
         hostVoiceId: 'custom-host-voice',
         expertVoiceId: null,
         ttsProvider: null,
@@ -240,7 +235,6 @@ describe('processAudioGeneration', () => {
     it('uses custom expertVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: true,
         hostVoiceId: null,
         expertVoiceId: 'custom-expert-voice',
         ttsProvider: null,
@@ -284,7 +278,6 @@ describe('processAudioGeneration', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: false,
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: null,
@@ -292,7 +285,7 @@ describe('processAudioGeneration', () => {
       setupStandardProvider();
     });
 
-    it('uses standard TTS provider when usePremiumVoice is false', async () => {
+    it('uses standard TTS provider when no custom provider is set', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioGeneration(job);
 
