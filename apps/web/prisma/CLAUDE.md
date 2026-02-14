@@ -38,7 +38,7 @@ The schema is organized into logical sections:
 
 | Enum                 | Values                                                                                                                                                                          | Used By                      |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `PodcastStatus`      | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED → IMPORTING → TRANSCRIBING | Podcast.status               |
+| `PodcastStatus`      | PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → SCRIPT_READY → GENERATING_AUDIO → STITCHING → READY → UPDATING → FAILED → IMPORTING → TRANSCRIBING | Podcast.status               |
 | `Speaker`            | HOST, EXPERT                                                                                                                                                                    | Segment.speaker              |
 | `InteractionStatus`  | PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED                                                                                                        | Interaction.status           |
 | `UserRole`           | USER, CREATOR, ADMIN, SYSTEM                                                                                                                                                    | User.role                    |
@@ -50,7 +50,7 @@ The schema is organized into logical sections:
 | `ReferenceType`      | WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT                                                                                                                                        | Reference.type               |
 | `VerificationStatus` | PENDING, VERIFIED, FAILED, REPLACED, REMOVED                                                                                                                                    | Reference.verificationStatus |
 | `VoiceRequestStatus` | PENDING, APPROVED, DENIED, REVOKED                                                                                                                                              | VoiceRequest.status          |
-| `NotificationType`   | Includes VOICE_REQUEST_*, QUESTION_ON_YOUR_PODCAST, QUESTION_UPVOTED, COMMENT_ON_YOUR_PODCAST, COMMENT_REPLY (+ others)                                                        | Notification.type            |
+| `NotificationType`   | Includes VOICE_REQUEST_*, QUESTION_ON_YOUR_PODCAST, QUESTION_UPVOTED, COMMENT_ON_YOUR_PODCAST, COMMENT_REPLY, SCRIPT_READY (+ others)                                          | Notification.type            |
 
 ## Commands
 

@@ -232,6 +232,8 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
     ↓
 [reference-validation] → Source quality filter + 4-layer verification (URL, CrossRef, OpenAlex, AI)
     ↓
+[SCRIPT_READY pause] → User reviews/edits script (WEB/IMPORT only; auto-approve for TWITTER/API)
+    ↓
 [audio-generation] × N → TTS per segment (multi-provider: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) (parallel, 5 concurrent)
     ↓
 [audio-stitching] → FFmpeg concat + normalize + duration hard check → final.mp3
@@ -307,7 +309,7 @@ Claude generates natural HOST segment addressing Q&A
 | `TweetMention`          | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                                                                                                                   |
 | `ApiUsageLog`           | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                                                                                                                                 |
 
-**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
+**Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → SCRIPT_READY → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
 
 ## Pricing Model: Free + BYOK
 
