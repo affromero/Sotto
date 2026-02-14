@@ -2,6 +2,7 @@
   "name": "sotto",
   "version": "0.1.0",
   "private": true,
+  "workspaces": ["apps/*", "packages/*"],
   "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "scripts": {
     "build": "next build",
