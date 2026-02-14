@@ -612,6 +612,55 @@
 }
 
 /* ==========================================================================
+   IMPORT PLATFORM STRIP
+   ========================================================================== */
+
+.importPlatforms {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+
+.importPlatformsLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.importPlatformsList {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.importPlatformPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-lighter);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.importPlatformPillMuted {
+  background: var(--color-background);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+/* ==========================================================================
    SPLIT LAYOUT (Demo + Interrupt sections)
    ========================================================================== */
 

@@ -224,8 +224,8 @@ export default function LandingPage() {
               </div>
               <h3>Import Any Podcast</h3>
               <p>
-                Upload human-recorded episodes, lectures, or NotebookLM exports. Sotto adds
-                transcripts, social features, and interactive Q&amp;A on top.
+                Upload from NotebookLM, Spotify, Apple Podcasts, YouTube, or any audio file. Sotto
+                adds transcripts, social features, and interactive Q&amp;A on top.
               </p>
             </article>
             <article className={`${styles.pillar} ${styles.rev} ${styles.d2}`}>
@@ -250,6 +250,20 @@ export default function LandingPage() {
                 gets woven back into the episode permanently.
               </p>
             </article>
+          </div>
+          <div className={`${styles.importPlatforms} ${styles.rev}`}>
+            <span className={styles.importPlatformsLabel}>Import from</span>
+            <div className={styles.importPlatformsList}>
+              <span className={styles.importPlatformPill}>NotebookLM</span>
+              <span className={styles.importPlatformPill}>Spotify</span>
+              <span className={styles.importPlatformPill}>Apple Podcasts</span>
+              <span className={styles.importPlatformPill}>YouTube</span>
+              <span
+                className={`${styles.importPlatformPill} ${styles.importPlatformPillMuted}`}
+              >
+                Any audio file
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -966,8 +980,8 @@ export default function LandingPage() {
               <div className={styles.stepContent}>
                 <h3>Create or import</h3>
                 <p>
-                  Chat with Sotto to generate a two-voice podcast from any topic. Or upload an
-                  existing episode — human-recorded, AI-made, anything.
+                  Chat with Sotto to generate a two-voice podcast from any topic. Or import from
+                  NotebookLM, Spotify, Apple Podcasts, YouTube — any audio file works.
                 </p>
               </div>
             </div>
