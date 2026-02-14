@@ -21,7 +21,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Create')).toBeInTheDocument();
     expect(screen.getByText('Discover')).toBeInTheDocument();
-    expect(screen.getByText('Billing')).toBeInTheDocument();
+    expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
     // Voices, Analytics, Team are CREATOR/ADMIN only
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Dashboard').closest('a')).toHaveAttribute('href', '/dashboard');
     expect(screen.getByText('Create').closest('a')).toHaveAttribute('href', '/create');
     expect(screen.getByText('Discover').closest('a')).toHaveAttribute('href', '/feed');
-    expect(screen.getByText('Billing').closest('a')).toHaveAttribute('href', '/billing');
+    expect(screen.getByText('API Keys').closest('a')).toHaveAttribute('href', '/billing');
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
@@ -60,7 +60,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Voices')).toBeInTheDocument();
     expect(screen.getByText('Team')).toBeInTheDocument();
-    expect(screen.getByText('Billing')).toBeInTheDocument();
+    expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument();
   });
 
@@ -70,8 +70,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Admin Panel')).toBeInTheDocument();
     expect(screen.getByText('Analytics')).toBeInTheDocument();
-    // ADMIN doesn't see Billing
-    expect(screen.queryByText('Billing')).not.toBeInTheDocument();
+    expect(screen.getByText('API Keys')).toBeInTheDocument();
   });
 
   it('displays user name when provided', () => {

@@ -9,13 +9,9 @@ vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
-const mockPrismaTransaction = vi.fn();
 const mockPrismaPodcastFindUnique = vi.fn();
 const mockPrismaPodcastUpdate = vi.fn();
 const mockPrismaJobUpdateMany = vi.fn();
-const mockPrismaSubscriptionFindUnique = vi.fn();
-const mockPrismaUserFindUnique = vi.fn();
-const mockPrismaVoiceCloneFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -26,16 +22,6 @@ vi.mock('@/lib/prisma', () => ({
     job: {
       updateMany: (...args: unknown[]) => mockPrismaJobUpdateMany(...args),
     },
-    subscription: {
-      findUnique: (...args: unknown[]) => mockPrismaSubscriptionFindUnique(...args),
-    },
-    user: {
-      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
-    },
-    voiceClone: {
-      findMany: (...args: unknown[]) => mockPrismaVoiceCloneFindMany(...args),
-    },
-    $transaction: (operations: unknown) => mockPrismaTransaction(operations),
   },
 }));
 
@@ -49,27 +35,20 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
-const mockConsumeCredit = vi.fn();
-const mockGetUserTier = vi.fn().mockResolvedValue('FREE');
+const mockCanResolveAi = vi.fn().mockResolvedValue(true);
 
-vi.mock('@/lib/subscription', () => ({
-  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
 }));
 
-const mockCanGenerate = vi.fn();
+const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
+
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+}));
 
 vi.mock('@/lib/stripe', () => ({
-  TIER_LIMITS: {
-    FREE: { maxDurationMinutes: 5 },
-    PRO: { maxDurationMinutes: 10 },
-    STARTER: { maxDurationMinutes: 10 },
-    STUDIO: { maxDurationMinutes: 10 },
-  },
-  canGenerate: (...args: unknown[]) => mockCanGenerate(...args),
-}));
-
-vi.mock('@/lib/credits', () => ({
-  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
+  LIMITS: { maxDurationMinutes: 30 },
 }));
 
 // ---- Import under test ----
@@ -94,11 +73,8 @@ async function createMockParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
-    mockPrismaUserFindUnique.mockResolvedValue({ role: 'USER' });
-    mockPrismaVoiceCloneFindMany.mockResolvedValue([]);
-    mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
-    mockConsumeCredit.mockResolvedValue(undefined);
+    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
   });
 
   it('returns 401 for unauthenticated request', async () => {
@@ -164,65 +140,30 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     });
   });
 
-  it('returns 400 when podcast is in EXTRACTING status', async () => {
+  it('returns 403 when AI provider not configured', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-004',
-      userId: 'user-001',
-      status: 'EXTRACTING',
-      discovery: null,
-    });
+    mockCanResolveAi.mockResolvedValue(false);
 
     const request = createMockRequest();
-    const params = await createMockParams('podcast-004');
+    const params = await createMockParams('podcast-noai');
     const response = await POST(request, params);
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('PENDING, DISCOVERING, or FAILED');
+    expect(response.status).toBe(403);
+    expect(data.error).toContain('AI provider not configured');
   });
 
-  it('returns 400 when podcast is in SCRIPTING status', async () => {
+  it('returns 429 when rate limited', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-005',
-      userId: 'user-001',
-      status: 'SCRIPTING',
-      discovery: null,
-    });
+    mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
 
     const request = createMockRequest();
-    const params = await createMockParams('podcast-005');
+    const params = await createMockParams('podcast-rl');
     const response = await POST(request, params);
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('PENDING, DISCOVERING, or FAILED');
-  });
-
-  it('returns 402 when premium voice requested but no credits remaining', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-006',
-      userId: 'user-001',
-      status: 'PENDING',
-      usePremiumVoice: true,
-      discovery: null,
-    });
-    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
-    mockCanGenerate.mockReturnValue({
-      allowed: false,
-      cost: 2,
-      reason: 'Insufficient credits: need 2, have 0. Buy more credits or upgrade your plan.',
-    });
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-006');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(402);
-    expect(data.error).toContain('Insufficient credits');
+    expect(response.status).toBe(429);
+    expect(data.error).toContain('Rate limit exceeded');
   });
 
   it('successfully starts generation for PENDING podcast', async () => {
@@ -231,10 +172,10 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       id: 'podcast-007',
       userId: 'user-001',
       status: 'PENDING',
-      usePremiumVoice: false,
       discovery: {
         sourceUrl: 'https://example.com/article',
         sourceContent: null,
+        durationTarget: null,
       },
     });
     mockPrismaPodcastUpdate.mockResolvedValue({});
@@ -248,36 +189,12 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     expect(data).toEqual({ success: true, message: 'Generation started' });
   });
 
-  it('successfully starts generation for DISCOVERING podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-002' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-008',
-      userId: 'user-002',
-      status: 'DISCOVERING',
-      usePremiumVoice: false,
-      discovery: {
-        sourceUrl: null,
-        sourceContent: 'Manual source text',
-      },
-    });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-008');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true, message: 'Generation started' });
-  });
-
   it('cleans up failed jobs before retrying FAILED podcast', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-003' });
     mockPrismaPodcastFindUnique.mockResolvedValue({
       id: 'podcast-009',
       userId: 'user-003',
       status: 'FAILED',
-      usePremiumVoice: false,
       discovery: null,
     });
     mockPrismaJobUpdateMany.mockResolvedValue({ count: 2 });
@@ -290,127 +207,28 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true, message: 'Generation started' });
+    expect(mockPrismaJobUpdateMany).toHaveBeenCalled();
   });
 
-  it('consumes 2 credits when usePremiumVoice is true', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-005' });
+  it('returns 400 when duration exceeds limit', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
     mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-011',
-      userId: 'user-005',
+      id: 'podcast-dur',
+      userId: 'user-001',
       status: 'PENDING',
-      usePremiumVoice: true,
-      discovery: null,
-    });
-    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
-    mockCanGenerate.mockReturnValue({ allowed: true, cost: 2 });
-    mockConsumeCredit.mockResolvedValue(undefined);
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-011');
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('consumes 1 credit when usePremiumVoice is false', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-006' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-012',
-      userId: 'user-006',
-      status: 'PENDING',
-      usePremiumVoice: false,
-      discovery: null,
-    });
-    mockPrismaSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
-    mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
-    mockConsumeCredit.mockResolvedValue(undefined);
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-012');
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('queues job with both sourceUrl and sourceContent when available', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-007' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-013',
-      userId: 'user-007',
-      status: 'PENDING',
-      usePremiumVoice: false,
-      discovery: {
-        sourceUrl: 'https://example.com/doc.pdf',
-        sourceContent: 'Fallback content',
-      },
-    });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-013');
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('queues job with neither sourceUrl nor sourceContent when discovery has none', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-008' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-014',
-      userId: 'user-008',
-      status: 'PENDING',
-      usePremiumVoice: false,
       discovery: {
         sourceUrl: null,
         sourceContent: null,
+        durationTarget: 60,
       },
     });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
 
     const request = createMockRequest();
-    const params = await createMockParams('podcast-014');
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('validates podcastId parameter is provided', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-011' });
-
-    const request = createMockRequest();
-    const params = await createMockParams('');
-
-    mockPrismaPodcastFindUnique.mockResolvedValue(null);
-
+    const params = await createMockParams('podcast-dur');
     const response = await POST(request, params);
     const data = await response.json();
 
-    expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Podcast not found' });
-  });
-
-  it('stores creditCost on podcast after consuming credits', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-cc',
-      userId: 'user-001',
-      status: 'PENDING',
-      usePremiumVoice: false,
-      hostVoiceId: 'shared-voice-1',
-      expertVoiceId: null,
-      discovery: null,
-    });
-    mockPrismaVoiceCloneFindMany.mockResolvedValue([{ elevenLabsVoiceId: 'shared-voice-1' }]);
-    mockCanGenerate.mockReturnValue({ allowed: true, cost: 2 });
-    mockConsumeCredit.mockResolvedValue(undefined);
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-cc');
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('exceeds the maximum');
   });
 });

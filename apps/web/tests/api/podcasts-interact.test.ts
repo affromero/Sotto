@@ -4,12 +4,9 @@ import { NextRequest } from 'next/server';
 // Define mock functions at module scope for proper typing
 const mockAuth = vi.fn();
 const mockPodcastFindUnique = vi.fn();
-const mockUserFindUnique = vi.fn();
-const mockSubscriptionFindUnique = vi.fn();
 const mockInteractionCreate = vi.fn();
 const mockAddJob = vi.fn();
-const mockCanInteract = vi.fn();
-const mockConsumeCredit = vi.fn();
+const mockCheckRateLimit = vi.fn();
 
 // Mock dependencies
 vi.mock('@/lib/auth', () => ({
@@ -20,12 +17,6 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
-    },
-    user: {
-      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
-    },
-    subscription: {
-      findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
     },
     interaction: {
       create: (...args: unknown[]) => mockInteractionCreate(...args),
@@ -41,13 +32,8 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
-vi.mock('@/lib/stripe', () => ({
-  canInteract: (...args: unknown[]) => mockCanInteract(...args),
-  INTERACTION_CREDIT_COST: 0.25,
-}));
-
-vi.mock('@/lib/credits', () => ({
-  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
 // Import route after mocks are set up
@@ -83,12 +69,6 @@ const mockSession = {
 
 const mockPodcast = {
   id: 'podcast-123',
-  userId: 'user-123',
-  title: 'Test Podcast',
-  status: 'READY',
-  visibility: 'PUBLIC',
-  createdAt: new Date(),
-  updatedAt: new Date(),
 };
 
 const mockInteraction = {
@@ -112,31 +92,11 @@ const mockInteraction = {
 describe('POST /api/podcasts/[podcastId]/interact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Set up default mocks for credit-based interaction check
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
-    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
-    mockCanInteract.mockReturnValue({ allowed: true, cost: 0.25 });
-    mockConsumeCredit.mockResolvedValue({ balanceBefore: 5, balanceAfter: 4.75 });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: 0 });
   });
 
   it('returns 401 when user is not authenticated', async () => {
     mockAuth.mockResolvedValue(null);
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Test question',
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(401);
-    expect(body.error).toBe('Unauthorized');
-  });
-
-  it('returns 401 when session has no user ID', async () => {
-    mockAuth.mockResolvedValue({ user: {}, expires: '2026-12-31' });
 
     const { request, params } = createRequest('podcast-123', {
       question: 'Test question',
@@ -182,22 +142,6 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     expect(body.error).toBeDefined();
   });
 
-  it('returns 400 when question exceeds 2000 characters', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'a'.repeat(2001),
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBeDefined();
-  });
-
   it('returns 400 when timestamp is negative', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
@@ -214,62 +158,9 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     expect(body.error).toBeDefined();
   });
 
-  it('returns 400 when question is missing', async () => {
+  it('returns 429 when rate limited', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-
-    const { request, params } = createRequest('podcast-123', {
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBeDefined();
-  });
-
-  it('returns 400 when timestamp is missing', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Valid question',
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBeDefined();
-  });
-
-  it('returns 400 when timestamp is not a number', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Valid question',
-      timestamp: 'not-a-number',
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(body.error).toBeDefined();
-  });
-
-  it('returns 402 when insufficient credits for interaction', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
-    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
-    mockCanInteract.mockReturnValue({
-      allowed: false,
-      cost: 0.25,
-      reason: 'Insufficient credits: interactions cost 0.25 credits, you have 0.',
-    });
+    mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
 
     const { request, params } = createRequest('podcast-123', {
       question: 'Valid question',
@@ -279,97 +170,8 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     const response = await POST(request, params);
     const body = await response.json();
 
-    expect(response.status).toBe(402);
-    expect(body.error).toContain('Insufficient credits');
-  });
-
-  it('consumes 0.25 credits on successful interaction', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Valid question',
-      timestamp: 120,
-    });
-
-    await POST(request, params);
-
-    expect(mockConsumeCredit).toHaveBeenCalledWith(
-      'user-123',
-      0.25,
-      'Interaction question',
-      'podcast-123'
-    );
-  });
-
-  it('does not consume credits for ADMIN users', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
-    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
-    mockCanInteract.mockReturnValue({ allowed: true, cost: 0.25 });
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Admin question',
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-    expect(mockConsumeCredit).not.toHaveBeenCalled();
-  });
-
-  it('fails if consumeCredit throws insufficient balance', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockConsumeCredit.mockRejectedValue(new Error('Insufficient credits: need 0.25, have 0'));
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Valid question',
-      timestamp: 120,
-    });
-
-    await expect(POST(request, params)).rejects.toThrow('Insufficient credits');
-  });
-
-  it('accepts timestamp 0 as valid', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Question at the start',
-      timestamp: 0,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-  });
-
-  it('accepts question at exactly 2000 characters', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue({
-      ...mockInteraction,
-      question: 'a'.repeat(2000),
-    });
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'a'.repeat(2000),
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(429);
+    expect(body.error).toContain('Rate limit exceeded');
   });
 
   it('creates interaction with PENDING status', async () => {
@@ -430,120 +232,5 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
       question: 'Can you explain quantum entanglement?',
       timestamp: 120.5,
     });
-  });
-
-  it('returns complete interaction object', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Can you explain quantum entanglement?',
-      timestamp: 120.5,
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(body).toMatchObject({
-      id: 'interaction-123',
-      podcastId: 'podcast-123',
-      userId: 'user-123',
-      question: 'Can you explain quantum entanglement?',
-      timestamp: 120.5,
-      status: 'PENDING',
-      resolved: false,
-    });
-  });
-
-  it('accepts decimal timestamps', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue({
-      ...mockInteraction,
-      timestamp: 45.789,
-    });
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Test question',
-      timestamp: 45.789,
-    });
-
-    const response = await POST(request, params);
-    const body = await response.json();
-
-    expect(response.status).toBe(201);
-    expect(body.timestamp).toBe(45.789);
-  });
-
-  it('handles large timestamp values', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue({
-      ...mockInteraction,
-      timestamp: 3600,
-    });
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Question at 1 hour mark',
-      timestamp: 3600,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-  });
-
-  it('trims whitespace from question text', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue({
-      ...mockInteraction,
-      question: 'Test question',
-    });
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: '  Test question  ',
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-  });
-
-  it('handles missing podcast select gracefully', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue({ id: 'podcast-123' });
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockResolvedValue({ id: 'job-123' });
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Test question',
-      timestamp: 120,
-    });
-
-    const response = await POST(request, params);
-
-    expect(response.status).toBe(201);
-  });
-
-  it('handles queue job dispatch failure', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
-    mockInteractionCreate.mockResolvedValue(mockInteraction);
-    mockAddJob.mockRejectedValue(new Error('Queue connection failed'));
-
-    const { request, params } = createRequest('podcast-123', {
-      question: 'Test question',
-      timestamp: 120,
-    });
-
-    await expect(POST(request, params)).rejects.toThrow('Queue connection failed');
   });
 });

@@ -7,7 +7,6 @@ const mockVoiceCloneCount = vi.fn();
 const mockVoiceCloneFindUnique = vi.fn();
 const mockVoiceCloneCreate = vi.fn();
 const mockVoiceCloneDelete = vi.fn();
-const mockSubscriptionFindUnique = vi.fn();
 const mockVoiceAllowlistFindMany = vi.fn();
 const mockVoiceRequestFindMany = vi.fn();
 const mockVoiceRequestDeleteMany = vi.fn();
@@ -29,9 +28,6 @@ vi.mock('@/lib/prisma', () => ({
       create: (...args: unknown[]) => mockVoiceCloneCreate(...args),
       delete: (...args: unknown[]) => mockVoiceCloneDelete(...args),
     },
-    subscription: {
-      findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
-    },
     voiceAllowlist: {
       findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
     },
@@ -39,6 +35,17 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...args: unknown[]) => mockVoiceRequestFindMany(...args),
       deleteMany: (...args: unknown[]) => mockVoiceRequestDeleteMany(...args),
     },
+  },
+}));
+
+vi.mock('@/lib/stripe', () => ({
+  LIMITS: {
+    maxDurationMinutes: 30,
+    maxVoiceClones: 10,
+    canDownload: true,
+    canMakePrivate: true,
+    canExportPdf: true,
+    hasPremiumSfx: true,
   },
 }));
 
@@ -135,15 +142,9 @@ describe('GET /api/voices', () => {
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 
-  it('returns voice pool, user clones, and credits for authenticated user', async () => {
+  it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
     mockAuth.mockResolvedValue(mockSession);
     mockVoiceCloneFindMany.mockResolvedValue([mockVoiceClone]);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 1,
-    });
 
     const response = await GET();
     const body = await response.json();
@@ -151,7 +152,8 @@ describe('GET /api/voices', () => {
     expect(response.status).toBe(200);
     expect(body).toHaveProperty('poolVoices');
     expect(body).toHaveProperty('userClones');
-    expect(body).toHaveProperty('credits');
+    expect(body).toHaveProperty('maxVoiceClones');
+    expect(body.maxVoiceClones).toBe(10);
     expect(Array.isArray(body.poolVoices)).toBe(true);
     expect(body.poolVoices).toHaveLength(2);
   });
@@ -174,12 +176,6 @@ describe('GET /api/voices', () => {
         createdAt: mockVoiceClone2.createdAt,
       },
     ]);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'STUDIO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 2,
-    });
 
     const response = await GET();
     const body = await response.json();
@@ -190,61 +186,6 @@ describe('GET /api/voices', () => {
       name: 'My Voice',
       elevenLabsVoiceId: 'el-voice-1',
       sourceType: 'UPLOAD',
-    });
-  });
-
-  it('returns correct credits for FREE tier', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindMany.mockResolvedValue([]);
-    mockSubscriptionFindUnique.mockResolvedValue(null);
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(body.credits).toEqual({
-      used: 0,
-      total: 3,
-      remaining: 3,
-    });
-  });
-
-  it('returns correct credits for PRO tier', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindMany.mockResolvedValue([]);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 2,
-    });
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(body.credits).toEqual({
-      used: 2,
-      total: 10,
-      remaining: 8,
-    });
-  });
-
-  it('returns correct credits for STUDIO tier', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindMany.mockResolvedValue([]);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'STUDIO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 4,
-    });
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(body.credits).toEqual({
-      used: 4,
-      total: 20,
-      remaining: 16,
     });
   });
 
@@ -264,12 +205,6 @@ describe('GET /api/voices', () => {
         },
       },
     ]);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'STUDIO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
 
     const response = await GET();
     const body = await response.json();
@@ -303,58 +238,8 @@ describe('POST /api/voices/clone', () => {
     expect(body).toEqual({ error: 'Unauthorized' });
   });
 
-  it('returns 403 for FREE tier users (0 voice clones allowed)', async () => {
+  it('returns 403 when user reaches voice clone limit', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue(null);
-
-    const formData = new FormData();
-    formData.append('name', 'Test Voice');
-    formData.append('sourceType', 'UPLOAD');
-
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
-      method: 'POST',
-      body: formData,
-    });
-    const response = await POST_CLONE(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Voice cloning requires a paid subscription' });
-  });
-
-  it('returns 403 when PRO tier user reaches clone limit (3)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
-    mockVoiceCloneCount.mockResolvedValue(3);
-
-    const formData = new FormData();
-    formData.append('name', 'Test Voice');
-    formData.append('sourceType', 'UPLOAD');
-
-    const request = createRequest('http://localhost:3000/api/voices/clone', {
-      method: 'POST',
-      body: formData,
-    });
-    const response = await POST_CLONE(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Maximum of 3 voice clones allowed for your tier' });
-  });
-
-  it('returns 403 when STUDIO tier user reaches clone limit (10)', async () => {
-    mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'STUDIO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(10);
 
     const formData = new FormData();
@@ -369,17 +254,11 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Maximum of 10 voice clones allowed for your tier' });
+    expect(body).toEqual({ error: 'Maximum of 10 voice clones allowed' });
   });
 
   it('returns 400 when name is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(0);
 
     const formData = new FormData();
@@ -396,12 +275,6 @@ describe('POST /api/voices/clone', () => {
 
   it('returns 400 when sourceType is invalid', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(0);
 
     const formData = new FormData();
@@ -419,12 +292,6 @@ describe('POST /api/voices/clone', () => {
 
   it('returns 400 when audio file is missing', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(0);
 
     const formData = new FormData();
@@ -442,14 +309,8 @@ describe('POST /api/voices/clone', () => {
     expect(body).toEqual({ error: 'Audio file is required' });
   });
 
-  it('successfully creates voice clone for PRO user', async () => {
+  it('successfully creates voice clone for authenticated user', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'PRO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(1);
     mockCloneVoice.mockResolvedValue({ voiceId: 'el-voice-new' });
     mockVoiceCloneCreate.mockResolvedValue({
@@ -491,14 +352,8 @@ describe('POST /api/voices/clone', () => {
     expect(body.elevenLabsVoiceId).toBe('el-voice-new');
   });
 
-  it('successfully creates voice clone for STUDIO user', async () => {
+  it('successfully creates voice clone with RECORD source type', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockSubscriptionFindUnique.mockResolvedValue({
-      userId: 'user-1',
-      tier: 'STUDIO',
-      status: 'ACTIVE',
-      premiumCreditsUsed: 0,
-    });
     mockVoiceCloneCount.mockResolvedValue(3);
     mockCloneVoice.mockResolvedValue({ voiceId: 'el-voice-studio' });
     mockVoiceCloneCreate.mockResolvedValue({

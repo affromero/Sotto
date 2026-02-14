@@ -3,8 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
 import { cloneVoiceSchema } from '@/lib/validations';
-import { getUserTier } from '@/lib/subscription';
-import { TIER_LIMITS } from '@/lib/stripe';
+import { LIMITS } from '@/lib/stripe';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -12,23 +11,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const tier = await getUserTier(session.user.id);
-  const limits = TIER_LIMITS[tier];
-
-  if (limits.maxVoiceClones === 0) {
-    return NextResponse.json(
-      { error: 'Voice cloning requires a paid subscription' },
-      { status: 403 }
-    );
-  }
-
   const existingCount = await prisma.voiceClone.count({
     where: { userId: session.user.id },
   });
 
-  if (existingCount >= limits.maxVoiceClones) {
+  if (existingCount >= LIMITS.maxVoiceClones) {
     return NextResponse.json(
-      { error: `Maximum of ${limits.maxVoiceClones} voice clones allowed for your tier` },
+      { error: `Maximum of ${LIMITS.maxVoiceClones} voice clones allowed` },
       { status: 403 }
     );
   }
@@ -90,17 +79,6 @@ export async function PATCH(request: NextRequest) {
 
   if (voiceClone.userId !== session.user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  // Only Studio tier users can make voices requestable
-  if (requestable) {
-    const tier = await getUserTier(session.user.id);
-    if (tier !== 'STUDIO') {
-      return NextResponse.json(
-        { error: 'Only Studio tier users can share voice clones' },
-        { status: 403 }
-      );
-    }
   }
 
   const updated = await prisma.voiceClone.update({

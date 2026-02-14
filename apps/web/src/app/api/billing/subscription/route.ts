@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { TIER_LIMITS } from '@/lib/stripe';
+import { LIMITS } from '@/lib/stripe';
+import { listAiProviders, listByokProviders } from '@/lib/byok';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -10,34 +10,19 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-    });
-
-    if (!subscription || subscription.status !== 'ACTIVE') {
-      return NextResponse.json({
-        tier: 'FREE',
-        status: 'ACTIVE',
-        cancelAtPeriodEnd: false,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        premiumCreditsUsed: 0,
-        voiceCreatorAddonActive: false,
-        limits: TIER_LIMITS.FREE,
-      });
-    }
-
-    const tier = subscription.tier as keyof typeof TIER_LIMITS;
+    const [aiKeys, ttsKeys] = await Promise.all([
+      listAiProviders(session.user.id),
+      listByokProviders(session.user.id),
+    ]);
 
     return NextResponse.json({
-      tier: subscription.tier,
-      status: subscription.status,
-      cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-      currentPeriodStart: subscription.currentPeriodStart?.toISOString() || null,
-      currentPeriodEnd: subscription.currentPeriodEnd.toISOString(),
-      premiumCreditsUsed: subscription.premiumCreditsUsed,
-      voiceCreatorAddonActive: subscription.voiceCreatorAddonActive,
-      limits: TIER_LIMITS[tier],
+      tier: 'FREE',
+      status: 'ACTIVE',
+      byok: {
+        ai: aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
+        tts: ttsKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
+      },
+      limits: LIMITS,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch subscription';

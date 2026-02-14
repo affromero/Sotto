@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { consumeCredit } from '@/lib/credits';
-import { IMPORT_CREDIT_COST } from '@/lib/stripe';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
@@ -77,23 +75,6 @@ export async function POST(request: NextRequest) {
 
     const { title: validatedTitle, topic: validatedTopic, isHumanContent } = validation.data;
 
-    const subscription = await prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-      select: { creditsBalance: true },
-    });
-
-    const balance = subscription?.creditsBalance ?? 0;
-    if (balance < IMPORT_CREDIT_COST) {
-      return NextResponse.json(
-        {
-          error: `Insufficient credits: imports cost ${IMPORT_CREDIT_COST} credits, you have ${balance}`,
-        },
-        { status: 402 }
-      );
-    }
-
-    await consumeCredit(session.user.id, IMPORT_CREDIT_COST, 'podcast_import');
-
     const podcast = await prisma.podcast.create({
       data: {
         userId: session.user.id,
@@ -103,7 +84,6 @@ export async function POST(request: NextRequest) {
         source: 'IMPORT',
         isHumanContent,
         visibility: 'PRIVATE',
-        creditCost: IMPORT_CREDIT_COST,
       },
     });
 
@@ -150,10 +130,6 @@ export async function POST(request: NextRequest) {
     logger.error('Import podcast failed', {
       error: err instanceof Error ? err.message : String(err),
     });
-
-    if (err instanceof Error && err.message.includes('Insufficient credits')) {
-      return NextResponse.json({ error: err.message }, { status: 402 });
-    }
 
     return NextResponse.json({ error: 'Failed to import podcast' }, { status: 500 });
   }

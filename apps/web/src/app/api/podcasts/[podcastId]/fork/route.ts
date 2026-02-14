@@ -2,9 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { forkBodySchema } from '@/lib/validations';
-import { getUserTier } from '@/lib/subscription';
-import { canGenerate } from '@/lib/stripe';
-import { consumeCredit } from '@/lib/credits';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
@@ -62,33 +59,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Credit check
-  const tier = await getUserTier(userId);
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId },
-    select: { creditsBalance: true },
-  });
-  const creditsBalance = subscription?.creditsBalance ?? 0;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
-
-  const check = canGenerate(creditsBalance, false, tier, user?.role, 0);
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.reason }, { status: 402 });
-  }
-
-  // Consume credit
-  try {
-    await consumeCredit(userId, check.cost, 'Fork generation', undefined);
-  } catch {
-    return NextResponse.json(
-      { error: 'Insufficient credits to fork this podcast.' },
-      { status: 402 }
-    );
-  }
-
   // Create fork podcast + discovery in a transaction
   const forkedPodcast = await prisma.$transaction(async (tx) => {
     const newPodcast = await tx.podcast.create({
@@ -99,7 +69,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         remixNote: remixNote || null,
         status: 'PENDING',
         forkedFromId: podcastId,
-        creditCost: check.cost,
       },
     });
 
@@ -138,7 +107,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return newPodcast;
   });
 
-  // Update credit cost reference on the podcast (already set in create)
   // Set status to EXTRACTING and enqueue generation
   await prisma.podcast.update({
     where: { id: forkedPodcast.id },

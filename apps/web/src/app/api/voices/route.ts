@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { VOICE_POOL } from '@/lib/elevenlabs';
-import { getUserVoiceCredits } from '@/lib/subscription';
+import { LIMITS } from '@/lib/stripe';
 
 export async function GET() {
   const session = await auth();
@@ -10,7 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [userClones, credits, approvedRequests, allowlistEntries] = await Promise.all([
+  const [userClones, approvedRequests, allowlistEntries] = await Promise.all([
     prisma.voiceClone.findMany({
       where: { userId: session.user.id },
       select: {
@@ -23,7 +23,6 @@ export async function GET() {
       },
       orderBy: { createdAt: 'desc' },
     }),
-    getUserVoiceCredits(session.user.id),
     prisma.voiceRequest.findMany({
       where: {
         requesterId: session.user.id,
@@ -107,6 +106,6 @@ export async function GET() {
     poolVoices: VOICE_POOL,
     userClones,
     sharedVoices,
-    credits,
+    maxVoiceClones: LIMITS.maxVoiceClones,
   });
 }
