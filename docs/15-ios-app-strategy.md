@@ -511,25 +511,27 @@ npx expo run:ios
 # Scan QR code with Expo Go app
 ```
 
-**Folder Structure**:
+**Folder Structure** (monorepo: `apps/mobile/`):
 
 ```
-sotto-mobile/
+apps/mobile/
 ├── app/                    # Expo Router screens
-├── components/             # Shared components
-├── lib/                    # API client, auth, audio
-├── hooks/                  # React hooks
+├── components/             # Mobile components
+├── lib/                    # API client, auth, audio, theme
 ├── assets/                 # Images, fonts
 ├── app.json                # Expo config
-└── eas.json                # Build config
+├── eas.json                # Build config
+├── .env.example            # Environment variables
+└── package.json            # @sotto/mobile workspace
 ```
 
-**Shared Code Strategy**:
+**Shared Code Strategy** (via `@sotto/shared` workspace package):
 
-- Copy type definitions from `src/types/*.ts`
-- Copy validation schemas from `src/lib/validations.ts`
+- Import types from `@sotto/shared` (types, enums, interfaces)
+- Import validations from `@sotto/shared` (Zod schemas)
+- Import design tokens from `@sotto/shared` (colors, spacing, typography)
 - Rewrite UI components (CSS Modules → StyleSheet)
-- Share API contract (same endpoints)
+- Share API contract (same `/api/*` endpoints)
 
 **Hot Reloading**:
 
