@@ -278,3 +278,28 @@ export const createCommentSchema = z.object({
   parentId: z.string().optional(),
   timestamp: z.number().min(0).optional(),
 });
+
+/**
+ * Collection creation validation
+ */
+export const createCollectionSchema = z.object({
+  name: z.string().min(1).max(100),
+  description: z.string().max(500).optional(),
+  isPublic: z.boolean().optional(),
+});
+
+/**
+ * Collection update validation
+ */
+export const updateCollectionSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  isPublic: z.boolean().optional(),
+});
+
+/**
+ * Collection item validation (add/remove podcast)
+ */
+export const collectionItemSchema = z.object({
+  podcastId: z.string().min(1),
+});

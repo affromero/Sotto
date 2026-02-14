@@ -12,6 +12,7 @@ import {
   Download,
   Pencil,
   RefreshCw,
+  ListMusic,
 } from 'lucide-react';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
@@ -23,6 +24,7 @@ import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
 import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
+import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
@@ -89,6 +91,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [showForkRemix, setShowForkRemix] = useState(false);
+  const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [lineageData, setLineageData] = useState<{
@@ -373,6 +376,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
             <span>{saved ? 'Saved' : 'Save'}</span>
           </button>
+          {isAuthenticated && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => setShowAddToCollection(true)}
+              aria-label="Add to collection"
+              type="button"
+            >
+              <ListMusic size={18} />
+              <span>Collect</span>
+            </button>
+          )}
           {isOwner && (
             <Link
               href={`/podcast/${podcast.id}/edit`}
@@ -552,6 +566,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         onClose={() => setShowForkRemix(false)}
         podcastId={podcast.id}
         podcastTitle={podcast.title}
+      />
+
+      {/* Add to Collection Modal */}
+      <AddToCollectionModal
+        podcastId={podcast.id}
+        isOpen={showAddToCollection}
+        onClose={() => setShowAddToCollection(false)}
       />
     </div>
   );

@@ -51,6 +51,52 @@
   border-bottom-color: var(--color-primary);
 }
 
+/* Collections tab */
+
+.collectionsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+.collectionsLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xl) 0;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.collectionsSpinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: var(--radius-full);
+  animation: collectSpin 0.8s linear infinite;
+}
+
+@keyframes collectSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.collectionsEmpty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  font: var(--text-body);
+  color: var(--color-text-tertiary);
+}
+
+@media (min-width: 600px) {
+  .collectionsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 @media (min-width: 769px) {
   .main {
     padding: var(--spacing-xl);
