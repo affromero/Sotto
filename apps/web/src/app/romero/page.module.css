@@ -76,6 +76,7 @@
   text-decoration: none;
   transition: color var(--transition-fast);
   letter-spacing: -0.5px;
+  flex: 1;
 }
 
 .navSolid .navLogo {
@@ -112,6 +113,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  justify-content: flex-end;
 }
 
 .navSign {
