@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
@@ -10,10 +9,9 @@ import styles from './page.module.css';
 
 interface ApiKeyManagerProps {
   initialKeys: ApiKeyData[];
-  tier: string;
 }
 
-export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
+export function ApiKeyManager({ initialKeys }: ApiKeyManagerProps) {
   const [keys, setKeys] = useState<ApiKeyData[]>(initialKeys);
   const [name, setName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -89,21 +87,6 @@ export function ApiKeyManager({ initialKeys, tier }: ApiKeyManagerProps) {
     setNewKey(null);
     setCopied(false);
   }, []);
-
-  if (tier !== 'STUDIO') {
-    return (
-      <div className={styles.upgradeCard}>
-        <h2 className={styles.upgradeTitle}>API Access</h2>
-        <p className={styles.upgradeText}>
-          API keys are available on the Studio plan. Upgrade to access the Sotto API
-          programmatically.
-        </p>
-        <Link href="/billing">
-          <Button>Upgrade to Studio</Button>
-        </Link>
-      </div>
-    );
-  }
 
   const activeKeys = keys.filter((k) => !k.revokedAt);
   const revokedKeys = keys.filter((k) => k.revokedAt);

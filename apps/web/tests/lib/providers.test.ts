@@ -96,29 +96,25 @@ vi.mock('@/lib/r2', () => ({
 }));
 
 vi.mock('@/lib/stripe', () => ({
+  LIMITS: {
+    maxDurationMinutes: 30,
+    maxVoiceClones: 10,
+    canDownload: true,
+    canMakePrivate: true,
+    canExportPdf: true,
+    hasPremiumSfx: true,
+  },
   TIER_LIMITS: {
     FREE: {
-      creditsMonthly: 3,
-      maxRollover: 0,
-      maxDurationMinutes: 5,
-      maxVoiceClones: 0,
-      premiumVoiceSurcharge: 0,
-      canDownload: false,
-      canMakePrivate: false,
-    },
-    PRO: {
-      creditsMonthly: 10,
-      maxRollover: 3,
-      maxDurationMinutes: 10,
-      maxVoiceClones: 3,
-      premiumVoiceSurcharge: 0,
+      maxDurationMinutes: 30,
+      maxVoiceClones: 10,
       canDownload: true,
       canMakePrivate: true,
+      canExportPdf: true,
+      hasPremiumSfx: true,
+      premiumVoiceSurcharge: 0,
     },
   },
-  INTERACTION_CREDIT_COST: 0.25,
-  createCheckoutSession: vi.fn().mockResolvedValue('https://checkout.stripe.com/session'),
-  createPortalSession: vi.fn().mockResolvedValue('https://billing.stripe.com/portal'),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -128,7 +124,6 @@ vi.mock('@/lib/logger', () => ({
 import { createAIProvider } from '@/lib/providers/ai';
 import { createTtsProvider } from '@/lib/providers/tts';
 import { createStorageProvider } from '@/lib/providers/storage';
-import { createPaymentProvider } from '@/lib/providers/payment';
 
 describe('Provider Factories', () => {
   describe('createAIProvider', () => {
@@ -169,39 +164,6 @@ describe('Provider Factories', () => {
       const provider = createStorageProvider('r2');
       const url = await provider.uploadFile('key', Buffer.from('data'), 'text/plain');
       expect(url).toBe('https://r2.example.com/file');
-    });
-  });
-
-  describe('createPaymentProvider', () => {
-    it('none provider returns unlimited limits', () => {
-      const provider = createPaymentProvider('none');
-      const limits = provider.getTierLimits('FREE');
-      expect(limits.creditsMonthly).toBe(Infinity);
-      expect(limits.canDownload).toBe(true);
-    });
-
-    it('none provider returns empty checkout URL', async () => {
-      const provider = createPaymentProvider('none');
-      const url = await provider.createCheckoutSession({
-        userId: 'user-1',
-        userEmail: 'test@test.com',
-        priceId: 'price_123',
-        successUrl: 'http://localhost/success',
-        cancelUrl: 'http://localhost/cancel',
-      });
-      expect(url).toBe('');
-    });
-
-    it('none provider returns returnUrl for portal', async () => {
-      const provider = createPaymentProvider('none');
-      const url = await provider.createPortalSession('cus_123', 'http://localhost/billing');
-      expect(url).toBe('http://localhost/billing');
-    });
-
-    it('stripe provider delegates getTierLimits', () => {
-      const provider = createPaymentProvider('stripe');
-      const limits = provider.getTierLimits('FREE');
-      expect(limits.creditsMonthly).toBe(1);
     });
   });
 

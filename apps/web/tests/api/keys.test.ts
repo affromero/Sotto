@@ -30,11 +30,6 @@ vi.mock('@/lib/api-keys', () => ({
   generateApiKey: () => mockGenerateApiKey(),
 }));
 
-const mockGetUserTier = vi.fn();
-vi.mock('@/lib/subscription', () => ({
-  getUserTier: (userId: string) => mockGetUserTier(userId),
-}));
-
 const mockLogger = {
   info: vi.fn(),
   error: vi.fn(),
@@ -192,39 +187,8 @@ describe('POST /api/keys', () => {
     expect(body.error).toBe('Unauthorized');
   });
 
-  it('returns 403 when user tier is FREE', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('FREE');
-
-    const request = createRequest('http://localhost:3000/api/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('API keys require a Studio subscription');
-  });
-
-  it('returns 403 when user tier is PRO', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('PRO');
-
-    const request = createRequest('http://localhost:3000/api/keys', {
-      method: 'POST',
-      body: JSON.stringify({ name: 'Test Key' }),
-    });
-    const response = await POST(request);
-
-    expect(response.status).toBe(403);
-    const body = await response.json();
-    expect(body.error).toBe('API keys require a Studio subscription');
-  });
-
   it('returns 400 for invalid input (missing name)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
 
     const request = createRequest('http://localhost:3000/api/keys', {
       method: 'POST',
@@ -239,7 +203,7 @@ describe('POST /api/keys', () => {
 
   it('returns 400 for invalid input (name too long)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
+
 
     const request = createRequest('http://localhost:3000/api/keys', {
       method: 'POST',
@@ -252,7 +216,7 @@ describe('POST /api/keys', () => {
 
   it('returns 400 when user has reached MAX_ACTIVE_KEYS limit (10)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
+
     mockPrisma.apiKey.count.mockResolvedValue(10);
 
     const request = createRequest('http://localhost:3000/api/keys', {
@@ -266,9 +230,9 @@ describe('POST /api/keys', () => {
     expect(body.error).toBe('Maximum of 10 active API keys allowed');
   });
 
-  it('creates API key successfully for STUDIO tier user', async () => {
+  it('creates API key successfully for authenticated user', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
+
     mockPrisma.apiKey.count.mockResolvedValue(3);
 
     mockGenerateApiKey.mockReturnValue({
@@ -303,7 +267,7 @@ describe('POST /api/keys', () => {
 
   it('returns full API key only on creation (shown once)', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
+
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
     mockGenerateApiKey.mockReturnValue({
@@ -336,7 +300,7 @@ describe('POST /api/keys', () => {
 
   it('generates API key with sk_sotto_ prefix', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockGetUserTier.mockResolvedValue('STUDIO');
+
     mockPrisma.apiKey.count.mockResolvedValue(0);
 
     mockGenerateApiKey.mockReturnValue({

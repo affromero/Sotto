@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
-import { stripe } from '@/lib/stripe';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 
 export const dynamic = 'force-dynamic';
@@ -123,19 +122,6 @@ export async function GET() {
     checks.elevenlabs = { status: 'error', latencyMs: Date.now() - elStart };
   }
 
-  // --- Stripe (non-critical) ---
-  const stripeStart = Date.now();
-  try {
-    if (stripe) {
-      await stripe.balance.retrieve();
-      checks.stripe = { status: 'ok', latencyMs: Date.now() - stripeStart };
-    } else {
-      checks.stripe = { status: 'not_configured', latencyMs: 0 };
-    }
-  } catch {
-    checks.stripe = { status: 'error', latencyMs: Date.now() - stripeStart };
-  }
-
   // --- BullMQ Queues (non-critical, uses existing Redis) ---
   try {
     const redis = getRedisClient();
@@ -166,7 +152,6 @@ export async function GET() {
     'PITCH_PASSWORD',
     'ANTHROPIC_API_KEY',
     'ELEVENLABS_API_KEY',
-    'STRIPE_SECRET_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY_ID',
     'R2_SECRET_ACCESS_KEY',

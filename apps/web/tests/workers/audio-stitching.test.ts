@@ -75,17 +75,14 @@ vi.mock('@/lib/elevenlabs', () => ({
   generateSoundEffect: (...args: unknown[]) => mockGenerateSoundEffect(...args),
 }));
 
-const mockGetUserTier = vi.fn().mockResolvedValue('FREE');
-
-vi.mock('@/lib/subscription', () => ({
-  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
-}));
-
 vi.mock('@/lib/stripe', () => ({
-  TIER_LIMITS: {
-    FREE: { hasPremiumSfx: false, maxDurationMinutes: 5 },
-    PRO: { hasPremiumSfx: false, maxDurationMinutes: 10 },
-    STUDIO: { hasPremiumSfx: true, maxDurationMinutes: 10 },
+  LIMITS: {
+    maxDurationMinutes: 30,
+    maxVoiceClones: 10,
+    canDownload: true,
+    canMakePrivate: true,
+    canExportPdf: true,
+    hasPremiumSfx: true,
   },
 }));
 
@@ -171,9 +168,6 @@ describe('processAudioStitching', () => {
     // Default script data (no sound cues)
     mockPrismaScriptFindUnique.mockResolvedValue({ soundCues: [] });
 
-    // Default user tier
-    mockGetUserTier.mockResolvedValue('FREE');
-
     // Default stitch result
     mockStitchWithEffects.mockResolvedValue({ duration: 300 });
 
@@ -254,9 +248,8 @@ describe('processAudioStitching', () => {
     });
   });
 
-  describe('sound effects (FREE tier)', () => {
+  describe('sound effects', () => {
     beforeEach(() => {
-      mockGetUserTier.mockResolvedValue('FREE');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
@@ -270,12 +263,12 @@ describe('processAudioStitching', () => {
       });
     });
 
-    it('uses stock SFX for FREE tier', async () => {
+    it('generates premium SFX via ElevenLabs', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockCopyFile).toHaveBeenCalledTimes(2);
-      expect(mockGenerateSoundEffect).not.toHaveBeenCalled();
+      expect(mockGenerateSoundEffect).toHaveBeenCalledTimes(2);
+      expect(mockCopyFile).not.toHaveBeenCalled();
     });
 
     it('passes SFX inserts to stitchWithEffects', async () => {
@@ -330,7 +323,6 @@ describe('processAudioStitching', () => {
 
   describe('skipSfx option', () => {
     beforeEach(() => {
-      mockGetUserTier.mockResolvedValue('STUDIO');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm intro', durationSeconds: 2, insertAfterTurn: 0 },
@@ -366,9 +358,8 @@ describe('processAudioStitching', () => {
     });
   });
 
-  describe('sound effects (STUDIO tier)', () => {
+  describe('premium sound effects', () => {
     beforeEach(() => {
-      mockGetUserTier.mockResolvedValue('STUDIO');
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           {
@@ -381,7 +372,7 @@ describe('processAudioStitching', () => {
       });
     });
 
-    it('generates premium SFX via ElevenLabs for STUDIO tier', async () => {
+    it('generates premium SFX via ElevenLabs with custom prompt', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
@@ -760,9 +751,6 @@ describe('processAudioStitching', () => {
       // Script fetched for sound cues
       expect(mockPrismaScriptFindUnique).toHaveBeenCalled();
 
-      // User tier checked
-      expect(mockGetUserTier).toHaveBeenCalledWith('user-1');
-
       // Audio downloaded from R2
       expect(mockDownloadFile).toHaveBeenCalledTimes(3);
 
@@ -801,8 +789,7 @@ describe('processAudioStitching', () => {
       expect(job.updateProgress).toHaveBeenCalledWith(100);
     });
 
-    it('executes full pipeline for STUDIO tier podcast with SFX', async () => {
-      mockGetUserTier.mockResolvedValue('STUDIO');
+    it('executes full pipeline for podcast with SFX', async () => {
       mockPrismaScriptFindUnique.mockResolvedValue({
         soundCues: [
           { type: 'intro', prompt: 'Warm piano intro', durationSeconds: 3, insertAfterTurn: 0 },

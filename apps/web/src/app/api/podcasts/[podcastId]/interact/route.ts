@@ -3,8 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, addJob, JobType } from '@/lib/queue';
-import { canInteract, INTERACTION_CREDIT_COST } from '@/lib/stripe';
-import { consumeCredit } from '@/lib/credits';
+import { checkRateLimit } from '@/lib/redis';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -15,6 +14,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Rate limit: 60/hour
+  const hourly = await checkRateLimit(`interact:hour:${session.user.id}`, 60, 3600);
+  if (!hourly.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 60 interactions per hour.' },
+      { status: 429 }
+    );
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -34,34 +42,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const { question, timestamp } = parsed.data;
-
-  // Check credit balance for interaction
-  const [user, subscription] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    }),
-    prisma.subscription.findUnique({
-      where: { userId: session.user.id },
-      select: { creditsBalance: true },
-    }),
-  ]);
-
-  const creditsBalance = subscription?.creditsBalance ?? 0;
-  const check = canInteract(creditsBalance, user?.role);
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.reason }, { status: 402 });
-  }
-
-  // Consume interaction credit (ADMIN bypasses)
-  if (user?.role !== 'ADMIN') {
-    await consumeCredit(
-      session.user.id,
-      INTERACTION_CREDIT_COST,
-      'Interaction question',
-      podcastId
-    );
-  }
 
   // Create interaction record
   const interaction = await prisma.interaction.create({

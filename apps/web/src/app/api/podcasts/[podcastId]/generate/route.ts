@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { getUserTier } from '@/lib/subscription';
-import { TIER_LIMITS, canGenerate } from '@/lib/stripe';
-import { consumeCredit } from '@/lib/credits';
+import { LIMITS } from '@/lib/stripe';
+import { canResolveAi } from '@/lib/providers/ai';
+import { checkRateLimit } from '@/lib/redis';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -15,6 +15,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Rate limit: 20/hour, 100/day
+  const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
+  if (!hourly.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 20 generations per hour.' },
+      { status: 429 }
+    );
+  }
+  const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
+  if (!daily.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 100 generations per day.' },
+      { status: 429 }
+    );
+  }
+
+  // BYOK check: ensure AI provider is configured
+  const hasAi = await canResolveAi(authResult.userId);
+  if (!hasAi) {
+    return NextResponse.json(
+      { error: 'AI provider not configured. Add an API key in Settings.' },
+      { status: 403 }
+    );
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -45,78 +70,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Pre-generation duration validation
+  // Duration validation
   const durationTarget = podcast.discovery?.durationTarget;
-  const tier = await getUserTier(authResult.userId);
-  const maxMinutes = TIER_LIMITS[tier].maxDurationMinutes;
-
-  if (durationTarget && durationTarget > maxMinutes) {
+  if (durationTarget && durationTarget > LIMITS.maxDurationMinutes) {
     return NextResponse.json(
       {
-        error: `Requested duration (${durationTarget} min) exceeds your plan's limit of ${maxMinutes} minutes. Reduce duration or upgrade your plan.`,
+        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${LIMITS.maxDurationMinutes} minutes.`,
       },
       { status: 400 }
     );
   }
-
-  // Detect shared voices (voice clones owned by other users)
-  const voiceIdsToCheck = [podcast.hostVoiceId, podcast.expertVoiceId].filter(
-    (id): id is string => !!id
-  );
-  let sharedVoiceCount = 0;
-  if (voiceIdsToCheck.length > 0) {
-    const foreignClones = await prisma.voiceClone.findMany({
-      where: {
-        elevenLabsVoiceId: { in: voiceIdsToCheck },
-        userId: { not: authResult.userId },
-      },
-      select: { elevenLabsVoiceId: true },
-    });
-    sharedVoiceCount = foreignClones.length;
-  }
-
-  // Check credit balance and consume credits
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId: authResult.userId },
-    select: { creditsBalance: true },
-  });
-  const creditsBalance = subscription?.creditsBalance ?? 0;
-  const user = await prisma.user.findUnique({
-    where: { id: authResult.userId },
-    select: { role: true },
-  });
-
-  const check = canGenerate(
-    creditsBalance,
-    podcast.usePremiumVoice,
-    tier,
-    user?.role,
-    sharedVoiceCount
-  );
-  if (!check.allowed) {
-    return NextResponse.json({ error: check.reason }, { status: 402 });
-  }
-
-  try {
-    const sharedNote = sharedVoiceCount > 0 ? ` + ${sharedVoiceCount} shared voice surcharge` : '';
-    await consumeCredit(
-      authResult.userId,
-      check.cost,
-      `Podcast generation${podcast.usePremiumVoice ? ' (premium voice)' : ''}${sharedNote}`,
-      podcastId
-    );
-  } catch {
-    return NextResponse.json(
-      { error: 'Insufficient credits to generate this podcast.' },
-      { status: 402 }
-    );
-  }
-
-  // Store credit cost on podcast for accurate refunds
-  await prisma.podcast.update({
-    where: { id: podcastId },
-    data: { creditCost: check.cost },
-  });
 
   // For FAILED podcasts, clean up old failed jobs
   if (podcast.status === 'FAILED') {

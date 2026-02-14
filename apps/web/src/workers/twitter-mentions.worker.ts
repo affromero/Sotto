@@ -5,8 +5,7 @@ import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent } from '@/lib/tweet-parser';
 import { getAiKey } from '@/lib/byok';
-import { getUserUsage } from '@/lib/subscription';
-import { consumeCredit } from '@/lib/credits';
+import { canResolveAi } from '@/lib/providers/ai';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet } from '@/types/twitter';
@@ -99,9 +98,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     return;
   }
 
-  // 4. Check subscription limits
-  const usage = await getUserUsage(userId);
-  if (!usage.canCreate) {
+  // 4. Check BYOK key availability
+  const hasAi = await canResolveAi(userId);
+  if (!hasAi) {
     await prisma.tweetMention.create({
       data: {
         tweetId: tweet.id,
@@ -109,7 +108,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         text: tweet.text,
         status: 'IGNORED',
         userId,
-        errorMessage: `No credits remaining (balance: ${usage.creditsBalance}/${usage.creditsMonthly})`,
+        errorMessage: 'No AI provider configured (missing BYOK key)',
       },
     });
     return;
@@ -189,10 +188,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       data: { podcastId: podcast.id },
     });
 
-    // 12. Consume credit
-    await consumeCredit(userId, 1, 'Twitter podcast generation', podcast.id);
-
-    // 13. Kick off the generation pipeline
+    // 12. Kick off the generation pipeline
     await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
       podcastId: podcast.id,
       userId,

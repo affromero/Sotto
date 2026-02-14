@@ -3,7 +3,6 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateApiKey } from '@/lib/api-keys';
 import { createApiKeySchema } from '@/lib/validations';
-import { getUserTier } from '@/lib/subscription';
 
 const MAX_ACTIVE_KEYS = 10;
 
@@ -33,12 +32,6 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Only Studio tier can create API keys
-  const tier = await getUserTier(session.user.id);
-  if (tier !== 'STUDIO') {
-    return NextResponse.json({ error: 'API keys require a Studio subscription' }, { status: 403 });
   }
 
   const body = await request.json();

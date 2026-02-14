@@ -1,6 +1,5 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getUserTier } from '@/lib/subscription';
 import { ApiKeyManager } from './ApiKeyManager';
 import styles from './page.module.css';
 
@@ -15,21 +14,18 @@ export default async function ApiKeysPage() {
     return null;
   }
 
-  const [tier, keys] = await Promise.all([
-    getUserTier(userId),
-    prisma.apiKey.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        keyPrefix: true,
-        lastUsedAt: true,
-        createdAt: true,
-        revokedAt: true,
-      },
-    }),
-  ]);
+  const keys = await prisma.apiKey.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      name: true,
+      keyPrefix: true,
+      lastUsedAt: true,
+      createdAt: true,
+      revokedAt: true,
+    },
+  });
 
   const serializedKeys = keys.map((k) => ({
     id: k.id,
@@ -43,7 +39,7 @@ export default async function ApiKeysPage() {
   return (
     <main className={styles.main}>
       <h1 className={styles.pageTitle}>API Keys</h1>
-      <ApiKeyManager initialKeys={serializedKeys} tier={tier} />
+      <ApiKeyManager initialKeys={serializedKeys} />
     </main>
   );
 }

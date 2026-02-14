@@ -56,16 +56,16 @@ vi.mock('@/lib/tweet-parser', () => ({
   parseTweetIntent: (...args: unknown[]) => mockParseTweetIntent(...args),
 }));
 
-const mockGetUserUsage = vi.fn();
+const mockCanResolveAi = vi.fn().mockResolvedValue(true);
 
-vi.mock('@/lib/subscription', () => ({
-  getUserUsage: (...args: unknown[]) => mockGetUserUsage(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
 }));
 
-const mockConsumeCredit = vi.fn();
+const mockGetAiKey = vi.fn().mockResolvedValue(null);
 
-vi.mock('@/lib/credits', () => ({
-  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
 const mockSelectVoicePair = vi.fn();
@@ -149,7 +149,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
+      mockCanResolveAi.mockResolvedValue(true);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -186,7 +186,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
+      mockCanResolveAi.mockResolvedValue(true);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',
@@ -222,7 +222,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
+      mockCanResolveAi.mockResolvedValue(true);
       const mockParseResult: TweetParseResult = {
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -273,12 +273,6 @@ describe('processTwitterMentions', () => {
         include: { discovery: true },
       });
 
-      expect(mockConsumeCredit).toHaveBeenCalledWith(
-        'user-001',
-        1,
-        'Twitter podcast generation',
-        'podcast-001'
-      );
       expect(mockAddJob).toHaveBeenCalled();
     });
   });
@@ -312,7 +306,7 @@ describe('processTwitterMentions', () => {
       expect(mockPrismaPodcastCreate).not.toHaveBeenCalled();
     });
 
-    it('ignores mention when user has no credits remaining', async () => {
+    it('ignores mention when no AI provider is configured', async () => {
       const tweet = createMockTweet();
       mockGetMentions.mockResolvedValue([tweet]);
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
@@ -321,11 +315,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({
-        canCreate: false,
-        creditsBalance: 0,
-        creditsMonthly: 1,
-      });
+      mockCanResolveAi.mockResolvedValue(false);
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
       const job = createMockJob({});
@@ -338,7 +328,7 @@ describe('processTwitterMentions', () => {
           text: tweet.text,
           status: 'IGNORED',
           userId: 'user-001',
-          errorMessage: 'No credits remaining (balance: 0/1)',
+          errorMessage: 'No AI provider configured (missing BYOK key)',
         },
       });
       expect(mockParseTweetIntent).not.toHaveBeenCalled();
@@ -411,7 +401,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
+      mockCanResolveAi.mockResolvedValue(true);
       mockGetTweet.mockResolvedValue(parentTweet);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'AI',
@@ -435,7 +425,7 @@ describe('processTwitterMentions', () => {
       await processTwitterMentions(job);
 
       expect(mockGetTweet).toHaveBeenCalledWith('parent-123');
-      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text);
+      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text, undefined);
     });
   });
 
@@ -449,7 +439,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: 'user-host-voice',
         preferredExpertVoiceId: 'user-expert-voice',
       });
-      mockGetUserUsage.mockResolvedValue({ canCreate: true, creditsBalance: 1, creditsMonthly: 1 });
+      mockCanResolveAi.mockResolvedValue(true);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',

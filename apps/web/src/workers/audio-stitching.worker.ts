@@ -10,8 +10,7 @@ import { prisma } from '@/lib/prisma';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
-import { getUserTier } from '@/lib/subscription';
-import { TIER_LIMITS } from '@/lib/stripe';
+import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 
@@ -56,14 +55,12 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
     const soundCues = (script?.soundCues ?? []) as SoundCue[];
 
-    // 3. Determine user tier for SFX quality
+    // 3. Load podcast metadata
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
       select: { userId: true, title: true, source: true, sourceTweetId: true },
     });
-    const tier = await getUserTier(podcast.userId);
-    const tierLimits = TIER_LIMITS[tier];
-    const usePremiumSfx = tierLimits.hasPremiumSfx;
+    const usePremiumSfx = LIMITS.hasPremiumSfx;
 
     await job.updateProgress(10);
 
@@ -162,7 +159,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await job.updateProgress(80);
 
     // 7. Post-stitch duration hard check
-    const maxDurationSeconds = tierLimits.maxDurationMinutes * 60 * 1.1; // 10% grace
+    const maxDurationSeconds = LIMITS.maxDurationMinutes * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
       await prisma.podcast.update({
         where: { id: podcastId },
@@ -173,7 +170,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         userId: podcast.userId,
         type: 'PODCAST_READY',
         title: 'Podcast generation failed',
-        message: `"${podcast.title}" exceeded the ${tierLimits.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        message: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         data: { podcastId },
       });
 

@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getUserTier } from '@/lib/subscription';
 import { createVoiceRequestSchema } from '@/lib/validations';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Verify requester is a paid tier
-  const requesterTier = await getUserTier(session.user.id);
-  if (requesterTier === 'FREE') {
-    return NextResponse.json(
-      { error: 'Voice sharing requires a paid subscription' },
-      { status: 403 }
-    );
   }
 
   const body = await request.json();
@@ -49,15 +39,6 @@ export async function POST(request: NextRequest) {
 
   if (voiceClone.userId === session.user.id) {
     return NextResponse.json({ error: 'You cannot request your own voice' }, { status: 400 });
-  }
-
-  // Verify voice owner is Studio tier
-  const ownerTier = await getUserTier(voiceClone.userId);
-  if (ownerTier !== 'STUDIO') {
-    return NextResponse.json(
-      { error: 'Voice sharing is only available from Studio tier creators' },
-      { status: 403 }
-    );
   }
 
   // Create the request (unique constraint prevents duplicates)

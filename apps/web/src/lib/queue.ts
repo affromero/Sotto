@@ -2,8 +2,6 @@ import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { logger } from './logger';
 import { prisma } from './prisma';
-import { refundCredits } from './credits';
-import { TIER_LIMITS, type TierName } from './stripe';
 
 /**
  * Job types for the Sotto queue system
@@ -210,7 +208,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       failedReason: args.failedReason,
     });
 
-    // Centralized failure handler: refund credits on final failure
+    // Centralized failure handler: mark podcast as FAILED and notify user
     try {
       const job = await queue.getJob(args.jobId);
       const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
@@ -218,13 +216,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       const podcast = await prisma.podcast.findUnique({
         where: { id: podcastId },
-        select: {
-          status: true,
-          userId: true,
-          usePremiumVoice: true,
-          creditCost: true,
-          user: { select: { subscription: { select: { tier: true } } } },
-        },
+        select: { status: true, userId: true, title: true },
       });
 
       if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED') return;
@@ -234,14 +226,6 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         data: { status: 'FAILED' },
       });
 
-      // Refund credits — use stored creditCost for accuracy (includes shared voice surcharges)
-      const tier = (podcast.user.subscription?.tier ?? 'FREE') as TierName;
-      const limits = TIER_LIMITS[tier];
-      const refundAmount =
-        podcast.creditCost ?? 1 + (podcast.usePremiumVoice ? limits.premiumVoiceSurcharge : 0);
-
-      await refundCredits(podcast.userId, refundAmount, 'generation_failed', podcastId);
-
       // Queue a notification
       const notifQueue = queueInstances.get('notifications');
       if (notifQueue) {
@@ -249,15 +233,14 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           userId: podcast.userId,
           type: 'PODCAST_READY',
           title: 'Generation Failed',
-          message: `Your podcast generation failed. ${refundAmount} credit${refundAmount > 1 ? 's' : ''} refunded.`,
+          message: 'Your podcast generation failed. Please try again.',
           data: { podcastId },
         });
       }
 
-      logger.info('Refunded credits after generation failure', {
+      logger.info('Marked podcast as FAILED after generation failure', {
         userId: podcast.userId,
         podcastId,
-        refundAmount,
       });
     } catch (err) {
       logger.error('Failed to process failure handler', {

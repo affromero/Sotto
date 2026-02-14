@@ -17,8 +17,7 @@ import {
 } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
-import { getUserTier } from '@/lib/subscription';
-import { TIER_LIMITS } from '@/lib/stripe';
+import { LIMITS } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
 
 const MAX_VERIFICATION_ATTEMPTS = 3;
@@ -31,11 +30,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   const aiKey = await getAiKey(userId);
 
-  const [podcast, script, discovery, references] = await Promise.all([
-    prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: { id: true, userId: true },
-    }),
+  const [script, discovery, references] = await Promise.all([
     prisma.script.findUniqueOrThrow({
       where: { podcastId },
     }),
@@ -48,8 +43,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }),
   ]);
 
-  const tier = await getUserTier(podcast.userId);
-  const maxDurationMinutes = TIER_LIMITS[tier].maxDurationMinutes;
+  const maxDurationMinutes = LIMITS.maxDurationMinutes;
 
   const turns = script.turns as ScriptTurn[];
   const generatedRefs: GeneratedReference[] = references.map((r) => ({

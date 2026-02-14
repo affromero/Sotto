@@ -7,7 +7,7 @@ import {
   PlusCircle,
   Radio,
   Settings,
-  CreditCard,
+  Key,
   BarChart2,
   Mic,
   Users,
@@ -56,11 +56,7 @@ function getNavItems(role: string): NavItem[] {
     items.push({ href: '/team', label: 'Team', icon: Users });
   }
 
-  // Billing - everyone except ADMIN (admin doesn't need it)
-  if (role !== 'ADMIN') {
-    items.push({ href: '/billing', label: 'Billing', icon: CreditCard });
-  }
-
+  items.push({ href: '/billing', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
 
   return items;

@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { TIER_LIMITS, type TierName } from '@/lib/stripe';
 import { Badge } from '@/components/ui/Badge';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -42,13 +41,6 @@ const statusLabels: Record<PodcastStatus, string> = {
   TRANSCRIBING: 'Transcribing...',
 };
 
-const tierLabels: Record<string, string> = {
-  FREE: 'Free',
-  STARTER: 'Starter',
-  PRO: 'Pro',
-  STUDIO: 'Studio',
-};
-
 function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
     month: 'short',
@@ -80,14 +72,6 @@ export default async function DashboardPage() {
       select: {
         name: true,
         role: true,
-        subscription: {
-          select: {
-            tier: true,
-            status: true,
-            creditsBalance: true,
-            creditsMonthly: true,
-          },
-        },
         _count: {
           select: {
             followers: true,
@@ -130,9 +114,6 @@ export default async function DashboardPage() {
   ]);
 
   const displayName = user?.name || 'there';
-  const tier = (user?.subscription?.tier || 'FREE') as TierName;
-  const creditsBalance = user?.subscription?.creditsBalance ?? 0;
-  const creditsMonthly = user?.subscription?.creditsMonthly ?? TIER_LIMITS[tier].creditsMonthly;
   const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
   const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
   const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
@@ -162,24 +143,6 @@ export default async function DashboardPage() {
       </section>
 
       <section className={styles.stats} aria-label="Usage statistics">
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Credit Balance</span>
-          <span className={styles.statValue}>
-            {creditsBalance}
-            <span className={styles.statLimit}>
-              / {creditsMonthly === Infinity ? 'Unlimited' : `${creditsMonthly} mo`}
-            </span>
-          </span>
-          {creditsBalance === 0 && (
-            <Link href="/billing" className={styles.outOfCreditsLink}>
-              Get more credits
-            </Link>
-          )}
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>Current Plan</span>
-          <span className={styles.statValue}>{tierLabels[tier] || tier}</span>
-        </div>
         <div className={styles.statCard}>
           <span className={styles.statLabel}>Total Podcasts</span>
           <span className={styles.statValue}>{podcasts.length}</span>

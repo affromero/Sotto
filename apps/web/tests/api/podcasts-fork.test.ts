@@ -8,8 +8,6 @@ const mockPodcastUpdate = vi.fn();
 const mockPodcastTagCreateMany = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockTransaction = vi.fn();
-const mockSubscriptionFindUnique = vi.fn();
-const mockUserFindUnique = vi.fn();
 
 // Mock auth
 const mockAuth = vi.fn();
@@ -31,30 +29,8 @@ vi.mock('@/lib/prisma', () => ({
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
     },
-    subscription: {
-      findUnique: (...args: unknown[]) => mockSubscriptionFindUnique(...args),
-    },
-    user: {
-      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
-    },
     $transaction: (callback: unknown) => mockTransaction(callback),
   },
-}));
-
-// Mock subscription / credits / stripe
-const mockGetUserTier = vi.fn();
-vi.mock('@/lib/subscription', () => ({
-  getUserTier: (...args: unknown[]) => mockGetUserTier(...args),
-}));
-
-const mockCanGenerate = vi.fn();
-vi.mock('@/lib/stripe', () => ({
-  canGenerate: (...args: unknown[]) => mockCanGenerate(...args),
-}));
-
-const mockConsumeCredit = vi.fn();
-vi.mock('@/lib/credits', () => ({
-  consumeCredit: (...args: unknown[]) => mockConsumeCredit(...args),
 }));
 
 // Mock queue
@@ -117,11 +93,6 @@ const mockSourcePodcast = {
 function setupSuccessMocks(userId = 'user-1') {
   mockAuth.mockResolvedValue({ user: { id: userId, name: 'Alice' } });
   mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-  mockGetUserTier.mockResolvedValue('FREE');
-  mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 5 });
-  mockUserFindUnique.mockResolvedValue({ role: 'USER' });
-  mockCanGenerate.mockReturnValue({ allowed: true, cost: 1 });
-  mockConsumeCredit.mockResolvedValue(undefined);
   mockAddJob.mockResolvedValue(undefined);
   mockPodcastUpdate.mockResolvedValue({});
 
@@ -250,24 +221,6 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toBe('Only podcasts with READY status can be forked');
-  });
-
-  it('returns 402 when user has insufficient credits', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
-    mockGetUserTier.mockResolvedValue('FREE');
-    mockSubscriptionFindUnique.mockResolvedValue({ creditsBalance: 0 });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
-    mockCanGenerate.mockReturnValue({ allowed: false, reason: 'No credits remaining' });
-
-    const request = createRequest();
-    const response = await POST(request, {
-      params: Promise.resolve({ podcastId: 'source-pod-1' }),
-    });
-
-    expect(response.status).toBe(402);
-    const body = await response.json();
-    expect(body.error).toBe('No credits remaining');
   });
 
   it('successfully creates a fork and returns id', async () => {
