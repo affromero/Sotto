@@ -75,7 +75,7 @@ type HandleCheckResult = 'NAME' | 'OFFENSIVE' | 'OK';
  * and profane/offensive content in one call. Results cached in Redis.
  * Fails open — if the LLM or Redis is unavailable, allows the handle.
  */
-export async function checkHandleContent(handle: string): Promise<HandleCheckResult> {
+export async function checkHandleContent(handle: string, apiKeyOverride?: string): Promise<HandleCheckResult> {
   const normalized = handle.toLowerCase();
 
   // Handles with underscores/digits are unlikely plain names or slurs
@@ -96,7 +96,7 @@ export async function checkHandleContent(handle: string): Promise<HandleCheckRes
           content: `Classify "${normalized}":\n- NAME if it is a common given name (first name) in any language or culture\n- OFFENSIVE if it is profane, vulgar, a slur, hate speech, or sexually explicit\n- OK otherwise`,
         },
       ],
-      { maxTokens: 3, model: 'claude-haiku-4-5-20251001' }
+      { maxTokens: 3, model: 'claude-haiku-4-5-20251001', apiKeyOverride }
     );
 
     const answer = content.trim().toUpperCase();

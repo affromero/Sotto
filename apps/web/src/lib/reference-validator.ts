@@ -382,7 +382,8 @@ export async function searchTitle(ref: ReferenceInput): Promise<VerificationChec
 export async function aiEvaluateReferences(
   refs: ReferenceInput[],
   priorChecks: Map<string, VerificationCheck[]>,
-  topic: string
+  topic: string,
+  apiKeyOverride?: string
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
@@ -440,6 +441,7 @@ Evaluate each reference. Return JSON only.`;
       [{ role: 'user', content: userMessage }],
       {
         maxTokens: 4096,
+        apiKeyOverride,
       }
     );
 

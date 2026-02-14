@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent } from '@/lib/tweet-parser';
+import { getAiKey } from '@/lib/byok';
 import { getUserUsage } from '@/lib/subscription';
 import { consumeCredit } from '@/lib/credits';
 import { selectVoicePair } from '@/lib/elevenlabs';
@@ -137,21 +138,24 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       }
     }
 
-    // 7. Parse intent via Claude
-    const parsed = await parseTweetIntent(tweet.text, parentText);
+    // 7. Resolve user's AI key for BYOK passthrough
+    const aiKey = await getAiKey(userId);
+
+    // 8. Parse intent via Claude
+    const parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
 
     await prisma.tweetMention.update({
       where: { id: mention.id },
       data: { parsedTopic: parsed.topic, status: 'GENERATING' },
     });
 
-    // 8. Determine voice IDs
+    // 9. Determine voice IDs
     const tempPodcastId = mention.id; // use mention ID as seed for voice selection
     const voicePair = selectVoicePair(tempPodcastId);
     const hostVoiceId = user.preferredHostVoiceId ?? voicePair.host.id;
     const expertVoiceId = user.preferredExpertVoiceId ?? voicePair.expert.id;
 
-    // 9. Create Podcast + Discovery records
+    // 10. Create Podcast + Discovery records
     const podcast = await prisma.podcast.create({
       data: {
         userId,
@@ -179,16 +183,16 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       include: { discovery: true },
     });
 
-    // 10. Link mention to podcast
+    // 11. Link mention to podcast
     await prisma.tweetMention.update({
       where: { id: mention.id },
       data: { podcastId: podcast.id },
     });
 
-    // 11. Consume credit
+    // 12. Consume credit
     await consumeCredit(userId, 1, 'Twitter podcast generation', podcast.id);
 
-    // 12. Kick off the generation pipeline
+    // 13. Kick off the generation pipeline
     await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
       podcastId: podcast.id,
       userId,

@@ -1,4 +1,6 @@
 import { logger } from '../logger';
+import { getAiKey, hasAiKey } from '../byok';
+import type { AiProviderId } from './ai-registry';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -159,4 +161,49 @@ export function createAIProvider(type?: string): AIProvider {
       logger.warn(`Unknown AI_PROVIDER "${providerType}", falling back to anthropic`);
       return new AnthropicProvider();
   }
+}
+
+export interface ResolvedAiProvider {
+  provider: AiProviderId;
+  source: 'byok' | 'platform' | 'claude-code';
+  apiKey?: string;
+}
+
+/**
+ * Resolve which AI provider + key to use for a given user.
+ * Priority: user BYOK key → platform env var → claude-code dev mode → error.
+ */
+export async function resolveAiProvider(userId: string): Promise<ResolvedAiProvider> {
+  // 1. Check user BYOK key
+  const userKey = await getAiKey(userId);
+  if (userKey) {
+    return { provider: userKey.provider, source: 'byok', apiKey: userKey.apiKey };
+  }
+
+  // 2. Check platform env vars
+  if (process.env.ANTHROPIC_API_KEY) {
+    return { provider: 'anthropic', source: 'platform' };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return { provider: 'openai', source: 'platform' };
+  }
+
+  // 3. Dev mode: claude-code provider
+  if (process.env.AI_PROVIDER === 'claude-code') {
+    return { provider: 'anthropic', source: 'claude-code' };
+  }
+
+  throw new Error('No AI provider available. Configure an API key in settings.');
+}
+
+/**
+ * Check if AI can be resolved for a user without throwing.
+ * Returns true if user has BYOK key, platform has env key, or AI_PROVIDER=claude-code.
+ */
+export async function canResolveAi(userId: string): Promise<boolean> {
+  if (await hasAiKey(userId)) return true;
+  if (process.env.ANTHROPIC_API_KEY) return true;
+  if (process.env.OPENAI_API_KEY) return true;
+  if (process.env.AI_PROVIDER === 'claude-code') return true;
+  return false;
 }

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
 import { generateResponse, logApiUsage } from '@/lib/claude';
+import { getAiKey } from '@/lib/byok';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
@@ -90,6 +91,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     .map((s) => `${s.speaker}: ${s.text}`)
     .join('\n');
 
+  // Resolve user's AI key for BYOK passthrough
+  const aiKey = await getAiKey(session.user.id);
+
   // Generate the explanation segment text via Claude
   const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the HOST speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text.`;
 
@@ -98,7 +102,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       role: 'user',
       content: `Podcast context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural podcast segment that addresses this question and answer.`,
     },
-  ]);
+  ], { apiKeyOverride: aiKey?.apiKey });
 
   await logApiUsage({
     podcastId,

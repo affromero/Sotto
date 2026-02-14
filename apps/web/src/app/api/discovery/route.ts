@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { streamDiscoveryResponse, parseChips, parseMetadata } from '@/lib/discovery-agent';
+import { getAiKey } from '@/lib/byok';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
@@ -21,6 +22,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Resolve user's AI key for BYOK passthrough
+  const aiKey = await getAiKey(session.user.id);
+
   // Build message history
   const messages = discovery?.messages.map((m) => ({
     role: m.role as 'user' | 'assistant',
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       let fullResponse = '';
-      for await (const chunk of streamDiscoveryResponse(messages)) {
+      for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey)) {
         fullResponse += chunk;
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
       }

@@ -11,14 +11,16 @@ if (!ANTHROPIC_API_KEY && !USE_CLAUDE_CODE) {
 const client = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
 /**
- * Generate a non-streaming response from Claude
+ * Generate a non-streaming response from Claude.
+ * When apiKeyOverride is provided, creates a fresh client with that key
+ * instead of using the module-level client (for BYOK users).
  */
 export async function generateResponse(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  options?: { maxTokens?: number; model?: string }
+  options?: { maxTokens?: number; model?: string; apiKeyOverride?: string }
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
-  if (USE_CLAUDE_CODE) {
+  if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     return executeClaudeCode(systemPrompt, serializeMessages(messages), {
       model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
@@ -26,11 +28,15 @@ export async function generateResponse(
     });
   }
 
-  if (!client) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY');
+  const activeClient = options?.apiKeyOverride
+    ? new Anthropic({ apiKey: options.apiKeyOverride })
+    : client;
+
+  if (!activeClient) {
+    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const response = await client.messages.create({
+  const response = await activeClient.messages.create({
     model: options?.model || 'claude-sonnet-4-5-20250929',
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,
@@ -48,14 +54,15 @@ export async function generateResponse(
 }
 
 /**
- * Stream a response from Claude (for discovery chat)
+ * Stream a response from Claude (for discovery chat).
+ * When apiKeyOverride is provided, creates a fresh client with that key.
  */
 export async function* streamResponse(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  options?: { maxTokens?: number; model?: string }
+  options?: { maxTokens?: number; model?: string; apiKeyOverride?: string }
 ): AsyncGenerator<string> {
-  if (USE_CLAUDE_CODE) {
+  if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
       model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
@@ -64,11 +71,15 @@ export async function* streamResponse(
     return;
   }
 
-  if (!client) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY');
+  const activeClient = options?.apiKeyOverride
+    ? new Anthropic({ apiKey: options.apiKeyOverride })
+    : client;
+
+  if (!activeClient) {
+    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const stream = client.messages.stream({
+  const stream = activeClient.messages.stream({
     model: options?.model || 'claude-sonnet-4-5-20250929',
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,

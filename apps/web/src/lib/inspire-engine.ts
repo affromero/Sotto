@@ -24,7 +24,7 @@ export interface InspireResult {
  * Get personalized topic suggestions based on user interests.
  * Falls back to popular topics if user has no interests.
  */
-export async function getPersonalizedTopics(userId: string): Promise<TopicSuggestion[]> {
+export async function getPersonalizedTopics(userId: string, apiKeyOverride?: string): Promise<TopicSuggestion[]> {
   const interests = await prisma.userInterest.findMany({
     where: { userId },
     include: { tag: { select: { name: true, slug: true } } },
@@ -42,7 +42,8 @@ export async function getPersonalizedTopics(userId: string): Promise<TopicSugges
 
   const tagNames = interests.map((i) => i.tag.name);
 
-  if (!ANTHROPIC_API_KEY) {
+  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
+  if (!effectiveApiKey) {
     const fallback = tagNames.map((name) => ({
       title: `Deep dive into ${name}`,
       category: name,
@@ -52,7 +53,7 @@ export async function getPersonalizedTopics(userId: string): Promise<TopicSugges
   }
 
   try {
-    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: effectiveApiKey });
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
@@ -114,18 +115,19 @@ export async function getTrendingTopics(): Promise<TopicSuggestion[]> {
  * Get current events using Claude with web search.
  * Falls back to generated topic ideas if web search fails.
  */
-export async function getCurrentEvents(interests?: string[]): Promise<TopicSuggestion[]> {
+export async function getCurrentEvents(interests?: string[], apiKeyOverride?: string): Promise<TopicSuggestion[]> {
   const interestKey = interests?.sort().join(',') ?? 'general';
   const cacheKey = `inspire:news:${interestKey}`;
   const cached = await cache.get<TopicSuggestion[]>(cacheKey);
   if (cached) return cached;
 
-  if (!ANTHROPIC_API_KEY) {
+  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
+  if (!effectiveApiKey) {
     return getGenericNewsSuggestions();
   }
 
   try {
-    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: effectiveApiKey });
 
     const interestContext =
       interests && interests.length > 0
@@ -169,9 +171,11 @@ Return ONLY a JSON array:
  */
 export async function drillDown(
   category: string,
-  parentTitle?: string
+  parentTitle?: string,
+  apiKeyOverride?: string
 ): Promise<TopicSuggestion[]> {
-  if (!ANTHROPIC_API_KEY) {
+  const effectiveApiKey = apiKeyOverride || ANTHROPIC_API_KEY;
+  if (!effectiveApiKey) {
     return [
       { title: `${category}: Beginner's Guide`, category, hook: 'Start from the fundamentals' },
       { title: `${category}: Latest Breakthroughs`, category, hook: 'What happened this year' },
@@ -185,7 +189,7 @@ export async function drillDown(
   }
 
   try {
-    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+    const client = new Anthropic({ apiKey: effectiveApiKey });
     const context = parentTitle
       ? `The user tapped on "${parentTitle}" in the "${category}" category.`
       : `The user wants to explore "${category}".`;

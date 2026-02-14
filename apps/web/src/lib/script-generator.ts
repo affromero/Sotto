@@ -49,6 +49,7 @@ export async function generateScript(params: {
   tone: string;
   durationTarget: number;
   sourceContent?: string;
+  apiKeyOverride?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -132,6 +133,7 @@ Only return the JSON object, nothing else.`;
 
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
+    apiKeyOverride: params.apiKeyOverride,
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
@@ -212,6 +214,7 @@ export async function generateScriptWithFeedback(params: {
   previousScript: ScriptTurn[];
   previousReferences: GeneratedReference[];
   verificationFeedback: string;
+  apiKeyOverride?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -292,6 +295,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
 
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
+    apiKeyOverride: params.apiKeyOverride,
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };

@@ -23,6 +23,7 @@ import {
   cleanAndRenumberCitations,
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
+import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
 const MAX_CONCURRENT = 5;
@@ -53,6 +54,8 @@ export async function processReferenceValidation(
 
   logger.info('Starting reference validation', { podcastId });
   await job.updateProgress(5);
+
+  const aiKey = await getAiKey(userId);
 
   // Load references and script
   const [references, script, podcast] = await Promise.all([
@@ -145,7 +148,7 @@ export async function processReferenceValidation(
   // Layer 4: AI evaluation (single batch call, only accepted refs)
   let aiResults: Map<string, VerificationCheck>;
   try {
-    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '');
+    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey);
   } catch (error) {
     logger.warn('AI evaluation failed, using external checks only', {
       error: error instanceof Error ? error.message : 'Unknown',

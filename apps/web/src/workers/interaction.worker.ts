@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { generateResponse, logApiUsage } from '@/lib/claude';
+import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
 export async function processInteraction(job: Job<ProcessInteractionPayload>): Promise<void> {
@@ -9,6 +10,8 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
 
   logger.info('Processing interaction', { podcastId, interactionId });
   await job.updateProgress(10);
+
+  const aiKey = await getAiKey(userId);
 
   // Get podcast script context
   const script = await prisma.script.findUnique({ where: { podcastId } });
@@ -61,7 +64,7 @@ Answer concisely and helpfully, using the podcast context. Keep answers under 20
       role: 'user',
       content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
     },
-  ]);
+  ], { apiKeyOverride: aiKey?.apiKey });
 
   await job.updateProgress(80);
 

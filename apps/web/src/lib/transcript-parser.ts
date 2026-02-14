@@ -183,7 +183,8 @@ function parseText(text: string): ParsedSegment[] {
  * Whisper doesn't provide speaker diarization, so we use LLM for this
  */
 export async function diarizeSpeakers(
-  segments: TranscriptionResult['segments']
+  segments: TranscriptionResult['segments'],
+  apiKeyOverride?: string
 ): Promise<ParsedSegment[]> {
   if (segments.length === 0) {
     return [];
@@ -206,6 +207,7 @@ Rules:
 
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userPrompt }], {
     maxTokens: 4096,
+    apiKeyOverride,
   });
 
   const jsonMatch = response.content.match(/\[[\s\S]*\]/);
