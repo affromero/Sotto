@@ -16,6 +16,9 @@ import { api } from '../../lib/api';
 import { setToken } from '../../lib/auth';
 
 const IS_DEV = __DEV__;
+const GOOGLE_CONFIGURED = !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+const GITHUB_CONFIGURED = !!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
+const TWITTER_CONFIGURED = !!process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID;
 
 interface AuthResponse {
   token: string;
@@ -288,41 +291,47 @@ export default function LoginScreen() {
               </Text>
             </Pressable>
 
-            <Pressable
-              onPress={() => handleOAuthSignIn('google')}
-              style={[styles.oauthButton, styles.oauthButtonGoogle]}
-              disabled={loading}
-              accessibilityLabel="Sign in with Google"
-              accessibilityRole="button"
-            >
-              <Text style={styles.oauthButtonText}>
-                Sign in with Google
-              </Text>
-            </Pressable>
+            {GOOGLE_CONFIGURED && (
+              <Pressable
+                onPress={() => handleOAuthSignIn('google')}
+                style={[styles.oauthButton, styles.oauthButtonGoogle]}
+                disabled={loading}
+                accessibilityLabel="Sign in with Google"
+                accessibilityRole="button"
+              >
+                <Text style={styles.oauthButtonText}>
+                  Sign in with Google
+                </Text>
+              </Pressable>
+            )}
 
-            <Pressable
-              onPress={() => handleOAuthSignIn('github')}
-              style={[styles.oauthButton, styles.oauthButtonGithub]}
-              disabled={loading}
-              accessibilityLabel="Sign in with GitHub"
-              accessibilityRole="button"
-            >
-              <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
-                Sign in with GitHub
-              </Text>
-            </Pressable>
+            {GITHUB_CONFIGURED && (
+              <Pressable
+                onPress={() => handleOAuthSignIn('github')}
+                style={[styles.oauthButton, styles.oauthButtonGithub]}
+                disabled={loading}
+                accessibilityLabel="Sign in with GitHub"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
+                  Sign in with GitHub
+                </Text>
+              </Pressable>
+            )}
 
-            <Pressable
-              onPress={() => handleOAuthSignIn('twitter')}
-              style={[styles.oauthButton, styles.oauthButtonTwitter]}
-              disabled={loading}
-              accessibilityLabel="Sign in with Twitter"
-              accessibilityRole="button"
-            >
-              <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
-                Sign in with Twitter
-              </Text>
-            </Pressable>
+            {TWITTER_CONFIGURED && (
+              <Pressable
+                onPress={() => handleOAuthSignIn('twitter')}
+                style={[styles.oauthButton, styles.oauthButtonTwitter]}
+                disabled={loading}
+                accessibilityLabel="Sign in with Twitter"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
+                  Sign in with Twitter
+                </Text>
+              </Pressable>
+            )}
 
             {loading && (
               <ActivityIndicator
