@@ -185,7 +185,7 @@ describe('useAuth', () => {
         result.current.signIn();
       });
 
-      expect(mockSignIn).toHaveBeenCalledWith(undefined, { callbackUrl: '/auth/login' });
+      expect(mockSignIn).toHaveBeenCalledWith(undefined, { callbackUrl: '/dashboard' });
     });
 
   });
