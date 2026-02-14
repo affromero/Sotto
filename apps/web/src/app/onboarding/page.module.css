@@ -18,6 +18,15 @@
   max-width: 640px;
 }
 
+.containerWide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xl);
+  width: 100%;
+  max-width: 720px;
+}
+
 .header {
   text-align: center;
   display: flex;

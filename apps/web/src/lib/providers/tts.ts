@@ -8,7 +8,7 @@ import {
 } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
 import { getProviderMeta, compareQuality } from './tts-registry';
-import { getByokKey, getByokExtraData, listByokProviders } from '../byok';
+import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
 
 export interface SpeechParams {
   text: string;
@@ -294,6 +294,17 @@ export async function resolveTtsProvider(context: {
     source: 'platform',
     providerId: 'openai',
   };
+}
+
+/**
+ * Check if TTS can be resolved for a user without throwing.
+ * Returns true if user has BYOK TTS key or platform has a TTS key.
+ */
+export async function canResolveTts(userId: string): Promise<boolean> {
+  if (await hasByokKey(userId)) return true;
+  if (process.env.ELEVENLABS_API_KEY) return true;
+  if (process.env.OPENAI_API_KEY) return true;
+  return false;
 }
 
 // Re-export voice pool utilities for convenience
