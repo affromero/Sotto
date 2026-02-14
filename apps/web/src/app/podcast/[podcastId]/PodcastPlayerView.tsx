@@ -52,6 +52,7 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     SCRIPTING: 'info',
     VERIFYING_SCRIPT: 'info',
     VALIDATING_REFERENCES: 'info',
+    SCRIPT_READY: 'info',
     GENERATING_AUDIO: 'info',
     STITCHING: 'info',
     READY: 'success',

@@ -9,6 +9,7 @@ export type PodcastStatus =
   | 'SCRIPTING'
   | 'VERIFYING_SCRIPT'
   | 'VALIDATING_REFERENCES'
+  | 'SCRIPT_READY'
   | 'GENERATING_AUDIO'
   | 'STITCHING'
   | 'READY'
@@ -60,7 +61,8 @@ export type NotificationType =
   | 'QUESTION_ON_YOUR_PODCAST'
   | 'QUESTION_UPVOTED'
   | 'COMMENT_ON_YOUR_PODCAST'
-  | 'COMMENT_REPLY';
+  | 'COMMENT_REPLY'
+  | 'SCRIPT_READY';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
 

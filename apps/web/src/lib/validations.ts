@@ -18,6 +18,28 @@ export const createPodcastSchema = z.object({
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
+  metadata: z.object({
+    topic: z.string(),
+    depth: z.string().optional(),
+    audienceLevel: z.string().optional(),
+    audience: z.string().optional(),
+    focusAreas: z.array(z.string()).optional(),
+    tone: z.string().optional(),
+    durationTarget: z.number().optional(),
+    sourceUrl: z.string().url().optional(),
+    sourceContent: z.string().optional(),
+  }).optional(),
+});
+
+/**
+ * Script turn update validation
+ */
+export const updateScriptSchema = z.object({
+  turns: z.array(z.object({
+    speaker: z.enum(['HOST', 'EXPERT']),
+    text: z.string().min(1).max(10000),
+    direction: z.string().optional(),
+  })).min(2),
 });
 
 /**
