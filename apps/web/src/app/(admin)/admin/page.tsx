@@ -18,7 +18,6 @@ async function getOverviewStats() {
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
-    tierDistribution,
     totalPlays,
   ] = await Promise.all([
     prisma.user.count(),
@@ -35,10 +34,6 @@ async function getOverviewStats() {
     prisma.user.count({
       where: { createdAt: { gte: monthAgo } },
     }),
-    prisma.subscription.groupBy({
-      by: ['tier'],
-      _count: true,
-    }),
     prisma.podcast.aggregate({
       _sum: { playCount: true },
     }),
@@ -53,27 +48,12 @@ async function getOverviewStats() {
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
-    tierDistribution,
     totalPlays: totalPlays._sum.playCount ?? 0,
   };
 }
 
 export default async function AdminOverviewPage() {
   const stats = await getOverviewStats();
-
-  const tierCounts = {
-    FREE: 0,
-    STARTER: 0,
-    PRO: 0,
-    STUDIO: 0,
-  };
-
-  stats.tierDistribution.forEach((tier) => {
-    if (tier.tier === 'FREE') tierCounts.FREE = tier._count;
-    if (tier.tier === 'STARTER') tierCounts.STARTER = tier._count;
-    if (tier.tier === 'PRO') tierCounts.PRO = tier._count;
-    if (tier.tier === 'STUDIO') tierCounts.STUDIO = tier._count;
-  });
 
   return (
     <div className={styles.container}>
@@ -144,27 +124,6 @@ export default async function AdminOverviewPage() {
         </div>
       </div>
 
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>Tier Distribution</h2>
-        <div className={styles.statsGrid}>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Free</span>
-            <span className={styles.statValue}>{tierCounts.FREE.toLocaleString()}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Starter</span>
-            <span className={styles.statValue}>{tierCounts.STARTER.toLocaleString()}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Pro</span>
-            <span className={styles.statValue}>{tierCounts.PRO.toLocaleString()}</span>
-          </div>
-          <div className={styles.statCard}>
-            <span className={styles.statLabel}>Studio</span>
-            <span className={styles.statValue}>{tierCounts.STUDIO.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

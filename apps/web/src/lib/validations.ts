@@ -72,19 +72,6 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-/**
- * Billing checkout validation — subscription tier selection
- */
-export const checkoutSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('subscription'),
-    tier: z.enum(['starter', 'pro', 'studio', 'power']),
-  }),
-  z.object({
-    type: z.literal('credit_pack'),
-    credits: z.union([z.literal(3), z.literal(10), z.literal(25)]),
-  }),
-]);
 
 /**
  * Analytics query validation

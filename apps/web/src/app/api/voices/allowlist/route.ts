@@ -30,23 +30,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Must be Studio tier with active Voice Creator add-on
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId: session.user.id },
-    select: { tier: true, voiceCreatorAddonActive: true },
-  });
-
-  if (!subscription || subscription.tier !== 'STUDIO') {
-    return NextResponse.json(
-      { error: 'Voice Creator add-on requires Studio tier' },
-      { status: 403 }
-    );
-  }
-
-  if (!subscription.voiceCreatorAddonActive) {
-    return NextResponse.json({ error: 'Voice Creator add-on is not active' }, { status: 403 });
-  }
-
   // Find target user by handle
   const targetUser = await prisma.user.findUnique({
     where: { handle },

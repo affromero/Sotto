@@ -44,9 +44,6 @@ export async function GET() {
     prisma.voiceAllowlist.findMany({
       where: {
         allowedUserId: session.user.id,
-        voiceClone: {
-          user: { subscription: { voiceCreatorAddonActive: true } },
-        },
       },
       select: {
         voiceClone: {

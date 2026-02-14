@@ -36,6 +36,7 @@
     "lucide-react": "^0.563.0",
     "next": "^16.1.4",
     "next-auth": "^5.0.0-beta.30",
+    "openai": "^6.22.0",
     "pdf-parse": "^2.4.5",
     "pdfmake": "^0.3.3",
     "prisma": "^6.19.2",

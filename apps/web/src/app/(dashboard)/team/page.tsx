@@ -17,22 +17,14 @@ export default async function TeamPage() {
     redirect('/auth/login');
   }
 
-  // Check subscription and role
-  const [subscription, dbUser] = await Promise.all([
-    prisma.subscription.findUnique({
-      where: { userId },
-      select: { tier: true },
-    }),
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: { role: true },
-    }),
-  ]);
+  const dbUser = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
 
-  const tier = subscription?.tier || 'FREE';
   const role = dbUser?.role || 'USER';
 
-  if (tier !== 'STUDIO' && role !== 'CREATOR' && role !== 'ADMIN') {
+  if (role !== 'CREATOR' && role !== 'ADMIN') {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>

@@ -98,58 +98,7 @@ async function main() {
   }
   console.log(`  Created ${createdUsers.length} additional users`);
 
-  // ── 4. Subscriptions ────────────────────────────────────────────
-  const subscriptions: {
-    userId: string;
-    tier: 'FREE' | 'STARTER' | 'PRO' | 'STUDIO';
-    credits: number;
-    monthly: number;
-    maxRollover: number;
-  }[] = [
-    { userId: demoUser.id, tier: 'PRO', credits: 12, monthly: 15, maxRollover: 5 },
-    { userId: adminUser.id, tier: 'STUDIO', credits: 45, monthly: 50, maxRollover: 20 },
-    { userId: createdUsers[0].id, tier: 'STARTER', credits: 3, monthly: 5, maxRollover: 2 },
-    { userId: createdUsers[1].id, tier: 'PRO', credits: 10, monthly: 15, maxRollover: 5 },
-    { userId: createdUsers[2].id, tier: 'FREE', credits: 1, monthly: 2, maxRollover: 0 },
-    { userId: createdUsers[3].id, tier: 'FREE', credits: 2, monthly: 2, maxRollover: 0 },
-    { userId: createdUsers[4].id, tier: 'STARTER', credits: 4, monthly: 5, maxRollover: 2 },
-    { userId: createdUsers[5].id, tier: 'FREE', credits: 0, monthly: 2, maxRollover: 0 },
-    { userId: createdUsers[6].id, tier: 'FREE', credits: 2, monthly: 2, maxRollover: 0 },
-    { userId: createdUsers[7].id, tier: 'PRO', credits: 8, monthly: 15, maxRollover: 5 },
-    { userId: createdUsers[8].id, tier: 'FREE', credits: 1, monthly: 2, maxRollover: 0 },
-    { userId: createdUsers[9].id, tier: 'STARTER', credits: 5, monthly: 5, maxRollover: 2 },
-  ];
-
-  const periodEnd = new Date();
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-  for (const sub of subscriptions) {
-    await prisma.subscription.upsert({
-      where: { userId: sub.userId },
-      update: {
-        tier: sub.tier,
-        creditsBalance: sub.credits,
-        creditsMonthly: sub.monthly,
-        maxRollover: sub.maxRollover,
-        status: 'ACTIVE',
-      },
-      create: {
-        userId: sub.userId,
-        tier: sub.tier,
-        stripeCustomerId: `demo_cus_${sub.userId}`,
-        stripeSubscriptionId: `demo_sub_${sub.userId}`,
-        stripePriceId: `demo_price_${sub.tier.toLowerCase()}`,
-        status: 'ACTIVE',
-        creditsBalance: sub.credits,
-        creditsMonthly: sub.monthly,
-        maxRollover: sub.maxRollover,
-        currentPeriodEnd: periodEnd,
-      },
-    });
-  }
-  console.log(`  Created ${subscriptions.length} subscriptions`);
-
-  // ── 5. Ensure tags exist (reuse from seed.ts) ──────────────────
+  // ── 4. Ensure tags exist (reuse from seed.ts) ──────────────────
   const tagSlugs = [
     'technology',
     'science',
@@ -798,57 +747,6 @@ async function main() {
     await prisma.follow.create({ data: pair }).catch(() => {}); // ignore if already exists
   }
   console.log(`  Created ${followPairs.length} follow relationships`);
-
-  // ── 9. Credit transactions for demo user ────────────────────────
-  const existingTx = await prisma.creditTransaction.count({
-    where: { userId: demoUser.id },
-  });
-  if (existingTx === 0) {
-    const now = new Date();
-    const txData = [
-      {
-        userId: demoUser.id,
-        amount: 15,
-        balanceBefore: 0,
-        balanceAfter: 15,
-        type: 'monthly_grant',
-        description: 'Monthly credit grant — Pro tier',
-        createdAt: new Date(now.getFullYear(), now.getMonth(), 1),
-      },
-      {
-        userId: demoUser.id,
-        amount: -1,
-        balanceBefore: 15,
-        balanceAfter: 14,
-        type: 'generation',
-        description: 'Generated: The Hidden History of Cryptography',
-        podcastId: podcasts[0]?.id,
-        createdAt: new Date(now.getFullYear(), now.getMonth(), 3),
-      },
-      {
-        userId: demoUser.id,
-        amount: -1,
-        balanceBefore: 14,
-        balanceAfter: 13,
-        type: 'generation',
-        description: 'Generated: Understanding Quantum Computing',
-        podcastId: podcasts[1]?.id,
-        createdAt: new Date(now.getFullYear(), now.getMonth(), 7),
-      },
-      {
-        userId: demoUser.id,
-        amount: -1,
-        balanceBefore: 13,
-        balanceAfter: 12,
-        type: 'generation',
-        description: 'Generated: The Future of Remote Work',
-        podcastId: podcasts[2]?.id,
-        createdAt: new Date(now.getFullYear(), now.getMonth(), 12),
-      },
-    ];
-    await prisma.creditTransaction.createMany({ data: txData });
-    console.log('  Created credit transactions for demo user');
-  }
 
   console.log('\nDemo data seeded successfully!');
   console.log(`  Demo user:  ${demoUser.email} (${demoUser.id})`);

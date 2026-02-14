@@ -40,16 +40,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Check TEAM subscription
-  const subscription = await prisma.subscription.findUnique({
-    where: { userId: session.user.id },
-    select: { tier: true },
-  });
-
-  if (!subscription || subscription.tier !== 'STUDIO') {
-    return NextResponse.json({ error: 'Studio subscription required' }, { status: 403 });
-  }
-
   // Check not already in a team
   const existingUser = await prisma.user.findUnique({
     where: { id: session.user.id },

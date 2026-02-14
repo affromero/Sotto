@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
     signupsToday,
     signupsThisWeek,
     signupsThisMonth,
-    tierDistribution,
     // Podcasts
     totalPodcasts,
     podcastsByStatus,
@@ -115,10 +114,6 @@ export async function GET(request: NextRequest) {
     prisma.user.count({ where: { createdAt: { gte: today } } }),
     prisma.user.count({ where: { createdAt: { gte: weekAgo } } }),
     prisma.user.count({ where: { createdAt: { gte: monthAgo } } }),
-    prisma.subscription.groupBy({
-      by: ['tier'],
-      _count: true,
-    }),
     // --- Podcasts ---
     prisma.podcast.count(),
     prisma.podcast.groupBy({
@@ -179,9 +174,6 @@ export async function GET(request: NextRequest) {
       signupsToday,
       signupsThisWeek,
       signupsThisMonth,
-      tierDistribution: Object.fromEntries(
-        tierDistribution.map((t) => [t.tier, t._count])
-      ),
     },
     podcasts: {
       total: totalPodcasts,

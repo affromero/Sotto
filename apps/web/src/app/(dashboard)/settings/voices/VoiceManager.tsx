@@ -12,12 +12,6 @@ interface VoiceClone {
   createdAt: string;
 }
 
-interface VoiceCredits {
-  used: number;
-  total: number;
-  remaining: number;
-}
-
 interface VoiceRequest {
   id: string;
   status: string;
@@ -41,13 +35,8 @@ interface UserSearchResult {
   image: string | null;
 }
 
-interface VoiceData {
-  userClones: VoiceClone[];
-  credits: VoiceCredits;
-}
-
 export function VoiceManager() {
-  const [data, setData] = useState<VoiceData | null>(null);
+  const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cloneName, setCloneName] = useState('');
@@ -61,8 +50,6 @@ export function VoiceManager() {
     received: VoiceRequest[];
   }>({ sent: [], received: [] });
   const [updatingRequest, setUpdatingRequest] = useState<string | null>(null);
-  const [addonActive, setAddonActive] = useState(false);
-  const [addonLoading, setAddonLoading] = useState(false);
   const [allowlistEntries, setAllowlistEntries] = useState<Record<string, AllowlistEntry[]>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
@@ -76,7 +63,6 @@ export function VoiceManager() {
   useEffect(() => {
     fetchVoices();
     fetchRequests();
-    fetchAddonStatus();
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -91,7 +77,7 @@ export function VoiceManager() {
       const response = await fetch('/api/voices');
       if (!response.ok) throw new Error('Failed to fetch voices');
       const voiceData = await response.json();
-      setData(voiceData);
+      setUserClones(voiceData.userClones ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load voices');
     } finally {
@@ -111,18 +97,6 @@ export function VoiceManager() {
     }
   }
 
-  async function fetchAddonStatus() {
-    try {
-      const response = await fetch('/api/billing/subscription');
-      if (response.ok) {
-        const sub = await response.json();
-        setAddonActive(sub.voiceCreatorAddonActive ?? false);
-      }
-    } catch {
-      // Non-critical
-    }
-  }
-
   async function fetchAllowlist(voiceCloneId: string) {
     try {
       const response = await fetch(`/api/voices/allowlist?voiceCloneId=${voiceCloneId}`);
@@ -132,24 +106,6 @@ export function VoiceManager() {
       }
     } catch {
       // Non-critical
-    }
-  }
-
-  async function handleSubscribeAddon() {
-    setAddonLoading(true);
-    try {
-      const response = await fetch('/api/billing/voice-creator-addon', { method: 'POST' });
-      if (response.ok) {
-        const { url } = await response.json();
-        if (url) window.location.href = url;
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to start addon checkout');
-      }
-    } catch {
-      setError('Failed to start addon checkout');
-    } finally {
-      setAddonLoading(false);
     }
   }
 
@@ -379,18 +335,6 @@ export function VoiceManager() {
     );
   }
 
-  if (!data) {
-    return (
-      <div className={styles.container}>
-        <p className={styles.error}>Failed to load voice data</p>
-      </div>
-    );
-  }
-
-  const creditPct =
-    data.credits.total > 0 ? Math.min((data.credits.used / data.credits.total) * 100, 100) : 0;
-  const isFree = data.credits.total === 0;
-
   return (
     <div className={styles.container}>
       <h2 className={styles.heading}>Voice Management</h2>
@@ -402,37 +346,15 @@ export function VoiceManager() {
       )}
 
       <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Premium Voice Credits</h3>
-        <div className={styles.creditLabel}>
-          {data.credits.used} / {data.credits.total} used this month
-        </div>
-        <div
-          className={styles.creditBar}
-          role="progressbar"
-          aria-valuenow={data.credits.used}
-          aria-valuemax={data.credits.total}
-        >
-          <div className={styles.creditBarFill} style={{ width: `${creditPct}%` }} />
-        </div>
-        {data.credits.remaining === 0 && data.credits.total > 0 && (
-          <p className={styles.hint}>
-            All credits used this month. Credits reset at the start of your next billing period.
-          </p>
-        )}
-      </section>
-
-      <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Cloned Voices</h3>
 
-        {data.userClones.length === 0 ? (
+        {userClones.length === 0 ? (
           <p className={styles.empty}>
-            {isFree
-              ? 'Voice cloning is available on Pro and Creator plans.'
-              : 'No cloned voices yet. Upload an audio sample to create your first custom voice.'}
+            No cloned voices yet. Upload an audio sample to create your first custom voice.
           </p>
         ) : (
           <div className={styles.voiceList}>
-            {data.userClones.map((voice) => (
+            {userClones.map((voice) => (
               <div key={voice.id} className={styles.voiceItemWrap}>
                 <div className={styles.voiceItem}>
                   <div>
@@ -464,29 +386,27 @@ export function VoiceManager() {
                         {voice.requestable ? 'Shared' : 'Private'}
                       </span>
                     </label>
-                    {addonActive && (
-                      <button
-                        type="button"
-                        className={`${styles.playButton} ${activeVoiceId === voice.id ? styles.allowlistActive : ''}`}
-                        onClick={() => handleToggleAllowlistPanel(voice.id)}
-                        aria-label={`Manage instant access for ${voice.name}`}
-                        title="Manage Instant Access"
+                    <button
+                      type="button"
+                      className={`${styles.playButton} ${activeVoiceId === voice.id ? styles.allowlistActive : ''}`}
+                      onClick={() => handleToggleAllowlistPanel(voice.id)}
+                      aria-label={`Manage instant access for ${voice.name}`}
+                      title="Manage Instant Access"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        aria-hidden="true"
                       >
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          aria-hidden="true"
-                        >
-                          <path d="M8 1.5a3 3 0 0 1 3 3v2H5v-2a3 3 0 0 1 3-3z" />
-                          <rect x="3" y="6.5" width="10" height="7" rx="1" />
-                        </svg>
-                      </button>
-                    )}
+                        <path d="M8 1.5a3 3 0 0 1 3 3v2H5v-2a3 3 0 0 1 3-3z" />
+                        <rect x="3" y="6.5" width="10" height="7" rx="1" />
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       className={styles.playButton}
@@ -534,7 +454,7 @@ export function VoiceManager() {
                     </button>
                   </div>
                 </div>
-                {addonActive && activeVoiceId === voice.id && (
+                {activeVoiceId === voice.id && (
                   <div className={styles.allowlistPanel}>
                     <div className={styles.allowlistHeader}>
                       Instant Access ({allowlistEntries[voice.id]?.length ?? 0})
@@ -617,32 +537,6 @@ export function VoiceManager() {
           </div>
         )}
       </section>
-
-      {!addonActive && data.userClones.length > 0 && !isFree && (
-        <section className={styles.section}>
-          <div className={styles.upgradeBanner}>
-            <p>
-              Unlock <strong>Voice Creator</strong> ($15/mo) to pre-approve users for instant voice
-              access, bypassing the request workflow.
-            </p>
-            <button
-              type="button"
-              className={styles.upgradeButton}
-              onClick={handleSubscribeAddon}
-              disabled={addonLoading}
-            >
-              {addonLoading ? (
-                <>
-                  <span className={styles.spinnerSmall} />
-                  Loading...
-                </>
-              ) : (
-                'Subscribe to Voice Creator'
-              )}
-            </button>
-          </div>
-        </section>
-      )}
 
       {voiceRequests.received.length > 0 && (
         <section className={styles.section}>
@@ -741,67 +635,55 @@ export function VoiceManager() {
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Add New Voice</h3>
-        {isFree ? (
-          <div className={styles.upgradeBanner}>
-            <p>
-              Voice cloning requires a paid subscription. Upgrade to clone your own voice for
-              podcasts.
-            </p>
-            <a href="/pricing" className={styles.upgradeButton}>
-              View Plans
-            </a>
+        <form onSubmit={handleClone} className={styles.uploadForm}>
+          <div className={styles.formGroup}>
+            <label htmlFor="voice-name" className={styles.label}>
+              Voice Name
+            </label>
+            <input
+              id="voice-name"
+              type="text"
+              className={styles.nameInput}
+              value={cloneName}
+              onChange={(e) => setCloneName(e.target.value)}
+              placeholder="My Voice"
+              required
+              disabled={cloning}
+              maxLength={100}
+            />
           </div>
-        ) : (
-          <form onSubmit={handleClone} className={styles.uploadForm}>
-            <div className={styles.formGroup}>
-              <label htmlFor="voice-name" className={styles.label}>
-                Voice Name
-              </label>
-              <input
-                id="voice-name"
-                type="text"
-                className={styles.nameInput}
-                value={cloneName}
-                onChange={(e) => setCloneName(e.target.value)}
-                placeholder="My Voice"
-                required
-                disabled={cloning}
-                maxLength={100}
-              />
-            </div>
-            <div className={styles.formGroup}>
-              <label htmlFor="voice-file" className={styles.label}>
-                Audio Sample
-              </label>
-              <input
-                id="voice-file"
-                type="file"
-                className={styles.fileInput}
-                accept="audio/*"
-                onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
-                required
-                disabled={cloning}
-              />
-              <p className={styles.hint}>
-                Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
-              </p>
-            </div>
-            <button
-              type="submit"
-              className={styles.cloneButton}
-              disabled={cloning || !cloneName.trim() || !cloneFile}
-            >
-              {cloning ? (
-                <>
-                  <span className={styles.spinnerSmall} />
-                  Cloning...
-                </>
-              ) : (
-                'Clone Voice'
-              )}
-            </button>
-          </form>
-        )}
+          <div className={styles.formGroup}>
+            <label htmlFor="voice-file" className={styles.label}>
+              Audio Sample
+            </label>
+            <input
+              id="voice-file"
+              type="file"
+              className={styles.fileInput}
+              accept="audio/*"
+              onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+              required
+              disabled={cloning}
+            />
+            <p className={styles.hint}>
+              Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
+            </p>
+          </div>
+          <button
+            type="submit"
+            className={styles.cloneButton}
+            disabled={cloning || !cloneName.trim() || !cloneFile}
+          >
+            {cloning ? (
+              <>
+                <span className={styles.spinnerSmall} />
+                Cloning...
+              </>
+            ) : (
+              'Clone Voice'
+            )}
+          </button>
+        </form>
       </section>
     </div>
   );
