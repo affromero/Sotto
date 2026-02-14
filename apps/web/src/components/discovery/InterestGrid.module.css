@@ -13,6 +13,7 @@
 
 .cardWrapper {
   animation: cardEntrance 0.4s ease-out both;
+  display: flex;
 }
 
 /* ---- Category header card ---- */
@@ -27,6 +28,7 @@
   padding: var(--spacing-md) var(--spacing-sm) calc(var(--spacing-md) + 8px);
   min-height: 100px;
   width: 100%;
+  flex: 1;
   background: var(--color-surface);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-xl);
