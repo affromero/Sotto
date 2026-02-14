@@ -3,7 +3,6 @@ import {
   ValidateReferencesPayload,
   addJob,
   JobType,
-  audioGenerationQueue,
   notificationQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
@@ -23,6 +22,7 @@ import {
   cleanAndRenumberCitations,
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
+import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
@@ -313,16 +313,41 @@ export async function processReferenceValidation(
 
   await job.updateProgress(75);
 
-  // Create segments and queue audio generation
-  await createSegmentsAndQueueAudio(podcastId, turns);
+  await job.updateProgress(80);
 
-  await job.updateProgress(95);
-
-  // Update podcast status
-  await prisma.podcast.update({
+  // Check source to decide whether to pause for review
+  const podcastRecord = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    data: { status: 'GENERATING_AUDIO' },
+    select: { source: true },
   });
+
+  if (podcastRecord.source === 'WEB' || podcastRecord.source === 'IMPORT') {
+    // Pause for user review
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'SCRIPT_READY' },
+    });
+
+    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+      userId,
+      type: 'SCRIPT_READY',
+      title: 'Script ready for review',
+      message: 'Your podcast script is ready. Review and approve it to start audio generation.',
+      data: { podcastId },
+    });
+
+    logger.info('References validated, paused at SCRIPT_READY for review', { podcastId });
+  } else {
+    // Auto-approve for TWITTER/API sources
+    await createSegmentsAndQueueAudio(podcastId, turns);
+
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'GENERATING_AUDIO' },
+    });
+
+    logger.info('References validated, auto-approved for audio generation', { podcastId });
+  }
 
   await job.updateProgress(100);
 
@@ -336,27 +361,4 @@ export async function processReferenceValidation(
     replaced: String(replacedCount),
     removed: String(removedCount),
   });
-}
-
-async function createSegmentsAndQueueAudio(
-  podcastId: string,
-  turns: Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>
-): Promise<void> {
-  for (let i = 0; i < turns.length; i++) {
-    const segment = await prisma.segment.create({
-      data: {
-        podcastId,
-        speaker: turns[i].speaker,
-        text: turns[i].text,
-        order: i,
-      },
-    });
-
-    await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, {
-      podcastId,
-      segmentId: segment.id,
-      speaker: turns[i].speaker,
-      text: turns[i].text,
-    });
-  }
 }

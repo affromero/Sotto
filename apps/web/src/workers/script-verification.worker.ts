@@ -4,7 +4,6 @@ import {
   addJob,
   JobType,
   referenceValidationQueue,
-  audioGenerationQueue,
   notificationQueue,
   scriptVerificationQueue,
 } from '@/lib/queue';
@@ -15,6 +14,7 @@ import {
   type ScriptTurn,
   type GeneratedReference,
 } from '@/lib/script-generator';
+import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
 import { LIMITS } from '@/lib/stripe';
@@ -112,31 +112,40 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
       logger.info('Script verified, routing to reference validation', { podcastId });
     } else {
-      const scriptTurns = turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>;
-      for (let i = 0; i < scriptTurns.length; i++) {
-        const segment = await prisma.segment.create({
-          data: {
-            podcastId,
-            speaker: scriptTurns[i].speaker,
-            text: scriptTurns[i].text,
-            order: i,
-          },
-        });
-
-        await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, {
-          podcastId,
-          segmentId: segment.id,
-          speaker: scriptTurns[i].speaker,
-          text: scriptTurns[i].text,
-        });
-      }
-
-      await prisma.podcast.update({
+      // No references — check source to decide whether to pause for review
+      const podcast = await prisma.podcast.findUniqueOrThrow({
         where: { id: podcastId },
-        data: { status: 'GENERATING_AUDIO' },
+        select: { source: true },
       });
 
-      logger.info('Script verified (no refs), routing to audio generation', { podcastId });
+      if (podcast.source === 'WEB' || podcast.source === 'IMPORT') {
+        // Pause for user review
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: { status: 'SCRIPT_READY' },
+        });
+
+        await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+          userId,
+          type: 'SCRIPT_READY',
+          title: 'Script ready for review',
+          message: 'Your podcast script is ready. Review and approve it to start audio generation.',
+          data: { podcastId },
+        });
+
+        logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { podcastId });
+      } else {
+        // Auto-approve for TWITTER/API sources (no user at browser)
+        const scriptTurns = turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>;
+        await createSegmentsAndQueueAudio(podcastId, scriptTurns);
+
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: { status: 'GENERATING_AUDIO' },
+        });
+
+        logger.info('Script verified (no refs), auto-approved for audio generation', { podcastId });
+      }
     }
 
     await job.updateProgress(100);

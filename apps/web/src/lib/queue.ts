@@ -219,7 +219,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         select: { status: true, userId: true, title: true },
       });
 
-      if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED') return;
+      if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') return;
 
       await prisma.podcast.update({
         where: { id: podcastId },
