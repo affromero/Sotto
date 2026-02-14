@@ -35,7 +35,7 @@ function nextTurnId(): string {
 export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEditorProps) {
   const [turns, setTurns] = useState<TurnState[]>([]);
   const [references, setReferences] = useState<ReferenceData[]>([]);
-  const [version, setVersion] = useState(0);
+  const [, setVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -159,7 +159,6 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
     setDeletingIndex(null);
     // Focus textarea after render
     setTimeout(() => textareaRef.current?.focus(), 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turns]);
 
   const confirmEdit = useCallback(() => {
@@ -191,7 +190,6 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       e.preventDefault();
       confirmEdit();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cancelEdit, confirmEdit]);
 
   // Toggle speaker
