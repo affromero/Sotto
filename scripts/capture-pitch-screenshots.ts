@@ -94,7 +94,7 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
     // Desktop captures
     {
       name: 'landing',
-      path: '/romero',
+      path: '/',
       viewport: { width: 1440, height: 900 },
       auth: 'none',
       fullPage: true,
@@ -182,7 +182,7 @@ function getScreenshotDefs(demoPodcastId: string, demoUserId: string): Screensho
     // Mobile captures
     {
       name: 'mobile-landing',
-      path: '/romero',
+      path: '/',
       viewport: { width: 390, height: 844 },
       auth: 'none',
       fullPage: true,
