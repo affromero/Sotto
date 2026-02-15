@@ -5,7 +5,8 @@ import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent } from '@/lib/tweet-parser';
 import { getAiKey } from '@/lib/byok';
-import { canResolveAi } from '@/lib/providers/ai';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet } from '@/types/twitter';
@@ -98,9 +99,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     return;
   }
 
-  // 4. Check BYOK key availability
-  const hasAi = await canResolveAi(userId);
-  if (!hasAi) {
+  // 4. Check generation gate (BYOK or free tier)
+  const gate = await checkGenerationGate(userId);
+  if (!gate.allowed) {
     await prisma.tweetMention.create({
       data: {
         tweetId: tweet.id,
@@ -108,7 +109,10 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         text: tweet.text,
         status: 'IGNORED',
         userId,
-        errorMessage: 'No AI provider configured (missing BYOK key)',
+        errorMessage:
+          gate.reason === 'free_tier_exhausted'
+            ? 'Free generations exhausted'
+            : 'No AI provider configured',
       },
     });
     return;
@@ -194,6 +198,12 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       userId,
       sourceUrl: parsed.sourceUrl,
     });
+
+    // Increment free tier counter for non-BYOK users
+    if (!gate.isByokUser) {
+      const config = await getFreeTierConfig();
+      await tryIncrementFreeGeneration(userId, config.generationLimit);
+    }
 
     logger.info('Twitter mention processed — podcast created', {
       tweetId: tweet.id,

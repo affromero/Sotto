@@ -1,0 +1,76 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.label {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.select,
+.input {
+  appearance: none;
+  padding: 10px 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.select:focus,
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.input {
+  max-width: 120px;
+}
+
+.hint {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.error {
+  padding: 10px 14px;
+  background: var(--color-error-subtle, #fef2f2);
+  color: var(--color-error, #dc2626);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+}
+
+.saveButton {
+  appearance: none;
+  align-self: flex-start;
+  padding: 10px 24px;
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.saveButton:hover {
+  opacity: 0.9;
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

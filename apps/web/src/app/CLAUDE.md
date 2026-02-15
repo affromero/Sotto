@@ -32,6 +32,7 @@
 | `/admin/analytics`           | `(admin)/admin/analytics/page.tsx`         | Yes (ADMIN only)            | Site analytics (page views, visitors, devices)           |
 | `/admin/moderation`          | `(admin)/admin/moderation/page.tsx`        | Yes (ADMIN only)            | Failed podcasts + feedback review                        |
 | `/admin/handles`             | `(admin)/admin/handles/page.tsx`           | Yes (ADMIN only)            | Reserved handle management                               |
+| `/admin/config`              | `(admin)/admin/config/page.tsx`            | Yes (ADMIN only)            | Free tier config (AI/TTS provider, model, generation limit) |
 
 ## API Route Index
 
@@ -119,7 +120,9 @@
 | `/api/voices/request`                                            | GET/POST         | Yes        | Voice request listing/creation                                              |
 | `/api/voices/request/[id]`                                       | PATCH            | Yes        | Update voice request status                                                 |
 | `/api/tts-providers`                                             | GET              | Yes        | List available TTS providers + user BYOK status                             |
+| `/api/ai-models`                                                 | GET              | Yes        | List available AI models for user's BYOK provider                           |
 | `/api/settings/byok`                                             | GET/POST/DELETE  | Yes        | Multi-provider TTS BYOK key management (5 providers)                        |
+| `/api/admin/config`                                              | GET/PATCH        | ADMIN      | Free tier configuration (AI/TTS provider, model, generation limit)          |
 
 ## Route Groups
 

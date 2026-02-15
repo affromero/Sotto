@@ -56,10 +56,18 @@ vi.mock('@/lib/tweet-parser', () => ({
   parseTweetIntent: (...args: unknown[]) => mockParseTweetIntent(...args),
 }));
 
-const mockCanResolveAi = vi.fn().mockResolvedValue(true);
+const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
 
-vi.mock('@/lib/providers/ai', () => ({
-  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
+vi.mock('@/lib/generation-gate', () => ({
+  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
+  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
+}));
+
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3 });
+
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
 }));
 
 const mockGetAiKey = vi.fn().mockResolvedValue(null);
@@ -149,7 +157,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockCanResolveAi.mockResolvedValue(true);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -186,7 +194,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockCanResolveAi.mockResolvedValue(true);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',
@@ -222,7 +230,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockCanResolveAi.mockResolvedValue(true);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       const mockParseResult: TweetParseResult = {
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -315,7 +323,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockCanResolveAi.mockResolvedValue(false);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
       const job = createMockJob({});
@@ -328,7 +336,7 @@ describe('processTwitterMentions', () => {
           text: tweet.text,
           status: 'IGNORED',
           userId: 'user-001',
-          errorMessage: 'No AI provider configured (missing BYOK key)',
+          errorMessage: 'No AI provider configured',
         },
       });
       expect(mockParseTweetIntent).not.toHaveBeenCalled();
@@ -401,7 +409,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
       });
-      mockCanResolveAi.mockResolvedValue(true);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockGetTweet.mockResolvedValue(parentTweet);
       mockParseTweetIntent.mockResolvedValue({
         topic: 'AI',
@@ -439,7 +447,7 @@ describe('processTwitterMentions', () => {
         preferredHostVoiceId: 'user-host-voice',
         preferredExpertVoiceId: 'user-expert-voice',
       });
-      mockCanResolveAi.mockResolvedValue(true);
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',

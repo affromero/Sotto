@@ -126,6 +126,10 @@ export function InterruptChatPanel({
           if (incRes.ok) {
             setState('incorporated');
           } else {
+            const incData = await incRes.json().catch(() => ({}));
+            if (incData.code === 'free_tier_exhausted') {
+              setError('Free generations used. Add your own API keys to keep creating.');
+            }
             setState('resolved');
           }
         } else {

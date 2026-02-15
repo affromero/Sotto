@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { generateScript, type SourceMetadata } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { logger } from '@/lib/logger';
 
@@ -39,6 +41,22 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   const aiKey = await getAiKey(userId);
 
+  // Read podcast's aiModel preference
+  const podcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { aiModel: true },
+  });
+
+  // Model priority: user's choice > provider default > free tier admin config
+  let model = podcast.aiModel ?? undefined;
+  if (!model && aiKey) {
+    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
+  }
+  if (!model) {
+    const config = await getFreeTierConfig();
+    model = config.aiModel;
+  }
+
   // Get discovery metadata
   const discovery = await prisma.discovery.findUniqueOrThrow({
     where: { id: discoveryId },
@@ -57,6 +75,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     sourceContent: discovery.sourceContent || undefined,
     sourceMetadata: sourceMetadata || undefined,
     apiKeyOverride: aiKey?.apiKey,
+    model,
   });
 
   await job.updateProgress(50);
@@ -155,11 +174,15 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   }
 
   // Route to script verification (handles both with and without references)
+  // Resolve the actual AI provider used
+  const resolvedAiProvider = aiKey?.provider ?? (await getFreeTierConfig()).aiProvider;
+
   await prisma.podcast.update({
     where: { id: podcastId },
     data: {
       status: 'VERIFYING_SCRIPT',
-      aiProvider: aiKey?.provider ?? 'anthropic',
+      aiProvider: resolvedAiProvider,
+      aiModel: model,
       language: detectedLanguage ?? undefined,
     },
   });

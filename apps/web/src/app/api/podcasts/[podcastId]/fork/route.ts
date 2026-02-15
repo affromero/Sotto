@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -16,6 +18,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const userId = session.user.id;
+
+  // Generation gate: BYOK or free tier
+  const gate = await checkGenerationGate(userId);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys to continue.'
+        : 'AI provider not configured.';
+    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const parsed = forkBodySchema.safeParse(body);
@@ -119,6 +131,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     sourceText: sourcePodcast.script?.markdown || undefined,
   };
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, extractPayload);
+
+  // Increment free tier counter for non-BYOK users
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    await tryIncrementFreeGeneration(userId, config.generationLimit);
+  }
 
   // Notify source podcast owner about the fork
   if (sourcePodcast.userId !== userId) {

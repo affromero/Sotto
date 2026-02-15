@@ -9,6 +9,7 @@ import {
 import type { TtsProviderId } from './tts-registry';
 import { getProviderMeta, compareQuality } from './tts-registry';
 import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
+import { getFreeTierConfig } from '../free-tier-config';
 
 export interface SpeechParams {
   text: string;
@@ -288,11 +289,12 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Default: platform OpenAI
+  // Default: use admin-configured free tier TTS provider
+  const config = await getFreeTierConfig();
   return {
-    provider: createTtsProvider('openai'),
+    provider: createTtsProvider(config.ttsProvider),
     source: 'platform',
-    providerId: 'openai',
+    providerId: config.ttsProvider,
   };
 }
 

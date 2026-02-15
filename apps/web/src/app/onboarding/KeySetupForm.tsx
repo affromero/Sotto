@@ -56,7 +56,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
         <div className={styles.sectionHeader}>
           <div className={styles.sectionLabel}>
             <h2 className={styles.sectionTitle}>AI Provider</h2>
-            <span className={styles.sectionBadge}>Required for generation</span>
+            <span className={styles.sectionBadge}>Unlocks unlimited</span>
           </div>
           <p className={styles.sectionDescription}>
             Sotto uses an AI model to write podcast scripts and answer your questions. Connect your
@@ -72,7 +72,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
         <div className={styles.sectionHeader}>
           <div className={styles.sectionLabel}>
             <h2 className={styles.sectionTitle}>Text-to-Speech</h2>
-            <span className={styles.sectionBadge}>Required for audio</span>
+            <span className={styles.sectionBadge}>Unlocks unlimited</span>
           </div>
           <p className={styles.sectionDescription}>
             Sotto converts scripts into natural-sounding voices. Connect at least one TTS provider
@@ -88,7 +88,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
           className={styles.continueButton}
           onClick={handleContinue}
         >
-          Continue to Create
+          Unlock Unlimited
           <svg
             width="18"
             height="18"
@@ -109,7 +109,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
           className={styles.skipLink}
           onClick={handleSkip}
         >
-          Skip for now &mdash; explore the feed first
+          Maybe later &mdash; explore the feed first
         </button>
       </div>
     </div>
