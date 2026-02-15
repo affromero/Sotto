@@ -9,20 +9,17 @@ interface FeedGridProps {
 function SkeletonCard() {
   return (
     <div className={styles.skeleton} aria-hidden="true">
-      <div className={styles.skeletonHeader}>
-        <div className={styles.skeletonTitle} />
-        <div className={styles.skeletonDuration} />
-      </div>
-      <div className={styles.skeletonTopic} />
-      <div className={styles.skeletonTopicShort} />
-      <div className={styles.skeletonCreator}>
-        <div className={styles.skeletonAvatar} />
-        <div className={styles.skeletonName} />
-      </div>
-      <div className={styles.skeletonStats}>
-        <div className={styles.skeletonStat} />
-        <div className={styles.skeletonStat} />
-        <div className={styles.skeletonStat} />
+      <div className={styles.skeletonCover} />
+      <div className={styles.skeletonBody}>
+        <div className={styles.skeletonCreator}>
+          <div className={styles.skeletonAvatar} />
+          <div className={styles.skeletonName} />
+        </div>
+        <div className={styles.skeletonStats}>
+          <div className={styles.skeletonStat} />
+          <div className={styles.skeletonStat} />
+          <div className={styles.skeletonStat} />
+        </div>
       </div>
     </div>
   );

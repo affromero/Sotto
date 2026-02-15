@@ -43,73 +43,42 @@
   max-width: 320px;
 }
 
-/* Skeleton loading cards */
+/* Skeleton loading cards — matches new gradient card structure */
 .skeleton {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-5);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
-.skeletonHeader {
+.skeletonCover {
+  height: 140px;
+  background: var(--color-border);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonBody {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.skeletonTitle {
-  height: 20px;
-  width: 70%;
-  background: var(--color-border);
-  border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.skeletonDuration {
-  height: 18px;
-  width: 48px;
-  background: var(--color-border);
-  border-radius: var(--radius-full);
-  animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 100ms;
-}
-
-.skeletonTopic {
-  height: 14px;
-  width: 100%;
-  background: var(--color-border);
-  border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 200ms;
-}
-
-.skeletonTopicShort {
-  height: 14px;
-  width: 60%;
-  background: var(--color-border);
-  border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 250ms;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
 .skeletonCreator {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-1);
 }
 
 .skeletonAvatar {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   background: var(--color-border);
   animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 300ms;
+  animation-delay: 200ms;
 }
 
 .skeletonName {
@@ -118,7 +87,7 @@
   background: var(--color-border);
   border-radius: var(--radius-md);
   animation: pulse 1.5s ease-in-out infinite;
-  animation-delay: 350ms;
+  animation-delay: 300ms;
 }
 
 .skeletonStats {
@@ -155,11 +124,4 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
-}
-
-/* Desktop: skeleton min-height matches card */
-@media (min-width: 768px) {
-  .skeleton {
-    min-height: 240px;
-  }
 }
