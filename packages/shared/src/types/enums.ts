@@ -54,8 +54,6 @@ export type TelegramMessageStatus =
   | 'FAILED'
   | 'IGNORED';
 
-export type TeamInviteStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
-
 export type NotificationType =
   | 'PODCAST_READY'
   | 'PODCAST_FAILED'
@@ -64,7 +62,6 @@ export type NotificationType =
   | 'PODCAST_FORKED'
   | 'NEW_FOLLOWER'
   | 'SIMILAR_PODCAST_CREATED'
-  | 'TEAM_INVITE'
   | 'TWITTER_PODCAST_READY'
   | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
