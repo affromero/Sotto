@@ -269,10 +269,11 @@ export const byokSchema = z.object({
  * Import podcast validation
  */
 export const importPodcastSchema = z.object({
-  title: z.string().min(1).max(200),
-  topic: z.string().min(1).max(5000),
+  title: z.string().max(200).optional(),
+  topic: z.string().max(5000).optional(),
   isHumanContent: z.boolean().default(false),
   sourcePlatform: z.string().max(50).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs']).optional(),
 });
 
 /**

@@ -111,6 +111,9 @@ export interface ImportAudioPayload {
   audioKey: string;
   transcriptText?: string;
   isHumanContent: boolean;
+  generateMetadata?: boolean;
+  sttProvider?: 'openai' | 'elevenlabs';
+  sttApiKey?: string;
 }
 
 export interface IngestEventsPayload {

@@ -82,6 +82,7 @@ export type {
   TranscriptionResult,
   SourcePlatformValue,
   SourcePlatformInfo,
+  SttProviderId,
 } from './types/import';
 
 export { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from './types/import';

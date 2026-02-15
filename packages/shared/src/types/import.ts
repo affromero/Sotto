@@ -1,8 +1,11 @@
+export type SttProviderId = 'openai' | 'elevenlabs';
+
 export interface ImportPodcastRequest {
-  title: string;
-  topic: string;
+  title?: string;
+  topic?: string;
   isHumanContent: boolean;
   sourcePlatform?: string;
+  sttProvider?: SttProviderId;
 }
 
 export type SourcePlatformValue = 'notebooklm' | 'spotify' | 'apple_podcasts' | 'youtube' | 'other';
