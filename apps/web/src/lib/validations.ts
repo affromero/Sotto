@@ -25,7 +25,7 @@ export const createPodcastSchema = z.object({
     audience: z.string().optional(),
     focusAreas: z.array(z.string()).optional(),
     tone: z.string().optional(),
-    durationTarget: z.number().optional(),
+    durationTarget: z.number().min(5).max(40).optional(),
     sourceUrl: z.string().url().optional(),
     sourceContent: z.string().optional(),
   }).optional(),
