@@ -80,13 +80,17 @@
   color: var(--color-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
-  margin-top: var(--spacing-sm);
-  align-self: flex-start;
 }
 
 .addKeyBtn:hover {
   border-color: var(--color-primary);
   background: var(--color-primary-subtle);
+}
+
+.getKeyLink {
+  composes: addKeyBtn;
+  text-decoration: none;
+  display: inline-block;
 }
 
 .keyForm {
