@@ -45,3 +45,22 @@ export async function generateImportMetadata(
 
   return { title, topic };
 }
+
+/**
+ * Compare user-provided metadata with AI-generated metadata.
+ * Returns true only when the AI suggestion is meaningfully different.
+ */
+export function isMetadataDifferent(userValue: string, aiValue: string): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+
+  const u = normalize(userValue);
+  const a = normalize(aiValue);
+
+  if (u === a) return false;
+  if (u.includes(a) || a.includes(u)) return false;
+  if (a.length < 10) return false;
+  if (u === 'untitled import' || u === '') return false;
+
+  return true;
+}
