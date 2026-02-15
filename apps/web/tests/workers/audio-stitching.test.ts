@@ -17,6 +17,8 @@ const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
 const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
+const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -37,6 +39,10 @@ vi.mock('@/lib/prisma', () => ({
     tweetMention: {
       findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
       update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
+    },
+    telegramMessage: {
+      findFirst: (...args: unknown[]) => mockPrismaTelegramMessageFindFirst(...args),
+      update: (...args: unknown[]) => mockPrismaTelegramMessageUpdate(...args),
     },
   },
 }));
@@ -64,9 +70,11 @@ vi.mock('@/lib/queue', () => ({
   JobType: {
     SEND_NOTIFICATION: 'send_notification',
     REPLY_TWITTER: 'reply_twitter',
+    REPLY_TELEGRAM: 'reply_telegram',
   },
   notificationQueue: { name: 'notifications' },
   twitterReplyQueue: { name: 'twitter-reply' },
+  telegramReplyQueue: { name: 'telegram-reply' },
 }));
 
 const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));

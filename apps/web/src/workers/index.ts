@@ -1,5 +1,6 @@
-import { createWorker, twitterMentionsQueue, keyValidationQueue, JobType } from '@/lib/queue';
+import { createWorker, twitterMentionsQueue, telegramBotQueue, keyValidationQueue, JobType } from '@/lib/queue';
 import { isTwitterConfigured } from '@/lib/twitter';
+import { isTelegramBotConfigured } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { processContentExtraction } from './content-extraction.worker';
 import { processScriptGeneration } from './script-generation.worker';
@@ -18,6 +19,8 @@ import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
 import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
+import { processTelegramUpdates } from './telegram-bot.worker';
+import { processTelegramReply } from './telegram-reply.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -40,6 +43,8 @@ const workers = [
   createWorker('data-export', processDataExport, { concurrency: 1 }),
   createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
+  createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 35000 }),
+  createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -53,6 +58,19 @@ if (isTwitterConfigured()) {
     .catch((err) => logger.error('Failed to schedule Twitter polling', { error: err.message }));
 } else {
   logger.info('Twitter integration not configured — polling disabled');
+}
+
+// Set up Telegram bot polling if configured
+if (isTelegramBotConfigured()) {
+  const pollInterval = parseInt(process.env.TELEGRAM_POLL_INTERVAL_MS || '35000', 10);
+  telegramBotQueue
+    .add(JobType.POLL_TELEGRAM_UPDATES, {}, { repeat: { every: pollInterval } })
+    .then(() =>
+      logger.info('Telegram bot polling scheduled', { intervalMs: String(pollInterval) })
+    )
+    .catch((err) => logger.error('Failed to schedule Telegram polling', { error: err.message }));
+} else {
+  logger.info('Telegram bot not configured — polling disabled');
 }
 
 // Schedule BYOK key re-validation every 24 hours

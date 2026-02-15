@@ -20,7 +20,7 @@ export type PodcastStatus =
 
 export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
-export type PodcastSource = 'WEB' | 'TWITTER' | 'API' | 'IMPORT';
+export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT';
 
 export type Speaker = 'HOST' | 'EXPERT';
 
@@ -45,6 +45,15 @@ export type TweetMentionStatus =
   | 'FAILED'
   | 'IGNORED';
 
+export type TelegramMessageStatus =
+  | 'PENDING'
+  | 'DISCOVERING'
+  | 'GENERATING'
+  | 'READY'
+  | 'REPLIED'
+  | 'FAILED'
+  | 'IGNORED';
+
 export type TeamInviteStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
 
 export type NotificationType =
@@ -57,6 +66,7 @@ export type NotificationType =
   | 'SIMILAR_PODCAST_CREATED'
   | 'TEAM_INVITE'
   | 'TWITTER_PODCAST_READY'
+  | 'TELEGRAM_PODCAST_READY'
   | 'VOICE_REQUEST_RECEIVED'
   | 'VOICE_REQUEST_APPROVED'
   | 'VOICE_REQUEST_DENIED'

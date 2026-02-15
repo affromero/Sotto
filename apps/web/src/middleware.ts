@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = new Set([
   '/feedback',
   '/api/feedback',
   '/pitch',
+  '/connect/telegram',
 ]);
 const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
 
