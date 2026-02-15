@@ -19,13 +19,15 @@
 1. Enroll at [developer.apple.com/programs](https://developer.apple.com/programs/) ($99/year)
 2. Complete identity verification (takes 24-48 hours)
 3. Note your **Team ID** — visible in [Membership](https://developer.apple.com/account/#/membership)
-4. Update `apps/mobile/eas.json` with your Team ID:
+4. Note your **App Apple ID** — visible in App Store Connect → App Information → Apple ID
+5. Add the `submit` block to `apps/mobile/eas.json`:
    ```json
    "submit": {
      "production": {
        "ios": {
          "appleId": "me@afromero.co",
-         "appleTeamId": "YOUR_TEAM_ID"
+         "ascAppId": "<Apple ID from App Store Connect>",
+         "appleTeamId": "<Team ID from developer.apple.com>"
        }
      }
    }
