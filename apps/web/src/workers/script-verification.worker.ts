@@ -8,6 +8,7 @@ import {
   scriptVerificationQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { verifyScript } from '@/lib/script-verifier';
 import {
   generateScriptWithFeedback,
@@ -154,10 +155,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   // Script failed verification
   if (attemptNumber >= MAX_VERIFICATION_ATTEMPTS) {
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'FAILED' },
-    });
+    await markPodcastFailed(podcastId);
 
     await prisma.script.update({
       where: { podcastId },

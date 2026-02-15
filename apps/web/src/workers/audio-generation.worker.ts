@@ -27,6 +27,42 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   logger.info('Generating audio for segment', { podcastId, segmentId, speaker });
   await job.updateProgress(10);
 
+  // Idempotency: skip if segment already has audio
+  const existingSegment = await prisma.segment.findUnique({
+    where: { id: segmentId },
+    select: { audioUrl: true },
+  });
+
+  if (existingSegment?.audioUrl) {
+    logger.info('Segment already has audio, skipping TTS', { podcastId, segmentId });
+
+    // Still check if all segments are done — may need to trigger stitching
+    const pendingSegments = await prisma.segment.count({
+      where: { podcastId, audioUrl: null },
+    });
+
+    if (pendingSegments === 0) {
+      const segments = await prisma.segment.findMany({
+        where: { podcastId },
+        orderBy: { order: 'asc' },
+        select: { id: true },
+      });
+
+      await addJob(audioStitchingQueue, JobType.STITCH_AUDIO, {
+        podcastId,
+        segmentIds: segments.map((s) => s.id),
+      });
+
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { status: 'STITCHING' },
+      });
+    }
+
+    await job.updateProgress(100);
+    return;
+  }
+
   // Fetch podcast to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },

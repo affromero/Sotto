@@ -7,6 +7,7 @@ import {
   twitterReplyQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
@@ -161,10 +162,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 7. Post-stitch duration hard check
     const maxDurationSeconds = LIMITS.maxDurationMinutes * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
-      await prisma.podcast.update({
-        where: { id: podcastId },
-        data: { status: 'FAILED' },
-      });
+      await markPodcastFailed(podcastId);
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
@@ -282,12 +280,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
   } catch (err) {
     // Mark podcast as failed on unrecoverable error
-    await prisma.podcast
-      .update({
-        where: { id: podcastId },
-        data: { status: 'FAILED' },
-      })
-      .catch(() => {});
+    await markPodcastFailed(podcastId).catch(() => {});
 
     // If Twitter-sourced, queue failure reply
     if (job.data.podcastId) {

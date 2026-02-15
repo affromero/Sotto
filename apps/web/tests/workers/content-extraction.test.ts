@@ -7,12 +7,14 @@ const mockPrismaDiscoveryUpdate = vi.fn().mockResolvedValue({
   podcastId: 'podcast-001',
   sourceContent: '',
 });
+const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     discovery: {
       update: (...args: unknown[]) => mockPrismaDiscoveryUpdate(...args),
+      findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
@@ -71,6 +73,7 @@ const defaultPayload: ExtractContentPayload = {
 describe('processContentExtraction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrismaDiscoveryFindUnique.mockResolvedValue(null);
     mockPrismaDiscoveryUpdate.mockResolvedValue({
       id: 'discovery-001',
       podcastId: 'podcast-001',
@@ -427,6 +430,64 @@ Line 3`;
         where: { podcastId: 'podcast-001' },
         data: { sourceContent: unicodeText },
       });
+    });
+  });
+
+  describe('idempotency', () => {
+    it('skips extraction when sourceContent already exists', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({
+        id: 'discovery-existing',
+        sourceContent: 'Already extracted content',
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/article',
+      });
+      await processContentExtraction(job);
+
+      expect(mockExtractFromUrl).not.toHaveBeenCalled();
+      expect(mockPrismaDiscoveryUpdate).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'SCRIPTING' },
+      });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'script-generation' },
+        'generate_script',
+        expect.objectContaining({
+          podcastId: 'podcast-001',
+          discoveryId: 'discovery-existing',
+          sourceContent: 'Already extracted content',
+        })
+      );
+    });
+
+    it('proceeds normally when sourceContent is null', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({
+        id: 'discovery-001',
+        sourceContent: null,
+      });
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceText: 'User text',
+      });
+      await processContentExtraction(job);
+
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
+    });
+
+    it('proceeds normally when discovery does not exist', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue(null);
+
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceText: 'User text',
+      });
+      await processContentExtraction(job);
+
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalled();
     });
   });
 
