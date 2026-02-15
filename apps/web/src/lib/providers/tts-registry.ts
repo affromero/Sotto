@@ -42,7 +42,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       validate: async (creds) => {
         try {
           const res = await fetch('https://api.elevenlabs.io/v1/user', {
-            method: 'HEAD',
             headers: { 'xi-api-key': creds.apiKey },
           });
           return res.ok;

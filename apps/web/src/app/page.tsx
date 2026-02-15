@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import styles from './page.module.css';
 import accessStyles from './access.module.css';
@@ -21,6 +22,7 @@ const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="b
 const MAX_RIPPLES = 3;
 
 export default function LandingPage() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [accessState, setAccessState] = useState<'checking' | 'gated' | 'granted'>('checking');
   const [password, setPassword] = useState('');
   const [accessError, setAccessError] = useState('');
@@ -181,9 +183,17 @@ export default function LandingPage() {
             <Link href="/feed" className={styles.navCta}>
               Explore Feed
             </Link>
-            <Link href="/auth/login" className={styles.navSign}>
-              Sign In
-            </Link>
+            {!authLoading && (
+              isAuthenticated ? (
+                <Link href="/dashboard" className={styles.navSign}>
+                  Dashboard
+                </Link>
+              ) : (
+                <Link href="/auth/login" className={styles.navSign}>
+                  Sign In
+                </Link>
+              )
+            )}
             <button
               type="button"
               className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ''}`}
@@ -220,8 +230,8 @@ export default function LandingPage() {
             <Link href="/feed" className={styles.btnPrimary}>
               Explore the Feed
             </Link>
-            <Link href="/auth/login" className={styles.btnGhost}>
-              Sign In
+            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
+              {isAuthenticated ? 'Dashboard' : 'Sign In'}
             </Link>
           </div>
         </div>
@@ -1280,8 +1290,8 @@ export default function LandingPage() {
             <Link href="/feed" className={styles.btnPrimary}>
               Explore the Feed
             </Link>
-            <Link href="/auth/login" className={styles.btnGhost}>
-              Sign In
+            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
+              {isAuthenticated ? 'Dashboard' : 'Sign In'}
             </Link>
           </div>
         </div>
