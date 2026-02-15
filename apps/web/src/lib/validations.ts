@@ -342,3 +342,12 @@ export const deleteAccountSchema = z.object({
 export const telegramConnectSchema = z.object({
   code: z.string().min(1),
 });
+
+/**
+ * User discovery search validation
+ */
+export const userDiscoverySearchSchema = z.object({
+  query: z.string().min(2).max(100),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(30).default(20),
+});

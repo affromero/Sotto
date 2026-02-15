@@ -106,6 +106,7 @@ export default async function FeedPage() {
             trendingPodcasts={remainingTrending}
             tags={tags}
             isAuthenticated={isAuthenticated}
+            currentUserId={session?.user?.id ?? null}
           />
         </div>
       </main>
