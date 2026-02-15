@@ -1,6 +1,16 @@
 import { generateResponse, streamResponse } from './claude';
 
 /**
+ * Detect URLs in a message string.
+ * Returns an array of matched URLs (http/https only).
+ */
+export function detectUrls(message: string): string[] {
+  const urlRegex = /https?:\/\/[^\s<>)"',]+/gi;
+  const matches = message.match(urlRegex);
+  return matches ? [...new Set(matches)] : [];
+}
+
+/**
  * System prompt for the discovery chat agent
  */
 const DISCOVERY_SYSTEM_PROMPT = `You are Sotto's podcast discovery agent. Your job is to have a natural conversation
@@ -16,6 +26,12 @@ You are warm, curious, and conversational — like a knowledgeable friend who's 
 5. Ask about FOCUS — what specific angle interests them
 6. Ask about TONE (casual, professional, socratic/questioning)
 7. Optionally ask about DURATION preference
+
+## URL Handling:
+- If the user's message includes a [URL_CONTEXT] block, you've been given the extracted content from their link
+- Acknowledge the source naturally: "I see you've shared an article about {topic}..."
+- Use the extracted content to infer the topic and focus — skip those questions if the content makes them obvious
+- Still ask about AUDIENCE, TONE, and DURATION — these can't be inferred from the URL
 
 ## Rules:
 - Ask ONE question at a time
@@ -40,9 +56,12 @@ End your final message with a metadata block:
   "focus_areas": ["...", "..."],
   "tone": "casual|professional|socratic",
   "duration_target": 10,
+  "source_url": "https://...",
   "ready": true
 }
-[/METADATA]`;
+[/METADATA]
+
+Include "source_url" only if the user shared a URL. Otherwise omit it.`;
 
 /**
  * Parse chip suggestions from agent message

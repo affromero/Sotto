@@ -9,7 +9,7 @@ vi.mock('@/lib/claude', () => ({
 }));
 
 // ---- Import under test ----
-import { generateScript } from '@/lib/script-generator';
+import { generateScript, generateScriptWithFeedback } from '@/lib/script-generator';
 
 // ---- Tests ----
 
@@ -112,7 +112,6 @@ describe('generateScript', () => {
       const userMessage = call[1][0].content;
 
       expect(userMessage).toContain('Source material:');
-      expect(userMessage.length).toBeLessThan(8500); // Should truncate at 8000
     });
 
     it('applies casual tone to system prompt', async () => {
@@ -661,7 +660,7 @@ describe('generateScript', () => {
       expect(result.references).toEqual([]);
     });
 
-    it('handles long source content by truncating', async () => {
+    it('truncates sourceContent at 20000 chars', async () => {
       const mockResponse = {
         turns: [{ speaker: 'HOST', text: 'Summary time.' }],
         soundCues: [],
@@ -674,7 +673,7 @@ describe('generateScript', () => {
         outputTokens: 600,
       });
 
-      const longContent = 'A'.repeat(10000); // 10k chars
+      const longContent = 'A'.repeat(25000); // 25k chars, exceeds limit
 
       await generateScript({
         topic: 'Long Source',
@@ -689,10 +688,10 @@ describe('generateScript', () => {
       const call = mockGenerateResponse.mock.calls[0];
       const userMessage = call[1][0].content;
 
-      // Should truncate to 8000 chars max after "Source material:\n"
-      const sourceMatch = userMessage.match(/Source material:\n(.+)/s);
-      expect(sourceMatch).toBeTruthy();
-      expect(sourceMatch![1].length).toBe(8000);
+      // Source material header + 20000 chars of content
+      expect(userMessage).toContain('Source material:');
+      const contentAfterHeader = userMessage.split('Source material:\n')[1];
+      expect(contentAfterHeader.length).toBe(20000);
     });
 
     it('passes audience parameter to system prompt', async () => {
@@ -752,5 +751,194 @@ describe('generateScript', () => {
         expect.objectContaining({ apiKeyOverride: 'user-api-key-123' })
       );
     });
+
+    it('includes sourceMetadata in user message when provided', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'From the article...' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'Metadata Test',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceContent: 'Article body text here',
+        sourceMetadata: {
+          title: 'The Future of AI',
+          author: 'Jane Doe',
+          publishedDate: '2024-03-15',
+          siteName: 'TechCrunch',
+        },
+      });
+
+      const call = mockGenerateResponse.mock.calls[0];
+      const userMessage = call[1][0].content;
+
+      expect(userMessage).toContain('Title: The Future of AI');
+      expect(userMessage).toContain('Author: Jane Doe');
+      expect(userMessage).toContain('Published: 2024-03-15');
+      expect(userMessage).toContain('Source: TechCrunch');
+      expect(userMessage).toContain('Content:');
+      expect(userMessage).toContain('Article body text here');
+    });
+
+    it('uses simple format when sourceMetadata is absent', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'From the source...' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'No Metadata',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceContent: 'Plain source text',
+      });
+
+      const call = mockGenerateResponse.mock.calls[0];
+      const userMessage = call[1][0].content;
+
+      expect(userMessage).toContain('Source material:\nPlain source text');
+      expect(userMessage).not.toContain('Title:');
+      expect(userMessage).not.toContain('Content:');
+    });
+
+    it('handles partial sourceMetadata (some fields undefined)', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'Partial meta...' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'Partial Meta',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceContent: 'Some text',
+        sourceMetadata: {
+          title: 'Only Title',
+        },
+      });
+
+      const call = mockGenerateResponse.mock.calls[0];
+      const userMessage = call[1][0].content;
+
+      expect(userMessage).toContain('Title: Only Title');
+      expect(userMessage).not.toContain('Author:');
+      expect(userMessage).not.toContain('Published:');
+      expect(userMessage).not.toContain('Source:');
+    });
+  });
+});
+
+describe('generateScriptWithFeedback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('truncates sourceContent at 20000 chars', async () => {
+    const mockResponse = {
+      turns: [{ speaker: 'HOST', text: 'Revised content.' }],
+      soundCues: [],
+      references: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 3000,
+      outputTokens: 1200,
+    });
+
+    const longContent = 'B'.repeat(25000);
+
+    await generateScriptWithFeedback({
+      topic: 'Long Source Feedback',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+      sourceContent: longContent,
+      previousScript: [{ speaker: 'HOST', text: 'Old script.' }],
+      previousReferences: [],
+      verificationFeedback: 'Fix the citations.',
+    });
+
+    const call = mockGenerateResponse.mock.calls[0];
+    const userMessage = call[1][0].content;
+
+    expect(userMessage).toContain('Source material:');
+    const contentAfterHeader = userMessage.split('Source material:\n')[1];
+    // Content is truncated at 20000 chars (though it appears within a larger message)
+    expect(contentAfterHeader.length).toBeLessThanOrEqual(20100); // 20000 + small overhead
+  });
+
+  it('includes sourceMetadata in user message when provided', async () => {
+    const mockResponse = {
+      turns: [{ speaker: 'HOST', text: 'Revised with metadata.' }],
+      soundCues: [],
+      references: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 2000,
+      outputTokens: 1000,
+    });
+
+    await generateScriptWithFeedback({
+      topic: 'Metadata Feedback',
+      depth: 'deep_dive',
+      audienceLevel: 'expert',
+      focusAreas: ['accuracy'],
+      tone: 'professional',
+      durationTarget: 15,
+      sourceContent: 'Article content',
+      sourceMetadata: {
+        title: 'Research Paper',
+        author: 'Dr. Smith',
+        publishedDate: '2024-06-01',
+        siteName: 'Nature',
+      },
+      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
+      previousReferences: [],
+      verificationFeedback: 'Add more citations.',
+    });
+
+    const call = mockGenerateResponse.mock.calls[0];
+    const userMessage = call[1][0].content;
+
+    expect(userMessage).toContain('Title: Research Paper');
+    expect(userMessage).toContain('Author: Dr. Smith');
+    expect(userMessage).toContain('Source: Nature');
   });
 });
