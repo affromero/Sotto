@@ -83,6 +83,14 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
   });
 
+  // Write back resolved provider if not already set
+  if (!podcast.ttsProvider) {
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { ttsProvider: providerId },
+    }).catch(() => {});
+  }
+
   // Use custom voice ID if set, otherwise let the provider pick from its pool
   const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
   const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId);
