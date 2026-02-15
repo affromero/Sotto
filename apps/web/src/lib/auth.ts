@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Google from 'next-auth/providers/google';
@@ -7,11 +9,17 @@ import Apple from 'next-auth/providers/apple';
 import { prisma } from './prisma';
 import { generateUniqueHandle, isHandleAvailable } from './handles';
 
+const adminsPath = join(process.cwd(), '..', '..', 'config', 'admins.json');
+const adminEmails: string[] = (() => {
+  try {
+    const data = JSON.parse(readFileSync(adminsPath, 'utf-8'));
+    return (data.admins as string[]).map((e) => e.trim().toLowerCase());
+  } catch {
+    return [];
+  }
+})();
+
 function isAdminEmail(email: string): boolean {
-  const adminEmails = (process.env.ADMIN_EMAILS ?? '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean);
   return adminEmails.includes(email.toLowerCase());
 }
 
