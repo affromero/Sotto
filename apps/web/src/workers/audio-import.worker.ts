@@ -7,6 +7,7 @@ import { createSttProvider } from '@/lib/providers/stt';
 import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
 import { generateImportMetadata } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
+import { getAiKey } from '@/lib/byok';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
@@ -35,6 +36,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
   try {
     await mkdir(tmpDir, { recursive: true });
+
+    // Resolve user's BYOK AI key for diarization + metadata generation
+    const aiKey = await getAiKey(userId, 'anthropic') ?? await getAiKey(userId, 'openai');
+    const aiApiKey = aiKey?.apiKey;
 
     await prisma.podcast.update({
       where: { id: podcastId },
@@ -95,7 +100,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
           end: s.endTime ?? 0,
           text: s.text,
         }));
-        segments = await diarizeSpeakers(whisperSegments);
+        segments = await diarizeSpeakers(whisperSegments, aiApiKey);
       }
     } else {
       logger.info('Transcribing audio', { provider: sttProvider ?? 'openai' });
@@ -107,7 +112,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       await job.updateProgress(70);
 
       logger.info('Running speaker diarization');
-      segments = await diarizeSpeakers(transcription.segments);
+      segments = await diarizeSpeakers(transcription.segments, aiApiKey);
     }
 
     await job.updateProgress(75);
@@ -116,7 +121,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     if (generateMetadata) {
       try {
         const fullText = segments.map((s) => s.text).join(' ');
-        const metadata = await generateImportMetadata(fullText);
+        const metadata = await generateImportMetadata(fullText, aiApiKey);
 
         await prisma.podcast.update({
           where: { id: podcastId },

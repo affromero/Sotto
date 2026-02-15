@@ -12,8 +12,7 @@ export class ClaudeCodeProvider implements AIProvider {
     opts?: AIOptions
   ): Promise<AIResponse> {
     return executeClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: opts?.maxTokens,
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
   }
 
@@ -23,8 +22,7 @@ export class ClaudeCodeProvider implements AIProvider {
     opts?: AIOptions
   ): AsyncGenerator<string> {
     yield* streamClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: opts?.maxTokens,
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
   }
 }

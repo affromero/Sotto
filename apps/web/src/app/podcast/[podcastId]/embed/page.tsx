@@ -4,7 +4,7 @@ import { EmbedPlayer } from '@/components/player/EmbedPlayer';
 import type { Metadata } from 'next';
 
 interface EmbedPageProps {
-  params: { podcastId: string };
+  params: Promise<{ podcastId: string }>;
 }
 
 export const metadata: Metadata = {
@@ -12,8 +12,9 @@ export const metadata: Metadata = {
 };
 
 export default async function EmbedPage({ params }: EmbedPageProps) {
+  const { podcastId } = await params;
   const podcast = await prisma.podcast.findUnique({
-    where: { id: params.podcastId },
+    where: { id: podcastId },
     select: {
       id: true,
       title: true,

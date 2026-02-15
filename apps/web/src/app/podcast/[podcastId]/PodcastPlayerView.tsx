@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   Heart,
@@ -13,6 +14,7 @@ import {
   Pencil,
   RefreshCw,
   ListMusic,
+  Trash2,
 } from 'lucide-react';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
@@ -83,6 +85,7 @@ function formatDuration(seconds: number | null): string {
 }
 
 export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId }: PodcastPlayerViewProps) {
+  const router = useRouter();
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
@@ -94,6 +97,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [showForkRemix, setShowForkRemix] = useState(false);
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -177,6 +182,21 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       setRetrying(false);
     }
   }, [podcast.id]);
+
+  const handleDelete = useCallback(async () => {
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        router.push('/dashboard');
+      }
+    } catch {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }, [podcast.id, router]);
 
   const handleExportPdf = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -314,11 +334,30 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Failed state */}
       {podcast.status === 'FAILED' && isOwner && (
         <div className={styles.failedState}>
-          <p className={styles.failedText}>Generation failed. You can retry the process.</p>
-          <Button onClick={handleRetry} loading={retrying} disabled={retrying}>
-            <RefreshCw size={16} />
-            {retrying ? 'Retrying...' : 'Retry Generation'}
-          </Button>
+          <p className={styles.failedText}>Generation failed. You can retry or delete this podcast.</p>
+          <div className={styles.failedActions}>
+            <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
+              <RefreshCw size={16} />
+              {retrying ? 'Retrying...' : 'Retry Generation'}
+            </Button>
+            {showDeleteConfirm ? (
+              <div className={styles.deleteConfirm}>
+                <span className={styles.deleteConfirmText}>Are you sure?</span>
+                <Button variant="danger" onClick={handleDelete} loading={deleting} disabled={deleting}>
+                  <Trash2 size={16} />
+                  {deleting ? 'Deleting...' : 'Yes, Delete'}
+                </Button>
+                <Button variant="secondary" onClick={() => setShowDeleteConfirm(false)} disabled={deleting}>
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <Button variant="secondary" onClick={() => setShowDeleteConfirm(true)} disabled={retrying}>
+                <Trash2 size={16} />
+                Delete
+              </Button>
+            )}
+          </div>
         </div>
       )}
 

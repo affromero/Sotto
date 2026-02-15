@@ -6,12 +6,13 @@ import { ProfileClient } from './ProfileClient';
 import styles from './page.module.css';
 
 interface ProfilePageProps {
-  params: { userId: string };
+  params: Promise<{ userId: string }>;
 }
 
 export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
+  const { userId } = await params;
   const user = await prisma.user.findUnique({
-    where: { id: params.userId },
+    where: { id: userId },
     select: { name: true, bio: true },
   });
 
@@ -24,18 +25,19 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
     description: user.bio || `${user.name || 'User'}'s podcasts on Sotto`,
     alternates: {
       types: {
-        'application/rss+xml': `${appUrl}/api/users/${params.userId}/rss`,
+        'application/rss+xml': `${appUrl}/api/users/${userId}/rss`,
       },
     },
   };
 }
 
 export default async function ProfilePage({ params }: ProfilePageProps) {
+  const { userId: profileUserId } = await params;
   const session = await auth();
   const currentUserId = session?.user?.id;
 
   const user = await prisma.user.findUnique({
-    where: { id: params.userId },
+    where: { id: profileUserId },
     select: {
       id: true,
       name: true,

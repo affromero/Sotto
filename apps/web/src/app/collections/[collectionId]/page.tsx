@@ -6,12 +6,13 @@ import { CollectionDetail } from '@/components/collections/CollectionDetail';
 import styles from './page.module.css';
 
 interface CollectionPageProps {
-  params: { collectionId: string };
+  params: Promise<{ collectionId: string }>;
 }
 
 export async function generateMetadata({ params }: CollectionPageProps): Promise<Metadata> {
+  const { collectionId } = await params;
   const collection = await prisma.collection.findUnique({
-    where: { id: params.collectionId },
+    where: { id: collectionId },
     select: { name: true, description: true, user: { select: { name: true } } },
   });
 
@@ -24,11 +25,12 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 }
 
 export default async function CollectionPage({ params }: CollectionPageProps) {
+  const { collectionId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
 
   const collection = await prisma.collection.findUnique({
-    where: { id: params.collectionId },
+    where: { id: collectionId },
     include: {
       user: {
         select: { id: true, name: true, handle: true, image: true },

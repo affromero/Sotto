@@ -6,19 +6,20 @@ import { PodcastPlayerView } from './PodcastPlayerView';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
-  params: { podcastId: string };
+  params: Promise<{ podcastId: string }>;
 }
 
 export async function generateMetadata({ params }: PodcastPageProps): Promise<Metadata> {
+  const { podcastId } = await params;
   const podcast = await prisma.podcast.findUnique({
-    where: { id: params.podcastId },
+    where: { id: podcastId },
     select: { title: true, topic: true, audioUrl: true, user: { select: { name: true } } },
   });
 
   if (!podcast) return { title: 'Podcast Not Found' };
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
-  const podcastUrl = `${appUrl}/podcast/${params.podcastId}`;
+  const podcastUrl = `${appUrl}/podcast/${podcastId}`;
 
   return {
     title: podcast.title,
@@ -45,11 +46,12 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
 }
 
 export default async function PodcastPage({ params }: PodcastPageProps) {
+  const { podcastId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
 
   const podcast = await prisma.podcast.findUnique({
-    where: { id: params.podcastId },
+    where: { id: podcastId },
     include: {
       user: {
         select: {

@@ -23,8 +23,7 @@ export async function generateResponse(
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     return executeClaudeCode(systemPrompt, serializeMessages(messages), {
-      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: options?.maxTokens,
+      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
   }
 
@@ -65,8 +64,7 @@ export async function* streamResponse(
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
-      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: options?.maxTokens,
+      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
     return;
   }

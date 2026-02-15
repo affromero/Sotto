@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { message, discoveryId } = body;
+  const { message, content, discoveryId } = body;
+  const userMessage = message ?? content;
 
   // Get or create discovery
   let discovery;
@@ -31,25 +32,46 @@ export async function POST(request: NextRequest) {
     content: m.content,
   })) || [];
 
-  messages.push({ role: 'user', content: message });
+  messages.push({ role: 'user', content: userMessage });
 
   // Stream response
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      let fullResponse = '';
-      for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey)) {
-        fullResponse += chunk;
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+      try {
+        let fullResponse = '';
+        for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey)) {
+          fullResponse += chunk;
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+        }
+
+        const { chips } = parseChips(fullResponse);
+        const metadata = parseMetadata(fullResponse);
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata })}\n\n`)
+        );
+      } catch (error) {
+        const status = (error as { status?: number }).status;
+        const isAuthError = status === 401 || status === 403;
+
+        if (isAuthError && aiKey) {
+          await prisma.userAiKey.updateMany({
+            where: { userId: session.user.id, provider: aiKey.provider },
+            data: { isValid: false },
+          });
+        }
+
+        const errorMessage = isAuthError
+          ? 'Your AI API key is invalid or has been revoked. Please update it in Settings.'
+          : 'An error occurred while generating a response. Please try again.';
+
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`)
+        );
+      } finally {
+        controller.close();
       }
-
-      const { chips } = parseChips(fullResponse);
-      const metadata = parseMetadata(fullResponse);
-
-      controller.enqueue(
-        encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata })}\n\n`)
-      );
-      controller.close();
     },
   });
 

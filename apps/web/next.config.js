@@ -4,6 +4,9 @@ const path = require('path');
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  experimental: {
+    proxyClientMaxBodySize: '150mb',
+  },
   transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared'],
   turbopack: {
     root: path.resolve(__dirname, '../..'),

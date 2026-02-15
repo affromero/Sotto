@@ -130,8 +130,7 @@ class ClaudeCodeLazyProvider implements AIProvider {
   ): Promise<AIResponse> {
     const { executeClaudeCode, serializeMessages } = await this.getClient();
     return executeClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: opts?.maxTokens,
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
   }
 
@@ -142,8 +141,7 @@ class ClaudeCodeLazyProvider implements AIProvider {
   ): AsyncGenerator<string> {
     const { streamClaudeCode, serializeMessages } = await this.getClient();
     yield* streamClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku',
-      maxTokens: opts?.maxTokens,
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
     });
   }
 }
