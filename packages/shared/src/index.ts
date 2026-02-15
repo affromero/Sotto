@@ -44,6 +44,8 @@ export type {
   DiscoveryMessage,
   DiscoveryMetadata,
   DiscoveryState,
+  TasteQuestion,
+  TasteAnswer,
 } from './types/discovery';
 
 export type { PlayerState, PlayerControls } from './types/player';
