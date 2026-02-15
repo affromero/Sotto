@@ -80,11 +80,9 @@ describe('createSttProvider', () => {
   });
 
   it('groq provider passes baseURL to OpenAI client', async () => {
+    // Warm up vitest mock module cache for dynamic import('openai') in loadClient
     await import('openai');
     const provider = createSttProvider('groq', 'gsk-test');
-
-    // Wait for async loadClient to complete
-    await new Promise((r) => setTimeout(r, 10));
 
     // The provider should have been constructed with baseURL
     // We verify by checking that transcribe uses the correct model
@@ -106,7 +104,6 @@ describe('createSttProvider', () => {
 
   it('openai provider uses whisper-1 model', async () => {
     const provider = createSttProvider('openai', 'sk-test');
-    await new Promise((r) => setTimeout(r, 10));
 
     mockTranscriptionsCreate.mockResolvedValueOnce({
       text: 'hello',

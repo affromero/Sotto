@@ -47,7 +47,7 @@ const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
 
 class OpenAIWhisperProvider implements SttProvider {
   private client: any | null = null;
-  private isAvailable = false;
+  private initPromise: Promise<void> | null = null;
   private config: WhisperProviderConfig;
 
   constructor(apiKey?: string, config?: WhisperProviderConfig) {
@@ -58,7 +58,7 @@ class OpenAIWhisperProvider implements SttProvider {
       return;
     }
 
-    this.loadClient(key);
+    this.initPromise = this.loadClient(key);
   }
 
   private async loadClient(apiKey: string): Promise<void> {
@@ -68,7 +68,6 @@ class OpenAIWhisperProvider implements SttProvider {
         apiKey,
         ...(this.config.baseURL ? { baseURL: this.config.baseURL } : {}),
       } as { apiKey: string });
-      this.isAvailable = true;
       logger.info(`${this.config.name} STT provider initialized`);
     } catch (err) {
       logger.warn('OpenAI SDK not installed — STT transcription unavailable', {
@@ -78,7 +77,8 @@ class OpenAIWhisperProvider implements SttProvider {
   }
 
   async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
-    if (!this.client || !this.isAvailable) {
+    await this.initPromise;
+    if (!this.client) {
       throw new Error(`${this.config.name} provider not initialized — set ${this.config.envVar}`);
     }
 
