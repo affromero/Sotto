@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { ImportAudioPayload, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
@@ -257,10 +258,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       error: err instanceof Error ? err.message : String(err),
     });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'FAILED' },
-    });
+    await markPodcastFailed(podcastId);
 
     throw err;
   } finally {

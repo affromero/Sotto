@@ -86,6 +86,12 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+const mockMarkPodcastFailed = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/lib/pipeline-resume', () => ({
+  markPodcastFailed: (...args: unknown[]) => mockMarkPodcastFailed(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -664,10 +670,7 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        data: { status: 'FAILED' },
-      });
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
     });
 
     it('propagates error from downloadFile', async () => {

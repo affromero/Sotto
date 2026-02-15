@@ -6,6 +6,7 @@ import {
   notificationQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import {
   verifyUrl,
   verifyDoi,
@@ -196,10 +197,7 @@ export async function processReferenceValidation(
   });
 
   if (allFailed) {
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'FAILED' },
-    });
+    await markPodcastFailed(podcastId);
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
