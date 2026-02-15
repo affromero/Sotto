@@ -87,6 +87,8 @@ export type {
 
 export { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from './types/import';
 
+export { getContentBadgeLabel } from './content-badge';
+
 export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 
 // Theme / design tokens

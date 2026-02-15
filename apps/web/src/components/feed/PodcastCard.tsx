@@ -4,7 +4,7 @@ import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
-import { SOURCE_PLATFORMS } from '@sotto/shared';
+import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { Badge } from '@/components/ui/Badge';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
@@ -43,11 +43,6 @@ function formatCount(count: number): string {
   return count.toString();
 }
 
-function platformLabel(slug: string): string {
-  const platform = SOURCE_PLATFORMS.find((p) => p.value === slug);
-  return platform?.label ?? slug;
-}
-
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -62,13 +57,6 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-function getContentBadgeLabel(podcast: PodcastSummary): string {
-  if (podcast.source === 'IMPORT' && podcast.isHumanContent) return 'Human';
-  if (podcast.source === 'IMPORT') {
-    return podcast.sourcePlatform ? platformLabel(podcast.sourcePlatform) : 'Imported';
-  }
-  return 'AI';
-}
 
 export function PodcastCard({
   podcast,

@@ -14,7 +14,7 @@ import { useLocalSearchParams, Stack } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import TrackPlayer, { useProgress, usePlaybackState, State } from 'react-native-track-player';
-import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
@@ -230,6 +230,27 @@ export default function PodcastScreen() {
         <Text style={styles.creator}>
           {podcast.user?.name ?? 'Unknown Creator'}
         </Text>
+        <View style={styles.podcastBadgeRow}>
+          <View
+            style={[
+              styles.podcastContentBadge,
+              podcast.source !== 'IMPORT' || !podcast.isHumanContent
+                ? styles.podcastContentBadgeAi
+                : styles.podcastContentBadgeHuman,
+            ]}
+          >
+            <Text
+              style={[
+                styles.podcastContentBadgeText,
+                podcast.source !== 'IMPORT' || !podcast.isHumanContent
+                  ? styles.podcastContentBadgeTextAi
+                  : styles.podcastContentBadgeTextHuman,
+              ]}
+            >
+              {getContentBadgeLabel(podcast)}
+            </Text>
+          </View>
+        </View>
         {totalDuration > 0 && (
           <Text style={styles.durationBadge}>
             {formatTime(totalDuration)}
@@ -534,6 +555,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: spacing.xs,
+  },
+  podcastBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  podcastContentBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  podcastContentBadgeAi: {
+    backgroundColor: colors.primaryLighter,
+  },
+  podcastContentBadgeHuman: {
+    backgroundColor: colors.successLighter,
+  },
+  podcastContentBadgeText: {
+    fontFamily: typography.fontBody,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  podcastContentBadgeTextAi: {
+    color: colors.primary,
+  },
+  podcastContentBadgeTextHuman: {
+    color: colors.success,
   },
   durationBadge: {
     fontFamily: typography.fontBody,
