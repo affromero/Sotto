@@ -34,6 +34,24 @@ vi.mock('@/lib/discovery-agent', () => ({
   streamDiscoveryResponse: (...args: unknown[]) => mockStreamDiscoveryResponse(...args),
   parseChips: (...args: unknown[]) => mockParseChips(...args),
   parseMetadata: (...args: unknown[]) => mockParseMetadata(...args),
+  detectUrls: () => [],
+}));
+
+vi.mock('@/lib/extractors', () => ({
+  extractContent: vi.fn().mockResolvedValue({ text: '', markdown: '' }),
+}));
+
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: false, remaining: 0, resetAt: 0 }),
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 import { POST } from '@/app/api/discovery/route';
