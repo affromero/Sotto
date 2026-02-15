@@ -31,9 +31,15 @@
   transition: color var(--transition-fast);
 }
 
-.nav a:hover { color: var(--color-text-primary); }
+.nav a:hover {
+  color: var(--color-text-primary);
+}
 
-.actions { display: flex; align-items: center; gap: var(--spacing-sm); }
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
 
 .signIn {
   font-size: var(--font-size-sm);
@@ -42,6 +48,38 @@
   text-decoration: none;
 }
 
+/* Avatar for authenticated users */
+
+.avatarLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.avatarFallback {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
 @media (max-width: 768px) {
-  .nav { display: none; }
+  .nav {
+    display: none;
+  }
 }

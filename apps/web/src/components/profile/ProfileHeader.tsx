@@ -85,7 +85,7 @@ export function ProfileHeader({
       <div className={styles.infoColumn}>
         <div className={styles.nameRow}>
           <h1 className={styles.name}>
-            {user.name || 'Anonymous'}
+            <span>{user.name || 'Anonymous'}</span>
             {user.role === 'SYSTEM' && <Badge variant="system">Sotto</Badge>}
             {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
             {user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
