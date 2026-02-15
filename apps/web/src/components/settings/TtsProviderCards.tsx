@@ -42,12 +42,19 @@ const PROVIDERS = [
   },
 ];
 
+interface ProviderStatus {
+  provider: string;
+  isValid: boolean;
+}
+
 interface TtsProviderCardsProps {
-  initialConfigured: string[];
+  initialConfigured: Array<ProviderStatus>;
 }
 
 export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
-  const [configured, setConfigured] = useState<Set<string>>(new Set(initialConfigured));
+  const [configured, setConfigured] = useState<Map<string, boolean>>(
+    new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -83,7 +90,7 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
         return;
       }
 
-      setConfigured((prev) => new Set([...prev, providerId]));
+      setConfigured((prev) => new Map(prev).set(providerId, true));
       setFieldValues((prev) => {
         const next = { ...prev };
         delete next[`${providerId}-apiKey`];
@@ -110,7 +117,7 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
         body: JSON.stringify({ provider: providerId }),
       });
       setConfigured((prev) => {
-        const next = new Set(prev);
+        const next = new Map(prev);
         next.delete(providerId);
         return next;
       });
@@ -128,6 +135,7 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
     <div className={styles.grid}>
       {PROVIDERS.map((provider) => {
         const isConfigured = configured.has(provider.id);
+        const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
 
         return (
@@ -141,7 +149,11 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
                 </div>
               </div>
               {isConfigured ? (
-                <span className={styles.statusConnected}>Connected</span>
+                isValid ? (
+                  <span className={styles.statusConnected}>Connected</span>
+                ) : (
+                  <span className={styles.statusInvalid}>Key Invalid</span>
+                )
               ) : (
                 <span className={styles.statusNone}>Not configured</span>
               )}

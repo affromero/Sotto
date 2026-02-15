@@ -835,10 +835,12 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
-        where: { id: 'podcast-001' },
-        data: { status: 'FAILED' },
-      });
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: expect.objectContaining({ status: 'FAILED' }),
+        })
+      );
     });
 
     it('sends failure notification when all references fail', async () => {

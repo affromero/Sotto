@@ -207,6 +207,7 @@ model Podcast {
   topic     String        @db.Text
   status         PodcastStatus @default(PENDING)
   failedAtStatus String?
+  failureReason  String?       @db.Text
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -616,6 +617,8 @@ model Notification {
 
 enum NotificationType {
   PODCAST_READY
+  PODCAST_FAILED
+  KEY_INVALID
   PODCAST_LIKED
   PODCAST_FORKED
   NEW_FOLLOWER
