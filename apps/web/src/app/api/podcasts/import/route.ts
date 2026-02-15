@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Readable } from 'stream';
+import busboy from 'busboy';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
@@ -22,6 +24,76 @@ const ALLOWED_AUDIO_TYPES = [
 
 const ALLOWED_AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'mp4', 'aac', 'webm', 'opus'];
 
+interface ParsedFile {
+  buffer: Buffer;
+  filename: string;
+  mimeType: string;
+}
+
+function parseMultipart(
+  request: NextRequest
+): Promise<{ fields: Record<string, string>; files: Record<string, ParsedFile> }> {
+  const contentType = request.headers.get('content-type');
+  if (!contentType?.includes('multipart/form-data')) {
+    return Promise.reject(new Error('Expected multipart/form-data'));
+  }
+
+  const reader = request.body?.getReader();
+  if (!reader) {
+    return Promise.reject(new Error('No request body'));
+  }
+
+  const nodeStream = new Readable({
+    async read() {
+      const { done, value } = await reader.read();
+      if (done) {
+        this.push(null);
+      } else {
+        this.push(Buffer.from(value));
+      }
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    const fields: Record<string, string> = {};
+    const files: Record<string, ParsedFile> = {};
+
+    const bb = busboy({
+      headers: { 'content-type': contentType },
+      limits: { fileSize: MAX_AUDIO_SIZE },
+    });
+
+    bb.on('field', (name, value) => {
+      fields[name] = value;
+    });
+
+    bb.on('file', (fieldname, stream, info) => {
+      const chunks: Buffer[] = [];
+      let truncated = false;
+
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('limit', () => {
+        truncated = true;
+      });
+      stream.on('end', () => {
+        if (truncated) {
+          return; // handled in 'finish'
+        }
+        files[fieldname] = {
+          buffer: Buffer.concat(chunks),
+          filename: info.filename,
+          mimeType: info.mimeType,
+        };
+      });
+    });
+
+    bb.on('finish', () => resolve({ fields, files }));
+    bb.on('error', reject);
+
+    nodeStream.pipe(bb);
+  });
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
 
@@ -30,14 +102,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const formData = await request.formData();
+    const { fields, files } = await parseMultipart(request);
 
-    const title = formData.get('title') as string | null;
-    const topic = formData.get('topic') as string | null;
-    const isHumanContentStr = formData.get('isHumanContent') as string | null;
-    const sourcePlatform = formData.get('sourcePlatform') as string | null;
-    const audioFile = formData.get('audio') as File | null;
-    const transcriptFile = formData.get('transcript') as File | null;
+    const title = fields.title || null;
+    const topic = fields.topic || null;
+    const isHumanContentStr = fields.isHumanContent || null;
+    const sourcePlatform = fields.sourcePlatform || null;
+    const audioFile = files.audio || null;
+    const transcriptFile = files.transcript || null;
 
     if (!title || !topic) {
       return NextResponse.json({ error: 'Missing required fields: title, topic' }, { status: 400 });
@@ -61,18 +133,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (audioFile.size > MAX_AUDIO_SIZE) {
+    if (audioFile.buffer.length > MAX_AUDIO_SIZE) {
       return NextResponse.json(
         { error: `Audio file too large: max ${MAX_AUDIO_SIZE / 1024 / 1024}MB` },
         { status: 400 }
       );
     }
 
-    const fileExt = audioFile.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_AUDIO_TYPES.includes(audioFile.type) && (!fileExt || !ALLOWED_AUDIO_EXTENSIONS.includes(fileExt))) {
+    const fileExt = audioFile.filename.split('.').pop()?.toLowerCase();
+    if (
+      !ALLOWED_AUDIO_TYPES.includes(audioFile.mimeType) &&
+      (!fileExt || !ALLOWED_AUDIO_EXTENSIONS.includes(fileExt))
+    ) {
       return NextResponse.json(
         {
-          error: `Unsupported audio type: ${audioFile.type}`,
+          error: `Unsupported audio type: ${audioFile.mimeType}`,
           allowed: ALLOWED_AUDIO_TYPES,
         },
         { status: 400 }
@@ -99,11 +174,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    const audioBuffer = Buffer.from(await audioFile.arrayBuffer());
-    const ext = audioFile.name.split('.').pop() || 'mp3';
+    const ext = fileExt || 'mp3';
     const audioKey = `imports/${podcast.id}/original.${ext}`;
 
-    await uploadFile(audioKey, audioBuffer, audioFile.type);
+    await uploadFile(audioKey, audioFile.buffer, audioFile.mimeType);
 
     await prisma.podcast.update({
       where: { id: podcast.id },
@@ -112,7 +186,7 @@ export async function POST(request: NextRequest) {
 
     let transcriptText: string | undefined;
     if (transcriptFile) {
-      transcriptText = await transcriptFile.text();
+      transcriptText = transcriptFile.buffer.toString('utf-8');
       logger.info('Transcript provided', {
         podcastId: podcast.id,
         length: String(transcriptText.length),
@@ -130,7 +204,7 @@ export async function POST(request: NextRequest) {
     logger.info('Audio import queued', {
       podcastId: podcast.id,
       userId: session.user.id,
-      audioSize: String(audioFile.size),
+      audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
     });
 
@@ -143,6 +217,7 @@ export async function POST(request: NextRequest) {
       error: err instanceof Error ? err.message : String(err),
     });
 
-    return NextResponse.json({ error: 'Failed to import podcast' }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `Failed to import podcast: ${message}` }, { status: 500 });
   }
 }
