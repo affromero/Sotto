@@ -364,7 +364,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Failed state */}
       {podcast.status === 'FAILED' && isOwner && (
         <div className={styles.failedState}>
-          <p className={styles.failedText}>Generation failed. You can retry or delete this podcast.</p>
+          <p className={styles.failedText}>
+            {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
+          </p>
           <div className={styles.failedActions}>
             <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
               <RefreshCw size={16} />
