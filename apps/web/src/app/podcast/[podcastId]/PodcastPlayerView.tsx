@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -16,7 +16,7 @@ import {
   ListMusic,
   Trash2,
 } from 'lucide-react';
-import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
+import { AudioPlayerProvider, usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
@@ -85,12 +85,30 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
+function PlayerBridge({
+  onTimeUpdate,
+  seekRef,
+}: {
+  onTimeUpdate: (time: number) => void;
+  seekRef: React.MutableRefObject<((time: number) => void) | null>;
+}) {
+  const { currentTime, seek } = usePlayer();
+  useEffect(() => {
+    seekRef.current = seek;
+  }, [seek, seekRef]);
+  useEffect(() => {
+    onTimeUpdate(currentTime);
+  }, [currentTime, onTimeUpdate]);
+  return null;
+}
+
 export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId }: PodcastPlayerViewProps) {
   const router = useRouter();
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
   const [currentTime, setCurrentTime] = useState(0);
+  const seekRef = useRef<((time: number) => void) | null>(null);
   const [showInterruptChat, setShowInterruptChat] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
@@ -252,11 +270,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
     setShowInterruptChat(true);
   }, []);
 
+  const handleSegmentClick = useCallback((time: number) => {
+    setCurrentTime(time);
+    seekRef.current?.(time);
+  }, []);
+
   const isReady = podcast.status === 'READY';
   const isProcessing = !isReady && podcast.status !== 'FAILED';
 
   return (
     <AudioPlayerProvider>
+    <PlayerBridge onTimeUpdate={setCurrentTime} seekRef={seekRef} />
     <div className={styles.playerView}>
       {/* Back nav */}
       <nav className={styles.breadcrumb}>
@@ -537,7 +561,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                 segments={podcast.segments}
                 references={podcast.references}
                 currentTime={currentTime}
-                onSegmentClick={setCurrentTime}
+                onSegmentClick={handleSegmentClick}
                 questionCounts={isOwner ? questionCounts : undefined}
               />
             ) : (
@@ -545,7 +569,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                 segments={podcast.segments}
                 references={podcast.references}
                 currentTime={currentTime}
-                onSegmentClick={setCurrentTime}
+                onSegmentClick={handleSegmentClick}
               />
             )}
           </section>

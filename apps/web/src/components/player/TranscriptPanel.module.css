@@ -37,6 +37,7 @@
 .active {
   background: var(--color-primary-subtle);
   border-left-color: var(--color-primary);
+  animation: bgPulse 2.5s ease-in-out infinite;
 }
 
 .speaker {
@@ -64,6 +65,15 @@
   font: var(--text-body-sm);
   color: var(--color-text-primary);
   line-height: 1.6;
+}
+
+@keyframes bgPulse {
+  0%, 100% { background: var(--color-primary-subtle); }
+  50% { background: rgba(217, 119, 6, 0.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active { animation: none; }
 }
 
 @media (max-width: 768px) {
