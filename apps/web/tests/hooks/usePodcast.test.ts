@@ -17,6 +17,7 @@ const mockPodcastData: PodcastDetail = {
   isHumanContent: false,
   forkedFromId: null,
   remixNote: null,
+  failureReason: null,
   currentVersion: 1,
   user: {
     id: 'user-1',
