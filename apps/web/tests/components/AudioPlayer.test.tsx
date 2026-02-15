@@ -11,6 +11,8 @@ vi.mock('@/components/player/PlaybackControls', () => ({
 describe('AudioPlayer', () => {
   const mockPlayer = {
     podcastId: 'test-podcast-id',
+    podcastTitle: 'Test Podcast',
+    audioUrl: 'https://example.com/audio.mp3',
     isPlaying: false,
     currentTime: 30,
     duration: 180,
@@ -26,6 +28,7 @@ describe('AudioPlayer', () => {
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
     loadPodcast: vi.fn(),
+    clearPodcast: vi.fn(),
   };
 
   beforeEach(() => {

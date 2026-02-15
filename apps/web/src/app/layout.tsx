@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { DM_Serif_Display, Inter } from 'next/font/google';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { EventProvider } from '@/components/providers/EventProvider';
+import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { PageViewTracker } from '@/components/providers/PageViewTracker';
+import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
 import '@/styles/globals.css';
 
 const dmSerifDisplay = DM_Serif_Display({
@@ -49,8 +51,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SessionProvider>
           <EventProvider>
-            <PageViewTracker />
-            {children}
+            <AudioPlayerProvider>
+              <PageViewTracker />
+              {children}
+              <GlobalMiniPlayer />
+            </AudioPlayerProvider>
           </EventProvider>
         </SessionProvider>
       </body>

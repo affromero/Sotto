@@ -9,6 +9,8 @@ vi.mock('@/components/providers/AudioPlayerProvider');
 describe('InterruptButton', () => {
   const mockPlayer = {
     podcastId: 'test-podcast-id',
+    podcastTitle: 'Test Podcast',
+    audioUrl: 'https://example.com/audio.mp3',
     isPlaying: true,
     currentTime: 45,
     duration: 180,
@@ -24,6 +26,7 @@ describe('InterruptButton', () => {
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
     loadPodcast: vi.fn(),
+    clearPodcast: vi.fn(),
   };
 
   beforeEach(() => {

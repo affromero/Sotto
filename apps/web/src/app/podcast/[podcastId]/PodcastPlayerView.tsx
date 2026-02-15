@@ -16,7 +16,7 @@ import {
   ListMusic,
   Trash2,
 } from 'lucide-react';
-import { AudioPlayerProvider, usePlayer } from '@/components/providers/AudioPlayerProvider';
+import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
@@ -284,7 +284,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const isProcessing = !isReady && podcast.status !== 'FAILED';
 
   return (
-    <AudioPlayerProvider>
+    <>
     <PlayerBridge onTimeUpdate={setCurrentTime} seekRef={seekRef} />
     <div className={styles.playerView}>
       {/* Back nav */}
@@ -413,7 +413,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Player */}
       {isReady && podcast.audioUrl && (
         <section className={styles.playerSection} aria-label="Audio player">
-          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} />
+          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
         </section>
       )}
 
@@ -661,6 +661,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         onClose={() => setShowAddToCollection(false)}
       />
     </div>
-    </AudioPlayerProvider>
+    </>
   );
 }
