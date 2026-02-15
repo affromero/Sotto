@@ -11,10 +11,15 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { DiscoveryMetadata } from '@sotto/shared';
 import { api } from '../../lib/api';
+
+interface KeyStatus {
+  provider: string;
+  configured: boolean;
+}
 
 interface ChatMessage {
   id: string;
@@ -73,6 +78,26 @@ export default function CreateScreen() {
   const [discoveryId, setDiscoveryId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [latestChips, setLatestChips] = useState<string[]>([]);
+
+  const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
+    queryKey: ['settings', 'ai-keys'],
+    queryFn: async () => {
+      const res = await api.get('/settings/ai-keys');
+      return res.data;
+    },
+  });
+
+  const { data: ttsKeys } = useQuery<{ keys: KeyStatus[] }>({
+    queryKey: ['settings', 'byok'],
+    queryFn: async () => {
+      const res = await api.get('/settings/byok');
+      return res.data;
+    },
+  });
+
+  const hasAiKey = aiKeys?.keys?.some((k) => k.configured) ?? false;
+  const hasTtsKey = ttsKeys?.keys?.some((k) => k.configured) ?? false;
+  const missingKeys = !hasAiKey || !hasTtsKey;
 
   const discoveryMutation = useMutation<DiscoveryResponse, Error, string>({
     mutationFn: async (userMessage: string) => {
@@ -169,6 +194,21 @@ export default function CreateScreen() {
     >
       {messages.length === 0 ? (
         <View style={styles.welcomeContainer}>
+          {missingKeys && (
+            <Pressable
+              style={styles.keyWarning}
+              onPress={() => router.push('/settings/api-keys')}
+            >
+              <Text style={styles.keyWarningText}>
+                {!hasAiKey && !hasTtsKey
+                  ? 'Add AI and TTS API keys to create podcasts'
+                  : !hasAiKey
+                    ? 'Add an AI provider key to create podcasts'
+                    : 'Add a TTS provider key to create podcasts'}
+              </Text>
+              <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
+            </Pressable>
+          )}
           <Text style={styles.welcomeTitle}>Create a Podcast</Text>
           <Text style={styles.welcomeSubtitle}>
             Tell me what you want to learn about. I will ask a few questions to
@@ -242,10 +282,10 @@ export default function CreateScreen() {
                     <Pressable
                       style={({ pressed }) => [
                         styles.createButton,
-                        pressed && styles.createButtonPressed,
-                        isCreating && styles.createButtonDisabled,
+                        pressed && !missingKeys && styles.createButtonPressed,
+                        (isCreating || missingKeys) && styles.createButtonDisabled,
                       ]}
-                      onPress={handleCreate}
+                      onPress={missingKeys ? () => router.push('/settings/api-keys') : handleCreate}
                       disabled={isCreating}
                     >
                       {isCreating ? (
@@ -253,6 +293,10 @@ export default function CreateScreen() {
                           size="small"
                           color={colors.textInverse}
                         />
+                      ) : missingKeys ? (
+                        <Text style={styles.createButtonText}>
+                          Add API Keys to Create
+                        </Text>
                       ) : (
                         <Text style={styles.createButtonText}>
                           Create Podcast
@@ -335,6 +379,29 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
+  },
+  keyWarning: {
+    backgroundColor: colors.warningLighter,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  keyWarningText: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.warning,
+    flex: 1,
+    lineHeight: 18,
+  },
+  keyWarningLink: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
   welcomeTitle: {
     fontFamily: typography.fontHeading,
