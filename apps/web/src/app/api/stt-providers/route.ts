@@ -19,6 +19,11 @@ const STT_PROVIDERS: SttProviderInfo[] = [
     displayName: 'ElevenLabs Scribe',
     description: 'High-quality transcription with word-level timestamps',
   },
+  {
+    id: 'groq',
+    displayName: 'Groq Whisper',
+    description: 'Free, fast transcription powered by Groq',
+  },
 ];
 
 export async function GET() {
@@ -38,6 +43,11 @@ export async function GET() {
     const hasElevenLabs =
       (await getByokKey(userId, 'elevenlabs')) !== null || !!process.env.ELEVENLABS_API_KEY;
     if (hasElevenLabs) configuredProviders.push('elevenlabs');
+
+    // Groq Whisper: check BYOK Groq key or platform key
+    const hasGroq =
+      (await getAiKey(userId, 'groq')) !== null || !!process.env.GROQ_API_KEY;
+    if (hasGroq) configuredProviders.push('groq');
   }
 
   return NextResponse.json({ providers: STT_PROVIDERS, configuredProviders });

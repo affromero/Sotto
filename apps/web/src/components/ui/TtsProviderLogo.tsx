@@ -4,7 +4,7 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'anthropic';
+  provider: 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'anthropic' | 'groq';
   size?: number;
   className?: string;
 }
@@ -91,6 +91,19 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           />
         </svg>
       );
+    case 'groq':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#F55036" />
+          <path
+            d="M7 12h3l1.5-4 3 8 1.5-4h3"
+            stroke="#fff"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      );
     default:
       return null;
   }
@@ -103,6 +116,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   cartesia: 'Cartesia',
   hume: 'Hume AI',
   anthropic: 'Anthropic',
+  groq: 'Groq',
 };
 
 /**
