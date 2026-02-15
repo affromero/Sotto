@@ -65,6 +65,12 @@
   color: var(--color-error);
 }
 
+.fieldHint {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
 .input,
 .textarea {
   width: 100%;
