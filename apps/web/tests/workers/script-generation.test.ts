@@ -555,7 +555,7 @@ describe('processScriptGeneration', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VERIFYING_SCRIPT' },
+        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
       });
     });
 
@@ -608,7 +608,7 @@ describe('processScriptGeneration', () => {
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VERIFYING_SCRIPT' },
+        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
       });
     });
 
@@ -863,7 +863,7 @@ describe('processScriptGeneration', () => {
       // Status updated to VERIFYING_SCRIPT
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VERIFYING_SCRIPT' },
+        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
       });
 
       // Script verification job queued
@@ -924,7 +924,7 @@ describe('processScriptGeneration', () => {
       // Status updated to VERIFYING_SCRIPT
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { status: 'VERIFYING_SCRIPT' },
+        data: expect.objectContaining({ status: 'VERIFYING_SCRIPT' }),
       });
 
       // Usage logged

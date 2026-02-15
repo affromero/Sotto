@@ -464,20 +464,15 @@ describe('POST /api/discovery', () => {
   describe('Edge cases and validation', () => {
     it('handles empty message string', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
-      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
-      mockParseMetadata.mockReturnValue(null);
 
       const request = createPostRequest({
         message: '',
       });
       const response = await POST(request);
 
-      expect(response.status).toBe(200);
-      expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
-        [{ role: 'user', content: '' }],
-        'test-ai-key'
-      );
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBe('Message is required');
     });
 
     it('handles very long message string', async () => {
@@ -501,16 +496,15 @@ describe('POST /api/discovery', () => {
 
     it('handles missing message field', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
-      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
-      mockParseMetadata.mockReturnValue(null);
 
       const request = createPostRequest({
         discoveryId: 'disc-1',
       });
       const response = await POST(request);
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(400);
+      const body = await response.json();
+      expect(body.error).toBe('Message is required');
     });
 
     it('handles discovery with no existing messages', async () => {

@@ -7,6 +7,7 @@ const mockPodcastCount = vi.fn();
 const mockPodcastCreate = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
+const mockPodcastUpdateMany = vi.fn();
 const mockPodcastDelete = vi.fn();
 const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
@@ -26,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
       create: (...args: unknown[]) => mockPodcastCreate(...args),
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
+      updateMany: (...args: unknown[]) => mockPodcastUpdateMany(...args),
       delete: (...args: unknown[]) => mockPodcastDelete(...args),
     },
     like: {
