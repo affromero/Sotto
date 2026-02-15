@@ -1,12 +1,14 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { PlayerState, PlayerControls } from '@/types/player';
 
 export function useAudioPlayer(): PlayerState & PlayerControls {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [state, setState] = useState<PlayerState>({
     podcastId: null,
+    podcastTitle: null,
+    audioUrl: null,
     isPlaying: false,
     currentTime: 0,
     duration: 0,
@@ -15,31 +17,33 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     isMuted: false,
   });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !audioRef.current) {
-      audioRef.current = new Audio();
-
-      audioRef.current.addEventListener('timeupdate', () => {
-        setState((s) => ({ ...s, currentTime: audioRef.current?.currentTime || 0 }));
+  function getAudio(): HTMLAudioElement | null {
+    if (typeof window === 'undefined') return null;
+    if (!audioRef.current) {
+      const audio = new Audio();
+      audio.addEventListener('timeupdate', () => {
+        setState((s) => ({ ...s, currentTime: audio.currentTime || 0 }));
       });
-
-      audioRef.current.addEventListener('loadedmetadata', () => {
-        setState((s) => ({ ...s, duration: audioRef.current?.duration || 0 }));
+      audio.addEventListener('loadedmetadata', () => {
+        setState((s) => ({ ...s, duration: audio.duration || 0 }));
       });
-
-      audioRef.current.addEventListener('ended', () => {
+      audio.addEventListener('ended', () => {
         setState((s) => ({ ...s, isPlaying: false }));
       });
+      audioRef.current = audio;
     }
-  }, []);
+    return audioRef.current;
+  }
 
   const play = useCallback(() => {
-    audioRef.current?.play();
+    const audio = getAudio();
+    if (!audio) return;
     setState((s) => ({ ...s, isPlaying: true }));
+    audio.play().catch(() => setState((s) => ({ ...s, isPlaying: false })));
   }, []);
 
   const pause = useCallback(() => {
-    audioRef.current?.pause();
+    getAudio()?.pause();
     setState((s) => ({ ...s, isPlaying: false }));
   }, []);
 
@@ -49,46 +53,97 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
   }, [state.isPlaying, play, pause]);
 
   const seek = useCallback((time: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
+    const audio = getAudio();
+    if (audio) {
+      audio.currentTime = time;
       setState((s) => ({ ...s, currentTime: time }));
     }
   }, []);
 
   const skip = useCallback((seconds: number) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime += seconds;
+    const audio = getAudio();
+    if (audio) {
+      audio.currentTime += seconds;
     }
   }, []);
 
   const setPlaybackRate = useCallback((rate: number) => {
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
+    const audio = getAudio();
+    if (audio) {
+      audio.playbackRate = rate;
       setState((s) => ({ ...s, playbackRate: rate }));
     }
   }, []);
 
   const setVolume = useCallback((volume: number) => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
+    const audio = getAudio();
+    if (audio) {
+      audio.volume = volume;
       setState((s) => ({ ...s, volume, isMuted: volume === 0 }));
     }
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = !audioRef.current.muted;
+    const audio = getAudio();
+    if (audio) {
+      audio.muted = !audio.muted;
       setState((s) => ({ ...s, isMuted: !s.isMuted }));
     }
   }, []);
 
-  const loadPodcast = useCallback((podcastId: string, audioUrl: string) => {
-    if (audioRef.current) {
-      audioRef.current.src = audioUrl;
-      audioRef.current.load();
-      setState((s) => ({ ...s, podcastId, currentTime: 0, isPlaying: false }));
+  const loadPodcast = useCallback(
+    (podcastId: string, audioUrl: string, podcastTitle?: string) => {
+      const audio = getAudio();
+      if (!audio) return;
+      if (state.podcastId === podcastId) {
+        setState((s) => ({ ...s, podcastTitle: podcastTitle ?? s.podcastTitle }));
+        return;
+      }
+      audio.src = audioUrl;
+      audio.load();
+      setState((s) => ({
+        ...s,
+        podcastId,
+        podcastTitle: podcastTitle ?? null,
+        audioUrl,
+        currentTime: 0,
+        isPlaying: false,
+      }));
+    },
+    [state.podcastId]
+  );
+
+  const clearPodcast = useCallback(() => {
+    const audio = getAudio();
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
     }
+    setState({
+      podcastId: null,
+      podcastTitle: null,
+      audioUrl: null,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      playbackRate: 1,
+      volume: 1,
+      isMuted: false,
+    });
   }, []);
 
-  return { ...state, play, pause, toggle, seek, skip, setPlaybackRate, setVolume, toggleMute, loadPodcast };
+  return {
+    ...state,
+    play,
+    pause,
+    toggle,
+    seek,
+    skip,
+    setPlaybackRate,
+    setVolume,
+    toggleMute,
+    loadPodcast,
+    clearPodcast,
+  };
 }

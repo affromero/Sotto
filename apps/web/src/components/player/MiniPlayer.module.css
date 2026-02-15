@@ -116,6 +116,12 @@
   to { transform: translateY(0); }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .miniPlayer {
+    animation: none;
+  }
+}
+
 @media (max-width: 768px) {
   .miniPlayer {
     height: var(--mini-player-height);

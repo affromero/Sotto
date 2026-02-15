@@ -7,6 +7,7 @@ const mockPlay = vi.fn().mockResolvedValue(undefined);
 const mockPause = vi.fn();
 const mockLoad = vi.fn();
 const mockAddEventListener = vi.fn();
+const mockRemoveAttribute = vi.fn();
 
 class MockAudio {
   src = '';
@@ -20,6 +21,7 @@ class MockAudio {
   load = mockLoad;
   addEventListener = mockAddEventListener;
   removeEventListener = vi.fn();
+  removeAttribute = mockRemoveAttribute;
 }
 
 beforeEach(() => {
@@ -32,6 +34,16 @@ describe('useAudioPlayer', () => {
     it('has null podcastId', () => {
       const { result } = renderHook(() => useAudioPlayer());
       expect(result.current.podcastId).toBeNull();
+    });
+
+    it('has null podcastTitle', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      expect(result.current.podcastTitle).toBeNull();
+    });
+
+    it('has null audioUrl', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      expect(result.current.audioUrl).toBeNull();
     });
 
     it('is not playing initially', () => {
@@ -72,6 +84,15 @@ describe('useAudioPlayer', () => {
         result.current.play();
       });
       expect(result.current.isPlaying).toBe(true);
+    });
+
+    it('reverts isPlaying when play() promise rejects', async () => {
+      mockPlay.mockRejectedValueOnce(new Error('not allowed'));
+      const { result } = renderHook(() => useAudioPlayer());
+      await act(async () => {
+        result.current.play();
+      });
+      expect(result.current.isPlaying).toBe(false);
     });
 
     it('sets isPlaying to false when pause is called', () => {
@@ -216,6 +237,22 @@ describe('useAudioPlayer', () => {
       expect(result.current.podcastId).toBe('podcast-1');
     });
 
+    it('sets podcastTitle when provided', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'My Podcast');
+      });
+      expect(result.current.podcastTitle).toBe('My Podcast');
+    });
+
+    it('sets audioUrl', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3');
+      });
+      expect(result.current.audioUrl).toBe('https://example.com/audio.mp3');
+    });
+
     it('resets currentTime to 0', () => {
       const { result } = renderHook(() => useAudioPlayer());
       act(() => {
@@ -238,6 +275,50 @@ describe('useAudioPlayer', () => {
       expect(result.current.isPlaying).toBe(false);
     });
 
+    it('skips reload when same podcastId is loaded', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Title 1');
+      });
+      act(() => {
+        result.current.seek(30);
+      });
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Title 1 Updated');
+      });
+      expect(result.current.currentTime).toBe(30);
+      expect(result.current.podcastTitle).toBe('Title 1 Updated');
+    });
   });
 
+  describe('clearPodcast', () => {
+    it('resets all state to initial values', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3', 'Test');
+      });
+      act(() => {
+        result.current.play();
+      });
+      act(() => {
+        result.current.clearPodcast();
+      });
+      expect(result.current.podcastId).toBeNull();
+      expect(result.current.podcastTitle).toBeNull();
+      expect(result.current.audioUrl).toBeNull();
+      expect(result.current.isPlaying).toBe(false);
+      expect(result.current.currentTime).toBe(0);
+    });
+
+    it('pauses audio before clearing', () => {
+      const { result } = renderHook(() => useAudioPlayer());
+      act(() => {
+        result.current.loadPodcast('podcast-1', 'https://example.com/audio.mp3');
+      });
+      act(() => {
+        result.current.clearPodcast();
+      });
+      expect(mockPause).toHaveBeenCalled();
+    });
+  });
 });

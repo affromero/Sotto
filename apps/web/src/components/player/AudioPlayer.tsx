@@ -15,9 +15,10 @@ function formatTime(seconds: number): string {
 interface AudioPlayerProps {
   podcastId?: string;
   audioUrl?: string;
+  podcastTitle?: string;
 }
 
-export function AudioPlayer({ podcastId: initialPodcastId, audioUrl }: AudioPlayerProps) {
+export function AudioPlayer({ podcastId: initialPodcastId, audioUrl, podcastTitle }: AudioPlayerProps) {
   const player = usePlayer();
   const progressRef = useRef<HTMLDivElement>(null);
   const loadedRef = useRef<string | null>(null);
@@ -25,9 +26,9 @@ export function AudioPlayer({ podcastId: initialPodcastId, audioUrl }: AudioPlay
   useEffect(() => {
     if (initialPodcastId && audioUrl && loadedRef.current !== initialPodcastId) {
       loadedRef.current = initialPodcastId;
-      player.loadPodcast(initialPodcastId, audioUrl);
+      player.loadPodcast(initialPodcastId, audioUrl, podcastTitle);
     }
-  }, [initialPodcastId, audioUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialPodcastId, audioUrl, podcastTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -40,8 +41,8 @@ export function AudioPlayer({ podcastId: initialPodcastId, audioUrl }: AudioPlay
   );
 
   const handlePlayFromQueue = useCallback(
-    (podcastId: string, audioUrl: string) => {
-      player.loadPodcast(podcastId, audioUrl);
+    (podcastId: string, audioUrl: string, title?: string) => {
+      player.loadPodcast(podcastId, audioUrl, title);
       player.play();
     },
     [player]
