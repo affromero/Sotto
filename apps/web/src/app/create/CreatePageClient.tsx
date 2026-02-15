@@ -6,6 +6,7 @@ import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
+import { DurationSelector } from '@/components/create/DurationSelector';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { ImportUploader } from '@/components/import/ImportUploader';
@@ -37,6 +38,7 @@ function CreatePageContent() {
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
+  const [durationTarget, setDurationTarget] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
@@ -49,6 +51,11 @@ function CreatePageContent() {
 
   const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
     setMetadata(meta);
+    if (meta.durationTarget) {
+      // Clamp to nearest valid step (5–40, step 5)
+      const clamped = Math.max(5, Math.min(40, Math.round(meta.durationTarget / 5) * 5));
+      setDurationTarget(clamped);
+    }
     setStep('voice');
   }, []);
 
@@ -81,7 +88,7 @@ function CreatePageContent() {
           body: JSON.stringify({
             title: metadata.topic,
             topic: metadata.topic,
-            metadata,
+            metadata: { ...metadata, durationTarget },
             hostVoiceId: voiceSelection.hostVoiceId,
             expertVoiceId: voiceSelection.expertVoiceId,
             ttsProvider,
@@ -101,7 +108,7 @@ function CreatePageContent() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, durationTarget, createAsSotto]);
 
   // Poll during scripting phase (waiting for SCRIPT_READY)
   const scriptingPollRef = useRef(false);
@@ -355,6 +362,7 @@ function CreatePageContent() {
           <div className={styles.chatArea}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
             <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
+            <DurationSelector value={durationTarget} onChange={setDurationTarget} />
             <div className={styles.voiceActions}>
               <button
                 type="button"

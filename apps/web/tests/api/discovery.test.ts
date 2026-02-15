@@ -323,10 +323,10 @@ describe('POST /api/discovery', () => {
       expect(finalData.metadata).toEqual({
         topic: 'Quantum Computing',
         depth: 'standard',
-        audience_level: 'intermediate',
-        focus_areas: ['qubits', 'entanglement'],
+        audienceLevel: 'intermediate',
+        focusAreas: ['qubits', 'entanglement'],
         tone: 'professional',
-        duration_target: 10,
+        durationTarget: 10,
         ready: true,
       });
     });
@@ -416,10 +416,10 @@ describe('POST /api/discovery', () => {
       expect(finalData.metadata).toEqual({
         topic: 'Machine Learning',
         depth: 'deep_dive',
-        audience_level: 'expert',
-        focus_areas: ['neural networks', 'transformers'],
+        audienceLevel: 'expert',
+        focusAreas: ['neural networks', 'transformers'],
         tone: 'professional',
-        duration_target: 15,
+        durationTarget: 15,
         ready: true,
       });
     });

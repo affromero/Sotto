@@ -46,7 +46,21 @@ export async function POST(request: NextRequest) {
         }
 
         const { chips } = parseChips(fullResponse);
-        const metadata = parseMetadata(fullResponse);
+        const rawMeta = parseMetadata(fullResponse);
+
+        // Map snake_case keys from AI output to camelCase for the client
+        const metadata = rawMeta
+          ? {
+              topic: rawMeta.topic,
+              depth: rawMeta.depth,
+              audienceLevel: rawMeta.audience_level,
+              audience: rawMeta.audience,
+              focusAreas: rawMeta.focus_areas,
+              tone: rawMeta.tone,
+              durationTarget: rawMeta.duration_target,
+              ready: rawMeta.ready,
+            }
+          : null;
 
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata })}\n\n`)
