@@ -26,7 +26,6 @@ describe('Sidebar', () => {
     // Voices, Analytics, Team are CREATOR/ADMIN only
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
-    expect(screen.queryByText('Team')).not.toBeInTheDocument();
   });
 
   it('marks active link with aria-current for exact path match', () => {
@@ -59,7 +58,6 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Voices')).toBeInTheDocument();
-    expect(screen.getByText('Team')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.queryByText('Admin Panel')).not.toBeInTheDocument();
   });

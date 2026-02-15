@@ -105,27 +105,6 @@ export const analyticsQuerySchema = z.object({
 });
 
 /**
- * Team creation validation
- */
-export const createTeamSchema = z.object({
-  name: z.string().min(1).max(100),
-});
-
-/**
- * Team update validation
- */
-export const updateTeamSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
-});
-
-/**
- * Team invite validation
- */
-export const teamInviteSchema = z.object({
-  email: z.string().email(),
-});
-
-/**
  * API key creation validation
  */
 export const createApiKeySchema = z.object({

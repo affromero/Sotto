@@ -10,7 +10,6 @@ import {
   Key,
   BarChart2,
   Mic,
-  Users,
   LogOut,
   Shield,
 } from 'lucide-react';
@@ -50,11 +49,6 @@ function getNavItems(role: string): NavItem[] {
   // Voices - CREATOR and ADMIN
   if (role === 'CREATOR' || role === 'ADMIN') {
     items.push({ href: '/settings/voices', label: 'Voices', icon: Mic });
-  }
-
-  // Team - CREATOR and ADMIN
-  if (role === 'CREATOR' || role === 'ADMIN') {
-    items.push({ href: '/team', label: 'Team', icon: Users });
   }
 
   items.push({ href: '/billing', label: 'API Keys', icon: Key });

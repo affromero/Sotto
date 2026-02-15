@@ -44,10 +44,6 @@ model User {
   // Telegram integration
   telegramEnabled Boolean @default(false)
 
-  // Team membership (dormant — kept for future use)
-  teamId String?
-  team   Team?   @relation(fields: [teamId], references: [id])
-
   // Relations
   accounts           Account[]
   sessions           Session[]
@@ -55,7 +51,6 @@ model User {
   discoveries        Discovery[]
   interactions       Interaction[]
   notifications      Notification[]
-  ownedTeams         Team[]              @relation("TeamOwner")
   apiUsageLogs       ApiUsageLog[]
   pushSubscriptions  PushSubscription[]
   expoPushTokens     ExpoPushToken[]
@@ -109,7 +104,6 @@ model User {
   // Free tier
   freeGenerationsUsed Int @default(0)
 
-  @@index([teamId])
   @@index([role])
   @@index([handle])
 }
@@ -164,47 +158,6 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
-}
-
-// ============ TEAMS ============
-
-model Team {
-  id        String   @id @default(cuid())
-  name      String
-  ownerId   String?
-  seats     Int      @default(10)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  owner   User?        @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  members User[]
-  invites TeamInvite[]
-
-  @@index([ownerId])
-}
-
-model TeamInvite {
-  id        String           @id @default(cuid())
-  teamId    String
-  email     String
-  token     String           @unique
-  status    TeamInviteStatus @default(PENDING)
-  invitedBy String
-  expiresAt DateTime
-  createdAt DateTime         @default(now())
-
-  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([teamId])
-  @@index([email])
-  @@index([token])
-}
-
-enum TeamInviteStatus {
-  PENDING
-  ACCEPTED
-  EXPIRED
-  REVOKED
 }
 
 // ============ PODCASTS ============
@@ -637,7 +590,6 @@ enum NotificationType {
   PODCAST_FORKED
   NEW_FOLLOWER
   SIMILAR_PODCAST_CREATED
-  TEAM_INVITE
   TWITTER_PODCAST_READY
   TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED

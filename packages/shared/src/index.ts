@@ -11,7 +11,6 @@ export type {
   ReferenceType,
   VerificationStatus,
   TweetMentionStatus,
-  TeamInviteStatus,
   NotificationType,
   VoiceCloneSource,
   VoiceRequestStatus,
@@ -73,8 +72,6 @@ export type {
 } from './types/analytics';
 
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
-
-export type { TeamSummary, TeamMember, TeamInviteData } from './types/team';
 
 export type {
   ImportPodcastRequest,
