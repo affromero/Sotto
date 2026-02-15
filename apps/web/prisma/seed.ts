@@ -211,6 +211,89 @@ async function main() {
 
   console.warn(`✅ Created ${subTagCount} sub-interest tags`);
 
+  // Taxonomy tags: Format, Language, Episode Type, Production
+  const taxonomyCategories: Array<{
+    name: string;
+    slug: string;
+    children: Array<{ name: string; slug: string }>;
+  }> = [
+    {
+      name: 'Format',
+      slug: 'format',
+      children: [
+        { name: 'Conversation', slug: 'format-conversation' },
+        { name: 'Interview', slug: 'format-interview' },
+        { name: 'Monologue', slug: 'format-monologue' },
+        { name: 'Debate', slug: 'format-debate' },
+        { name: 'Q&A', slug: 'format-qa' },
+        { name: 'Storytelling', slug: 'format-storytelling' },
+        { name: 'Tutorial', slug: 'format-tutorial' },
+      ],
+    },
+    {
+      name: 'Language',
+      slug: 'language',
+      children: [
+        { name: 'English', slug: 'lang-en' },
+        { name: 'Spanish', slug: 'lang-es' },
+        { name: 'French', slug: 'lang-fr' },
+        { name: 'German', slug: 'lang-de' },
+        { name: 'Portuguese', slug: 'lang-pt' },
+        { name: 'Japanese', slug: 'lang-ja' },
+        { name: 'Korean', slug: 'lang-ko' },
+        { name: 'Chinese', slug: 'lang-zh' },
+        { name: 'Arabic', slug: 'lang-ar' },
+        { name: 'Hindi', slug: 'lang-hi' },
+        { name: 'Russian', slug: 'lang-ru' },
+        { name: 'Other', slug: 'lang-other' },
+      ],
+    },
+    {
+      name: 'Episode Type',
+      slug: 'episode-type',
+      children: [
+        { name: 'Deep Dive', slug: 'type-deep-dive' },
+        { name: 'Quick Overview', slug: 'type-quick-overview' },
+        { name: 'Current Events', slug: 'type-current-events' },
+        { name: 'Research Paper', slug: 'type-research-paper' },
+        { name: 'Book Summary', slug: 'type-book-summary' },
+        { name: 'How-To Guide', slug: 'type-how-to' },
+        { name: 'Explainer', slug: 'type-explainer' },
+      ],
+    },
+    {
+      name: 'Production',
+      slug: 'production',
+      children: [
+        { name: 'AI-Generated', slug: 'prod-ai-generated' },
+        { name: 'Human-Created', slug: 'prod-human-created' },
+        { name: 'AI-Assisted', slug: 'prod-ai-assisted' },
+        { name: 'Imported', slug: 'prod-imported' },
+        { name: 'Remix', slug: 'prod-remix' },
+      ],
+    },
+  ];
+
+  let taxonomyTagCount = 0;
+  for (const category of taxonomyCategories) {
+    const parent = await prisma.tag.upsert({
+      where: { slug: category.slug },
+      update: {},
+      create: { name: category.name, slug: category.slug },
+    });
+
+    for (const child of category.children) {
+      await prisma.tag.upsert({
+        where: { slug: child.slug },
+        update: { parentId: parent.id },
+        create: { name: child.name, slug: child.slug, parentId: parent.id },
+      });
+      taxonomyTagCount++;
+    }
+  }
+
+  console.warn(`✅ Created ${taxonomyCategories.length} taxonomy categories with ${taxonomyTagCount} tags`);
+
   // Upsert @sotto system account
   await prisma.user.upsert({
     where: { email: 'system@sotto.fm' },
