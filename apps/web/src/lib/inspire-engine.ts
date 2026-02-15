@@ -4,6 +4,7 @@ import { getTrending } from './recommendation-engine';
 import { logger } from './logger';
 import { resolveAiProvider } from './providers/ai';
 import type { ResolvedAiProvider } from './providers/ai';
+import { WEB_SEARCH_TOOL } from './claude';
 
 const CACHE_TTL_SECONDS = 3600; // 1 hour
 
@@ -50,9 +51,7 @@ async function generateTopics(
       const client = new Anthropic({ apiKey });
 
       const messages = [{ role: 'user' as const, content: prompt }];
-      const tools = opts.webSearch
-        ? [{ type: 'web_search_20250305' as const, name: 'web_search' as const }]
-        : undefined;
+      const tools = opts.webSearch ? [WEB_SEARCH_TOOL] : undefined;
 
       const response = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
