@@ -6,8 +6,10 @@ import { TagFilter } from '@/components/feed/TagFilter';
 import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel';
 import { HeroSection } from '@/components/feed/HeroSection';
 import { TrendingSection } from '@/components/feed/TrendingSection';
+import { SuggestedFollows } from '@/components/feed/SuggestedFollows';
 import { FeedGrid } from '@/components/feed/FeedGrid';
 import { PodcastCard } from '@/components/feed/PodcastCard';
+import { UserSearchGrid, type UserDiscoveryResult } from '@/components/feed/UserSearchGrid';
 import { ActivityFeed } from '@/components/feed/ActivityFeed';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './page.module.css';
@@ -19,6 +21,7 @@ interface Tag {
 }
 
 type FeedTab = 'discover' | 'activity';
+type SearchMode = 'podcasts' | 'people';
 
 interface FeedClientProps {
   initialPodcasts: PodcastSummary[];
@@ -26,6 +29,7 @@ interface FeedClientProps {
   trendingPodcasts: PodcastSummary[];
   tags: Tag[];
   isAuthenticated?: boolean;
+  currentUserId: string | null;
 }
 
 type SortOption = 'recent' | 'popular' | 'trending' | 'most_forked';
@@ -38,7 +42,7 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
   { value: 'most_forked', label: 'Most Forked' },
 ];
 
-export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, tags, isAuthenticated }: FeedClientProps) {
+export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, tags, isAuthenticated, currentUserId }: FeedClientProps) {
   const [activeTab, setActiveTab] = useState<FeedTab>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | undefined>(undefined);
@@ -48,6 +52,13 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
   const [hasMore, setHasMore] = useState(initialPodcasts.length >= 24);
   const [sort, setSort] = useState<SortOption>('recent');
   const [mode, setMode] = useState<ModeOption>('all');
+
+  // People search state
+  const [searchMode, setSearchMode] = useState<SearchMode>('podcasts');
+  const [userResults, setUserResults] = useState<UserDiscoveryResult[]>([]);
+  const [userLoading, setUserLoading] = useState(false);
+  const [userHasMore, setUserHasMore] = useState(false);
+  const [userPage, setUserPage] = useState(1);
 
   const fetchPodcasts = useCallback(
     async (
@@ -95,14 +106,67 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
     [podcasts]
   );
 
+  const fetchUsers = useCallback(
+    async (query: string, append = false) => {
+      if (query.length < 2) {
+        if (!append) {
+          setUserResults([]);
+          setUserHasMore(false);
+          setUserPage(1);
+        }
+        return;
+      }
+
+      setUserLoading(true);
+      try {
+        const page = append ? userPage + 1 : 1;
+        const params = new URLSearchParams({
+          query,
+          page: String(page),
+          limit: '20',
+        });
+        const response = await fetch(`/api/users/discover?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (append) {
+            setUserResults((prev) => [...prev, ...data.users]);
+          } else {
+            setUserResults(data.users);
+          }
+          setUserHasMore(data.hasMore ?? false);
+          setUserPage(page);
+        }
+      } finally {
+        setUserLoading(false);
+      }
+    },
+    [userPage]
+  );
+
   const handleSearchChange = useCallback(
     (value: string) => {
       setSearchQuery(value);
       if (value.length === 0 || value.length >= 2) {
-        fetchPodcasts(value, activeTag, advancedFilters, sort, mode);
+        if (searchMode === 'people') {
+          fetchUsers(value);
+        } else {
+          fetchPodcasts(value, activeTag, advancedFilters, sort, mode);
+        }
       }
     },
-    [activeTag, advancedFilters, sort, mode, fetchPodcasts]
+    [activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers, searchMode]
+  );
+
+  const handleSearchModeChange = useCallback(
+    (newMode: SearchMode) => {
+      setSearchMode(newMode);
+      if (newMode === 'people' && searchQuery.length >= 2) {
+        fetchUsers(searchQuery);
+      } else if (newMode === 'podcasts') {
+        fetchPodcasts(searchQuery, activeTag, advancedFilters, sort, mode);
+      }
+    },
+    [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers]
   );
 
   const handleTagSelect = useCallback(
@@ -138,8 +202,12 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
   );
 
   const handleLoadMore = useCallback(() => {
-    fetchPodcasts(searchQuery, activeTag, advancedFilters, sort, mode, true);
-  }, [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts]);
+    if (searchMode === 'people') {
+      fetchUsers(searchQuery, true);
+    } else {
+      fetchPodcasts(searchQuery, activeTag, advancedFilters, sort, mode, true);
+    }
+  }, [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers, searchMode]);
 
   const hasActiveFilters = Object.values(advancedFilters).some((v) => v !== undefined);
   const isDefaultView =
@@ -148,8 +216,10 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
     !hasActiveFilters &&
     sort === 'recent' &&
     mode === 'all';
-  const showHero = isDefaultView && heroPodcasts.length > 0;
-  const showTrending = isDefaultView && trendingPodcasts.length > 0;
+  const showHero = isDefaultView && searchMode === 'podcasts' && heroPodcasts.length > 0;
+  const showTrending = isDefaultView && searchMode === 'podcasts' && trendingPodcasts.length > 0;
+  const showSuggested = isAuthenticated && currentUserId && isDefaultView && searchMode === 'podcasts';
+  const isPeopleMode = searchMode === 'people';
 
   return (
     <div className={styles.feedContent}>
@@ -189,89 +259,141 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
           {showHero && <HeroSection podcasts={heroPodcasts} />}
 
           <div className={styles.filters}>
-            <SearchBar
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Search podcasts by topic, title, or creator..."
-            />
-            {tags.length > 0 && (
-              <TagFilter tags={tags} activeTag={activeTag} onTagSelect={handleTagSelect} />
-            )}
-            <FilterPanel filters={advancedFilters} onChange={handleFiltersChange} />
-          </div>
-
-          <div className={styles.toggleRow}>
-            <div className={styles.pillGroup} role="radiogroup" aria-label="Feed mode">
-              <button
-                className={`${styles.pill} ${mode === 'all' ? styles.pillActive : ''}`}
-                onClick={() => handleModeChange('all')}
-                role="radio"
-                aria-checked={mode === 'all'}
-                type="button"
-              >
-                All
-              </button>
-              <button
-                className={`${styles.pill} ${mode === 'remixes' ? styles.pillActive : ''}`}
-                onClick={() => handleModeChange('remixes')}
-                role="radio"
-                aria-checked={mode === 'remixes'}
-                type="button"
-              >
-                Remixes
-              </button>
-            </div>
-
-            <span className={styles.toggleLabel}>Sort:</span>
-            <div className={styles.pillGroup} role="radiogroup" aria-label="Sort order">
-              {SORT_OPTIONS.map((option) => (
+            <div className={styles.searchRow}>
+              <SearchBar
+                value={searchQuery}
+                onChange={handleSearchChange}
+                placeholder={
+                  isPeopleMode
+                    ? 'Search people by name, handle, or interest...'
+                    : 'Search podcasts by topic, title, or creator...'
+                }
+              />
+              <div className={styles.pillGroup} role="radiogroup" aria-label="Search mode">
                 <button
-                  key={option.value}
-                  className={`${styles.pill} ${sort === option.value ? styles.pillActive : ''}`}
-                  onClick={() => handleSortChange(option.value)}
+                  className={`${styles.pill} ${searchMode === 'podcasts' ? styles.pillActive : ''}`}
+                  onClick={() => handleSearchModeChange('podcasts')}
                   role="radio"
-                  aria-checked={sort === option.value}
+                  aria-checked={searchMode === 'podcasts'}
                   type="button"
                 >
-                  {option.label}
+                  Podcasts
                 </button>
-              ))}
+                <button
+                  className={`${styles.pill} ${searchMode === 'people' ? styles.pillActive : ''}`}
+                  onClick={() => handleSearchModeChange('people')}
+                  role="radio"
+                  aria-checked={searchMode === 'people'}
+                  type="button"
+                >
+                  People
+                </button>
+              </div>
             </div>
+
+            {!isPeopleMode && (
+              <>
+                {tags.length > 0 && (
+                  <TagFilter tags={tags} activeTag={activeTag} onTagSelect={handleTagSelect} />
+                )}
+                <FilterPanel filters={advancedFilters} onChange={handleFiltersChange} />
+              </>
+            )}
           </div>
+
+          {!isPeopleMode && (
+            <div className={styles.toggleRow}>
+              <div className={styles.pillGroup} role="radiogroup" aria-label="Feed mode">
+                <button
+                  className={`${styles.pill} ${mode === 'all' ? styles.pillActive : ''}`}
+                  onClick={() => handleModeChange('all')}
+                  role="radio"
+                  aria-checked={mode === 'all'}
+                  type="button"
+                >
+                  All
+                </button>
+                <button
+                  className={`${styles.pill} ${mode === 'remixes' ? styles.pillActive : ''}`}
+                  onClick={() => handleModeChange('remixes')}
+                  role="radio"
+                  aria-checked={mode === 'remixes'}
+                  type="button"
+                >
+                  Remixes
+                </button>
+              </div>
+
+              <span className={styles.toggleLabel}>Sort:</span>
+              <div className={styles.pillGroup} role="radiogroup" aria-label="Sort order">
+                {SORT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    className={`${styles.pill} ${sort === option.value ? styles.pillActive : ''}`}
+                    onClick={() => handleSortChange(option.value)}
+                    role="radio"
+                    aria-checked={sort === option.value}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {showSuggested && <SuggestedFollows currentUserId={currentUserId} />}
 
           {showTrending && <TrendingSection podcasts={trendingPodcasts} />}
 
-          <section aria-label="Podcast feed">
-            <FeedGrid
-              loading={loading && podcasts.length === 0}
-              emptyMessage={
-                searchQuery
-                  ? `No podcasts found for "${searchQuery}"`
-                  : mode === 'remixes'
-                    ? 'No remixes yet. Be the first to fork a podcast!'
-                    : 'No podcasts yet. Be the first to create one!'
-              }
-            >
-              {podcasts.map((podcast) => (
-                <PodcastCard
-                  key={podcast.id}
-                  podcast={podcast}
-                  feedSort={sort}
-                  searchQuery={searchQuery}
-                />
-              ))}
-            </FeedGrid>
-          </section>
+          {isPeopleMode ? (
+            <section aria-label="People search results">
+              <UserSearchGrid
+                users={userResults}
+                loading={userLoading && userResults.length === 0}
+                emptyMessage={
+                  searchQuery.length >= 2
+                    ? `No people found for "${searchQuery}"`
+                    : 'Type at least 2 characters to search for people'
+                }
+                isAuthenticated={!!isAuthenticated}
+                currentUserId={currentUserId}
+              />
+            </section>
+          ) : (
+            <section aria-label="Podcast feed">
+              <FeedGrid
+                loading={loading && podcasts.length === 0}
+                emptyMessage={
+                  searchQuery
+                    ? `No podcasts found for "${searchQuery}"`
+                    : mode === 'remixes'
+                      ? 'No remixes yet. Be the first to fork a podcast!'
+                      : 'No podcasts yet. Be the first to create one!'
+                }
+              >
+                {podcasts.map((podcast) => (
+                  <PodcastCard
+                    key={podcast.id}
+                    podcast={podcast}
+                    feedSort={sort}
+                    searchQuery={searchQuery}
+                  />
+                ))}
+              </FeedGrid>
+            </section>
+          )}
 
-          {hasMore && podcasts.length > 0 && (
+          {((isPeopleMode && userHasMore && userResults.length > 0) ||
+            (!isPeopleMode && hasMore && podcasts.length > 0)) && (
             <div className={styles.loadMoreRow}>
               <button
                 className={styles.loadMoreBtn}
                 onClick={handleLoadMore}
-                disabled={loading}
+                disabled={isPeopleMode ? userLoading : loading}
                 type="button"
               >
-                {loading ? 'Loading...' : 'Load More'}
+                {(isPeopleMode ? userLoading : loading) ? 'Loading...' : 'Load More'}
               </button>
             </div>
           )}
