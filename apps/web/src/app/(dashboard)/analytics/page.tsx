@@ -29,11 +29,11 @@ export default async function AnalyticsPage() {
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Analytics</h1>
           <p className={styles.upgradeText}>
-            Upgrade to Pro or Studio to access usage analytics, cost breakdowns, and generation
-            statistics.
+            Analytics is available for creators. Start creating podcasts to unlock usage analytics,
+            cost breakdowns, and generation statistics.
           </p>
-          <Link href="/billing" className={styles.upgradeLink}>
-            Upgrade Plan
+          <Link href="/create" className={styles.upgradeLink}>
+            Create a Podcast
           </Link>
         </div>
       </main>
