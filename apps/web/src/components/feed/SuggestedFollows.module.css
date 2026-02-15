@@ -1,0 +1,245 @@
+/* SuggestedFollows — Horizontal carousel for suggested people */
+
+.root {
+  width: 100%;
+  background: var(--color-primary-subtle);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.heading {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.dismissBtn {
+  background: none;
+  border: none;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  transition: color var(--transition-fast);
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dismissBtn:hover {
+  color: var(--color-text-primary);
+}
+
+/* Horizontal scroll */
+
+.scrollContainer {
+  display: flex;
+  gap: var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--space-2);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollContainer::-webkit-scrollbar {
+  display: none;
+}
+
+/* Card wrapper */
+
+.cardWrapper {
+  flex: 0 0 auto;
+  width: 200px;
+  scroll-snap-align: start;
+}
+
+/* Card */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  height: 100%;
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+}
+
+.avatarWrapper {
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.avatarFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: var(--text-body);
+  font-weight: 600;
+}
+
+.name {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.handle {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+/* Shared interest chips */
+
+.sharedChips {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-subtle);
+  font: var(--text-caption);
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+/* Stats */
+
+.statsRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.stat {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.stat strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.statDot {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+/* Skeleton loading */
+
+.skeletonAvatar {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.skeletonName {
+  width: 100px;
+  height: 14px;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 100ms;
+}
+
+.skeletonHandle {
+  width: 70px;
+  height: 12px;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 200ms;
+}
+
+.skeletonChips {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.skeletonChip {
+  width: 50px;
+  height: 18px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  animation: pulse 1.5s ease-in-out infinite;
+  animation-delay: 300ms;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Responsive */
+
+@media (max-width: 767px) {
+  .cardWrapper {
+    width: calc(50vw - var(--space-8));
+    min-width: 180px;
+  }
+}
+
+@media (min-width: 768px) {
+  .cardWrapper {
+    width: 220px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .cardWrapper {
+    width: 240px;
+  }
+}
