@@ -23,11 +23,13 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
   const [sourcePlatform, setSourcePlatform] = useState('');
   const [isHumanContent, setIsHumanContent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   const audioInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -52,14 +54,14 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
-    const audioFile = files.find((f) => f.type.startsWith('audio/'));
+    const dropped = files.find((f) => f.type.startsWith('audio/'));
 
-    if (audioFile) {
-      if (audioFile.size > MAX_AUDIO_SIZE) {
+    if (dropped) {
+      if (dropped.size > MAX_AUDIO_SIZE) {
         setError(`Audio file too large. Maximum size is 100MB.`);
         return;
       }
-      setAudioFile(audioFile);
+      setAudioFile(dropped);
       setError(null);
     }
   }, []);
@@ -101,42 +103,74 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       }
 
       setLoading(true);
+      setUploadProgress(0);
       setError(null);
 
-      try {
-        const formData = new FormData();
-        formData.append('title', title.trim());
-        formData.append('topic', topic.trim());
-        formData.append('audio', audioFile);
-        formData.append('isHumanContent', String(isHumanContent));
+      const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('topic', topic.trim());
+      formData.append('audio', audioFile);
+      formData.append('isHumanContent', String(isHumanContent));
 
-        if (sourcePlatform) {
-          formData.append('sourcePlatform', sourcePlatform);
-        }
-
-        if (transcriptFile) {
-          formData.append('transcript', transcriptFile);
-        }
-
-        const response = await fetch('/api/podcasts/import', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to import podcast');
-        }
-
-        const podcast = await response.json();
-        onImportStarted(podcast.id);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Something went wrong');
-        setLoading(false);
+      if (sourcePlatform) {
+        formData.append('sourcePlatform', sourcePlatform);
       }
+
+      if (transcriptFile) {
+        formData.append('transcript', transcriptFile);
+      }
+
+      const xhr = new XMLHttpRequest();
+      xhrRef.current = xhr;
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          setUploadProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        xhrRef.current = null;
+        try {
+          const data = JSON.parse(xhr.responseText);
+          if (xhr.status >= 200 && xhr.status < 300) {
+            onImportStarted(data.id);
+          } else {
+            setError(data.error || 'Failed to import podcast');
+            setLoading(false);
+            setUploadProgress(0);
+          }
+        } catch {
+          setError('Failed to import podcast');
+          setLoading(false);
+          setUploadProgress(0);
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        xhrRef.current = null;
+        setError('Network error — please check your connection and try again');
+        setLoading(false);
+        setUploadProgress(0);
+      });
+
+      xhr.addEventListener('abort', () => {
+        xhrRef.current = null;
+        setLoading(false);
+        setUploadProgress(0);
+      });
+
+      xhr.open('POST', '/api/podcasts/import');
+      xhr.send(formData);
     },
     [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, onImportStarted]
   );
+
+  const handleCancel = useCallback(() => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+    }
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
@@ -366,16 +400,46 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       </div>
 
       <div className={styles.actions}>
-        <Button
-          type="submit"
-          variant="primary"
-          size="large"
-          fullWidth
-          loading={loading}
-          disabled={loading || !audioFile || !title.trim() || !topic.trim()}
-        >
-          {loading ? 'Importing...' : 'Import Podcast'}
-        </Button>
+        {loading && uploadProgress < 100 ? (
+          <div className={styles.progressContainer}>
+            <div className={styles.progressHeader}>
+              <span className={styles.progressLabel}>Uploading...</span>
+              <span className={styles.progressPercent}>{uploadProgress}%</span>
+            </div>
+            <div className={styles.progressTrack}>
+              <div
+                className={styles.progressFill}
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <button
+              type="button"
+              className={styles.cancelButton}
+              onClick={handleCancel}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : loading ? (
+          <div className={styles.progressContainer}>
+            <div className={styles.progressHeader}>
+              <span className={styles.progressLabel}>Processing...</span>
+            </div>
+            <div className={styles.progressTrack}>
+              <div className={`${styles.progressFill} ${styles.progressIndeterminate}`} />
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="submit"
+            variant="primary"
+            size="large"
+            fullWidth
+            disabled={!audioFile || !title.trim() || !topic.trim()}
+          >
+            Import Podcast
+          </Button>
+        )}
       </div>
     </form>
   );
