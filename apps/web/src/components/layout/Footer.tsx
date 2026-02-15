@@ -17,9 +17,9 @@ export function Footer() {
           <div>
             <h4>Company</h4>
             <a href="/feedback">Feedback</a>
-            <a href="#">About</a>
-            <a href="#">Privacy</a>
-            <a href="#">Terms</a>
+            <a href="/support">Support</a>
+            <a href="/privacy">Privacy</a>
+            <a href="/terms">Terms</a>
           </div>
         </div>
       </div>

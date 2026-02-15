@@ -151,8 +151,8 @@ export default function ProfileScreen() {
   });
 
   const handleSettingsPress = useCallback(() => {
-    Alert.alert('Settings', 'Settings screen coming soon.');
-  }, []);
+    router.push('/settings');
+  }, [router]);
 
   const handleLogout = useCallback(() => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [

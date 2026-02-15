@@ -1,0 +1,106 @@
+.main {
+  min-height: 100vh;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background: var(--color-background);
+}
+
+.container {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.title {
+  font: var(--text-h1);
+  margin-bottom: var(--spacing-sm);
+}
+
+.subtitle {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+.section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  margin-bottom: var(--spacing-md);
+}
+
+.contactCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
+.contactItem {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.contactIcon {
+  font-size: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.contactItem strong {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  margin-bottom: 2px;
+}
+
+.contactItem p {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.contactItem a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.faqList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.faqItem {
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.faqItem h3 {
+  font: var(--text-h4);
+  margin-bottom: var(--spacing-xs);
+}
+
+.faqItem p {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.faqItem a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
