@@ -82,6 +82,10 @@
   border-left-color: #F43F5E;
 }
 
+.statLikes {
+  border-left-color: #EC4899;
+}
+
 .statLabel {
   font: var(--text-caption);
   color: var(--color-text-secondary);
@@ -132,7 +136,7 @@
 
 .creatorStatsGrid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--spacing-md);
 }
 
@@ -363,6 +367,10 @@
 @media (min-width: 600px) {
   .stats {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .creatorStatsGrid {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .header {
