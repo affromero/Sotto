@@ -78,7 +78,7 @@ describe('Middleware — Evil Agent Security Tests', () => {
   // PASSWORD GATE — Trying to access the app without the secret URL
   // =====================================================================
   describe('Password Gate — Stealth', () => {
-    it('redirects / to pass through (under construction is public)', async () => {
+    it('/ passes through as public (landing page with inline gate)', async () => {
       const res = await middleware(createRequest('/'));
       expect(isPassThrough(res)).toBe(true);
     });
@@ -103,7 +103,7 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/');
     });
 
-    it('/romero passes through as a public route', async () => {
+    it('/romero passes through as public (redirects to / server-side)', async () => {
       const res = await middleware(createRequest('/romero'));
       expect(isPassThrough(res)).toBe(true);
     });
@@ -483,7 +483,7 @@ describe('Middleware — Evil Agent Security Tests', () => {
       delete process.env.SITE_PASSWORD;
     });
 
-    it('allows /romero without password', async () => {
+    it('allows /romero without password (redirect page is public)', async () => {
       const res = await middleware(createRequest('/romero'));
       expect(isPassThrough(res)).toBe(true);
     });

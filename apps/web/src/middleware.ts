@@ -87,8 +87,8 @@ export async function middleware(request: NextRequest) {
 
   // Early-access password gate
   // All non-public routes require the sotto_access cookie when SITE_PASSWORD is set.
-  // /romero handles its own gate inline (shows password form or landing page).
-  // All other gated routes silently redirect to / (under construction) to hide the gate.
+  // / handles its own gate inline (shows password form or landing page).
+  // All other gated routes silently redirect to / to hide the gate.
   if (process.env.SITE_PASSWORD) {
     const accessCookie = request.cookies.get('sotto_access');
     const secret = process.env.NEXTAUTH_SECRET;
