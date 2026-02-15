@@ -29,6 +29,8 @@ export enum JobType {
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
   VALIDATE_KEYS = 'validate_keys',
+  POLL_TELEGRAM_UPDATES = 'poll_telegram_updates',
+  REPLY_TELEGRAM = 'reply_telegram',
 }
 
 /**
@@ -156,6 +158,14 @@ export interface DataExportPayload {
 }
 
 export interface ValidateKeysPayload {}
+
+export interface PollTelegramUpdatesPayload {}
+
+export interface ReplyTelegramPayload {
+  podcastId: string;
+  telegramMessageId: string;
+  chatId: string;
+}
 
 /**
  * Queue configuration
@@ -400,3 +410,5 @@ export const audioImportQueue = createQueue('audio-import', { attempts: 2 });
 export const featureComputationQueue = createQueue('feature-computation', { attempts: 2 });
 export const dataExportQueue = createQueue('data-export', { attempts: 2 });
 export const keyValidationQueue = createQueue('key-validation', { attempts: 1 });
+export const telegramBotQueue = createQueue('telegram-bot', { attempts: 1 });
+export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3 });
