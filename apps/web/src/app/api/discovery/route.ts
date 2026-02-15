@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { streamDiscoveryResponse, parseChips, parseMetadata } from '@/lib/discovery-agent';
+import { streamDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
+import { extractContent } from '@/lib/extractors';
+import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
 import { prisma } from '@/lib/prisma';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -12,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { message, content, discoveryId } = body;
-  const userMessage = message ?? content;
+  let userMessage: string = message ?? content;
 
   // Get or create discovery
   let discovery;
@@ -25,6 +28,35 @@ export async function POST(request: NextRequest) {
 
   // Resolve user's AI key for BYOK passthrough
   const aiKey = await getAiKey(session.user.id);
+
+  // Inline URL extraction: detect URLs in the latest message and inject context
+  const detectedUrls = detectUrls(userMessage);
+  if (detectedUrls.length > 0) {
+    const { allowed } = await checkRateLimit(`url-extract:${session.user.id}`, 10, 60);
+    if (allowed) {
+      try {
+        const extracted = await extractContent(detectedUrls[0]);
+        const preview = extracted.text.substring(0, 3000);
+        const contextBlock = [
+          '[URL_CONTEXT]',
+          extracted.title ? `Title: ${extracted.title}` : '',
+          extracted.siteName ? `Site: ${extracted.siteName}` : '',
+          extracted.author ? `Author: ${extracted.author}` : '',
+          `Content: ${preview}`,
+          '[/URL_CONTEXT]',
+        ]
+          .filter(Boolean)
+          .join('\n');
+
+        userMessage = `${userMessage}\n\n${contextBlock}`;
+      } catch (err) {
+        logger.warn('URL extraction failed in discovery chat', {
+          url: detectedUrls[0],
+          error: (err as Error).message,
+        });
+      }
+    }
+  }
 
   // Build message history
   const messages = discovery?.messages.map((m) => ({

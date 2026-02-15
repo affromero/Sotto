@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { generateScript } from '@/lib/script-generator';
+import { generateScript, type SourceMetadata } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
@@ -43,6 +43,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     where: { id: discoveryId },
   });
 
+  const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
+
   const result = await generateScript({
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
@@ -52,6 +54,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
     sourceContent: discovery.sourceContent || undefined,
+    sourceMetadata: sourceMetadata || undefined,
     apiKeyOverride: aiKey?.apiKey,
   });
 

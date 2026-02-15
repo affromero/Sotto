@@ -40,6 +40,15 @@ const AUDIENCE_GUIDANCE: Record<string, string> = {
     'This podcast is for a MATURE ADULT audience. No content restrictions — you can discuss controversial, sensitive, or complex topics frankly. Assume adult context and full comprehension. Be direct and unfiltered where the topic warrants it.',
 };
 
+export interface SourceMetadata {
+  title?: string;
+  author?: string;
+  publishedDate?: string;
+  siteName?: string;
+  wordCount?: number;
+  sourceType?: string;
+}
+
 export async function generateScript(params: {
   topic: string;
   depth: string;
@@ -49,6 +58,7 @@ export async function generateScript(params: {
   tone: string;
   durationTarget: number;
   sourceContent?: string;
+  sourceMetadata?: SourceMetadata;
   apiKeyOverride?: string;
 }): Promise<{
   turns: ScriptTurn[];
@@ -128,7 +138,7 @@ The "references" array must contain an entry for every [N] cited in the turns. T
 Only return the JSON object, nothing else.`;
 
   const userMessage = params.sourceContent
-    ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\nSource material:\n${params.sourceContent.substring(0, 8000)}`
+    ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
     : `Topic: ${params.topic}\nDepth: ${params.depth}`;
 
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
@@ -211,6 +221,7 @@ export async function generateScriptWithFeedback(params: {
   tone: string;
   durationTarget: number;
   sourceContent?: string;
+  sourceMetadata?: SourceMetadata;
   previousScript: ScriptTurn[];
   previousReferences: GeneratedReference[];
   verificationFeedback: string;
@@ -289,7 +300,7 @@ ${previousScriptText}
 ## PREVIOUS REFERENCES:
 ${previousRefsText}
 
-${params.sourceContent ? `\nSource material:\n${params.sourceContent.substring(0, 8000)}` : ''}
+${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}` : ''}
 
 Revise the script addressing ALL feedback. Return JSON only.`;
 
@@ -353,4 +364,22 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
   };
+}
+
+const SOURCE_CONTENT_LIMIT = 20000;
+
+function formatSourceBlock(content: string, metadata?: SourceMetadata): string {
+  const truncated = content.substring(0, SOURCE_CONTENT_LIMIT);
+
+  if (metadata && (metadata.title || metadata.author || metadata.publishedDate || metadata.siteName)) {
+    const parts = [
+      metadata.title && `Title: ${metadata.title}`,
+      metadata.author && `Author: ${metadata.author}`,
+      metadata.publishedDate && `Published: ${metadata.publishedDate}`,
+      metadata.siteName && `Source: ${metadata.siteName}`,
+    ].filter(Boolean);
+    return `Source material:\n${parts.join(' | ')}\nContent:\n${truncated}`;
+  }
+
+  return `Source material:\n${truncated}`;
 }
