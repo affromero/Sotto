@@ -18,6 +18,7 @@ export const createPodcastSchema = z.object({
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
+  aiModel: z.string().optional(),
   metadata: z.object({
     topic: z.string(),
     depth: z.string().optional(),

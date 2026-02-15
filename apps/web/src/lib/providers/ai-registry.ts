@@ -13,11 +13,18 @@ export interface AiProviderAuthField {
   placeholder: string;
 }
 
+export interface AiModelOption {
+  id: string;
+  displayName: string;
+  tier: 'fast' | 'balanced' | 'best';
+}
+
 export interface AiProviderMeta {
   id: AiProviderId;
   displayName: string;
   defaultModel: string;
   getApiKeyUrl: string;
+  models: AiModelOption[];
   auth: {
     fields: AiProviderAuthField[];
     validate: (credentials: Record<string, string>) => Promise<boolean>;
@@ -30,6 +37,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Anthropic (Claude)',
     defaultModel: 'claude-sonnet-4-5-20250929',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
+    models: [
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast' },
+      { id: 'claude-sonnet-4-5-20250929', displayName: 'Claude Sonnet 4.5', tier: 'balanced' },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', tier: 'best' },
+    ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
       validate: async (creds) => {
@@ -60,6 +72,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'OpenAI',
     defaultModel: 'gpt-4o',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
+    models: [
+      { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', tier: 'fast' },
+      { id: 'gpt-4o', displayName: 'GPT-4o', tier: 'balanced' },
+    ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
       validate: async (creds) => {
@@ -80,6 +96,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     displayName: 'Groq',
     defaultModel: 'whisper-large-v3-turbo',
     getApiKeyUrl: 'https://console.groq.com/keys',
+    models: [
+      { id: 'whisper-large-v3-turbo', displayName: 'Whisper Large v3 Turbo', tier: 'fast' },
+    ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
       validate: async (creds) => {
@@ -112,6 +131,18 @@ export function getAiProviderIds(): AiProviderId[] {
 
 export function isValidAiProviderId(id: string): id is AiProviderId {
   return id in AI_PROVIDERS;
+}
+
+/**
+ * Get the display name for a model ID (e.g. 'claude-sonnet-4-5-20250929' → 'Claude Sonnet 4.5').
+ * Returns the raw ID if no match is found.
+ */
+export function getAiModelDisplayName(modelId: string): string {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.displayName;
+  }
+  return modelId;
 }
 
 export async function validateAiProviderCredentials(

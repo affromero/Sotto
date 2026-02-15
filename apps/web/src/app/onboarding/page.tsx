@@ -48,10 +48,9 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
       <main className={styles.main}>
         <div className={styles.containerWide}>
           <header className={styles.header}>
-            <h1 className={styles.title}>Connect your API keys</h1>
+            <h1 className={styles.title}>Unlock unlimited podcasts</h1>
             <p className={styles.subtitle}>
-              Sotto is BYOK (Bring Your Own Key). Connect your AI and TTS provider keys to start
-              creating podcasts.
+              You&apos;ve used your free generations. Add your own API keys for unlimited access.
             </p>
           </header>
 

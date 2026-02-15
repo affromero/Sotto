@@ -50,7 +50,7 @@ export function OnboardingForm({ categories }: OnboardingFormProps) {
         throw new Error('Failed to save interests');
       }
 
-      router.push('/onboarding?step=keys');
+      router.push('/create');
     } catch {
       setSaving(false);
     }
@@ -69,7 +69,7 @@ export function OnboardingForm({ categories }: OnboardingFormProps) {
         throw new Error('Failed to skip onboarding');
       }
 
-      router.push('/onboarding?step=keys');
+      router.push('/create');
     } catch {
       setSaving(false);
     }

@@ -48,6 +48,19 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
+// Mock generation gate
+const mockCheckGenerationGate = vi.fn();
+const mockTryIncrementFreeGeneration = vi.fn();
+vi.mock('@/lib/generation-gate', () => ({
+  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
+  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
+}));
+
+const mockGetFreeTierConfig = vi.fn();
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
 // Mock validations — let real schema through
 vi.mock('@/lib/validations', async () => {
   const actual = await vi.importActual('@/lib/validations');
@@ -95,6 +108,7 @@ const mockSourcePodcast = {
 
 function setupSuccessMocks(userId = 'user-1') {
   mockAuth.mockResolvedValue({ user: { id: userId, name: 'Alice' } });
+  mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
   mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
   mockAddJob.mockResolvedValue(undefined);
   mockPodcastUpdate.mockResolvedValue({});
@@ -146,6 +160,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 404 when source podcast does not exist', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const request = createRequest();
@@ -160,6 +175,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 403 when source podcast is not PUBLIC', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       visibility: 'PRIVATE',
@@ -177,6 +193,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 403 when source podcast is UNLISTED', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       visibility: 'UNLISTED',
@@ -194,6 +211,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 400 when source podcast status is not READY', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       status: 'PENDING',
@@ -211,6 +229,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 400 when source podcast is GENERATING_AUDIO', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       status: 'GENERATING_AUDIO',

@@ -54,6 +54,12 @@
   gap: var(--spacing-xs);
 }
 
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .title {
   font: var(--text-h2);
   color: var(--color-text-primary);

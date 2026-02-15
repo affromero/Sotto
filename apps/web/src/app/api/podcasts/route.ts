@@ -4,8 +4,9 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { canResolveAi } from '@/lib/providers/ai';
 import { LIMITS } from '@/lib/stripe';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 export async function GET(request: NextRequest) {
@@ -65,13 +66,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // BYOK check: ensure AI provider is configured
-  const hasAi = await canResolveAi(authResult.userId);
-  if (!hasAi) {
-    return NextResponse.json(
-      { error: 'AI provider not configured. Add an API key in Settings.' },
-      { status: 403 }
-    );
+  // Generation gate: BYOK or free tier
+  const gate = await checkGenerationGate(authResult.userId);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys to continue.'
+        : 'AI provider not configured.';
+    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
   // Duration validation
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
       hostVoiceId: parsed.data.hostVoiceId,
       expertVoiceId: parsed.data.expertVoiceId,
       ttsProvider: parsed.data.ttsProvider ?? null,
+      aiModel: parsed.data.aiModel ?? null,
     },
   });
 
@@ -136,6 +139,19 @@ export async function POST(request: NextRequest) {
     sourceText: sourceText ?? undefined,
   };
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
+
+  // Increment free tier counter for non-BYOK users
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
+    if (!ok) {
+      await prisma.podcast.delete({ where: { id: podcast.id } });
+      return NextResponse.json(
+        { error: 'Free generations used.', code: 'free_tier_exhausted' },
+        { status: 403 }
+      );
+    }
+  }
 
   // Fire-and-forget activity record
   prisma.activity.create({

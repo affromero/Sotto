@@ -1,0 +1,24 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font: var(--text-caption);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.default {
+  background: var(--color-success-lighter, #f0fdf4);
+  color: var(--color-success, #16a34a);
+}
+
+.warning {
+  background: var(--color-warning-lighter);
+  color: var(--color-warning);
+}
+
+.exhausted {
+  background: var(--color-error-subtle, #fef2f2);
+  color: var(--color-error, #dc2626);
+}

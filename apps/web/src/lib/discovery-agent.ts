@@ -114,11 +114,13 @@ export function parseMetadata(
  */
 export async function getDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  model?: string
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,
     apiKeyOverride,
+    model,
     tools: [WEB_SEARCH_TOOL],
   });
 }
@@ -128,11 +130,13 @@ export async function getDiscoveryResponse(
  */
 export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  model?: string
 ): AsyncGenerator<string> {
   return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,
     apiKeyOverride,
+    model,
     tools: [WEB_SEARCH_TOOL],
   });
 }

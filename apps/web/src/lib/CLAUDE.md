@@ -42,6 +42,8 @@ All shared business logic and external service integrations live here.
 | `inspire-engine.ts`      | "Inspire Me" topic suggestions: `getPersonalizedTopics()`, `getTrendingTopics()`, `getCurrentEvents()` (Claude + web search), `drillDown()`                                                                | Anthropic API + `redis.ts`                    |
 | `handles.ts`             | Handle validation, availability checks, unique generation (reserved handles, format validation)                                                                                                            | Uses `prisma.ts`                              |
 | `rss.ts`                 | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts                                                                                                             | Uses `prisma.ts`                              |
+| `free-tier-config.ts`    | `getFreeTierConfig()` reads singleton FreeTierConfig row; `setFreeTierConfig()` for admin updates                                                                                                          | Uses `prisma.ts`                              |
+| `generation-gate.ts`     | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display                                                     | Uses `prisma.ts`, `byok.ts`                  |
 
 ## Providers (`src/lib/providers/`)
 

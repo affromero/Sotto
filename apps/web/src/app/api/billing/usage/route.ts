@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { LIMITS } from '@/lib/stripe';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -11,10 +12,11 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [podcastCount, ttsKeys, aiKeys] = await Promise.all([
+    const [podcastCount, ttsKeys, aiKeys, freeTier] = await Promise.all([
       prisma.podcast.count({ where: { userId: session.user.id } }),
       listByokProviders(session.user.id),
       listAiProviders(session.user.id),
+      getFreeTierStatus(session.user.id),
     ]);
 
     return NextResponse.json({
@@ -23,6 +25,12 @@ export async function GET(_request: NextRequest) {
       byok: {
         ai: aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
         tts: ttsKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
+      },
+      freeTier: {
+        used: freeTier.freeGenerationsUsed,
+        limit: freeTier.freeGenerationsLimit,
+        remaining: freeTier.freeGenerationsRemaining,
+        isByokUser: freeTier.isByokUser,
       },
       limits: {
         maxDurationMinutes: LIMITS.maxDurationMinutes,

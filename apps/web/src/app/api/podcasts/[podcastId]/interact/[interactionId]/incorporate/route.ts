@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
 import { generateResponse, logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
@@ -31,6 +33,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Only the podcast owner can incorporate
   if (interaction.podcast.userId !== session.user.id) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Generation gate
+  const gate = await checkGenerationGate(session.user.id);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys to continue.'
+        : 'AI provider not configured.';
+    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
   if (interaction.podcast.source === 'IMPORT') {
@@ -122,6 +134,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   };
 
   await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload);
+
+  // Increment free tier counter for non-BYOK users
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    await tryIncrementFreeGeneration(session.user.id, config.generationLimit);
+  }
 
   return NextResponse.json(
     {
