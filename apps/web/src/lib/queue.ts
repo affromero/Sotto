@@ -3,6 +3,10 @@ import { createRedisConnection } from './redis';
 import { logger } from './logger';
 import { prisma } from './prisma';
 import { markPodcastFailed } from './pipeline-resume';
+import { classifyError, isKeyInvalidationError, userMessage } from './byok-errors';
+import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
+import type { AiProviderId } from './providers/ai-registry';
+import type { TtsProviderId } from './providers/tts-registry';
 
 /**
  * Job types for the Sotto queue system
@@ -212,7 +216,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       failedReason: args.failedReason,
     });
 
-    // Centralized failure handler: mark podcast as FAILED and notify user
+    // Centralized failure handler: classify error, invalidate BYOK keys, notify user
     try {
       const job = await queue.getJob(args.jobId);
       const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
@@ -220,21 +224,87 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       const podcast = await prisma.podcast.findUnique({
         where: { id: podcastId },
-        select: { status: true, userId: true, title: true },
+        select: { status: true, userId: true, title: true, ttsProvider: true },
       });
+      if (!podcast) return;
 
-      if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') return;
-
-      await markPodcastFailed(podcastId);
-
-      // Queue a notification
+      const errorKind = classifyError(args.failedReason || '');
       const notifQueue = queueInstances.get('notifications');
+
+      const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
+      const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
+
+      // Handle interaction failures separately — podcast is already READY
+      if (queueName === 'interactions') {
+        if (isKeyInvalidationError(errorKind)) {
+          const aiKey = await prisma.userAiKey.findFirst({
+            where: { userId: podcast.userId, isValid: true },
+          });
+          if (aiKey) {
+            await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+            if (notifQueue) {
+              await notifQueue.add('send_notification', {
+                userId: podcast.userId,
+                type: 'KEY_INVALID',
+                title: 'API Key Invalid',
+                message: userMessage(errorKind, aiKey.provider),
+                data: { podcastId },
+              });
+            }
+          }
+        }
+        return;
+      }
+
+      // Skip already-terminal states
+      if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') return;
+
+      // Determine provider label and attempt key invalidation
+      let failureReason = userMessage(errorKind, 'the provider');
+
+      if (isKeyInvalidationError(errorKind)) {
+        if (TTS_QUEUES.includes(queueName) && podcast.ttsProvider) {
+          // BYOK TTS key was used (ttsProvider is set)
+          await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
+          failureReason = userMessage(errorKind, podcast.ttsProvider);
+          if (notifQueue) {
+            await notifQueue.add('send_notification', {
+              userId: podcast.userId,
+              type: 'KEY_INVALID',
+              title: 'API Key Invalid',
+              message: failureReason,
+              data: { podcastId },
+            });
+          }
+        } else if (AI_QUEUES.includes(queueName)) {
+          const aiKey = await prisma.userAiKey.findFirst({
+            where: { userId: podcast.userId, isValid: true },
+          });
+          if (aiKey) {
+            await markAiKeyInvalid(podcast.userId, aiKey.provider as AiProviderId);
+            failureReason = userMessage(errorKind, aiKey.provider);
+            if (notifQueue) {
+              await notifQueue.add('send_notification', {
+                userId: podcast.userId,
+                type: 'KEY_INVALID',
+                title: 'API Key Invalid',
+                message: failureReason,
+                data: { podcastId },
+              });
+            }
+          }
+        }
+      }
+
+      await markPodcastFailed(podcastId, failureReason);
+
+      // Queue a podcast failure notification
       if (notifQueue) {
         await notifQueue.add('send_notification', {
           userId: podcast.userId,
-          type: 'PODCAST_READY',
+          type: 'PODCAST_FAILED',
           title: 'Generation Failed',
-          message: 'Your podcast generation failed. Please try again.',
+          message: failureReason,
           data: { podcastId },
         });
       }
@@ -242,6 +312,8 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       logger.info('Marked podcast as FAILED after generation failure', {
         userId: podcast.userId,
         podcastId,
+        errorKind,
+        failureReason,
       });
     } catch (err) {
       logger.error('Failed to process failure handler', {

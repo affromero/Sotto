@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import type { NotificationType } from '@prisma/client';
 import { SendNotificationPayload } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { sendPushNotification, sendExpoPushNotification } from '@/lib/push-notifications';
@@ -13,7 +14,7 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
   await prisma.notification.create({
     data: {
       userId,
-      type: type as 'PODCAST_READY' | 'PODCAST_LIKED' | 'PODCAST_FORKED' | 'NEW_FOLLOWER' | 'SIMILAR_PODCAST_CREATED',
+      type: type as NotificationType,
       title,
       message,
       data: data || undefined,
