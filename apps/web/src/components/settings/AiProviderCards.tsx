@@ -21,6 +21,13 @@ const PROVIDERS = [
     placeholder: 'sk-...',
     getKeyUrl: 'https://platform.openai.com/api-keys',
   },
+  {
+    id: 'groq' as const,
+    name: 'Groq',
+    description: 'Free Whisper transcription — sign up at console.groq.com',
+    placeholder: 'gsk_...',
+    getKeyUrl: 'https://console.groq.com/keys',
+  },
 ];
 
 interface AiProviderCardsProps {
