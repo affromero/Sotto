@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { generateScript, type SourceMetadata } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
+import { detectLanguage } from '@/lib/language-detect';
 import { logger } from '@/lib/logger';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
@@ -108,10 +109,59 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     }
   }
 
+  // Detect language from script text
+  const fullText = result.turns.map((t: { text: string }) => t.text).join(' ');
+  const detectedLanguage = detectLanguage(fullText);
+
+  // Auto-assign language tag
+  if (detectedLanguage) {
+    const langSlug = `lang-${detectedLanguage}`;
+    const langTag = await prisma.tag.findUnique({ where: { slug: langSlug } });
+    if (langTag) {
+      await prisma.podcastTag.upsert({
+        where: { podcastId_tagId: { podcastId, tagId: langTag.id } },
+        update: {},
+        create: { podcastId, tagId: langTag.id },
+      });
+    }
+  }
+
+  // Auto-assign production tag
+  const prodTag = await prisma.tag.findUnique({ where: { slug: 'prod-ai-generated' } });
+  if (prodTag) {
+    await prisma.podcastTag.upsert({
+      where: { podcastId_tagId: { podcastId, tagId: prodTag.id } },
+      update: {},
+      create: { podcastId, tagId: prodTag.id },
+    });
+  }
+
+  // Auto-assign episode type tag from discovery depth
+  const depthToTypeSlug: Record<string, string> = {
+    quick_overview: 'type-quick-overview',
+    standard: 'type-explainer',
+    deep_dive: 'type-deep-dive',
+  };
+  const typeSlug = depthToTypeSlug[discovery.depth || 'standard'];
+  if (typeSlug) {
+    const typeTag = await prisma.tag.findUnique({ where: { slug: typeSlug } });
+    if (typeTag) {
+      await prisma.podcastTag.upsert({
+        where: { podcastId_tagId: { podcastId, tagId: typeTag.id } },
+        update: {},
+        create: { podcastId, tagId: typeTag.id },
+      });
+    }
+  }
+
   // Route to script verification (handles both with and without references)
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'VERIFYING_SCRIPT' },
+    data: {
+      status: 'VERIFYING_SCRIPT',
+      aiProvider: aiKey?.provider ?? 'anthropic',
+      language: detectedLanguage ?? undefined,
+    },
   });
 
   await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {

@@ -9,6 +9,7 @@ import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
 import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
+import { detectLanguage } from '@/lib/language-detect';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
@@ -271,6 +272,38 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
     await job.updateProgress(90);
 
+    // Detect language from transcript text
+    const importFullText = segments.map((s) => s.text).join(' ');
+    const detectedLanguage = detectLanguage(importFullText);
+
+    // Auto-assign language tag
+    if (detectedLanguage) {
+      const langSlug = `lang-${detectedLanguage}`;
+      const langTag = await prisma.tag.findUnique({ where: { slug: langSlug } });
+      if (langTag) {
+        await prisma.podcastTag.upsert({
+          where: { podcastId_tagId: { podcastId, tagId: langTag.id } },
+          update: {},
+          create: { podcastId, tagId: langTag.id },
+        });
+      }
+    }
+
+    // Auto-assign production tag
+    const podcastForTags = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { isHumanContent: true },
+    });
+    const prodSlug = podcastForTags.isHumanContent ? 'prod-human-created' : 'prod-imported';
+    const prodTag = await prisma.tag.findUnique({ where: { slug: prodSlug } });
+    if (prodTag) {
+      await prisma.podcastTag.upsert({
+        where: { podcastId_tagId: { podcastId, tagId: prodTag.id } },
+        update: {},
+        create: { podcastId, tagId: prodTag.id },
+      });
+    }
+
     await prisma.podcast.update({
       where: { id: podcastId },
       data: {
@@ -279,6 +312,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         duration,
         fileSize: await fileSize,
         currentVersion: podcastVersion.version,
+        language: detectedLanguage ?? undefined,
       },
     });
 

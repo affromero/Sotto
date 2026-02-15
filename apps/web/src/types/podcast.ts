@@ -17,6 +17,9 @@ export interface PodcastSummary {
   source: PodcastSource;
   isHumanContent: boolean;
   sourcePlatform?: string | null;
+  aiProvider?: string | null;
+  ttsProvider?: string | null;
+  language?: string | null;
   forkedFromId: string | null;
   user: {
     id: string;

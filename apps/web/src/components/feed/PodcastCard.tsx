@@ -8,6 +8,7 @@ import { Play, Heart, GitFork } from 'lucide-react';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { Badge } from '@/components/ui/Badge';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastCard.module.css';
@@ -174,6 +175,10 @@ export function PodcastCard({
               {formatDate(podcast.createdAt)}
             </time>
           </div>
+
+          {(podcast.aiProvider || podcast.ttsProvider || podcast.language) && (
+            <MetadataBadges podcast={podcast} categories={['ai', 'tts', 'language']} compact />
+          )}
 
           <div className={styles.stats}>
             <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
