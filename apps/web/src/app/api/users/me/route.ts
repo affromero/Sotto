@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { isHandleAvailable } from '@/lib/handles';
 import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/validations';
@@ -24,15 +25,15 @@ const updateUserSchema = z
   })
   .strict();
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: authResult.userId },
     });
 
     if (!user) {
@@ -60,8 +61,8 @@ export async function GET(_request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -77,7 +78,7 @@ export async function PATCH(request: NextRequest) {
     // Validate handle availability if changing it
     if (handle !== undefined) {
       const currentUser = await prisma.user.findUnique({
-        where: { id: session.user.id },
+        where: { id: authResult.userId },
         select: { handle: true },
       });
       if (currentUser?.handle !== handle) {
@@ -95,7 +96,7 @@ export async function PATCH(request: NextRequest) {
       // Update user profile fields (including handle if provided)
       const updateData = handle !== undefined ? { ...data, handle } : data;
       const user = await tx.user.update({
-        where: { id: session.user.id },
+        where: { id: authResult.userId },
         data: updateData,
       });
 
@@ -153,14 +154,14 @@ export async function PATCH(request: NextRequest) {
 
         // Delete existing manual interests
         await tx.userInterest.deleteMany({
-          where: { userId: session.user.id, source: { in: ['onboarding', 'manual'] } },
+          where: { userId: authResult.userId, source: { in: ['onboarding', 'manual'] } },
         });
 
         // Create new interests
         if (allTagIds.length > 0) {
           await tx.userInterest.createMany({
             data: allTagIds.map((tagId) => ({
-              userId: session.user.id,
+              userId: authResult.userId,
               tagId,
               source: 'manual',
               weight: 1.0,
