@@ -11,26 +11,6 @@
   margin: 0 auto;
 }
 
-/* Header */
-
-.header {
-  text-align: center;
-  padding: var(--spacing-xl) 0 var(--spacing-lg);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-  margin-bottom: var(--spacing-xs);
-}
-
-.subtitle {
-  font: var(--text-body-lg);
-  color: var(--color-text-secondary);
-  max-width: 560px;
-  margin: 0 auto;
-}
-
 /* Feed Tabs */
 
 .feedTabs {
@@ -121,8 +101,8 @@
 }
 
 .pillActive:hover {
-  background: var(--color-primary-dark);
-  border-color: var(--color-primary-dark);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
   color: var(--color-surface);
 }
 
@@ -171,9 +151,5 @@
 @media (min-width: 769px) {
   .main {
     padding: var(--spacing-xl);
-  }
-
-  .header {
-    padding: var(--spacing-2xl) 0 var(--spacing-xl);
   }
 }

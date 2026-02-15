@@ -5,6 +5,8 @@ import { canResolveAi } from '@/lib/providers/ai';
 import { canResolveTts } from '@/lib/providers/tts';
 import { Badge } from '@/components/ui/Badge';
 import { KeysRequiredBanner } from '@/components/ui/KeysRequiredBanner';
+import { PodcastCard } from '@/components/feed/PodcastCard';
+import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
 
@@ -95,8 +97,30 @@ export default async function DashboardPage() {
         duration: true,
         playCount: true,
         forkCount: true,
+        likeCount: true,
         createdAt: true,
         audioUrl: true,
+        source: true,
+        sourcePlatform: true,
+        isHumanContent: true,
+        visibility: true,
+        forkedFromId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            handle: true,
+            role: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: { id: true, name: true, slug: true },
+            },
+          },
+        },
       },
     }),
     prisma.podcast.findMany({
@@ -106,14 +130,39 @@ export default async function DashboardPage() {
         userId: { not: userId },
       },
       orderBy: { forkCount: 'desc' },
-      take: 4,
+      take: 6,
       select: {
         id: true,
         title: true,
         topic: true,
+        status: true,
+        visibility: true,
+        audioUrl: true,
+        duration: true,
+        playCount: true,
         forkCount: true,
         likeCount: true,
-        user: { select: { name: true } },
+        createdAt: true,
+        source: true,
+        sourcePlatform: true,
+        isHumanContent: true,
+        forkedFromId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+            handle: true,
+            role: true,
+          },
+        },
+        tags: {
+          include: {
+            tag: {
+              select: { id: true, name: true, slug: true },
+            },
+          },
+        },
       },
     }),
     canResolveAi(userId),
@@ -127,6 +176,12 @@ export default async function DashboardPage() {
   const followerCount = user?._count?.followers ?? 0;
 
   const needsKeys = !hasAi || !hasTts;
+
+  const serializedTrending = trendingToFork.map((p) => ({
+    ...p,
+    createdAt: p.createdAt.toISOString(),
+    tags: p.tags.map((pt) => pt.tag),
+  }));
 
   return (
     <main className={styles.main}>
@@ -154,7 +209,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className={styles.stats} aria-label="Usage statistics">
-        <div className={styles.statCard}>
+        <div className={`${styles.statCard} ${styles.statPodcasts}`}>
           <span className={styles.statLabel}>Total Podcasts</span>
           <span className={styles.statValue}>{podcasts.length}</span>
         </div>
@@ -164,15 +219,15 @@ export default async function DashboardPage() {
         <section className={styles.creatorStats} aria-label="Creator statistics">
           <h2 className={styles.creatorStatsTitle}>Creator Stats</h2>
           <div className={styles.creatorStatsGrid}>
-            <div className={styles.creatorStatCard}>
+            <div className={`${styles.creatorStatCard} ${styles.statListens}`}>
               <span className={styles.statLabel}>Total Listens</span>
               <span className={styles.statValue}>{totalListens.toLocaleString()}</span>
             </div>
-            <div className={styles.creatorStatCard}>
+            <div className={`${styles.creatorStatCard} ${styles.statFollowers}`}>
               <span className={styles.statLabel}>Followers</span>
               <span className={styles.statValue}>{followerCount.toLocaleString()}</span>
             </div>
-            <div className={styles.creatorStatCard}>
+            <div className={`${styles.creatorStatCard} ${styles.statForks}`}>
               <span className={styles.statLabel}>Forks</span>
               <span className={styles.statValue}>{totalForks.toLocaleString()}</span>
             </div>
@@ -212,40 +267,55 @@ export default async function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <ul className={styles.podcastList} role="list" aria-label="Your podcasts">
-            {podcasts.map((podcast) => (
-              <li key={podcast.id} className={styles.podcastItem}>
+          <div className={styles.podcastGrid} role="list" aria-label="Your podcasts">
+            {podcasts.map((podcast) => {
+              const gradient = getPodcastGradient(podcast.id);
+              const gradientVars = {
+                '--cover-from': gradient.from,
+                '--cover-to': gradient.to,
+                '--cover-angle': gradient.angle,
+              } as React.CSSProperties;
+
+              return (
                 <Link
+                  key={podcast.id}
                   href={`/podcast/${podcast.id}`}
-                  className={styles.podcastLink}
+                  className={styles.miniGradientCard}
+                  style={gradientVars}
                   aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
+                  role="listitem"
                 >
-                  <div className={styles.podcastInfo}>
-                    <h3 className={styles.podcastTitle}>{podcast.title}</h3>
-                    <p className={styles.podcastTopic}>{podcast.topic}</p>
+                  <div
+                    className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''}`}
+                  >
+                    <div className={styles.miniGradientBadge}>
+                      <Badge variant={statusVariants[podcast.status]}>
+                        {statusLabels[podcast.status]}
+                      </Badge>
+                    </div>
+                    <h3 className={styles.miniGradientTitle}>{podcast.title}</h3>
                   </div>
-                  <div className={styles.podcastMeta}>
-                    <Badge variant={statusVariants[podcast.status]}>
-                      {statusLabels[podcast.status]}
-                    </Badge>
+                  <div className={styles.miniGradientBody}>
+                    <p className={styles.miniGradientTopic}>{podcast.topic}</p>
+                    <div className={styles.miniGradientMeta}>
+                      <span>{formatDuration(podcast.duration)}</span>
+                      <span>{formatDate(podcast.createdAt)}</span>
+                      {podcast.playCount > 0 && (
+                        <span>{podcast.playCount.toLocaleString()} plays</span>
+                      )}
+                    </div>
                     {podcast.status === 'FAILED' && (
                       <span className={styles.retryHint}>Tap to retry</span>
                     )}
-                    <span className={styles.podcastDuration}>
-                      {formatDuration(podcast.duration)}
-                    </span>
-                    <time className={styles.podcastDate} dateTime={podcast.createdAt.toISOString()}>
-                      {formatDate(podcast.createdAt)}
-                    </time>
                   </div>
                 </Link>
-              </li>
-            ))}
-          </ul>
+              );
+            })}
+          </div>
         )}
       </section>
 
-      {trendingToFork.length > 0 && (
+      {serializedTrending.length > 0 && (
         <section className={styles.trendingSection} aria-label="Trending podcasts to fork">
           <div className={styles.trendingSectionHeader}>
             <h2 className={styles.sectionTitle}>Trending to Fork</h2>
@@ -253,20 +323,10 @@ export default async function DashboardPage() {
               See all
             </Link>
           </div>
-          <div className={styles.trendingGrid}>
-            {trendingToFork.map((p) => (
-              <div key={p.id} className={styles.trendingCard}>
-                <Link href={`/podcast/${p.id}`} className={styles.trendingCardTitle}>
-                  {p.title}
-                </Link>
-                <span className={styles.trendingCardMeta}>by {p.user.name || 'Anonymous'}</span>
-                <div className={styles.trendingCardStats}>
-                  <span className={styles.trendingCardStat}>{p.forkCount} forks</span>
-                  <span className={styles.trendingCardStat}>{p.likeCount} likes</span>
-                </div>
-                <Link href={`/podcast/${p.id}`} className={styles.trendingForkBtn}>
-                  Fork
-                </Link>
+          <div className={styles.trendingScroll}>
+            {serializedTrending.map((p) => (
+              <div key={p.id} className={styles.trendingCardWrapper}>
+                <PodcastCard podcast={p} variant="compact" />
               </div>
             ))}
           </div>

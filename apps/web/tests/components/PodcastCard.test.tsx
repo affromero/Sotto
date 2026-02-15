@@ -46,7 +46,8 @@ describe('PodcastCard', () => {
 
   it('renders creator name', () => {
     render(<PodcastCard podcast={mockPodcast} />);
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    const names = screen.getAllByText('Jane Smith');
+    expect(names.length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders creator avatar image when provided', () => {
@@ -105,7 +106,9 @@ describe('PodcastCard', () => {
 
   it('links to podcast detail page', () => {
     render(<PodcastCard podcast={mockPodcast} />);
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('link', {
+      name: 'Listen to Introduction to Quantum Computing by Jane Smith',
+    });
     expect(link).toHaveAttribute('href', '/podcast/podcast-1');
   });
 
@@ -162,7 +165,8 @@ describe('PodcastCard', () => {
       user: { ...mockPodcast.user, name: null },
     };
     render(<PodcastCard podcast={podcastNoName} />);
-    expect(screen.getByText('Anonymous')).toBeInTheDocument();
+    const anonymousElements = screen.getAllByText('Anonymous');
+    expect(anonymousElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it('uses question mark fallback for anonymous user avatar', () => {
@@ -171,6 +175,7 @@ describe('PodcastCard', () => {
       user: { ...mockPodcast.user, name: null, image: null },
     };
     render(<PodcastCard podcast={podcastAnon} />);
-    expect(screen.getByText('?')).toBeInTheDocument();
+    const fallbacks = screen.getAllByText('?');
+    expect(fallbacks.length).toBeGreaterThanOrEqual(1);
   });
 });
