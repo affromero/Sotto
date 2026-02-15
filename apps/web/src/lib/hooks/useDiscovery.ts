@@ -2,13 +2,23 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useTrack } from '@/components/providers/EventProvider';
+import { detectUrls } from '@/lib/discovery-agent';
 import { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@/types/discovery';
+
+export interface LinkPreviewData {
+  url: string;
+  title: string | null;
+  siteName: string | null;
+  wordCount: number | null;
+  isLoading: boolean;
+}
 
 interface UseDiscoveryReturn {
   messages: DiscoveryMessage[];
   metadata: DiscoveryMetadata | null;
   isLoading: boolean;
   isComplete: boolean;
+  linkPreview: LinkPreviewData | null;
   sendMessage: (content: string, podcastId?: string, isChipBased?: boolean) => Promise<void>;
   reset: () => void;
 }
@@ -22,6 +32,7 @@ const initialState: DiscoveryState = {
 
 export function useDiscovery(): UseDiscoveryReturn {
   const [state, setState] = useState<DiscoveryState>(initialState);
+  const [linkPreview, setLinkPreview] = useState<LinkPreviewData | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const track = useTrack();
   const messageIndexRef = useRef(0);
@@ -53,6 +64,32 @@ export function useDiscovery(): UseDiscoveryReturn {
         messages: [...prev.messages, userMessage],
         isLoading: true,
       }));
+
+      // Detect URLs and fetch preview
+      const urls = detectUrls(content);
+      if (urls.length > 0) {
+        setLinkPreview({ url: urls[0], title: null, siteName: null, wordCount: null, isLoading: true });
+        fetch('/api/discovery/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: urls[0] }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) {
+              setLinkPreview({
+                url: urls[0],
+                title: data.title,
+                siteName: data.siteName,
+                wordCount: data.wordCount,
+                isLoading: false,
+              });
+            } else {
+              setLinkPreview(null);
+            }
+          })
+          .catch(() => setLinkPreview(null));
+      }
 
       // Abort any in-flight request
       if (abortControllerRef.current) {
@@ -286,6 +323,7 @@ export function useDiscovery(): UseDiscoveryReturn {
     }
     messageIndexRef.current = 0;
     setState(initialState);
+    setLinkPreview(null);
   }, []);
 
   return {
@@ -293,6 +331,7 @@ export function useDiscovery(): UseDiscoveryReturn {
     metadata: state.metadata,
     isLoading: state.isLoading,
     isComplete: state.isComplete,
+    linkPreview,
     sendMessage,
     reset,
   };

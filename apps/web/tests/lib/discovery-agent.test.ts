@@ -21,6 +21,7 @@ vi.mock('@/lib/logger', () => ({
 
 // ---- Import under test ----
 import {
+  detectUrls,
   parseChips,
   parseMetadata,
   getDiscoveryResponse,
@@ -28,6 +29,53 @@ import {
 } from '@/lib/discovery-agent';
 
 // ---- Tests ----
+
+describe('detectUrls', () => {
+  it('detects https URLs in text', () => {
+    const result = detectUrls('Check out https://example.com/article for more');
+    expect(result).toEqual(['https://example.com/article']);
+  });
+
+  it('detects http URLs in text', () => {
+    const result = detectUrls('Visit http://example.com/page');
+    expect(result).toEqual(['http://example.com/page']);
+  });
+
+  it('detects multiple URLs in one message', () => {
+    const result = detectUrls('See https://a.com and https://b.com/path');
+    expect(result).toEqual(['https://a.com', 'https://b.com/path']);
+  });
+
+  it('returns empty array when no URLs present', () => {
+    const result = detectUrls('Just a regular message with no links');
+    expect(result).toEqual([]);
+  });
+
+  it('does not detect email addresses as URLs', () => {
+    const result = detectUrls('Contact me at user@example.com');
+    expect(result).toEqual([]);
+  });
+
+  it('handles URLs with query params and fragments', () => {
+    const result = detectUrls('https://example.com/page?q=test&lang=en#section');
+    expect(result).toEqual(['https://example.com/page?q=test&lang=en#section']);
+  });
+
+  it('handles URLs at start, middle, and end of text', () => {
+    const result = detectUrls(
+      'https://start.com is cool, also https://middle.com is great, and https://end.com'
+    );
+    expect(result).toHaveLength(3);
+    expect(result).toContain('https://start.com');
+    expect(result).toContain('https://middle.com');
+    expect(result).toContain('https://end.com');
+  });
+
+  it('deduplicates repeated URLs', () => {
+    const result = detectUrls('Visit https://example.com and https://example.com again');
+    expect(result).toEqual(['https://example.com']);
+  });
+});
 
 describe('parseChips', () => {
   beforeEach(() => {
