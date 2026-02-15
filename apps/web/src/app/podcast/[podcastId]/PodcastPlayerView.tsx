@@ -283,6 +283,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       <header className={styles.podcastHeader}>
         <h1 className={styles.podcastTitle}>{podcast.title}</h1>
 
+        {podcast.topic && (
+          <p className={styles.podcastDescription}>{podcast.topic}</p>
+        )}
+
         <div className={styles.metaRow}>
           <Link href={`/profile/${podcast.user.id}`} className={styles.creator}>
             <div className={styles.creatorAvatar}>
@@ -376,7 +380,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Player */}
       {isReady && podcast.audioUrl && (
         <section className={styles.playerSection} aria-label="Audio player">
-          <AudioPlayer />
+          <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} />
         </section>
       )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { PlaybackControls } from './PlaybackControls';
 import { ListeningQueue } from './ListeningQueue';
@@ -12,9 +12,22 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-export function AudioPlayer() {
+interface AudioPlayerProps {
+  podcastId?: string;
+  audioUrl?: string;
+}
+
+export function AudioPlayer({ podcastId: initialPodcastId, audioUrl }: AudioPlayerProps) {
   const player = usePlayer();
   const progressRef = useRef<HTMLDivElement>(null);
+  const loadedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (initialPodcastId && audioUrl && loadedRef.current !== initialPodcastId) {
+      loadedRef.current = initialPodcastId;
+      player.loadPodcast(initialPodcastId, audioUrl);
+    }
+  }, [initialPodcastId, audioUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProgressClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
