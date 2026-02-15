@@ -14,6 +14,7 @@ import {
   generateScriptWithFeedback,
   type ScriptTurn,
   type GeneratedReference,
+  type SourceMetadata,
 } from '@/lib/script-generator';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logApiUsage } from '@/lib/claude';
@@ -206,6 +207,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     feedback: verdict.feedback.substring(0, 200),
   });
 
+  const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
+
   const revised = await generateScriptWithFeedback({
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
@@ -215,6 +218,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     tone: discovery.tone || 'casual',
     durationTarget: discovery.durationTarget || 10,
     sourceContent: discovery.sourceContent || undefined,
+    sourceMetadata: sourceMetadata || undefined,
     previousScript: turns,
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
