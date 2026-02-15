@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Readable } from 'stream';
 import busboy from 'busboy';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
@@ -122,9 +122,9 @@ async function resolveSttApiKey(
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
 
     const podcast = await prisma.podcast.create({
       data: {
-        userId: session.user.id,
+        userId: authResult.userId,
         title: validatedTitle,
         topic: validatedTopic,
         status: 'IMPORTING',
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const sttApiKey = await resolveSttApiKey(session.user.id, validatedSttProvider);
+    const sttApiKey = await resolveSttApiKey(authResult.userId, validatedSttProvider);
 
     if (!sttApiKey && !transcriptText) {
       await prisma.podcast.delete({ where: { id: podcast.id } });
@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
 
     await addJob(audioImportQueue, JobType.IMPORT_AUDIO, {
       podcastId: podcast.id,
-      userId: session.user.id,
+      userId: authResult.userId,
       audioKey,
       transcriptText,
       isHumanContent,
@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
 
     logger.info('Audio import queued', {
       podcastId: podcast.id,
-      userId: session.user.id,
+      userId: authResult.userId,
       audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
       sttProvider: validatedSttProvider ?? 'openai',
