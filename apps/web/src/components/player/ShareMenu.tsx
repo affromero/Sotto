@@ -11,9 +11,10 @@ interface ShareMenuProps {
   podcastTitle: string;
   audioUrl: string | null;
   isPublic: boolean;
+  triggerClassName?: string;
 }
 
-export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic }: ShareMenuProps) {
+export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, triggerClassName }: ShareMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic }: Share
   return (
     <div className={styles.container} ref={containerRef}>
       <button
-        className={styles.triggerBtn}
+        className={triggerClassName || styles.triggerBtn}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Share this podcast"
         aria-expanded={isOpen}
