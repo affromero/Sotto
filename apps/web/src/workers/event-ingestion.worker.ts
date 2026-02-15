@@ -113,8 +113,15 @@ export async function processEventIngestion(
       });
 
       if (!playbackSession && eventType === 'playback.play') {
-        playbackSession = await prisma.playbackSession.create({
-          data: { userId, sessionId, podcastId },
+        playbackSession = await prisma.$transaction(async (tx) => {
+          const session = await tx.playbackSession.create({
+            data: { userId, sessionId, podcastId },
+          });
+          await tx.podcast.update({
+            where: { id: podcastId },
+            data: { playCount: { increment: 1 } },
+          });
+          return session;
         });
       }
 

@@ -111,7 +111,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true },
+    select: { userId: true, forkedFromId: true },
   });
 
   if (!podcast) {
@@ -122,13 +122,29 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Disconnect forks so child podcasts aren't orphaned
-  await prisma.podcast.updateMany({
-    where: { forkedFromId: podcastId },
-    data: { forkedFromId: null },
-  });
+  await prisma.$transaction(async (tx) => {
+    // Disconnect forks so child podcasts aren't orphaned
+    await tx.podcast.updateMany({
+      where: { forkedFromId: podcastId },
+      data: { forkedFromId: null },
+    });
 
-  await prisma.podcast.delete({ where: { id: podcastId } });
+    // Decrement parent's forkCount if this podcast is a fork
+    if (podcast.forkedFromId) {
+      const parent = await tx.podcast.findUnique({
+        where: { id: podcast.forkedFromId },
+        select: { id: true },
+      });
+      if (parent) {
+        await tx.podcast.update({
+          where: { id: podcast.forkedFromId },
+          data: { forkCount: { decrement: 1 } },
+        });
+      }
+    }
+
+    await tx.podcast.delete({ where: { id: podcastId } });
+  });
 
   return new NextResponse(null, { status: 204 });
 }

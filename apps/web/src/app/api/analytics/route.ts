@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { analyticsQuerySchema } from '@/lib/validations';
@@ -67,14 +68,20 @@ export async function GET(request: NextRequest) {
     }),
 
     // Time series — use raw query for date grouping
-    prisma.$queryRaw<Array<{ date: Date; count: bigint; total_cost: number }>>`
-      SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_cost), 0) as total_cost
-      FROM "ApiUsageLog"
-      WHERE user_id = ${session.user.id}
-      ${sinceDate ? prisma.$queryRaw`AND created_at >= ${sinceDate}` : prisma.$queryRaw``}
-      GROUP BY DATE(created_at)
-      ORDER BY date ASC
-    `.catch(() => []),
+    (() => {
+      const dateFragment = sinceDate
+        ? Prisma.sql`AND created_at >= ${sinceDate}`
+        : Prisma.empty;
+
+      return prisma.$queryRaw<Array<{ date: Date; count: bigint; total_cost: number }>>`
+        SELECT DATE(created_at) as date, COUNT(*) as count, COALESCE(SUM(total_cost), 0) as total_cost
+        FROM "ApiUsageLog"
+        WHERE user_id = ${session.user.id}
+        ${dateFragment}
+        GROUP BY DATE(created_at)
+        ORDER BY date ASC
+      `.catch(() => []);
+    })(),
   ]);
 
   const response: AnalyticsResponse = {

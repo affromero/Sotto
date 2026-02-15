@@ -21,13 +21,39 @@ export async function DELETE(
   const { podcastId } = await context.params;
 
   try {
-    await prisma.podcast.delete({
+    const podcast = await prisma.podcast.findUnique({
       where: { id: podcastId },
+      select: { forkedFromId: true },
+    });
+
+    if (!podcast) {
+      return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.podcast.updateMany({
+        where: { forkedFromId: podcastId },
+        data: { forkedFromId: null },
+      });
+
+      if (podcast.forkedFromId) {
+        const parent = await tx.podcast.findUnique({
+          where: { id: podcast.forkedFromId },
+          select: { id: true },
+        });
+        if (parent) {
+          await tx.podcast.update({
+            where: { id: podcast.forkedFromId },
+            data: { forkCount: { decrement: 1 } },
+          });
+        }
+      }
+
+      await tx.podcast.delete({ where: { id: podcastId } });
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting podcast:', error);
+  } catch {
     return NextResponse.json({ error: 'Failed to delete podcast' }, { status: 500 });
   }
 }
