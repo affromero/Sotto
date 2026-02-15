@@ -49,6 +49,7 @@ interface SettingsFormProps {
   selectedInterestTagIds: string[];
   configuredTtsProviders: string[];
   configuredAiProviders: string[];
+  isTwitterProviderAvailable: boolean;
 }
 
 const providerLabels: Record<string, string> = {
@@ -75,6 +76,7 @@ export function SettingsForm({
   selectedInterestTagIds,
   configuredTtsProviders,
   configuredAiProviders,
+  isTwitterProviderAvailable,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -464,71 +466,73 @@ export function SettingsForm({
       </section>
 
       {/* Twitter Integration Section */}
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Twitter Integration</h2>
-        {!isTwitterConnected ? (
-          <div>
-            <p className={styles.twitterDescription}>
-              Connect your Twitter account to generate podcasts by tweeting at @sottofm.
-            </p>
-            <div className={styles.formActions}>
-              <Button onClick={() => signIn('twitter')}>Connect Twitter</Button>
-            </div>
-          </div>
-        ) : (
-          <div className={styles.form}>
-            {twitterHandle && <p className={styles.twitterHandle}>@{twitterHandle}</p>}
-
-            <label className={styles.toggleRow}>
-              <div className={styles.toggleInfo}>
-                <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
-                <span className={styles.toggleDescription}>
-                  Generate podcasts when you tweet at @sottofm
-                </span>
+      {isTwitterProviderAvailable && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Twitter Integration</h2>
+          {!isTwitterConnected ? (
+            <div>
+              <p className={styles.twitterDescription}>
+                Connect your Twitter account to generate podcasts by tweeting at @sottofm.
+              </p>
+              <div className={styles.formActions}>
+                <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>Connect Twitter</Button>
               </div>
-              <input
-                type="checkbox"
-                className={styles.toggle}
-                checked={twitterEnabled}
-                onChange={(e) => setTwitterEnabled(e.target.checked)}
-                aria-label="Toggle Twitter podcast generation"
-              />
-            </label>
-
-            <VoicePreferenceSelector
-              label="Preferred Host Voice"
-              value={hostVoiceId}
-              onChange={setHostVoiceId}
-              voiceClones={voiceClones}
-            />
-
-            <VoicePreferenceSelector
-              label="Preferred Expert Voice"
-              value={expertVoiceId}
-              onChange={setExpertVoiceId}
-              voiceClones={voiceClones}
-            />
-
-            <div className={styles.formActions}>
-              <Button
-                onClick={handleSaveTwitterSettings}
-                loading={twitterSaving}
-                disabled={twitterSaving}
-              >
-                {twitterSaved ? 'Saved' : 'Save Twitter Settings'}
-              </Button>
-              <Button
-                variant="danger"
-                onClick={handleDisconnectTwitter}
-                loading={disconnecting}
-                disabled={disconnecting}
-              >
-                Disconnect Twitter
-              </Button>
             </div>
-          </div>
-        )}
-      </section>
+          ) : (
+            <div className={styles.form}>
+              {twitterHandle && <p className={styles.twitterHandle}>@{twitterHandle}</p>}
+
+              <label className={styles.toggleRow}>
+                <div className={styles.toggleInfo}>
+                  <span className={styles.toggleLabel}>Enable Tweet-to-Podcast</span>
+                  <span className={styles.toggleDescription}>
+                    Generate podcasts when you tweet at @sottofm
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  className={styles.toggle}
+                  checked={twitterEnabled}
+                  onChange={(e) => setTwitterEnabled(e.target.checked)}
+                  aria-label="Toggle Twitter podcast generation"
+                />
+              </label>
+
+              <VoicePreferenceSelector
+                label="Preferred Host Voice"
+                value={hostVoiceId}
+                onChange={setHostVoiceId}
+                voiceClones={voiceClones}
+              />
+
+              <VoicePreferenceSelector
+                label="Preferred Expert Voice"
+                value={expertVoiceId}
+                onChange={setExpertVoiceId}
+                voiceClones={voiceClones}
+              />
+
+              <div className={styles.formActions}>
+                <Button
+                  onClick={handleSaveTwitterSettings}
+                  loading={twitterSaving}
+                  disabled={twitterSaving}
+                >
+                  {twitterSaved ? 'Saved' : 'Save Twitter Settings'}
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleDisconnectTwitter}
+                  loading={disconnecting}
+                  disabled={disconnecting}
+                >
+                  Disconnect Twitter
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* AI Provider Keys (BYOK) */}
       <section className={styles.section}>
