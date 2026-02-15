@@ -28,6 +28,7 @@ export enum JobType {
   INGEST_EVENTS = 'ingest_events',
   COMPUTE_FEATURES = 'compute_features',
   EXPORT_DATA = 'export_data',
+  VALIDATE_KEYS = 'validate_keys',
 }
 
 /**
@@ -153,6 +154,8 @@ export interface DataExportPayload {
   dateTo?: string;
   format: 'jsonl' | 'csv';
 }
+
+export interface ValidateKeysPayload {}
 
 /**
  * Queue configuration
@@ -396,3 +399,4 @@ export const eventIngestionQueue = createQueue('event-ingestion', {
 export const audioImportQueue = createQueue('audio-import', { attempts: 2 });
 export const featureComputationQueue = createQueue('feature-computation', { attempts: 2 });
 export const dataExportQueue = createQueue('data-export', { attempts: 2 });
+export const keyValidationQueue = createQueue('key-validation', { attempts: 1 });
