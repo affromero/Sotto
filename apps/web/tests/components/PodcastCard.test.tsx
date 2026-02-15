@@ -73,7 +73,7 @@ describe('PodcastCard', () => {
 
   it('displays play count with proper formatting', () => {
     render(<PodcastCard podcast={mockPodcast} />);
-    expect(screen.getByText('1.3K')).toBeInTheDocument();
+    expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
   });
 
   it('displays like count', () => {
@@ -89,7 +89,7 @@ describe('PodcastCard', () => {
   it('formats large play counts with M suffix', () => {
     const popularPodcast = { ...mockPodcast, playCount: 2500000 };
     render(<PodcastCard podcast={popularPodcast} />);
-    expect(screen.getByText('2.5M')).toBeInTheDocument();
+    expect(screen.getByLabelText('2500000 plays')).toBeInTheDocument();
   });
 
   it('renders all tags', () => {
