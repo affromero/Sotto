@@ -1,0 +1,74 @@
+/* Sotto "Send to Sotto" button — injected into NotebookLM pages */
+
+#sotto-send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+/* ─── State: idle ─────────────────────────────────────────────────────────── */
+#sotto-send-btn[data-state="idle"] {
+  background-color: #D97706;
+  color: #FFFFFF;
+}
+
+#sotto-send-btn[data-state="idle"]:hover {
+  background-color: #B45309;
+}
+
+/* ─── State: capturing ────────────────────────────────────────────────────── */
+#sotto-send-btn[data-state="capturing"] {
+  background-color: #D97706;
+  color: #FFFFFF;
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* ─── State: uploading ────────────────────────────────────────────────────── */
+#sotto-send-btn[data-state="uploading"] {
+  background-color: #1E3A5F;
+  color: #FFFFFF;
+  opacity: 0.8;
+  cursor: wait;
+}
+
+/* ─── State: success ──────────────────────────────────────────────────────── */
+#sotto-send-btn[data-state="success"] {
+  background-color: #10B981;
+  color: #FFFFFF;
+  cursor: default;
+}
+
+/* ─── State: error ────────────────────────────────────────────────────────── */
+#sotto-send-btn[data-state="error"] {
+  background-color: #DC2626;
+  color: #FFFFFF;
+}
+
+/* ─── Disabled ────────────────────────────────────────────────────────────── */
+#sotto-send-btn:disabled {
+  pointer-events: none;
+}
+
+/* ─── Icon ────────────────────────────────────────────────────────────────── */
+#sotto-send-btn .sotto-icon {
+  flex-shrink: 0;
+}
+
+/* ─── Reduced motion ──────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #sotto-send-btn {
+    transition: none;
+  }
+}
