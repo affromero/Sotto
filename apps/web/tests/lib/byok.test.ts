@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ---- Mocks ----
 
+const mockTtsKeyUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+const mockAiKeyUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     userTtsKey: {
@@ -11,6 +14,7 @@ vi.mock('@/lib/prisma', () => ({
       delete: vi.fn(),
       count: vi.fn(),
       update: vi.fn(),
+      updateMany: (...args: unknown[]) => mockTtsKeyUpdateMany(...args),
     },
     userAiKey: {
       findUnique: vi.fn(),
@@ -19,6 +23,7 @@ vi.mock('@/lib/prisma', () => ({
       delete: vi.fn(),
       count: vi.fn(),
       update: vi.fn(),
+      updateMany: (...args: unknown[]) => mockAiKeyUpdateMany(...args),
     },
   },
 }));
@@ -38,7 +43,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 }));
 
 // ---- Import under test ----
-import { encryptApiKey, decryptApiKey } from '@/lib/byok';
+import { encryptApiKey, decryptApiKey, markTtsKeyInvalid, markAiKeyInvalid } from '@/lib/byok';
 
 // ---- Tests ----
 
@@ -505,5 +510,75 @@ describe('byok encryption/decryption', () => {
         expect(decrypted.length).toBe(key.length);
       });
     }
+  });
+});
+
+describe('markTtsKeyInvalid', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sets isValid to false for the matching TTS key', async () => {
+    await markTtsKeyInvalid('user-1', 'elevenlabs' as Parameters<typeof markTtsKeyInvalid>[1]);
+
+    expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', provider: 'elevenlabs', isValid: true },
+      data: { isValid: false },
+    });
+  });
+
+  it('only targets keys for the specified provider', async () => {
+    await markTtsKeyInvalid('user-1', 'cartesia' as Parameters<typeof markTtsKeyInvalid>[1]);
+
+    expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ provider: 'cartesia' }),
+      })
+    );
+  });
+
+  it('only targets keys for the specified user', async () => {
+    await markTtsKeyInvalid('user-42', 'openai' as Parameters<typeof markTtsKeyInvalid>[1]);
+
+    expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: 'user-42' }),
+      })
+    );
+  });
+});
+
+describe('markAiKeyInvalid', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sets isValid to false for the matching AI key', async () => {
+    await markAiKeyInvalid('user-1', 'anthropic' as Parameters<typeof markAiKeyInvalid>[1]);
+
+    expect(mockAiKeyUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', provider: 'anthropic', isValid: true },
+      data: { isValid: false },
+    });
+  });
+
+  it('only targets keys for the specified provider', async () => {
+    await markAiKeyInvalid('user-1', 'openai' as Parameters<typeof markAiKeyInvalid>[1]);
+
+    expect(mockAiKeyUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ provider: 'openai' }),
+      })
+    );
+  });
+
+  it('only targets currently valid keys', async () => {
+    await markAiKeyInvalid('user-1', 'anthropic' as Parameters<typeof markAiKeyInvalid>[1]);
+
+    expect(mockAiKeyUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ isValid: true }),
+      })
+    );
   });
 });
