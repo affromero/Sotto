@@ -16,6 +16,7 @@ import {
   ListMusic,
   Trash2,
 } from 'lucide-react';
+import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
@@ -255,6 +256,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const isProcessing = !isReady && podcast.status !== 'FAILED';
 
   return (
+    <AudioPlayerProvider>
     <div className={styles.playerView}>
       {/* Back nav */}
       <nav className={styles.breadcrumb}>
@@ -615,5 +617,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         onClose={() => setShowAddToCollection(false)}
       />
     </div>
+    </AudioPlayerProvider>
   );
 }
