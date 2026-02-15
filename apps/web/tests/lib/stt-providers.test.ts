@@ -80,7 +80,7 @@ describe('createSttProvider', () => {
   });
 
   it('groq provider passes baseURL to OpenAI client', async () => {
-    const { default: OpenAI } = await import('openai');
+    await import('openai');
     const provider = createSttProvider('groq', 'gsk-test');
 
     // Wait for async loadClient to complete
