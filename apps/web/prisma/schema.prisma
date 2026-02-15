@@ -330,6 +330,7 @@ model Discovery {
   priorKnowledge String?  @db.Text
   sourceUrl      String?
   sourceContent  String?  @db.Text
+  sourceMetadata Json?
 
   // Relations
   podcast  Podcast            @relation(fields: [podcastId], references: [id], onDelete: Cascade)

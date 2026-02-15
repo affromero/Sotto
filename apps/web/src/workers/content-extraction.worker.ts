@@ -1,7 +1,8 @@
 import { Job } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { ExtractContentPayload, addJob, JobType, scriptGenerationQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
-import { extractFromUrl } from '@/lib/content-parser';
+import { extractContent } from '@/lib/extractors';
 import { logger } from '@/lib/logger';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
@@ -36,15 +37,29 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   }
 
   let content = sourceText || '';
+  let sourceMetadata: Prisma.InputJsonValue | undefined;
 
   if (sourceUrl) {
-    content = await extractFromUrl(sourceUrl);
+    const extracted = await extractContent(sourceUrl);
+    content = extracted.markdown || extracted.text;
+    sourceMetadata = {
+      title: extracted.title,
+      author: extracted.author,
+      publishedDate: extracted.publishedDate,
+      siteName: extracted.siteName,
+      wordCount: extracted.wordCount,
+      sourceType: extracted.sourceType,
+      extractionMethod: extracted.extractionMethod,
+    };
   }
 
-  // Store extracted content in discovery
+  // Store extracted content and metadata in discovery
   const discovery = await prisma.discovery.update({
     where: { podcastId },
-    data: { sourceContent: content },
+    data: {
+      sourceContent: content,
+      ...(sourceMetadata && { sourceMetadata }),
+    },
   });
 
   await job.updateProgress(50);
