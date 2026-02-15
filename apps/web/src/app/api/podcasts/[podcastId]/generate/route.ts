@@ -130,7 +130,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await prisma.script.deleteMany({ where: { podcastId } });
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { failedAtStatus: null },
+        data: { failedAtStatus: null, failureReason: null },
       });
       // Fall through to normal routing below
     } else {
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Standard generation pipeline: start from scratch
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'EXTRACTING', failedAtStatus: null },
+    data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
   });
 
   const payload: ExtractContentPayload = {
@@ -191,7 +191,7 @@ async function routeResume(
     case 'EXTRACT_CONTENT': {
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'EXTRACTING', failedAtStatus: null },
+        data: { status: 'EXTRACTING', failedAtStatus: null, failureReason: null },
       });
 
       const payload: ExtractContentPayload = {
@@ -220,7 +220,7 @@ async function routeResume(
 
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'SCRIPTING', failedAtStatus: null },
+        data: { status: 'SCRIPTING', failedAtStatus: null, failureReason: null },
       });
 
       const payload: GenerateScriptPayload = {
@@ -245,7 +245,7 @@ async function routeResume(
 
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'VERIFYING_SCRIPT', failedAtStatus: null },
+        data: { status: 'VERIFYING_SCRIPT', failedAtStatus: null, failureReason: null },
       });
 
       const payload: VerifyScriptPayload = {
@@ -265,7 +265,7 @@ async function routeResume(
     case 'VALIDATE_REFERENCES': {
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'VALIDATING_REFERENCES', failedAtStatus: null },
+        data: { status: 'VALIDATING_REFERENCES', failedAtStatus: null, failureReason: null },
       });
 
       const payload: ValidateReferencesPayload = {
@@ -291,7 +291,7 @@ async function routeResume(
 
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'SCRIPT_READY', failedAtStatus: null },
+        data: { status: 'SCRIPT_READY', failedAtStatus: null, failureReason: null },
       });
 
       return NextResponse.json({
@@ -304,7 +304,7 @@ async function routeResume(
     case 'GENERATE_AUDIO': {
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'GENERATING_AUDIO', failedAtStatus: null },
+        data: { status: 'GENERATING_AUDIO', failedAtStatus: null, failureReason: null },
       });
 
       // Queue audio generation only for pending segments
@@ -340,7 +340,7 @@ async function routeResume(
 
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'STITCHING', failedAtStatus: null },
+        data: { status: 'STITCHING', failedAtStatus: null, failureReason: null },
       });
 
       const payload: StitchAudioPayload = {
@@ -398,7 +398,7 @@ async function startImport(
 
   await prisma.podcast.update({
     where: { id: podcastId },
-    data: { status: 'IMPORTING', failedAtStatus: null },
+    data: { status: 'IMPORTING', failedAtStatus: null, failureReason: null },
   });
 
   const importPayload: ImportAudioPayload = {

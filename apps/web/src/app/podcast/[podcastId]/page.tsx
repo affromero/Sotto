@@ -202,6 +202,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     isHumanContent: podcast.isHumanContent,
     forkedFromId: podcast.forkedFromId,
     remixNote: podcast.remixNote,
+    failureReason: podcast.failureReason,
     currentVersion: podcast.currentVersion,
     user: podcast.user,
     segments: podcast.segments.map((s) => ({

@@ -392,3 +392,25 @@ export async function validateAiKey(
 ): Promise<boolean> {
   return validateAiProviderCredentials(provider, { apiKey });
 }
+
+/**
+ * Mark a TTS BYOK key as invalid after a runtime failure.
+ */
+export async function markTtsKeyInvalid(userId: string, provider: TtsProviderId): Promise<void> {
+  await prisma.userTtsKey.updateMany({
+    where: { userId, provider, isValid: true },
+    data: { isValid: false },
+  });
+  logger.info('Marked TTS BYOK key as invalid', { userId, provider });
+}
+
+/**
+ * Mark an AI BYOK key as invalid after a runtime failure.
+ */
+export async function markAiKeyInvalid(userId: string, provider: AiProviderId): Promise<void> {
+  await prisma.userAiKey.updateMany({
+    where: { userId, provider, isValid: true },
+    data: { isValid: false },
+  });
+  logger.info('Marked AI BYOK key as invalid', { userId, provider });
+}

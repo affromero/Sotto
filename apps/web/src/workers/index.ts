@@ -1,4 +1,4 @@
-import { createWorker, twitterMentionsQueue, JobType } from '@/lib/queue';
+import { createWorker, twitterMentionsQueue, keyValidationQueue, JobType } from '@/lib/queue';
 import { isTwitterConfigured } from '@/lib/twitter';
 import { logger } from '@/lib/logger';
 import { processContentExtraction } from './content-extraction.worker';
@@ -17,6 +17,7 @@ import { processEventIngestion } from './event-ingestion.worker';
 import { processFeatureComputation } from './feature-computation.worker';
 import { processDataExport } from './data-export.worker';
 import { processAudioImport } from './audio-import.worker';
+import { processKeyValidation } from './key-validation.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -38,6 +39,7 @@ const workers = [
   createWorker('feature-computation', processFeatureComputation, { concurrency: 2 }),
   createWorker('data-export', processDataExport, { concurrency: 1 }),
   createWorker('audio-import', processAudioImport, { concurrency: 2 }),
+  createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -52,6 +54,12 @@ if (isTwitterConfigured()) {
 } else {
   logger.info('Twitter integration not configured — polling disabled');
 }
+
+// Schedule BYOK key re-validation every 24 hours
+keyValidationQueue
+  .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
+  .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
+  .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
 
 logger.info(`${workers.length} workers started`);
 

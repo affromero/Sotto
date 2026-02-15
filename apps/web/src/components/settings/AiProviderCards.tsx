@@ -30,12 +30,19 @@ const PROVIDERS = [
   },
 ];
 
+interface ProviderStatus {
+  provider: string;
+  isValid: boolean;
+}
+
 interface AiProviderCardsProps {
-  initialConfigured: string[];
+  initialConfigured: Array<ProviderStatus>;
 }
 
 export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
-  const [configured, setConfigured] = useState<Set<string>>(new Set(initialConfigured));
+  const [configured, setConfigured] = useState<Map<string, boolean>>(
+    new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -64,7 +71,7 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
         return;
       }
 
-      setConfigured((prev) => new Set([...prev, providerId]));
+      setConfigured((prev) => new Map(prev).set(providerId, true));
       setFieldValues((prev) => {
         const next = { ...prev };
         delete next[providerId];
@@ -90,7 +97,7 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
         body: JSON.stringify({ provider: providerId }),
       });
       setConfigured((prev) => {
-        const next = new Set(prev);
+        const next = new Map(prev);
         next.delete(providerId);
         return next;
       });
@@ -108,6 +115,7 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
     <div className={styles.grid}>
       {PROVIDERS.map((provider) => {
         const isConfigured = configured.has(provider.id);
+        const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
 
         return (
@@ -121,7 +129,11 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
                 </div>
               </div>
               {isConfigured ? (
-                <span className={styles.statusConnected}>Connected</span>
+                isValid ? (
+                  <span className={styles.statusConnected}>Connected</span>
+                ) : (
+                  <span className={styles.statusInvalid}>Key Invalid</span>
+                )
               ) : (
                 <span className={styles.statusNone}>Not configured</span>
               )}

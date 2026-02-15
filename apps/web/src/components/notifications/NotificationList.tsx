@@ -1,6 +1,6 @@
 'use client';
 
-import { Headphones, Heart, GitFork, UserPlus, Bell } from 'lucide-react';
+import { Headphones, Heart, GitFork, UserPlus, Bell, AlertTriangle } from 'lucide-react';
 import styles from './NotificationList.module.css';
 
 interface Notification {
@@ -20,6 +20,8 @@ interface NotificationListProps {
 
 const typeIcons: Record<string, typeof Bell> = {
   podcast_ready: Headphones,
+  podcast_failed: AlertTriangle,
+  key_invalid: AlertTriangle,
   liked: Heart,
   forked: GitFork,
   follower: UserPlus,

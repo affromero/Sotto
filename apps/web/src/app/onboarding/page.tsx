@@ -41,8 +41,8 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
       listByokProviders(userId),
     ]);
 
-    const aiConfigured = aiKeys.filter((k) => k.isValid).map((k) => k.provider);
-    const ttsConfigured = ttsKeys.filter((k) => k.isValid).map((k) => k.provider);
+    const aiConfigured = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
+    const ttsConfigured = ttsKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
 
     return (
       <main className={styles.main}>
