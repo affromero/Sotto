@@ -2,7 +2,10 @@
   "name": "sotto",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
@@ -43,6 +46,10 @@
   "devDependencies": {
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "prisma": "^6.19.2",
     "sort-package-json": "^3.6.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2"
   }
 }
