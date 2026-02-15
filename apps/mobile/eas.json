@@ -11,14 +11,5 @@
       "distribution": "internal"
     },
     "production": {}
-  },
-  "submit": {
-    "production": {
-      "ios": {
-        "appleId": "me@afromero.co",
-        "ascAppId": "TBD",
-        "appleTeamId": "TBD"
-      }
-    }
   }
 }

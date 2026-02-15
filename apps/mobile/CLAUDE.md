@@ -155,6 +155,22 @@ eas submit --platform ios --latest               # Upload to App Store Connect
 eas update --branch production --message "fix: description"  # OTA update
 ```
 
+### First App Store Submission
+
+Before the first `eas submit`, add the `submit` block to `eas.json` with your Apple Developer credentials:
+
+```json
+"submit": {
+  "production": {
+    "ios": {
+      "appleId": "me@afromero.co",
+      "ascAppId": "<from App Store Connect → App Information → Apple ID>",
+      "appleTeamId": "<from developer.apple.com → Membership → Team ID>"
+    }
+  }
+}
+```
+
 ## Conventions
 
 - **No web code** — this app calls the web API, it doesn't import web app code
