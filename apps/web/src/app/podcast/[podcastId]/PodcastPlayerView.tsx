@@ -33,6 +33,7 @@ import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
 import { Badge } from '@/components/ui/Badge';
+import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import type { PodcastDetail } from '@/types/podcast';
 import type { PodcastStatus } from '@prisma/client';
@@ -349,6 +350,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             </Badge>
           )}
         </div>
+
+        <MetadataBadges podcast={podcast} />
 
         {podcast.tags.length > 0 && (
           <div className={styles.tags}>

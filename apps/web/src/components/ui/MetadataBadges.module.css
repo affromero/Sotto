@@ -1,0 +1,50 @@
+/* MetadataBadges — Provider/language pills for podcast cards and detail pages */
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Variant colors */
+
+.default {
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+.info {
+  background: var(--color-info-lighter);
+  color: var(--color-info);
+}
+
+.success {
+  background: var(--color-success-lighter);
+  color: var(--color-success);
+}
+
+.accent {
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+}
+
+/* Compact mode: smaller padding */
+
+.compact .badge {
+  padding: 1px var(--space-1);
+  font-size: 10px;
+}
