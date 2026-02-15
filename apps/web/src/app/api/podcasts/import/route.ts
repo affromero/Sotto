@@ -6,7 +6,9 @@ import { prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
+import { getAiKey, getByokKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
+import type { SttProviderId } from '@sotto/shared';
 
 const MAX_AUDIO_SIZE = 100 * 1024 * 1024;
 
@@ -94,6 +96,26 @@ function parseMultipart(
   });
 }
 
+/**
+ * Resolve the BYOK API key for the selected STT provider.
+ * Falls back to platform keys when no BYOK key is available.
+ */
+async function resolveSttApiKey(
+  userId: string,
+  sttProvider: SttProviderId | undefined
+): Promise<string | undefined> {
+  const provider = sttProvider ?? 'openai';
+
+  if (provider === 'openai') {
+    const byokKey = await getAiKey(userId, 'openai');
+    return byokKey?.apiKey ?? process.env.OPENAI_API_KEY ?? undefined;
+  }
+
+  // elevenlabs
+  const byokKey = await getByokKey(userId, 'elevenlabs');
+  return byokKey ?? process.env.ELEVENLABS_API_KEY ?? undefined;
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth();
 
@@ -104,26 +126,24 @@ export async function POST(request: NextRequest) {
   try {
     const { fields, files } = await parseMultipart(request);
 
-    const title = fields.title || null;
-    const topic = fields.topic || null;
+    const title = fields.title || undefined;
+    const topic = fields.topic || undefined;
     const isHumanContentStr = fields.isHumanContent || null;
     const sourcePlatform = fields.sourcePlatform || null;
+    const sttProviderField = fields.sttProvider || undefined;
     const audioFile = files.audio || null;
     const transcriptFile = files.transcript || null;
-
-    if (!title || !topic) {
-      return NextResponse.json({ error: 'Missing required fields: title, topic' }, { status: 400 });
-    }
 
     if (!audioFile) {
       return NextResponse.json({ error: 'Missing required field: audio' }, { status: 400 });
     }
 
     const validation = importPodcastSchema.safeParse({
-      title,
-      topic,
+      title: title || undefined,
+      topic: topic || undefined,
       isHumanContent: isHumanContentStr === 'true',
       sourcePlatform: sourcePlatform || undefined,
+      sttProvider: sttProviderField || undefined,
     });
 
     if (!validation.success) {
@@ -155,11 +175,14 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      title: validatedTitle,
-      topic: validatedTopic,
       isHumanContent,
       sourcePlatform: validatedSourcePlatform,
+      sttProvider: validatedSttProvider,
     } = validation.data;
+
+    const validatedTitle = validation.data.title || 'Untitled Import';
+    const validatedTopic = validation.data.topic || '';
+    const generateMetadata = !validation.data.title;
 
     const podcast = await prisma.podcast.create({
       data: {
@@ -193,12 +216,17 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    const sttApiKey = await resolveSttApiKey(session.user.id, validatedSttProvider);
+
     await addJob(audioImportQueue, JobType.IMPORT_AUDIO, {
       podcastId: podcast.id,
       userId: session.user.id,
       audioKey,
       transcriptText,
       isHumanContent,
+      generateMetadata,
+      sttProvider: validatedSttProvider,
+      sttApiKey,
     });
 
     logger.info('Audio import queued', {
@@ -206,6 +234,8 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
+      sttProvider: validatedSttProvider ?? 'openai',
+      generateMetadata: String(generateMetadata),
     });
 
     return NextResponse.json({
