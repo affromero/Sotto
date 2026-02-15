@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { router, Stack } from 'expo-router';
+import { openBrowserAsync } from 'expo-web-browser';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setToken } from '../../lib/auth';
@@ -346,7 +347,22 @@ export default function LoginScreen() {
         {/* Footer */}
         <View style={styles.footerSection}>
           <Text style={styles.footerText}>
-            By signing in, you agree to our Terms of Service
+            By signing in, you agree to our{' '}
+            <Text
+              style={styles.footerLink}
+              onPress={() => openBrowserAsync('https://sotto.fm/terms')}
+              accessibilityRole="link"
+            >
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.footerLink}
+              onPress={() => openBrowserAsync('https://sotto.fm/privacy')}
+              accessibilityRole="link"
+            >
+              Privacy Policy
+            </Text>
           </Text>
         </View>
       </ScrollView>
@@ -504,5 +520,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textTertiary,
     textAlign: 'center',
+    lineHeight: 18,
+  },
+  footerLink: {
+    color: colors.primary,
+    textDecorationLine: 'underline',
   },
 });
