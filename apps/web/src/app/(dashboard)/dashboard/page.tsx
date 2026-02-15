@@ -174,6 +174,7 @@ export default async function DashboardPage() {
   const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
   const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
   const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
+  const totalLikes = podcasts.reduce((sum, p) => sum + p.likeCount, 0);
   const followerCount = user?._count?.followers ?? 0;
 
   const needsKeys = !hasAi || !hasTts;
@@ -231,6 +232,10 @@ export default async function DashboardPage() {
             <div className={`${styles.creatorStatCard} ${styles.statForks}`}>
               <span className={styles.statLabel}>Forks</span>
               <span className={styles.statValue}>{totalForks.toLocaleString()}</span>
+            </div>
+            <div className={`${styles.creatorStatCard} ${styles.statLikes}`}>
+              <span className={styles.statLabel}>Likes</span>
+              <span className={styles.statValue}>{totalLikes.toLocaleString()}</span>
             </div>
           </div>
         </section>

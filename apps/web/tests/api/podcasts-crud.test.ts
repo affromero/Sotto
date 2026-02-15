@@ -19,8 +19,10 @@ const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockAuth = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
+const mockTransaction = vi.fn();
+
+vi.mock('@/lib/prisma', () => {
+  const txProxy = {
     podcast: {
       findMany: (...args: unknown[]) => mockPodcastFindMany(...args),
       count: (...args: unknown[]) => mockPodcastCount(...args),
@@ -42,8 +44,10 @@ vi.mock('@/lib/prisma', () => ({
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
-  },
-}));
+    $transaction: (...args: unknown[]) => mockTransaction(...args),
+  };
+  return { prisma: txProxy };
+});
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -85,6 +89,7 @@ const mockPrisma = {
     create: mockPodcastCreate,
     findUnique: mockPodcastFindUnique,
     update: mockPodcastUpdate,
+    updateMany: mockPodcastUpdateMany,
     delete: mockPodcastDelete,
   },
   like: {
@@ -796,6 +801,10 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 describe('DELETE /api/podcasts/[podcastId]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // $transaction executes the callback with a tx that delegates to the same mocks
+    mockTransaction.mockImplementation((fn: (tx: typeof mockPrisma) => Promise<unknown>) =>
+      fn(mockPrisma)
+    );
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -827,7 +836,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('returns 403 when user is not the owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {
@@ -841,7 +850,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('deletes podcast when user is owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
     mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
@@ -850,6 +859,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     });
 
     expect(response.status).toBe(204);
+    expect(mockTransaction).toHaveBeenCalled();
     expect(mockPrisma.podcast.delete).toHaveBeenCalledWith({
       where: { id: 'pod-1' },
     });
@@ -857,7 +867,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
   it('returns 204 with no content on successful deletion', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
     mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
@@ -870,9 +880,9 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     expect(body).toBe('');
   });
 
-  it('checks ownership before deletion', async () => {
+  it('checks ownership with forkedFromId before deletion', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
     mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
@@ -882,7 +892,26 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
     expect(mockPrisma.podcast.findUnique).toHaveBeenCalledWith({
       where: { id: 'pod-1' },
-      select: { userId: true },
+      select: { userId: true, forkedFromId: true },
+    });
+  });
+
+  it('decrements parent forkCount when deleting a forked podcast', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique
+      .mockResolvedValueOnce({ userId: 'user-1', forkedFromId: 'parent-1' })
+      .mockResolvedValueOnce({ id: 'parent-1' });
+    mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
+
+    const request = createDeleteRequest('/api/podcasts/pod-1');
+    const response = await deletePodcast(request, {
+      params: Promise.resolve({ podcastId: 'pod-1' }),
+    });
+
+    expect(response.status).toBe(204);
+    expect(mockPrisma.podcast.update).toHaveBeenCalledWith({
+      where: { id: 'parent-1' },
+      data: { forkCount: { decrement: 1 } },
     });
   });
 });
