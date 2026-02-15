@@ -219,6 +219,8 @@ model Podcast {
   hostVoiceId     String?
   expertVoiceId   String?
   ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
+  language        String?  // ISO 639-1, e.g. 'en', 'es', 'ja'
 
   // Source tracking (web, twitter, api)
   source        PodcastSource @default(WEB)
