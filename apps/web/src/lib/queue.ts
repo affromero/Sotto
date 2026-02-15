@@ -2,6 +2,7 @@ import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { logger } from './logger';
 import { prisma } from './prisma';
+import { markPodcastFailed } from './pipeline-resume';
 
 /**
  * Job types for the Sotto queue system
@@ -224,10 +225,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') return;
 
-      await prisma.podcast.update({
-        where: { id: podcastId },
-        data: { status: 'FAILED' },
-      });
+      await markPodcastFailed(podcastId);
 
       // Queue a notification
       const notifQueue = queueInstances.get('notifications');

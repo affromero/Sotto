@@ -205,9 +205,10 @@ model Podcast {
   userId    String
   title     String
   topic     String        @db.Text
-  status    PodcastStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  status         PodcastStatus @default(PENDING)
+  failedAtStatus String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   // Audio
   audioUrl  String?

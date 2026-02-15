@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { ImportAudioPayload, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
+import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
@@ -36,6 +37,35 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
   try {
     await mkdir(tmpDir, { recursive: true });
+
+    // Idempotency: if import already completed (PodcastVersion exists with audio), skip everything
+    const existingVersion = await prisma.podcastVersion.findFirst({
+      where: { podcastId },
+      select: { audioUrl: true, version: true, id: true },
+    });
+
+    if (existingVersion?.audioUrl) {
+      logger.info('Import already completed, setting READY', { podcastId });
+
+      const podcast = await prisma.podcast.findUniqueOrThrow({
+        where: { id: podcastId },
+        select: { duration: true, fileSize: true },
+      });
+
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: {
+          status: 'READY',
+          audioUrl: existingVersion.audioUrl,
+          currentVersion: existingVersion.version,
+          duration: podcast.duration,
+          fileSize: podcast.fileSize,
+        },
+      });
+
+      await job.updateProgress(100);
+      return;
+    }
 
     // Resolve user's BYOK AI key for diarization + metadata generation
     const aiKey = await getAiKey(userId, 'anthropic') ?? await getAiKey(userId, 'openai');
@@ -152,14 +182,22 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       text: seg.text,
     }));
 
-    await prisma.script.create({
-      data: {
-        podcastId,
-        version: 1,
-        turns,
-        markdown: segments.map((s) => `**${s.speaker}:** ${s.text}`).join('\n\n'),
-      },
+    // Idempotency: only create Script if it doesn't already exist
+    const existingScript = await prisma.script.findUnique({
+      where: { podcastId },
+      select: { id: true },
     });
+
+    if (!existingScript) {
+      await prisma.script.create({
+        data: {
+          podcastId,
+          version: 1,
+          turns,
+          markdown: segments.map((s) => `**${s.speaker}:** ${s.text}`).join('\n\n'),
+        },
+      });
+    }
 
     const finalAudioBuffer = await import('fs/promises').then((fs) => fs.readFile(normalizedPath));
     const audioUrl = await uploadPodcastAudio(podcastId, finalAudioBuffer);
@@ -257,10 +295,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       error: err instanceof Error ? err.message : String(err),
     });
 
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { status: 'FAILED' },
-    });
+    await markPodcastFailed(podcastId);
 
     throw err;
   } finally {
