@@ -47,8 +47,8 @@ interface SettingsFormProps {
   voiceClones: VoiceCloneData[];
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
-  configuredTtsProviders: string[];
-  configuredAiProviders: string[];
+  configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
+  configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   isTwitterProviderAvailable: boolean;
 }
 

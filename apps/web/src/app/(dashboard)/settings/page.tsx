@@ -75,8 +75,8 @@ export default async function SettingsPage() {
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
   categories.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
 
-  const configuredProviders = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
-  const configuredAiProviders = aiKeys.filter((k) => k.isValid).map((k) => k.provider);
+  const configuredProviders = byokKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
+  const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
   return (
