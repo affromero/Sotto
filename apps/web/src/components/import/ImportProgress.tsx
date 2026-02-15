@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Upload, FileAudio, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { MetadataSuggestion } from './MetadataSuggestion';
 import type { Podcast } from '@prisma/client';
 import styles from './ImportProgress.module.css';
 
@@ -33,46 +34,43 @@ export function ImportProgress({ podcastId }: ImportProgressProps) {
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
+  const [suggestionHandled, setSuggestionHandled] = useState(false);
+
+  const fetchPodcast = async () => {
+    try {
+      const response = await fetch(`/api/podcasts/${podcastId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch podcast status');
+      }
+      const data = await response.json();
+      setPodcast(data);
+      const stepIndex = statusToStepMap[data.status] ?? 0;
+      setCurrentStep(stepIndex);
+      return data;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load podcast status');
+      return null;
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
     let intervalId: NodeJS.Timeout | null = null;
 
-    const fetchPodcast = async () => {
-      try {
-        const response = await fetch(`/api/podcasts/${podcastId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch podcast status');
-        }
-
-        const data = await response.json();
-
-        if (!mounted) return;
-
-        setPodcast(data);
-
-        const stepIndex = statusToStepMap[data.status] ?? 0;
-        setCurrentStep(stepIndex);
-
-        if (data.status === 'READY' || data.status === 'FAILED') {
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-        }
-      } catch (err) {
-        if (!mounted) return;
-        setError(err instanceof Error ? err.message : 'Failed to load podcast status');
+    const poll = async () => {
+      const data = await fetchPodcast();
+      if (!mounted) return;
+      if (data?.status === 'READY' || data?.status === 'FAILED') {
+        if (intervalId) clearInterval(intervalId);
       }
     };
 
-    fetchPodcast();
-    intervalId = setInterval(fetchPodcast, 3000);
+    poll();
+    intervalId = setInterval(poll, 3000);
 
     return () => {
       mounted = false;
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      if (intervalId) clearInterval(intervalId);
     };
   }, [podcastId]);
 
@@ -219,6 +217,21 @@ export function ImportProgress({ podcastId }: ImportProgressProps) {
               Start Over
             </Button>
           </div>
+        )}
+
+        {isReady && (podcast.suggestedTitle || podcast.suggestedTopic) && !suggestionHandled && (
+          <MetadataSuggestion
+            podcastId={podcastId}
+            currentTitle={podcast.title}
+            currentTopic={podcast.topic ?? ''}
+            suggestedTitle={podcast.suggestedTitle}
+            suggestedTopic={podcast.suggestedTopic}
+            onAccepted={() => {
+              setSuggestionHandled(true);
+              fetchPodcast();
+            }}
+            onDismissed={() => setSuggestionHandled(true)}
+          />
         )}
 
         {isReady && (
