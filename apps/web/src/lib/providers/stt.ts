@@ -25,14 +25,36 @@ export interface SttProvider {
  * OpenAI Whisper API provider
  * Uses verbose JSON format to extract word-level timestamps
  */
+interface WhisperProviderConfig {
+  baseURL?: string;
+  model: string;
+  envVar: string;
+  name: string;
+}
+
+const OPENAI_WHISPER_CONFIG: WhisperProviderConfig = {
+  model: 'whisper-1',
+  envVar: 'OPENAI_API_KEY',
+  name: 'OpenAI Whisper',
+};
+
+const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
+  baseURL: 'https://api.groq.com/openai/v1',
+  model: 'whisper-large-v3-turbo',
+  envVar: 'GROQ_API_KEY',
+  name: 'Groq Whisper',
+};
+
 class OpenAIWhisperProvider implements SttProvider {
   private client: any | null = null;
   private isAvailable = false;
+  private config: WhisperProviderConfig;
 
-  constructor(apiKey?: string) {
-    const key = apiKey || process.env.OPENAI_API_KEY;
+  constructor(apiKey?: string, config?: WhisperProviderConfig) {
+    this.config = config ?? OPENAI_WHISPER_CONFIG;
+    const key = apiKey || process.env[this.config.envVar];
     if (!key) {
-      logger.warn('No OpenAI API key provided — Whisper STT will not work');
+      logger.warn(`No API key provided — ${this.config.name} STT will not work`);
       return;
     }
 
@@ -42,9 +64,12 @@ class OpenAIWhisperProvider implements SttProvider {
   private async loadClient(apiKey: string): Promise<void> {
     try {
       const { default: OpenAI } = await import('openai');
-      this.client = new OpenAI({ apiKey });
+      this.client = new OpenAI({
+        apiKey,
+        ...(this.config.baseURL ? { baseURL: this.config.baseURL } : {}),
+      } as { apiKey: string });
       this.isAvailable = true;
-      logger.info('OpenAI Whisper STT provider initialized');
+      logger.info(`${this.config.name} STT provider initialized`);
     } catch (err) {
       logger.warn('OpenAI SDK not installed — STT transcription unavailable', {
         error: err instanceof Error ? err.message : String(err),
@@ -54,7 +79,7 @@ class OpenAIWhisperProvider implements SttProvider {
 
   async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
     if (!this.client || !this.isAvailable) {
-      throw new Error('OpenAI Whisper provider not initialized — set OPENAI_API_KEY');
+      throw new Error(`${this.config.name} provider not initialized — set ${this.config.envVar}`);
     }
 
     const startTime = Date.now();
@@ -64,7 +89,7 @@ class OpenAIWhisperProvider implements SttProvider {
     try {
       const response = await this.client.audio.transcriptions.create({
         file,
-        model: 'whisper-1',
+        model: this.config.model,
         response_format: 'verbose_json',
         language: opts?.language,
         timestamp_granularities: ['segment'],
@@ -72,7 +97,7 @@ class OpenAIWhisperProvider implements SttProvider {
 
       const durationMs = Date.now() - startTime;
 
-      logger.info('Whisper transcription complete', {
+      logger.info(`${this.config.name} transcription complete`, {
         language: response.language,
         duration: response.duration,
         segments: String((response as { segments?: unknown[] }).segments?.length ?? 0),
@@ -103,13 +128,13 @@ class OpenAIWhisperProvider implements SttProvider {
       };
     } catch (err) {
       if (err instanceof Error && err.message.includes('verbose_json')) {
-        logger.warn('Whisper verbose_json format failed, falling back to text-only', {
+        logger.warn(`${this.config.name} verbose_json format failed, falling back to text-only`, {
           error: err.message,
         });
 
         const textResponse = await this.client.audio.transcriptions.create({
           file,
-          model: 'whisper-1',
+          model: this.config.model,
           response_format: 'text',
           language: opts?.language,
         });
@@ -250,7 +275,7 @@ class ElevenLabsScribeProvider implements SttProvider {
   }
 }
 
-export type SttProviderId = 'openai' | 'elevenlabs';
+export type SttProviderId = 'openai' | 'elevenlabs' | 'groq';
 
 /**
  * Create an STT provider instance
@@ -261,6 +286,8 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string): St
   switch (target) {
     case 'elevenlabs':
       return new ElevenLabsScribeProvider(apiKey);
+    case 'groq':
+      return new OpenAIWhisperProvider(apiKey, GROQ_WHISPER_CONFIG);
     case 'openai':
     default:
       return new OpenAIWhisperProvider(apiKey);

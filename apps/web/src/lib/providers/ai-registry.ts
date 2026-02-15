@@ -5,7 +5,7 @@
  */
 import { logger } from '../logger';
 
-export type AiProviderId = 'anthropic' | 'openai';
+export type AiProviderId = 'anthropic' | 'openai' | 'groq';
 
 export interface AiProviderAuthField {
   key: string;
@@ -65,6 +65,26 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       validate: async (creds) => {
         try {
           const res = await fetch('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  groq: {
+    id: 'groq',
+    displayName: 'Groq',
+    defaultModel: 'whisper-large-v3-turbo',
+    getApiKeyUrl: 'https://console.groq.com/keys',
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/models', {
             headers: { Authorization: `Bearer ${creds.apiKey}` },
           });
           return res.ok;

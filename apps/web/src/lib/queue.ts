@@ -112,7 +112,7 @@ export interface ImportAudioPayload {
   transcriptText?: string;
   isHumanContent: boolean;
   generateMetadata?: boolean;
-  sttProvider?: 'openai' | 'elevenlabs';
+  sttProvider?: 'openai' | 'elevenlabs' | 'groq';
   sttApiKey?: string;
 }
 

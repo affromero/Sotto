@@ -494,7 +494,7 @@ Provider selection (swap services via env):
 
 - `AI_PROVIDER` — `anthropic` (default) | `openai` | `claude-code` (dev only)
 - `TTS_PROVIDER` — `elevenlabs` (default) | `openai`
-- `STT_PROVIDER` — `openai` (default) | `elevenlabs`
+- `STT_PROVIDER` — `openai` (default) | `elevenlabs` | `groq`
 - `STORAGE_PROVIDER` — `r2` (default) | `s3` | `local`
 
 ## Reference
