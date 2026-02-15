@@ -1,6 +1,19 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}));
+
+vi.mock('@/components/providers/EventProvider', () => ({
+  useTrack: () => vi.fn(),
+}));
+
+vi.mock('@/lib/podcast-gradient', () => ({
+  getPodcastGradient: () => ({ from: '#000', to: '#fff', angle: '135deg' }),
+}));
+
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import type { PodcastSummary } from '@/types/podcast';
 

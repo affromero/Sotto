@@ -550,6 +550,13 @@ describe('processAudioGeneration', () => {
   describe('stitching queue (segments still pending)', () => {
     beforeEach(() => {
       mockPrismaSegmentCount.mockResolvedValue(3);
+      // Set ttsProvider so the write-back update is skipped
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        hostVoiceId: null,
+        expertVoiceId: null,
+        ttsProvider: 'elevenlabs',
+      });
     });
 
     it('does not queue stitching when segments are still pending', async () => {
@@ -671,6 +678,13 @@ describe('processAudioGeneration', () => {
       mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('expert-audio'));
       mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/expert-audio.mp3');
       mockPrismaSegmentCount.mockResolvedValue(5);
+      // Set ttsProvider so the write-back update is skipped
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        hostVoiceId: null,
+        expertVoiceId: null,
+        ttsProvider: 'elevenlabs',
+      });
 
       const job = createMockJob({
         podcastId: 'podcast-002',
