@@ -138,7 +138,7 @@ export class SottoMLProvider implements MLProvider {
       let matchWeight = 0;
       let totalWeight = 0;
       for (const [tagId, weight] of interestMap) {
-        totalWeight += weight;
+        totalWeight += Math.abs(weight);
         if (podcastTagIds.has(tagId)) {
           // Exact match: full weight
           matchWeight += weight;
