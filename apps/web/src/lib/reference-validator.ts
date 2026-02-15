@@ -7,7 +7,7 @@
  * Layer 4: Claude AI Evaluation
  */
 
-import { generateResponse } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { logger } from './logger';
 
 export interface VerificationCheck {
@@ -414,6 +414,12 @@ For each reference, evaluate:
 
 Err on the side of REJECTION. It is far better to flag a real reference as suspicious than to let a hallucinated one through.
 
+## Web Search:
+You have access to web search. For EVERY reference, search the web to verify it actually exists.
+Search for the exact title, authors, and publication venue. If you cannot find the reference online,
+it is likely hallucinated. When suggesting replacements, search for real sources on the same topic
+and provide verified URLs and DOIs.
+
 Respond in JSON format:
 {
   "evaluations": [
@@ -442,6 +448,7 @@ Evaluate each reference. Return JSON only.`;
       {
         maxTokens: 4096,
         apiKeyOverride,
+        tools: [WEB_SEARCH_TOOL],
       }
     );
 

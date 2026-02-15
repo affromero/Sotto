@@ -182,6 +182,39 @@ describe('claude', () => {
         generateResponse('System prompt', [{ role: 'user', content: 'Test' }])
       ).rejects.toThrow('Request timeout');
     });
+
+    it('passes tools to messages.create when provided', async () => {
+      const { generateResponse, WEB_SEARCH_TOOL } = await import('@/lib/claude');
+
+      mockMessagesCreate.mockResolvedValue({
+        content: [{ type: 'text' as const, text: 'Response with tools' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      await generateResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+        tools: [WEB_SEARCH_TOOL],
+      });
+
+      expect(mockMessagesCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        })
+      );
+    });
+
+    it('does not pass tools when undefined', async () => {
+      const { generateResponse } = await import('@/lib/claude');
+
+      mockMessagesCreate.mockResolvedValue({
+        content: [{ type: 'text' as const, text: 'No tools' }],
+        usage: { input_tokens: 100, output_tokens: 50 },
+      });
+
+      await generateResponse('System prompt', [{ role: 'user', content: 'Test' }]);
+
+      const callArg = mockMessagesCreate.mock.calls[0][0];
+      expect(callArg).not.toHaveProperty('tools');
+    });
   });
 
   describe('streamResponse', () => {
@@ -316,6 +349,53 @@ describe('claude', () => {
       const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }]);
 
       await expect(generator.next()).rejects.toThrow('Stream interrupted');
+    });
+
+    it('passes tools to messages.stream when provided', async () => {
+      const { streamResponse, WEB_SEARCH_TOOL } = await import('@/lib/claude');
+
+      async function* mockGenerator() {
+        yield {
+          type: 'content_block_delta' as const,
+          delta: { type: 'text_delta' as const, text: 'Hello' },
+        };
+      }
+
+      mockMessagesStream.mockReturnValue(mockGenerator());
+
+      const chunks: string[] = [];
+      for await (const chunk of streamResponse(
+        'System prompt',
+        [{ role: 'user', content: 'Test' }],
+        { tools: [WEB_SEARCH_TOOL] }
+      )) {
+        chunks.push(chunk);
+      }
+
+      expect(mockMessagesStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        })
+      );
+    });
+
+    it('does not pass tools to stream when undefined', async () => {
+      const { streamResponse } = await import('@/lib/claude');
+
+      async function* mockGenerator() {
+        // Empty
+      }
+
+      mockMessagesStream.mockReturnValue(mockGenerator());
+
+      for await (const _ of streamResponse('System prompt', [
+        { role: 'user', content: 'Test' },
+      ])) {
+        // consume
+      }
+
+      const callArg = mockMessagesStream.mock.calls[0][0];
+      expect(callArg).not.toHaveProperty('tools');
     });
   });
 

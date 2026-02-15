@@ -9,6 +9,7 @@ global.fetch = mockFetch;
 
 vi.mock('@/lib/claude', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -689,6 +690,31 @@ describe('reference-validator', () => {
 
       expect(result.get('ref-1')?.passed).toBe(false);
       expect(result.get('ref-1')?.confidence).toBe(0);
+    });
+
+    it('passes web search tool to generateResponse', async () => {
+      const refs: ReferenceInput[] = [createMockReference()];
+      const priorChecks = new Map<string, VerificationCheck[]>();
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify({
+          evaluations: [
+            { refNumber: 1, verdict: 'REAL', confidence: 0.9, reasoning: 'Verified' },
+          ],
+        }),
+        inputTokens: 600,
+        outputTokens: 300,
+      });
+
+      await aiEvaluateReferences(refs, priorChecks, 'Test Topic');
+
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        })
+      );
     });
 
   });
