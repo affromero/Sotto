@@ -1,0 +1,279 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ---- Mocks ----
+
+const mockGenerateResponse = vi.fn();
+
+vi.mock('@/lib/claude', () => ({
+  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
+}));
+
+// ---- Import under test ----
+import { verifyScript } from '@/lib/script-verifier';
+
+// ---- Tests ----
+
+describe('verifyScript', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('passes web search tool to generateResponse', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Water boils at 100C',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Common knowledge',
+          },
+        ],
+        overallScore: 0.95,
+        feedback: '',
+      }),
+      inputTokens: 500,
+      outputTokens: 300,
+    });
+
+    await verifyScript({
+      topic: 'Water Properties',
+      turns: [{ speaker: 'HOST', text: 'Water boils at 100C.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
+  });
+
+  it('includes web search instructions in system prompt', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'Test',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).toContain('web search');
+    expect(systemPrompt).toContain('Verify whether cited sources actually exist');
+  });
+
+  it('returns passed=true when all claims are common knowledge', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'The earth orbits the sun',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Common knowledge',
+          },
+        ],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 500,
+      outputTokens: 300,
+    });
+
+    const result = await verifyScript({
+      topic: 'Astronomy Basics',
+      turns: [{ speaker: 'HOST', text: 'The earth orbits the sun.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.score).toBe(1.0);
+    expect(result.commonKnowledgeClaims).toBe(1);
+  });
+
+  it('returns passed=false when unsupported claims exist', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: '73% of scientists agree',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [],
+            needsMoreCitations: true,
+            hasUnreliableSource: false,
+            verificationNote: 'No citation provided for specific statistic',
+          },
+        ],
+        overallScore: 0.3,
+        feedback: 'Add citation for the 73% statistic.',
+      }),
+      inputTokens: 600,
+      outputTokens: 400,
+    });
+
+    const result = await verifyScript({
+      topic: 'Science Survey',
+      turns: [{ speaker: 'EXPERT', text: '73% of scientists agree.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unsupportedClaims).toHaveLength(1);
+    expect(result.feedback).toContain('73%');
+  });
+
+  it('returns passed=false when unreliable sources are cited', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'AI will replace jobs',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: true,
+            verificationNote: 'Wikipedia is not a reliable source',
+          },
+        ],
+        overallScore: 0.4,
+        feedback: 'Replace Wikipedia citation with peer-reviewed source.',
+      }),
+      inputTokens: 700,
+      outputTokens: 350,
+    });
+
+    const result = await verifyScript({
+      topic: 'AI Impact',
+      turns: [{ speaker: 'EXPERT', text: 'AI will replace jobs [1].' }],
+      references: [
+        {
+          number: 1,
+          title: 'AI Wikipedia',
+          authors: [],
+          year: 2024,
+          url: 'https://wikipedia.org/wiki/AI',
+          type: 'WEB',
+          publisher: null,
+          doi: null,
+        },
+      ],
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unreliableSourceClaims).toHaveLength(1);
+  });
+
+  it('adds duration feedback when script exceeds time limit', async () => {
+    const longText = 'word '.repeat(2000); // ~2000 words = ~13 minutes
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 0.9,
+        feedback: '',
+      }),
+      inputTokens: 800,
+      outputTokens: 200,
+    });
+
+    const result = await verifyScript({
+      topic: 'Long Script',
+      turns: [{ speaker: 'HOST', text: longText }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+      maxDurationMinutes: 10,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.durationFeedback).toContain('exceeds');
+  });
+
+  it('handles unparseable AI response', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: 'This is not valid JSON at all',
+      inputTokens: 400,
+      outputTokens: 100,
+    });
+
+    const result = await verifyScript({
+      topic: 'Parse Error',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.feedback).toContain('could not parse');
+  });
+
+  it('passes apiKeyOverride to generateResponse', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'BYOK Test',
+      turns: [{ speaker: 'HOST', text: 'Test.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+      apiKeyOverride: 'user-key-456',
+    });
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ apiKeyOverride: 'user-key-456' })
+    );
+  });
+});
