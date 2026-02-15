@@ -335,3 +335,10 @@ export const collectionItemSchema = z.object({
 export const deleteAccountSchema = z.object({
   confirm: z.literal('DELETE'),
 });
+
+/**
+ * Telegram account linking validation
+ */
+export const telegramConnectSchema = z.object({
+  code: z.string().min(1),
+});

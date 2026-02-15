@@ -5,6 +5,7 @@ import {
   JobType,
   notificationQueue,
   twitterReplyQueue,
+  telegramReplyQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
@@ -270,6 +271,25 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       }
     }
 
+    // 12. If generated from Telegram, queue a reply message
+    if (podcast.source === 'TELEGRAM') {
+      const telegramMsg = await prisma.telegramMessage.findFirst({
+        where: { podcastId, status: { in: ['GENERATING'] } },
+        select: { id: true, chatId: true },
+      });
+      if (telegramMsg) {
+        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
+          podcastId,
+          telegramMessageId: telegramMsg.id,
+          chatId: telegramMsg.chatId,
+        });
+        await prisma.telegramMessage.update({
+          where: { id: telegramMsg.id },
+          data: { status: 'READY' },
+        });
+      }
+    }
+
     await job.updateProgress(100);
     logger.info('Audio stitching complete', {
       podcastId,
@@ -295,6 +315,23 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
           podcastId: job.data.podcastId,
           tweetMentionId: mention.id,
           originalTweetId: mention.tweetId,
+        }).catch(() => {});
+      }
+    }
+
+    // If Telegram-sourced, queue failure reply
+    if (job.data.podcastId) {
+      const telegramMsg = await prisma.telegramMessage
+        .findFirst({
+          where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, chatId: true },
+        })
+        .catch(() => null);
+      if (telegramMsg) {
+        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
+          podcastId: job.data.podcastId,
+          telegramMessageId: telegramMsg.id,
+          chatId: telegramMsg.chatId,
         }).catch(() => {});
       }
     }
