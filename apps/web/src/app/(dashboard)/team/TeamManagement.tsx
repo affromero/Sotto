@@ -23,9 +23,9 @@ interface TeamInvite {
 interface TeamData {
   id: string;
   name: string;
-  ownerId: string;
+  ownerId: string | null;
   seats: number;
-  owner: TeamMember;
+  owner: TeamMember | null;
   members: TeamMember[];
   invites: TeamInvite[];
   _count: { members: number };
