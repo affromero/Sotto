@@ -13,7 +13,8 @@ import {
   JobType,
 } from '@/lib/queue';
 import { LIMITS } from '@/lib/stripe';
-import { canResolveAi } from '@/lib/providers/ai';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
@@ -54,13 +55,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // BYOK check: ensure AI provider is configured
-  const hasAi = await canResolveAi(authResult.userId);
-  if (!hasAi) {
-    return NextResponse.json(
-      { error: 'AI provider not configured. Add an API key in Settings.' },
-      { status: 403 }
-    );
+  // Generation gate: BYOK or free tier
+  const gate = await checkGenerationGate(authResult.userId);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys to continue.'
+        : 'AI provider not configured.';
+    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -164,6 +166,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   };
 
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
+
+  // Increment free tier counter (skip for FAILED retries — already counted)
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
+  }
 
   return NextResponse.json({ success: true, message: 'Generation started' });
 }

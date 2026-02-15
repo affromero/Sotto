@@ -33,6 +33,7 @@ The schema is organized into logical sections:
 | Versioning        | PodcastVersion, PodcastVersionSegment                                                                                                                           | Immutable version snapshots (segments + stitched audio per version)                                                                 |
 | BYOK Keys (TTS)   | UserTtsKey                                                                                                                                                      | Multi-provider BYOK keys (AES-256-GCM encrypted): ElevenLabs, OpenAI, PlayHT, Cartesia, Hume                                        |
 | BYOK Keys (AI)    | UserAiKey                                                                                                                                                       | AI provider BYOK keys (AES-256-GCM encrypted): Anthropic, OpenAI                                                                    |
+| Free Tier Config  | FreeTierConfig                                                                                                                                                  | Singleton row: admin-configurable free tier settings (AI provider/model, TTS provider, generation limit)                              |
 
 ## Key Enums
 

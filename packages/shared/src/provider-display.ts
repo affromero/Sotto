@@ -31,9 +31,22 @@ export const LANGUAGE_DISPLAY: Record<string, string> = {
   tr: 'Turkish',
 };
 
+export const AI_MODEL_DISPLAY: Record<string, string> = {
+  'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
+  'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
+  'claude-opus-4-6': 'Claude Opus 4.6',
+  'gpt-4o-mini': 'GPT-4o Mini',
+  'gpt-4o': 'GPT-4o',
+};
+
 export function getAiProviderLabel(id: string | null | undefined): string | null {
   if (!id) return null;
   return AI_PROVIDER_DISPLAY[id]?.shortLabel ?? id;
+}
+
+export function getAiModelLabel(modelId: string | null | undefined): string | null {
+  if (!modelId) return null;
+  return AI_MODEL_DISPLAY[modelId] ?? modelId;
 }
 
 export function getTtsProviderLabel(id: string | null | undefined): string | null {

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 import { Badge } from '@/components/ui/Badge';
 import styles from './page.module.css';
 
@@ -16,10 +17,11 @@ export default async function BillingPage() {
     return null;
   }
 
-  const [ttsKeys, aiKeys, podcastCount] = await Promise.all([
+  const [ttsKeys, aiKeys, podcastCount, freeTier] = await Promise.all([
     listByokProviders(userId),
     listAiProviders(userId),
     prisma.podcast.count({ where: { userId } }),
+    getFreeTierStatus(userId),
   ]);
 
   const hasAnyKey = ttsKeys.length > 0 || aiKeys.length > 0;
@@ -76,6 +78,27 @@ export default async function BillingPage() {
         )}
       </section>
 
+      {/* Free Tier */}
+      {!freeTier.isByokUser && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Free Tier</h2>
+          <div className={styles.creditCard}>
+            <div className={styles.creditBalance}>
+              {freeTier.freeGenerationsRemaining}/{freeTier.freeGenerationsLimit}
+            </div>
+            <div className={styles.creditMeta}>
+              <span>free generations remaining</span>
+            </div>
+          </div>
+          {freeTier.freeGenerationsRemaining === 0 && (
+            <p className={styles.manageText}>
+              You&apos;ve used all your free generations.{' '}
+              <Link href="/onboarding?step=keys">Add your own API keys</Link> for unlimited access.
+            </p>
+          )}
+        </section>
+      )}
+
       {/* Usage Stats */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Usage</h2>
@@ -92,8 +115,7 @@ export default async function BillingPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Get Started</h2>
           <p className={styles.manageText}>
-            Sotto is free and BYOK (Bring Your Own Key). Add your AI and TTS API keys in Settings to
-            start generating podcasts.
+            Start with free podcasts, then add your own API keys for unlimited access.
           </p>
           <div className={styles.manageActions}>
             <Link href="/settings" className={styles.planName}>

@@ -28,6 +28,7 @@ const mockPrismaSegmentCreate = vi.fn().mockImplementation((args) => ({
 }));
 
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null });
 const mockPrismaTagFindUnique = vi
   .fn()
   .mockResolvedValue({ id: 'tag-general', slug: 'general-audience' });
@@ -50,6 +51,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
     tag: {
       findUnique: (...args: unknown[]) => mockPrismaTagFindUnique(...args),
@@ -101,6 +103,27 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+}));
+
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({
+  aiProvider: 'anthropic',
+  aiModel: 'claude-haiku-4-5-20251001',
+  ttsProvider: 'openai',
+  generationLimit: 3,
+});
+
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
+const mockGetAiProviderMeta = vi.fn().mockReturnValue({
+  id: 'anthropic',
+  displayName: 'Anthropic (Claude)',
+  defaultModel: 'claude-sonnet-4-5-20250929',
+});
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -174,11 +197,25 @@ describe('processScriptGeneration', () => {
       podcastId: 'podcast-001',
     });
     mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null });
     mockPrismaSegmentCreate.mockImplementation((args) => ({
       id: `segment-${args.data.order}`,
       ...args.data,
     }));
     mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    // Reset free tier / AI provider mocks
+    mockGetFreeTierConfig.mockResolvedValue({
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'openai',
+      generationLimit: 3,
+    });
+    mockGetAiProviderMeta.mockReturnValue({
+      id: 'anthropic',
+      displayName: 'Anthropic (Claude)',
+      defaultModel: 'claude-sonnet-4-5-20250929',
+    });
   });
 
   describe('idempotency', () => {
@@ -241,16 +278,18 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockGenerateScript).toHaveBeenCalledWith({
-        topic: 'AI Safety',
-        depth: 'deep_dive',
-        audienceLevel: 'expert',
-        audience: 'mature',
-        focusAreas: ['alignment', 'interpretability'],
-        tone: 'professional',
-        durationTarget: 20,
-        sourceContent: 'Research paper content here...',
-      });
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'AI Safety',
+          depth: 'deep_dive',
+          audienceLevel: 'expert',
+          audience: 'mature',
+          focusAreas: ['alignment', 'interpretability'],
+          tone: 'professional',
+          durationTarget: 20,
+          sourceContent: 'Research paper content here...',
+        })
+      );
     });
 
     it('passes empty strings as fallback for null topic', async () => {
@@ -268,16 +307,18 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockGenerateScript).toHaveBeenCalledWith({
-        topic: '',
-        depth: 'standard',
-        audienceLevel: 'intermediate',
-        audience: 'general',
-        focusAreas: [],
-        tone: 'casual',
-        durationTarget: 10,
-        sourceContent: undefined,
-      });
+      expect(mockGenerateScript).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: '',
+          depth: 'standard',
+          audienceLevel: 'intermediate',
+          audience: 'general',
+          focusAreas: [],
+          tone: 'casual',
+          durationTarget: 10,
+          sourceContent: undefined,
+        })
+      );
     });
 
     it('omits sourceContent parameter when null', async () => {

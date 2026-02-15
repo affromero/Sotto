@@ -67,6 +67,11 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
 
       if (!response.ok) {
         const data = await response.json();
+        if (data.code === 'free_tier_exhausted') {
+          router.push('/onboarding?step=keys');
+          onClose();
+          return;
+        }
         throw new Error(data.error || 'Failed to fork podcast');
       }
 
@@ -166,8 +171,7 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
                 </div>
                 <h3 className={styles.confirmTitle}>Ready to Fork?</h3>
                 <p className={styles.confirmText}>
-                  Your new podcast will be queued for generation. This will use 1 credit from your
-                  account.
+                  Your new podcast will be queued for generation.
                 </p>
 
                 <div className={styles.summaryBox}>
