@@ -148,7 +148,8 @@ class ElevenLabsScribeProvider implements SttProvider {
     const startTime = Date.now();
 
     const formData = new FormData();
-    const blob = new Blob([audio], { type: 'audio/mpeg' });
+    const uint8Array = new Uint8Array(audio);
+    const blob = new Blob([uint8Array], { type: 'audio/mpeg' });
     formData.append('file', blob, 'audio.mp3');
     formData.append('model_id', 'scribe_v1');
     formData.append('tag_audio_events', 'false');
