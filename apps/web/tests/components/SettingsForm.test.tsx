@@ -36,6 +36,7 @@ const defaultProps = {
   configuredTtsProviders: [],
   configuredAiProviders: [],
   isTwitterProviderAvailable: false,
+  quizAnswerCount: 0,
 };
 
 describe('SettingsForm', () => {
