@@ -19,7 +19,7 @@ export type ResumePoint =
  * Mark a podcast as FAILED, recording the status it was in when the failure occurred.
  * Idempotent: skips if the podcast is already FAILED.
  */
-export async function markPodcastFailed(podcastId: string): Promise<void> {
+export async function markPodcastFailed(podcastId: string, failureReason?: string): Promise<void> {
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
     select: { status: true },
@@ -34,10 +34,11 @@ export async function markPodcastFailed(podcastId: string): Promise<void> {
     data: {
       status: 'FAILED',
       failedAtStatus: podcast.status,
+      failureReason: failureReason ?? null,
     },
   });
 
-  logger.info('Marked podcast as FAILED', { podcastId, failedAtStatus: podcast.status });
+  logger.info('Marked podcast as FAILED', { podcastId, failedAtStatus: podcast.status, failureReason });
 }
 
 /**

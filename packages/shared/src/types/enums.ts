@@ -49,6 +49,8 @@ export type TeamInviteStatus = 'PENDING' | 'ACCEPTED' | 'EXPIRED' | 'REVOKED';
 
 export type NotificationType =
   | 'PODCAST_READY'
+  | 'PODCAST_FAILED'
+  | 'KEY_INVALID'
   | 'PODCAST_LIKED'
   | 'PODCAST_FORKED'
   | 'NEW_FOLLOWER'
