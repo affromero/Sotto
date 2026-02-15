@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
+import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { Menu } from 'lucide-react';
 import styles from './DashboardShell.module.css';
 
@@ -20,6 +21,8 @@ interface DashboardShellProps {
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const player = usePlayer();
+  const hasActivePlayer = !!player.podcastId;
 
   return (
     <div className={styles.layout}>
@@ -43,10 +46,12 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           <span className={styles.logo}>Sotto</span>
         </header>
 
-        <div className={styles.content}>{children}</div>
+        <div className={`${styles.content} ${hasActivePlayer ? styles.contentWithPlayer : ''}`}>
+          {children}
+        </div>
       </div>
 
-      <MobileNav currentPath={pathname} />
+      <MobileNav currentPath={pathname} hasActivePlayer={hasActivePlayer} />
     </div>
   );
 }
