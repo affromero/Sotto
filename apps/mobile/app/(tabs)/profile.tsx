@@ -259,6 +259,18 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      <Pressable
+        style={({ pressed }) => [
+          styles.savedIdeasRow,
+          pressed && styles.savedIdeasRowPressed,
+        ]}
+        onPress={() => router.push('/ideas')}
+      >
+        <Text style={styles.savedIdeasIcon}>{'\uD83D\uDD16'}</Text>
+        <Text style={styles.savedIdeasLabel}>Saved Ideas</Text>
+        <Text style={styles.savedIdeasChevron}>{'\u203A'}</Text>
+      </Pressable>
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Your Podcasts</Text>
       </View>
@@ -400,6 +412,36 @@ const styles = StyleSheet.create({
     width: StyleSheet.hairlineWidth,
     height: 32,
     backgroundColor: colors.border,
+  },
+  savedIdeasRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  savedIdeasRowPressed: {
+    backgroundColor: colors.surfaceHover,
+  },
+  savedIdeasIcon: {
+    fontSize: 20,
+    marginRight: spacing.sm + 4,
+  },
+  savedIdeasLabel: {
+    fontFamily: typography.fontBody,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  savedIdeasChevron: {
+    fontFamily: typography.fontBody,
+    fontSize: 22,
+    color: colors.textTertiary,
+    fontWeight: '300',
   },
   sectionHeader: {
     marginBottom: spacing.md,

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,11 +10,12 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { DiscoveryMetadata } from '@sotto/shared';
 import { api } from '../../lib/api';
+import { SwipeQuiz } from '../../components/SwipeQuiz';
 
 interface KeyStatus {
   provider: string;
@@ -72,12 +73,15 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 export default function CreateScreen() {
   const router = useRouter();
+  const { topic } = useLocalSearchParams<{ topic?: string }>();
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [discoveryId, setDiscoveryId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [latestChips, setLatestChips] = useState<string[]>([]);
+  const [showQuiz, setShowQuiz] = useState(!topic);
+  const topicHandled = useRef(false);
 
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'ai-keys'],
@@ -155,6 +159,14 @@ export default function CreateScreen() {
     [discoveryMutation],
   );
 
+  useEffect(() => {
+    if (topic && !topicHandled.current) {
+      topicHandled.current = true;
+      setShowQuiz(false);
+      sendMessage(topic);
+    }
+  }, [topic, sendMessage]);
+
   const handleSend = useCallback(() => {
     sendMessage(inputText);
   }, [inputText, sendMessage]);
@@ -192,7 +204,38 @@ export default function CreateScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={88}
     >
-      {messages.length === 0 ? (
+      {messages.length === 0 && showQuiz ? (
+        <View style={styles.quizContainer}>
+          {missingKeys && (
+            <Pressable
+              style={styles.keyWarning}
+              onPress={() => router.push('/settings/api-keys')}
+            >
+              <Text style={styles.keyWarningText}>
+                {!hasAiKey && !hasTtsKey
+                  ? 'Add AI and TTS API keys to create podcasts'
+                  : !hasAiKey
+                    ? 'Add an AI provider key to create podcasts'
+                    : 'Add a TTS provider key to create podcasts'}
+              </Text>
+              <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
+            </Pressable>
+          )}
+          <SwipeQuiz
+            onComplete={() => setShowQuiz(false)}
+            onSelectTopic={(questionText) => {
+              setShowQuiz(false);
+              sendMessage(questionText);
+            }}
+          />
+          <Pressable
+            style={styles.skipButton}
+            onPress={() => setShowQuiz(false)}
+          >
+            <Text style={styles.skipButtonText}>Skip to chat</Text>
+          </Pressable>
+        </View>
+      ) : messages.length === 0 ? (
         <View style={styles.welcomeContainer}>
           {missingKeys && (
             <Pressable
@@ -215,25 +258,6 @@ export default function CreateScreen() {
             understand your interests, then generate a conversational podcast
             just for you.
           </Text>
-          <View style={styles.welcomeChips}>
-            {[
-              'Quantum computing explained simply',
-              'The history of jazz music',
-              'How does the stock market work?',
-              'Space exploration in 2025',
-            ].map((suggestion) => (
-              <Pressable
-                key={suggestion}
-                style={({ pressed }) => [
-                  styles.welcomeChip,
-                  pressed && styles.welcomeChipPressed,
-                ]}
-                onPress={() => sendMessage(suggestion)}
-              >
-                <Text style={styles.welcomeChipText}>{suggestion}</Text>
-              </Pressable>
-            ))}
-          </View>
         </View>
       ) : (
         <FlatList
@@ -375,6 +399,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  quizContainer: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  skipButton: {
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  skipButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 15,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
   welcomeContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -415,26 +455,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 24,
     marginBottom: spacing.lg,
-  },
-  welcomeChips: {
-    gap: spacing.sm,
-  },
-  welcomeChip: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.sm + 4,
-    paddingHorizontal: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  welcomeChipPressed: {
-    backgroundColor: colors.primaryLighter,
-    borderColor: colors.primary,
-  },
-  welcomeChipText: {
-    fontFamily: typography.fontBody,
-    fontSize: 15,
-    color: colors.textPrimary,
   },
   messageList: {
     paddingHorizontal: spacing.md,
