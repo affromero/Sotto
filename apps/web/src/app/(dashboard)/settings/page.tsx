@@ -16,7 +16,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -64,6 +64,7 @@ export default async function SettingsPage() {
     }),
     listByokProviders(userId),
     listAiProviders(userId),
+    prisma.tasteQuizAnswer.count({ where: { userId } }),
   ]);
 
   if (!user) return null;
@@ -101,6 +102,7 @@ export default async function SettingsPage() {
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
         isTwitterProviderAvailable={isTwitterProviderAvailable}
+        quizAnswerCount={quizAnswerCount}
       />
     </main>
   );

@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
-import { OnboardingForm } from './OnboardingForm';
+import { generateQuestions } from '@/lib/taste-quiz';
+import { QuizStep } from './QuizStep';
 import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
 
@@ -63,34 +63,26 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
     );
   }
 
-  // Interest selection step (default) — fetch parent categories with children
-  const categories = await prisma.tag.findMany({
-    where: { slug: { in: ONBOARDING_TAG_SLUGS } },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      children: {
-        select: { id: true, name: true, slug: true },
-        orderBy: { name: 'asc' },
-      },
-    },
-  });
-
-  const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
-  categories.sort((a, b) => (slugOrder.get(a.slug) ?? 99) - (slugOrder.get(b.slug) ?? 99));
+  // Taste quiz step (default) — generate initial questions
+  let initialQuestions: Awaited<ReturnType<typeof generateQuestions>> = [];
+  try {
+    initialQuestions = await generateQuestions(userId, 10);
+  } catch {
+    // If question generation fails (no LLM configured), show empty quiz
+    // which will show loading state and user can skip
+  }
 
   return (
     <main className={styles.main}>
       <div className={styles.container}>
         <header className={styles.header}>
-          <h1 className={styles.title}>What are you curious about?</h1>
+          <h1 className={styles.title}>Let&apos;s find podcasts you&apos;ll love</h1>
           <p className={styles.subtitle}>
-            Pick topics that interest you. This helps us personalize your experience.
+            Just say yes or no — it takes 30 seconds.
           </p>
         </header>
 
-        <OnboardingForm categories={categories} />
+        <QuizStep initialQuestions={initialQuestions} />
       </div>
     </main>
   );
