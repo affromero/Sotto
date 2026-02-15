@@ -1,30 +1,7 @@
-/* ShareMenu */
+/* OverflowMenu */
 
 .container {
   position: relative;
-}
-
-.triggerBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  font: var(--text-body-sm);
-  cursor: pointer;
-  border-radius: var(--radius-md);
-  min-height: 44px;
-  min-width: 44px;
-  transition:
-    color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.triggerBtn:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-hover);
 }
 
 .dropdown {
@@ -55,14 +32,27 @@
   text-align: left;
   transition: background var(--transition-fast);
   min-height: 44px;
-  text-decoration: none;
 }
 
 .menuItem:hover {
   background: var(--color-surface-hover);
 }
 
+.menuItemDanger {
+  color: var(--color-error);
+}
+
+.menuItemDanger:hover {
+  background: var(--color-error-lighter);
+}
+
 .menuItemIcon {
+  display: flex;
+  align-items: center;
   color: var(--color-text-secondary);
   flex-shrink: 0;
+}
+
+.menuItemDanger .menuItemIcon {
+  color: var(--color-error);
 }
