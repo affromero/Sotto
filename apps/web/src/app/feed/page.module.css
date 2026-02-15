@@ -58,6 +58,26 @@
   gap: var(--spacing-md);
 }
 
+/* Search row with mode toggle */
+
+.searchRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.searchRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 480px) {
+  .searchRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* Sort & Mode Toggles */
 
 .toggleRow {
