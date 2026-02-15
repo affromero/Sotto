@@ -431,7 +431,7 @@ export default function PitchPage() {
       {/* Top bar */}
       <header className={styles.topBar}>
         <div className={styles.topBarLeft}>
-          <a href="/romero" className={styles.topBarLogo}>
+          <a href="/" className={styles.topBarLogo}>
             Sotto
           </a>
           <span className={styles.topBarDivider} />
