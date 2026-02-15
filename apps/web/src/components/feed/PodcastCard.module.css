@@ -168,6 +168,65 @@
   transform: translate(-50%, -50%) scale(0.96);
 }
 
+/* ── Fork Button (bottom-right on cover) ────── */
+
+.forkButton {
+  position: absolute;
+  bottom: var(--space-3);
+  right: var(--space-3);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-full);
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text-primary);
+  font: var(--text-caption);
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card:hover .forkButton {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.forkButton:hover {
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.forkButton:active {
+  transform: scale(0.95);
+}
+
+/* Always show fork button on touch devices */
+@media (hover: none) {
+  .forkButton {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Hide fork button text on compact variant */
+.compact .forkButton {
+  bottom: var(--space-2);
+  right: var(--space-2);
+  padding: 6px;
+}
+
+.compact .forkButton span {
+  display: none;
+}
+
 /* ── White Body ─────────────────────────────── */
 
 .body {
@@ -405,5 +464,17 @@
 
   .playButton:active {
     transform: translate(-50%, -50%) scale(1);
+  }
+
+  .forkButton {
+    transition: opacity var(--transition-fast);
+  }
+
+  .card:hover .forkButton {
+    transform: translateY(0);
+  }
+
+  .forkButton:active {
+    transform: none;
   }
 }

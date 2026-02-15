@@ -281,8 +281,9 @@ export default function LandingPage() {
               </div>
               <h3>Import Any Podcast</h3>
               <p>
-                Upload from NotebookLM, Spotify, Apple Podcasts, YouTube, or any audio file. Sotto
-                adds transcripts, social features, and interactive Q&amp;A on top.
+                Send straight from NotebookLM with our Chrome extension — one click, no download.
+                Or import from Spotify, Apple Podcasts, YouTube, or any audio file. Sotto adds
+                transcripts, social features, and interactive Q&amp;A on top.
               </p>
             </article>
             <article className={`${styles.pillar} ${styles.rev} ${styles.d2}`}>
@@ -311,7 +312,10 @@ export default function LandingPage() {
           <div className={`${styles.importPlatforms} ${styles.rev}`}>
             <span className={styles.importPlatformsLabel}>Import from</span>
             <div className={styles.importPlatformsList}>
-              <span className={styles.importPlatformPill}>NotebookLM</span>
+              <span className={`${styles.importPlatformPill} ${styles.importPlatformPillHighlight}`}>
+                NotebookLM
+                <span className={styles.importPlatformBadge}>Chrome Extension</span>
+              </span>
               <span className={styles.importPlatformPill}>Spotify</span>
               <span className={styles.importPlatformPill}>Apple Podcasts</span>
               <span className={styles.importPlatformPill}>YouTube</span>
@@ -820,7 +824,8 @@ export default function LandingPage() {
                 <h3>Create or import</h3>
                 <p>
                   Chat with Sotto to generate a two-voice podcast from any topic. Or import from
-                  NotebookLM, Spotify, Apple Podcasts, YouTube — any audio file works.
+                  NotebookLM with our Chrome extension, Spotify, Apple Podcasts, YouTube — any
+                  audio file works.
                 </p>
               </div>
             </div>

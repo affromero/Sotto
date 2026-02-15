@@ -229,7 +229,7 @@ model Podcast {
 
   // Fork tracking
   forkedFromId     String?
-  forkedFrom       Podcast?  @relation("Forks", fields: [forkedFromId], references: [id])
+  forkedFrom       Podcast?  @relation("Forks", fields: [forkedFromId], references: [id], onDelete: SetNull)
   forks            Podcast[] @relation("Forks")
   remixNote        String?   @db.Text
   parentDiscovery  Json?

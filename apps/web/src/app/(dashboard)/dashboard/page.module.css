@@ -210,6 +210,10 @@
 
 /* Podcast Grid — mini gradient cards */
 
+.cardWrapper {
+  position: relative;
+}
+
 .podcastGrid {
   display: grid;
   grid-template-columns: 1fr;

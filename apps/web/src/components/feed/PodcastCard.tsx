@@ -2,6 +2,7 @@
 
 import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
 import { getContentBadgeLabel } from '@sotto/shared';
@@ -67,6 +68,7 @@ export function PodcastCard({
   searchQuery,
   observeRef,
 }: PodcastCardProps) {
+  const router = useRouter();
   const track = useTrack();
   const mountTimeRef = useRef(0);
   const duration = formatDuration(podcast.duration);
@@ -214,6 +216,20 @@ export function PodcastCard({
           <Play size={18} aria-hidden="true" />
         </button>
       )}
+
+      <button
+        className={styles.forkButton}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          router.push(`/podcast/${podcast.id}?fork=1`);
+        }}
+        aria-label={`Fork ${podcast.title}`}
+        type="button"
+      >
+        <GitFork size={16} aria-hidden="true" />
+        <span>Fork</span>
+      </button>
     </article>
   );
 }
