@@ -12,12 +12,14 @@ const PROVIDERS = [
     name: 'ElevenLabs',
     quality: 'Premium',
     fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xi-xxxxxxxxxxxxxxxxxxxx' }],
+    getKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
   },
   {
     id: 'openai' as const,
     name: 'OpenAI',
     quality: 'Standard',
     fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
+    getKeyUrl: 'https://platform.openai.com/api-keys',
   },
   {
     id: 'playht' as const,
@@ -27,18 +29,21 @@ const PROVIDERS = [
       { key: 'apiKey', label: 'API Key', placeholder: 'Your PlayHT API key' },
       { key: 'userId', label: 'User ID', placeholder: 'Your PlayHT User ID' },
     ],
+    getKeyUrl: 'https://play.ht/studio/api-access',
   },
   {
     id: 'cartesia' as const,
     name: 'Cartesia',
     quality: 'Premium',
     fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Cartesia API key' }],
+    getKeyUrl: 'https://play.cartesia.ai/keys',
   },
   {
     id: 'hume' as const,
     name: 'Hume AI',
     quality: 'Ultra',
     fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
+    getKeyUrl: 'https://platform.hume.ai/settings/keys',
   },
 ];
 
@@ -176,13 +181,23 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
             )}
 
             {!isConfigured && !isExpanded && (
-              <button
-                type="button"
-                className={styles.addKeyBtn}
-                onClick={() => setExpandedId(provider.id)}
-              >
-                Add Key
-              </button>
+              <div className={styles.cardActions}>
+                <button
+                  type="button"
+                  className={styles.addKeyBtn}
+                  onClick={() => setExpandedId(provider.id)}
+                >
+                  Add Key
+                </button>
+                <a
+                  href={provider.getKeyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.getKeyLink}
+                >
+                  Get API Key
+                </a>
+              </div>
             )}
 
             {isExpanded && (

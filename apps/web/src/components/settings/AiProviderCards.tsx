@@ -168,8 +168,7 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
                   href={provider.getKeyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={styles.addKeyBtn}
-                  style={{ textDecoration: 'none' }}
+                  className={styles.getKeyLink}
                 >
                   Get API Key
                 </a>
