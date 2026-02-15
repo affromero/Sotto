@@ -75,6 +75,16 @@ describe('detectUrls', () => {
     const result = detectUrls('Visit https://example.com and https://example.com again');
     expect(result).toEqual(['https://example.com']);
   });
+
+  it('returns empty array for undefined input', () => {
+    const result = detectUrls(undefined as unknown as string);
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array for null input', () => {
+    const result = detectUrls(null as unknown as string);
+    expect(result).toEqual([]);
+  });
 });
 
 describe('parseChips', () => {

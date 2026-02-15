@@ -15,7 +15,11 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { message, content, discoveryId } = body;
-  let userMessage: string = message ?? content;
+  let userMessage: string | undefined = message ?? content;
+
+  if (!userMessage) {
+    return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+  }
 
   // Get or create discovery
   let discovery;
