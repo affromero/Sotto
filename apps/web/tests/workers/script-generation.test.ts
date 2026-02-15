@@ -14,6 +14,7 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
   sourceContent: null,
 });
 
+const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaScriptCreate = vi.fn().mockResolvedValue({
   id: 'script-001',
   podcastId: 'podcast-001',
@@ -38,6 +39,7 @@ vi.mock('@/lib/prisma', () => ({
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
     },
     script: {
+      findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
       create: (...args: unknown[]) => mockPrismaScriptCreate(...args),
     },
     reference: {
@@ -166,6 +168,7 @@ describe('processScriptGeneration', () => {
     });
 
     // Reset all Prisma mocks
+    mockPrismaScriptFindUnique.mockResolvedValue(null);
     mockPrismaScriptCreate.mockResolvedValue({
       id: 'script-001',
       podcastId: 'podcast-001',
@@ -176,6 +179,41 @@ describe('processScriptGeneration', () => {
       ...args.data,
     }));
     mockAddJob.mockResolvedValue({ id: 'job-1' });
+  });
+
+  describe('idempotency', () => {
+    it('skips generation when script already exists', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({ id: 'existing-script' });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockGenerateScript).not.toHaveBeenCalled();
+      expect(mockPrismaScriptCreate).not.toHaveBeenCalled();
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'VERIFYING_SCRIPT' },
+      });
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'script-verification' },
+        'verify_script',
+        {
+          podcastId: 'podcast-001',
+          userId: 'user-001',
+          discoveryId: 'discovery-001',
+        }
+      );
+    });
+
+    it('proceeds normally when no script exists', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue(null);
+
+      const job = createMockJob(defaultPayload);
+      await processScriptGeneration(job);
+
+      expect(mockGenerateScript).toHaveBeenCalled();
+      expect(mockPrismaScriptCreate).toHaveBeenCalled();
+    });
   });
 
   describe('discovery metadata fetch', () => {

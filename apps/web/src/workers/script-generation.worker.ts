@@ -12,6 +12,30 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   logger.info('Generating script', { podcastId });
   await job.updateProgress(10);
 
+  // Idempotency: skip if script already exists
+  const existingScript = await prisma.script.findUnique({
+    where: { podcastId },
+    select: { id: true },
+  });
+
+  if (existingScript) {
+    logger.info('Script already exists, skipping to verification', { podcastId });
+
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'VERIFYING_SCRIPT' },
+    });
+
+    await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, {
+      podcastId,
+      userId,
+      discoveryId,
+    });
+
+    await job.updateProgress(100);
+    return;
+  }
+
   const aiKey = await getAiKey(userId);
 
   // Get discovery metadata

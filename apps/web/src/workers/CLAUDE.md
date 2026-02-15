@@ -45,8 +45,22 @@ Incorporation (post-READY):
 `queue.ts` includes a centralized `setupQueueEvents()` handler that:
 
 1. Catches all terminal job failures across all queues
-2. Marks the associated podcast as `FAILED`
+2. Calls `markPodcastFailed(podcastId)` which records `failedAtStatus` (the status the podcast was in when it failed) and sets status to `FAILED`
 3. Queues a notification: "Generation failed."
+
+## Checkpointing & Idempotency
+
+Workers are idempotent — safe to re-run after a failure. Each worker checks for existing output before doing expensive work:
+
+| Worker               | Guard                                        | Skip behavior                                            |
+| -------------------- | -------------------------------------------- | -------------------------------------------------------- |
+| content-extraction   | `discovery.sourceContent` already populated  | Skips extraction, chains to script-generation            |
+| script-generation    | `Script` record exists for podcast           | Skips generation, chains to script-verification          |
+| audio-generation     | `segment.audioUrl` already set               | Skips TTS, still checks if all segments done → stitching |
+| audio-import         | `PodcastVersion` exists with audioUrl        | Skips entire import, sets READY                          |
+| audio-import         | `Script` already exists (mid-import retry)   | Skips script creation (prevents @@unique violation)      |
+
+When a podcast fails, `POST /api/podcasts/[id]/generate` uses `determineResumePoint()` from `lib/pipeline-resume.ts` to inspect existing data and resume from the furthest completed step. Pass `?forceRestart=true` to nuke everything and start from scratch.
 
 ## Adding a New Worker
 

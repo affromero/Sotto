@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks (must be declared before any import that touches the modules) ----
 
+const mockPrismaSegmentFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCount = vi.fn().mockResolvedValue(0);
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
@@ -18,6 +19,7 @@ const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     segment: {
+      findUnique: (...args: unknown[]) => mockPrismaSegmentFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
       count: (...args: unknown[]) => mockPrismaSegmentCount(...args),
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
@@ -155,6 +157,8 @@ function setupStandardProvider() {
 describe('processAudioGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: segment has no existing audio
+    mockPrismaSegmentFindUnique.mockResolvedValue(null);
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
       hostVoiceId: null,
@@ -176,6 +180,48 @@ describe('processAudioGeneration', () => {
     mockRm.mockResolvedValue(undefined);
     // Default: premium provider via resolveTtsProvider
     setupPremiumProvider();
+  });
+
+  describe('idempotency', () => {
+    it('skips TTS when segment already has audio', async () => {
+      mockPrismaSegmentFindUnique.mockResolvedValue({
+        audioUrl: 'https://cdn.example.com/existing.mp3',
+      });
+      mockPrismaSegmentCount.mockResolvedValue(3); // still pending
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
+      expect(mockUploadSegmentAudio).not.toHaveBeenCalled();
+      expect(mockPrismaSegmentUpdate).not.toHaveBeenCalled();
+      expect(mockAddJob).not.toHaveBeenCalled();
+    });
+
+    it('triggers stitching when skipped segment was the last pending', async () => {
+      mockPrismaSegmentFindUnique.mockResolvedValue({
+        audioUrl: 'https://cdn.example.com/existing.mp3',
+      });
+      mockPrismaSegmentCount.mockResolvedValue(0); // all done
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1' },
+        { id: 'seg-2' },
+      ]);
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPremiumGenerateSpeech).not.toHaveBeenCalled();
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'audio-stitching' },
+        'stitch_audio',
+        { podcastId: 'podcast-001', segmentIds: ['seg-1', 'seg-2'] }
+      );
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'STITCHING' },
+      });
+    });
   });
 
   describe('podcast lookup', () => {

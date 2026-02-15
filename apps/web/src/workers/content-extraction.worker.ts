@@ -10,6 +10,31 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   logger.info('Extracting content', { podcastId });
   await job.updateProgress(10);
 
+  // Idempotency: skip if content was already extracted
+  const existingDiscovery = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { id: true, sourceContent: true },
+  });
+
+  if (existingDiscovery?.sourceContent) {
+    logger.info('Content already extracted, skipping to script generation', { podcastId });
+
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'SCRIPTING' },
+    });
+
+    await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
+      podcastId,
+      userId,
+      discoveryId: existingDiscovery.id,
+      sourceContent: existingDiscovery.sourceContent,
+    });
+
+    await job.updateProgress(100);
+    return;
+  }
+
   let content = sourceText || '';
 
   if (sourceUrl) {
