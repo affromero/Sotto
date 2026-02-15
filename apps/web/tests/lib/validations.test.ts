@@ -133,6 +133,60 @@ describe('createPodcastSchema', () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it('accepts durationTarget within valid range', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic', durationTarget: 20 },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts durationTarget at minimum boundary (5)', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic', durationTarget: 5 },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts durationTarget at maximum boundary (40)', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic', durationTarget: 40 },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects durationTarget below minimum', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic', durationTarget: 3 },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects durationTarget above maximum', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic', durationTarget: 45 },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts metadata without durationTarget (optional)', () => {
+    const result = createPodcastSchema.safeParse({
+      title: 'My Podcast',
+      topic: 'A topic',
+      metadata: { topic: 'A topic' },
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe('interactionSchema', () => {
