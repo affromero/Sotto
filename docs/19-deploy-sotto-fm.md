@@ -1329,19 +1329,19 @@ Run all checks from your **local machine** (not the server).
 curl -I https://sotto.fm 2>&1 | head -5
 ```
 
-Expected: You should see a `200` response (the "Under Construction" page):
+Expected: You should see a `200` response (the landing page with inline password gate when `SITE_PASSWORD` is set):
 
 ```
 HTTP/2 200
 ```
 
-Then test the password-gated alpha landing page:
+Then test the legacy URL redirect:
 
 ```bash
 curl -I https://sotto.fm/romero 2>&1 | head -5
 ```
 
-Expected: `307` redirect to `/access` (password gate). A 307 is an HTTP status code meaning "Temporary Redirect" — the server is saying "go to `/access` instead." This is the middleware in action — it detected no `sotto_access` cookie and sent the visitor to the password page:
+Expected: `307` redirect to `/` (the landing page now lives at the root):
 
 ```
 HTTP/2 307
@@ -1399,12 +1399,12 @@ location: https://sotto.fm/
 
 Open a browser and verify each step:
 
-1. **Visit `sotto.fm`** → Should show the "Under Construction" page (public, no password)
-2. **Visit `sotto.fm/romero`** → Should redirect to the password entry page (`/access`)
-3. **Enter a wrong password** → Should show an error message, stay on the page
-4. **Enter the correct password** (the `SITE_PASSWORD` you set in `.env`) → Should redirect to the alpha landing page (`/romero`)
-5. **Refresh the page** → Should stay on the landing page (the `sotto_access` cookie persists for 30 days)
-6. **Open an incognito/private window** → Visit `sotto.fm/romero` → Should redirect to `/access` again (no cookie in incognito)
+1. **Visit `sotto.fm`** → Should show the password gate (when `SITE_PASSWORD` is set) or the full landing page
+2. **Enter a wrong password** → Should show an error message, stay on the page
+3. **Enter the correct password** (the `SITE_PASSWORD` you set in `.env`) → Should reveal the full landing page
+4. **Refresh the page** → Should stay on the landing page (the `sotto_access` cookie persists for 30 days)
+5. **Open an incognito/private window** → Visit `sotto.fm` → Should show the password gate again (no cookie in incognito)
+6. **Visit `sotto.fm/romero`** → Should redirect to `sotto.fm`
 
 ### 7.6 Check security headers
 
@@ -1560,7 +1560,7 @@ Start with value testing (the app itself). Friends will try it as a favor — st
 
 Send your friends:
 
-- **URL**: `sotto.fm/romero` (the public root `sotto.fm` shows "Under Construction")
+- **URL**: `sotto.fm`
 - **Password**: whatever you set as `SITE_PASSWORD` in `.env`
 
 ### 9.3 The DM to send
@@ -1571,7 +1571,7 @@ Don't just drop a link. Give them a specific action and a reason to try it. Send
 
 > Hey — I'm building something and would love your honest take. It turns any topic into a podcast you can interrupt with questions.
 >
-> sotto.fm/romero (password: `YOUR_PASSWORD`)
+> sotto.fm (password: `YOUR_PASSWORD`)
 >
 > Try making one about [something specific they'd care about]. Takes 2 min to start. Let me know what's confusing or if you'd actually use it.
 
@@ -1590,14 +1590,13 @@ Don't just drop a link. Give them a specific action and a reason to try it. Send
 
 ### 9.4 How the password gate works for them
 
-1. They visit `sotto.fm/romero` in their browser
-2. They're redirected to the password entry page (`/access`)
+1. They visit `sotto.fm` in their browser
+2. The landing page shows an inline password form (when `SITE_PASSWORD` is set)
 3. They type the password and submit
 4. A signed cookie (`sotto_access`) is set in their browser
-5. They're redirected to the alpha landing page (`/romero`)
+5. The full landing page is revealed
 6. The cookie lasts **30 days** — they won't need to enter the password again for a month
 7. On a different device or after clearing cookies, they'll need the password again
-8. Visiting `sotto.fm` (root) shows the public "Under Construction" page — no password needed
 
 ### 9.5 What to ask after they try it
 
