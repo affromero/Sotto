@@ -10,13 +10,18 @@ vi.mock('@/lib/api-keys', () => ({
 }));
 
 const mockPrismaPodcastFindUnique = vi.fn();
-const mockPrismaPodcastUpdate = vi.fn();
-const mockPrismaJobUpdateMany = vi.fn();
+const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaJobUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVersionSegmentDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaPodcastVersionDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaSegmentDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaScriptDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPrismaReferenceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
+  id: 'discovery-001',
+  sourceContent: null,
+});
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -35,6 +40,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     segment: {
       deleteMany: (...args: unknown[]) => mockPrismaSegmentDeleteMany(...args),
+      findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
     },
     script: {
       deleteMany: (...args: unknown[]) => mockPrismaScriptDeleteMany(...args),
@@ -42,17 +48,38 @@ vi.mock('@/lib/prisma', () => ({
     reference: {
       deleteMany: (...args: unknown[]) => mockPrismaReferenceDeleteMany(...args),
     },
+    discovery: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
+    },
   },
 }));
 
 const mockAddJob = vi.fn();
 
 vi.mock('@/lib/queue', () => ({
-  contentExtractionQueue: {},
+  contentExtractionQueue: { name: 'content-extraction' },
+  scriptGenerationQueue: { name: 'script-generation' },
+  scriptVerificationQueue: { name: 'script-verification' },
+  referenceValidationQueue: { name: 'reference-validation' },
+  audioGenerationQueue: { name: 'audio-generation' },
+  audioStitchingQueue: { name: 'audio-stitching' },
+  audioImportQueue: { name: 'audio-import' },
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     EXTRACT_CONTENT: 'extract_content',
+    GENERATE_SCRIPT: 'generate_script',
+    VERIFY_SCRIPT: 'verify_script',
+    VALIDATE_REFERENCES: 'validate_references',
+    GENERATE_AUDIO: 'generate_audio',
+    STITCH_AUDIO: 'stitch_audio',
+    IMPORT_AUDIO: 'import_audio',
   },
+}));
+
+const mockDetermineResumePoint = vi.fn();
+
+vi.mock('@/lib/pipeline-resume', () => ({
+  determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
 }));
 
 const mockCanResolveAi = vi.fn().mockResolvedValue(true);
@@ -71,17 +98,27 @@ vi.mock('@/lib/stripe', () => ({
   LIMITS: { maxDurationMinutes: 30 },
 }));
 
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn().mockResolvedValue(null),
+  getByokKey: vi.fn().mockResolvedValue(null),
+}));
+
 // ---- Import under test ----
 import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
 
 // ---- Helpers ----
 
-function createMockRequest(): NextRequest {
-  return {
-    headers: new Headers({
-      authorization: 'Bearer test-api-key',
-    }),
-  } as NextRequest;
+function createMockRequest(searchParams?: Record<string, string>): NextRequest {
+  const url = new URL('http://localhost/api/podcasts/p/generate');
+  if (searchParams) {
+    for (const [k, v] of Object.entries(searchParams)) {
+      url.searchParams.set(k, v);
+    }
+  }
+  return new NextRequest(url, {
+    method: 'POST',
+    headers: { authorization: 'Bearer test-api-key' },
+  });
 }
 
 async function createMockParams(podcastId: string) {
@@ -95,6 +132,8 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     vi.clearAllMocks();
     mockCanResolveAi.mockResolvedValue(true);
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
+    mockPrismaPodcastUpdate.mockResolvedValue({});
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
   });
 
   it('returns 401 for unauthenticated request', async () => {
@@ -193,12 +232,12 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       userId: 'user-001',
       status: 'PENDING',
       discovery: {
+        id: 'disc-007',
         sourceUrl: 'https://example.com/article',
         sourceContent: null,
         durationTarget: null,
       },
     });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-007');
@@ -209,27 +248,6 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     expect(data).toEqual({ success: true, message: 'Generation started' });
   });
 
-  it('cleans up failed jobs before retrying FAILED podcast', async () => {
-    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-003' });
-    mockPrismaPodcastFindUnique.mockResolvedValue({
-      id: 'podcast-009',
-      userId: 'user-003',
-      status: 'FAILED',
-      discovery: null,
-    });
-    mockPrismaJobUpdateMany.mockResolvedValue({ count: 2 });
-    mockPrismaPodcastUpdate.mockResolvedValue({});
-
-    const request = createMockRequest();
-    const params = await createMockParams('podcast-009');
-    const response = await POST(request, params);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true, message: 'Generation started' });
-    expect(mockPrismaJobUpdateMany).toHaveBeenCalled();
-  });
-
   it('returns 400 when duration exceeds limit', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
     mockPrismaPodcastFindUnique.mockResolvedValue({
@@ -237,6 +255,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       userId: 'user-001',
       status: 'PENDING',
       discovery: {
+        id: 'disc-dur',
         sourceUrl: null,
         sourceContent: null,
         durationTarget: 60,
@@ -250,5 +269,150 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain('exceeds the maximum');
+  });
+
+  describe('smart resume for FAILED podcasts', () => {
+    it('uses determineResumePoint to resume from EXTRACT_CONTENT', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-f1',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: {
+          id: 'disc-f1',
+          sourceUrl: 'https://example.com',
+          sourceContent: null,
+          durationTarget: null,
+        },
+      });
+      mockDetermineResumePoint.mockResolvedValue({ step: 'EXTRACT_CONTENT' });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-f1');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.resumedAt).toBe('EXTRACT_CONTENT');
+      expect(mockPrismaJobUpdateMany).toHaveBeenCalled();
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'content-extraction' }),
+        'extract_content',
+        expect.objectContaining({ podcastId: 'podcast-f1' })
+      );
+    });
+
+    it('uses determineResumePoint to resume from GENERATE_AUDIO with pending segments', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-f2',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: { id: 'disc-f2', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+      mockDetermineResumePoint.mockResolvedValue({
+        step: 'GENERATE_AUDIO',
+        pendingSegmentIds: ['seg-3', 'seg-5'],
+      });
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-3', speaker: 'HOST', text: 'Hello' },
+        { id: 'seg-5', speaker: 'EXPERT', text: 'Hi' },
+      ]);
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-f2');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.resumedAt).toBe('GENERATE_AUDIO');
+      expect(data.pendingSegments).toBe(2);
+      // Should queue 2 audio generation jobs
+      expect(mockAddJob).toHaveBeenCalledTimes(2);
+    });
+
+    it('uses determineResumePoint to resume from STITCH_AUDIO', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-f3',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: { id: 'disc-f3', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+      mockDetermineResumePoint.mockResolvedValue({
+        step: 'STITCH_AUDIO',
+        segmentIds: ['seg-1', 'seg-2', 'seg-3'],
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-f3');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.resumedAt).toBe('STITCH_AUDIO');
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'audio-stitching' }),
+        'stitch_audio',
+        expect.objectContaining({ segmentIds: ['seg-1', 'seg-2', 'seg-3'] })
+      );
+    });
+
+    it('uses determineResumePoint to resume from SCRIPT_READY', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-f4',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: { id: 'disc-f4', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+      mockDetermineResumePoint.mockResolvedValue({ step: 'SCRIPT_READY' });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-f4');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.resumedAt).toBe('SCRIPT_READY');
+      // No job queued — user must approve script
+      expect(mockAddJob).not.toHaveBeenCalled();
+    });
+
+    it('nukes everything and restarts when forceRestart=true', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-fr',
+        userId: 'user-001',
+        status: 'FAILED',
+        source: 'WEB',
+        discovery: {
+          id: 'disc-fr',
+          sourceUrl: 'https://example.com',
+          sourceContent: null,
+          durationTarget: null,
+        },
+      });
+
+      const request = createMockRequest({ forceRestart: 'true' });
+      const params = await createMockParams('podcast-fr');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.message).toBe('Generation started');
+      // All cleanup operations should have been called
+      expect(mockPrismaPodcastVersionSegmentDeleteMany).toHaveBeenCalled();
+      expect(mockPrismaPodcastVersionDeleteMany).toHaveBeenCalled();
+      expect(mockPrismaSegmentDeleteMany).toHaveBeenCalled();
+      expect(mockPrismaReferenceDeleteMany).toHaveBeenCalled();
+      expect(mockPrismaScriptDeleteMany).toHaveBeenCalled();
+      // determineResumePoint should NOT be called
+      expect(mockDetermineResumePoint).not.toHaveBeenCalled();
+    });
   });
 });
