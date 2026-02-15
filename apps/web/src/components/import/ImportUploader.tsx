@@ -5,6 +5,7 @@ import { Upload, FileAudio, FileText, X, AlertCircle, ChevronDown, Info } from '
 import { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from '@sotto/shared';
 import type { SourcePlatformValue } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
+import { SttProviderSelector } from './SttProviderSelector';
 import styles from './ImportUploader.module.css';
 
 interface ImportUploaderProps {
@@ -22,6 +23,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
   const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
   const [sourcePlatform, setSourcePlatform] = useState('');
   const [isHumanContent, setIsHumanContent] = useState(false);
+  const [sttProvider, setSttProvider] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -89,14 +91,6 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
     async (e: React.FormEvent) => {
       e.preventDefault();
 
-      if (!title.trim()) {
-        setError('Please enter a title');
-        return;
-      }
-      if (!topic.trim()) {
-        setError('Please enter a description');
-        return;
-      }
       if (!audioFile) {
         setError('Please select an audio file');
         return;
@@ -107,15 +101,21 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       setError(null);
 
       const formData = new FormData();
-      formData.append('title', title.trim());
-      formData.append('topic', topic.trim());
       formData.append('audio', audioFile);
       formData.append('isHumanContent', String(isHumanContent));
 
+      if (title.trim()) {
+        formData.append('title', title.trim());
+      }
+      if (topic.trim()) {
+        formData.append('topic', topic.trim());
+      }
       if (sourcePlatform) {
         formData.append('sourcePlatform', sourcePlatform);
       }
-
+      if (sttProvider) {
+        formData.append('sttProvider', sttProvider);
+      }
       if (transcriptFile) {
         formData.append('transcript', transcriptFile);
       }
@@ -163,7 +163,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       xhr.open('POST', '/api/podcasts/import');
       xhr.send(formData);
     },
-    [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, onImportStarted]
+    [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, sttProvider, onImportStarted]
   );
 
   const handleCancel = useCallback(() => {
@@ -194,75 +194,6 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
           </button>
         </div>
       )}
-
-      <div className={styles.field}>
-        <label htmlFor="title" className={styles.label}>
-          Title <span className={styles.required}>*</span>
-        </label>
-        <input
-          id="title"
-          type="text"
-          className={styles.input}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter podcast title"
-          disabled={loading}
-          required
-        />
-      </div>
-
-      <div className={styles.field}>
-        <label htmlFor="topic" className={styles.label}>
-          Description <span className={styles.required}>*</span>
-        </label>
-        <textarea
-          id="topic"
-          className={styles.textarea}
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="What is this podcast about?"
-          rows={4}
-          disabled={loading}
-          required
-        />
-      </div>
-
-      <div className={styles.field}>
-        <label htmlFor="sourcePlatform" className={styles.label}>
-          Source Platform
-        </label>
-        <div className={styles.selectWrapper}>
-          <select
-            id="sourcePlatform"
-            className={styles.select}
-            value={sourcePlatform}
-            onChange={(e) => {
-              const value = e.target.value;
-              setSourcePlatform(value);
-              const platform = SOURCE_PLATFORMS.find((p) => p.value === value);
-              if (platform?.isAiGenerated) {
-                setIsHumanContent(false);
-              }
-            }}
-            disabled={loading}
-          >
-            <option value="">Select a platform (optional)</option>
-            {SOURCE_PLATFORMS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={16} className={styles.selectIcon} aria-hidden="true" />
-        </div>
-        {sourcePlatform &&
-          SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue] && (
-            <div className={styles.platformHelp}>
-              <Info size={16} aria-hidden="true" />
-              <p>{SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue]}</p>
-            </div>
-          )}
-      </div>
 
       <div className={styles.field}>
         <label className={styles.label}>
@@ -333,6 +264,77 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
             </div>
           )}
         </div>
+      </div>
+
+      <SttProviderSelector value={sttProvider} onChange={setSttProvider} />
+
+      <div className={styles.field}>
+        <label htmlFor="title" className={styles.label}>
+          Title
+        </label>
+        <input
+          id="title"
+          type="text"
+          className={styles.input}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Enter podcast title"
+          disabled={loading}
+        />
+        <span className={styles.fieldHint}>Auto-generated from transcript if left blank</span>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="topic" className={styles.label}>
+          Description
+        </label>
+        <textarea
+          id="topic"
+          className={styles.textarea}
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+          placeholder="What is this podcast about?"
+          rows={3}
+          disabled={loading}
+        />
+        <span className={styles.fieldHint}>Auto-generated from transcript if left blank</span>
+      </div>
+
+      <div className={styles.field}>
+        <label htmlFor="sourcePlatform" className={styles.label}>
+          Source Platform
+        </label>
+        <div className={styles.selectWrapper}>
+          <select
+            id="sourcePlatform"
+            className={styles.select}
+            value={sourcePlatform}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSourcePlatform(value);
+              const platform = SOURCE_PLATFORMS.find((p) => p.value === value);
+              if (platform?.isAiGenerated) {
+                setIsHumanContent(false);
+              }
+            }}
+            disabled={loading}
+          >
+            <option value="">Select a platform (optional)</option>
+            {SOURCE_PLATFORMS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={16} className={styles.selectIcon} aria-hidden="true" />
+        </div>
+        {sourcePlatform &&
+          SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue] && (
+            <div className={styles.platformHelp}>
+              <Info size={16} aria-hidden="true" />
+              <p>{SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue]}</p>
+            </div>
+          )}
       </div>
 
       <div className={styles.field}>
@@ -435,7 +437,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
             variant="primary"
             size="large"
             fullWidth
-            disabled={!audioFile || !title.trim() || !topic.trim()}
+            disabled={!audioFile}
           >
             Import Podcast
           </Button>
