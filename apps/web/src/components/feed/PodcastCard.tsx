@@ -7,11 +7,13 @@ import { Play, Heart, GitFork } from 'lucide-react';
 import { SOURCE_PLATFORMS } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { Badge } from '@/components/ui/Badge';
+import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastCard.module.css';
 
 interface PodcastCardProps {
   podcast: PodcastSummary;
+  variant?: 'default' | 'featured' | 'compact';
   onPlay?: (id: string) => void;
   position?: number;
   feedSort?: string;
@@ -60,8 +62,17 @@ function formatDate(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
+function getContentBadgeLabel(podcast: PodcastSummary): string {
+  if (podcast.source === 'IMPORT' && podcast.isHumanContent) return 'Human';
+  if (podcast.source === 'IMPORT') {
+    return podcast.sourcePlatform ? platformLabel(podcast.sourcePlatform) : 'Imported';
+  }
+  return 'AI';
+}
+
 export function PodcastCard({
   podcast,
+  variant = 'default',
   onPlay,
   position = 0,
   feedSort,
@@ -71,6 +82,7 @@ export function PodcastCard({
   const track = useTrack();
   const mountTimeRef = useRef(0);
   const duration = formatDuration(podcast.duration);
+  const gradient = getPodcastGradient(podcast.id);
 
   useEffect(() => {
     mountTimeRef.current = Date.now();
@@ -96,98 +108,108 @@ export function PodcastCard({
     });
   }, [track, podcast.id, position, feedSort, searchQuery]);
 
+  const variantClass = variant !== 'default' ? styles[variant] : '';
+  const cardClassName = `${styles.card} ${variantClass}`.trim();
+
+  const gradientVars = {
+    '--cover-from': gradient.from,
+    '--cover-to': gradient.to,
+    '--cover-angle': gradient.angle,
+  } as React.CSSProperties;
+
   return (
-    <article className={styles.card} ref={cardRef}>
+    <article className={cardClassName} ref={cardRef} style={gradientVars}>
       <Link
         href={`/podcast/${podcast.id}`}
         className={styles.cardLink}
         aria-label={`Listen to ${podcast.title} by ${podcast.user.name || 'Unknown'}`}
         onClick={handleClick}
       >
-        <div className={styles.header}>
-          <h3 className={styles.title}>{podcast.title}</h3>
-          {duration && <span className={styles.duration}>{duration}</span>}
-        </div>
-
-        {podcast.forkedFromId && (
-          <p className={styles.remixSubline}>
-            Remix of {(podcast as any).forkedFrom?.title || 'another podcast'}
-          </p>
-        )}
-
-        <div className={styles.topicRow}>
-          <p className={styles.topic}>{podcast.topic}</p>
-          <span
-            className={styles.contentBadge}
-            data-type={
-              podcast.source === 'IMPORT' && podcast.isHumanContent
-                ? 'human'
-                : podcast.source === 'IMPORT'
-                  ? 'imported'
-                  : 'ai'
-            }
-          >
-            {podcast.source === 'IMPORT' && podcast.isHumanContent
-              ? 'Human'
-              : podcast.source === 'IMPORT'
-                ? podcast.sourcePlatform
-                  ? platformLabel(podcast.sourcePlatform)
-                  : 'Imported'
-                : 'AI'}
-          </span>
-        </div>
-
-        <div className={styles.creator}>
-          <div className={styles.avatar}>
-            {podcast.user.image ? (
-              <Image
-                src={podcast.user.image}
-                alt={podcast.user.name || 'Creator'}
-                width={32}
-                height={32}
-                className={styles.avatarImage}
-              />
-            ) : (
-              <span className={styles.avatarFallback}>
-                {(podcast.user.name || '?')[0].toUpperCase()}
-              </span>
-            )}
+        <div className={styles.cover}>
+          <div className={styles.coverBadges}>
+            <span className={styles.contentBadge}>
+              {getContentBadgeLabel(podcast)}
+            </span>
+            {duration && <span className={styles.duration}>{duration}</span>}
           </div>
-          <span className={styles.creatorName}>
-            {podcast.user.name || 'Anonymous'}
-            {podcast.user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
-            {podcast.user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
-          </span>
-          <span className={styles.dot} aria-hidden="true" />
-          <time className={styles.date} dateTime={podcast.createdAt}>
-            {formatDate(podcast.createdAt)}
-          </time>
-        </div>
 
-        <div className={styles.stats}>
-          <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
-            <Play size={14} aria-hidden="true" />
-            <span>{formatCount(podcast.playCount)}</span>
-          </span>
-          <span className={styles.stat} aria-label={`${podcast.likeCount} likes`}>
-            <Heart size={14} aria-hidden="true" />
-            <span>{formatCount(podcast.likeCount)}</span>
-          </span>
-          <span className={styles.stat} aria-label={`${podcast.forkCount} forks`}>
-            <GitFork size={14} aria-hidden="true" />
-            <span>{formatCount(podcast.forkCount)}</span>
-          </span>
-        </div>
-
-        {podcast.tags.length > 0 && (
-          <div className={styles.tags} aria-label="Tags">
-            {podcast.tags.map((tag) => (
-              <span key={tag.id} className={styles.tag}>
-                {tag.name}
-              </span>
-            ))}
+          <div className={styles.coverContent}>
+            <h3 className={styles.title}>{podcast.title}</h3>
+            <p className={styles.topic}>{podcast.topic}</p>
           </div>
-        )}
+
+          {/* Compact variant: overlay meta on cover */}
+          <div className={styles.compactMeta}>
+            <span className={styles.compactCreator}>
+              {podcast.user.name || 'Anonymous'}
+            </span>
+            <span className={styles.compactStat}>
+              <Play size={10} aria-hidden="true" />
+              {formatCount(podcast.playCount)}
+            </span>
+          </div>
+        </div>
+
+        {/* White body (hidden in compact variant via CSS) */}
+        <div className={styles.body}>
+          {podcast.forkedFromId && (
+            <p className={styles.remixSubline}>
+              Remix of {((podcast as unknown) as { forkedFrom?: { title: string } }).forkedFrom?.title || 'another podcast'}
+            </p>
+          )}
+
+          <div className={styles.creator}>
+            <div className={styles.avatar}>
+              {podcast.user.image ? (
+                <Image
+                  src={podcast.user.image}
+                  alt={podcast.user.name || 'Creator'}
+                  width={24}
+                  height={24}
+                  className={styles.avatarImage}
+                />
+              ) : (
+                <span className={styles.avatarFallback}>
+                  {(podcast.user.name || '?')[0].toUpperCase()}
+                </span>
+              )}
+            </div>
+            <span className={styles.creatorName}>
+              {podcast.user.name || 'Anonymous'}
+              {podcast.user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
+              {podcast.user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
+            </span>
+            <span className={styles.dot} aria-hidden="true" />
+            <time className={styles.date} dateTime={podcast.createdAt}>
+              {formatDate(podcast.createdAt)}
+            </time>
+          </div>
+
+          <div className={styles.stats}>
+            <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
+              <Play size={14} aria-hidden="true" />
+              <span>{formatCount(podcast.playCount)}</span>
+            </span>
+            <span className={styles.stat} aria-label={`${podcast.likeCount} likes`}>
+              <Heart size={14} aria-hidden="true" />
+              <span>{formatCount(podcast.likeCount)}</span>
+            </span>
+            <span className={styles.stat} aria-label={`${podcast.forkCount} forks`}>
+              <GitFork size={14} aria-hidden="true" />
+              <span>{formatCount(podcast.forkCount)}</span>
+            </span>
+          </div>
+
+          {podcast.tags.length > 0 && (
+            <div className={styles.tags} aria-label="Tags">
+              {podcast.tags.map((tag) => (
+                <span key={tag.id} className={styles.tag}>
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </Link>
 
       {onPlay && podcast.audioUrl && (

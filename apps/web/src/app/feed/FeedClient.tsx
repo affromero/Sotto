@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { TagFilter } from '@/components/feed/TagFilter';
 import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel';
+import { HeroSection } from '@/components/feed/HeroSection';
 import { TrendingSection } from '@/components/feed/TrendingSection';
 import { FeedGrid } from '@/components/feed/FeedGrid';
 import { PodcastCard } from '@/components/feed/PodcastCard';
@@ -21,6 +22,7 @@ type FeedTab = 'discover' | 'activity';
 
 interface FeedClientProps {
   initialPodcasts: PodcastSummary[];
+  heroPodcasts: PodcastSummary[];
   trendingPodcasts: PodcastSummary[];
   tags: Tag[];
   isAuthenticated?: boolean;
@@ -36,7 +38,7 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
   { value: 'most_forked', label: 'Most Forked' },
 ];
 
-export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenticated }: FeedClientProps) {
+export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, tags, isAuthenticated }: FeedClientProps) {
   const [activeTab, setActiveTab] = useState<FeedTab>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState<string | undefined>(undefined);
@@ -140,13 +142,14 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
   }, [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts]);
 
   const hasActiveFilters = Object.values(advancedFilters).some((v) => v !== undefined);
-  const showTrending =
+  const isDefaultView =
     !searchQuery &&
     !activeTag &&
     !hasActiveFilters &&
     sort === 'recent' &&
-    mode === 'all' &&
-    trendingPodcasts.length > 0;
+    mode === 'all';
+  const showHero = isDefaultView && heroPodcasts.length > 0;
+  const showTrending = isDefaultView && trendingPodcasts.length > 0;
 
   return (
     <div className={styles.feedContent}>
@@ -183,6 +186,8 @@ export function FeedClient({ initialPodcasts, trendingPodcasts, tags, isAuthenti
           role="tabpanel"
           aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
         >
+          {showHero && <HeroSection podcasts={heroPodcasts} />}
+
           <div className={styles.filters}>
             <SearchBar
               value={searchQuery}

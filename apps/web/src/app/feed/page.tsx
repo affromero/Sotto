@@ -12,6 +12,40 @@ export const metadata: Metadata = {
   description: 'Explore AI-generated podcasts created by the Sotto community.',
 };
 
+const podcastSelect = {
+  id: true,
+  title: true,
+  topic: true,
+  status: true,
+  visibility: true,
+  audioUrl: true,
+  duration: true,
+  playCount: true,
+  likeCount: true,
+  forkCount: true,
+  createdAt: true,
+  source: true,
+  sourcePlatform: true,
+  isHumanContent: true,
+  forkedFromId: true,
+  user: {
+    select: {
+      id: true,
+      name: true,
+      image: true,
+      handle: true,
+      role: true,
+    },
+  },
+  tags: {
+    include: {
+      tag: {
+        select: { id: true, name: true, slug: true },
+      },
+    },
+  },
+} as const;
+
 export default async function FeedPage() {
   const session = await auth();
   const isAuthenticated = !!session?.user?.id;
@@ -24,37 +58,7 @@ export default async function FeedPage() {
       },
       orderBy: { createdAt: 'desc' },
       take: 24,
-      select: {
-        id: true,
-        title: true,
-        topic: true,
-        status: true,
-        visibility: true,
-        audioUrl: true,
-        duration: true,
-        playCount: true,
-        likeCount: true,
-        forkCount: true,
-        createdAt: true,
-        source: true,
-        isHumanContent: true,
-        forkedFromId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            handle: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        },
-      },
+      select: podcastSelect,
     }),
     prisma.tag.findMany({
       orderBy: { name: 'asc' },
@@ -72,37 +76,7 @@ export default async function FeedPage() {
       },
       orderBy: { playCount: 'desc' },
       take: 8,
-      select: {
-        id: true,
-        title: true,
-        topic: true,
-        status: true,
-        visibility: true,
-        audioUrl: true,
-        duration: true,
-        playCount: true,
-        likeCount: true,
-        forkCount: true,
-        createdAt: true,
-        source: true,
-        isHumanContent: true,
-        forkedFromId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            handle: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        },
-      },
+      select: podcastSelect,
     }),
   ]);
 
@@ -113,6 +87,10 @@ export default async function FeedPage() {
       tags: p.tags.map((pt) => pt.tag),
     }));
 
+  const serializedTrending = serializePodcasts(trending);
+  const heroPodcasts = serializedTrending.slice(0, 3);
+  const remainingTrending = serializedTrending.slice(3);
+
   const topBarUser = session?.user
     ? { name: session.user.name, image: session.user.image, id: session.user.id }
     : null;
@@ -122,16 +100,10 @@ export default async function FeedPage() {
       <TopBar user={topBarUser} />
       <main className={styles.main}>
         <div className={styles.container}>
-          <header className={styles.header}>
-            <h1 className={styles.title}>Discover Podcasts</h1>
-            <p className={styles.subtitle}>
-              Explore AI-generated podcasts created by the community. Learn something new today.
-            </p>
-          </header>
-
           <FeedClient
             initialPodcasts={serializePodcasts(podcasts)}
-            trendingPodcasts={serializePodcasts(trending)}
+            heroPodcasts={heroPodcasts}
+            trendingPodcasts={remainingTrending}
             tags={tags}
             isAuthenticated={isAuthenticated}
           />
