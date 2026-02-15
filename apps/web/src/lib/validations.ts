@@ -57,6 +57,7 @@ export const updatePodcastSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   topic: z.string().min(1).max(5000).optional(),
   visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+  dismissSuggestion: z.boolean().optional(),
 });
 
 /**

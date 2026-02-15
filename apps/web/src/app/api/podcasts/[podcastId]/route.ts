@@ -84,9 +84,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  const { dismissSuggestion, ...updateData } = parsed.data;
+
   const updated = await prisma.podcast.update({
     where: { id: podcastId },
-    data: parsed.data,
+    data: {
+      ...updateData,
+      ...(dismissSuggestion && { suggestedTitle: null, suggestedTopic: null }),
+    },
     include: {
       user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: true } },
