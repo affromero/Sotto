@@ -93,6 +93,8 @@
 | `/api/teams/invite`                                              | POST             | Yes        | Send team invite                                                            |
 | `/api/users/me`                                                  | GET/PATCH        | Yes        | Current user profile                                                        |
 | `/api/users/me/twitter`                                          | GET/PATCH/DELETE | Yes        | Twitter settings (handle, enabled, voice prefs, disconnect)                 |
+| `/api/users/discover`                                            | GET              | No (opt)   | Search users by name/handle/bio/interests (enriches isFollowing if authed)  |
+| `/api/users/suggested`                                           | GET              | Yes        | Suggested follows via tag overlap + embedding + collaborative listening     |
 | `/api/users/search`                                              | GET              | Yes        | Search users by handle (for allowlist)                                      |
 | `/api/voices/clone`                                              | POST             | Yes        | Create voice clone                                                          |
 | `/api/voices/preview`                                            | POST             | Yes        | Preview voice sample                                                        |
