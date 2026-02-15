@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
 import type { CustomTag } from '@/components/discovery/InterestGrid';
+import { TasteQuiz } from '@/components/discovery/TasteQuiz';
+import type { TasteQuestion, TasteAnswer } from '@/components/discovery/TasteQuiz';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
@@ -50,6 +52,7 @@ interface SettingsFormProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   isTwitterProviderAvailable: boolean;
+  quizAnswerCount: number;
 }
 
 const providerLabels: Record<string, string> = {
@@ -77,6 +80,7 @@ export function SettingsForm({
   configuredTtsProviders,
   configuredAiProviders,
   isTwitterProviderAvailable,
+  quizAnswerCount,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -136,6 +140,13 @@ export function SettingsForm({
   const [twitterSaving, setTwitterSaving] = useState(false);
   const [twitterSaved, setTwitterSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // Taste quiz state
+  const [quizCount, setQuizCount] = useState(quizAnswerCount);
+  const [quizActive, setQuizActive] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<TasteQuestion[]>([]);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizResetting, setQuizResetting] = useState(false);
 
   // Interests state
   const [interestIds, setInterestIds] = useState<string[]>(selectedInterestTagIds);
@@ -387,6 +398,82 @@ export function SettingsForm({
             </Button>
           </div>
         </form>
+      </section>
+
+      {/* Taste Quiz Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Taste Quiz</h2>
+        <p className={styles.sectionDesc}>
+          Answer quick yes/no questions to improve your recommendations.
+          {quizCount > 0 && ` You\u2019ve answered ${quizCount} question${quizCount !== 1 ? 's' : ''}.`}
+        </p>
+
+        {quizActive ? (
+          <TasteQuiz
+            initialQuestions={quizQuestions}
+            onComplete={async (answers: TasteAnswer[]) => {
+              if (answers.length > 0) {
+                await fetch('/api/taste-quiz', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ answers }),
+                });
+                setQuizCount((prev) => prev + answers.filter((a) => a.response !== 'skip').length);
+              }
+              setQuizActive(false);
+            }}
+            onRequestMore={async () => {
+              const res = await fetch('/api/taste-quiz?count=10');
+              if (!res.ok) return [];
+              const data = await res.json();
+              return data.questions;
+            }}
+            onSkipAll={() => setQuizActive(false)}
+          />
+        ) : (
+          <div className={styles.formActions}>
+            <Button
+              onClick={async () => {
+                setQuizLoading(true);
+                try {
+                  const res = await fetch('/api/taste-quiz?count=10');
+                  if (res.ok) {
+                    const data = await res.json();
+                    setQuizQuestions(data.questions);
+                    setQuizActive(true);
+                  }
+                } finally {
+                  setQuizLoading(false);
+                }
+              }}
+              loading={quizLoading}
+              disabled={quizLoading}
+            >
+              {quizCount > 0 ? 'Take More Questions' : 'Take the Quiz'}
+            </Button>
+            {quizCount > 0 && (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  if (!confirm('Reset all quiz answers? This will remove quiz-based interest data.')) return;
+                  setQuizResetting(true);
+                  try {
+                    const res = await fetch('/api/taste-quiz', { method: 'DELETE' });
+                    if (res.ok) {
+                      setQuizCount(0);
+                    }
+                  } finally {
+                    setQuizResetting(false);
+                  }
+                }}
+                loading={quizResetting}
+                disabled={quizResetting}
+              >
+                Reset Quiz
+              </Button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Interests Section */}
