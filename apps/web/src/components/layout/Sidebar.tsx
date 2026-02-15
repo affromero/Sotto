@@ -14,6 +14,7 @@ import {
   LogOut,
   Shield,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -114,7 +115,11 @@ export function Sidebar({ currentPath, isOpen = false, onClose, user }: SidebarP
             )}
           </div>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>{displayName}</span>
+            <div className={styles.userNameRow}>
+              <span className={styles.userName}>{displayName}</span>
+              {role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
+              {role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
+            </div>
             <button
               className={styles.signOut}
               onClick={() => {

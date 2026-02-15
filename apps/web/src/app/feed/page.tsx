@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import type { Metadata } from 'next';
+import { TopBar } from '@/components/layout/TopBar';
 import { FeedClient } from './FeedClient';
 import styles from './page.module.css';
 
@@ -112,23 +113,30 @@ export default async function FeedPage() {
       tags: p.tags.map((pt) => pt.tag),
     }));
 
-  return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Discover Podcasts</h1>
-          <p className={styles.subtitle}>
-            Explore AI-generated podcasts created by the community. Learn something new today.
-          </p>
-        </header>
+  const topBarUser = session?.user
+    ? { name: session.user.name, image: session.user.image, id: session.user.id }
+    : null;
 
-        <FeedClient
-          initialPodcasts={serializePodcasts(podcasts)}
-          trendingPodcasts={serializePodcasts(trending)}
-          tags={tags}
-          isAuthenticated={isAuthenticated}
-        />
-      </div>
-    </main>
+  return (
+    <>
+      <TopBar user={topBarUser} />
+      <main className={styles.main}>
+        <div className={styles.container}>
+          <header className={styles.header}>
+            <h1 className={styles.title}>Discover Podcasts</h1>
+            <p className={styles.subtitle}>
+              Explore AI-generated podcasts created by the community. Learn something new today.
+            </p>
+          </header>
+
+          <FeedClient
+            initialPodcasts={serializePodcasts(podcasts)}
+            trendingPodcasts={serializePodcasts(trending)}
+            tags={tags}
+            isAuthenticated={isAuthenticated}
+          />
+        </div>
+      </main>
+    </>
   );
 }

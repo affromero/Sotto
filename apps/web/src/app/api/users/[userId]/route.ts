@@ -13,8 +13,10 @@ export async function GET(
     select: {
       id: true,
       name: true,
+      handle: true,
       image: true,
       bio: true,
+      role: true,
       createdAt: true,
       _count: {
         select: {
@@ -47,8 +49,10 @@ export async function GET(
   return NextResponse.json({
     id: user.id,
     name: user.name,
+    handle: user.handle,
     image: user.image,
     bio: user.bio,
+    role: user.role,
     createdAt: user.createdAt,
     podcastCount: user._count.podcasts,
     followerCount: user._count.followers,

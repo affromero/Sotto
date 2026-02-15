@@ -164,6 +164,13 @@
   flex: 1;
 }
 
+.userNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .userName {
   font: var(--text-body-sm);
   font-weight: 600;
