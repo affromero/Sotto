@@ -6,7 +6,7 @@ import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
 import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
-import { generateImportMetadata } from '@/lib/import-metadata-generator';
+import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
 import * as path from 'path';
@@ -147,12 +147,13 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
     await job.updateProgress(75);
 
-    // Auto-generate title and topic from transcript if requested
-    if (generateMetadata) {
-      try {
-        const fullText = segments.map((s) => s.text).join(' ');
-        const metadata = await generateImportMetadata(fullText, aiApiKey);
+    // Always generate AI metadata from transcript
+    try {
+      const fullText = segments.map((s) => s.text).join(' ');
+      const metadata = await generateImportMetadata(fullText, aiApiKey);
 
+      if (generateMetadata) {
+        // User didn't provide title — apply AI metadata directly
         await prisma.podcast.update({
           where: { id: podcastId },
           data: {
@@ -161,16 +162,42 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
           },
         });
 
-        logger.info('Auto-generated import metadata', {
+        logger.info('Applied AI-generated metadata', {
           podcastId,
           title: metadata.title,
         });
-      } catch (err) {
-        logger.warn('Failed to auto-generate import metadata — using defaults', {
-          podcastId,
-          error: err instanceof Error ? err.message : String(err),
+      } else {
+        // User provided their own title — store as suggestion if meaningfully different
+        const podcast = await prisma.podcast.findUniqueOrThrow({
+          where: { id: podcastId },
+          select: { title: true, topic: true },
         });
+
+        const titleDifferent = isMetadataDifferent(podcast.title, metadata.title);
+        const topicDifferent = podcast.topic
+          ? isMetadataDifferent(podcast.topic, metadata.topic)
+          : metadata.topic.length >= 10;
+
+        if (titleDifferent || topicDifferent) {
+          await prisma.podcast.update({
+            where: { id: podcastId },
+            data: {
+              suggestedTitle: titleDifferent ? metadata.title : null,
+              suggestedTopic: topicDifferent ? metadata.topic : null,
+            },
+          });
+
+          logger.info('Stored AI metadata suggestions', {
+            podcastId,
+            suggestedTitle: titleDifferent ? metadata.title : null,
+          });
+        }
       }
+    } catch (err) {
+      logger.warn('Failed to generate import metadata — continuing without suggestions', {
+        podcastId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     await job.updateProgress(80);
