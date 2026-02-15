@@ -1,5 +1,4 @@
 User-agent: *
-Disallow: /romero
 Disallow: /access
 Disallow: /api/
 Disallow: /dashboard

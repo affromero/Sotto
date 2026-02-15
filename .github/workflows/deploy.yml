@@ -277,7 +277,7 @@ jobs:
 
           # Footer links
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          TEXT="${TEXT}${NL}<a href=\"https://sotto.fm/romero\">sotto.fm</a>  ·  <a href=\"https://sotto.fm/pitch\">Pitch</a>  ·  <a href=\"${RUN_URL}\">Run</a>"
+          TEXT="${TEXT}${NL}<a href=\"https://sotto.fm\">sotto.fm</a>  ·  <a href=\"https://sotto.fm/pitch\">Pitch</a>  ·  <a href=\"${RUN_URL}\">Run</a>"
 
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -H "Content-Type: application/json" \
