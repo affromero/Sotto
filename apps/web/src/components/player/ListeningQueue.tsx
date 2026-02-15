@@ -21,7 +21,7 @@ interface QueueItem {
 }
 
 interface ListeningQueueProps {
-  onPlayPodcast?: (podcastId: string, audioUrl: string) => void;
+  onPlayPodcast?: (podcastId: string, audioUrl: string, title?: string) => void;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -65,7 +65,7 @@ export function ListeningQueue({ onPlayPodcast }: ListeningQueueProps) {
   const handlePlay = useCallback(
     (item: QueueItem) => {
       if (onPlayPodcast && item.podcast.audioUrl) {
-        onPlayPodcast(item.podcastId, item.podcast.audioUrl);
+        onPlayPodcast(item.podcastId, item.podcast.audioUrl, item.podcast.title);
       }
     },
     [onPlayPodcast]
