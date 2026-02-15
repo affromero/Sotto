@@ -8,6 +8,7 @@ const mockStreamResponse = vi.fn();
 vi.mock('@/lib/claude', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
   streamResponse: (...args: unknown[]) => mockStreamResponse(...args),
+  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -357,6 +358,24 @@ describe('getDiscoveryResponse', () => {
     expect(result.inputTokens).toBe(250);
     expect(result.outputTokens).toBe(120);
   });
+
+  it('passes web search tool to generateResponse', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: 'Response with search',
+      inputTokens: 100,
+      outputTokens: 50,
+    });
+
+    await getDiscoveryResponse([{ role: 'user', content: 'What happened today?' }]);
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
+  });
 });
 
 describe('streamDiscoveryResponse', () => {
@@ -377,5 +396,23 @@ describe('streamDiscoveryResponse', () => {
     const result = streamDiscoveryResponse(messages);
 
     expect(result).toBe(mockAsyncGenerator);
+  });
+
+  it('passes web search tool to streamResponse', () => {
+    const mockAsyncGenerator = (async function* () {
+      yield 'chunk';
+    })();
+
+    mockStreamResponse.mockReturnValue(mockAsyncGenerator);
+
+    streamDiscoveryResponse([{ role: 'user', content: 'Current events?' }]);
+
+    expect(mockStreamResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { generateResponse } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 
 export type ScriptTurn = {
   speaker: 'HOST' | 'EXPERT';
@@ -135,6 +135,14 @@ The "direction" field is optional — only include it when the delivery should n
 The "insertAfterTurn" field is the 0-based index; use -1 to insert before the first turn.
 The "references" array must contain an entry for every [N] cited in the turns. Type must be one of: WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT.
 
+## Web Search:
+You have access to web search. Use it to:
+- Find current events, recent news, and up-to-date information
+- Verify facts and find accurate statistics
+- Discover recent studies, reports, and publications
+- Ground the podcast in real, current information rather than outdated training data
+For time-sensitive topics (current events, "what happened today/this week", latest developments), ALWAYS search the web first before writing the script.
+
 Only return the JSON object, nothing else.`;
 
   const userMessage = params.sourceContent
@@ -144,6 +152,7 @@ Only return the JSON object, nothing else.`;
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
+    tools: [WEB_SEARCH_TOOL],
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
@@ -276,6 +285,9 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 ## Sound Effect Cues:
 Include [SFX: description] markers at natural transition points (3-5 per episode max).
 
+## Web Search:
+You have access to web search. Use it to verify facts, find accurate statistics, and discover current information to improve the script.
+
 ## Output Format:
 Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
 Only return the JSON object, nothing else.`;
@@ -307,6 +319,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
+    tools: [WEB_SEARCH_TOOL],
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
