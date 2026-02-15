@@ -1741,6 +1741,190 @@
 }
 
 /* ==========================================================================
+   BOT INTEGRATIONS SECTION
+   ========================================================================== */
+
+.botSection {
+  position: relative;
+  padding: 100px 0;
+  background: linear-gradient(170deg, #0b1120 0%, #122035 45%, #1a3050 100%);
+  overflow: hidden;
+}
+
+.botGlow {
+  position: absolute;
+  top: 20%;
+  right: 10%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(217, 119, 6, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.botGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.botColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.botLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.botLabel svg {
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Dark-bg overrides for twFeatures/twFeature */
+.botSection .twFeatures {
+  margin: 8px 0;
+}
+
+.botSection .twFeature {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.botSection .twFeature svg {
+  color: #f6ad55;
+}
+
+/* ==========================================================================
+   TELEGRAM MOCK
+   ========================================================================== */
+
+.tgMock {
+  background: #17212b;
+  border-radius: var(--radius-2xl);
+  border: 1px solid #242f3d;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tgMsgRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.tgMsgRowUser {
+  align-items: flex-end;
+}
+
+.tgBotName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6ab3f3;
+  margin-bottom: 2px;
+}
+
+.tgBubble {
+  padding: 8px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 85%;
+  white-space: pre-line;
+}
+
+.tgBubbleBot {
+  background: #2b5278;
+  color: #fff;
+  border-radius: 4px 16px 16px 16px;
+}
+
+.tgBubbleUser {
+  background: #2b6a41;
+  color: #fff;
+  border-radius: 16px 4px 16px 16px;
+}
+
+.tgKeyboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.tgKey {
+  padding: 8px 14px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid #3b5069;
+  border-radius: 8px;
+  color: #6ab3f3;
+  cursor: default;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.tgKeySelected {
+  background: rgba(106, 179, 243, 0.15);
+  border-color: #6ab3f3;
+}
+
+.tgKeyAccent {
+  background: #2b5278;
+  border-color: #2b5278;
+  color: #fff;
+}
+
+.tgKeyUrl {
+  background: transparent;
+  border: 1px solid #3b5069;
+  border-radius: 8px;
+  color: #6ab3f3;
+  padding: 8px 14px;
+  font-size: 13px;
+  width: 100%;
+  text-align: center;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tgFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.tgFeature {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tgFeature svg {
+  color: #f6ad55;
+  min-width: 16px;
+}
+
+/* ==========================================================================
    USE CASES
    ========================================================================== */
 
@@ -2201,6 +2385,13 @@
     max-width: 480px;
     margin: 0 auto;
   }
+
+  .botGrid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
+    margin: 0 auto;
+    gap: 48px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -2350,6 +2541,16 @@
     gap: 16px;
   }
 
+  /* Bot integrations */
+  .botSection {
+    padding: 64px 0;
+  }
+
+  .tgFeatures,
+  .botSection .twFeatures {
+    gap: 10px;
+  }
+
   /* Pricing */
   .tiers {
     grid-template-columns: 1fr;
@@ -2441,6 +2642,21 @@
   .twCardVisual {
     width: 52px;
     min-width: 52px;
+  }
+
+  /* Bot integrations */
+  .tgBubble {
+    font-size: 13px;
+  }
+
+  .tgMock {
+    padding: 12px;
+  }
+
+  .tgKey,
+  .tgKeyUrl {
+    font-size: 12px;
+    padding: 6px 10px;
   }
 }
 
