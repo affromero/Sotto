@@ -87,7 +87,17 @@ export type {
 
 export { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from './types/import';
 
-export { getContentBadgeLabel } from './content-badge';
+export { getContentBadgeLabel, getPodcastBadges } from './content-badge';
+export type { PodcastBadge } from './content-badge';
+
+export {
+  AI_PROVIDER_DISPLAY,
+  TTS_PROVIDER_DISPLAY,
+  LANGUAGE_DISPLAY,
+  getAiProviderLabel,
+  getTtsProviderLabel,
+  getLanguageLabel,
+} from './provider-display';
 
 export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 
