@@ -62,6 +62,7 @@ describe('markPodcastFailed', () => {
       data: {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
+        failureReason: null,
       },
     });
   });
@@ -109,6 +110,7 @@ describe('markPodcastFailed', () => {
       data: {
         status: 'FAILED',
         failedAtStatus: 'STITCHING',
+        failureReason: null,
       },
     });
   });

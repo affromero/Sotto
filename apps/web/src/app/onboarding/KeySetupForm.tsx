@@ -5,9 +5,14 @@ import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import styles from './KeySetupForm.module.css';
 
+interface ProviderStatus {
+  provider: string;
+  isValid: boolean;
+}
+
 interface KeySetupFormProps {
-  initialAiConfigured: string[];
-  initialTtsConfigured: string[];
+  initialAiConfigured: Array<ProviderStatus>;
+  initialTtsConfigured: Array<ProviderStatus>;
 }
 
 export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeySetupFormProps) {
