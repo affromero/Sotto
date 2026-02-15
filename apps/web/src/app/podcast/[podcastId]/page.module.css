@@ -294,6 +294,17 @@
   background: var(--color-primary-light);
 }
 
+.actionBtnDanger {
+  color: var(--color-error);
+  border-color: var(--color-error-light);
+}
+
+.actionBtnDanger:hover {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: var(--color-error-lighter);
+}
+
 /* Interrupt */
 
 .interruptSection {

@@ -6,6 +6,7 @@ import { canResolveTts } from '@/lib/providers/tts';
 import { Badge } from '@/components/ui/Badge';
 import { KeysRequiredBanner } from '@/components/ui/KeysRequiredBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
+import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -277,38 +278,39 @@ export default async function DashboardPage() {
               } as React.CSSProperties;
 
               return (
-                <Link
-                  key={podcast.id}
-                  href={`/podcast/${podcast.id}`}
-                  className={styles.miniGradientCard}
-                  style={gradientVars}
-                  aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
-                  role="listitem"
-                >
-                  <div
-                    className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''}`}
+                <div key={podcast.id} className={`${styles.cardWrapper} dashboardCardWrapper`} role="listitem">
+                  <Link
+                    href={`/podcast/${podcast.id}`}
+                    className={styles.miniGradientCard}
+                    style={gradientVars}
+                    aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
                   >
-                    <div className={styles.miniGradientBadge}>
-                      <Badge variant={statusVariants[podcast.status]}>
-                        {statusLabels[podcast.status]}
-                      </Badge>
+                    <div
+                      className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''}`}
+                    >
+                      <div className={styles.miniGradientBadge}>
+                        <Badge variant={statusVariants[podcast.status]}>
+                          {statusLabels[podcast.status]}
+                        </Badge>
+                      </div>
+                      <h3 className={styles.miniGradientTitle}>{podcast.title}</h3>
                     </div>
-                    <h3 className={styles.miniGradientTitle}>{podcast.title}</h3>
-                  </div>
-                  <div className={styles.miniGradientBody}>
-                    <p className={styles.miniGradientTopic}>{podcast.topic}</p>
-                    <div className={styles.miniGradientMeta}>
-                      <span>{formatDuration(podcast.duration)}</span>
-                      <span>{formatDate(podcast.createdAt)}</span>
-                      {podcast.playCount > 0 && (
-                        <span>{podcast.playCount.toLocaleString()} plays</span>
+                    <div className={styles.miniGradientBody}>
+                      <p className={styles.miniGradientTopic}>{podcast.topic}</p>
+                      <div className={styles.miniGradientMeta}>
+                        <span>{formatDuration(podcast.duration)}</span>
+                        <span>{formatDate(podcast.createdAt)}</span>
+                        {podcast.playCount > 0 && (
+                          <span>{podcast.playCount.toLocaleString()} plays</span>
+                        )}
+                      </div>
+                      {podcast.status === 'FAILED' && (
+                        <span className={styles.retryHint}>Tap to retry</span>
                       )}
                     </div>
-                    {podcast.status === 'FAILED' && (
-                      <span className={styles.retryHint}>Tap to retry</span>
-                    )}
-                  </div>
-                </Link>
+                  </Link>
+                  <DeletePodcastButton podcastId={podcast.id} />
+                </div>
               );
             })}
           </div>

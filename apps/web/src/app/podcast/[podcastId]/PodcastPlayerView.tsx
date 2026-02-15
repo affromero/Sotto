@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   Heart,
@@ -104,6 +104,7 @@ function PlayerBridge({
 
 export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId }: PodcastPlayerViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
   const [likeCount, setLikeCount] = useState(podcast.likeCount);
   const [saved, setSaved] = useState(podcast.isSaved);
@@ -113,7 +114,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [viewMode, setViewMode] = useState<ViewMode>('transcript');
   const [pdfUrl, setPdfUrl] = useState<string | null>(podcast.pdfUrl);
   const [pdfLoading, setPdfLoading] = useState(false);
-  const [showForkRemix, setShowForkRemix] = useState(false);
+  const [showForkRemix, setShowForkRemix] = useState(
+    searchParams.get('fork') === '1' && !isOwner && isAuthenticated
+  );
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -509,6 +512,41 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                 </>
               )}
             </button>
+          )}
+          {isOwner && podcast.status !== 'FAILED' && (
+            showDeleteConfirm ? (
+              <div className={styles.deleteConfirm}>
+                <span className={styles.deleteConfirmText}>Delete?</span>
+                <button
+                  className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  type="button"
+                  aria-label="Confirm delete"
+                >
+                  <Trash2 size={18} />
+                  <span>{deleting ? 'Deleting...' : 'Yes'}</span>
+                </button>
+                <button
+                  className={styles.actionBtn}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  type="button"
+                >
+                  <span>Cancel</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                onClick={() => setShowDeleteConfirm(true)}
+                aria-label="Delete this podcast"
+                type="button"
+              >
+                <Trash2 size={18} />
+                <span>Delete</span>
+              </button>
+            )
           )}
         </div>
       </div>

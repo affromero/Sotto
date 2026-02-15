@@ -122,6 +122,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Disconnect forks so child podcasts aren't orphaned
+  await prisma.podcast.updateMany({
+    where: { forkedFromId: podcastId },
+    data: { forkedFromId: null },
+  });
+
   await prisma.podcast.delete({ where: { id: podcastId } });
 
   return new NextResponse(null, { status: 204 });
