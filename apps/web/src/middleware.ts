@@ -16,8 +16,6 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 const PUBLIC_ROUTES = new Set([
   '/',
   '/romero',
-  '/auth/login',
-  '/auth/signup',
   '/api/access',
   '/api/health',
   '/api/waitlist',
@@ -37,7 +35,7 @@ async function verifyAccessCookie(value: string, secret: string): Promise<boolea
   if (!timestamp || !signature) return false;
 
   const age = Date.now() - parseInt(timestamp, 10);
-  if (isNaN(age) || age < 0 || age > 60 * 60 * 1000) return false;
+  if (isNaN(age) || age < 0 || age > 30 * 24 * 60 * 60 * 1000) return false;
 
   const key = await crypto.subtle.importKey(
     'raw',
@@ -85,11 +83,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Detect secure cookies — must match what NextAuth uses when setting the cookie.
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  const secureCookie = forwardedProto === 'https' || request.nextUrl.protocol === 'https:';
+
+  // Fetch JWT token once — secureCookie ensures correct cookie name lookup
+  const token = await getToken({
+    req: request,
+    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+    secureCookie,
+  });
+
+  // Auth pages (login, signup): bypass password gate but redirect if already authenticated
+  if (AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
+    if (token) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    return NextResponse.next();
+  }
+
   // Early-access password gate
-  // All non-public routes require the sotto_access cookie when SITE_PASSWORD is set.
-  // / handles its own gate inline (shows password form or landing page).
-  // All other gated routes silently redirect to / to hide the gate.
-  if (process.env.SITE_PASSWORD) {
+  // Authenticated users (valid JWT) bypass the gate entirely.
+  if (process.env.SITE_PASSWORD && !token) {
     const accessCookie = request.cookies.get('sotto_access');
     const secret = process.env.NEXTAUTH_SECRET;
 
@@ -99,7 +114,6 @@ export async function middleware(request: NextRequest) {
     }
 
     if (!hasAccess) {
-      // Everything non-public silently redirects to landing
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
@@ -107,22 +121,6 @@ export async function middleware(request: NextRequest) {
   // Skip API routes (handled by individual route handlers)
   if (pathname.startsWith('/api/')) {
     return NextResponse.next();
-  }
-
-  // Only fetch token when needed for route protection
-  const needsAuth =
-    PROTECTED_ROUTES.some((route) => pathname.startsWith(route)) ||
-    AUTH_ROUTES.some((route) => pathname.startsWith(route));
-
-  if (!needsAuth) {
-    return NextResponse.next();
-  }
-
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
-
-  // Redirect authenticated users away from auth pages
-  if (token && AUTH_ROUTES.some((route) => pathname.startsWith(route))) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Redirect unauthenticated users to login for protected routes

@@ -24,11 +24,13 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const config = await getFreeTierConfig();
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { freeGenerationsUsed: true },
+    select: { freeGenerationsUsed: true, role: true },
   });
 
-  // BYOK users are always allowed, no counting
-  if (isByokUser) {
+  const isAdmin = user.role === 'ADMIN';
+
+  // Admin and BYOK users are always allowed, no counting
+  if (isAdmin || isByokUser) {
     return {
       allowed: true,
       reason: 'ok',
@@ -110,13 +112,15 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const config = await getFreeTierConfig();
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { freeGenerationsUsed: true },
+    select: { freeGenerationsUsed: true, role: true },
   });
+
+  const isAdmin = user.role === 'ADMIN';
 
   return {
     freeGenerationsUsed: user.freeGenerationsUsed,
     freeGenerationsLimit: config.generationLimit,
     freeGenerationsRemaining: Math.max(0, config.generationLimit - user.freeGenerationsUsed),
-    isByokUser,
+    isByokUser: isByokUser || isAdmin,
   };
 }

@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   const signature = cookie.value.substring(separatorIndex + 1);
   const age = Date.now() - parseInt(timestamp, 10);
 
-  if (isNaN(age) || age < 0 || age > 60 * 60 * 1000) {
+  if (isNaN(age) || age < 0 || age > 30 * 24 * 60 * 60 * 1000) {
     return NextResponse.json({ gated: true, hasAccess: false });
   }
 
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60, // 1 hour
+    maxAge: 30 * 24 * 60 * 60, // 30 days
     path: '/',
   });
 
