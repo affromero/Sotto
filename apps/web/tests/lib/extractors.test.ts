@@ -292,5 +292,13 @@ describe('extractors', () => {
       expect(result.sourceType).toBe('html');
       expect(result.text).toContain('first paragraph');
     });
+
+    it('routes YouTube URLs to youtube extractor', async () => {
+      // YouTube extractor returns sourceType 'youtube' even on failure
+      const result = await extractContent('https://www.youtube.com/watch?v=test123');
+
+      expect(result.sourceType).toBe('youtube');
+      expect(result.extractionMethod).toBe('youtube-transcript');
+    });
   });
 });
