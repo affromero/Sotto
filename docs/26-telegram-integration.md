@@ -85,17 +85,37 @@ By default, bots in groups only receive messages that mention them or start with
 
 ---
 
+### 1d. Create a dev bot (recommended)
+
+Telegram's `getUpdates` only works with **one consumer per bot token**. If both local dev and production poll with the same token, they'll race for updates and messages will be split randomly.
+
+Create a second bot for local development:
+
+1. Send `/newbot` to @BotFather again
+2. Name: `Sotto FM Dev`
+3. Username: `SottoFMDevBot`
+4. Save the token — this is your local `TELEGRAM_BOT_TOKEN`
+
+| Bot | Username | Environment |
+|---|---|---|
+| **Production** | `@SottoFMBot` | sotto.fm server `.env` |
+| **Development** | `@SottoFMDevBot` | local `.env` |
+
+---
+
 ## Step 2: Configure Environment Variables
 
-Add the bot token to `.env.local`:
+Add the **dev bot** token to your local `.env`:
 
 ```env
-# ── Telegram @SottoFMBot ──
-TELEGRAM_BOT_TOKEN=7123456789:AAHxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# ── Telegram @SottoFMDevBot (local dev) ──
+TELEGRAM_BOT_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # ── Optional: polling interval (default 35s — 30s long poll + 5s buffer) ──
 # TELEGRAM_POLL_INTERVAL_MS=35000
 ```
+
+On the production server, set the **production bot** token instead.
 
 That's it — only one variable is required. Compare this to Twitter's 8 variables.
 
