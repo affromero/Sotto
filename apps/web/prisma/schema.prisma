@@ -162,12 +162,12 @@ model Follow {
 model Team {
   id        String   @id @default(cuid())
   name      String
-  ownerId   String
+  ownerId   String?
   seats     Int      @default(10)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner   User         @relation("TeamOwner", fields: [ownerId], references: [id])
+  owner   User?        @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   members User[]
   invites TeamInvite[]
 
@@ -699,7 +699,7 @@ model ApiUsageLog {
 
   metadata Json @default("{}")
 
-  user User? @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([podcastId])
   @@index([userId])

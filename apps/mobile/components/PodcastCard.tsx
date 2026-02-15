@@ -1,5 +1,5 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { colors, spacing, typography, borderRadius, getContentBadgeLabel } from '@sotto/shared';
 import type { PodcastSummary } from '@sotto/shared';
 import { Avatar } from './Avatar';
 import { formatDuration, formatCount, timeAgo, formatDurationMinutes } from '../lib/formatters';
@@ -54,7 +54,28 @@ function FeedCard({
             </Text>
           ) : null}
         </View>
-        <Text style={styles.timeAgo}>{timeAgo(podcast.createdAt)}</Text>
+        <View style={styles.headerRight}>
+          <View
+            style={[
+              styles.contentBadge,
+              podcast.source !== 'IMPORT' || !podcast.isHumanContent
+                ? styles.contentBadgeAi
+                : styles.contentBadgeHuman,
+            ]}
+          >
+            <Text
+              style={[
+                styles.contentBadgeText,
+                podcast.source !== 'IMPORT' || !podcast.isHumanContent
+                  ? styles.contentBadgeTextAi
+                  : styles.contentBadgeTextHuman,
+              ]}
+            >
+              {getContentBadgeLabel(podcast)}
+            </Text>
+          </View>
+          <Text style={styles.timeAgo}>{timeAgo(podcast.createdAt)}</Text>
+        </View>
       </View>
 
       <Text style={styles.feedTitle} numberOfLines={2}>
@@ -174,6 +195,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs + 2,
+  },
+  contentBadge: {
+    paddingHorizontal: spacing.xs + 2,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  contentBadgeAi: {
+    backgroundColor: colors.primaryLighter,
+  },
+  contentBadgeHuman: {
+    backgroundColor: colors.successLighter,
+  },
+  contentBadgeText: {
+    fontFamily: typography.fontBody,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  contentBadgeTextAi: {
+    color: colors.primary,
+  },
+  contentBadgeTextHuman: {
+    color: colors.success,
   },
   timeAgo: {
     fontFamily: typography.fontBody,

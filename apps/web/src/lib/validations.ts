@@ -327,3 +327,10 @@ export const updateCollectionSchema = z.object({
 export const collectionItemSchema = z.object({
   podcastId: z.string().min(1),
 });
+
+/**
+ * Account deletion confirmation
+ */
+export const deleteAccountSchema = z.object({
+  confirm: z.literal('DELETE'),
+});

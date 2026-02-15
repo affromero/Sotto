@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isHandleAvailable } from '@/lib/handles';
-import { handleSchema, customTagSchema } from '@/lib/validations';
+import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
+import { notificationQueue, addJob, JobType } from '@/lib/queue';
 import { z } from 'zod';
 
 const updateUserSchema = z
@@ -186,6 +187,64 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update user';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const validation = deleteAccountSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'You must send { "confirm": "DELETE" } to delete your account' },
+        { status: 400 }
+      );
+    }
+
+    const userId = session.user.id;
+
+    // Collect storage keys for R2 cleanup before deleting
+    const podcasts = await prisma.podcast.findMany({
+      where: { userId },
+      select: { audioUrl: true, pdfUrl: true, importedAudioKey: true },
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { image: true },
+    });
+
+    const storageKeys: string[] = [];
+    for (const p of podcasts) {
+      if (p.audioUrl) storageKeys.push(p.audioUrl);
+      if (p.pdfUrl) storageKeys.push(p.pdfUrl);
+      if (p.importedAudioKey) storageKeys.push(p.importedAudioKey);
+    }
+    if (user?.image) storageKeys.push(user.image);
+
+    // Delete user — cascades handle all related records
+    await prisma.user.delete({ where: { id: userId } });
+
+    // Queue R2 storage cleanup for collected keys
+    if (storageKeys.length > 0) {
+      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+        userId: 'system',
+        type: 'STORAGE_CLEANUP',
+        title: 'Account Deletion Cleanup',
+        message: `Clean up ${storageKeys.length} storage objects for deleted user`,
+        data: { storageKeys: JSON.stringify(storageKeys) },
+      });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete account';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
