@@ -44,6 +44,7 @@ All shared business logic and external service integrations live here.
 | `rss.ts`                 | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts                                                                                                             | Uses `prisma.ts`                              |
 | `free-tier-config.ts`    | `getFreeTierConfig()` reads singleton FreeTierConfig row; `setFreeTierConfig()` for admin updates                                                                                                          | Uses `prisma.ts`                              |
 | `generation-gate.ts`     | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display                                                     | Uses `prisma.ts`, `byok.ts`                  |
+| `traffic-report.ts`      | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report`                                                                                                          | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts` |
 
 ## Providers (`src/lib/providers/`)
 
