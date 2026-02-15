@@ -150,8 +150,8 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/');
     });
 
-    it('rejects a cookie older than 1 hour (expired)', async () => {
-      const expiredTs = Date.now() - 1000 * 60 * 61; // 61 minutes ago
+    it('rejects a cookie older than 30 days (expired)', async () => {
+      const expiredTs = Date.now() - 31 * 24 * 60 * 60 * 1000; // 31 days ago
       const expiredCookie = await createValidAccessCookie(TEST_SECRET, expiredTs);
       const res = await middleware(
         createRequest('/dashboard', { cookies: { sotto_access: expiredCookie } })
@@ -361,20 +361,20 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(fullLocation).toContain('callbackUrl=%2Fcreate');
     });
 
-    it('/auth/login passes through as public (even with cookie)', async () => {
+    it('/auth/login redirects authenticated users to /dashboard', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(
         createRequest('/auth/login', { cookies: { sotto_access: validCookie } })
       );
-      expect(isPassThrough(res)).toBe(true);
+      expect(getRedirectLocation(res)).toBe('/dashboard');
     });
 
-    it('/auth/signup passes through as public (even with cookie)', async () => {
+    it('/auth/signup redirects authenticated users to /dashboard', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-1', role: 'USER' });
       const res = await middleware(
         createRequest('/auth/signup', { cookies: { sotto_access: validCookie } })
       );
-      expect(isPassThrough(res)).toBe(true);
+      expect(getRedirectLocation(res)).toBe('/dashboard');
     });
 
     it('allows authenticated user to access /dashboard', async () => {
