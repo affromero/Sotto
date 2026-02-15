@@ -13,10 +13,15 @@ vi.mock('@/lib/auth', () => ({
   auth: () => mockAuth(),
 }));
 
+const mockUserAiKeyUpdateMany = vi.fn();
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockDiscoveryFindUniqueOrThrow(...args),
+    },
+    userAiKey: {
+      updateMany: (...args: unknown[]) => mockUserAiKeyUpdateMany(...args),
     },
   },
 }));
@@ -515,7 +520,7 @@ describe('POST /api/discovery', () => {
       );
     });
 
-    it('handles streaming error during consumption', async () => {
+    it('handles streaming error by sending error SSE event', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
 
       async function* errorGenerator() {
@@ -532,7 +537,52 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
       expect(response.status).toBe(200);
 
-      await expect(readSSEStream(response)).rejects.toThrow('Streaming error');
+      const events = await readSSEStream(response);
+      const errorEvent = events.find((e) => {
+        try {
+          return JSON.parse(e).error;
+        } catch {
+          return false;
+        }
+      });
+
+      expect(errorEvent).toBeDefined();
+      const parsed = JSON.parse(errorEvent!);
+      expect(parsed.error).toContain('An error occurred');
+    });
+
+    it('sends auth error and marks key invalid on 401', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockGetAiKey.mockResolvedValue({ apiKey: 'bad-key', provider: 'anthropic' });
+      mockUserAiKeyUpdateMany.mockResolvedValue({ count: 1 });
+
+      const authError = new Error('Invalid API key');
+      (authError as unknown as Record<string, unknown>).status = 401;
+
+      async function* authErrorGenerator() {
+        throw authError;
+      }
+
+      mockStreamDiscoveryResponse.mockReturnValue(authErrorGenerator());
+
+      const request = createPostRequest({ message: 'Test' });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const errorEvent = events.find((e) => {
+        try {
+          return JSON.parse(e).error;
+        } catch {
+          return false;
+        }
+      });
+
+      const parsed = JSON.parse(errorEvent!);
+      expect(parsed.error).toContain('invalid or has been revoked');
+      expect(mockUserAiKeyUpdateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', provider: 'anthropic' },
+        data: { isValid: false },
+      });
     });
 
     it('preserves message role types from discovery', async () => {

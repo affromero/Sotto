@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
-import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
+import { contentExtractionQueue, audioImportQueue, addJob, JobType } from '@/lib/queue';
 import { LIMITS } from '@/lib/stripe';
 import { canResolveAi } from '@/lib/providers/ai';
 import { checkRateLimit } from '@/lib/redis';
-import type { ExtractContentPayload } from '@/lib/queue';
+import { getAiKey, getByokKey } from '@/lib/byok';
+import type { ExtractContentPayload, ImportAudioPayload } from '@/lib/queue';
+import type { SttProviderId } from '@sotto/shared';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -44,7 +46,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    include: {
+    select: {
+      id: true,
+      userId: true,
+      status: true,
+      source: true,
+      importedAudioKey: true,
+      isHumanContent: true,
+      title: true,
       discovery: {
         select: { sourceUrl: true, sourceContent: true, durationTarget: true },
       },
@@ -87,15 +96,66 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       where: { podcastId, status: 'failed' },
       data: { status: 'superseded' },
     });
+
+    // Clean up data from previous failed attempt
+    await prisma.podcastVersionSegment.deleteMany({
+      where: { version: { podcastId } },
+    });
+    await prisma.podcastVersion.deleteMany({ where: { podcastId } });
+    await prisma.segment.deleteMany({ where: { podcastId } });
+    await prisma.script.deleteMany({ where: { podcastId } });
   }
 
-  // Update status to EXTRACTING
+  // Imported podcasts re-queue the import pipeline
+  if (podcast.source === 'IMPORT' && podcast.importedAudioKey) {
+    // Resolve STT key — try groq first, then openai, then elevenlabs
+    let sttProvider: SttProviderId | undefined;
+    let sttApiKey: string | undefined;
+
+    const groqKey = await getAiKey(authResult.userId, 'groq');
+    if (groqKey?.apiKey || process.env.GROQ_API_KEY) {
+      sttProvider = 'groq';
+      sttApiKey = groqKey?.apiKey ?? process.env.GROQ_API_KEY;
+    } else {
+      const openaiKey = await getAiKey(authResult.userId, 'openai');
+      if (openaiKey?.apiKey || process.env.OPENAI_API_KEY) {
+        sttProvider = 'openai';
+        sttApiKey = openaiKey?.apiKey ?? process.env.OPENAI_API_KEY;
+      } else {
+        const elKey = await getByokKey(authResult.userId, 'elevenlabs');
+        if (elKey || process.env.ELEVENLABS_API_KEY) {
+          sttProvider = 'elevenlabs';
+          sttApiKey = elKey ?? process.env.ELEVENLABS_API_KEY;
+        }
+      }
+    }
+
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { status: 'IMPORTING' },
+    });
+
+    const importPayload: ImportAudioPayload = {
+      podcastId,
+      userId: authResult.userId,
+      audioKey: podcast.importedAudioKey,
+      isHumanContent: podcast.isHumanContent,
+      generateMetadata: !podcast.title || podcast.title === 'Untitled Import',
+      sttProvider,
+      sttApiKey,
+    };
+
+    await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload);
+
+    return NextResponse.json({ success: true, message: 'Import retry started' });
+  }
+
+  // Standard generation pipeline
   await prisma.podcast.update({
     where: { id: podcastId },
     data: { status: 'EXTRACTING' },
   });
 
-  // Queue content extraction job
   const payload: ExtractContentPayload = {
     podcastId,
     userId: authResult.userId,

@@ -118,23 +118,94 @@ export function useDiscovery(): UseDiscoveryReturn {
 
             try {
               const parsed = JSON.parse(data) as {
-                type: string;
+                type?: string;
+                text?: string;
                 content?: string;
                 chips?: string[];
                 metadata?: Partial<DiscoveryMetadata>;
+                done?: boolean;
+                error?: string;
               };
 
-              if (parsed.type === 'content' && parsed.content) {
+              // Handle error events from the server
+              if (parsed.error) {
                 setState((prev) => ({
                   ...prev,
                   messages: prev.messages.map((msg) =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: msg.content + parsed.content }
+                      ? { ...msg, content: parsed.error as string }
+                      : msg
+                  ),
+                }));
+                continue;
+              }
+
+              // Handle streaming text chunks
+              const textChunk = parsed.text ?? parsed.content;
+              if (textChunk && !parsed.done) {
+                setState((prev) => ({
+                  ...prev,
+                  messages: prev.messages.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, content: msg.content + textChunk }
                       : msg
                   ),
                 }));
               }
 
+              // Handle completion with chips and metadata
+              if (parsed.done) {
+                if (parsed.chips) {
+                  setState((prev) => ({
+                    ...prev,
+                    messages: prev.messages.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, chips: parsed.chips as string[] }
+                        : msg
+                    ),
+                  }));
+                }
+
+                if (parsed.metadata) {
+                  setState((prev) => {
+                    const newMetadata = prev.metadata
+                      ? { ...prev.metadata, ...parsed.metadata }
+                      : ({
+                          topic: '',
+                          depth: 'standard',
+                          audienceLevel: 'intermediate',
+                          audience: 'general',
+                          focusAreas: [],
+                          tone: 'casual',
+                          durationTarget: 10,
+                          ready: false,
+                          ...parsed.metadata,
+                        } as DiscoveryMetadata);
+
+                    const isComplete = parsed.metadata?.ready === true;
+
+                    if (isComplete) {
+                      track({
+                        eventType: 'discovery.metadata_complete',
+                        turnsCount: messageIndexRef.current,
+                        topic: newMetadata.topic || '',
+                        depth: newMetadata.depth || 'standard',
+                        audience: newMetadata.audienceLevel || 'intermediate',
+                        tone: newMetadata.tone || 'casual',
+                        durationTarget: newMetadata.durationTarget || 10,
+                      });
+                    }
+
+                    return {
+                      ...prev,
+                      metadata: newMetadata,
+                      isComplete,
+                    };
+                  });
+                }
+              }
+
+              // Legacy: handle type-based format
               if (parsed.type === 'chips' && parsed.chips) {
                 setState((prev) => ({
                   ...prev,
@@ -164,7 +235,6 @@ export function useDiscovery(): UseDiscoveryReturn {
 
                   const isComplete = parsed.metadata?.ready === true;
 
-                  // Emit metadata complete event when discovery finishes
                   if (isComplete) {
                     track({
                       eventType: 'discovery.metadata_complete',

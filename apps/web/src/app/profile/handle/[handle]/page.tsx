@@ -6,12 +6,13 @@ import { ProfileClient } from '../../[userId]/ProfileClient';
 import styles from './page.module.css';
 
 interface HandleProfilePageProps {
-  params: { handle: string };
+  params: Promise<{ handle: string }>;
 }
 
 export async function generateMetadata({ params }: HandleProfilePageProps): Promise<Metadata> {
+  const { handle } = await params;
   const user = await prisma.user.findUnique({
-    where: { handle: params.handle.toLowerCase() },
+    where: { handle: handle.toLowerCase() },
     select: { name: true, bio: true, handle: true },
   });
 
@@ -24,18 +25,19 @@ export async function generateMetadata({ params }: HandleProfilePageProps): Prom
     description: user.bio || `${user.name || `@${user.handle}`}'s podcasts on Sotto`,
     alternates: {
       types: {
-        'application/rss+xml': `${appUrl}/api/users/handle/${params.handle}/rss`,
+        'application/rss+xml': `${appUrl}/api/users/handle/${handle}/rss`,
       },
     },
   };
 }
 
 export default async function HandleProfilePage({ params }: HandleProfilePageProps) {
+  const { handle } = await params;
   const session = await auth();
   const currentUserId = session?.user?.id;
 
   const user = await prisma.user.findUnique({
-    where: { handle: params.handle.toLowerCase() },
+    where: { handle: handle.toLowerCase() },
     select: {
       id: true,
       name: true,

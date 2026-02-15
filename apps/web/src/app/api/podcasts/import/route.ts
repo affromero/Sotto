@@ -223,6 +223,17 @@ export async function POST(request: NextRequest) {
 
     const sttApiKey = await resolveSttApiKey(session.user.id, validatedSttProvider);
 
+    if (!sttApiKey && !transcriptText) {
+      await prisma.podcast.delete({ where: { id: podcast.id } });
+      const provider = validatedSttProvider ?? 'openai';
+      return NextResponse.json(
+        {
+          error: `No API key available for speech-to-text provider "${provider}". Add a ${provider === 'openai' ? 'OpenAI' : provider === 'groq' ? 'Groq' : 'ElevenLabs'} key in Settings → API Keys, or provide a transcript file.`,
+        },
+        { status: 400 }
+      );
+    }
+
     await addJob(audioImportQueue, JobType.IMPORT_AUDIO, {
       podcastId: podcast.id,
       userId: session.user.id,

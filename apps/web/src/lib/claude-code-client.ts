@@ -9,7 +9,6 @@ interface ClaudeCodeResponse {
 
 interface ClaudeCodeOptions {
   model?: string;
-  maxTokens?: number;
   timeoutMs?: number;
 }
 
@@ -42,17 +41,13 @@ export async function executeClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku';
+  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
   const timeoutMs = opts?.timeoutMs || 120_000;
 
   const args = ['-p', '--model', model, '--output-format', 'text'];
 
   if (systemPrompt) {
     args.push('--system-prompt', systemPrompt);
-  }
-
-  if (opts?.maxTokens) {
-    args.push('--max-tokens', String(opts.maxTokens));
   }
 
   logger.info('claude-code: executing', { model, promptLength: String(prompt.length) });
@@ -115,17 +110,13 @@ export async function* streamClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): AsyncGenerator<string> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'haiku';
+  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
   const timeoutMs = opts?.timeoutMs || 120_000;
 
   const args = ['-p', '--model', model, '--output-format', 'stream-json'];
 
   if (systemPrompt) {
     args.push('--system-prompt', systemPrompt);
-  }
-
-  if (opts?.maxTokens) {
-    args.push('--max-tokens', String(opts.maxTokens));
   }
 
   logger.info('claude-code: streaming', { model, promptLength: String(prompt.length) });
