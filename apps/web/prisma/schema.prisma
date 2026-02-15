@@ -41,6 +41,9 @@ model User {
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
 
+  // Telegram integration
+  telegramEnabled Boolean @default(false)
+
   // Team membership (dormant — kept for future use)
   teamId String?
   team   Team?   @relation(fields: [teamId], references: [id])
@@ -69,6 +72,9 @@ model User {
 
   // Twitter mentions
   tweetMentions TweetMention[]
+
+  // Telegram messages
+  telegramMessages TelegramMessage[]
 
   // BYOK TTS keys (multi-provider)
   userTtsKeys UserTtsKey[]
@@ -273,8 +279,9 @@ model Podcast {
   jobs         Job[]
   references   Reference[]
   versions     PodcastVersion[]
-  tweetMention     TweetMention?
-  playbackSessions PlaybackSession[]
+  tweetMention      TweetMention?
+  telegramMessage   TelegramMessage?
+  playbackSessions  PlaybackSession[]
   podcastFeature   PodcastFeature?
   listeningQueues  ListeningQueue[]
   comments         Comment[]
@@ -314,6 +321,7 @@ enum PodcastVisibility {
 enum PodcastSource {
   WEB
   TWITTER
+  TELEGRAM
   API
   IMPORT
 }
@@ -627,6 +635,7 @@ enum NotificationType {
   SIMILAR_PODCAST_CREATED
   TEAM_INVITE
   TWITTER_PODCAST_READY
+  TELEGRAM_PODCAST_READY
   VOICE_REQUEST_RECEIVED
   VOICE_REQUEST_APPROVED
   VOICE_REQUEST_DENIED
@@ -783,6 +792,41 @@ model TweetMention {
 enum TweetMentionStatus {
   PENDING
   PARSING
+  GENERATING
+  READY
+  REPLIED
+  FAILED
+  IGNORED
+}
+
+// ============ TELEGRAM MESSAGES ============
+
+model TelegramMessage {
+  id                 String                 @id @default(cuid())
+  telegramUserId     String
+  chatId             String
+  telegramMessageId  String?
+  text               String?                @db.Text
+  parsedTopic        String?                @db.Text
+  status             TelegramMessageStatus  @default(PENDING)
+  userId             String?
+  podcastId          String?                @unique
+  errorMessage       String?                @db.Text
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+
+  @@index([telegramUserId])
+  @@index([chatId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum TelegramMessageStatus {
+  PENDING
+  DISCOVERING
   GENERATING
   READY
   REPLIED
