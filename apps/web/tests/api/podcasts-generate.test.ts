@@ -12,6 +12,11 @@ vi.mock('@/lib/api-keys', () => ({
 const mockPrismaPodcastFindUnique = vi.fn();
 const mockPrismaPodcastUpdate = vi.fn();
 const mockPrismaJobUpdateMany = vi.fn();
+const mockPrismaPodcastVersionSegmentDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaPodcastVersionDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaSegmentDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaScriptDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaReferenceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -21,6 +26,21 @@ vi.mock('@/lib/prisma', () => ({
     },
     job: {
       updateMany: (...args: unknown[]) => mockPrismaJobUpdateMany(...args),
+    },
+    podcastVersionSegment: {
+      deleteMany: (...args: unknown[]) => mockPrismaPodcastVersionSegmentDeleteMany(...args),
+    },
+    podcastVersion: {
+      deleteMany: (...args: unknown[]) => mockPrismaPodcastVersionDeleteMany(...args),
+    },
+    segment: {
+      deleteMany: (...args: unknown[]) => mockPrismaSegmentDeleteMany(...args),
+    },
+    script: {
+      deleteMany: (...args: unknown[]) => mockPrismaScriptDeleteMany(...args),
+    },
+    reference: {
+      deleteMany: (...args: unknown[]) => mockPrismaReferenceDeleteMany(...args),
     },
   },
 }));
