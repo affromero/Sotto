@@ -12,7 +12,9 @@ const mockPodcastDelete = vi.fn();
 const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
-const mockCanResolveAi = vi.fn();
+const mockCheckGenerationGate = vi.fn();
+const mockTryIncrementFreeGeneration = vi.fn();
+const mockGetFreeTierConfig = vi.fn();
 const mockAddJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
@@ -67,8 +69,13 @@ vi.mock('@/lib/queue', () => ({
   JobType: { EXTRACT_CONTENT: 'EXTRACT_CONTENT' },
 }));
 
-vi.mock('@/lib/providers/ai', () => ({
-  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
+vi.mock('@/lib/generation-gate', () => ({
+  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
+  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
+}));
+
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
 }));
 
 vi.mock('@/lib/stripe', () => ({
@@ -278,7 +285,7 @@ describe('POST /api/podcasts', () => {
   it('creates podcast and queues extraction pipeline', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue({
@@ -303,7 +310,7 @@ describe('POST /api/podcasts', () => {
   it('creates podcast with optional voice IDs', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
@@ -327,6 +334,7 @@ describe('POST /api/podcasts', () => {
         hostVoiceId: 'voice-host-custom',
         expertVoiceId: 'voice-expert-custom',
         ttsProvider: null,
+        aiModel: null,
       },
     });
   });
@@ -423,7 +431,7 @@ describe('POST /api/podcasts', () => {
   it('checks API key rate limit for Bearer token requests', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);
@@ -438,7 +446,7 @@ describe('POST /api/podcasts', () => {
   it('does not check API key rate limit for session-based auth', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);

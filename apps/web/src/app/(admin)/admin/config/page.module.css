@@ -1,0 +1,19 @@
+.container {
+  max-width: 640px;
+}
+
+.header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.title {
+  font: var(--text-heading-lg);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.subtitle {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}

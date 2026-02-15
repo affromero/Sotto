@@ -82,10 +82,17 @@ vi.mock('@/lib/pipeline-resume', () => ({
   determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
 }));
 
-const mockCanResolveAi = vi.fn().mockResolvedValue(true);
+const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3 });
 
-vi.mock('@/lib/providers/ai', () => ({
-  canResolveAi: (...args: unknown[]) => mockCanResolveAi(...args),
+vi.mock('@/lib/generation-gate', () => ({
+  checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
+  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
+}));
+
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
 }));
 
 const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
@@ -130,7 +137,7 @@ async function createMockParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCanResolveAi.mockResolvedValue(true);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
     mockPrismaPodcastUpdate.mockResolvedValue({});
     mockAddJob.mockResolvedValue({ id: 'job-1' });
@@ -201,7 +208,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
   it('returns 403 when AI provider not configured', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCanResolveAi.mockResolvedValue(false);
+    mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-noai');

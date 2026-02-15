@@ -60,6 +60,7 @@ export async function generateScript(params: {
   sourceContent?: string;
   sourceMetadata?: SourceMetadata;
   apiKeyOverride?: string;
+  model?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -152,6 +153,7 @@ Only return the JSON object, nothing else.`;
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
+    model: params.model,
     tools: [WEB_SEARCH_TOOL],
   });
 
@@ -235,6 +237,7 @@ export async function generateScriptWithFeedback(params: {
   previousReferences: GeneratedReference[];
   verificationFeedback: string;
   apiKeyOverride?: string;
+  model?: string;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -319,6 +322,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
+    model: params.model,
     tools: [WEB_SEARCH_TOOL],
   });
 

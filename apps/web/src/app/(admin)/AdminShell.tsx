@@ -12,6 +12,7 @@ import {
   BarChart2,
   Shield,
   AtSign,
+  Settings,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ const navItems: NavItem[] = [
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/handles', label: 'Handles', icon: AtSign },
   { href: '/admin/moderation', label: 'Moderation', icon: Shield },
+  { href: '/admin/config', label: 'Config', icon: Settings },
 ];
 
 export function AdminShell({ user, children }: AdminShellProps) {

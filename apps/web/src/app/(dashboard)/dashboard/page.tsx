@@ -1,10 +1,9 @@
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { canResolveAi } from '@/lib/providers/ai';
-import { canResolveTts } from '@/lib/providers/tts';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 import { Badge } from '@/components/ui/Badge';
-import { KeysRequiredBanner } from '@/components/ui/KeysRequiredBanner';
+import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
@@ -74,7 +73,7 @@ export default async function DashboardPage() {
 
   const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
 
-  const [user, podcasts, trendingToFork, hasAi, hasTts] = await Promise.all([
+  const [user, podcasts, trendingToFork, freeTier] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -166,8 +165,7 @@ export default async function DashboardPage() {
         },
       },
     }),
-    canResolveAi(userId),
-    canResolveTts(userId),
+    getFreeTierStatus(userId),
   ]);
 
   const displayName = user?.name || 'there';
@@ -177,8 +175,6 @@ export default async function DashboardPage() {
   const totalLikes = podcasts.reduce((sum, p) => sum + p.likeCount, 0);
   const followerCount = user?._count?.followers ?? 0;
 
-  const needsKeys = !hasAi || !hasTts;
-
   const serializedTrending = trendingToFork.map((p) => ({
     ...p,
     createdAt: p.createdAt.toISOString(),
@@ -187,7 +183,11 @@ export default async function DashboardPage() {
 
   return (
     <main className={styles.main}>
-      {needsKeys && <KeysRequiredBanner />}
+      <FreeTierBanner
+        used={freeTier.freeGenerationsUsed}
+        limit={freeTier.freeGenerationsLimit}
+        isByokUser={freeTier.isByokUser}
+      />
 
       <section className={styles.header}>
         <h1 className={styles.greeting}>Welcome back, {displayName}</h1>

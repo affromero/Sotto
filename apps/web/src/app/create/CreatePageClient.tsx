@@ -6,7 +6,9 @@ import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
+import { AiModelSelector } from '@/components/create/AiModelSelector';
 import { DurationSelector } from '@/components/create/DurationSelector';
+import { FreeTierCounter } from '@/components/ui/FreeTierCounter';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { ImportUploader } from '@/components/import/ImportUploader';
@@ -18,15 +20,26 @@ type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating
 type TabMode = 'create' | 'import';
 type ImportStep = 'upload' | 'importing';
 
-export function CreatePageClient() {
+interface FreeTierInfo {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+interface CreatePageClientProps {
+  freeTier?: FreeTierInfo | null;
+  isByokUser?: boolean;
+}
+
+export function CreatePageClient({ freeTier, isByokUser }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} />
     </Suspense>
   );
 }
 
-function CreatePageContent() {
+function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
@@ -38,6 +51,7 @@ function CreatePageContent() {
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
+  const [aiModel, setAiModel] = useState<string | undefined>();
   const [durationTarget, setDurationTarget] = useState(10);
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
@@ -92,6 +106,7 @@ function CreatePageContent() {
             hostVoiceId: voiceSelection.hostVoiceId,
             expertVoiceId: voiceSelection.expertVoiceId,
             ttsProvider,
+            aiModel,
           }),
         });
       }
@@ -108,7 +123,7 @@ function CreatePageContent() {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, durationTarget, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, aiModel, durationTarget, createAsSotto]);
 
   // Poll during scripting phase (waiting for SCRIPT_READY)
   const scriptingPollRef = useRef(false);
@@ -263,7 +278,10 @@ function CreatePageContent() {
             </svg>
           </a>
           <div className={styles.headerText}>
-            <h1 className={styles.title}>{getTitle()}</h1>
+            <div className={styles.titleRow}>
+              <h1 className={styles.title}>{getTitle()}</h1>
+              {freeTier && <FreeTierCounter used={freeTier.used} limit={freeTier.limit} />}
+            </div>
             <p className={styles.subtitle}>{getSubtitle()}</p>
           </div>
         </header>
@@ -361,6 +379,7 @@ function CreatePageContent() {
         {step === 'voice' && tabMode === 'create' && (
           <div className={styles.chatArea}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
+            {isByokUser && <AiModelSelector value={aiModel} onChange={setAiModel} />}
             <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
             <DurationSelector value={durationTarget} onChange={setDurationTarget} />
             <div className={styles.voiceActions}>

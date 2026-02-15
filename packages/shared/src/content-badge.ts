@@ -1,6 +1,6 @@
 import type { PodcastSummary } from './types/podcast';
 import { SOURCE_PLATFORMS } from './types/import';
-import { getAiProviderLabel, getTtsProviderLabel, getLanguageLabel } from './provider-display';
+import { getAiProviderLabel, getAiModelLabel, getTtsProviderLabel, getLanguageLabel } from './provider-display';
 
 export function getContentBadgeLabel(
   podcast: Pick<PodcastSummary, 'source' | 'isHumanContent' | 'sourcePlatform'>
@@ -23,7 +23,7 @@ export interface PodcastBadge {
 export function getPodcastBadges(
   podcast: Pick<
     PodcastSummary,
-    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'ttsProvider' | 'language'
+    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'language'
   >
 ): PodcastBadge[] {
   const badges: PodcastBadge[] = [];
@@ -38,9 +38,9 @@ export function getPodcastBadges(
     variant: isHuman ? 'success' : isImport ? 'default' : 'info',
   });
 
-  // 2. AI provider badge — only for non-import AI podcasts
+  // 2. AI model/provider badge — prefer model name (e.g. "Claude Sonnet 4.5") over provider
   if (!isImport) {
-    const aiLabel = getAiProviderLabel(podcast.aiProvider);
+    const aiLabel = getAiModelLabel(podcast.aiModel) ?? getAiProviderLabel(podcast.aiProvider);
     if (aiLabel) {
       badges.push({
         category: 'ai',

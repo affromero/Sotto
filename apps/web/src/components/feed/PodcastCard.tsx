@@ -176,7 +176,7 @@ export function PodcastCard({
             </time>
           </div>
 
-          {(podcast.aiProvider || podcast.ttsProvider || podcast.language) && (
+          {(podcast.aiProvider || podcast.aiModel || podcast.ttsProvider || podcast.language) && (
             <MetadataBadges podcast={podcast} categories={['ai', 'tts', 'language']} compact />
           )}
 
