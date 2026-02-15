@@ -153,6 +153,10 @@ export function SettingsForm({
   const [customTags, setCustomTags] = useState<CustomTag[]>([]);
   const [interestsSaving, setInterestsSaving] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
+  const [interestsResetting, setInterestsResetting] = useState(false);
+
+  // Recommendations reset state
+  const [recsResetting, setRecsResetting] = useState(false);
 
   const handleInterestsChange = (tagIds: string[], custom: CustomTag[]) => {
     setInterestIds(tagIds);
@@ -469,7 +473,7 @@ export function SettingsForm({
                 loading={quizResetting}
                 disabled={quizResetting}
               >
-                Reset Quiz
+                Reset Quiz Answers
               </Button>
             )}
           </div>
@@ -491,6 +495,32 @@ export function SettingsForm({
           >
             {interestsSaved ? 'Saved' : 'Save Interests'}
           </Button>
+          {interestIds.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={async () => {
+                if (!confirm('Clear all grid selections? This only removes manually picked interests — quiz answers are kept.')) return;
+                setInterestsResetting(true);
+                try {
+                  const res = await fetch('/api/users/me', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ interests: [], customTags: [] }),
+                  });
+                  if (res.ok) {
+                    setInterestIds([]);
+                    setCustomTags([]);
+                  }
+                } finally {
+                  setInterestsResetting(false);
+                }
+              }}
+              loading={interestsResetting}
+              disabled={interestsResetting}
+            >
+              Clear Grid Selections
+            </Button>
+          )}
         </div>
       </section>
 
@@ -639,6 +669,39 @@ export function SettingsForm({
           AES-256-GCM and never stored in plaintext.
         </p>
         <TtsProviderCards initialConfigured={configuredTtsProviders} />
+      </section>
+
+      {/* Reset Recommendations */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Reset Recommendations</h2>
+        <p className={styles.sectionDesc}>
+          Start completely fresh. This clears your grid selections, quiz answers,
+          learned preferences, and recommendation history. Your podcasts, likes,
+          and follows are not affected.
+        </p>
+        <div className={styles.formActions}>
+          <Button
+            variant="danger"
+            onClick={async () => {
+              if (!confirm('Reset all recommendation data? This clears grid selections, quiz answers, learned preferences, and recommendation history. Your podcasts, likes, and follows are not affected.')) return;
+              setRecsResetting(true);
+              try {
+                const res = await fetch('/api/users/me/recommendations', { method: 'DELETE' });
+                if (res.ok) {
+                  setInterestIds([]);
+                  setCustomTags([]);
+                  setQuizCount(0);
+                }
+              } finally {
+                setRecsResetting(false);
+              }
+            }}
+            loading={recsResetting}
+            disabled={recsResetting}
+          >
+            Reset All Recommendations
+          </Button>
+        </div>
       </section>
 
       {/* Danger Zone */}
