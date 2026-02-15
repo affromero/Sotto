@@ -104,6 +104,9 @@ model User {
   // Taste quiz
   tasteQuizAnswers TasteQuizAnswer[]
 
+  // Saved ideas
+  savedIdeas SavedIdea[]
+
   // Free tier
   freeGenerationsUsed Int @default(0)
 
@@ -246,6 +249,7 @@ model Podcast {
   listeningQueues  ListeningQueue[]
   comments         Comment[]
   collectionItems  CollectionItem[]
+  savedIdea        SavedIdea?
 
   @@index([userId])
   @@index([status])
@@ -581,6 +585,25 @@ model TasteQuizAnswer {
 
   @@unique([userId, questionId])
   @@index([userId])
+}
+
+// ============ SAVED IDEAS ============
+
+model SavedIdea {
+  id         String    @id @default(cuid())
+  userId     String
+  questionId String
+  question   String
+  tagSlugs   String[]
+  category   String
+  podcastId  String?   @unique
+  createdAt  DateTime  @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast? @relation(fields: [podcastId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, questionId])
+  @@index([userId, createdAt])
 }
 
 // ============ NOTIFICATIONS ============

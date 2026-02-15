@@ -1,0 +1,85 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { savedIdeaSchema, paginationSchema } from '@/lib/validations';
+
+/**
+ * GET /api/ideas
+ * List user's saved ideas, newest first, paginated.
+ */
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const params = Object.fromEntries(request.nextUrl.searchParams);
+  const validation = paginationSchema.safeParse(params);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+  }
+
+  const { page, limit } = validation.data;
+  const skip = (page - 1) * limit;
+
+  const [ideas, total] = await Promise.all([
+    prisma.savedIdea.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        questionId: true,
+        question: true,
+        tagSlugs: true,
+        category: true,
+        podcastId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.savedIdea.count({ where: { userId: session.user.id } }),
+  ]);
+
+  return NextResponse.json({
+    ideas,
+    total,
+    page,
+    totalPages: Math.ceil(total / limit),
+  });
+}
+
+/**
+ * POST /api/ideas
+ * Save a quiz question as an idea (upsert by userId + questionId).
+ */
+export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const validation = savedIdeaSchema.safeParse(body);
+  if (!validation.success) {
+    return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+  }
+
+  const { questionId, question, tagSlugs, category } = validation.data;
+
+  const idea = await prisma.savedIdea.upsert({
+    where: {
+      userId_questionId: { userId: session.user.id, questionId },
+    },
+    create: {
+      userId: session.user.id,
+      questionId,
+      question,
+      tagSlugs,
+      category,
+    },
+    update: {},
+  });
+
+  return NextResponse.json({ idea }, { status: 201 });
+}
