@@ -53,17 +53,29 @@ Replace `$ADMIN_REPORT_KEY` with the value from Step 1 and `DAYS` with the perio
 
 If the response is not 200 or doesn't contain valid JSON, report the error and stop.
 
-Parse the JSON response. The shape is:
+Parse the JSON response. The shape is (18 sections):
 
 ```
 {
   meta: { generatedAt, periodDays, since },
   traffic: { pageViews, uniqueVisitors, avgPagesPerSession, topPages[], referrers[], devices[], dailyVisitors[] },
   waitlist: { total, recentSignups, bySource[] },
-  users: { total, signupsToday, signupsThisWeek, signupsThisMonth, tierDistribution },
+  users: { total, signupsToday, signupsThisWeek, signupsThisMonth, roleDistribution[] },
   podcasts: { total, byStatus, totalPlays },
   playback: { sessionsInPeriod, avgCompletionPercent, avgListenSeconds },
-  costs: { breakdown, dailyTrend[] }
+  costs: { breakdown, dailyTrend[] },
+  providers: { ttsDistribution[], aiProviderDistribution[], aiModelDistribution[], byokAdoption: { tts[], ai[] } },
+  topics: { topTags[], depthDistribution[], audienceLevelDistribution[], toneDistribution[], durationTarget: { avg, median }, languageDistribution[] },
+  sources: { sourceDistribution[], sourcePlatformDistribution[], humanVsAi: { human, ai } },
+  engagement: { totals: { likes, saves, comments, forks, follows }, dailyTrend[], mostLiked[], mostForked[], mostCommented[] },
+  interactions: { totalQuestions, byStatus, answerRate, incorporationRate, helpfulRate, avgQuestionsPerPodcast, publicVsPrivate },
+  playbackDetails: { totalListenHours, speedDistribution[], avgPausesPerSession, avgSeeksPerSession, avgInterruptsPerSession, completionDistribution[] },
+  content: { avgDurationSeconds, avgSegmentsPerPodcast, avgFileSizeBytes, visibilityDistribution[], podcastsWithForks, durationDistribution[] },
+  freeTier: { config, usersWithFreeGenerations, avgFreeGenerationsUsed, usersExhaustedFreeTier, byokUsersCount },
+  pipeline: { totalAttempted, totalFailed, failureRate, failedAtStage[], avgTimeToReadySeconds, inProgressByStatus[] },
+  recommendations: { totalImpressions, totalClicks, totalQueues, ctr, queueRate, bySurface[], avgListenedPercent },
+  collections: { total, totalItems, totalFollows, newInPeriod, mostFollowed[] },
+  voices: { totalClones, bySourceType[], requestableCount, requestsByStatus[] }
 }
 ```
 
@@ -149,11 +161,11 @@ Write the markdown with these sections. Use the data from Step 2. Format all num
 | Signups This Week   | {signupsThisWeek}  |
 | Signups This Month  | {signupsThisMonth} |
 
-### Tier Distribution
+### Role Distribution
 
-| Tier    | Users |
+| Role    | Users |
 | ------- | ----- |
-| {for each tier in tierDistribution...} |
+| {for each role in roleDistribution...} |
 
 ---
 
@@ -197,6 +209,310 @@ Write the markdown with these sections. Use the data from Step 2. Format all num
 | Date       | Total   | {service columns...} |
 | ---------- | ------- | -------------------- |
 | {for each day in dailyTrend...} |
+
+---
+
+## Providers & BYOK
+
+### TTS Provider Distribution (period)
+
+| Provider | Podcasts |
+| -------- | -------- |
+| {for each ttsDistribution entry...} |
+
+### AI Provider Distribution (period)
+
+| Provider | Podcasts |
+| -------- | -------- |
+| {for each aiProviderDistribution entry...} |
+
+### AI Model Distribution (period)
+
+| Model | Podcasts |
+| ----- | -------- |
+| {for each aiModelDistribution entry...} |
+
+### BYOK Adoption (cumulative)
+
+**TTS Keys:**
+
+| Provider | Users |
+| -------- | ----- |
+| {for each byokAdoption.tts entry...} |
+
+**AI Keys:**
+
+| Provider | Users |
+| -------- | ----- |
+| {for each byokAdoption.ai entry...} |
+
+---
+
+## Topics & Discovery
+
+### Top Tags (period)
+
+| Tag  | Slug | Podcasts |
+| ---- | ---- | -------- |
+| {for each topTags entry, up to 20...} |
+
+### Depth Distribution
+
+| Depth | Count |
+| ----- | ----- |
+| {for each depthDistribution entry...} |
+
+### Audience Level Distribution
+
+| Level | Count |
+| ----- | ----- |
+| {for each audienceLevelDistribution entry...} |
+
+### Tone Distribution
+
+| Tone | Count |
+| ---- | ----- |
+| {for each toneDistribution entry...} |
+
+### Duration Target
+
+| Metric | Value |
+| ------ | ----- |
+| Average | {durationTarget.avg} min |
+| Median  | {durationTarget.median} min |
+
+### Language Distribution
+
+| Language | Podcasts |
+| -------- | -------- |
+| {for each languageDistribution entry...} |
+
+---
+
+## Sources
+
+### Source Distribution (period)
+
+| Source | Count |
+| ------ | ----- |
+| {for each sourceDistribution entry...} |
+
+### Platform Distribution (imports, period)
+
+| Platform | Count |
+| -------- | ----- |
+| {for each sourcePlatformDistribution entry...} |
+
+### Human vs AI Content (period)
+
+| Type  | Count |
+| ----- | ----- |
+| Human | {humanVsAi.human} |
+| AI    | {humanVsAi.ai} |
+
+---
+
+## Engagement (period)
+
+| Metric   | Total          |
+| -------- | -------------- |
+| Likes    | {totals.likes} |
+| Saves    | {totals.saves} |
+| Comments | {totals.comments} |
+| Forks    | {totals.forks} |
+| Follows  | {totals.follows} |
+
+### Daily Engagement Trend
+
+| Date | Likes | Saves | Comments | Forks |
+| ---- | ----- | ----- | -------- | ----- |
+| {for each dailyTrend entry...} |
+
+### Most Liked Podcasts
+
+| Podcast | Creator | Likes |
+| ------- | ------- | ----- |
+| {for each mostLiked entry, top 10...} |
+
+### Most Forked Podcasts
+
+| Podcast | Creator | Forks |
+| ------- | ------- | ----- |
+| {for each mostForked entry, top 10...} |
+
+### Most Commented Podcasts
+
+| Podcast | Creator | Comments |
+| ------- | ------- | -------- |
+| {for each mostCommented entry, top 10...} |
+
+---
+
+## Q&A Interactions (period)
+
+| Metric                   | Value                     |
+| ------------------------ | ------------------------- |
+| Total Questions          | {totalQuestions}           |
+| Answer Rate              | {answerRate}%             |
+| Incorporation Rate       | {incorporationRate}%      |
+| Helpful Rate             | {helpfulRate}%            |
+| Avg Questions/Podcast    | {avgQuestionsPerPodcast}  |
+| Public Questions         | {publicVsPrivate.public}  |
+| Private Questions        | {publicVsPrivate.private} |
+
+### By Status
+
+| Status | Count |
+| ------ | ----- |
+| {for each status in byStatus...} |
+
+---
+
+## Playback Details (period)
+
+| Metric               | Value                       |
+| -------------------- | --------------------------- |
+| Total Listen Hours   | {totalListenHours}          |
+| Avg Pauses/Session   | {avgPausesPerSession}       |
+| Avg Seeks/Session    | {avgSeeksPerSession}        |
+| Avg Interrupts/Session | {avgInterruptsPerSession} |
+
+### Speed Distribution
+
+| Speed | Sessions |
+| ----- | -------- |
+| {for each speedDistribution entry...} |
+
+### Completion Distribution
+
+| Bucket | Sessions |
+| ------ | -------- |
+| {for each completionDistribution entry...} |
+
+---
+
+## Content Characteristics
+
+| Metric                  | Value                     |
+| ----------------------- | ------------------------- |
+| Avg Duration            | {avgDurationSeconds}s ({formatted as Xm Ys}) |
+| Avg Segments/Podcast    | {avgSegmentsPerPodcast}   |
+| Avg File Size           | {avgFileSizeBytes} ({formatted as MB}) |
+| Podcasts with Forks     | {podcastsWithForks}       |
+
+### Visibility Distribution
+
+| Visibility | Count |
+| ---------- | ----- |
+| {for each visibilityDistribution entry...} |
+
+### Duration Distribution (READY podcasts)
+
+| Bucket | Count |
+| ------ | ----- |
+| {for each durationDistribution entry...} |
+
+---
+
+## Free Tier Health
+
+### Configuration
+
+| Setting          | Value                         |
+| ---------------- | ----------------------------- |
+| AI Provider      | {config.aiProvider}           |
+| AI Model         | {config.aiModel}              |
+| TTS Provider     | {config.ttsProvider}          |
+| Generation Limit | {config.generationLimit}      |
+
+### Usage
+
+| Metric                    | Value                          |
+| ------------------------- | ------------------------------ |
+| Users with Free Gens      | {usersWithFreeGenerations}     |
+| Avg Free Gens Used        | {avgFreeGenerationsUsed}       |
+| Users Exhausted Free Tier | {usersExhaustedFreeTier}       |
+| Users with Both BYOK Keys | {byokUsersCount}              |
+
+---
+
+## Pipeline Health (period)
+
+| Metric               | Value                      |
+| -------------------- | -------------------------- |
+| Total Attempted      | {totalAttempted}           |
+| Total Failed         | {totalFailed}              |
+| Failure Rate         | {failureRate}%             |
+| Avg Time to Ready    | {avgTimeToReadySeconds}s ({formatted as Xm Ys}) |
+
+### Failed at Stage
+
+| Stage | Count |
+| ----- | ----- |
+| {for each failedAtStage entry...} |
+
+### Currently In Progress
+
+| Status | Count |
+| ------ | ----- |
+| {for each inProgressByStatus entry...} |
+
+---
+
+## Recommendations (period)
+
+| Metric              | Value                    |
+| ------------------- | ------------------------ |
+| Total Impressions   | {totalImpressions}       |
+| Total Clicks        | {totalClicks}            |
+| Total Queues        | {totalQueues}            |
+| CTR                 | {ctr}%                   |
+| Queue Rate          | {queueRate}%             |
+| Avg Listened %      | {avgListenedPercent}%    |
+
+### By Surface
+
+| Surface | Impressions | Clicks | Queues | CTR |
+| ------- | ----------- | ------ | ------ | --- |
+| {for each bySurface entry...} |
+
+---
+
+## Collections
+
+| Metric         | Value              |
+| -------------- | ------------------ |
+| Total          | {total}            |
+| Total Items    | {totalItems}       |
+| Total Follows  | {totalFollows}     |
+| New ({N}d)     | {newInPeriod}      |
+
+### Most Followed Collections
+
+| Collection | Creator | Followers |
+| ---------- | ------- | --------- |
+| {for each mostFollowed entry, top 5...} |
+
+---
+
+## Voice Clones
+
+| Metric           | Value             |
+| ---------------- | ----------------- |
+| Total Clones     | {totalClones}     |
+| Requestable      | {requestableCount} |
+
+### By Source Type
+
+| Source | Count |
+| ------ | ----- |
+| {for each bySourceType entry...} |
+
+### Voice Requests by Status
+
+| Status | Count |
+| ------ | ----- |
+| {for each requestsByStatus entry...} |
 ```
 
 ### Formatting Rules
@@ -205,8 +521,10 @@ Write the markdown with these sections. Use the data from Step 2. Format all num
 - **Percentages:** 1 decimal place (e.g., `42.3%`)
 - **Dollar amounts:** 2 decimal places with `$` prefix (e.g., `$1.23`)
 - **Duration:** Convert seconds to `Xm Ys` format (e.g., 185s becomes `3m 5s`)
+- **File sizes:** Convert bytes to MB with 1 decimal (e.g., `12.5 MB`)
 - **Empty sections:** If a section has no data (empty arrays, zero counts), include the header but write "No data for this period." instead of an empty table
 - **Daily cost trend service columns:** Use the unique service names from the dailyTrend entries as dynamic column headers
+- **Rates:** answerRate, incorporationRate, helpfulRate, failureRate, ctr, queueRate are 0-1 floats — multiply by 100 and format as percentages
 
 ---
 
