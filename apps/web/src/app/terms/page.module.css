@@ -1,0 +1,75 @@
+.main {
+  min-height: 100vh;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background: var(--color-background);
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: var(--spacing-2xl);
+}
+
+.title {
+  font: var(--text-h1);
+  margin-bottom: var(--spacing-sm);
+}
+
+.subtitle {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+}
+
+.lastUpdated {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+  margin-top: var(--spacing-sm);
+}
+
+.content {
+  line-height: 1.8;
+}
+
+.content h2 {
+  font: var(--text-h3);
+  margin-top: var(--spacing-2xl);
+  margin-bottom: var(--spacing-md);
+}
+
+.content h3 {
+  font: var(--text-h4);
+  margin-top: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
+}
+
+.content p {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.content ul {
+  list-style: disc;
+  padding-left: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.content li {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.content a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.content strong {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
