@@ -8,16 +8,41 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter, Stack } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { openBrowserAsync } from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../lib/api';
 import { deleteToken } from '../lib/auth';
 
+interface KeyStatus {
+  provider: string;
+  configured: boolean;
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
+    queryKey: ['settings', 'ai-keys'],
+    queryFn: async () => {
+      const res = await api.get('/settings/ai-keys');
+      return res.data;
+    },
+  });
+
+  const { data: ttsKeys } = useQuery<{ keys: KeyStatus[] }>({
+    queryKey: ['settings', 'byok'],
+    queryFn: async () => {
+      const res = await api.get('/settings/byok');
+      return res.data;
+    },
+  });
+
+  const hasAiKey = aiKeys?.keys?.some((k) => k.configured) ?? false;
+  const hasTtsKey = ttsKeys?.keys?.some((k) => k.configured) ?? false;
+  const allKeysConfigured = hasAiKey && hasTtsKey;
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -84,7 +109,17 @@ export default function SettingsScreen() {
               ]}
               onPress={() => router.push('/settings/api-keys')}
             >
-              <Text style={styles.rowLabel}>API Keys</Text>
+              <View style={styles.rowLabelWithStatus}>
+                <Text style={styles.rowLabel}>API Keys</Text>
+                <View
+                  style={[
+                    styles.keyStatusDot,
+                    allKeysConfigured
+                      ? styles.keyStatusDotGreen
+                      : styles.keyStatusDotAmber,
+                  ]}
+                />
+              </View>
               <Text style={styles.rowChevron}>{'\u203A'}</Text>
             </Pressable>
           </View>
@@ -201,6 +236,22 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
     marginLeft: spacing.md,
+  },
+  rowLabelWithStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  keyStatusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  keyStatusDotGreen: {
+    backgroundColor: colors.success,
+  },
+  keyStatusDotAmber: {
+    backgroundColor: colors.warning,
   },
   rowLabel: {
     fontFamily: typography.fontBody,
