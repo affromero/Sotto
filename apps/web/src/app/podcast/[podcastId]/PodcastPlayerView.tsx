@@ -29,6 +29,7 @@ import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
+import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
@@ -429,6 +430,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         </div>
 
         <div className={styles.actionButtons}>
+          {/* Primary actions — always visible */}
           <button
             className={`${styles.actionBtn} ${liked ? styles.actionBtnActive : ''}`}
             onClick={handleLike}
@@ -439,37 +441,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             <Heart size={18} fill={liked ? 'currentColor' : 'none'} />
             <span>{liked ? 'Liked' : 'Like'}</span>
           </button>
-          <button
-            className={`${styles.actionBtn} ${saved ? styles.actionBtnActive : ''}`}
-            onClick={handleSave}
-            aria-label={saved ? 'Unsave' : 'Save'}
-            aria-pressed={saved}
-            type="button"
-          >
-            <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
-            <span>{saved ? 'Saved' : 'Save'}</span>
-          </button>
-          {isAuthenticated && (
-            <button
-              className={styles.actionBtn}
-              onClick={() => setShowAddToCollection(true)}
-              aria-label="Add to collection"
-              type="button"
-            >
-              <ListMusic size={18} />
-              <span>Collect</span>
-            </button>
-          )}
-          {isOwner && (
-            <Link
-              href={`/podcast/${podcast.id}/edit`}
-              className={styles.actionBtn}
-              aria-label="Edit this podcast"
-            >
-              <Pencil size={18} />
-              <span>Edit</span>
-            </Link>
-          )}
           {!isOwner && isAuthenticated && (
             <button
               className={styles.actionBtn}
@@ -481,72 +452,74 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
               <span>Fork</span>
             </button>
           )}
+          <button
+            className={`${styles.actionBtn} ${saved ? styles.actionBtnActive : ''}`}
+            onClick={handleSave}
+            aria-label={saved ? 'Unsave' : 'Save'}
+            aria-pressed={saved}
+            type="button"
+          >
+            <Bookmark size={18} fill={saved ? 'currentColor' : 'none'} />
+            <span>{saved ? 'Saved' : 'Save'}</span>
+          </button>
           <ShareMenu
             podcastId={podcast.id}
             podcastTitle={podcast.title}
             audioUrl={podcast.audioUrl}
             isPublic={podcast.visibility === 'PUBLIC'}
+            triggerClassName={styles.actionBtn}
           />
-          {isReady && isAuthenticated && (
-            <button
-              className={styles.actionBtn}
-              onClick={handleExportPdf}
-              aria-label={pdfUrl ? 'Download PDF transcript' : 'Generate PDF transcript'}
-              disabled={pdfLoading}
-              type="button"
-            >
-              {pdfLoading ? (
-                <>
-                  <FileText size={18} />
-                  <span>Generating...</span>
-                </>
-              ) : pdfUrl ? (
-                <>
-                  <Download size={18} />
-                  <span>PDF</span>
-                </>
-              ) : (
-                <>
-                  <FileText size={18} />
-                  <span>PDF</span>
-                </>
-              )}
-            </button>
-          )}
-          {isOwner && podcast.status !== 'FAILED' && (
-            showDeleteConfirm ? (
-              <div className={styles.deleteConfirm}>
-                <span className={styles.deleteConfirmText}>Delete?</span>
-                <button
-                  className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  type="button"
-                  aria-label="Confirm delete"
-                >
-                  <Trash2 size={18} />
-                  <span>{deleting ? 'Deleting...' : 'Yes'}</span>
-                </button>
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={deleting}
-                  type="button"
-                >
-                  <span>Cancel</span>
-                </button>
-              </div>
-            ) : (
+
+          {/* Overflow menu — secondary actions */}
+          {showDeleteConfirm ? (
+            <div className={styles.deleteConfirm}>
+              <span className={styles.deleteConfirmText}>Delete?</span>
               <button
                 className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
-                onClick={() => setShowDeleteConfirm(true)}
-                aria-label="Delete this podcast"
+                onClick={handleDelete}
+                disabled={deleting}
                 type="button"
+                aria-label="Confirm delete"
               >
                 <Trash2 size={18} />
-                <span>Delete</span>
+                <span>{deleting ? 'Deleting...' : 'Yes'}</span>
               </button>
-            )
+              <button
+                className={styles.actionBtn}
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                type="button"
+              >
+                <span>Cancel</span>
+              </button>
+            </div>
+          ) : (
+            <OverflowMenu
+              triggerClassName={styles.actionBtn}
+              items={[
+                ...(isAuthenticated ? [{
+                  icon: <ListMusic size={16} />,
+                  label: 'Add to Collection',
+                  onClick: () => setShowAddToCollection(true),
+                }] : []),
+                ...(isOwner ? [{
+                  icon: <Pencil size={16} />,
+                  label: 'Edit',
+                  onClick: () => router.push(`/podcast/${podcast.id}/edit`),
+                }] : []),
+                ...(isReady && isAuthenticated ? [{
+                  icon: pdfLoading ? <FileText size={16} /> : pdfUrl ? <Download size={16} /> : <FileText size={16} />,
+                  label: pdfLoading ? 'Generating PDF...' : 'PDF Transcript',
+                  onClick: handleExportPdf,
+                }] : []),
+                ...(isOwner && podcast.status !== 'FAILED' ? [{
+                  icon: <Trash2 size={16} />,
+                  label: 'Delete',
+                  onClick: () => setShowDeleteConfirm(true),
+                  danger: true,
+                }] : []),
+              ]}
+            />
           )}
         </div>
       </div>
