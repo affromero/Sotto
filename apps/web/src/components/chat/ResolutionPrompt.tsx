@@ -6,13 +6,18 @@ import styles from './ResolutionPrompt.module.css';
 interface ResolutionPromptProps {
   onResolve: (resolved: boolean, incorporate: boolean) => void;
   isLoading?: boolean;
+  canIncorporate?: boolean;
 }
 
-export function ResolutionPrompt({ onResolve, isLoading = false }: ResolutionPromptProps) {
+export function ResolutionPrompt({ onResolve, isLoading = false, canIncorporate = true }: ResolutionPromptProps) {
   const [step, setStep] = useState<'initial' | 'followup'>('initial');
 
   function handleYes() {
-    setStep('followup');
+    if (canIncorporate) {
+      setStep('followup');
+    } else {
+      onResolve(true, false);
+    }
   }
 
   function handleNo() {

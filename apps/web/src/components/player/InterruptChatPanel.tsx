@@ -9,6 +9,7 @@ import styles from './InterruptChatPanel.module.css';
 interface InterruptChatPanelProps {
   podcastId: string;
   isOwner: boolean;
+  podcastSource: string;
   currentTime: number;
   existingInteractions: InteractionSummary[];
   onClose: () => void;
@@ -27,6 +28,7 @@ type PanelState =
 export function InterruptChatPanel({
   podcastId,
   isOwner,
+  podcastSource,
   currentTime,
   existingInteractions,
   onClose,
@@ -230,6 +232,7 @@ export function InterruptChatPanel({
           <p className={styles.answerText}>{answer}</p>
           <ResolutionPrompt
             onResolve={(helpful, incorporate) => handleResolve(helpful, incorporate)}
+            canIncorporate={isOwner && podcastSource !== 'IMPORT'}
           />
         </div>
       )}

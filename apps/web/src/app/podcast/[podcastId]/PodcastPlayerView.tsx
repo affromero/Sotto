@@ -541,6 +541,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         <InterruptChatPanel
           podcastId={podcast.id}
           isOwner={isOwner}
+          podcastSource={podcast.source}
           currentTime={currentTime}
           existingInteractions={podcast.interactions}
           onClose={() => setShowInterruptChat(false)}
