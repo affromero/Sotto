@@ -1,4 +1,4 @@
-import { generateResponse, streamResponse } from './claude';
+import { generateResponse, streamResponse, WEB_SEARCH_TOOL } from './claude';
 
 /**
  * Detect URLs in a message string.
@@ -62,7 +62,12 @@ End your final message with a metadata block:
 }
 [/METADATA]
 
-Include "source_url" only if the user shared a URL. Otherwise omit it.`;
+Include "source_url" only if the user shared a URL. Otherwise omit it.
+
+## Web Search:
+You have access to web search. When the user asks about current events, recent news, or time-sensitive topics,
+search the web to understand what they're referring to. Use search results to ask better follow-up questions
+and suggest more specific focus areas. Do NOT dump search results — use them to inform your conversation naturally.`;
 
 /**
  * Parse chip suggestions from agent message
@@ -111,7 +116,11 @@ export async function getDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
-  return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024, apiKeyOverride });
+  return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+    maxTokens: 1024,
+    apiKeyOverride,
+    tools: [WEB_SEARCH_TOOL],
+  });
 }
 
 /**
@@ -121,5 +130,9 @@ export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string
 ): AsyncGenerator<string> {
-  return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, { maxTokens: 1024, apiKeyOverride });
+  return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+    maxTokens: 1024,
+    apiKeyOverride,
+    tools: [WEB_SEARCH_TOOL],
+  });
 }

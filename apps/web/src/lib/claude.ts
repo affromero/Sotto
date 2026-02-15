@@ -10,6 +10,11 @@ if (!ANTHROPIC_API_KEY && !USE_CLAUDE_CODE) {
 
 const client = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
+export const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305' as const,
+  name: 'web_search' as const,
+};
+
 /**
  * Generate a non-streaming response from Claude.
  * When apiKeyOverride is provided, creates a fresh client with that key
@@ -18,7 +23,12 @@ const client = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) 
 export async function generateResponse(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  options?: { maxTokens?: number; model?: string; apiKeyOverride?: string }
+  options?: {
+    maxTokens?: number;
+    model?: string;
+    apiKeyOverride?: string;
+    tools?: Anthropic.MessageCreateParams['tools'];
+  }
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
@@ -40,6 +50,7 @@ export async function generateResponse(
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,
     messages,
+    ...(options?.tools?.length ? { tools: options.tools } : {}),
   });
 
   const textBlock = response.content.find((block) => block.type === 'text');
@@ -59,7 +70,12 @@ export async function generateResponse(
 export async function* streamResponse(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-  options?: { maxTokens?: number; model?: string; apiKeyOverride?: string }
+  options?: {
+    maxTokens?: number;
+    model?: string;
+    apiKeyOverride?: string;
+    tools?: Anthropic.MessageCreateParams['tools'];
+  }
 ): AsyncGenerator<string> {
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
@@ -82,6 +98,7 @@ export async function* streamResponse(
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,
     messages,
+    ...(options?.tools?.length ? { tools: options.tools } : {}),
   });
 
   for await (const event of stream) {

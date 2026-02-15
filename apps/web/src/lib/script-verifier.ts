@@ -1,4 +1,4 @@
-import { generateResponse } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 
 export interface ClaimAnalysis {
@@ -120,6 +120,13 @@ export async function verifyScript(params: {
 ## Audience Level Context:
 Level "${audienceLevel}" — adjust expectations accordingly. Expert-level content needs stricter sourcing.
 
+## Web Search:
+You have access to web search. Use it to:
+- Verify whether cited sources actually exist (search for the title, authors, and publication)
+- Cross-check specific factual claims against current, authoritative sources
+- Find real sources to suggest as replacements for unverifiable citations
+Do NOT rely solely on your training data — actively search to confirm or refute each non-obvious claim.
+
 ## This is attempt ${attemptNumber} of 3.
 ${previousFeedback ? `\n## Previous Feedback (that the script was revised to address):\n${previousFeedback}` : ''}
 
@@ -159,6 +166,7 @@ Analyze every factual claim. Return JSON only.`;
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 8192,
     apiKeyOverride: params.apiKeyOverride,
+    tools: [WEB_SEARCH_TOOL],
   });
 
   let parsed: {

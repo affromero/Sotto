@@ -6,6 +6,7 @@ const mockGenerateResponse = vi.fn();
 
 vi.mock('@/lib/claude', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
 }));
 
 // ---- Import under test ----
@@ -722,6 +723,37 @@ describe('generateScript', () => {
       expect(systemPrompt).toContain('CHILDREN');
     });
 
+    it('passes web search tool to generateResponse', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'Current events.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 400,
+        outputTokens: 500,
+      });
+
+      await generateScript({
+        topic: 'Today in Politics',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+      });
+
+      expect(mockGenerateResponse).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Array),
+        expect.objectContaining({
+          tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        })
+      );
+    });
+
     it('passes apiKeyOverride to generateResponse', async () => {
       const mockResponse = {
         turns: [{ speaker: 'HOST', text: 'BYOK test.' }],
@@ -940,5 +972,39 @@ describe('generateScriptWithFeedback', () => {
     expect(userMessage).toContain('Title: Research Paper');
     expect(userMessage).toContain('Author: Dr. Smith');
     expect(userMessage).toContain('Source: Nature');
+  });
+
+  it('passes web search tool to generateResponse', async () => {
+    const mockResponse = {
+      turns: [{ speaker: 'HOST', text: 'Revised.' }],
+      soundCues: [],
+      references: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 1000,
+      outputTokens: 500,
+    });
+
+    await generateScriptWithFeedback({
+      topic: 'Feedback Web Search',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
+      previousReferences: [],
+      verificationFeedback: 'Verify claims.',
+    });
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      })
+    );
   });
 });
