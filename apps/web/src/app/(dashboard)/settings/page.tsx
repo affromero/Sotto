@@ -77,6 +77,7 @@ export default async function SettingsPage() {
 
   const configuredProviders = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
   const configuredAiProviders = aiKeys.filter((k) => k.isValid).map((k) => k.provider);
+  const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
   return (
     <main className={styles.main}>
@@ -99,6 +100,7 @@ export default async function SettingsPage() {
         selectedInterestTagIds={selectedInterestTagIds}
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
+        isTwitterProviderAvailable={isTwitterProviderAvailable}
       />
     </main>
   );
