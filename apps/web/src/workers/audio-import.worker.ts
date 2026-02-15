@@ -5,6 +5,7 @@ import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
 import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
+import { generateImportMetadata } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import * as path from 'path';
 import * as os from 'os';
@@ -20,9 +21,15 @@ const execFileAsync = promisify(execFile);
  * Handles the full pipeline for user-uploaded audio podcasts
  */
 export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<void> {
-  const { podcastId, userId, audioKey, transcriptText } = job.data;
+  const { podcastId, userId, audioKey, transcriptText, sttProvider, sttApiKey, generateMetadata } =
+    job.data;
 
-  logger.info('Starting audio import', { podcastId, userId, hasTranscript: !!transcriptText });
+  logger.info('Starting audio import', {
+    podcastId,
+    userId,
+    hasTranscript: !!transcriptText,
+    sttProvider: sttProvider ?? 'openai',
+  });
 
   const tmpDir = path.join(os.tmpdir(), `sotto-import-${crypto.randomUUID()}`);
 
@@ -91,16 +98,44 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         segments = await diarizeSpeakers(whisperSegments);
       }
     } else {
-      logger.info('Transcribing audio with Whisper');
-      const sttProvider = createSttProvider();
+      logger.info('Transcribing audio', { provider: sttProvider ?? 'openai' });
+      const provider = createSttProvider(sttProvider, sttApiKey);
       const normalizedBuffer = await import('fs/promises').then((fs) =>
         fs.readFile(normalizedPath)
       );
-      const transcription = await sttProvider.transcribe(normalizedBuffer);
+      const transcription = await provider.transcribe(normalizedBuffer);
       await job.updateProgress(70);
 
       logger.info('Running speaker diarization');
       segments = await diarizeSpeakers(transcription.segments);
+    }
+
+    await job.updateProgress(75);
+
+    // Auto-generate title and topic from transcript if requested
+    if (generateMetadata) {
+      try {
+        const fullText = segments.map((s) => s.text).join(' ');
+        const metadata = await generateImportMetadata(fullText);
+
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: {
+            title: metadata.title,
+            topic: metadata.topic,
+          },
+        });
+
+        logger.info('Auto-generated import metadata', {
+          podcastId,
+          title: metadata.title,
+        });
+      } catch (err) {
+        logger.warn('Failed to auto-generate import metadata — using defaults', {
+          podcastId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     await job.updateProgress(80);
