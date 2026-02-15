@@ -254,6 +254,10 @@ model Podcast {
   isHumanContent      Boolean @default(false)
   sourcePlatform      String?  // e.g. "notebooklm", "spotify", "apple_podcasts", "youtube"
 
+  // AI-suggested metadata (for imports where user provided their own)
+  suggestedTitle       String?
+  suggestedTopic       String?  @db.Text
+
   // Relations
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   discovery    Discovery?
