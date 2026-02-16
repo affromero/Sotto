@@ -25,6 +25,23 @@ export type GeneratedReference = {
 };
 
 /**
+ * Normalize references from AI output — authors may arrive as a
+ * comma-separated string instead of string[].
+ */
+function normalizeReferences(
+  refs: Array<Record<string, unknown>>
+): GeneratedReference[] {
+  return refs.map((ref) => ({
+    ...ref,
+    authors: Array.isArray(ref.authors)
+      ? (ref.authors as string[])
+      : typeof ref.authors === 'string'
+        ? (ref.authors as string).split(/,\s*/)
+        : [],
+  })) as GeneratedReference[];
+}
+
+/**
  * Generate a 2-voice podcast script from discovery metadata.
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
@@ -197,9 +214,9 @@ Only return the JSON object, nothing else.`;
     ];
   }
 
-  if (!parsed.references) {
-    parsed.references = [];
-  }
+  parsed.references = normalizeReferences(
+    (parsed.references as Array<Record<string, unknown>>) || []
+  );
 
   // Generate markdown version with delivery directions
   const markdown = parsed.turns
@@ -362,9 +379,9 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     ];
   }
 
-  if (!parsed.references) {
-    parsed.references = [];
-  }
+  parsed.references = normalizeReferences(
+    (parsed.references as Array<Record<string, unknown>>) || []
+  );
 
   const markdown = parsed.turns
     .map((turn) => {
