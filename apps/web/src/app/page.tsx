@@ -175,9 +175,9 @@ export default function LandingPage() {
             <a href="#features" onClick={() => setMenuOpen(false)}>
               Features
             </a>
-            <a href="#voices" onClick={() => setMenuOpen(false)}>
+            <Link href="/voices" onClick={() => setMenuOpen(false)}>
               Voices
-            </a>
+            </Link>
           </div>
           <div className={styles.navRight}>
             <Link href="/feed" className={styles.navCta}>
@@ -1452,7 +1452,7 @@ export default function LandingPage() {
             <div>
               <h4>Product</h4>
               <a href="#features">Features</a>
-              <a href="#voices">Voices</a>
+              <Link href="/voices">Voices</Link>
             </div>
             <div>
               <h4>Company</h4>

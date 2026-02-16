@@ -25,6 +25,7 @@ export function TopBar({ user }: TopBarProps) {
       </Link>
       <nav className={styles.nav}>
         <Link href="/feed">Feed</Link>
+        <Link href="/voices">Voices</Link>
         <Link href="/create">Create</Link>
       </nav>
       <div className={styles.actions}>
