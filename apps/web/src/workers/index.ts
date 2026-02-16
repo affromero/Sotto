@@ -1,4 +1,11 @@
-import { createWorker, twitterMentionsQueue, telegramBotQueue, keyValidationQueue, JobType } from '@/lib/queue';
+import {
+  createWorker,
+  twitterMentionsQueue,
+  telegramBotQueue,
+  keyValidationQueue,
+  twitterTrendPollQueue,
+  JobType,
+} from '@/lib/queue';
 import { isTwitterConfigured } from '@/lib/twitter';
 import { isTelegramBotConfigured } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
@@ -21,6 +28,9 @@ import { processAudioImport } from './audio-import.worker';
 import { processKeyValidation } from './key-validation.worker';
 import { processTelegramUpdates } from './telegram-bot.worker';
 import { processTelegramReply } from './telegram-reply.worker';
+import { processAutoTweet } from './twitter-auto-tweet.worker';
+import { processTrendPoll } from './twitter-trend-poll.worker';
+import { processAdminThreadToPodcast } from './admin-thread-to-podcast.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -45,6 +55,9 @@ const workers = [
   createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
   createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 35000 }),
   createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
+  createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
+  createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
+  createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -71,6 +84,19 @@ if (isTelegramBotConfigured()) {
     .catch((err) => logger.error('Failed to schedule Telegram polling', { error: err.message }));
 } else {
   logger.info('Telegram bot not configured — polling disabled');
+}
+
+// Set up Twitter trend polling if credentials are configured
+if (isTwitterConfigured()) {
+  const trendInterval = parseInt(process.env.TWITTER_TREND_POLL_INTERVAL_MS || '7200000', 10);
+  twitterTrendPollQueue
+    .add(JobType.POLL_TWITTER_TRENDS, {}, { repeat: { every: trendInterval } })
+    .then(() =>
+      logger.info('Twitter trend polling scheduled', { intervalMs: String(trendInterval) })
+    )
+    .catch((err) => logger.error('Failed to schedule trend polling', { error: err.message }));
+} else {
+  logger.info('Twitter integration not configured — trend polling disabled');
 }
 
 // Schedule BYOK key re-validation every 24 hours

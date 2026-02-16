@@ -402,6 +402,83 @@ export async function replyToTweet(tweetId: string, text: string): Promise<strin
   return replyId;
 }
 
+/**
+ * Post a new tweet from the @sottofm bot account.
+ * Uses OAuth 1.0a for user-context write operations.
+ */
+export async function postTweet(text: string): Promise<string> {
+  const url = `${TWITTER_API_BASE}/tweets`;
+  const body = JSON.stringify({ text });
+
+  const authHeader = await generateOAuthHeader('POST', url);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: authHeader,
+      'Content-Type': 'application/json',
+    },
+    body,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twitter post API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const tweetId = data.data?.id as string;
+  logger.info('Posted tweet', { tweetId });
+  return tweetId;
+}
+
+/**
+ * Search for popular recent tweets matching a query.
+ * Uses Twitter API v2 GET /2/tweets/search/recent with relevancy sorting.
+ */
+export async function searchPopularTweets(
+  query: string,
+  maxResults: number = 10
+): Promise<TwitterTweet[]> {
+  const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
+
+  if (!bearerToken) {
+    throw new Error('Twitter credentials not configured — set TWITTER_BEARER_TOKEN');
+  }
+
+  if (!canMakeRequest('search')) {
+    return [];
+  }
+
+  const params = new URLSearchParams({
+    query,
+    sort_order: 'relevancy',
+    'tweet.fields': 'public_metrics,created_at,author_id,conversation_id',
+    max_results: String(Math.min(Math.max(maxResults, 10), 100)),
+  });
+
+  const url = `${TWITTER_API_BASE}/tweets/search/recent?${params}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+
+  updateRateLimit(response.headers, 'search');
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Twitter search API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.data) {
+    return [];
+  }
+
+  logger.info('Searched popular tweets', { query, count: String(data.data.length) });
+  return data.data as TwitterTweet[];
+}
+
 export function isTwitterConfigured(): boolean {
   return !!(getEnv('TWITTER_BEARER_TOKEN') && getEnv('TWITTER_SOTTO_USER_ID'));
 }

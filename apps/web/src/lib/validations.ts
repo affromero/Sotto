@@ -370,3 +370,40 @@ export const tasteQuizAnswerSchema = z.object({
     response: z.enum(['yes', 'no', 'skip']),
   })).min(1).max(20),
 });
+
+/**
+ * Twitter config update validation (admin)
+ */
+export const twitterConfigUpdateSchema = z.object({
+  autoTweetEnabled: z.boolean().optional(),
+  minLikes: z.number().int().min(1).max(10000).optional(),
+  minPlays: z.number().int().min(1).max(100000).optional(),
+  minForks: z.number().int().min(1).max(1000).optional(),
+  trendPollingEnabled: z.boolean().optional(),
+  trendPollIntervalMs: z.number().int().min(300000).max(86400000).optional(),
+  maxTrendPodcastsPerDay: z.number().int().min(1).max(20).optional(),
+  trendSearchQueries: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
+  tweetTemplate: z.string().min(10).max(500).optional(),
+});
+
+/**
+ * Manual tweet validation (admin)
+ */
+export const manualTweetSchema = z.object({
+  podcastId: z.string().min(1),
+});
+
+/**
+ * Thread-to-podcast validation (admin)
+ */
+export const threadToPodcastSchema = z.object({
+  tweetUrl: z.string().url().regex(/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/),
+});
+
+/**
+ * Trend generate validation (admin)
+ */
+export const trendGenerateSchema = z.object({
+  tweetText: z.string().min(1).max(5000),
+  tweetId: z.string().optional(),
+});
