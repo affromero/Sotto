@@ -13,6 +13,7 @@ import {
   Shield,
   AtSign,
   Settings,
+  MessageSquareShare,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
   { href: '/admin/handles', label: 'Handles', icon: AtSign },
   { href: '/admin/moderation', label: 'Moderation', icon: Shield },
   { href: '/admin/config', label: 'Config', icon: Settings },
+  { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
 ];
 
 export function AdminShell({ user, children }: AdminShellProps) {
