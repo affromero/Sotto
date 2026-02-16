@@ -23,7 +23,7 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
   const [gridCards, setGridCards] = useState<GridCard[]>(() =>
     questions.slice(0, GRID_SIZE).map((q) => ({ question: q, status: 'visible' as const }))
   );
-  const [, setQueue] = useState<TasteQuestion[]>(() => questions.slice(GRID_SIZE));
+  const queueRef = useRef<TasteQuestion[]>(questions.slice(GRID_SIZE));
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const savedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -59,35 +59,35 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
         prev.map((c, i) => (i === cardIndex ? { ...c, status: 'exiting' as const } : c))
       );
 
-      // After exit animation, replace or remove
+      // After evaporate animation, replace or fetch more
       setTimeout(() => {
-        setQueue((prevQueue) => {
-          if (prevQueue.length > 0) {
-            const [next, ...rest] = prevQueue;
+        const currentQueue = queueRef.current;
+        if (currentQueue.length > 0) {
+          const [next, ...rest] = currentQueue;
+          queueRef.current = rest;
+          setGridCards((prev) =>
+            prev.map((c, i) =>
+              i === cardIndex ? { question: next, status: 'entering' as const } : c
+            )
+          );
+          // Transition entering → visible after smoke-in completes
+          setTimeout(() => {
             setGridCards((prev) =>
               prev.map((c, i) =>
-                i === cardIndex ? { question: next, status: 'entering' as const } : c
+                i === cardIndex && c.status === 'entering'
+                  ? { ...c, status: 'visible' as const }
+                  : c
               )
             );
-            // Transition entering → visible
-            setTimeout(() => {
-              setGridCards((prev) =>
-                prev.map((c, i) =>
-                  i === cardIndex && c.status === 'entering'
-                    ? { ...c, status: 'visible' as const }
-                    : c
-                )
-              );
-            }, 250);
-            return rest;
-          }
-          // No more in queue — remove card from grid
+          }, 400);
+        } else {
+          // Queue empty — remove card and auto-fetch fresh batch
           setGridCards((prev) => prev.filter((_, i) => i !== cardIndex));
-          return prevQueue;
-        });
-      }, 250);
+          onLoadMore();
+        }
+      }, 350);
     },
-    [gridCards]
+    [gridCards, onLoadMore]
   );
 
   const handleSave = useCallback(
