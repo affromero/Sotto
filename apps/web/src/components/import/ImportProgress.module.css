@@ -78,9 +78,9 @@
 }
 
 .stepIconActive {
-  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, var(--color-teal) 0%, var(--color-teal-hover) 100%);
   color: white;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 4px 12px var(--color-teal-light);
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .stepLabelTextActive {
-  color: #0d9488;
+  color: var(--color-teal);
 }
 
 .stepLabelTextComplete {
@@ -206,7 +206,7 @@
 }
 
 .loadingSpinner {
-  color: #0d9488;
+  color: var(--color-teal);
   animation: spin 1s linear infinite;
 }
 
