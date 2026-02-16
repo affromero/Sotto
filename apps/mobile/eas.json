@@ -8,9 +8,12 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "autoIncrement": "version"
     },
-    "production": {}
+    "production": {
+      "autoIncrement": "version"
+    }
   },
   "submit": {
     "production": {
