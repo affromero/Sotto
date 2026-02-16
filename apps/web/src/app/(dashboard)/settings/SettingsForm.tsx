@@ -651,22 +651,22 @@ export function SettingsForm({
         </section>
       )}
 
-      {/* AI Provider Keys (BYOK) */}
+      {/* AI Provider Keys */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>AI Providers (BYOK)</h2>
+        <h2 className={styles.sectionTitle}>AI Providers</h2>
         <p className={styles.sectionDesc}>
-          Bring your own LLM API key for podcast generation. At least one AI key is required to
-          create podcasts. Keys are encrypted with AES-256-GCM.
+          AI is free for all users &mdash; Sotto handles scripts, Q&amp;A, and discovery chat at no
+          cost. Add your own key for faster models or higher limits.
         </p>
         <AiProviderCards initialConfigured={configuredAiProviders} />
       </section>
 
-      {/* TTS Provider Keys (BYOK) */}
+      {/* TTS Provider Keys */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Voice Providers (BYOK)</h2>
+        <h2 className={styles.sectionTitle}>Voice Providers</h2>
         <p className={styles.sectionDesc}>
-          Bring your own API keys to use premium voice providers. Keys are encrypted with
-          AES-256-GCM and never stored in plaintext.
+          Add a voice provider key for unlimited podcast generation with premium voices. Keys are
+          encrypted with AES-256-GCM.
         </p>
         <TtsProviderCards initialConfigured={configuredTtsProviders} />
       </section>

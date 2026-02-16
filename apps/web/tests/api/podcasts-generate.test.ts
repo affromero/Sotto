@@ -206,7 +206,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     });
   });
 
-  it('returns 403 when AI provider not configured', async () => {
+  it('returns 403 when TTS provider not configured', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
 
@@ -216,7 +216,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data.error).toContain('AI provider not configured');
+    expect(data.error).toContain('No voice provider available');
   });
 
   it('returns 429 when rate limited', async () => {

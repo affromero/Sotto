@@ -34,6 +34,12 @@
   flex-direction: column;
 }
 
+.cardNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .cardName {
   font: var(--text-body-sm);
   font-weight: 600;

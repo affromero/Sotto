@@ -1,5 +1,4 @@
 import { prisma } from './prisma';
-import { hasAiKey } from './byok';
 import { hasByokKey } from './byok';
 import { getFreeTierConfig } from './free-tier-config';
 
@@ -14,12 +13,12 @@ export interface GenerationGateResult {
 /**
  * Check whether a user is allowed to start a new generation.
  *
- * isByokUser = has at least one valid AI key AND at least one valid TTS key.
- * A user with only one side is treated as free tier (platform subsidizes the missing half).
+ * isByokUser = has at least one valid TTS key.
+ * AI is platform-subsidized for all users — no AI key required.
  */
 export async function checkGenerationGate(userId: string): Promise<GenerationGateResult> {
-  const [hasAi, hasTts] = await Promise.all([hasAiKey(userId), hasByokKey(userId)]);
-  const isByokUser = hasAi && hasTts;
+  const hasTts = await hasByokKey(userId);
+  const isByokUser = hasTts;
 
   const config = await getFreeTierConfig();
   const user = await prisma.user.findUniqueOrThrow({
@@ -40,25 +39,17 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     };
   }
 
-  // Check platform key availability (both AI and TTS must be available)
-  const hasPlatformAi =
-    !!process.env.ANTHROPIC_API_KEY ||
-    !!process.env.OPENAI_API_KEY ||
-    process.env.AI_PROVIDER === 'claude-code';
+  // Check platform TTS availability (AI is always platform-subsidized)
   const hasPlatformTts = !!process.env.ELEVENLABS_API_KEY || !!process.env.OPENAI_API_KEY;
 
-  if (!hasPlatformAi || !hasPlatformTts) {
-    // Platform can't subsidize — check if user's partial BYOK covers the gap
-    const canResolve = (hasAi || hasPlatformAi) && (hasTts || hasPlatformTts);
-    if (!canResolve) {
-      return {
-        allowed: false,
-        reason: 'no_provider',
-        freeGenerationsUsed: user.freeGenerationsUsed,
-        freeGenerationsLimit: config.generationLimit,
-        isByokUser: false,
-      };
-    }
+  if (!hasPlatformTts && !hasTts) {
+    return {
+      allowed: false,
+      reason: 'no_provider',
+      freeGenerationsUsed: user.freeGenerationsUsed,
+      freeGenerationsLimit: config.generationLimit,
+      isByokUser: false,
+    };
   }
 
   // Free tier: check counter
@@ -107,8 +98,8 @@ export async function getFreeTierStatus(userId: string): Promise<{
   freeGenerationsRemaining: number;
   isByokUser: boolean;
 }> {
-  const [hasAi, hasTts] = await Promise.all([hasAiKey(userId), hasByokKey(userId)]);
-  const isByokUser = hasAi && hasTts;
+  const hasTts = await hasByokKey(userId);
+  const isByokUser = hasTts;
   const config = await getFreeTierConfig();
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
