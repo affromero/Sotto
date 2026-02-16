@@ -147,14 +147,20 @@ export async function processReferenceValidation(
   await job.updateProgress(50);
 
   // Layer 4: AI evaluation (single batch call, only accepted refs)
+  // Skip in claude-code mode — CLI doesn't support web search tool and times out
   let aiResults: Map<string, VerificationCheck>;
-  try {
-    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey);
-  } catch (error) {
-    logger.warn('AI evaluation failed, using external checks only', {
-      error: error instanceof Error ? error.message : 'Unknown',
-    });
+  if (process.env.AI_PROVIDER === 'claude-code' && !aiKey?.apiKey) {
+    logger.info('Skipping AI reference evaluation in claude-code mode', { podcastId });
     aiResults = new Map();
+  } else {
+    try {
+      aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey);
+    } catch (error) {
+      logger.warn('AI evaluation failed, using external checks only', {
+        error: error instanceof Error ? error.message : 'Unknown',
+      });
+      aiResults = new Map();
+    }
   }
 
   // Merge AI results into allChecks
@@ -281,6 +287,14 @@ export async function processReferenceValidation(
       data: { turns, markdown },
     });
 
+    // Delete removed references FIRST (before renumbering to avoid unique constraint conflicts)
+    await prisma.reference.deleteMany({
+      where: {
+        podcastId,
+        number: { in: [...removedNumbers] },
+      },
+    });
+
     // Renumber remaining references in DB
     for (const [oldNum, newNum] of renumberMap) {
       if (oldNum !== newNum) {
@@ -293,14 +307,6 @@ export async function processReferenceValidation(
         }
       }
     }
-
-    // Delete removed references from DB
-    await prisma.reference.deleteMany({
-      where: {
-        podcastId,
-        number: { in: [...removedNumbers] },
-      },
-    });
 
     logger.info('Script cleaned and references renumbered', {
       podcastId,
