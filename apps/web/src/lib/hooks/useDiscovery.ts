@@ -36,6 +36,8 @@ export function useDiscovery(): UseDiscoveryReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const track = useTrack();
   const messageIndexRef = useRef(0);
+  const messagesRef = useRef<DiscoveryMessage[]>([]);
+  messagesRef.current = state.messages;
 
   const sendMessage = useCallback(
     async (content: string, podcastId?: string, isChipBased: boolean = false) => {
@@ -114,7 +116,12 @@ export function useDiscovery(): UseDiscoveryReturn {
       }));
 
       try {
-        const body: Record<string, string> = { content };
+        // Build conversation history from all prior messages (exclude the empty assistant placeholder)
+        const history = messagesRef.current
+          .filter((m) => m.id !== assistantMessageId && m.content)
+          .map((m) => ({ role: m.role, content: m.content }));
+
+        const body: Record<string, unknown> = { content, history };
         if (podcastId) {
           body.podcastId = podcastId;
         }
