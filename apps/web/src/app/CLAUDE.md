@@ -24,6 +24,7 @@
 | `/profile/[userId]`          | `profile/[userId]/page.tsx`                | No                          | User profile (by ID)                                     |
 | `/profile/handle/[handle]`   | `profile/handle/[handle]/page.tsx`         | No                          | User profile by handle (vanity URL)                      |
 | `/collections/[collectionId]` | `collections/[collectionId]/page.tsx`     | No                          | Collection detail page                                   |
+| `/voices`                    | `voices/page.tsx`                          | No                          | Voice marketplace — browse & request voice clones        |
 | `/feedback`                  | `feedback/page.tsx`                        | No                          | Feedback form (early access)                             |
 | `/admin`                     | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                                 |
 | `/admin/users`               | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment                        |
@@ -117,6 +118,7 @@
 | `/api/handles/check`                                             | GET              | No         | Check handle availability                                                   |
 | `/api/admin/handles`                                             | GET/POST/DELETE  | ADMIN      | Manage reserved handles                                                     |
 | `/api/admin/podcasts/create-as-sotto`                            | POST             | ADMIN      | Create podcast as @sotto                                                    |
+| `/api/voices/browse`                                             | GET              | No (opt)   | Browse requestable voices (search, sort, pagination, request status)        |
 | `/api/voices/request`                                            | GET/POST         | Yes        | Voice request listing/creation                                              |
 | `/api/voices/request/[id]`                                       | PATCH            | Yes        | Update voice request status                                                 |
 | `/api/tts-providers`                                             | GET              | Yes        | List available TTS providers + user BYOK status                             |
