@@ -10,6 +10,9 @@ interface VoiceClone {
   elevenLabsVoiceId: string;
   sourceType: 'UPLOAD' | 'RECORD';
   requestable: boolean;
+  priceInCents: number | null;
+  salesCount: number;
+  totalEarningsCents: number;
   createdAt: string;
 }
 
@@ -61,6 +64,11 @@ export function VoiceManager() {
   const [editingDescription, setEditingDescription] = useState<string | null>(null);
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [savingDescription, setSavingDescription] = useState(false);
+  const [stripeOnboarded, setStripeOnboarded] = useState(false);
+  const [connectingStripe, setConnectingStripe] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [priceDraft, setPriceDraft] = useState('');
+  const [savingPrice, setSavingPrice] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -82,6 +90,7 @@ export function VoiceManager() {
       if (!response.ok) throw new Error('Failed to fetch voices');
       const voiceData = await response.json();
       setUserClones(voiceData.userClones ?? []);
+      setStripeOnboarded(voiceData.stripeOnboarded ?? false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load voices');
     } finally {
@@ -223,6 +232,52 @@ export function VoiceManager() {
     } finally {
       setSavingDescription(false);
       setEditingDescription(null);
+    }
+  }
+
+  async function handleConnectStripe() {
+    setConnectingStripe(true);
+    try {
+      const response = await fetch('/api/stripe/connect', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to start Stripe onboarding');
+      const { url } = await response.json();
+      window.location.href = url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to connect Stripe');
+      setConnectingStripe(false);
+    }
+  }
+
+  function handleStartEditPrice(voice: VoiceClone) {
+    setEditingPrice(voice.id);
+    setPriceDraft(voice.priceInCents ? (voice.priceInCents / 100).toFixed(2) : '');
+  }
+
+  async function handleSavePrice(voiceCloneId: string) {
+    setSavingPrice(true);
+    try {
+      const priceValue = priceDraft.trim();
+      const priceInCents = priceValue === '' ? null : Math.round(parseFloat(priceValue) * 100);
+
+      if (priceInCents !== null && (isNaN(priceInCents) || priceInCents < 0 || priceInCents > 10000)) {
+        throw new Error('Price must be between $0.00 and $100.00');
+      }
+
+      const response = await fetch('/api/voices/clone', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceCloneId, priceInCents }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update price');
+      }
+      await fetchVoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update price');
+    } finally {
+      setSavingPrice(false);
+      setEditingPrice(null);
     }
   }
 
@@ -374,6 +429,33 @@ export function VoiceManager() {
       )}
 
       <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Stripe Payouts</h3>
+        {stripeOnboarded ? (
+          <div className={styles.stripeConnected}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <polyline points="3 8 7 12 13 4" />
+            </svg>
+            <span>Stripe Connected</span>
+            <a href="/api/stripe/connect" className={styles.stripeDashboardLink}>Dashboard</a>
+          </div>
+        ) : (
+          <div className={styles.stripePrompt}>
+            <p className={styles.stripePromptText}>
+              Connect your Stripe account to set prices on your voices and receive payouts (90% of each sale).
+            </p>
+            <button
+              type="button"
+              className={styles.cloneButton}
+              onClick={handleConnectStripe}
+              disabled={connectingStripe}
+            >
+              {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Cloned Voices</h3>
 
         {userClones.length === 0 ? (
@@ -424,6 +506,52 @@ export function VoiceManager() {
                         </button>
                       )
                     )}
+                    <div className={styles.priceRow}>
+                      {editingPrice === voice.id ? (
+                        <div className={styles.priceEdit}>
+                          <span className={styles.priceCurrency}>$</span>
+                          <input
+                            type="number"
+                            className={styles.priceInput}
+                            value={priceDraft}
+                            onChange={(e) => setPriceDraft(e.target.value)}
+                            onBlur={() => handleSavePrice(voice.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSavePrice(voice.id);
+                              }
+                              if (e.key === 'Escape') setEditingPrice(null);
+                            }}
+                            placeholder="0.00"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            autoFocus
+                            disabled={savingPrice}
+                          />
+                          <span className={styles.priceUnit}>/ podcast</span>
+                          <span className={styles.priceFee}>10% platform fee</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.priceBtn}
+                          onClick={() => handleStartEditPrice(voice)}
+                          disabled={!stripeOnboarded && !voice.priceInCents}
+                          title={stripeOnboarded ? 'Set price' : 'Connect Stripe to set prices'}
+                        >
+                          {voice.priceInCents && voice.priceInCents > 0
+                            ? `$${(voice.priceInCents / 100).toFixed(2)} / podcast`
+                            : 'Free — set a price'}
+                        </button>
+                      )}
+                      {voice.salesCount > 0 && (
+                        <span className={styles.earnings}>
+                          {voice.salesCount} {voice.salesCount === 1 ? 'sale' : 'sales'} — ${(voice.totalEarningsCents / 100).toFixed(2)} earned
+                        </span>
+                      )}
+                    </div>
                     <div className={styles.voiceMeta}>
                       <span
                         className={`${styles.voiceBadge} ${voice.sourceType === 'RECORD' ? styles.badgeRecord : styles.badgeUpload}`}

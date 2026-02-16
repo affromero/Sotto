@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { search, sort, page, limit } = parsed.data;
+  const { search, sort, pricing, page, limit } = parsed.data;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = { requestable: true };
@@ -25,6 +25,21 @@ export async function GET(request: NextRequest) {
       { user: { name: { contains: search, mode: 'insensitive' } } },
       { user: { handle: { contains: search, mode: 'insensitive' } } },
     ];
+  }
+
+  // Pricing filter
+  if (pricing === 'free') {
+    where.OR = where.OR
+      ? { AND: [{ OR: where.OR }, { OR: [{ priceInCents: null }, { priceInCents: 0 }] }] }
+      : { OR: [{ priceInCents: null }, { priceInCents: 0 }] };
+    if (where.OR && !Array.isArray(where.OR)) {
+      // Flatten: move the combined condition
+      const combined = where.OR;
+      delete where.OR;
+      Object.assign(where, combined);
+    }
+  } else if (pricing === 'paid') {
+    where.priceInCents = { gt: 0 };
   }
 
   const orderBy =
@@ -43,6 +58,7 @@ export async function GET(request: NextRequest) {
         name: true,
         description: true,
         sourceType: true,
+        priceInCents: true,
         createdAt: true,
         elevenLabsVoiceId: true,
         user: {
@@ -51,6 +67,7 @@ export async function GET(request: NextRequest) {
             name: true,
             handle: true,
             image: true,
+            stripeOnboarded: true,
           },
         },
         _count: {
@@ -63,36 +80,67 @@ export async function GET(request: NextRequest) {
     prisma.voiceClone.count({ where }),
   ]);
 
-  // Enrich with user's request status if authenticated
+  // Enrich with user's request status and purchase status if authenticated
   let requestStatusMap: Record<string, string> = {};
+  let purchasedSet = new Set<string>();
   if (currentUserId) {
     const voiceIds = voices.map((v) => v.id);
-    const userRequests = await prisma.voiceRequest.findMany({
-      where: {
-        requesterId: currentUserId,
-        voiceCloneId: { in: voiceIds },
-      },
-      select: {
-        voiceCloneId: true,
-        status: true,
-      },
-    });
+
+    const [userRequests, userPurchases, userAllowlist] = await Promise.all([
+      prisma.voiceRequest.findMany({
+        where: { requesterId: currentUserId, voiceCloneId: { in: voiceIds } },
+        select: { voiceCloneId: true, status: true },
+      }),
+      prisma.voicePurchase.findMany({
+        where: {
+          buyerId: currentUserId,
+          voiceCloneId: { in: voiceIds },
+          status: { in: ['authorized', 'captured'] },
+        },
+        select: { voiceCloneId: true },
+      }),
+      prisma.voiceAllowlist.findMany({
+        where: { allowedUserId: currentUserId, voiceCloneId: { in: voiceIds } },
+        select: { voiceCloneId: true },
+      }),
+    ]);
+
     requestStatusMap = Object.fromEntries(
       userRequests.map((r) => [r.voiceCloneId, r.status])
     );
+    purchasedSet = new Set([
+      ...userPurchases.map((p) => p.voiceCloneId),
+      ...userAllowlist.map((a) => a.voiceCloneId),
+    ]);
   }
 
-  const enrichedVoices = voices.map((v) => ({
-    id: v.id,
-    name: v.name,
-    description: v.description,
-    sourceType: v.sourceType,
-    createdAt: v.createdAt.toISOString(),
-    elevenLabsVoiceId: v.elevenLabsVoiceId,
-    owner: v.user,
-    approvedCount: v._count.voiceRequests,
-    requestStatus: requestStatusMap[v.id] ?? null,
-  }));
+  const enrichedVoices = voices.map((v) => {
+    const isOwner = currentUserId === v.user.id;
+    const hasAccess =
+      isOwner ||
+      requestStatusMap[v.id] === 'APPROVED' ||
+      purchasedSet.has(v.id);
+
+    return {
+      id: v.id,
+      name: v.name,
+      description: v.description,
+      sourceType: v.sourceType,
+      priceInCents: v.priceInCents,
+      createdAt: v.createdAt.toISOString(),
+      elevenLabsVoiceId: v.elevenLabsVoiceId,
+      owner: {
+        id: v.user.id,
+        name: v.user.name,
+        handle: v.user.handle,
+        image: v.user.image,
+      },
+      ownerStripeOnboarded: v.user.stripeOnboarded,
+      approvedCount: v._count.voiceRequests,
+      requestStatus: requestStatusMap[v.id] ?? null,
+      hasAccess,
+    };
+  });
 
   return NextResponse.json({
     voices: enrichedVoices,

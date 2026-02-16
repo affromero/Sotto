@@ -1,0 +1,164 @@
+/* Voice Payment Modal */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.description {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Voice line items */
+
+.lineItems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.lineItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-background);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+.voiceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voiceName {
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.voiceOwner {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.voicePrice {
+  font: var(--text-body);
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
+/* Totals */
+
+.totals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.totalRow {
+  display: flex;
+  justify-content: space-between;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.totalRowFinal {
+  display: flex;
+  justify-content: space-between;
+  font: var(--text-body);
+  font-weight: 700;
+  color: var(--color-text-primary);
+  padding-top: var(--spacing-xs);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Card element wrapper */
+
+.cardSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.cardLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.cardElement {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast);
+}
+
+.cardElement:focus-within {
+  border-color: var(--color-primary);
+}
+
+/* Reassurance */
+
+.reassurance {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-caption);
+  color: var(--color-success);
+}
+
+.reassurance svg {
+  flex-shrink: 0;
+}
+
+/* Error */
+
+.error {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-error-lighter);
+  border-radius: var(--radius-md);
+}
+
+/* Actions */
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+}
+
+/* Skip option */
+
+.skipOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: var(--spacing-sm);
+}
+
+.skipButton {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: var(--spacing-xs);
+}
+
+.skipButton:hover {
+  color: var(--color-text-primary);
+}

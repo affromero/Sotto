@@ -13,6 +13,8 @@ import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptEditor } from '@/components/create/ScriptEditor';
 import { ImportUploader } from '@/components/import/ImportUploader';
 import { ImportProgress } from '@/components/import/ImportProgress';
+import { StripeProvider } from '@/components/providers/StripeProvider';
+import { VoicePaymentModal, type VoiceChargeItem } from '@/components/voices/VoicePaymentModal';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
@@ -58,6 +60,8 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
   const [podcastId, setPodcastId] = useState<string | null>(null);
   const [pipelineStatus, setPipelineStatus] = useState<string>('PENDING');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [voiceCharges, setVoiceCharges] = useState<VoiceChargeItem[]>([]);
 
   // Auto-populate topic from URL query parameter (e.g., from Saved Ideas page)
   useEffect(() => {
@@ -85,7 +89,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
     setVoiceSelection(selection);
   }, []);
 
-  const handleGenerate = useCallback(async () => {
+  const createPodcast = useCallback(async (paymentIntentIds?: string[]) => {
     if (!metadata) return;
 
     setStep('scripting');
@@ -115,8 +119,17 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
             expertVoiceId: voiceSelection.expertVoiceId,
             ttsProvider,
             aiModel,
+            ...(paymentIntentIds ? { paymentIntentIds } : {}),
           }),
         });
+      }
+
+      if (response.status === 402) {
+        const data = await response.json();
+        setVoiceCharges(data.voiceCharges);
+        setPaymentModalOpen(true);
+        setStep('voice');
+        return;
       }
 
       if (!response.ok) {
@@ -132,6 +145,15 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
       setStep('voice');
     }
   }, [metadata, voiceSelection, ttsProvider, aiModel, durationTarget, createAsSotto]);
+
+  const handleGenerate = useCallback(async () => {
+    await createPodcast();
+  }, [createPodcast]);
+
+  const handlePaymentComplete = useCallback(async (paymentIntentIds: string[]) => {
+    setPaymentModalOpen(false);
+    await createPodcast(paymentIntentIds);
+  }, [createPodcast]);
 
   // Poll during scripting phase (waiting for SCRIPT_READY)
   const scriptingPollRef = useRef(false);
@@ -427,6 +449,17 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
           </div>
         )}
       </div>
+
+      {paymentModalOpen && (
+        <StripeProvider>
+          <VoicePaymentModal
+            isOpen={paymentModalOpen}
+            onClose={() => setPaymentModalOpen(false)}
+            voiceCharges={voiceCharges}
+            onPaymentComplete={handlePaymentComplete}
+          />
+        </StripeProvider>
+      )}
     </main>
   );
 }

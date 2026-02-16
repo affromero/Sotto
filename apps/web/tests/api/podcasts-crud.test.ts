@@ -82,6 +82,10 @@ vi.mock('@/lib/stripe', () => ({
   LIMITS: { maxDurationMinutes: 60 },
 }));
 
+vi.mock('@/lib/voice-pricing', () => ({
+  computeVoiceCharges: vi.fn().mockResolvedValue([]),
+}));
+
 import { GET as getList, POST as createPodcast } from '@/app/api/podcasts/route';
 import {
   GET as getPodcast,

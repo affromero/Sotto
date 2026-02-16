@@ -14,6 +14,7 @@ interface VoicesClientProps {
 }
 
 type SortOption = 'newest' | 'most_requested';
+type PricingFilter = 'all' | 'free' | 'paid';
 
 export function VoicesClient({
   initialVoices,
@@ -25,13 +26,14 @@ export function VoicesClient({
   const [total, setTotal] = useState(totalVoices);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortOption>('newest');
+  const [pricing, setPricing] = useState<PricingFilter>('all');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchVoices = useCallback(
-    async (params: { search?: string; sort?: SortOption; page?: number; append?: boolean }) => {
+    async (params: { search?: string; sort?: SortOption; pricing?: PricingFilter; page?: number; append?: boolean }) => {
       const isAppend = params.append ?? false;
       if (isAppend) {
         setLoadingMore(true);
@@ -43,6 +45,8 @@ export function VoicesClient({
         const searchParams = new URLSearchParams();
         if (params.search) searchParams.set('search', params.search);
         searchParams.set('sort', params.sort ?? sort);
+        const pricingValue = params.pricing ?? pricing;
+        if (pricingValue !== 'all') searchParams.set('pricing', pricingValue);
         searchParams.set('page', String(params.page ?? 1));
         searchParams.set('limit', '24');
 
@@ -61,7 +65,7 @@ export function VoicesClient({
         setLoadingMore(false);
       }
     },
-    [sort]
+    [sort, pricing]
   );
 
   function handleSearchChange(value: string) {
@@ -78,13 +82,20 @@ export function VoicesClient({
     if (newSort === sort) return;
     setSort(newSort);
     setPage(1);
-    fetchVoices({ search, sort: newSort, page: 1 });
+    fetchVoices({ search, sort: newSort, pricing, page: 1 });
+  }
+
+  function handlePricingChange(newPricing: PricingFilter) {
+    if (newPricing === pricing) return;
+    setPricing(newPricing);
+    setPage(1);
+    fetchVoices({ search, sort, pricing: newPricing, page: 1 });
   }
 
   function handleLoadMore() {
     const nextPage = page + 1;
     setPage(nextPage);
-    fetchVoices({ search, page: nextPage, append: true });
+    fetchVoices({ search, pricing, page: nextPage, append: true });
   }
 
   function handleRequestStatusChange(voiceId: string, status: string) {
@@ -128,6 +139,32 @@ export function VoicesClient({
               onClick={() => handleSortChange('most_requested')}
             >
               Most Requested
+            </button>
+          </div>
+        </div>
+        <div className={cardStyles.sortRow}>
+          <span className={cardStyles.sortLabel}>Pricing</span>
+          <div className={cardStyles.pillGroup}>
+            <button
+              type="button"
+              className={`${cardStyles.pill} ${pricing === 'all' ? cardStyles.pillActive : ''}`}
+              onClick={() => handlePricingChange('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`${cardStyles.pill} ${pricing === 'free' ? cardStyles.pillActive : ''}`}
+              onClick={() => handlePricingChange('free')}
+            >
+              Free
+            </button>
+            <button
+              type="button"
+              className={`${cardStyles.pill} ${pricing === 'paid' ? cardStyles.pillActive : ''}`}
+              onClick={() => handlePricingChange('paid')}
+            >
+              Paid
             </button>
           </div>
         </div>

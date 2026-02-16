@@ -129,6 +129,39 @@
   color: var(--color-accent);
 }
 
+.priceBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font: var(--text-body-sm);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--color-primary);
+}
+
+.freeBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font: var(--text-body-sm);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803D;
+}
+
+.accessBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font: var(--text-body-sm);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+}
+
 .usedBy {
   font: var(--text-caption);
   color: var(--color-text-secondary);

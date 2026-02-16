@@ -5,6 +5,7 @@ import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { computeVoiceCharges } from '@/lib/voice-pricing';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -71,6 +72,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // Check if the source podcast's voices are paid and forker needs to pay
+  const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
+  const skipPaidVoices = body.skipPaidVoices === true;
+  let forkHostVoiceId = sourcePodcast.hostVoiceId;
+  let forkExpertVoiceId = sourcePodcast.expertVoiceId;
+
+  if (!skipPaidVoices && !paymentIntentIds && (forkHostVoiceId || forkExpertVoiceId)) {
+    const voiceCharges = await computeVoiceCharges(
+      userId,
+      forkHostVoiceId ?? undefined,
+      forkExpertVoiceId ?? undefined
+    );
+
+    if (voiceCharges.length > 0) {
+      return NextResponse.json(
+        {
+          requiresPayment: true,
+          voiceCharges,
+          sourceTitle: sourcePodcast.title,
+        },
+        { status: 402 }
+      );
+    }
+  }
+
+  // If skipping paid voices, clear the voice IDs so the pool will be used instead
+  if (skipPaidVoices) {
+    forkHostVoiceId = null;
+    forkExpertVoiceId = null;
+  }
+
+  // Verify provided payment intents
+  if (paymentIntentIds) {
+    for (const piId of paymentIntentIds) {
+      const purchase = await prisma.voicePurchase.findUnique({
+        where: { stripePaymentIntent: piId },
+      });
+      if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== userId) {
+        return NextResponse.json({ error: 'Invalid or unauthorized payment' }, { status: 400 });
+      }
+    }
+  }
+
   // Create fork podcast + discovery in a transaction
   const forkedPodcast = await prisma.$transaction(async (tx) => {
     const newPodcast = await tx.podcast.create({
@@ -81,6 +125,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         remixNote: remixNote || null,
         status: 'PENDING',
         forkedFromId: podcastId,
+        hostVoiceId: forkHostVoiceId,
+        expertVoiceId: forkExpertVoiceId,
       },
     });
 
@@ -118,6 +164,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     return newPodcast;
   });
+
+  // Link VoicePurchase records to the forked podcast
+  if (paymentIntentIds) {
+    await prisma.voicePurchase.updateMany({
+      where: { stripePaymentIntent: { in: paymentIntentIds } },
+      data: { podcastId: forkedPodcast.id },
+    });
+  }
 
   // Set status to EXTRACTING and enqueue generation
   await prisma.podcast.update({

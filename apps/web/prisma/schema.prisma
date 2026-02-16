@@ -110,6 +110,13 @@ model User {
   // Free tier
   freeGenerationsUsed Int @default(0)
 
+  // Stripe Connect (voice monetization)
+  stripeAccountId  String?
+  stripeOnboarded  Boolean @default(false)
+
+  // Voice purchases
+  voicePurchases VoicePurchase[] @relation("VoiceBuyer")
+
   @@index([role])
   @@index([handle])
 }
@@ -250,6 +257,7 @@ model Podcast {
   comments         Comment[]
   collectionItems  CollectionItem[]
   savedIdea        SavedIdea?
+  voicePurchases   VoicePurchase[]
 
   @@index([userId])
   @@index([status])
@@ -1086,11 +1094,13 @@ model VoiceClone {
   sampleUrl         String?
   description       String?          @db.VarChar(200)
   requestable       Boolean          @default(false)
+  priceInCents      Int?             // null = free, 0+ = paid per-podcast
   createdAt         DateTime         @default(now())
 
-  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  voiceRequests VoiceRequest[]
-  allowlist     VoiceAllowlist[]
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voiceRequests  VoiceRequest[]
+  allowlist      VoiceAllowlist[]
+  voicePurchases VoicePurchase[]
 
   @@index([userId])
 }
@@ -1309,4 +1319,28 @@ model FreeTierConfig {
   generationLimit Int      @default(3)
   updatedAt       DateTime @updatedAt
   updatedBy       String?
+}
+
+// ============ VOICE PURCHASES (Stripe) ============
+
+model VoicePurchase {
+  id                  String   @id @default(cuid())
+  buyerId             String
+  voiceCloneId        String
+  podcastId           String
+  amountCents         Int
+  platformFeeCents    Int
+  stripePaymentIntent String   @unique
+  status              String   @default("authorized") // authorized | captured | cancelled | refunded
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  buyer      User       @relation("VoiceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  voiceClone VoiceClone @relation(fields: [voiceCloneId], references: [id], onDelete: Cascade)
+  podcast    Podcast    @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([buyerId])
+  @@index([voiceCloneId])
+  @@index([podcastId])
+  @@index([stripePaymentIntent])
 }

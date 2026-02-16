@@ -15,6 +15,7 @@ import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
+import { capturePodcastPayments } from '@/lib/voice-pricing';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -223,6 +224,14 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         fileSize: finalAudio.length,
         currentVersion: newVersion,
       },
+    });
+
+    // 9a. Capture voice payments on successful generation
+    await capturePodcastPayments(podcastId).catch((err) => {
+      logger.error('Failed to capture voice payments', {
+        podcastId,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
     // 9. Update segment start times based on actual durations from FFprobe
