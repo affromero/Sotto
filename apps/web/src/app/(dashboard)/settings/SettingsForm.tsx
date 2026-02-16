@@ -13,6 +13,7 @@ import { TasteQuiz } from '@/components/discovery/TasteQuiz';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
+import { ThemeSelector } from '@/components/settings/ThemeSelector';
 import styles from './page.module.css';
 
 interface VoiceCloneData {
@@ -296,6 +297,13 @@ export function SettingsForm({
 
   return (
     <div className={styles.sections}>
+      {/* Appearance Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Appearance</h2>
+        <p className={styles.sectionDesc}>Choose your preferred theme</p>
+        <ThemeSelector />
+      </section>
+
       {/* Profile Section */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Profile</h2>
