@@ -41,7 +41,10 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
 
   if (sourceUrl) {
     const extracted = await extractContent(sourceUrl);
-    content = extracted.markdown || extracted.text;
+    const urlContent = extracted.markdown || extracted.text;
+    content = content
+      ? `${content}\n\n---\n\n## Referenced Article\n\n${urlContent}`
+      : urlContent;
     sourceMetadata = {
       title: extracted.title,
       author: extracted.author,

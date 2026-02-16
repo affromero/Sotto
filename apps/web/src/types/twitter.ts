@@ -8,6 +8,9 @@ export interface TweetParseResult {
   tone: 'casual' | 'professional' | 'socratic';
   focusAreas: string[];
   sourceUrl?: string;
+  sourceUrls?: string[];
+  isDebate?: boolean;
+  viewpoints?: string[];
 }
 
 export interface TwitterTweet {
@@ -20,6 +23,34 @@ export interface TwitterTweet {
     id: string;
   }>;
   created_at: string;
+  conversation_id?: string;
+  entities?: {
+    urls?: Array<{
+      start: number;
+      end: number;
+      url: string;
+      expanded_url: string;
+      display_url: string;
+    }>;
+  };
+}
+
+export interface ThreadTweet {
+  id: string;
+  text: string;
+  authorId: string;
+  authorUsername: string;
+  authorName: string;
+  urls: string[];
+  createdAt: string;
+  inReplyToTweetId?: string;
+}
+
+export interface ThreadData {
+  rootTweet: ThreadTweet;
+  replies: ThreadTweet[];
+  participantCount: number;
+  tweetCount: number;
 }
 
 export interface TwitterMention {
