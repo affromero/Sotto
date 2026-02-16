@@ -6,6 +6,7 @@ import styles from './VoiceManager.module.css';
 interface VoiceClone {
   id: string;
   name: string;
+  description: string | null;
   elevenLabsVoiceId: string;
   sourceType: 'UPLOAD' | 'RECORD';
   requestable: boolean;
@@ -57,6 +58,9 @@ export function VoiceManager() {
   const [activeVoiceId, setActiveVoiceId] = useState<string | null>(null);
   const [addingToAllowlist, setAddingToAllowlist] = useState(false);
   const [removingEntry, setRemovingEntry] = useState<string | null>(null);
+  const [editingDescription, setEditingDescription] = useState<string | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -195,6 +199,30 @@ export function VoiceManager() {
       setError('Failed to update voice sharing setting');
     } finally {
       setTogglingRequestable(null);
+    }
+  }
+
+  function handleStartEditDescription(voice: VoiceClone) {
+    setEditingDescription(voice.id);
+    setDescriptionDraft(voice.description ?? '');
+  }
+
+  async function handleSaveDescription(voiceCloneId: string) {
+    setSavingDescription(true);
+    try {
+      const response = await fetch('/api/voices/clone', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ voiceCloneId, description: descriptionDraft.trim() }),
+      });
+      if (response.ok) {
+        await fetchVoices();
+      }
+    } catch {
+      setError('Failed to update description');
+    } finally {
+      setSavingDescription(false);
+      setEditingDescription(null);
     }
   }
 
@@ -359,6 +387,43 @@ export function VoiceManager() {
                 <div className={styles.voiceItem}>
                   <div>
                     <div className={styles.voiceName}>{voice.name}</div>
+                    {voice.requestable && (
+                      editingDescription === voice.id ? (
+                        <div className={styles.descriptionEdit}>
+                          <textarea
+                            className={styles.descriptionTextarea}
+                            value={descriptionDraft}
+                            onChange={(e) => setDescriptionDraft(e.target.value)}
+                            onBlur={() => handleSaveDescription(voice.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveDescription(voice.id);
+                              }
+                              if (e.key === 'Escape') {
+                                setEditingDescription(null);
+                              }
+                            }}
+                            placeholder="Add a description for the marketplace..."
+                            maxLength={200}
+                            rows={2}
+                            autoFocus
+                            disabled={savingDescription}
+                          />
+                          <span className={styles.descriptionCount}>
+                            {descriptionDraft.length}/200
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.descriptionBtn}
+                          onClick={() => handleStartEditDescription(voice)}
+                        >
+                          {voice.description || 'Add a description for the marketplace...'}
+                        </button>
+                      )
+                    )}
                     <div className={styles.voiceMeta}>
                       <span
                         className={`${styles.voiceBadge} ${voice.sourceType === 'RECORD' ? styles.badgeRecord : styles.badgeUpload}`}

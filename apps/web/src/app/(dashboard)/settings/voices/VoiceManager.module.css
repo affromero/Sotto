@@ -79,6 +79,58 @@
   margin: 0 0 var(--spacing-xs) 0;
 }
 
+.descriptionBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: var(--spacing-xs);
+  transition: color var(--transition-fast);
+}
+
+.descriptionBtn:hover {
+  color: var(--color-primary);
+}
+
+.descriptionEdit {
+  position: relative;
+  margin-bottom: var(--spacing-xs);
+}
+
+.descriptionTextarea {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font: var(--text-body-sm);
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  resize: none;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+}
+
+.descriptionTextarea:focus {
+  outline: none;
+}
+
+.descriptionTextarea:disabled {
+  opacity: 0.5;
+}
+
+.descriptionCount {
+  position: absolute;
+  right: var(--spacing-sm);
+  bottom: var(--spacing-xs);
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
 .voiceMeta {
   display: flex;
   align-items: center;
