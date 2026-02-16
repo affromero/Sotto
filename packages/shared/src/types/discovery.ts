@@ -23,3 +23,17 @@ export interface DiscoveryState {
   isLoading: boolean;
   isComplete: boolean;
 }
+
+export interface TasteQuestion {
+  id: string;
+  text: string;
+  tagSlugs: string[];
+  category: string;
+}
+
+export interface TasteAnswer {
+  questionId: string;
+  question: string;
+  tagSlugs: string[];
+  response: 'yes' | 'no' | 'skip';
+}

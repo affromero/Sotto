@@ -333,6 +333,16 @@ export const userDiscoverySearchSchema = z.object({
 });
 
 /**
+ * Saved idea validation
+ */
+export const savedIdeaSchema = z.object({
+  questionId: z.string().min(1).max(20),
+  question: z.string().min(1).max(500),
+  tagSlugs: z.array(z.string().min(1).max(100)).min(1).max(3),
+  category: z.string().min(1).max(100),
+});
+
+/**
  * Taste quiz question request validation
  */
 export const tasteQuizQuerySchema = z.object({
