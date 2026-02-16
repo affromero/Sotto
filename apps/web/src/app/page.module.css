@@ -1149,34 +1149,16 @@
   color: var(--color-text-tertiary);
 }
 
-.vsMockToggle {
-  display: flex;
+.vsMockPriceTag {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-}
-
-.vsMockToggleTrack {
-  width: 36px;
-  height: 20px;
-  background: var(--color-primary);
-  border-radius: var(--radius-full);
-  position: relative;
-}
-
-.vsMockToggleThumb {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 16px;
-  height: 16px;
-  background: #fff;
-  border-radius: 50%;
-}
-
-.vsMockToggleLabel {
+  padding: 4px 10px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-primary);
+  background: rgba(217, 119, 6, 0.1);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
 }
 
 .vsMockRequest {
