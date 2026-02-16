@@ -117,8 +117,16 @@ export const createApiKeySchema = z.object({
 export const voiceBrowseQuerySchema = z.object({
   search: z.string().max(100).optional(),
   sort: z.enum(['newest', 'most_requested']).default('newest'),
+  pricing: z.enum(['all', 'free', 'paid']).default('all'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(24),
+});
+
+/**
+ * Voice price update validation
+ */
+export const voicePriceSchema = z.object({
+  priceInCents: z.number().int().min(0).max(10000).nullable(), // $0-$100, null = free
 });
 
 /**

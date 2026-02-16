@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
+const mockUserFindUniqueOrThrow = vi.fn();
 const mockVoiceCloneFindMany = vi.fn();
 const mockVoiceCloneCount = vi.fn();
 const mockVoiceCloneFindUnique = vi.fn();
@@ -21,6 +22,9 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
+    },
     voiceClone: {
       findMany: (...args: unknown[]) => mockVoiceCloneFindMany(...args),
       count: (...args: unknown[]) => mockVoiceCloneCount(...args),
@@ -128,6 +132,10 @@ const mockVoiceClone2 = {
 describe('GET /api/voices', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUniqueOrThrow.mockResolvedValue({
+      stripeAccountId: null,
+      stripeOnboarded: false,
+    });
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
     mockVoiceRequestFindMany.mockResolvedValue([]);
   });
@@ -144,7 +152,9 @@ describe('GET /api/voices', () => {
 
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindMany.mockResolvedValue([mockVoiceClone]);
+    mockVoiceCloneFindMany.mockResolvedValue([
+      { ...mockVoiceClone, description: null, requestable: false, priceInCents: null, voicePurchases: [] },
+    ]);
 
     const response = await GET();
     const body = await response.json();
@@ -166,14 +176,22 @@ describe('GET /api/voices', () => {
         name: 'My Voice',
         elevenLabsVoiceId: 'el-voice-1',
         sourceType: 'UPLOAD',
+        description: null,
+        requestable: false,
+        priceInCents: null,
         createdAt: mockVoiceClone.createdAt,
+        voicePurchases: [],
       },
       {
         id: 'clone-2',
         name: 'Another Voice',
         elevenLabsVoiceId: 'el-voice-2',
         sourceType: 'RECORD',
+        description: null,
+        requestable: false,
+        priceInCents: null,
         createdAt: mockVoiceClone2.createdAt,
+        voicePurchases: [],
       },
     ]);
 
@@ -191,8 +209,8 @@ describe('GET /api/voices', () => {
 
   it('returns sharedVoices including allowlisted voices', async () => {
     mockAuth.mockResolvedValue(mockSession);
-    mockVoiceCloneFindMany.mockResolvedValue([]);
-    mockVoiceRequestFindMany.mockResolvedValue([]);
+    mockVoiceCloneFindMany.mockResolvedValue([]); // no user clones
+    mockVoiceRequestFindMany.mockResolvedValue([]); // no approved requests
     mockVoiceAllowlistFindMany.mockResolvedValue([
       {
         voiceClone: {

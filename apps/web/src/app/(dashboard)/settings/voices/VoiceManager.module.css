@@ -542,6 +542,124 @@
   margin: 0 0 var(--spacing-lg) 0;
 }
 
+/* Stripe Connect */
+
+.stripeConnected {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.stripeDashboardLink {
+  margin-left: auto;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.stripeDashboardLink:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
+.stripePrompt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.stripePromptText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Price row */
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.priceBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  background: none;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.priceBtn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.priceBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.priceEdit {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.priceCurrency {
+  font: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.priceInput {
+  width: 80px;
+  padding: 4px 8px;
+  font: var(--text-body-sm);
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.1);
+}
+
+.priceInput:focus {
+  outline: none;
+}
+
+.priceInput:disabled {
+  opacity: 0.5;
+}
+
+.priceUnit {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.priceFee {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.earnings {
+  font: var(--text-caption);
+  color: var(--color-success);
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
   .container {
     padding: var(--spacing-md);

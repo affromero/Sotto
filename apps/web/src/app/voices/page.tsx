@@ -26,6 +26,7 @@ export default async function VoicesPage() {
         name: true,
         description: true,
         sourceType: true,
+        priceInCents: true,
         createdAt: true,
         elevenLabsVoiceId: true,
         user: {
@@ -34,6 +35,7 @@ export default async function VoicesPage() {
             name: true,
             handle: true,
             image: true,
+            stripeOnboarded: true,
           },
         },
         _count: {
@@ -46,36 +48,65 @@ export default async function VoicesPage() {
     prisma.voiceClone.count({ where: { requestable: true } }),
   ]);
 
-  // Enrich with request status if authenticated
+  // Enrich with request status and access if authenticated
   let requestStatusMap: Record<string, string> = {};
+  let accessSet = new Set<string>();
   if (currentUserId) {
     const voiceIds = voices.map((v) => v.id);
-    const userRequests = await prisma.voiceRequest.findMany({
-      where: {
-        requesterId: currentUserId,
-        voiceCloneId: { in: voiceIds },
-      },
-      select: {
-        voiceCloneId: true,
-        status: true,
-      },
-    });
+    const [userRequests, userPurchases, userAllowlist] = await Promise.all([
+      prisma.voiceRequest.findMany({
+        where: { requesterId: currentUserId, voiceCloneId: { in: voiceIds } },
+        select: { voiceCloneId: true, status: true },
+      }),
+      prisma.voicePurchase.findMany({
+        where: {
+          buyerId: currentUserId,
+          voiceCloneId: { in: voiceIds },
+          status: { in: ['authorized', 'captured'] },
+        },
+        select: { voiceCloneId: true },
+      }),
+      prisma.voiceAllowlist.findMany({
+        where: { allowedUserId: currentUserId, voiceCloneId: { in: voiceIds } },
+        select: { voiceCloneId: true },
+      }),
+    ]);
     requestStatusMap = Object.fromEntries(
       userRequests.map((r) => [r.voiceCloneId, r.status])
     );
+    accessSet = new Set([
+      ...userPurchases.map((p) => p.voiceCloneId),
+      ...userAllowlist.map((a) => a.voiceCloneId),
+    ]);
   }
 
-  const serializedVoices = voices.map((v) => ({
-    id: v.id,
-    name: v.name,
-    description: v.description,
-    sourceType: v.sourceType,
-    createdAt: v.createdAt.toISOString(),
-    elevenLabsVoiceId: v.elevenLabsVoiceId,
-    owner: v.user,
-    approvedCount: v._count.voiceRequests,
-    requestStatus: requestStatusMap[v.id] ?? null,
-  }));
+  const serializedVoices = voices.map((v) => {
+    const isOwner = currentUserId === v.user.id;
+    const hasAccess =
+      isOwner ||
+      requestStatusMap[v.id] === 'APPROVED' ||
+      accessSet.has(v.id);
+
+    return {
+      id: v.id,
+      name: v.name,
+      description: v.description,
+      sourceType: v.sourceType,
+      priceInCents: v.priceInCents,
+      createdAt: v.createdAt.toISOString(),
+      elevenLabsVoiceId: v.elevenLabsVoiceId,
+      owner: {
+        id: v.user.id,
+        name: v.user.name,
+        handle: v.user.handle,
+        image: v.user.image,
+      },
+      ownerStripeOnboarded: v.user.stripeOnboarded,
+      approvedCount: v._count.voiceRequests,
+      requestStatus: requestStatusMap[v.id] ?? null,
+      hasAccess,
+    };
+  });
 
   const topBarUser = session?.user
     ? { name: session.user.name, image: session.user.image, id: session.user.id }
