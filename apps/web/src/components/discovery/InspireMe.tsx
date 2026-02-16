@@ -43,7 +43,7 @@ function buildUrl(params: Record<string, string | undefined>): string {
 
 export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<Section>('forYou');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(open);
   const [forYouQuestions, setForYouQuestions] = useState<TasteQuestion[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<PodcastSummary[]>([]);
   const [newsQuestions, setNewsQuestions] = useState<TasteQuestion[]>([]);
