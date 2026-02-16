@@ -41,7 +41,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const msg =
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
-        : 'AI provider not configured.';
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
