@@ -392,7 +392,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {podcast.forkedFrom && <ForkAttribution forkedFrom={podcast.forkedFrom} />}
 
       {/* Failed state */}
-      {podcast.status === 'FAILED' && isOwner && (
+      {liveStatus === 'FAILED' && isOwner && (
         <div className={styles.failedState}>
           <p className={styles.failedText}>
             {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
@@ -537,7 +537,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                   label: pdfLoading ? 'Generating PDF...' : 'PDF Transcript',
                   onClick: handleExportPdf,
                 }] : []),
-                ...(isOwner && podcast.status !== 'FAILED' ? [{
+                ...(isOwner && liveStatus !== 'FAILED' ? [{
                   icon: <Trash2 size={16} />,
                   label: 'Delete',
                   onClick: () => setShowDeleteConfirm(true),
