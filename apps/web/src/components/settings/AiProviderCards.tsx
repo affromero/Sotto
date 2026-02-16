@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
@@ -10,7 +11,8 @@ const PROVIDERS = [
   {
     id: 'anthropic' as const,
     name: 'Anthropic (Claude)',
-    description: 'Best for script generation and creative writing',
+    description: 'Better script generation and creative writing',
+    badge: 'optional' as const,
     placeholder: 'sk-ant-...',
     getKeyUrl: 'https://console.anthropic.com/settings/keys',
   },
@@ -18,13 +20,15 @@ const PROVIDERS = [
     id: 'openai' as const,
     name: 'OpenAI',
     description: 'Covers both LLM and TTS with one key',
+    badge: 'optional' as const,
     placeholder: 'sk-...',
     getKeyUrl: 'https://platform.openai.com/api-keys',
   },
   {
     id: 'groq' as const,
     name: 'Groq',
-    description: 'Free Whisper transcription — sign up at console.groq.com',
+    description: 'Free Whisper transcription — no credit card needed',
+    badge: 'free' as const,
     placeholder: 'gsk_...',
     getKeyUrl: 'https://console.groq.com/keys',
   },
@@ -124,7 +128,11 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
               <div className={styles.cardHeaderLeft}>
                 <TtsProviderLogo provider={provider.id} size={28} />
                 <div className={styles.cardInfo}>
-                  <span className={styles.cardName}>{provider.name}</span>
+                  <span className={styles.cardNameRow}>
+                    <span className={styles.cardName}>{provider.name}</span>
+                    {provider.badge === 'free' && <Badge variant="success">Free</Badge>}
+                    {provider.badge === 'optional' && <Badge variant="system">Optional</Badge>}
+                  </span>
                   <span className={styles.cardQuality}>{provider.description}</span>
                 </div>
               </div>
