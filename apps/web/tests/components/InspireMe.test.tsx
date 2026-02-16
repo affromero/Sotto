@@ -371,8 +371,8 @@ describe('InspireMe', () => {
 
     await waitFor(() => {
       // Should have called without topic again (3rd call)
-      const calls = fetchMock.mock.calls.map((c: string[][]) => c[0]);
-      expect(calls.filter((url: string) => url === '/api/inspire/all').length).toBeGreaterThanOrEqual(2);
+      const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string);
+      expect(calls.filter((url) => url === '/api/inspire/all').length).toBeGreaterThanOrEqual(2);
     });
   });
 });
