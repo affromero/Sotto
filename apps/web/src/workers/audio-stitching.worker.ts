@@ -6,6 +6,7 @@ import {
   notificationQueue,
   twitterReplyQueue,
   telegramReplyQueue,
+  twitterAutoTweetQueue,
 } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
@@ -260,6 +261,17 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       message: `"${podcast.title}" is ready to play.`,
       data: { podcastId },
     });
+
+    // 10b. If this podcast has a pending trend auto-tweet, queue it
+    const pendingAutoTweet = await prisma.twitterAutoTweet.findFirst({
+      where: { podcastId, trigger: 'trend', status: 'pending' },
+    });
+    if (pendingAutoTweet) {
+      await addJob(twitterAutoTweetQueue, JobType.AUTO_TWEET, {
+        podcastId,
+        trigger: 'trend' as const,
+      });
+    }
 
     // 11. If generated from Twitter, queue a reply to the original tweet
     if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
