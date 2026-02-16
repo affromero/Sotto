@@ -3,23 +3,21 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Bookmark } from 'lucide-react';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
-import { Spinner } from '@/components/ui/Spinner';
 import styles from './InspireQuiz.module.css';
 
 interface InspireQuizProps {
-  section: 'forYou' | 'trending' | 'news';
+  questions: TasteQuestion[];
   onSelectTopic: (topic: string) => void;
+  onLoadMore: () => void;
+  isLoadingMore: boolean;
 }
 
 type Direction = 'left' | 'right' | null;
 
-export function InspireQuiz({ section, onSelectTopic }: InspireQuizProps) {
-  const [questions, setQuestions] = useState<TasteQuestion[]>([]);
+export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMore }: InspireQuizProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [exitDirection, setExitDirection] = useState<Direction>(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
@@ -33,30 +31,13 @@ export function InspireQuiz({ section, onSelectTopic }: InspireQuizProps) {
   const total = questions.length;
   const progress = total > 0 ? (currentIndex / total) * 100 : 0;
 
-  const fetchQuestions = useCallback(async () => {
-    const res = await fetch(`/api/inspire/questions?section=${section}&count=6`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.questions ?? []) as TasteQuestion[];
-  }, [section]);
-
+  // Reset state when questions change (new tab or load more)
   useEffect(() => {
-    let cancelled = false;
-    setIsLoading(true);
-    setQuestions([]);
     setCurrentIndex(0);
     setIsDone(false);
-
-    fetchQuestions().then((q) => {
-      if (cancelled) return;
-      setQuestions(q);
-      setIsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchQuestions]);
+    setExitDirection(null);
+    setSwipeOffset(0);
+  }, [questions]);
 
   // Cleanup saved feedback timer
   useEffect(() => {
@@ -172,26 +153,9 @@ export function InspireQuiz({ section, onSelectTopic }: InspireQuizProps) {
     touchDeltaX.current = 0;
   };
 
-  const handleLoadMore = async () => {
-    setIsLoadingMore(true);
-    try {
-      const moreQuestions = await fetchQuestions();
-      setQuestions(moreQuestions);
-      setCurrentIndex(0);
-      setIsDone(false);
-    } finally {
-      setIsLoadingMore(false);
-    }
+  const handleLoadMore = () => {
+    onLoadMore();
   };
-
-  if (isLoading) {
-    return (
-      <div className={styles.loading}>
-        <Spinner size="large" />
-        <p className={styles.loadingText}>Finding ideas for you...</p>
-      </div>
-    );
-  }
 
   if (questions.length === 0) {
     return (
