@@ -7,6 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { LIMITS } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { computeVoiceCharges } from '@/lib/voice-pricing';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 export async function GET(request: NextRequest) {
@@ -87,6 +88,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Check if selected voices require payment (skip if paymentIntentIds provided)
+  const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
+  if (!paymentIntentIds) {
+    const voiceCharges = await computeVoiceCharges(
+      authResult.userId,
+      parsed.data.hostVoiceId,
+      parsed.data.expertVoiceId
+    );
+
+    if (voiceCharges.length > 0) {
+      return NextResponse.json(
+        {
+          requiresPayment: true,
+          voiceCharges,
+        },
+        { status: 402 }
+      );
+    }
+  } else {
+    // Verify all provided PaymentIntents are authorized
+    for (const piId of paymentIntentIds) {
+      const purchase = await prisma.voicePurchase.findUnique({
+        where: { stripePaymentIntent: piId },
+      });
+      if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== authResult.userId) {
+        return NextResponse.json(
+          { error: 'Invalid or unauthorized payment' },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
   const podcast = await prisma.podcast.create({
     data: {
       userId: authResult.userId,
@@ -99,6 +133,14 @@ export async function POST(request: NextRequest) {
       aiModel: parsed.data.aiModel ?? null,
     },
   });
+
+  // Link existing VoicePurchase records to this podcast
+  if (paymentIntentIds) {
+    await prisma.voicePurchase.updateMany({
+      where: { stripePaymentIntent: { in: paymentIntentIds } },
+      data: { podcastId: podcast.id },
+    });
+  }
 
   // Create Discovery record from metadata
   if (parsed.data.metadata) {
