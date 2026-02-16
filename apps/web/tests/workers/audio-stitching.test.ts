@@ -19,6 +19,7 @@ const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -43,6 +44,9 @@ vi.mock('@/lib/prisma', () => ({
     telegramMessage: {
       findFirst: (...args: unknown[]) => mockPrismaTelegramMessageFindFirst(...args),
       update: (...args: unknown[]) => mockPrismaTelegramMessageUpdate(...args),
+    },
+    twitterAutoTweet: {
+      findFirst: (...args: unknown[]) => mockPrismaTwitterAutoTweetFindFirst(...args),
     },
   },
 }));
@@ -71,10 +75,12 @@ vi.mock('@/lib/queue', () => ({
     SEND_NOTIFICATION: 'send_notification',
     REPLY_TWITTER: 'reply_twitter',
     REPLY_TELEGRAM: 'reply_telegram',
+    AUTO_TWEET: 'AUTO_TWEET',
   },
   notificationQueue: { name: 'notifications' },
   twitterReplyQueue: { name: 'twitter-reply' },
   telegramReplyQueue: { name: 'telegram-reply' },
+  twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
 }));
 
 const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio'));

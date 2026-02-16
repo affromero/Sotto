@@ -34,6 +34,7 @@
 | `/admin/moderation`          | `(admin)/admin/moderation/page.tsx`        | Yes (ADMIN only)            | Failed podcasts + feedback review                        |
 | `/admin/handles`             | `(admin)/admin/handles/page.tsx`           | Yes (ADMIN only)            | Reserved handle management                               |
 | `/admin/config`              | `(admin)/admin/config/page.tsx`            | Yes (ADMIN only)            | Free tier config (AI/TTS provider, model, generation limit) |
+| `/admin/twitter`             | `(admin)/admin/twitter/page.tsx`           | Yes (ADMIN only)            | Twitter dashboard (analytics, auto-tweet, trends, thread→podcast) |
 
 ## API Route Index
 
@@ -128,6 +129,11 @@
 | `/api/ai-models`                                                 | GET              | Yes        | List available AI models for user's BYOK provider                           |
 | `/api/settings/byok`                                             | GET/POST/DELETE  | Yes        | Multi-provider TTS BYOK key management (5 providers)                        |
 | `/api/admin/config`                                              | GET/PATCH        | ADMIN      | Free tier configuration (AI/TTS provider, model, generation limit)          |
+| `/api/admin/twitter/config`                                      | GET/PATCH        | ADMIN      | Twitter admin config (auto-tweet thresholds, trend polling, template)        |
+| `/api/admin/twitter/auto-tweet`                                  | GET/POST         | ADMIN      | List recent auto-tweets / manual "Tweet this"                               |
+| `/api/admin/twitter/trends`                                      | GET/POST         | ADMIN      | Live trending topics / generate podcast from topic                          |
+| `/api/admin/twitter/thread-to-podcast`                           | POST             | ADMIN      | Queue thread-to-podcast conversion job                                      |
+| `/api/admin/twitter/analytics`                                   | GET              | ADMIN      | 30-day Twitter engagement analytics                                         |
 
 ## Route Groups
 

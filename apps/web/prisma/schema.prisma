@@ -258,6 +258,7 @@ model Podcast {
   collectionItems  CollectionItem[]
   savedIdea        SavedIdea?
   voicePurchases   VoicePurchase[]
+  autoTweets       TwitterAutoTweet[]
 
   @@index([userId])
   @@index([status])
@@ -1343,4 +1344,38 @@ model VoicePurchase {
   @@index([voiceCloneId])
   @@index([podcastId])
   @@index([stripePaymentIntent])
+}
+
+// ============ TWITTER CONFIG (Admin Dashboard) ============
+
+model TwitterConfig {
+  id                      String   @id @default("singleton")
+  autoTweetEnabled        Boolean  @default(false)
+  minLikes                Int      @default(10)
+  minPlays                Int      @default(50)
+  minForks                Int      @default(3)
+  trendPollingEnabled     Boolean  @default(false)
+  trendPollIntervalMs     Int      @default(7200000)
+  maxTrendPodcastsPerDay  Int      @default(3)
+  trendSearchQueries      String[] @default(["AI", "science", "technology"])
+  tweetTemplate           String   @default("New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}")
+  updatedAt               DateTime @updatedAt
+  updatedBy               String?
+}
+
+model TwitterAutoTweet {
+  id           String   @id @default(cuid())
+  podcastId    String
+  tweetId      String?
+  tweetText    String?  @db.Text
+  trigger      String   // 'threshold' | 'manual' | 'trend'
+  status       String   @default("pending") // 'pending' | 'posted' | 'failed'
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([podcastId])
+  @@index([status])
+  @@index([createdAt])
 }

@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import type { IngestEventsPayload } from '@/lib/queue';
 
 /**
@@ -123,6 +124,9 @@ export async function processEventIngestion(
           });
           return session;
         });
+
+        // Fire-and-forget auto-tweet threshold check (after transaction committed)
+        checkAutoTweetThreshold(podcastId).catch(() => {});
       }
 
       if (!playbackSession) continue;

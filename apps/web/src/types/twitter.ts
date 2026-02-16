@@ -33,6 +33,13 @@ export interface TwitterTweet {
       display_url: string;
     }>;
   };
+  public_metrics?: {
+    retweet_count: number;
+    reply_count: number;
+    like_count: number;
+    quote_count: number;
+    impression_count?: number;
+  };
 }
 
 export interface ThreadTweet {
@@ -75,4 +82,41 @@ export interface TweetMentionData {
   podcastId: string | null;
   replyTweetId: string | null;
   createdAt: string;
+}
+
+export interface TwitterConfigData {
+  autoTweetEnabled: boolean;
+  minLikes: number;
+  minPlays: number;
+  minForks: number;
+  trendPollingEnabled: boolean;
+  trendPollIntervalMs: number;
+  maxTrendPodcastsPerDay: number;
+  trendSearchQueries: string[];
+  tweetTemplate: string;
+}
+
+export type AutoTweetTrigger = 'threshold' | 'manual' | 'trend';
+export type AutoTweetStatus = 'pending' | 'posted' | 'failed';
+
+export interface TwitterAutoTweetData {
+  id: string;
+  podcastId: string;
+  tweetId: string | null;
+  tweetText: string | null;
+  trigger: AutoTweetTrigger;
+  status: AutoTweetStatus;
+  errorMessage: string | null;
+  createdAt: string;
+  podcast?: {
+    title: string;
+    topic: string;
+  };
+}
+
+export interface TrendTopic {
+  query: string;
+  topTweet: TwitterTweet;
+  engagementScore: number;
+  tweetCount: number;
 }
