@@ -18,8 +18,8 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Import under test ----
-import { parseTweetIntent } from '@/lib/tweet-parser';
-import type { TweetParseResult } from '@/types/twitter';
+import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
+import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 // ---- Tests ----
 
@@ -288,5 +288,281 @@ describe('parseTweetIntent', () => {
       expect(result.audienceLevel).toBe('expert');
       expect(result.focusAreas).toContain('renormalization');
     });
+  });
+});
+
+// ---- parseThreadIntent ----
+
+function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
+  return {
+    rootTweet: {
+      id: 'root-1',
+      text: 'AI will replace all jobs in 5 years',
+      authorId: 'author-1',
+      authorUsername: 'alice',
+      authorName: 'Alice',
+      urls: [],
+      createdAt: '2026-02-10T10:00:00Z',
+    },
+    replies: [
+      {
+        id: 'reply-1',
+        text: 'That is a massive overstatement, AI augments not replaces',
+        authorId: 'author-2',
+        authorUsername: 'bob',
+        authorName: 'Bob',
+        urls: ['https://example.com/ai-jobs'],
+        createdAt: '2026-02-10T10:05:00Z',
+        inReplyToTweetId: 'root-1',
+      },
+      {
+        id: 'reply-2',
+        text: 'I agree with @alice, my job is already mostly automated',
+        authorId: 'author-3',
+        authorUsername: 'carol',
+        authorName: 'Carol',
+        urls: [],
+        createdAt: '2026-02-10T10:10:00Z',
+        inReplyToTweetId: 'reply-1',
+      },
+      {
+        id: 'reply-3',
+        text: '@sottofm make a podcast about this debate',
+        authorId: 'author-4',
+        authorUsername: 'dave',
+        authorName: 'Dave',
+        urls: [],
+        createdAt: '2026-02-10T10:15:00Z',
+        inReplyToTweetId: 'reply-2',
+      },
+    ],
+    participantCount: 4,
+    tweetCount: 4,
+    ...overrides,
+  };
+}
+
+function createMockMentionTweet(overrides?: Partial<ThreadTweet>): ThreadTweet {
+  return {
+    id: 'reply-3',
+    text: '@sottofm make a podcast about this debate',
+    authorId: 'author-4',
+    authorUsername: 'dave',
+    authorName: 'Dave',
+    urls: [],
+    createdAt: '2026-02-10T10:15:00Z',
+    ...overrides,
+  };
+}
+
+describe('parseThreadIntent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('parses a debate thread with viewpoints', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'AI Job Displacement',
+      title: 'Will AI Replace All Jobs? The Great Debate',
+      depth: 'deep_dive',
+      audienceLevel: 'intermediate',
+      tone: 'socratic',
+      focusAreas: ['automation', 'augmentation', 'labor market'],
+      sourceUrl: 'https://example.com/ai-jobs',
+      sourceUrls: ['https://example.com/ai-jobs'],
+      isDebate: true,
+      viewpoints: [
+        '@alice argues AI will replace all jobs within 5 years',
+        '@bob counters that AI augments rather than replaces',
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 300,
+      outputTokens: 400,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    const result = await parseThreadIntent(mention, thread);
+
+    expect(result.isDebate).toBe(true);
+    expect(result.viewpoints).toHaveLength(2);
+    expect(result.sourceUrls).toContain('https://example.com/ai-jobs');
+  });
+
+  it('parses an informational thread without debate', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'React Server Components',
+      title: 'Understanding React Server Components',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      tone: 'professional',
+      focusAreas: ['streaming', 'data fetching'],
+      isDebate: false,
+      viewpoints: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 200,
+      outputTokens: 300,
+    });
+
+    const thread = createMockThread({
+      replies: [
+        {
+          id: 'r1',
+          text: 'Good explanation of RSC',
+          authorId: 'a2',
+          authorUsername: 'bob',
+          authorName: 'Bob',
+          urls: [],
+          createdAt: '2026-02-10T10:05:00Z',
+          inReplyToTweetId: 'root-1',
+        },
+        {
+          id: 'r2',
+          text: 'Thanks for sharing',
+          authorId: 'a3',
+          authorUsername: 'carol',
+          authorName: 'Carol',
+          urls: [],
+          createdAt: '2026-02-10T10:10:00Z',
+          inReplyToTweetId: 'root-1',
+        },
+        {
+          id: 'r3',
+          text: '@sottofm make this a podcast',
+          authorId: 'a4',
+          authorUsername: 'dave',
+          authorName: 'Dave',
+          urls: [],
+          createdAt: '2026-02-10T10:15:00Z',
+        },
+      ],
+    });
+    const mention = createMockMentionTweet();
+
+    const result = await parseThreadIntent(mention, thread);
+
+    expect(result.isDebate).toBe(false);
+  });
+
+  it('uses maxTokens 1024 for thread parsing', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test Thread',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 100,
+      outputTokens: 150,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await parseThreadIntent(mention, thread);
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ maxTokens: 1024 })
+    );
+  });
+
+  it('throws on invalid JSON from Claude', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: 'Not valid JSON',
+      inputTokens: 50,
+      outputTokens: 10,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await expect(parseThreadIntent(mention, thread)).rejects.toThrow(
+      'Failed to parse thread intent — Claude returned invalid JSON'
+    );
+  });
+
+  it('throws when topic is missing', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({ title: 'Has Title', depth: 'standard', audienceLevel: 'beginner', tone: 'casual', focusAreas: [] }),
+      inputTokens: 50,
+      outputTokens: 50,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await expect(parseThreadIntent(mention, thread)).rejects.toThrow(
+      'Failed to extract topic and title from thread'
+    );
+  });
+
+  it('includes thread context in user message sent to Claude', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 100,
+      outputTokens: 100,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await parseThreadIntent(mention, thread);
+
+    const userMessage = mockGenerateResponse.mock.calls[0][1][0].content as string;
+    expect(userMessage).toContain('@alice');
+    expect(userMessage).toContain('AI will replace all jobs');
+    expect(userMessage).toContain('@bob');
+    expect(userMessage).toContain('4 tweets');
+    expect(userMessage).toContain('4 participants');
+  });
+
+  it('passes apiKeyOverride to generateResponse', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 100,
+      outputTokens: 100,
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await parseThreadIntent(mention, thread, 'user-api-key-123');
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ apiKeyOverride: 'user-api-key-123' })
+    );
   });
 });
