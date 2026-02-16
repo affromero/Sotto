@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Bookmark } from 'lucide-react';
+import { Bookmark, X, Sparkles, RefreshCw } from 'lucide-react';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import styles from './InspireQuiz.module.css';
 
@@ -12,259 +12,241 @@ interface InspireQuizProps {
   isLoadingMore: boolean;
 }
 
-type Direction = 'left' | 'right' | null;
+interface GridCard {
+  question: TasteQuestion;
+  status: 'visible' | 'exiting' | 'entering';
+}
+
+const GRID_SIZE = 6;
 
 export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMore }: InspireQuizProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [exitDirection, setExitDirection] = useState<Direction>(null);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const [savedFeedback, setSavedFeedback] = useState(false);
-  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [gridCards, setGridCards] = useState<GridCard[]>(() =>
+    questions.slice(0, GRID_SIZE).map((q) => ({ question: q, status: 'visible' as const }))
+  );
+  const [, setQueue] = useState<TasteQuestion[]>(() => questions.slice(GRID_SIZE));
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
+  const savedTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  const cardRef = useRef<HTMLDivElement>(null);
-  const touchStartX = useRef(0);
-  const touchDeltaX = useRef(0);
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  const currentQuestion = questions[currentIndex];
-  const total = questions.length;
-  const progress = total > 0 ? (currentIndex / total) * 100 : 0;
-
-  // Cleanup saved feedback timer
+  // Cleanup all saved feedback timers on unmount
   useEffect(() => {
+    const timers = savedTimersRef.current;
     return () => {
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      for (const timer of timers.values()) clearTimeout(timer);
+      timers.clear();
     };
   }, []);
 
-  const advanceCard = useCallback(
-    (direction: Direction) => {
-      if (isAnimating || !currentQuestion) return;
+  const handleNope = useCallback(
+    (cardIndex: number) => {
+      const card = gridCards[cardIndex];
+      if (!card || card.status !== 'visible') return;
 
-      setExitDirection(direction);
-      setIsAnimating(true);
-
-      setTimeout(() => {
-        setExitDirection(null);
-        setSwipeOffset(0);
-        setIsAnimating(false);
-
-        if (currentIndex + 1 >= total) {
-          setIsDone(true);
-        } else {
-          setCurrentIndex((prev) => prev + 1);
-        }
-      }, 300);
-    },
-    [isAnimating, currentQuestion, currentIndex, total]
-  );
-
-  const handleNotForMe = useCallback(() => {
-    if (isAnimating || !currentQuestion) return;
-
-    // Send taste signal (fire-and-forget)
-    const answer: TasteAnswer = {
-      questionId: currentQuestion.id,
-      question: currentQuestion.text,
-      tagSlugs: currentQuestion.tagSlugs,
-      response: 'no',
-    };
-    fetch('/api/taste-quiz', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answers: [answer] }),
-    });
-
-    advanceCard('left');
-  }, [isAnimating, currentQuestion, advanceCard]);
-
-  const handleYesMakeThis = useCallback(() => {
-    if (isAnimating || !currentQuestion) return;
-    onSelectTopic(currentQuestion.topic);
-  }, [isAnimating, currentQuestion, onSelectTopic]);
-
-  const handleSave = useCallback(async () => {
-    if (isAnimating || !currentQuestion) return;
-
-    try {
-      await fetch('/api/ideas', {
+      // Send taste signal (fire-and-forget)
+      const answer: TasteAnswer = {
+        questionId: card.question.id,
+        question: card.question.text,
+        tagSlugs: card.question.tagSlugs,
+        response: 'no',
+      };
+      fetch('/api/taste-quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          questionId: currentQuestion.id,
-          question: currentQuestion.text,
-          tagSlugs: currentQuestion.tagSlugs,
-          category: currentQuestion.category,
-        }),
+        body: JSON.stringify({ answers: [answer] }),
       });
 
-      setSavedFeedback(true);
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-      savedTimerRef.current = setTimeout(() => {
-        setSavedFeedback(false);
-      }, 1500);
-    } catch {
-      // Silently fail
-    }
-  }, [isAnimating, currentQuestion]);
+      // Start exit animation
+      setGridCards((prev) =>
+        prev.map((c, i) => (i === cardIndex ? { ...c, status: 'exiting' as const } : c))
+      );
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (isDone || isAnimating) return;
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (e.key === 'ArrowRight' || e.key === 'y') handleYesMakeThis();
-      else if (e.key === 'ArrowLeft' || e.key === 'n') handleNotForMe();
-      else if (e.key === 'b') handleSave();
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isDone, isAnimating, handleYesMakeThis, handleNotForMe, handleSave]);
+      // After exit animation, replace or remove
+      setTimeout(() => {
+        setQueue((prevQueue) => {
+          if (prevQueue.length > 0) {
+            const [next, ...rest] = prevQueue;
+            setGridCards((prev) =>
+              prev.map((c, i) =>
+                i === cardIndex ? { question: next, status: 'entering' as const } : c
+              )
+            );
+            // Transition entering → visible
+            setTimeout(() => {
+              setGridCards((prev) =>
+                prev.map((c, i) =>
+                  i === cardIndex && c.status === 'entering'
+                    ? { ...c, status: 'visible' as const }
+                    : c
+                )
+              );
+            }, 250);
+            return rest;
+          }
+          // No more in queue — remove card from grid
+          setGridCards((prev) => prev.filter((_, i) => i !== cardIndex));
+          return prevQueue;
+        });
+      }, 250);
+    },
+    [gridCards]
+  );
 
-  // Touch handlers for swipe
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchDeltaX.current = 0;
-  };
+  const handleSave = useCallback(
+    async (cardIndex: number) => {
+      const card = gridCards[cardIndex];
+      if (!card || card.status !== 'visible') return;
+      const id = card.question.id;
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const delta = e.touches[0].clientX - touchStartX.current;
-    touchDeltaX.current = delta;
-    setSwipeOffset(delta);
-  };
+      try {
+        await fetch('/api/ideas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questionId: id,
+            question: card.question.text,
+            tagSlugs: card.question.tagSlugs,
+            category: card.question.category,
+          }),
+        });
 
-  const handleTouchEnd = () => {
-    const threshold = 80;
-    if (touchDeltaX.current > threshold) {
-      handleYesMakeThis();
-    } else if (touchDeltaX.current < -threshold) {
-      handleNotForMe();
-    } else {
-      setSwipeOffset(0);
-    }
-    touchDeltaX.current = 0;
-  };
+        setSavedIds((prev) => new Set(prev).add(id));
 
-  const handleLoadMore = () => {
-    onLoadMore();
-  };
+        // Clear existing timer for this card if any
+        const existing = savedTimersRef.current.get(id);
+        if (existing) clearTimeout(existing);
 
+        const timer = setTimeout(() => {
+          setSavedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+          savedTimersRef.current.delete(id);
+        }, 1500);
+        savedTimersRef.current.set(id, timer);
+      } catch {
+        // Silently fail
+      }
+    },
+    [gridCards]
+  );
+
+  const handleMake = useCallback(
+    (cardIndex: number) => {
+      const card = gridCards[cardIndex];
+      if (!card || card.status !== 'visible') return;
+      onSelectTopic(card.question.topic);
+    },
+    [gridCards, onSelectTopic]
+  );
+
+  // Empty state — no questions at all
   if (questions.length === 0) {
     return (
-      <div className={styles.done}>
-        <p className={styles.doneText}>Let&apos;s find some ideas for you.</p>
+      <div className={styles.empty}>
+        <Sparkles size={24} className={styles.emptyIcon} aria-hidden="true" />
+        <p className={styles.emptyText}>Let&apos;s find some ideas for you.</p>
         <button
           type="button"
-          className={styles.loadMoreBtn}
-          onClick={handleLoadMore}
+          className={styles.shuffleBtn}
+          onClick={onLoadMore}
           disabled={isLoadingMore}
         >
-          {isLoadingMore ? 'Loading...' : 'Generate ideas'}
+          {isLoadingMore ? (
+            'Loading...'
+          ) : (
+            <>
+              <Sparkles size={16} aria-hidden="true" />
+              Generate ideas
+            </>
+          )}
         </button>
       </div>
     );
   }
 
-  if (isDone) {
+  // All cards dismissed
+  if (gridCards.length === 0) {
     return (
-      <div className={styles.done}>
-        <p className={styles.doneText}>You have seen all questions in this batch.</p>
+      <div className={styles.empty}>
+        <RefreshCw size={24} className={styles.emptyIcon} aria-hidden="true" />
+        <p className={styles.emptyText}>Ready for more ideas?</p>
         <button
           type="button"
-          className={styles.loadMoreBtn}
-          onClick={handleLoadMore}
+          className={styles.shuffleBtn}
+          onClick={onLoadMore}
           disabled={isLoadingMore}
         >
-          {isLoadingMore ? 'Loading...' : 'Load more'}
+          {isLoadingMore ? (
+            'Loading...'
+          ) : (
+            <>
+              <RefreshCw size={16} aria-hidden="true" />
+              Shuffle
+            </>
+          )}
         </button>
       </div>
     );
   }
-
-  // Card rotation based on swipe
-  const rotation = swipeOffset * 0.05;
-  const cardStyle: React.CSSProperties = exitDirection
-    ? {}
-    : {
-        transform: `translateX(${swipeOffset}px) rotate(${rotation}deg)`,
-      };
 
   return (
-    <div className={styles.quiz}>
-      {/* Progress bar */}
-      <div className={styles.progressBar}>
-        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-      </div>
-      <div className={styles.progressLabel}>
-        {currentIndex + 1} of {total}
-      </div>
+    <div className={styles.grid}>
+      {gridCards.map((card, index) => {
+        const isSaved = savedIds.has(card.question.id);
+        const statusClass =
+          card.status === 'exiting'
+            ? styles.cardExiting
+            : card.status === 'entering'
+              ? styles.cardEntering
+              : '';
 
-      {/* Card */}
-      <div className={styles.cardContainer}>
-        <div
-          ref={cardRef}
-          className={`${styles.card} ${exitDirection === 'right' ? styles.exitRight : ''} ${exitDirection === 'left' ? styles.exitLeft : ''}`}
-          style={cardStyle}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {currentQuestion?.category && (
-            <span className={styles.categoryBadge}>{currentQuestion.category}</span>
-          )}
-          <p className={styles.questionText}>{currentQuestion?.text}</p>
-
-          {/* Swipe hint indicators */}
+        return (
           <div
-            className={`${styles.swipeHint} ${styles.swipeMake}`}
-            style={{ opacity: Math.max(0, swipeOffset / 120) }}
+            key={card.question.id}
+            className={`${styles.card} ${statusClass}`}
+            style={{ animationDelay: `${index * 50}ms` }}
           >
-            Make it
-          </div>
-          <div
-            className={`${styles.swipeHint} ${styles.swipeNo}`}
-            style={{ opacity: Math.max(0, -swipeOffset / 120) }}
-          >
-            Nope
-          </div>
-        </div>
+            {card.question.category && (
+              <span className={styles.categoryBadge}>{card.question.category}</span>
+            )}
+            <p className={styles.questionText}>{card.question.text}</p>
 
-        {/* Saved feedback */}
-        {savedFeedback && <div className={styles.savedFeedback}>Saved!</div>}
-      </div>
+            {isSaved && <div className={styles.savedFeedback}>Saved!</div>}
 
-      {/* Actions */}
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={`${styles.answerBtn} ${styles.noBtn}`}
-          onClick={handleNotForMe}
-          disabled={isAnimating}
-          aria-label="Not for me"
-        >
-          Not for me
-        </button>
-        <button
-          type="button"
-          className={`${styles.answerBtn} ${styles.saveBtn}`}
-          onClick={handleSave}
-          disabled={isAnimating}
-          aria-label="Save idea"
-        >
-          <Bookmark size={18} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={`${styles.answerBtn} ${styles.yesBtn}`}
-          onClick={handleYesMakeThis}
-          disabled={isAnimating}
-          aria-label="Yes, make this"
-        >
-          Yes, make this
-        </button>
-      </div>
+            <div className={styles.actions}>
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${styles.nopeBtn}`}
+                onClick={() => handleNope(index)}
+                disabled={card.status !== 'visible'}
+                aria-label={`Dismiss: ${card.question.text}`}
+              >
+                <X size={14} aria-hidden="true" />
+                <span>Nope</span>
+              </button>
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${styles.saveBtn}`}
+                onClick={() => handleSave(index)}
+                disabled={card.status !== 'visible'}
+                aria-label={`Save: ${card.question.text}`}
+              >
+                <Bookmark size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${styles.makeBtn}`}
+                onClick={() => handleMake(index)}
+                disabled={card.status !== 'visible'}
+                aria-label={`Make podcast: ${card.question.text}`}
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>Make</span>
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
