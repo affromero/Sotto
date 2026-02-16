@@ -441,11 +441,11 @@ Respond with a JSON array only, no markdown. Each item:
     const resolved = await resolveAiProvider(userId);
     let responseText: string;
 
-    if (resolved.provider === 'anthropic' || resolved.source === 'platform') {
+    const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
+    if (anthropicApiKey) {
+      // Use Anthropic SDK directly with server-side web search tool
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      const apiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) return [];
-      const client = new Anthropic({ apiKey });
+      const client = new Anthropic({ apiKey: anthropicApiKey });
       const response = await client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 2048,
@@ -455,6 +455,7 @@ Respond with a JSON array only, no markdown. Each item:
       const textBlock = response.content.find((block) => block.type === 'text');
       responseText = textBlock && textBlock.type === 'text' ? textBlock.text : '';
     } else {
+      // No Anthropic API key — use AI provider (claude-code CLI has built-in web search)
       const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
       const result = await ai.generateResponse(
         systemPrompt,
