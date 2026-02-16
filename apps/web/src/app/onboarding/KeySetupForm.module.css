@@ -39,6 +39,15 @@
   border-radius: var(--radius-full);
 }
 
+.sectionBadgeFree {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-success);
+  background: var(--color-success-lighter);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
 .sectionDescription {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);

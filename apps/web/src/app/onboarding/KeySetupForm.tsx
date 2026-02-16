@@ -46,9 +46,9 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
           <line x1="12" y1="8" x2="12.01" y2="8" />
         </svg>
         <p className={styles.tipText}>
-          <span className={styles.tipHighlight}>One OpenAI key covers both AI and TTS</span>
-          {' '}&mdash; add it once under AI Provider and once under Text-to-Speech, or use separate
-          providers for each.
+          <span className={styles.tipHighlight}>AI is free for everyone</span>
+          {' '}&mdash; you only need a voice provider key for unlimited generation. One OpenAI key
+          covers both if you want to bring your own AI too.
         </p>
       </div>
 
@@ -56,11 +56,11 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
         <div className={styles.sectionHeader}>
           <div className={styles.sectionLabel}>
             <h2 className={styles.sectionTitle}>AI Provider</h2>
-            <span className={styles.sectionBadge}>Unlocks unlimited</span>
+            <span className={styles.sectionBadgeFree}>Free &mdash; included</span>
           </div>
           <p className={styles.sectionDescription}>
-            Sotto uses an AI model to write podcast scripts and answer your questions. Connect your
-            API key from Anthropic (Claude) or OpenAI.
+            AI is free for all users. Sotto handles script writing and Q&amp;A at no cost. Optionally
+            add your own key for faster models.
           </p>
         </div>
         <AiProviderCards initialConfigured={initialAiConfigured} />
@@ -75,8 +75,8 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
             <span className={styles.sectionBadge}>Unlocks unlimited</span>
           </div>
           <p className={styles.sectionDescription}>
-            Sotto converts scripts into natural-sounding voices. Connect at least one TTS provider
-            to hear your podcasts.
+            Add a voice provider key for unlimited podcast generation with premium voices. Without
+            one, you get a few free generations.
           </p>
         </div>
         <TtsProviderCards initialConfigured={initialTtsConfigured} />
@@ -88,7 +88,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
           className={styles.continueButton}
           onClick={handleContinue}
         >
-          Unlock Unlimited
+          Continue
           <svg
             width="18"
             height="18"
