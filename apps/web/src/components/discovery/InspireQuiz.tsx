@@ -153,8 +153,16 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
 
   if (questions.length === 0) {
     return (
-      <div className={styles.emptyState}>
-        <p>No suggestions available right now. Try again later!</p>
+      <div className={styles.done}>
+        <p className={styles.doneText}>Let&apos;s find some ideas for you.</p>
+        <button
+          type="button"
+          className={styles.loadMoreBtn}
+          onClick={handleLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? 'Loading...' : 'Generate ideas'}
+        </button>
       </div>
     );
   }

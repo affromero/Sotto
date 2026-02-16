@@ -145,35 +145,53 @@
 .topicChipActive {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-lg);
+  gap: 6px;
+  padding: 5px 6px 5px 10px;
+  border-radius: var(--radius-full);
   font: var(--text-body-sm);
   font-weight: 600;
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
+  color: var(--color-primary-hover);
+  background: var(--color-primary-light);
+  border: 1px solid rgba(217, 119, 6, 0.18);
+  letter-spacing: 0.01em;
+  animation: chipIn 0.2s ease-out;
 }
 
 .topicChipClear {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  margin-left: 2px;
+  width: 18px;
+  height: 18px;
   border: none;
   border-radius: var(--radius-full);
-  background: transparent;
+  background: rgba(217, 119, 6, 0.12);
   color: var(--color-primary);
   cursor: pointer;
   transition:
     background var(--transition-fast),
-    color var(--transition-fast);
+    color var(--transition-fast),
+    transform var(--transition-fast);
 }
 
 .topicChipClear:hover {
   background: var(--color-primary);
   color: var(--color-text-inverse);
+}
+
+.topicChipClear:active {
+  transform: scale(0.88);
+}
+
+@keyframes chipIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .tab {
