@@ -36,7 +36,7 @@ export default async function BillingPage() {
         {aiKeys.length === 0 ? (
           <p className={styles.placeholder}>
             No AI keys configured.{' '}
-            <Link href="/settings">Add one in Settings</Link> to start generating podcasts.
+            AI is free &mdash; <Link href="/settings">add your own key</Link> to choose a different model.
           </p>
         ) : (
           <div className={styles.historyTable}>
@@ -60,7 +60,7 @@ export default async function BillingPage() {
         {ttsKeys.length === 0 ? (
           <p className={styles.placeholder}>
             No TTS keys configured.{' '}
-            <Link href="/settings">Add one in Settings</Link> for voice generation.
+            <Link href="/settings">Add one in Settings</Link> for unlimited generation.
           </p>
         ) : (
           <div className={styles.historyTable}>
@@ -93,7 +93,7 @@ export default async function BillingPage() {
           {freeTier.freeGenerationsRemaining === 0 && (
             <p className={styles.manageText}>
               You&apos;ve used all your free generations.{' '}
-              <Link href="/onboarding?step=keys">Add your own API keys</Link> for unlimited access.
+              <Link href="/onboarding?step=keys">Add a voice provider key</Link> for unlimited access.
             </p>
           )}
         </section>
@@ -115,7 +115,7 @@ export default async function BillingPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Get Started</h2>
           <p className={styles.manageText}>
-            Start with free podcasts, then add your own API keys for unlimited access.
+            Start with free podcasts, then add a voice provider key for unlimited generation.
           </p>
           <div className={styles.manageActions}>
             <Link href="/settings" className={styles.planName}>
