@@ -176,6 +176,27 @@ describe('generateForYouQuestions', () => {
       3600
     );
   });
+
+  it('includes topic in cache key and prompt when provided', async () => {
+    const questions = JSON.stringify([
+      { text: 'Politics and AI regulation', tagSlugs: ['ai'], category: 'technology' },
+    ]);
+    const ai = createMockAI(questions);
+    mockCreateAIProvider.mockReturnValue(ai);
+
+    await generateForYouQuestions('user-1', 1, 'politics');
+
+    // Cache key includes topic
+    expect(mockCacheSet).toHaveBeenCalledWith(
+      'inspire:forYou:user-1:politics',
+      expect.any(Array),
+      3600
+    );
+
+    // Prompt includes topic context
+    const prompt = ai.generateResponse.mock.calls[0][0];
+    expect(prompt).toContain('politics');
+  });
 });
 
 describe('generateNewsQuestions', () => {

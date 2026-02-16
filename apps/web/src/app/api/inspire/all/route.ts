@@ -11,6 +11,7 @@ import { logger } from '@/lib/logger';
 const inspireAllSchema = z.object({
   section: z.enum(['forYou', 'news']).optional(),
   timeRange: z.enum(['1h', '12h', '24h', '1w', '1m']).optional(),
+  topic: z.string().max(50).optional(),
 });
 
 /**
@@ -31,8 +32,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
   }
 
-  const { section, timeRange } = validation.data;
+  const { section, timeRange, topic } = validation.data;
   const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
+  const topicHint = topic?.trim() || undefined;
   const userId = session.user.id;
 
   const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
@@ -45,12 +47,12 @@ export async function GET(request: NextRequest) {
 
   // Single-section refresh
   if (section === 'forYou') {
-    const forYou = await generateForYouQuestions(userId, 6);
+    const forYou = await generateForYouQuestions(userId, 6, topicHint);
     return NextResponse.json({ forYou });
   }
 
   if (section === 'news') {
-    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange);
+    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
     return NextResponse.json({ news });
   }
 
@@ -60,14 +62,15 @@ export async function GET(request: NextRequest) {
       logger.warn('Failed to fetch trending for inspire', { error: (err as Error).message });
       return [];
     }),
-    generateForYouQuestions(userId, 6),
+    generateForYouQuestions(userId, 6, topicHint),
   ]);
 
   const news = await generateNewsQuestions(
     userId,
     6,
     forYou.map((q) => q.text),
-    newsTimeRange
+    newsTimeRange,
+    topicHint
   );
 
   // Map RecommendedPodcast to PodcastSummary shape

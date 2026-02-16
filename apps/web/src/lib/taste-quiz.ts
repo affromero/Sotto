@@ -276,9 +276,12 @@ function parseAndFilterQuestions(
  */
 export async function generateForYouQuestions(
   userId: string,
-  count: number
+  count: number,
+  topic?: string
 ): Promise<TasteQuestion[]> {
-  const cacheKey = `inspire:forYou:${userId}`;
+  const cacheKey = topic
+    ? `inspire:forYou:${userId}:${topic.toLowerCase().trim()}`
+    : `inspire:forYou:${userId}`;
   const cached = await cache.get<TasteQuestion[]>(cacheKey);
   if (cached) return cached;
 
@@ -304,13 +307,17 @@ Your job is to COMBINE these interests in unexpected, creative ways. Examples:
 Also explore topics ADJACENT to their interests — things they haven't explicitly said but would likely enjoy based on their taste profile.`
     : `The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Aim for surprise and delight — topics that make someone think "I never knew I wanted to learn about that."`;
 
+  const topicContext = topic
+    ? `\n\nIMPORTANT: The user is specifically interested in "${topic}" right now. ALL questions must relate to this topic area. Still be creative and specific — don't just ask generic questions about "${topic}".`
+    : '';
+
   const requestCount = count + 5;
 
   const systemPrompt = `You generate personalized podcast topic questions for Sotto's "For You" feed.
 
 Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
 
-${interestContext}
+${interestContext}${topicContext}
 
 Rules:
 - Generate exactly ${requestCount} questions
@@ -384,9 +391,12 @@ export async function generateNewsQuestions(
   userId: string,
   count: number,
   excludeTopics: string[] = [],
-  timeRange: NewsTimeRange = '1w'
+  timeRange: NewsTimeRange = '1w',
+  topic?: string
 ): Promise<TasteQuestion[]> {
-  const cacheKey = `inspire:news:${timeRange}:${userId}`;
+  const cacheKey = topic
+    ? `inspire:news:${timeRange}:${userId}:${topic.toLowerCase().trim()}`
+    : `inspire:news:${timeRange}:${userId}`;
   const cached = await cache.get<TasteQuestion[]>(cacheKey);
   if (cached) return cached;
 
@@ -398,7 +408,15 @@ export async function generateNewsQuestions(
     ? `\n\nIMPORTANT: The following topics are already shown in a different tab. Do NOT generate questions about similar subjects:\n${excludeTopics.map((t) => `- ${t}`).join('\n')}`
     : '';
 
+  const topicFocus = topic
+    ? `\n\nIMPORTANT: The user wants news specifically about "${topic}". ALL questions must relate to this area. Search for recent events, developments, and controversies specifically about "${topic}".`
+    : '';
+
   const requestCount = count + 5;
+
+  const diversityNote = topic
+    ? `Focus all questions on "${topic}" news`
+    : 'Cover diverse topics: science, politics, tech, business, culture, sports';
 
   const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
 
@@ -411,7 +429,7 @@ Rules:
 - Questions must feel timely and urgent — "Would you listen to a podcast about [specific thing that just happened]?"
 - Include the "why now" — what makes this newsworthy right now
 - Category is the parent slug the question belongs to
-- Cover diverse topics: science, politics, tech, business, culture, sports${excludeContext}
+- ${diversityNote}${excludeContext}${topicFocus}
 
 Taxonomy (parent: [children]):
 ${ctx.taxonomyLines.join('\n')}

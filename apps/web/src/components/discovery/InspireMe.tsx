@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, Sparkles, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { X, Sparkles, RefreshCw, Search } from 'lucide-react';
 import type { TasteQuestion } from '@sotto/shared';
 import type { PodcastSummary } from '@/types/podcast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -32,6 +32,15 @@ const TIME_RANGE_LABELS: Record<NewsTimeRange, string> = {
   '1m': 'Past month',
 };
 
+function buildUrl(params: Record<string, string | undefined>): string {
+  const url = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) url.set(key, value);
+  }
+  const qs = url.toString();
+  return `/api/inspire/all${qs ? `?${qs}` : ''}`;
+}
+
 export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<Section>('forYou');
   const [isLoading, setIsLoading] = useState(false);
@@ -42,34 +51,30 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
   const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [topicInput, setTopicInput] = useState('');
+  const [activeTopic, setActiveTopic] = useState<string | undefined>();
+  const topicInputRef = useRef<HTMLInputElement>(null);
 
-  // Pre-fetch all tabs on open
-  useEffect(() => {
-    if (!open) return;
-
-    let cancelled = false;
+  const fetchAll = useCallback((topic?: string) => {
     setIsLoading(true);
     setFetchError(false);
 
-    fetch('/api/inspire/all')
+    fetch(buildUrl({ topic }))
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => {
-        if (cancelled) return;
         setForYouQuestions(data.forYou ?? []);
         setTrendingPodcasts(data.trending ?? []);
         setNewsQuestions(data.news ?? []);
       })
-      .catch(() => {
-        if (!cancelled) setFetchError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+      .catch(() => setFetchError(true))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
+  // Pre-fetch all tabs on open
+  useEffect(() => {
+    if (!open) return;
+    fetchAll(activeTopic);
+  }, [open, fetchAll, activeTopic]);
 
   const handleSelectTopic = useCallback(
     (topic: string) => {
@@ -83,9 +88,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     async (section: 'forYou' | 'news', timeRange?: NewsTimeRange) => {
       setIsLoadingMore(true);
       try {
-        const params = new URLSearchParams({ section });
-        if (timeRange) params.set('timeRange', timeRange);
-        const res = await fetch(`/api/inspire/all?${params}`);
+        const res = await fetch(buildUrl({ section, timeRange, topic: activeTopic }));
         if (!res.ok) return;
         const data = await res.json();
         if (section === 'forYou' && data.forYou) {
@@ -97,7 +100,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         setIsLoadingMore(false);
       }
     },
-    []
+    [activeTopic]
   );
 
   const handleTimeRangeChange = useCallback(
@@ -105,7 +108,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
       setNewsTimeRange(range);
       setIsLoadingNews(true);
       try {
-        const res = await fetch(`/api/inspire/all?section=news&timeRange=${range}`);
+        const res = await fetch(buildUrl({ section: 'news', timeRange: range, topic: activeTopic }));
         if (!res.ok) return;
         const data = await res.json();
         if (data.news) {
@@ -115,8 +118,18 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         setIsLoadingNews(false);
       }
     },
-    []
+    [activeTopic]
   );
+
+  const handleTopicSubmit = useCallback(() => {
+    const trimmed = topicInput.trim() || undefined;
+    setActiveTopic(trimmed);
+  }, [topicInput]);
+
+  const handleTopicClear = useCallback(() => {
+    setTopicInput('');
+    setActiveTopic(undefined);
+  }, []);
 
   if (!open) return null;
 
@@ -133,6 +146,34 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close">
             <X size={20} aria-hidden="true" />
           </button>
+        </div>
+
+        {/* Topic input */}
+        <div className={styles.topicBar}>
+          <Search size={16} className={styles.topicIcon} aria-hidden="true" />
+          <input
+            ref={topicInputRef}
+            type="text"
+            className={styles.topicInput}
+            placeholder="Focus on... (e.g., politics, AI, europe)"
+            value={topicInput}
+            maxLength={50}
+            onChange={(e) => setTopicInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleTopicSubmit();
+            }}
+            disabled={isLoading}
+          />
+          {activeTopic && (
+            <button
+              type="button"
+              className={styles.topicClear}
+              onClick={handleTopicClear}
+              aria-label="Clear topic filter"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         {/* Tabs */}
@@ -156,7 +197,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
           {isLoading ? (
             <div className={styles.loadingState}>
               <Spinner size="large" />
-              <p>Finding ideas for you...</p>
+              <p>{activeTopic ? `Finding ideas about "${activeTopic}"...` : 'Finding ideas for you...'}</p>
             </div>
           ) : fetchError ? (
             <div className={styles.emptyState}>
@@ -164,19 +205,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
               <button
                 type="button"
                 className={styles.retryButton}
-                onClick={() => {
-                  setFetchError(false);
-                  setIsLoading(true);
-                  fetch('/api/inspire/all')
-                    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-                    .then((data) => {
-                      setForYouQuestions(data.forYou ?? []);
-                      setTrendingPodcasts(data.trending ?? []);
-                      setNewsQuestions(data.news ?? []);
-                    })
-                    .catch(() => setFetchError(true))
-                    .finally(() => setIsLoading(false));
-                }}
+                onClick={() => fetchAll(activeTopic)}
               >
                 <RefreshCw size={16} aria-hidden="true" />
                 Retry

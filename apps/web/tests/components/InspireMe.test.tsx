@@ -274,4 +274,105 @@ describe('InspireMe', () => {
 
     expect(screen.getByText('Retry')).toBeInTheDocument();
   });
+
+  it('renders topic input field', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: async () => mockAllResponse,
+    });
+
+    render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
+
+    const input = screen.getByPlaceholderText(/Focus on/);
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute('maxLength', '50');
+  });
+
+  it('submitting a topic re-fetches with topic param', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockAllResponse,
+    });
+    global.fetch = fetchMock;
+
+    render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
+
+    // Wait for initial fetch
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all');
+    });
+
+    const input = screen.getByPlaceholderText(/Focus on/);
+    await user.type(input, 'politics');
+    await user.keyboard('{Enter}');
+
+    // Should re-fetch with topic param
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all?topic=politics');
+    });
+  });
+
+  it('shows topic-specific loading message', async () => {
+    const user = userEvent.setup();
+    let resolveFirst!: (value: unknown) => void;
+    const firstPromise = new Promise((resolve) => { resolveFirst = resolve; });
+
+    (global.fetch as ReturnType<typeof vi.fn>)
+      .mockImplementationOnce(() => firstPromise)
+      .mockImplementation(() => new Promise(() => {})); // Never resolves for second call
+
+    render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
+
+    // Resolve initial fetch
+    resolveFirst({ ok: true, json: async () => mockAllResponse });
+
+    await waitFor(() => {
+      expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
+    });
+
+    // Type and submit topic
+    const input = screen.getByPlaceholderText(/Focus on/);
+    await user.type(input, 'AI');
+    await user.keyboard('{Enter}');
+
+    // Should show topic-specific loading
+    await waitFor(() => {
+      expect(screen.getByText(/Finding ideas about "AI"/)).toBeInTheDocument();
+    });
+  });
+
+  it('clearing topic re-fetches without topic param', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockAllResponse,
+    });
+    global.fetch = fetchMock;
+
+    render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all');
+    });
+
+    // Set a topic
+    const input = screen.getByPlaceholderText(/Focus on/);
+    await user.type(input, 'europe');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all?topic=europe');
+    });
+
+    // Clear button should appear and clearing should re-fetch without topic
+    const clearBtn = screen.getByLabelText('Clear topic filter');
+    await user.click(clearBtn);
+
+    await waitFor(() => {
+      // Should have called without topic again (3rd call)
+      const calls = fetchMock.mock.calls.map((c: string[][]) => c[0]);
+      expect(calls.filter((url: string) => url === '/api/inspire/all').length).toBeGreaterThanOrEqual(2);
+    });
+  });
 });

@@ -75,6 +75,62 @@
   color: var(--color-text-primary);
 }
 
+/* Topic input */
+
+.topicBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.topicIcon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.topicInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.topicInput::placeholder {
+  color: var(--color-text-secondary);
+}
+
+.topicInput:disabled {
+  opacity: 0.5;
+}
+
+.topicClear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: none;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.topicClear:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
 /* Tabs */
 
 .tabs {
