@@ -209,11 +209,17 @@ async function loadInspireContext(userId: string): Promise<InspireContext> {
   };
 }
 
+interface ParseOptions {
+  /** When true, keep questions even if no slugs match the taxonomy (uses category or 'general' as fallback). */
+  lenient?: boolean;
+}
+
 function parseAndFilterQuestions(
   responseText: string,
   count: number,
   validSlugs: Set<string>,
-  priorQuestionIds: Set<string>
+  priorQuestionIds: Set<string>,
+  opts?: ParseOptions
 ): TasteQuestion[] {
   let rawQuestions: Array<{ text: string; tagSlugs: string[]; category: string }>;
   try {
@@ -229,19 +235,33 @@ function parseAndFilterQuestions(
 
   const questions: TasteQuestion[] = [];
   const seenIds = new Set<string>();
+  const lenient = opts?.lenient ?? false;
 
   for (const q of rawQuestions) {
-    if (!q.text || !Array.isArray(q.tagSlugs) || q.tagSlugs.length === 0) continue;
+    if (!q.text) continue;
     const id = hashQuestion(q.text);
     if (priorQuestionIds.has(id) || seenIds.has(id)) continue;
-    const validTagSlugs = q.tagSlugs.filter((s: string) => validSlugs.has(s));
-    if (validTagSlugs.length === 0) continue;
+
+    const suppliedSlugs = Array.isArray(q.tagSlugs) ? q.tagSlugs : [];
+    let validTagSlugs = suppliedSlugs.filter((s: string) => validSlugs.has(s));
+
+    // Fall back to category slug if no tag slugs matched the taxonomy
+    if (validTagSlugs.length === 0 && q.category && validSlugs.has(q.category)) {
+      validTagSlugs = [q.category];
+    }
+
+    // In lenient mode (news), keep the question with the raw slugs or a generic fallback
+    if (validTagSlugs.length === 0) {
+      if (!lenient) continue;
+      validTagSlugs = suppliedSlugs.length > 0 ? suppliedSlugs : ['general'];
+    }
+
     seenIds.add(id);
     questions.push({
       id,
       text: q.text,
       tagSlugs: validTagSlugs,
-      category: validSlugs.has(q.category) ? q.category : validTagSlugs[0],
+      category: validSlugs.has(q.category) ? q.category : (validTagSlugs[0] ?? 'general'),
     });
     if (questions.length >= count) break;
   }
@@ -306,15 +326,32 @@ Respond with a JSON array only, no markdown. Each item:
 {"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
-    const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
-    const result = await ai.generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
-      { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
-    );
+    // Use user's BYOK key if available (faster than platform claude-code CLI)
+    const resolved = await resolveAiProvider(userId).catch(() => null);
+    let responseText: string;
+
+    if (resolved?.apiKey && resolved.provider === 'anthropic') {
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic({ apiKey: resolved.apiKey });
+      const response = await client.messages.create({
+        model: ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: systemPrompt }],
+      });
+      const textBlock = response.content.find((block) => block.type === 'text');
+      responseText = textBlock?.type === 'text' ? textBlock.text : '';
+    } else {
+      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const result = await ai.generateResponse(
+        systemPrompt,
+        [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
+        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+      );
+      responseText = result.content;
+    }
 
     const questions = parseAndFilterQuestions(
-      result.content, count, ctx.validSlugs, ctx.priorQuestionIds
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
     );
 
     if (questions.length > 0) {
@@ -410,7 +447,8 @@ Respond with a JSON array only, no markdown. Each item:
     }
 
     const questions = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      { lenient: true }
     );
 
     if (questions.length > 0) {
