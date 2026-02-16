@@ -106,7 +106,8 @@ describe('GET /api/inspire/all', () => {
     expect(mockGenerateNews).toHaveBeenCalledWith(
       'user-123',
       6,
-      ['AI and Music']
+      ['AI and Music'],
+      '1w'
     );
   });
 

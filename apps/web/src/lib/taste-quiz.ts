@@ -328,21 +328,34 @@ Respond with a JSON array only, no markdown. Each item:
   }
 }
 
+export type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
+
+const NEWS_TIME_LABELS: Record<NewsTimeRange, string> = {
+  '1h': 'the past hour',
+  '12h': 'the past 12 hours',
+  '24h': 'the past 24 hours',
+  '1w': 'the past week',
+  '1m': 'the past month',
+};
+
 /**
  * Generate current-events "In the News" questions using web search.
- * Must reference specific real events/people/dates from the past week.
+ * Must reference specific real events/people/dates from the given time range.
  * Accepts excludeTopics to avoid overlap with ForYou questions.
  */
 export async function generateNewsQuestions(
   userId: string,
   count: number,
-  excludeTopics: string[] = []
+  excludeTopics: string[] = [],
+  timeRange: NewsTimeRange = '1w'
 ): Promise<TasteQuestion[]> {
-  const cacheKey = `inspire:news:${userId}`;
+  const cacheKey = `inspire:news:${timeRange}:${userId}`;
   const cached = await cache.get<TasteQuestion[]>(cacheKey);
   if (cached) return cached;
 
   const ctx = await loadInspireContext(userId);
+
+  const timeLabel = NEWS_TIME_LABELS[timeRange];
 
   const excludeContext = excludeTopics.length > 0
     ? `\n\nIMPORTANT: The following topics are already shown in a different tab. Do NOT generate questions about similar subjects:\n${excludeTopics.map((t) => `- ${t}`).join('\n')}`
@@ -352,14 +365,14 @@ export async function generateNewsQuestions(
 
   const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
 
-Search the web for the most notable events, breakthroughs, controversies, and developments from THE PAST WEEK. Each question MUST be grounded in a specific, real, verifiable event.
+Search the web for the most notable events, breakthroughs, controversies, and developments from ${timeLabel}. Each question MUST be grounded in a specific, real, verifiable event.
 
 Rules:
 - Generate exactly ${requestCount} questions
-- Each question MUST reference a specific real event, person, date, or development from this week
+- Each question MUST reference a specific real event, person, date, or development from ${timeLabel}
 - Each question maps to 1-3 existing tag slugs from the taxonomy
 - Questions must feel timely and urgent — "Would you listen to a podcast about [specific thing that just happened]?"
-- Include the "why now" — what makes this newsworthy this week specifically
+- Include the "why now" — what makes this newsworthy right now
 - Category is the parent slug the question belongs to
 - Cover diverse topics: science, politics, tech, business, culture, sports${excludeContext}
 

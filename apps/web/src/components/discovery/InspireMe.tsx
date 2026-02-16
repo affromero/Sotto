@@ -16,11 +16,20 @@ interface InspireMeProps {
 }
 
 type Section = 'forYou' | 'trending' | 'news';
+type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
 
 const SECTION_LABELS: Record<Section, string> = {
   forYou: 'For You',
   trending: 'Trending',
   news: 'In the News',
+};
+
+const TIME_RANGE_LABELS: Record<NewsTimeRange, string> = {
+  '1h': 'Past hour',
+  '12h': 'Past 12 hours',
+  '24h': 'Past 24 hours',
+  '1w': 'Past week',
+  '1m': 'Past month',
 };
 
 export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
@@ -30,6 +39,8 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [trendingPodcasts, setTrendingPodcasts] = useState<PodcastSummary[]>([]);
   const [newsQuestions, setNewsQuestions] = useState<TasteQuestion[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
+  const [isLoadingNews, setIsLoadingNews] = useState(false);
 
   // Pre-fetch all tabs on open
   useEffect(() => {
@@ -64,10 +75,12 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   );
 
   const handleLoadMore = useCallback(
-    async (section: 'forYou' | 'news') => {
+    async (section: 'forYou' | 'news', timeRange?: NewsTimeRange) => {
       setIsLoadingMore(true);
       try {
-        const res = await fetch(`/api/inspire/all?section=${section}`);
+        const params = new URLSearchParams({ section });
+        if (timeRange) params.set('timeRange', timeRange);
+        const res = await fetch(`/api/inspire/all?${params}`);
         if (!res.ok) return;
         const data = await res.json();
         if (section === 'forYou' && data.forYou) {
@@ -77,6 +90,24 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         }
       } finally {
         setIsLoadingMore(false);
+      }
+    },
+    []
+  );
+
+  const handleTimeRangeChange = useCallback(
+    async (range: NewsTimeRange) => {
+      setNewsTimeRange(range);
+      setIsLoadingNews(true);
+      try {
+        const res = await fetch(`/api/inspire/all?section=news&timeRange=${range}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.news) {
+          setNewsQuestions(data.news);
+        }
+      } finally {
+        setIsLoadingNews(false);
       }
     },
     []
@@ -127,12 +158,47 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
               podcasts={trendingPodcasts}
               onSelectTopic={handleSelectTopic}
             />
+          ) : activeSection === 'news' ? (
+            <>
+              <div className={styles.timeRangeBar}>
+                <label htmlFor="news-time-range" className={styles.timeRangeLabel}>
+                  Show news from:
+                </label>
+                <select
+                  id="news-time-range"
+                  className={styles.timeRangeSelect}
+                  value={newsTimeRange}
+                  onChange={(e) => handleTimeRangeChange(e.target.value as NewsTimeRange)}
+                  disabled={isLoadingNews}
+                >
+                  {(Object.keys(TIME_RANGE_LABELS) as NewsTimeRange[]).map((range) => (
+                    <option key={range} value={range}>
+                      {TIME_RANGE_LABELS[range]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {isLoadingNews ? (
+                <div className={styles.loadingState}>
+                  <Spinner size="large" />
+                  <p>Searching for news...</p>
+                </div>
+              ) : (
+                <InspireQuiz
+                  key={`news-${newsQuestions[0]?.id ?? 'empty'}`}
+                  questions={newsQuestions}
+                  onSelectTopic={handleSelectTopic}
+                  onLoadMore={() => handleLoadMore('news', newsTimeRange)}
+                  isLoadingMore={isLoadingMore}
+                />
+              )}
+            </>
           ) : (
             <InspireQuiz
-              key={`${activeSection}-${(activeSection === 'forYou' ? forYouQuestions : newsQuestions)[0]?.id ?? 'empty'}`}
-              questions={activeSection === 'forYou' ? forYouQuestions : newsQuestions}
+              key={`forYou-${forYouQuestions[0]?.id ?? 'empty'}`}
+              questions={forYouQuestions}
               onSelectTopic={handleSelectTopic}
-              onLoadMore={() => handleLoadMore(activeSection)}
+              onLoadMore={() => handleLoadMore('forYou')}
               isLoadingMore={isLoadingMore}
             />
           )}
