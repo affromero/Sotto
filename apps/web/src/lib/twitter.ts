@@ -1,5 +1,5 @@
 import { logger } from './logger';
-import type { TwitterTweet } from '@/types/twitter';
+import type { TwitterTweet, ThreadTweet, ThreadData } from '@/types/twitter';
 
 function getEnv(key: string): string | undefined {
   return process.env[key];
@@ -18,8 +18,12 @@ interface RateLimitInfo {
 
 let mentionsRateLimit: RateLimitInfo = { remaining: 100, resetAt: 0 };
 let tweetsRateLimit: RateLimitInfo = { remaining: 100, resetAt: 0 };
+let searchRateLimit: RateLimitInfo = { remaining: 100, resetAt: 0 };
 
-function updateRateLimit(headers: Headers, target: 'mentions' | 'tweets'): void {
+const THREAD_TWEET_LIMIT = 50;
+const QUOTED_TWEET_FETCH_LIMIT = 5;
+
+function updateRateLimit(headers: Headers, target: 'mentions' | 'tweets' | 'search'): void {
   const remaining = headers.get('x-rate-limit-remaining');
   const reset = headers.get('x-rate-limit-reset');
 
@@ -31,8 +35,10 @@ function updateRateLimit(headers: Headers, target: 'mentions' | 'tweets'): void 
 
     if (target === 'mentions') {
       mentionsRateLimit = info;
-    } else {
+    } else if (target === 'tweets') {
       tweetsRateLimit = info;
+    } else {
+      searchRateLimit = info;
     }
 
     if (info.remaining < 5) {
@@ -44,8 +50,9 @@ function updateRateLimit(headers: Headers, target: 'mentions' | 'tweets'): void 
   }
 }
 
-function canMakeRequest(target: 'mentions' | 'tweets'): boolean {
-  const info = target === 'mentions' ? mentionsRateLimit : tweetsRateLimit;
+function canMakeRequest(target: 'mentions' | 'tweets' | 'search'): boolean {
+  const rateLimits = { mentions: mentionsRateLimit, tweets: tweetsRateLimit, search: searchRateLimit };
+  const info = rateLimits[target];
   if (info.remaining <= 0 && Date.now() < info.resetAt) {
     logger.warn(`Twitter ${target} rate limited, waiting until reset`, {
       resetAt: new Date(info.resetAt).toISOString(),
@@ -130,7 +137,7 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities',
     max_results: '100',
   });
 
@@ -175,7 +182,7 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities',
   });
 
   const url = `${TWITTER_API_BASE}/tweets/${tweetId}?${params}`;
@@ -195,6 +202,171 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
 
   const data = await response.json();
   return (data.data as TwitterTweet) ?? null;
+}
+
+/**
+ * Fetch the full conversation thread for a given conversation_id.
+ * Uses Twitter API v2 GET /2/tweets/search/recent (requires Basic tier).
+ * Returns null if rate-limited or no results found.
+ */
+export async function getThread(conversationId: string): Promise<ThreadData | null> {
+  const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
+
+  if (!bearerToken) {
+    throw new Error('Twitter credentials not configured — set TWITTER_BEARER_TOKEN');
+  }
+
+  if (!canMakeRequest('search')) {
+    return null;
+  }
+
+  // Fetch root tweet separately (search results exclude it)
+  const rootParams = new URLSearchParams({
+    'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities',
+    expansions: 'author_id',
+    'user.fields': 'username,name',
+  });
+
+  const rootUrl = `${TWITTER_API_BASE}/tweets/${conversationId}?${rootParams}`;
+  const rootResponse = await fetch(rootUrl, {
+    headers: { Authorization: `Bearer ${bearerToken}` },
+  });
+
+  updateRateLimit(rootResponse.headers, 'tweets');
+
+  if (!rootResponse.ok) {
+    if (rootResponse.status === 404) return null;
+    const errorText = await rootResponse.text();
+    throw new Error(`Twitter API error (${rootResponse.status}): ${errorText}`);
+  }
+
+  const rootData = await rootResponse.json();
+  if (!rootData.data) return null;
+
+  const rawRootTweet = rootData.data as TwitterTweet;
+  const userMap = new Map<string, { username: string; name: string }>();
+
+  // Collect user info from root tweet includes
+  if (rootData.includes?.users) {
+    for (const user of rootData.includes.users) {
+      userMap.set(user.id, { username: user.username, name: user.name });
+    }
+  }
+
+  // Search for all replies in the conversation (paginated)
+  const allReplies: TwitterTweet[] = [];
+  let nextToken: string | undefined;
+
+  do {
+    if (!canMakeRequest('search')) break;
+
+    const searchParams = new URLSearchParams({
+      query: `conversation_id:${conversationId}`,
+      'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities',
+      expansions: 'author_id',
+      'user.fields': 'username,name',
+      max_results: '100',
+    });
+
+    if (nextToken) {
+      searchParams.set('next_token', nextToken);
+    }
+
+    const searchUrl = `${TWITTER_API_BASE}/tweets/search/recent?${searchParams}`;
+    const searchResponse = await fetch(searchUrl, {
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    });
+
+    updateRateLimit(searchResponse.headers, 'search');
+
+    if (!searchResponse.ok) {
+      // If rate-limited mid-fetch, return what we have so far
+      if (searchResponse.status === 429) break;
+      const errorText = await searchResponse.text();
+      throw new Error(`Twitter search API error (${searchResponse.status}): ${errorText}`);
+    }
+
+    const searchData = await searchResponse.json();
+
+    // Accumulate user info across pages
+    if (searchData.includes?.users) {
+      for (const user of searchData.includes.users) {
+        userMap.set(user.id, { username: user.username, name: user.name });
+      }
+    }
+
+    if (searchData.data) {
+      allReplies.push(...(searchData.data as TwitterTweet[]));
+    }
+
+    nextToken = searchData.meta?.next_token;
+  } while (nextToken && allReplies.length < THREAD_TWEET_LIMIT);
+
+  // Cap at THREAD_TWEET_LIMIT
+  const cappedReplies = allReplies.slice(0, THREAD_TWEET_LIMIT);
+
+  // Fetch quoted tweets referenced in the thread
+  const quotedTweetIds = new Set<string>();
+  const allTweets = [rawRootTweet, ...cappedReplies];
+  for (const tweet of allTweets) {
+    if (tweet.referenced_tweets) {
+      for (const ref of tweet.referenced_tweets) {
+        if (ref.type === 'quoted' && !allTweets.some((t) => t.id === ref.id)) {
+          quotedTweetIds.add(ref.id);
+        }
+      }
+    }
+  }
+
+  const quotedTweets: TwitterTweet[] = [];
+  let quotedFetchCount = 0;
+  for (const quotedId of quotedTweetIds) {
+    if (quotedFetchCount >= QUOTED_TWEET_FETCH_LIMIT) break;
+    const quoted = await getTweet(quotedId);
+    if (quoted) {
+      quotedTweets.push(quoted);
+    }
+    quotedFetchCount++;
+  }
+
+  // Convert to ThreadTweet objects
+  const toThreadTweet = (tweet: TwitterTweet): ThreadTweet => {
+    const author = userMap.get(tweet.author_id);
+    const repliedTo = tweet.referenced_tweets?.find((r) => r.type === 'replied_to');
+    return {
+      id: tweet.id,
+      text: tweet.text,
+      authorId: tweet.author_id,
+      authorUsername: author?.username ?? 'unknown',
+      authorName: author?.name ?? 'Unknown',
+      urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
+      createdAt: tweet.created_at,
+      inReplyToTweetId: repliedTo?.id,
+    };
+  };
+
+  const rootThreadTweet = toThreadTweet(rawRootTweet);
+
+  // Build replies: thread replies + quoted tweets, sorted chronologically
+  const replyThreadTweets = [...cappedReplies, ...quotedTweets]
+    .map(toThreadTweet)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  // Count unique participants
+  const participantIds = new Set([rootThreadTweet.authorId, ...replyThreadTweets.map((r) => r.authorId)]);
+
+  logger.info('Fetched thread', {
+    conversationId,
+    tweetCount: String(1 + replyThreadTweets.length),
+    participantCount: String(participantIds.size),
+  });
+
+  return {
+    rootTweet: rootThreadTweet,
+    replies: replyThreadTweets,
+    participantCount: participantIds.size,
+    tweetCount: 1 + replyThreadTweets.length,
+  };
 }
 
 /**
@@ -238,4 +410,5 @@ export function isTwitterConfigured(): boolean {
 export function _resetRateLimits(): void {
   mentionsRateLimit = { remaining: 100, resetAt: 0 };
   tweetsRateLimit = { remaining: 100, resetAt: 0 };
+  searchRateLimit = { remaining: 100, resetAt: 0 };
 }

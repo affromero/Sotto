@@ -2,14 +2,14 @@ import { Job } from 'bullmq';
 import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
-import { getMentions, getTweet, replyToTweet } from '@/lib/twitter';
-import { parseTweetIntent } from '@/lib/tweet-parser';
+import { getMentions, getTweet, getThread, replyToTweet } from '@/lib/twitter';
+import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
 import { getAiKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
-import type { TwitterTweet } from '@/types/twitter';
+import type { TwitterTweet, TweetParseResult, ThreadData } from '@/types/twitter';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
@@ -131,32 +131,64 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
   });
 
   try {
-    // 6. Fetch parent tweet for reply context
-    let parentText: string | undefined;
-    const parentTweetId = getParentTweetId(tweet);
-    if (parentTweetId) {
-      const parentTweet = await getTweet(parentTweetId);
-      if (parentTweet) {
-        parentText = parentTweet.text;
-      }
-    }
-
-    // 7. Resolve user's AI key for BYOK passthrough
+    // 6. Resolve user's AI key for BYOK passthrough
     const aiKey = await getAiKey(userId);
 
-    // 8. Parse intent via Claude
-    const parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
+    // 7. Detect thread and parse intent accordingly
+    const isThread = tweet.conversation_id && tweet.conversation_id !== tweet.id;
+    let parsed: TweetParseResult;
+    let threadData: ThreadData | null = null;
+
+    if (isThread) {
+      threadData = await getThread(tweet.conversation_id!);
+    }
+
+    if (threadData && threadData.replies.length >= 3) {
+      // Thread path: parse full conversation
+      const mentionAsThreadTweet = {
+        id: tweet.id,
+        text: tweet.text,
+        authorId: tweet.author_id,
+        authorUsername: 'unknown',
+        authorName: 'Unknown',
+        urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
+        createdAt: tweet.created_at,
+      };
+      parsed = await parseThreadIntent(mentionAsThreadTweet, threadData, aiKey?.apiKey);
+    } else {
+      // Single-tweet path: existing behavior
+      let parentText: string | undefined;
+      const parentTweetId = getParentTweetId(tweet);
+      if (parentTweetId) {
+        const parentTweet = await getTweet(parentTweetId);
+        if (parentTweet) {
+          parentText = parentTweet.text;
+        }
+      }
+      parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
+    }
 
     await prisma.tweetMention.update({
       where: { id: mention.id },
       data: { parsedTopic: parsed.topic, status: 'GENERATING' },
     });
 
-    // 9. Determine voice IDs
+    // 8. Determine voice IDs
     const tempPodcastId = mention.id; // use mention ID as seed for voice selection
     const voicePair = selectVoicePair(tempPodcastId);
     const hostVoiceId = user.preferredHostVoiceId ?? voicePair.host.id;
     const expertVoiceId = user.preferredExpertVoiceId ?? voicePair.expert.id;
+
+    // 9. Build podcast metadata — adjust for threads
+    const isThreadPodcast = threadData && threadData.replies.length >= 3;
+    const tone = parsed.isDebate ? 'socratic' : parsed.tone;
+    const focusAreas = isThreadPodcast && parsed.viewpoints
+      ? [...parsed.focusAreas, ...parsed.viewpoints]
+      : parsed.focusAreas;
+    const durationTarget = isThreadPodcast ? 15 : 10;
+    const sourceText = isThreadPodcast && threadData
+      ? formatThreadAsSourceText(threadData, parsed)
+      : undefined;
 
     // 10. Create Podcast + Discovery records
     const podcast = await prisma.podcast.create({
@@ -176,9 +208,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
             topic: parsed.topic,
             depth: parsed.depth,
             audienceLevel: parsed.audienceLevel,
-            tone: parsed.tone,
-            focusAreas: parsed.focusAreas,
-            durationTarget: 10,
+            tone,
+            focusAreas,
+            durationTarget,
             sourceUrl: parsed.sourceUrl,
           },
         },
@@ -197,6 +229,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       podcastId: podcast.id,
       userId,
       sourceUrl: parsed.sourceUrl,
+      sourceText,
     });
 
     // Increment free tier counter for non-BYOK users
@@ -209,6 +242,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       tweetId: tweet.id,
       podcastId: podcast.id,
       topic: parsed.topic,
+      isThread: String(!!isThreadPodcast),
     });
   } catch (err) {
     await prisma.tweetMention.update({
@@ -257,4 +291,28 @@ function getParentTweetId(tweet: TwitterTweet): string | undefined {
   }
   const repliedTo = tweet.referenced_tweets.find((r) => r.type === 'replied_to');
   return repliedTo?.id;
+}
+
+function formatThreadAsSourceText(thread: ThreadData, parsed: TweetParseResult): string {
+  const sections: string[] = [];
+
+  sections.push('## Twitter/X Thread Discussion');
+  sections.push('');
+
+  if (parsed.viewpoints && parsed.viewpoints.length > 0) {
+    sections.push('### Viewpoints Identified:');
+    for (const viewpoint of parsed.viewpoints) {
+      sections.push(`- ${viewpoint}`);
+    }
+    sections.push('');
+  }
+
+  sections.push('### Thread Conversation:');
+  sections.push(`**Original post by @${thread.rootTweet.authorUsername}:** ${thread.rootTweet.text}`);
+
+  for (const reply of thread.replies) {
+    sections.push(`**@${reply.authorUsername}:** ${reply.text}`);
+  }
+
+  return sections.join('\n');
 }

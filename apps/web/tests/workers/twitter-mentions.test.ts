@@ -42,18 +42,22 @@ vi.mock('@/lib/prisma', () => ({
 
 const mockGetMentions = vi.fn();
 const mockGetTweet = vi.fn();
+const mockGetThread = vi.fn();
 const mockReplyToTweet = vi.fn();
 
 vi.mock('@/lib/twitter', () => ({
   getMentions: (...args: unknown[]) => mockGetMentions(...args),
   getTweet: (...args: unknown[]) => mockGetTweet(...args),
+  getThread: (...args: unknown[]) => mockGetThread(...args),
   replyToTweet: (...args: unknown[]) => mockReplyToTweet(...args),
 }));
 
 const mockParseTweetIntent = vi.fn();
+const mockParseThreadIntent = vi.fn();
 
 vi.mock('@/lib/tweet-parser', () => ({
   parseTweetIntent: (...args: unknown[]) => mockParseTweetIntent(...args),
+  parseThreadIntent: (...args: unknown[]) => mockParseThreadIntent(...args),
 }));
 
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
@@ -134,6 +138,7 @@ describe('processTwitterMentions', () => {
     mockRedisGet.mockResolvedValue(null);
     mockRedisExists.mockResolvedValue(0);
     mockGetMentions.mockResolvedValue([]);
+    mockGetThread.mockResolvedValue(null);
     mockPrismaTweetMentionFindUnique.mockResolvedValue(null);
   });
 
@@ -474,6 +479,293 @@ describe('processTwitterMentions', () => {
           data: expect.objectContaining({
             hostVoiceId: 'user-host-voice',
             expertVoiceId: 'user-expert-voice',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('thread detection and routing', () => {
+    function setupLinkedUser() {
+      mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
+        twitterEnabled: true,
+        preferredHostVoiceId: null,
+        preferredExpertVoiceId: null,
+      });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockSelectVoicePair.mockReturnValue({
+        host: { id: 'voice-host-1' },
+        expert: { id: 'voice-expert-1' },
+      });
+      mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
+      mockPrismaPodcastCreate.mockResolvedValue({
+        id: 'podcast-001',
+        discovery: { id: 'discovery-001' },
+      });
+    }
+
+    it('uses single-tweet path when conversation_id equals tweet id (root mention)', async () => {
+      const tweet = createMockTweet({
+        conversation_id: '1234567890', // same as default tweet id
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).not.toHaveBeenCalled();
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+      expect(mockParseThreadIntent).not.toHaveBeenCalled();
+    });
+
+    it('uses single-tweet path when conversation_id is missing', async () => {
+      const tweet = createMockTweet(); // no conversation_id
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).not.toHaveBeenCalled();
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+    });
+
+    it('fetches thread when conversation_id differs from tweet id', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Root post',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
+        replies: [
+          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+        ],
+        participantCount: 4,
+        tweetCount: 4,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'Thread Topic',
+        title: 'Thread Discussion',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'socratic',
+        focusAreas: ['topic-a'],
+        isDebate: true,
+        viewpoints: ['@alice argues X', '@bob argues Y'],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).toHaveBeenCalledWith('thread-root-id');
+      expect(mockParseThreadIntent).toHaveBeenCalled();
+      expect(mockParseTweetIntent).not.toHaveBeenCalled();
+    });
+
+    it('falls back to single-tweet when getThread returns null', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue(null);
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).toHaveBeenCalledWith('thread-root-id');
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+      expect(mockParseThreadIntent).not.toHaveBeenCalled();
+    });
+
+    it('falls back to single-tweet when thread has fewer than 3 replies', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Root',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
+        replies: [
+          { id: 'r1', text: 'Only reply', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+        ],
+        participantCount: 2,
+        tweetCount: 2,
+      });
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+      expect(mockParseThreadIntent).not.toHaveBeenCalled();
+    });
+
+    it('sets durationTarget to 15 and includes sourceText for thread podcasts', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Root post about climate',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
+        replies: [
+          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+          { id: 'r3', text: 'Reply 3', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+        ],
+        participantCount: 4,
+        tweetCount: 4,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'Climate Change',
+        title: 'Climate Debate',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'professional',
+        focusAreas: ['emissions'],
+        isDebate: false,
+        viewpoints: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      // Check durationTarget = 15 for threads
+      expect(mockPrismaPodcastCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            discovery: expect.objectContaining({
+              create: expect.objectContaining({
+                durationTarget: 15,
+              }),
+            }),
+          }),
+        })
+      );
+
+      // Check sourceText is passed to addJob
+      expect(mockAddJob).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({
+          sourceText: expect.stringContaining('Twitter/X Thread Discussion'),
+        })
+      );
+    });
+
+    it('sets tone to socratic when parsed.isDebate is true', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: {
+          id: 'thread-root-id',
+          text: 'Controversial take',
+          authorId: 'a1',
+          authorUsername: 'alice',
+          authorName: 'Alice',
+          urls: [],
+          createdAt: '2026-02-10T10:00:00Z',
+        },
+        replies: [
+          { id: 'r1', text: 'Disagree', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Agree', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+          { id: 'r3', text: '@sottofm podcast this', authorId: 'a4', authorUsername: 'dave', authorName: 'Dave', urls: [], createdAt: '2026-02-10T10:15:00Z' },
+        ],
+        participantCount: 4,
+        tweetCount: 4,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'Debate Topic',
+        title: 'The Great Debate',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'professional', // original tone from Claude
+        focusAreas: ['point-a'],
+        isDebate: true,
+        viewpoints: ['@alice for', '@bob against'],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      // tone should be overridden to socratic
+      expect(mockPrismaPodcastCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            discovery: expect.objectContaining({
+              create: expect.objectContaining({
+                tone: 'socratic',
+              }),
+            }),
           }),
         })
       );
