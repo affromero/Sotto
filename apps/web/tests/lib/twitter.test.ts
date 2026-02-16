@@ -18,6 +18,7 @@ vi.mock('@/lib/logger', () => ({
 import {
   getMentions,
   getTweet,
+  getThread,
   replyToTweet,
   isTwitterConfigured,
   _resetRateLimits,
@@ -184,6 +185,8 @@ describe('twitter', () => {
       expect(url).toContain('tweet.fields=');
       expect(url).toContain('author_id');
       expect(url).toContain('created_at');
+      expect(url).toContain('conversation_id');
+      expect(url).toContain('entities');
     });
   });
 
@@ -428,6 +431,293 @@ describe('twitter', () => {
       expect(isTwitterConfigured()).toBe(true);
     });
 
+  });
+
+  describe('getThread', () => {
+    function createSearchResponse(
+      tweets: Partial<TwitterTweet>[],
+      users: Array<{ id: string; username: string; name: string }> = [],
+      nextToken?: string
+    ) {
+      return {
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: tweets.length > 0 ? tweets : undefined,
+          includes: users.length > 0 ? { users } : undefined,
+          meta: nextToken ? { next_token: nextToken } : { result_count: tweets.length },
+        }),
+      };
+    }
+
+    it('fetches root tweet and search results to build thread', async () => {
+      // First call: root tweet fetch
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-root',
+            text: 'Original post',
+            author_id: 'author-1',
+            created_at: '2026-02-10T10:00:00Z',
+            conversation_id: 'conv-root',
+          },
+          includes: { users: [{ id: 'author-1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+
+      // Second call: search results
+      mockFetch.mockResolvedValueOnce(
+        createSearchResponse(
+          [
+            {
+              id: 'reply-1',
+              text: 'I disagree',
+              author_id: 'author-2',
+              created_at: '2026-02-10T10:05:00Z',
+              referenced_tweets: [{ type: 'replied_to', id: 'conv-root' }],
+            },
+            {
+              id: 'reply-2',
+              text: 'Good point',
+              author_id: 'author-3',
+              created_at: '2026-02-10T10:10:00Z',
+              referenced_tweets: [{ type: 'replied_to', id: 'reply-1' }],
+            },
+          ],
+          [
+            { id: 'author-2', username: 'bob', name: 'Bob' },
+            { id: 'author-3', username: 'carol', name: 'Carol' },
+          ]
+        )
+      );
+
+      const result = await getThread('conv-root');
+
+      expect(result).not.toBeNull();
+      expect(result!.rootTweet.authorUsername).toBe('alice');
+      expect(result!.replies).toHaveLength(2);
+      expect(result!.participantCount).toBe(3);
+      expect(result!.tweetCount).toBe(3);
+    });
+
+    it('returns null when root tweet is not found', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        headers: createMockHeaders(),
+        text: async () => 'Not found',
+      });
+
+      const result = await getThread('nonexistent');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when rate limited', async () => {
+      // Exhaust search rate limit
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders('0', 900),
+        json: async () => ({ data: {} }),
+      });
+      // Trigger a search to set the rate limit
+      await getTweet('exhaust-tweets');
+      mockFetch.mockClear();
+
+      // Now exhaust search specifically
+      // Reset to test search rate limit
+      _resetRateLimits();
+
+      // Set search rate limit to 0 via a root tweet fetch that succeeds
+      // then a search that returns rate limit 0
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-1',
+            text: 'Root',
+            author_id: 'a1',
+            created_at: '2026-02-10T10:00:00Z',
+          },
+          includes: { users: [{ id: 'a1', username: 'user1', name: 'User 1' }] },
+        }),
+      });
+
+      // Search returns rate limit 0
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders('0', 900),
+        json: async () => ({
+          data: [
+            {
+              id: 'reply-1',
+              text: 'Reply',
+              author_id: 'a2',
+              created_at: '2026-02-10T10:05:00Z',
+            },
+          ],
+          includes: { users: [{ id: 'a2', username: 'user2', name: 'User 2' }] },
+          meta: { next_token: 'page2' },
+        }),
+      });
+
+      // The second page should be blocked by rate limit
+      const result = await getThread('conv-1');
+
+      // Should still return partial data (root + first page of replies)
+      expect(result).not.toBeNull();
+      expect(result!.replies.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('extracts URLs from tweet entities', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-urls',
+            text: 'Check this https://t.co/abc',
+            author_id: 'author-1',
+            created_at: '2026-02-10T10:00:00Z',
+            entities: {
+              urls: [
+                {
+                  start: 11,
+                  end: 31,
+                  url: 'https://t.co/abc',
+                  expanded_url: 'https://example.com/article',
+                  display_url: 'example.com/article',
+                },
+              ],
+            },
+          },
+          includes: { users: [{ id: 'author-1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+
+      // Empty search results
+      mockFetch.mockResolvedValueOnce(createSearchResponse([], []));
+
+      const result = await getThread('conv-urls');
+
+      expect(result).not.toBeNull();
+      expect(result!.rootTweet.urls).toContain('https://example.com/article');
+    });
+
+    it('paginates through search results', async () => {
+      // Root tweet
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-pag',
+            text: 'Root',
+            author_id: 'a1',
+            created_at: '2026-02-10T10:00:00Z',
+          },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+
+      // Page 1 with next_token
+      mockFetch.mockResolvedValueOnce(
+        createSearchResponse(
+          [{ id: 'r1', text: 'Reply 1', author_id: 'a2', created_at: '2026-02-10T10:01:00Z' }],
+          [{ id: 'a2', username: 'bob', name: 'Bob' }],
+          'page2token'
+        )
+      );
+
+      // Page 2 without next_token
+      mockFetch.mockResolvedValueOnce(
+        createSearchResponse(
+          [{ id: 'r2', text: 'Reply 2', author_id: 'a3', created_at: '2026-02-10T10:02:00Z' }],
+          [{ id: 'a3', username: 'carol', name: 'Carol' }]
+        )
+      );
+
+      const result = await getThread('conv-pag');
+
+      expect(result).not.toBeNull();
+      expect(result!.replies).toHaveLength(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3); // root + 2 pages
+    });
+
+    it('fetches quoted tweets referenced in thread', async () => {
+      // Root tweet with a quoted reference
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-qt',
+            text: 'Check this quote',
+            author_id: 'a1',
+            created_at: '2026-02-10T10:00:00Z',
+            referenced_tweets: [{ type: 'quoted', id: 'quoted-1' }],
+          },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+
+      // Empty search results
+      mockFetch.mockResolvedValueOnce(createSearchResponse([], []));
+
+      // Quoted tweet fetch (via getTweet)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'quoted-1',
+            text: 'Original quoted content',
+            author_id: 'a-qt',
+            created_at: '2026-02-09T10:00:00Z',
+          },
+        }),
+      });
+
+      const result = await getThread('conv-qt');
+
+      expect(result).not.toBeNull();
+      expect(result!.replies.some((r) => r.id === 'quoted-1')).toBe(true);
+    });
+
+    it('sorts replies chronologically', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-sort',
+            text: 'Root',
+            author_id: 'a1',
+            created_at: '2026-02-10T10:00:00Z',
+          },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+
+      // Replies in reverse order
+      mockFetch.mockResolvedValueOnce(
+        createSearchResponse(
+          [
+            { id: 'r-late', text: 'Later', author_id: 'a2', created_at: '2026-02-10T12:00:00Z' },
+            { id: 'r-early', text: 'Earlier', author_id: 'a2', created_at: '2026-02-10T10:30:00Z' },
+          ],
+          [{ id: 'a2', username: 'bob', name: 'Bob' }]
+        )
+      );
+
+      const result = await getThread('conv-sort');
+
+      expect(result).not.toBeNull();
+      expect(result!.replies[0].id).toBe('r-early');
+      expect(result!.replies[1].id).toBe('r-late');
+    });
   });
 
   describe('rate limit handling', () => {

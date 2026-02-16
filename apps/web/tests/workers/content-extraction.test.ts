@@ -251,12 +251,12 @@ describe('processContentExtraction', () => {
     });
   });
 
-  describe('priority handling', () => {
-    it('prefers sourceUrl over sourceText when both are provided', async () => {
+  describe('combining sourceText and sourceUrl', () => {
+    it('combines sourceText and URL content when both are provided', async () => {
       mockExtractContent.mockResolvedValue({
         text: 'Content from URL',
-        markdown: 'Content from URL',
-        title: null,
+        markdown: '# Article Content',
+        title: 'Article',
         siteName: null,
         author: null,
         publishedDate: null,
@@ -267,11 +267,50 @@ describe('processContentExtraction', () => {
       const job = createMockJob({
         ...defaultPayload,
         sourceUrl: 'https://example.com/article',
-        sourceText: 'User-provided text that should be ignored',
+        sourceText: 'Thread discussion text here',
       });
       await processContentExtraction(job);
 
       expect(mockExtractContent).toHaveBeenCalledWith('https://example.com/article');
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceContent: expect.stringContaining('Thread discussion text here'),
+          }),
+        })
+      );
+      // Should also contain the URL content
+      const updateCall = mockPrismaDiscoveryUpdate.mock.calls[0][0];
+      expect(updateCall.data.sourceContent).toContain('# Article Content');
+      expect(updateCall.data.sourceContent).toContain('Referenced Article');
+    });
+
+    it('uses only URL content when sourceText is empty', async () => {
+      mockExtractContent.mockResolvedValue({
+        text: 'URL content',
+        markdown: '# URL Content',
+        title: null,
+        siteName: null,
+        author: null,
+        publishedDate: null,
+        wordCount: 2,
+        sourceType: 'html',
+        extractionMethod: 'readability',
+      });
+      const job = createMockJob({
+        ...defaultPayload,
+        sourceUrl: 'https://example.com/article',
+        sourceText: '',
+      });
+      await processContentExtraction(job);
+
+      expect(mockPrismaDiscoveryUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceContent: '# URL Content',
+          }),
+        })
+      );
     });
   });
 
