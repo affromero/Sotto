@@ -1,0 +1,128 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.loading,
+.error {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  padding: var(--spacing-lg) 0;
+}
+
+.error {
+  color: var(--color-error, #dc2626);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.cardLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cardValue {
+  font: var(--text-heading-md);
+  color: var(--color-text-primary);
+}
+
+.cardSub {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.subTitle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body-sm);
+}
+
+.table th {
+  text-align: left;
+  font-weight: 600;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1.5px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.table td {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.truncate {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.badgeposted,
+.badgeREADY,
+.badgeREPLIED {
+  background: #ecfdf5;
+  color: #059669;
+  border-color: #a7f3d0;
+}
+
+.badgefailed,
+.badgeFAILED {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.badgepending,
+.badgePENDING {
+  background: #fffbeb;
+  color: #d97706;
+  border-color: #fde68a;
+}
+
+.badgeGENERATING,
+.badgePARSING {
+  background: #eff6ff;
+  color: #2563eb;
+  border-color: #bfdbfe;
+}

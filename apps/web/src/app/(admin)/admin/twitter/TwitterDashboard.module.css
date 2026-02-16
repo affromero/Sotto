@@ -1,0 +1,41 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-xxs);
+  border-bottom: 1.5px solid var(--color-border);
+  padding-bottom: 0;
+}
+
+.tab {
+  appearance: none;
+  background: none;
+  border: none;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1.5px;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
+}
+
+.tabActive {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.content {
+  min-height: 300px;
+}
