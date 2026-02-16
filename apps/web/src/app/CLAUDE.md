@@ -117,8 +117,7 @@
 | `/api/admin/traffic-report`                                      | GET              | Bearer key | Full analytics JSON (traffic, users, podcasts, playback, costs)             |
 | `/api/users/me/avatar`                                           | POST             | Yes        | Upload avatar image (multipart/form-data)                                   |
 | `/api/onboarding/interests`                                      | POST             | Yes        | Save onboarding interest selections + mark onboarded                        |
-| `/api/inspire`                                                   | GET              | Yes        | "Inspire Me" topics: personalized, trending, current events                 |
-| `/api/inspire/drill`                                             | POST             | Yes        | Drill down into a category for specific subtopics                           |
+| `/api/inspire/all`                                               | GET              | Yes        | All three Inspire Me tabs (forYou + trending + news) in one call, optional ?section= for refresh |
 | `/api/handles/check`                                             | GET              | No         | Check handle availability                                                   |
 | `/api/admin/handles`                                             | GET/POST/DELETE  | ADMIN      | Manage reserved handles                                                     |
 | `/api/admin/podcasts/create-as-sotto`                            | POST             | ADMIN      | Create podcast as @sotto                                                    |

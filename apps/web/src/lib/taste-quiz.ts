@@ -5,7 +5,6 @@ import { cache } from './redis';
 import { getFreeTierConfig } from './free-tier-config';
 import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
-import { getTrending } from './recommendation-engine';
 import { WEB_SEARCH_TOOL } from './claude';
 import { logger } from './logger';
 
@@ -160,22 +159,15 @@ Respond with a JSON array only, no markdown. Each item:
   return questions;
 }
 
-type InspireSection = 'forYou' | 'trending' | 'news';
+interface InspireContext {
+  taxonomyLines: string[];
+  validSlugs: Set<string>;
+  priorQuestionIds: Set<string>;
+  freeTierConfig: { aiProvider: string; aiModel: string };
+}
 
-/**
- * Generate quiz-format questions for the Inspire Me overlay.
- * Reuses the same taxonomy, slug validation, hash dedup, and prior-answer filtering.
- */
-export async function generateInspireQuestions(
-  userId: string,
-  count: number,
-  section: InspireSection
-): Promise<TasteQuestion[]> {
-  const cacheKey = `inspire:questions:${section}:${userId}`;
-  const cached = await cache.get<TasteQuestion[]>(cacheKey);
-  if (cached) return cached;
-
-  const [categories, existingInterests, priorAnswers, freeTierConfig] = await Promise.all([
+async function loadInspireContext(userId: string): Promise<InspireContext> {
+  const [categories, priorAnswers, freeTierConfig] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -187,10 +179,6 @@ export async function generateInspireQuestions(
         },
       },
     }),
-    prisma.userInterest.findMany({
-      where: { userId },
-      select: { tag: { select: { name: true, slug: true } }, weight: true },
-    }),
     prisma.tasteQuizAnswer.findMany({
       where: { userId },
       select: { questionId: true },
@@ -200,7 +188,6 @@ export async function generateInspireQuestions(
     getFreeTierConfig(),
   ]);
 
-  const priorQuestionIds = new Set(priorAnswers.map((a) => a.questionId));
   const validSlugs = new Set<string>();
   for (const cat of categories) {
     validSlugs.add(cat.slug);
@@ -214,96 +201,20 @@ export async function generateInspireQuestions(
     return `${cat.slug}: [${children}]`;
   });
 
-  const interestNames = existingInterests
-    .filter((i) => i.weight > 0)
-    .map((i) => i.tag.name);
+  return {
+    taxonomyLines,
+    validSlugs,
+    priorQuestionIds: new Set(priorAnswers.map((a) => a.questionId)),
+    freeTierConfig,
+  };
+}
 
-  let sectionContext: string;
-  let useWebSearch = false;
-
-  if (section === 'forYou') {
-    sectionContext = interestNames.length > 0
-      ? `The user is interested in: ${interestNames.join(', ')}. Generate questions tailored to their interests, combining topics they like in unexpected ways. Search the web for current events related to their interests.`
-      : 'The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Search the web for interesting current events.';
-    useWebSearch = true;
-  } else if (section === 'trending') {
-    let trendingContext = '';
-    try {
-      const trending = await getTrending();
-      if (trending.length > 0) {
-        trendingContext = `Currently trending podcasts on the platform:\n${trending.slice(0, 8).map((p) => `- "${p.title}" (${p.playCount} plays)`).join('\n')}\n\nGenerate questions inspired by what's popular right now.`;
-      }
-    } catch {
-      // Fall through to generic trending
-    }
-    sectionContext = trendingContext || 'Generate questions about topics that are broadly popular and trending in culture, tech, science, and current events.';
-  } else {
-    sectionContext = 'Search the web for the most notable current events and news from the past week. Generate questions about real, specific, timely topics — not evergreen content.';
-    useWebSearch = true;
-  }
-
-  const requestCount = count + Math.min(priorAnswers.length, 5);
-
-  const systemPrompt = `You generate podcast topic questions for Sotto's "Inspire Me" feature.
-
-Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
-
-Context: ${sectionContext}
-
-Rules:
-- Generate exactly ${requestCount} questions
-- Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must be specific, vivid, and concrete — not generic
-- Category is the parent slug the question belongs to
-
-Taxonomy (parent: [children]):
-${taxonomyLines.join('\n')}
-
-Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
-
-  let responseText: string;
-  try {
-    if (useWebSearch) {
-      // Use Anthropic directly for web search capability
-      const resolved = await resolveAiProvider(userId);
-      if (resolved.provider === 'anthropic' || resolved.source === 'platform') {
-        const { default: Anthropic } = await import('@anthropic-ai/sdk');
-        const apiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
-        if (!apiKey) throw new Error('No API key');
-        const client = new Anthropic({ apiKey });
-        const response = await client.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: systemPrompt }],
-          tools: [WEB_SEARCH_TOOL],
-        });
-        const textBlock = response.content.find((block) => block.type === 'text');
-        responseText = textBlock && textBlock.type === 'text' ? textBlock.text : '';
-      } else {
-        // Fallback: no web search
-        const ai = createAIProvider(freeTierConfig.aiProvider);
-        const result = await ai.generateResponse(
-          systemPrompt,
-          [{ role: 'user', content: `Generate ${requestCount} inspire questions.` }],
-          { model: freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
-        );
-        responseText = result.content;
-      }
-    } else {
-      const ai = createAIProvider(freeTierConfig.aiProvider);
-      const result = await ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: `Generate ${requestCount} inspire questions.` }],
-        { model: freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
-      );
-      responseText = result.content;
-    }
-  } catch (err) {
-    logger.warn('Failed to generate inspire questions', { error: (err as Error).message, section });
-    return [];
-  }
-
+function parseAndFilterQuestions(
+  responseText: string,
+  count: number,
+  validSlugs: Set<string>,
+  priorQuestionIds: Set<string>
+): TasteQuestion[] {
   let rawQuestions: Array<{ text: string; tagSlugs: string[]; category: string }>;
   try {
     const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -335,9 +246,180 @@ Respond with a JSON array only, no markdown. Each item:
     if (questions.length >= count) break;
   }
 
-  if (questions.length > 0) {
-    await cache.set(cacheKey, questions, 3600);
-  }
-
   return questions;
+}
+
+/**
+ * Generate interest-based "For You" questions. No web search — fast.
+ * Combines user interests in unexpected ways, explores adjacent topics.
+ * Falls back to diverse curiosity-driven questions when no interests exist.
+ */
+export async function generateForYouQuestions(
+  userId: string,
+  count: number
+): Promise<TasteQuestion[]> {
+  const cacheKey = `inspire:forYou:${userId}`;
+  const cached = await cache.get<TasteQuestion[]>(cacheKey);
+  if (cached) return cached;
+
+  const [ctx, existingInterests] = await Promise.all([
+    loadInspireContext(userId),
+    prisma.userInterest.findMany({
+      where: { userId },
+      select: { tag: { select: { name: true, slug: true } }, weight: true },
+    }),
+  ]);
+
+  const interestNames = existingInterests
+    .filter((i) => i.weight > 0)
+    .map((i) => i.tag.name);
+
+  const interestContext = interestNames.length > 0
+    ? `The user is interested in: ${interestNames.join(', ')}.
+
+Your job is to COMBINE these interests in unexpected, creative ways. Examples:
+- If they like "AI" and "History" → "Would you listen to a podcast about how ancient civilizations would have used artificial intelligence?"
+- If they like "Psychology" and "Sports" → "Would you listen to a podcast about the mental tricks Olympic athletes use to overcome fear?"
+
+Also explore topics ADJACENT to their interests — things they haven't explicitly said but would likely enjoy based on their taste profile.`
+    : `The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Aim for surprise and delight — topics that make someone think "I never knew I wanted to learn about that."`;
+
+  const requestCount = count + 5;
+
+  const systemPrompt = `You generate personalized podcast topic questions for Sotto's "For You" feed.
+
+Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
+
+${interestContext}
+
+Rules:
+- Generate exactly ${requestCount} questions
+- Each question maps to 1-3 existing tag slugs from the taxonomy
+- Questions must be specific, vivid, and concrete — not generic
+- Focus on CREATIVE COMBINATIONS and ADJACENT INTERESTS — not straightforward "more of what you like"
+- Category is the parent slug the question belongs to
+
+Taxonomy (parent: [children]):
+${ctx.taxonomyLines.join('\n')}
+
+Respond with a JSON array only, no markdown. Each item:
+{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+
+  try {
+    const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+    const result = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
+      { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+    );
+
+    const questions = parseAndFilterQuestions(
+      result.content, count, ctx.validSlugs, ctx.priorQuestionIds
+    );
+
+    if (questions.length > 0) {
+      await cache.set(cacheKey, questions, 3600);
+    }
+
+    return questions;
+  } catch (err) {
+    logger.warn('Failed to generate ForYou questions', { error: (err as Error).message });
+    return [];
+  }
+}
+
+export type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
+
+const NEWS_TIME_LABELS: Record<NewsTimeRange, string> = {
+  '1h': 'the past hour',
+  '12h': 'the past 12 hours',
+  '24h': 'the past 24 hours',
+  '1w': 'the past week',
+  '1m': 'the past month',
+};
+
+/**
+ * Generate current-events "In the News" questions using web search.
+ * Must reference specific real events/people/dates from the given time range.
+ * Accepts excludeTopics to avoid overlap with ForYou questions.
+ */
+export async function generateNewsQuestions(
+  userId: string,
+  count: number,
+  excludeTopics: string[] = [],
+  timeRange: NewsTimeRange = '1w'
+): Promise<TasteQuestion[]> {
+  const cacheKey = `inspire:news:${timeRange}:${userId}`;
+  const cached = await cache.get<TasteQuestion[]>(cacheKey);
+  if (cached) return cached;
+
+  const ctx = await loadInspireContext(userId);
+
+  const timeLabel = NEWS_TIME_LABELS[timeRange];
+
+  const excludeContext = excludeTopics.length > 0
+    ? `\n\nIMPORTANT: The following topics are already shown in a different tab. Do NOT generate questions about similar subjects:\n${excludeTopics.map((t) => `- ${t}`).join('\n')}`
+    : '';
+
+  const requestCount = count + 5;
+
+  const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
+
+Search the web for the most notable events, breakthroughs, controversies, and developments from ${timeLabel}. Each question MUST be grounded in a specific, real, verifiable event.
+
+Rules:
+- Generate exactly ${requestCount} questions
+- Each question MUST reference a specific real event, person, date, or development from ${timeLabel}
+- Each question maps to 1-3 existing tag slugs from the taxonomy
+- Questions must feel timely and urgent — "Would you listen to a podcast about [specific thing that just happened]?"
+- Include the "why now" — what makes this newsworthy right now
+- Category is the parent slug the question belongs to
+- Cover diverse topics: science, politics, tech, business, culture, sports${excludeContext}
+
+Taxonomy (parent: [children]):
+${ctx.taxonomyLines.join('\n')}
+
+Respond with a JSON array only, no markdown. Each item:
+{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+
+  try {
+    const resolved = await resolveAiProvider(userId);
+    let responseText: string;
+
+    if (resolved.provider === 'anthropic' || resolved.source === 'platform') {
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const apiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) return [];
+      const client = new Anthropic({ apiKey });
+      const response = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: systemPrompt }],
+        tools: [WEB_SEARCH_TOOL],
+      });
+      const textBlock = response.content.find((block) => block.type === 'text');
+      responseText = textBlock && textBlock.type === 'text' ? textBlock.text : '';
+    } else {
+      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const result = await ai.generateResponse(
+        systemPrompt,
+        [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
+        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+      );
+      responseText = result.content;
+    }
+
+    const questions = parseAndFilterQuestions(
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
+    );
+
+    if (questions.length > 0) {
+      await cache.set(cacheKey, questions, 3600);
+    }
+
+    return questions;
+  } catch (err) {
+    logger.warn('Failed to generate News questions', { error: (err as Error).message });
+    return [];
+  }
 }

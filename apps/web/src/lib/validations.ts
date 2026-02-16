@@ -196,14 +196,6 @@ export const onboardingInterestsSchema = z.object({
 });
 
 /**
- * Inspire Me drill-down validation
- */
-export const inspireDrillSchema = z.object({
-  category: z.string().min(1).max(200),
-  parentTitle: z.string().min(1).max(200).optional(),
-});
-
-/**
  * Picks refresh validation
  */
 export const refreshPicksSchema = z.object({
