@@ -199,6 +199,31 @@
   border-radius: var(--radius-xl);
 }
 
+/* Script Ready State */
+
+.scriptReadyState {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-primary-lighter, #fef3c7);
+  border: 1px solid var(--color-primary-light, #fcd34d);
+  border-radius: var(--radius-xl);
+}
+
+.scriptReadyText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.scriptReadyActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 .processingSpinner {
   width: 32px;
   height: 32px;

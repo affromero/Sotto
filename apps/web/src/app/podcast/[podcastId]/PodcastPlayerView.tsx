@@ -15,6 +15,7 @@ import {
   RefreshCw,
   ListMusic,
   Trash2,
+  Check,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -125,6 +126,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -158,7 +161,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
 
   // Poll for status updates while podcast is processing
   useEffect(() => {
-    if (liveStatus === 'READY' || liveStatus === 'FAILED') return;
+    if (liveStatus === 'READY' || liveStatus === 'FAILED' || liveStatus === 'SCRIPT_READY') return;
 
     const interval = setInterval(async () => {
       try {
@@ -245,6 +248,38 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
     }
   }, [podcast.id, router]);
 
+  const handleApproveScript = useCallback(async () => {
+    setApproving(true);
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}/script/approve`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        setLiveStatus('GENERATING_AUDIO');
+      }
+    } catch {
+      // ignore
+    } finally {
+      setApproving(false);
+    }
+  }, [podcast.id]);
+
+  const handleRegenerateScript = useCallback(async () => {
+    setRegenerating(true);
+    try {
+      const response = await fetch(`/api/podcasts/${podcast.id}/script/regenerate`, {
+        method: 'POST',
+      });
+      if (response.ok) {
+        setLiveStatus('SCRIPTING');
+      }
+    } catch {
+      // ignore
+    } finally {
+      setRegenerating(false);
+    }
+  }, [podcast.id]);
+
   const handleExportPdf = useCallback(async () => {
     if (!isAuthenticated) return;
 
@@ -304,7 +339,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   }, []);
 
   const isReady = liveStatus === 'READY';
-  const isProcessing = !isReady && liveStatus !== 'FAILED';
+  const isScriptReady = liveStatus === 'SCRIPT_READY';
+  const isProcessing = !isReady && !isScriptReady && liveStatus !== 'FAILED';
 
   return (
     <>
@@ -427,6 +463,26 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {isProcessing && (
         <div className={styles.processingState}>
           <GenerationProgress status={liveStatus} />
+        </div>
+      )}
+
+      {/* Script ready for review */}
+      {isScriptReady && isOwner && (
+        <div className={styles.scriptReadyState}>
+          <GenerationProgress status={liveStatus} />
+          <p className={styles.scriptReadyText}>
+            Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
+          </p>
+          <div className={styles.scriptReadyActions}>
+            <Button onClick={handleApproveScript} loading={approving} disabled={approving || regenerating}>
+              <Check size={16} />
+              {approving ? 'Approving...' : 'Approve & Generate Audio'}
+            </Button>
+            <Button variant="secondary" onClick={handleRegenerateScript} loading={regenerating} disabled={approving || regenerating}>
+              <RefreshCw size={16} />
+              {regenerating ? 'Regenerating...' : 'Regenerate Script'}
+            </Button>
+          </div>
         </div>
       )}
 
