@@ -31,6 +31,9 @@ export enum JobType {
   VALIDATE_KEYS = 'validate_keys',
   POLL_TELEGRAM_UPDATES = 'poll_telegram_updates',
   REPLY_TELEGRAM = 'reply_telegram',
+  AUTO_TWEET = 'auto_tweet',
+  POLL_TWITTER_TRENDS = 'poll_twitter_trends',
+  ADMIN_THREAD_TO_PODCAST = 'admin_thread_to_podcast',
 }
 
 /**
@@ -165,6 +168,18 @@ export interface ReplyTelegramPayload {
   podcastId: string;
   telegramMessageId: string;
   chatId: string;
+}
+
+export interface AutoTweetPayload {
+  podcastId: string;
+  trigger: 'threshold' | 'manual' | 'trend';
+}
+
+export interface PollTwitterTrendsPayload {}
+
+export interface AdminThreadToPodcastPayload {
+  tweetUrl: string;
+  adminUserId: string;
 }
 
 /**
@@ -412,3 +427,6 @@ export const dataExportQueue = createQueue('data-export', { attempts: 2 });
 export const keyValidationQueue = createQueue('key-validation', { attempts: 1 });
 export const telegramBotQueue = createQueue('telegram-bot', { attempts: 1 });
 export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3 });
+export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempts: 3 });
+export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1 });
+export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2 });
