@@ -42,7 +42,7 @@ export async function executeClaudeCode(
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
   const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
-  const timeoutMs = opts?.timeoutMs || 120_000;
+  const timeoutMs = opts?.timeoutMs || 300_000;
 
   const args = ['-p', '--model', model, '--output-format', 'text'];
 
@@ -111,7 +111,7 @@ export async function* streamClaudeCode(
   opts?: ClaudeCodeOptions
 ): AsyncGenerator<string> {
   const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
-  const timeoutMs = opts?.timeoutMs || 120_000;
+  const timeoutMs = opts?.timeoutMs || 300_000;
 
   const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];
 
