@@ -54,6 +54,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [topicInput, setTopicInput] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | undefined>();
   const topicInputRef = useRef<HTMLInputElement>(null);
+  const prevSectionRef = useRef<Section>(activeSection);
 
   const fetchAll = useCallback((topic?: string) => {
     setIsLoading(true);
@@ -102,6 +103,18 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     },
     [activeTopic]
   );
+
+  // Regenerate fresh cards when switching back to forYou or news tabs
+  useEffect(() => {
+    const prev = prevSectionRef.current;
+    prevSectionRef.current = activeSection;
+    if (activeSection === 'forYou' && prev !== 'forYou') {
+      handleLoadMore('forYou');
+    }
+    if (activeSection === 'news' && prev !== 'news') {
+      handleLoadMore('news', newsTimeRange);
+    }
+  }, [activeSection, handleLoadMore, newsTimeRange]);
 
   const handleTimeRangeChange = useCallback(
     async (range: NewsTimeRange) => {
