@@ -3,18 +3,21 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { checkRateLimit } from '@/lib/redis';
 import { generateForYouQuestions, generateNewsQuestions } from '@/lib/taste-quiz';
+import type { NewsTimeRange } from '@/lib/taste-quiz';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
 import { logger } from '@/lib/logger';
 
 const inspireAllSchema = z.object({
   section: z.enum(['forYou', 'news']).optional(),
+  timeRange: z.enum(['1h', '12h', '24h', '1w', '1m']).optional(),
 });
 
 /**
  * GET /api/inspire/all
  * Returns all three Inspire Me sections in one call.
  * Optional ?section=forYou|news for single-section refresh ("Load more").
+ * Optional ?timeRange=1h|12h|24h|1w|1m for news time range.
  */
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -28,7 +31,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
   }
 
-  const { section } = validation.data;
+  const { section, timeRange } = validation.data;
+  const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
   const userId = session.user.id;
 
   const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
@@ -46,7 +50,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (section === 'news') {
-    const news = await generateNewsQuestions(userId, 6);
+    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange);
     return NextResponse.json({ news });
   }
 
@@ -62,7 +66,8 @@ export async function GET(request: NextRequest) {
   const news = await generateNewsQuestions(
     userId,
     6,
-    forYou.map((q) => q.text)
+    forYou.map((q) => q.text),
+    newsTimeRange
   );
 
   // Map RecommendedPodcast to PodcastSummary shape

@@ -131,6 +131,54 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Time range selector (News tab) */
+
+.timeRangeBar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.timeRangeLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.timeRangeSelect {
+  appearance: none;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  padding: var(--spacing-xs) var(--spacing-xl) var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-sm) center;
+  min-height: 36px;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.timeRangeSelect:hover {
+  border-color: var(--color-primary);
+}
+
+.timeRangeSelect:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.timeRangeSelect:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* States */
 
 .loadingState {
