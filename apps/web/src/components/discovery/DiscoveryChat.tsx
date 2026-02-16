@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DiscoveryMessage, DiscoveryMetadata } from '@/types/discovery';
+import type { DiscoveryMessage } from '@/types/discovery';
+import type { DiscoveryMetadata } from '@/types/discovery';
+import { useDiscovery } from '@/lib/hooks/useDiscovery';
 import { SuggestionChips } from './SuggestionChips';
 import styles from './DiscoveryChat.module.css';
 
@@ -11,15 +13,25 @@ interface DiscoveryChatProps {
   initialTopic?: string;
 }
 
+const GREETING: DiscoveryMessage = {
+  id: 'greeting',
+  role: 'assistant',
+  content:
+    "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore?",
+  chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
+  createdAt: new Date(0).toISOString(),
+};
+
 export function DiscoveryChat({ podcastId, onComplete, initialTopic }: DiscoveryChatProps) {
-  const [messages, setMessages] = useState<DiscoveryMessage[]>([]);
-  const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
+  const { messages, metadata, isLoading, sendMessage } = useDiscovery();
   const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const initialTopicSentRef = useRef(false);
+  const prevIsLoadingRef = useRef(isLoading);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const displayMessages = messages.length === 0 ? [GREETING] : [GREETING, ...messages];
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -29,134 +41,45 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic }: Discovery
     scrollToBottom();
   }, [messages, isLoading, scrollToBottom]);
 
-  // Send initial greeting on mount
+  // Refocus input when response completes
   useEffect(() => {
-    const initChat = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch('/api/discovery', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            podcastId,
-            messages: [],
-          }),
-        });
-
-        if (!response.ok) throw new Error('Failed to start discovery');
-
-        const data = await response.json();
-        if (data.message) {
-          setMessages([data.message]);
-        }
-        if (data.metadata) {
-          setMetadata(data.metadata);
-        }
-      } catch {
-        setMessages([
-          {
-            id: 'error-init',
-            role: 'assistant',
-            content:
-              "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore?",
-            chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initChat();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Core send logic (used by both sendMessage and initialTopic effect)
-  const doSend = useCallback(
-    async (content: string, currentMessages: DiscoveryMessage[]) => {
-      const userMessage: DiscoveryMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: content.trim(),
-        chips: [],
-        createdAt: new Date().toISOString(),
-      };
-
-      const updatedMessages = [...currentMessages, userMessage];
-      setMessages(updatedMessages);
-      setInputValue('');
-      setIsLoading(true);
-
-      try {
-        const response = await fetch('/api/discovery', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            podcastId,
-            messages: updatedMessages,
-          }),
-        });
-
-        if (!response.ok) throw new Error('Failed to send message');
-
-        const data = await response.json();
-        if (data.message) {
-          setMessages((prev) => [...prev, data.message]);
-        }
-        if (data.metadata) {
-          setMetadata(data.metadata);
-        }
-      } catch {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: "I'm sorry, something went wrong. Could you try saying that again?",
-            chips: [],
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      } finally {
-        setIsLoading(false);
-        inputRef.current?.focus();
-      }
-    },
-    [podcastId]
-  );
-
-  // Auto-send initialTopic from Inspire Me when it changes
-  useEffect(() => {
-    if (initialTopic && !initialTopicSentRef.current && messages.length > 0 && !isLoading) {
-      initialTopicSentRef.current = true;
-      doSend(initialTopic, messages);
+    if (prevIsLoadingRef.current && !isLoading) {
+      inputRef.current?.focus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialTopic, messages.length, isLoading]);
+    prevIsLoadingRef.current = isLoading;
+  }, [isLoading]);
 
-  const sendMessage = useCallback(
-    async (content: string) => {
+  // Auto-send initialTopic from Inspire Me or URL param
+  useEffect(() => {
+    if (initialTopic && !initialTopicSentRef.current) {
+      initialTopicSentRef.current = true;
+      sendMessage(initialTopic, podcastId, false);
+    }
+  }, [initialTopic, sendMessage, podcastId]);
+
+  const handleSend = useCallback(
+    (content: string, isChipBased = false) => {
       if (!content.trim() || isLoading) return;
-      await doSend(content, messages);
+      setInputValue('');
+      sendMessage(content, podcastId, isChipBased);
     },
-    [isLoading, messages, doSend]
+    [isLoading, sendMessage, podcastId]
   );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    sendMessage(inputValue);
+    handleSend(inputValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage(inputValue);
+      handleSend(inputValue);
     }
   };
 
   const handleChipSelect = (chip: string) => {
-    sendMessage(chip);
+    handleSend(chip, true);
   };
 
   const handleGenerate = () => {
@@ -169,12 +92,12 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic }: Discovery
     <div className={styles.root} role="region" aria-label="Discovery chat">
       {/* Messages area */}
       <div className={styles.messages} role="log" aria-live="polite">
-        {messages.map((message, index) => {
+        {displayMessages.map((message, index) => {
           const isUser = message.role === 'user';
           const isLastAssistant =
             message.role === 'assistant' &&
-            (index === messages.length - 1 ||
-              messages.slice(index + 1).every((m) => m.role === 'user'));
+            (index === displayMessages.length - 1 ||
+              displayMessages.slice(index + 1).every((m) => m.role === 'user'));
 
           return (
             <div key={message.id} className={styles.messageGroup}>
