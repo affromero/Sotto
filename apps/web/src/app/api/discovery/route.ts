@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { message, content, discoveryId } = body;
+  const { message, content, discoveryId, history } = body;
   let userMessage: string | undefined = message ?? content;
 
   if (!userMessage) {
@@ -62,13 +62,26 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Build message history
-  const messages = discovery?.messages.map((m) => ({
-    role: m.role as 'user' | 'assistant',
-    content: m.content,
-  })) || [];
+  // Build message history: prefer client-provided history, fall back to DB
+  // Strip [chips: ...] and [METADATA]...[/METADATA] from assistant messages to keep context clean
+  const cleanAssistantContent = (text: string) =>
+    text
+      .replace(/\[chips:\s*.+?\]/g, '')
+      .replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '')
+      .trim();
 
-  messages.push({ role: 'user', content: userMessage });
+  const priorMessages: Array<{ role: 'user' | 'assistant'; content: string }> =
+    Array.isArray(history) && history.length > 0
+      ? history.map((m: { role: string; content: string }) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.role === 'assistant' ? cleanAssistantContent(m.content) : m.content,
+        }))
+      : discovery?.messages.map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.role === 'assistant' ? cleanAssistantContent(m.content) : m.content,
+        })) || [];
+
+  const messages = [...priorMessages, { role: 'user' as const, content: userMessage }];
 
   // Stream response
   const encoder = new TextEncoder();
