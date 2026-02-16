@@ -539,7 +539,7 @@ export default function LandingPage() {
               <h2 className={styles.h2}>Clone your voice. Share it — or sell it.</h2>
               <p className={styles.bodyLg}>
                 Upload a sample and Sotto clones your voice in seconds. Share it for free or set
-                a per-podcast price — you earn 90%, we handle the rest. Anyone on the network can
+                a per-podcast price — we handle payments, you get paid. Anyone on the network can
                 request access or purchase your voice for their podcasts.
               </p>
               <div className={styles.forkFeatures}>
@@ -612,22 +612,6 @@ export default function LandingPage() {
                     <path d="M5.5 8l2 2 3.5-4" />
                   </svg>
                   <span>Set your own price — or keep it free</span>
-                </div>
-                <div className={styles.forkFeature}>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M8 1v14M4 4h8M5 8h6M4 12h8" />
-                  </svg>
-                  <span>Earn 90% of every podcast sale</span>
                 </div>
               </div>
             </div>
