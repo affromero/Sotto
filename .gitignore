@@ -33,6 +33,10 @@ next-env.d.ts
 *.swp
 *.swo
 
+# iOS / EAS builds
+*.ipa
+apps/mobile/ios/
+
 # Vercel
 .vercel
 

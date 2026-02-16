@@ -11,5 +11,14 @@
       "distribution": "internal"
     },
     "production": {}
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "me@afromero.co",
+        "ascAppId": "6759265446",
+        "appleTeamId": "2HVQQ4W769"
+      }
+    }
   }
 }
