@@ -1,7 +1,6 @@
 import { createHash } from 'crypto';
 import type { TasteQuestion } from '@sotto/shared';
 import { prisma } from './prisma';
-import { cache } from './redis';
 import { getFreeTierConfig } from './free-tier-config';
 import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
@@ -225,9 +224,20 @@ function parseAndFilterQuestions(
   try {
     const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
+    if (!jsonMatch) {
+      logger.warn('parseAndFilterQuestions: no JSON array found', {
+        responseLength: String(responseText.length),
+        preview: responseText.slice(0, 300),
+      });
+      return [];
+    }
     rawQuestions = JSON.parse(jsonMatch[0]);
-  } catch {
+  } catch (err) {
+    logger.warn('parseAndFilterQuestions: JSON parse failed', {
+      error: (err as Error).message,
+      responseLength: String(responseText.length),
+      preview: responseText.slice(0, 300),
+    });
     return [];
   }
 
@@ -279,11 +289,6 @@ export async function generateForYouQuestions(
   count: number,
   topic?: string
 ): Promise<TasteQuestion[]> {
-  const cacheKey = topic
-    ? `inspire:forYou:${userId}:${topic.toLowerCase().trim()}`
-    : `inspire:forYou:${userId}`;
-  const cached = await cache.get<TasteQuestion[]>(cacheKey);
-  if (cached) return cached;
 
   const [ctx, existingInterests] = await Promise.all([
     loadInspireContext(userId),
@@ -361,10 +366,6 @@ Respond with a JSON array only, no markdown. Each item:
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds
     );
 
-    if (questions.length > 0) {
-      await cache.set(cacheKey, questions, 3600);
-    }
-
     return questions;
   } catch (err) {
     logger.warn('Failed to generate ForYou questions', { error: (err as Error).message });
@@ -394,11 +395,6 @@ export async function generateNewsQuestions(
   timeRange: NewsTimeRange = '1w',
   topic?: string
 ): Promise<TasteQuestion[]> {
-  const cacheKey = topic
-    ? `inspire:news:${timeRange}:${userId}:${topic.toLowerCase().trim()}`
-    : `inspire:news:${timeRange}:${userId}`;
-  const cached = await cache.get<TasteQuestion[]>(cacheKey);
-  if (cached) return cached;
 
   const ctx = await loadInspireContext(userId);
 
@@ -409,26 +405,26 @@ export async function generateNewsQuestions(
     : '';
 
   const topicFocus = topic
-    ? `\n\nIMPORTANT: The user wants news specifically about "${topic}". ALL questions must relate to this area. Search for recent events, developments, and controversies specifically about "${topic}".`
+    ? `\n\nThe user wants news about "${topic}". Prioritize questions related to this area. If there are no recent news stories specifically about "${topic}", broaden to closely related fields, recent developments in the broader domain, or historically significant events in "${topic}" that remain relevant.`
     : '';
 
   const requestCount = count + 5;
 
   const diversityNote = topic
-    ? `Focus all questions on "${topic}" news`
+    ? `Focus questions on "${topic}" and closely related areas`
     : 'Cover diverse topics: science, politics, tech, business, culture, sports';
 
   const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
 
-Search the web for the most notable events, breakthroughs, controversies, and developments from ${timeLabel}. Each question MUST be grounded in a specific, real, verifiable event.
+Search the web for notable events, breakthroughs, controversies, and developments from ${timeLabel}. Prefer questions grounded in specific, real, verifiable events.
 
 Rules:
-- Generate exactly ${requestCount} questions
-- Each question MUST reference a specific real event, person, date, or development from ${timeLabel}
+- Generate exactly ${requestCount} questions as a JSON array
+- Each question should reference a real event, person, date, or development — prefer recent but fall back to relevant ongoing stories if no recent results exist
 - Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must feel timely and urgent — "Would you listen to a podcast about [specific thing that just happened]?"
-- Include the "why now" — what makes this newsworthy right now
+- Questions must feel timely and compelling — "Would you listen to a podcast about [something newsworthy]?"
 - Category is the parent slug the question belongs to
+- NEVER refuse or apologize — always generate the full count of questions
 - ${diversityNote}${excludeContext}${topicFocus}
 
 Taxonomy (parent: [children]):
@@ -443,7 +439,7 @@ Respond with a JSON array only, no markdown. Each item:
 
     const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
     if (anthropicApiKey) {
-      // Use Anthropic SDK directly with server-side web search tool
+      // Use Anthropic SDK with server-side web search tool
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: anthropicApiKey });
       const response = await client.messages.create({
@@ -455,7 +451,7 @@ Respond with a JSON array only, no markdown. Each item:
       const textBlock = response.content.find((block) => block.type === 'text');
       responseText = textBlock && textBlock.type === 'text' ? textBlock.text : '';
     } else {
-      // No Anthropic API key — use AI provider (claude-code CLI has built-in web search)
+      // Use AI provider (claude-code CLI has built-in web search)
       const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
       const result = await ai.generateResponse(
         systemPrompt,
@@ -469,10 +465,6 @@ Respond with a JSON array only, no markdown. Each item:
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
-
-    if (questions.length > 0) {
-      await cache.set(cacheKey, questions, 3600);
-    }
 
     return questions;
   } catch (err) {
