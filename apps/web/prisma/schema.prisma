@@ -1084,6 +1084,7 @@ model VoiceClone {
   elevenLabsVoiceId String           @unique
   sourceType        VoiceCloneSource
   sampleUrl         String?
+  description       String?          @db.VarChar(200)
   requestable       Boolean          @default(false)
   createdAt         DateTime         @default(now())
 

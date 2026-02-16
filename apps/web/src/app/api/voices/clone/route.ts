@@ -60,11 +60,25 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { voiceCloneId, requestable } = body;
+  const { voiceCloneId, requestable, description } = body;
 
-  if (!voiceCloneId || typeof voiceCloneId !== 'string' || typeof requestable !== 'boolean') {
+  if (!voiceCloneId || typeof voiceCloneId !== 'string') {
+    return NextResponse.json({ error: 'voiceCloneId is required' }, { status: 400 });
+  }
+
+  const hasRequestable = typeof requestable === 'boolean';
+  const hasDescription = typeof description === 'string';
+
+  if (!hasRequestable && !hasDescription) {
     return NextResponse.json(
-      { error: 'voiceCloneId and requestable are required' },
+      { error: 'At least one of requestable or description is required' },
+      { status: 400 }
+    );
+  }
+
+  if (hasDescription && description.length > 200) {
+    return NextResponse.json(
+      { error: 'Description must be 200 characters or less' },
       { status: 400 }
     );
   }
@@ -81,9 +95,13 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  const data: Record<string, boolean | string> = {};
+  if (hasRequestable) data.requestable = requestable;
+  if (hasDescription) data.description = description;
+
   const updated = await prisma.voiceClone.update({
     where: { id: voiceCloneId },
-    data: { requestable },
+    data,
   });
 
   return NextResponse.json(updated);

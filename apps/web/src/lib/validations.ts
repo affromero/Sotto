@@ -112,6 +112,16 @@ export const createApiKeySchema = z.object({
 });
 
 /**
+ * Voice browse query validation
+ */
+export const voiceBrowseQuerySchema = z.object({
+  search: z.string().max(100).optional(),
+  sort: z.enum(['newest', 'most_requested']).default('newest'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(24),
+});
+
+/**
  * Voice clone creation validation
  */
 export const cloneVoiceSchema = z.object({

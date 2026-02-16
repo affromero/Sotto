@@ -18,6 +18,7 @@ export async function GET() {
         name: true,
         elevenLabsVoiceId: true,
         sourceType: true,
+        description: true,
         requestable: true,
         createdAt: true,
       },
