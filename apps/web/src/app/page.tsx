@@ -481,7 +481,7 @@ export default function LandingPage() {
       >
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
-            <span className={styles.overline}>Premium Voices</span>
+            <span className={styles.overline}>Voices</span>
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
               Choose from 16 curated AI voices or clone your own. Every podcast pairs a unique host
@@ -526,6 +526,142 @@ export default function LandingPage() {
               Sotto automatically pairs voices with different genders, accents, or tones for
               auditory contrast. Or pick your own combination.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ====== VOICE SHARING ====== */}
+      <section className={styles.section} aria-label="Voice cloning and sharing">
+        <div className={styles.inner}>
+          <div className={`${styles.split} ${styles.splitReverse}`}>
+            <div className={`${styles.splitText} ${styles.rev}`}>
+              <span className={styles.overline}>Voice Sharing</span>
+              <h2 className={styles.h2}>Clone your voice. Let others create with it.</h2>
+              <p className={styles.bodyLg}>
+                Upload a sample and Sotto clones your voice in seconds. Share it with specific
+                people or make it requestable — anyone on the network can ask to use your voice
+                for their podcasts. No paid tiers. Everyone gets voice cloning.
+              </p>
+              <div className={styles.forkFeatures}>
+                <div className={styles.forkFeature}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M13 7v1a5 5 0 0 1-10 0V7" />
+                    <path d="M8 13v2" />
+                  </svg>
+                  <span>Clone from any audio sample</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M11 1H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2z" />
+                    <path d="M8 11h.01" />
+                  </svg>
+                  <span>Toggle sharing on or off anytime</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5" />
+                    <path d="M14 3H2" />
+                    <path d="M6 1h4" />
+                  </svg>
+                  <span>Approve or deny every request</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="8" cy="8" r="7" />
+                    <path d="M5.5 8l2 2 3.5-4" />
+                  </svg>
+                  <span>Free for everyone — no paid tiers</span>
+                </div>
+              </div>
+            </div>
+            <div className={`${styles.splitVisual} ${styles.rev} ${styles.d1}`}>
+              <div className={styles.voiceSharingMock}>
+                <div className={styles.vsMockHeader}>
+                  <span className={styles.vsMockTitle}>My Voice Clones</span>
+                  <span className={styles.vsMockCount}>2 of 10</span>
+                </div>
+                <div className={styles.vsMockVoice}>
+                  <div className={styles.vsMockVoiceLeft}>
+                    <div className={styles.vsMockAvatar}>A</div>
+                    <div className={styles.vsMockVoiceInfo}>
+                      <span className={styles.vsMockVoiceName}>Andres&apos;s Voice</span>
+                      <span className={styles.vsMockVoiceMeta}>Uploaded · Warm baritone</span>
+                    </div>
+                  </div>
+                  <div className={styles.vsMockToggle}>
+                    <div className={styles.vsMockToggleTrack}>
+                      <div className={styles.vsMockToggleThumb} />
+                    </div>
+                    <span className={styles.vsMockToggleLabel}>Shared</span>
+                  </div>
+                </div>
+                <div className={styles.vsMockRequest}>
+                  <div className={styles.vsMockRequestDot} aria-hidden="true" />
+                  <div className={styles.vsMockRequestInfo}>
+                    <span className={styles.vsMockRequestText}>
+                      <strong>@sarah</strong> wants to use your voice
+                    </span>
+                    <span className={styles.vsMockRequestMsg}>
+                      &ldquo;Love your tone — perfect for my science series!&rdquo;
+                    </span>
+                  </div>
+                  <div className={styles.vsMockRequestActions}>
+                    <span className={styles.vsMockBtnApprove}>Approve</span>
+                    <span className={styles.vsMockBtnDeny}>Deny</span>
+                  </div>
+                </div>
+                <div className={styles.vsMockUsedBy}>
+                  <span className={styles.vsMockUsedByLabel}>Currently used by</span>
+                  <div className={styles.vsMockUsedByAvatars}>
+                    <span className={styles.vsMockUsedByAvatar}>S</span>
+                    <span className={styles.vsMockUsedByAvatar}>M</span>
+                    <span className={styles.vsMockUsedByAvatar}>J</span>
+                    <span className={styles.vsMockUsedByCount}>+2 others</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
