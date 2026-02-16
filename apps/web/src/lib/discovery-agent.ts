@@ -1,15 +1,5 @@
 import { generateResponse, streamResponse, WEB_SEARCH_TOOL } from './claude';
-
-/**
- * Detect URLs in a message string.
- * Returns an array of matched URLs (http/https only).
- */
-export function detectUrls(message: string | undefined | null): string[] {
-  if (!message) return [];
-  const urlRegex = /https?:\/\/[^\s<>)"',]+/gi;
-  const matches = message.match(urlRegex);
-  return matches ? [...new Set(matches)] : [];
-}
+export { detectUrls } from './detect-urls';
 
 /**
  * System prompt for the discovery chat agent
