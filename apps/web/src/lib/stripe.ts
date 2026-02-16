@@ -1,9 +1,8 @@
+import Stripe from 'stripe';
+
 /**
  * Flat feature limits — all features free for everyone.
- * Replaces the old credit-based TIER_LIMITS system.
- * File kept as stripe.ts to avoid breaking imports; will rename in a later phase.
  */
-
 export const LIMITS = {
   maxDurationMinutes: 40,
   maxVoiceClones: 10,
@@ -18,3 +17,11 @@ export type TierName = 'FREE';
 export const TIER_LIMITS: Record<TierName, typeof LIMITS & { premiumVoiceSurcharge: number }> = {
   FREE: { ...LIMITS, premiumVoiceSurcharge: 0 },
 };
+
+/** Platform fee percentage taken from voice sales */
+export const PLATFORM_FEE_PERCENT = 10;
+
+/** Stripe SDK client — null if STRIPE_SECRET_KEY is not set */
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY)
+  : null;
