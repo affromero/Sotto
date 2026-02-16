@@ -235,7 +235,11 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
   });
 
   events.on('completed', (args) => {
-    logger.debug(`Job completed in ${queueName}:`, { jobId: args.jobId });
+    // Suppress noisy repeating poll jobs (telegram-bot, twitter-mentions, twitter-trend-poll)
+    const isRepeat = args.jobId.startsWith('repeat:');
+    if (!isRepeat) {
+      logger.debug(`Job completed in ${queueName}:`, { jobId: args.jobId });
+    }
   });
 
   events.on('failed', async (args) => {
