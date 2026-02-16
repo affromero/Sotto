@@ -310,7 +310,23 @@ export function useDiscovery(): UseDiscoveryReturn {
         if (abortControllerRef.current === abortController) {
           abortControllerRef.current = null;
         }
-        setState((prev) => ({ ...prev, isLoading: false }));
+
+        // If streaming completed but assistant message is still empty, show fallback
+        setState((prev) => {
+          const assistantMsg = prev.messages.find((msg) => msg.id === assistantMessageId);
+          if (assistantMsg && !assistantMsg.content) {
+            return {
+              ...prev,
+              isLoading: false,
+              messages: prev.messages.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: "I couldn't generate a response. Please try again." }
+                  : msg
+              ),
+            };
+          }
+          return { ...prev, isLoading: false };
+        });
       }
     },
     [track]

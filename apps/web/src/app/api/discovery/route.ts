@@ -77,8 +77,22 @@ export async function POST(request: NextRequest) {
       try {
         let fullResponse = '';
         for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey)) {
-          fullResponse += chunk;
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          // Only stream string chunks (skip objects from claude-code stream-json)
+          const text = typeof chunk === 'string' ? chunk : '';
+          if (text) {
+            fullResponse += text;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+          }
+        }
+
+        if (!fullResponse.trim()) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ error: "I couldn't generate a response. Please try again." })}\n\n`
+            )
+          );
+          controller.close();
+          return;
         }
 
         const { chips } = parseChips(fullResponse);

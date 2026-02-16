@@ -99,6 +99,9 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic }: Discovery
             (index === displayMessages.length - 1 ||
               displayMessages.slice(index + 1).every((m) => m.role === 'user'));
 
+          // Skip empty assistant placeholders while loading — typing indicator handles this
+          if (!isUser && !message.content && isLoading) return null;
+
           return (
             <div key={message.id} className={styles.messageGroup}>
               <div
