@@ -4,7 +4,6 @@ import { useState, useCallback, useRef } from 'react';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { VoiceMarketplaceCard } from '@/components/voices/VoiceMarketplaceCard';
 import type { BrowseVoice } from '@/components/voices/VoiceMarketplaceCard';
-import styles from './page.module.css';
 import cardStyles from './VoicesClient.module.css';
 
 interface VoicesClientProps {
