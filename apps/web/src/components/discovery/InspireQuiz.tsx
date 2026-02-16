@@ -113,6 +113,8 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (isDone || isAnimating) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.key === 'ArrowRight' || e.key === 'y') handleYesMakeThis();
       else if (e.key === 'ArrowLeft' || e.key === 'n') handleNotForMe();
       else if (e.key === 'b') handleSave();
