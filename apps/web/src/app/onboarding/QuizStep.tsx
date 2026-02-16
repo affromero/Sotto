@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
-import type { TasteQuestion, TasteAnswer } from '@/components/discovery/TasteQuiz';
 import styles from './page.module.css';
 
 interface QuizStepProps {

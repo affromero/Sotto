@@ -59,6 +59,14 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const [podcastId, setPodcastId] = useState<string | null>(null);
   const [pipelineStatus, setPipelineStatus] = useState<string>('PENDING');
 
+  // Auto-populate topic from URL query parameter (e.g., from Saved Ideas page)
+  useEffect(() => {
+    const topic = searchParams.get('topic');
+    if (topic) {
+      setInitialTopic(topic);
+    }
+  }, [searchParams]);
+
   const handleInspireTopic = useCallback((topic: string) => {
     setInitialTopic(topic);
   }, []);

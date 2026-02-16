@@ -1,23 +1,10 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import styles from './TasteQuiz.module.css';
-
-export interface TasteQuestion {
-  id: string;
-  text: string;
-  tagSlugs: string[];
-  category: string;
-}
-
-export interface TasteAnswer {
-  questionId: string;
-  question: string;
-  tagSlugs: string[];
-  response: 'yes' | 'no' | 'skip';
-}
 
 interface TasteQuizProps {
   initialQuestions: TasteQuestion[];
