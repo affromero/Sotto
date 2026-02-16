@@ -1074,6 +1074,221 @@
 }
 
 /* ==========================================================================
+   VOICE SHARING MOCK
+   ========================================================================== */
+
+.voiceSharingMock {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.vsMockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vsMockTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.vsMockCount {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.vsMockVoice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vsMockVoiceLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vsMockAvatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vsMockVoiceInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vsMockVoiceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.vsMockVoiceMeta {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+
+.vsMockToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vsMockToggleTrack {
+  width: 36px;
+  height: 20px;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  position: relative;
+}
+
+.vsMockToggleThumb {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.vsMockToggleLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-primary);
+}
+
+.vsMockRequest {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(217, 119, 6, 0.04);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vsMockRequestDot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  margin-top: 4px;
+}
+
+.vsMockRequestInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vsMockRequestText {
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.vsMockRequestText strong {
+  font-weight: 600;
+}
+
+.vsMockRequestMsg {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.vsMockRequestActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vsMockBtnApprove {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary);
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+}
+
+.vsMockBtnDeny {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+}
+
+.vsMockUsedBy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+}
+
+.vsMockUsedByLabel {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+.vsMockUsedByAvatars {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.vsMockUsedByAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid var(--color-surface);
+  margin-left: -6px;
+}
+
+.vsMockUsedByAvatar:first-child {
+  margin-left: 0;
+}
+
+.vsMockUsedByCount {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-left: 8px;
+}
+
+/* ==========================================================================
    CREATOR ECONOMY
    ========================================================================== */
 
@@ -2381,6 +2596,11 @@
     margin-right: auto;
   }
 
+  .voiceSharingMock {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
   .twMock {
     max-width: 480px;
     margin: 0 auto;
@@ -2560,6 +2780,17 @@
   /* Voice grid */
   .voiceGrid {
     grid-template-columns: 1fr;
+  }
+
+  /* Voice sharing mock */
+  .vsMockRequest {
+    flex-wrap: wrap;
+  }
+
+  .vsMockRequestActions {
+    width: 100%;
+    margin-top: 8px;
+    padding-left: 20px;
   }
 
   /* Use cases */
