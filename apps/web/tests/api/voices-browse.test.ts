@@ -5,6 +5,8 @@ const mockAuth = vi.fn();
 const mockVoiceCloneFindMany = vi.fn();
 const mockVoiceCloneCount = vi.fn();
 const mockVoiceRequestFindMany = vi.fn();
+const mockVoicePurchaseFindMany = vi.fn();
+const mockVoiceAllowlistFindMany = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -18,6 +20,12 @@ vi.mock('@/lib/prisma', () => ({
     },
     voiceRequest: {
       findMany: (...args: unknown[]) => mockVoiceRequestFindMany(...args),
+    },
+    voicePurchase: {
+      findMany: (...args: unknown[]) => mockVoicePurchaseFindMany(...args),
+    },
+    voiceAllowlist: {
+      findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
     },
   },
 }));
@@ -37,6 +45,7 @@ const mockVoice = {
   name: 'My Voice',
   description: 'A warm narrator voice',
   sourceType: 'UPLOAD',
+  priceInCents: null,
   createdAt: new Date('2026-01-15T10:00:00Z'),
   elevenLabsVoiceId: 'el-voice-1',
   user: {
@@ -44,6 +53,7 @@ const mockVoice = {
     name: 'Test User',
     handle: 'testuser',
     image: null,
+    stripeOnboarded: false,
   },
   _count: {
     voiceRequests: 3,
@@ -55,6 +65,7 @@ const mockVoice2 = {
   name: 'Cool Voice',
   description: null,
   sourceType: 'RECORD',
+  priceInCents: null,
   createdAt: new Date('2026-01-16T10:00:00Z'),
   elevenLabsVoiceId: 'el-voice-2',
   user: {
@@ -62,6 +73,7 @@ const mockVoice2 = {
     name: 'Other User',
     handle: 'otheruser',
     image: 'https://example.com/avatar.jpg',
+    stripeOnboarded: false,
   },
   _count: {
     voiceRequests: 0,
@@ -74,6 +86,8 @@ describe('GET /api/voices/browse', () => {
     mockAuth.mockResolvedValue(null);
     mockVoiceCloneFindMany.mockResolvedValue([]);
     mockVoiceCloneCount.mockResolvedValue(0);
+    mockVoicePurchaseFindMany.mockResolvedValue([]);
+    mockVoiceAllowlistFindMany.mockResolvedValue([]);
   });
 
   it('returns empty results when no requestable voices exist', async () => {
