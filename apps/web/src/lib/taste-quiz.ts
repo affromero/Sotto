@@ -95,7 +95,7 @@ ${dislikedSummary ? `User dislikes: ${dislikedSummary}` : ''}
 ${recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recentQuestions}` : ''}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   const ai = createAIProvider(freeTierConfig.aiProvider);
   const response = await ai.generateResponse(
@@ -105,7 +105,7 @@ Respond with a JSON array only, no markdown. Each item:
   );
 
   // Parse the JSON response
-  let rawQuestions: Array<{ text: string; tagSlugs: string[]; category: string }>;
+  let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string }>;
   try {
     // Strip markdown code fences if present
     const cleaned = response.content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -148,6 +148,7 @@ Respond with a JSON array only, no markdown. Each item:
     questions.push({
       id,
       text: q.text,
+      topic: q.topic || q.text,
       tagSlugs: validTagSlugs,
       category: validSlugs.has(q.category) ? q.category : validTagSlugs[0],
     });
@@ -220,7 +221,7 @@ function parseAndFilterQuestions(
   priorQuestionIds: Set<string>,
   opts?: ParseOptions
 ): TasteQuestion[] {
-  let rawQuestions: Array<{ text: string; tagSlugs: string[]; category: string }>;
+  let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string }>;
   try {
     const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
@@ -246,11 +247,14 @@ function parseAndFilterQuestions(
   const questions: TasteQuestion[] = [];
   const seenIds = new Set<string>();
   const lenient = opts?.lenient ?? false;
+  let skippedNoText = 0;
+  let skippedDuped = 0;
+  let skippedSlugs = 0;
 
   for (const q of rawQuestions) {
-    if (!q.text) continue;
+    if (!q.text) { skippedNoText++; continue; }
     const id = hashQuestion(q.text);
-    if (priorQuestionIds.has(id) || seenIds.has(id)) continue;
+    if (priorQuestionIds.has(id) || seenIds.has(id)) { skippedDuped++; continue; }
 
     const suppliedSlugs = Array.isArray(q.tagSlugs) ? q.tagSlugs : [];
     let validTagSlugs = suppliedSlugs.filter((s: string) => validSlugs.has(s));
@@ -262,7 +266,7 @@ function parseAndFilterQuestions(
 
     // In lenient mode (news), keep the question with the raw slugs or a generic fallback
     if (validTagSlugs.length === 0) {
-      if (!lenient) continue;
+      if (!lenient) { skippedSlugs++; continue; }
       validTagSlugs = suppliedSlugs.length > 0 ? suppliedSlugs : ['general'];
     }
 
@@ -270,11 +274,20 @@ function parseAndFilterQuestions(
     questions.push({
       id,
       text: q.text,
+      topic: q.topic || q.text,
       tagSlugs: validTagSlugs,
       category: validSlugs.has(q.category) ? q.category : (validTagSlugs[0] ?? 'general'),
     });
     if (questions.length >= count) break;
   }
+
+  logger.info('parseAndFilterQuestions', {
+    raw: String(rawQuestions.length),
+    kept: String(questions.length),
+    skippedNoText: String(skippedNoText),
+    skippedDuped: String(skippedDuped),
+    skippedSlugs: String(skippedSlugs),
+  });
 
   return questions;
 }
@@ -335,7 +348,7 @@ Taxonomy (parent: [children]):
 ${ctx.taxonomyLines.join('\n')}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
     // Use user's BYOK key if available (faster than platform claude-code CLI)
@@ -431,7 +444,7 @@ Taxonomy (parent: [children]):
 ${ctx.taxonomyLines.join('\n')}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about...?", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
     const resolved = await resolveAiProvider(userId);

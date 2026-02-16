@@ -81,7 +81,7 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
 
   const handleYesMakeThis = useCallback(() => {
     if (isAnimating || !currentQuestion) return;
-    onSelectTopic(currentQuestion.text);
+    onSelectTopic(currentQuestion.topic);
   }, [isAnimating, currentQuestion, onSelectTopic]);
 
   const handleSave = useCallback(async () => {
