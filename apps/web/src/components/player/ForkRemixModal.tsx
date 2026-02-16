@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { StripeProvider } from '@/components/providers/StripeProvider';
+import { VoicePaymentModal, type VoiceChargeItem } from '@/components/voices/VoicePaymentModal';
 import styles from './ForkRemixModal.module.css';
 
 interface ForkRemixModalProps {
@@ -21,6 +23,8 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [voiceCharges, setVoiceCharges] = useState<VoiceChargeItem[]>([]);
 
   const [formData, setFormData] = useState({
     topic: podcastTitle,
@@ -47,8 +51,7 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const forkWithPayment = async (paymentIntentIds?: string[], skipPaidVoices?: boolean) => {
     setLoading(true);
     setError(null);
 
@@ -62,8 +65,17 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
           focusAreas: formData.focusAreas || undefined,
           depth: formData.depth || undefined,
           tone: formData.tone || undefined,
+          ...(paymentIntentIds ? { paymentIntentIds } : {}),
+          ...(skipPaidVoices ? { skipPaidVoices: true } : {}),
         }),
       });
+
+      if (response.status === 402) {
+        const data = await response.json();
+        setVoiceCharges(data.voiceCharges);
+        setPaymentModalOpen(true);
+        return;
+      }
 
       if (!response.ok) {
         const data = await response.json();
@@ -85,6 +97,21 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
     }
   };
 
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    await forkWithPayment();
+  };
+
+  const handlePaymentComplete = async (paymentIntentIds: string[]) => {
+    setPaymentModalOpen(false);
+    await forkWithPayment(paymentIntentIds);
+  };
+
+  const handleSkipPaidVoices = async () => {
+    setPaymentModalOpen(false);
+    await forkWithPayment(undefined, true);
+  };
+
   const handleClose = () => {
     setStep(1);
     setFormData({
@@ -99,6 +126,7 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
   };
 
   return (
+    <>
     <Modal isOpen={isOpen} onClose={handleClose} size="large">
       <div className={styles.modal}>
         <div className={styles.header}>
@@ -249,5 +277,19 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
         </form>
       </div>
     </Modal>
+
+    {paymentModalOpen && (
+      <StripeProvider>
+        <VoicePaymentModal
+          isOpen={paymentModalOpen}
+          onClose={() => setPaymentModalOpen(false)}
+          voiceCharges={voiceCharges}
+          onPaymentComplete={handlePaymentComplete}
+          allowSkip
+          onSkip={handleSkipPaidVoices}
+        />
+      </StripeProvider>
+    )}
+    </>
   );
 }
