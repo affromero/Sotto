@@ -52,14 +52,30 @@ export async function GET() {
   ]);
 
   // Count podcasts generated from Twitter
-  const podcastsFromTwitter = await prisma.podcast.count({
-    where: { source: 'TWITTER' },
-  });
-
-  // Count successful podcasts from Twitter
-  const successfulTwitterPodcasts = await prisma.podcast.count({
-    where: { source: 'TWITTER', status: 'READY' },
-  });
+  const [podcastsFromTwitter, successfulTwitterPodcasts, recentThreadPodcasts] = await Promise.all([
+    prisma.podcast.count({
+      where: { source: 'TWITTER' },
+    }),
+    prisma.podcast.count({
+      where: { source: 'TWITTER', status: 'READY' },
+    }),
+    // Thread podcasts are owned by @sotto system user
+    prisma.podcast.findMany({
+      where: {
+        source: 'TWITTER',
+        user: { handle: 'sotto' },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        source: true,
+      },
+    }),
+  ]);
 
   // Compute mention status breakdown
   const statusBreakdown: Record<string, number> = {};
@@ -94,5 +110,6 @@ export async function GET() {
       successful: successfulTwitterPodcasts,
       successRate,
     },
+    recentThreadPodcasts,
   });
 }
