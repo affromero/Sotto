@@ -10,7 +10,11 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [userClones, approvedRequests, allowlistEntries] = await Promise.all([
+  const [user, userClones, approvedRequests, allowlistEntries] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { stripeAccountId: true, stripeOnboarded: true },
+    }),
     prisma.voiceClone.findMany({
       where: { userId: session.user.id },
       select: {
@@ -20,7 +24,12 @@ export async function GET() {
         sourceType: true,
         description: true,
         requestable: true,
+        priceInCents: true,
         createdAt: true,
+        voicePurchases: {
+          where: { status: 'captured' },
+          select: { amountCents: true, platformFeeCents: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     }),
@@ -60,6 +69,26 @@ export async function GET() {
       },
     }),
   ]);
+
+  // Enrich user clones with earnings
+  const enrichedClones = userClones.map((clone) => {
+    const totalEarningsCents = clone.voicePurchases.reduce(
+      (sum, p) => sum + (p.amountCents - p.platformFeeCents),
+      0
+    );
+    return {
+      id: clone.id,
+      name: clone.name,
+      elevenLabsVoiceId: clone.elevenLabsVoiceId,
+      sourceType: clone.sourceType,
+      description: clone.description,
+      requestable: clone.requestable,
+      priceInCents: clone.priceInCents,
+      createdAt: clone.createdAt,
+      salesCount: clone.voicePurchases.length,
+      totalEarningsCents,
+    };
+  });
 
   // Merge approved-request voices + allowlisted voices, dedup by elevenLabsVoiceId
   const seenVoiceIds = new Set<string>();
@@ -102,8 +131,10 @@ export async function GET() {
 
   return NextResponse.json({
     poolVoices: VOICE_POOL,
-    userClones,
+    userClones: enrichedClones,
     sharedVoices,
     maxVoiceClones: LIMITS.maxVoiceClones,
+    stripeOnboarded: user.stripeOnboarded,
+    stripeAccountId: user.stripeAccountId,
   });
 }
