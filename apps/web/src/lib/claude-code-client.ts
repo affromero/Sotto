@@ -134,6 +134,7 @@ export async function* streamClaudeCode(
   child.stdin.end();
 
   let buffer = '';
+  let hasDeltas = false;
 
   try {
     for await (const chunk of child.stdout) {
@@ -145,11 +146,12 @@ export async function* streamClaudeCode(
         if (!line.trim()) continue;
         try {
           const event = JSON.parse(line);
-          if (event.type === 'assistant' && event.message) {
-            yield event.message;
-          } else if (event.type === 'content_block_delta' && event.delta?.text) {
+          // Only yield text deltas — skip assistant metadata (object) and result (duplicates streamed text)
+          if (event.type === 'content_block_delta' && event.delta?.text) {
+            hasDeltas = true;
             yield event.delta.text;
-          } else if (event.type === 'result' && event.result) {
+          } else if (event.type === 'result' && event.result && !hasDeltas) {
+            // Fallback: yield complete result only if no deltas were received
             yield event.result;
           }
         } catch {
@@ -162,11 +164,10 @@ export async function* streamClaudeCode(
     if (buffer.trim()) {
       try {
         const event = JSON.parse(buffer);
-        if (event.type === 'assistant' && event.message) {
-          yield event.message;
-        } else if (event.type === 'content_block_delta' && event.delta?.text) {
+        if (event.type === 'content_block_delta' && event.delta?.text) {
+          hasDeltas = true;
           yield event.delta.text;
-        } else if (event.type === 'result' && event.result) {
+        } else if (event.type === 'result' && event.result && !hasDeltas) {
           yield event.result;
         }
       } catch {
