@@ -1,6 +1,6 @@
 import { generateResponse } from './claude';
 import { logger } from './logger';
-import type { TweetParseResult } from '@/types/twitter';
+import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 const SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
 Users tag @sottofm on Twitter to request podcast generation. Extract structured metadata from their tweet.
@@ -66,6 +66,101 @@ export async function parseTweetIntent(
 
   if (!parsed.topic || !parsed.title) {
     throw new Error('Failed to extract topic and title from tweet');
+  }
+
+  return parsed;
+}
+
+const THREAD_SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
+You are analyzing a full Twitter/X thread conversation where someone tagged @sottofm.
+
+Your job:
+1. Read the entire thread carefully
+2. Identify the core topic of discussion
+3. Determine if this is a debate (multiple contrasting viewpoints) or informational (one perspective, explanations)
+4. Extract ALL URLs shared by any participant
+5. Summarize each distinct viewpoint with attribution (@username)
+6. Generate structured metadata for podcast generation
+
+Rules:
+- Generate a concise, engaging title (max 80 chars) that captures the thread's essence
+- If there are opposing viewpoints, set isDebate: true and list each viewpoint
+- Extract ALL URLs from the thread into sourceUrls array
+- Pick the single most relevant URL as sourceUrl (or null if none)
+- Infer depth from thread complexity: short threads → standard, long detailed threads → deep_dive
+- Infer audience from language: jargon → expert, plain → beginner, default → intermediate
+- If debate: tone should be "socratic"; if informational: infer from style
+- Focus areas should include key subtopics discussed across the thread
+- Strip @sottofm and other handles from the topic
+
+Respond with ONLY valid JSON matching this shape:
+{
+  "topic": "string — the core topic",
+  "title": "string — engaging podcast title (max 80 chars)",
+  "depth": "quick_overview" | "standard" | "deep_dive",
+  "audienceLevel": "beginner" | "intermediate" | "expert",
+  "tone": "casual" | "professional" | "socratic",
+  "focusAreas": ["string array of specific subtopics"],
+  "sourceUrl": "string | null — most relevant URL",
+  "sourceUrls": ["all URLs found in thread"],
+  "isDebate": true | false,
+  "viewpoints": ["@alice argues X because Y", "@bob counters with Z"]
+}`;
+
+function formatThreadForParsing(thread: ThreadData): string {
+  const lines: string[] = [];
+
+  lines.push(`[ROOT by @${thread.rootTweet.authorUsername}]: "${thread.rootTweet.text}"`);
+
+  for (const reply of thread.replies) {
+    lines.push(`[@${reply.authorUsername}]: "${reply.text}"`);
+  }
+
+  return lines.join('\n\n');
+}
+
+/**
+ * Parse a full thread mentioning @sottofm into structured podcast metadata.
+ * Analyzes the entire conversation for viewpoints, URLs, and debate detection.
+ */
+export async function parseThreadIntent(
+  mentionTweet: ThreadTweet,
+  thread: ThreadData,
+  apiKeyOverride?: string
+): Promise<TweetParseResult> {
+  const threadText = formatThreadForParsing(thread);
+  const userMessage = `The following thread was tagged by @${mentionTweet.authorUsername} who said: "${mentionTweet.text}"
+
+Thread (${thread.tweetCount} tweets, ${thread.participantCount} participants):
+
+${threadText}`;
+
+  const response = await generateResponse(
+    THREAD_SYSTEM_PROMPT,
+    [{ role: 'user', content: userMessage }],
+    { maxTokens: 1024, apiKeyOverride }
+  );
+
+  logger.info('Thread intent parsed', {
+    inputTokens: String(response.inputTokens),
+    outputTokens: String(response.outputTokens),
+    tweetCount: String(thread.tweetCount),
+  });
+
+  let parsed: TweetParseResult;
+  try {
+    const cleaned = response.content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    parsed = JSON.parse(cleaned) as TweetParseResult;
+  } catch {
+    logger.error('Failed to parse Claude thread JSON response', { raw: response.content });
+    throw new Error('Failed to parse thread intent — Claude returned invalid JSON');
+  }
+
+  if (!parsed.topic || !parsed.title) {
+    throw new Error('Failed to extract topic and title from thread');
   }
 
   return parsed;
