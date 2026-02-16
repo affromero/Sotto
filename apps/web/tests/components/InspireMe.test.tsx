@@ -257,9 +257,10 @@ describe('InspireMe', () => {
     });
   });
 
-  it('handles fetch error gracefully', async () => {
+  it('handles fetch error gracefully with retry button', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
+      status: 500,
       json: async () => ({ error: 'Server error' }),
     });
 
@@ -267,8 +268,10 @@ describe('InspireMe', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('No suggestions available right now. Try again later!')
+        screen.getByText('Something went wrong. Please try again.')
       ).toBeInTheDocument();
     });
+
+    expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 });

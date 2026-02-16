@@ -73,6 +73,8 @@ function setupDefaultMocks() {
   mockCacheGet.mockResolvedValue(null);
   mockCacheSet.mockResolvedValue(undefined);
   mockUserInterestFindMany.mockResolvedValue([]);
+  // Default: no BYOK key, falls through to createAIProvider
+  mockResolveAiProvider.mockRejectedValue(new Error('No AI provider'));
 }
 
 function createMockAI(responseContent: string) {
@@ -113,9 +115,9 @@ describe('generateForYouQuestions', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain('AI in cooking');
-    // Should use createAIProvider (no web search), NOT resolveAiProvider
+    // Tries BYOK first (resolveAiProvider), falls back to createAIProvider
+    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1');
     expect(mockCreateAIProvider).toHaveBeenCalled();
-    expect(mockResolveAiProvider).not.toHaveBeenCalled();
   });
 
   it('filters questions with invalid tag slugs', async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, RefreshCw } from 'lucide-react';
 import type { TasteQuestion } from '@sotto/shared';
 import type { PodcastSummary } from '@/types/podcast';
 import { Spinner } from '@/components/ui/Spinner';
@@ -41,6 +41,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   // Pre-fetch all tabs on open
   useEffect(() => {
@@ -48,14 +49,18 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
     let cancelled = false;
     setIsLoading(true);
+    setFetchError(false);
 
     fetch('/api/inspire/all')
-      .then((res) => (res.ok ? res.json() : null))
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((data) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
         setForYouQuestions(data.forYou ?? []);
         setTrendingPodcasts(data.trending ?? []);
         setNewsQuestions(data.news ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setFetchError(true);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -152,6 +157,30 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
             <div className={styles.loadingState}>
               <Spinner size="large" />
               <p>Finding ideas for you...</p>
+            </div>
+          ) : fetchError ? (
+            <div className={styles.emptyState}>
+              <p>Something went wrong. Please try again.</p>
+              <button
+                type="button"
+                className={styles.retryButton}
+                onClick={() => {
+                  setFetchError(false);
+                  setIsLoading(true);
+                  fetch('/api/inspire/all')
+                    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+                    .then((data) => {
+                      setForYouQuestions(data.forYou ?? []);
+                      setTrendingPodcasts(data.trending ?? []);
+                      setNewsQuestions(data.news ?? []);
+                    })
+                    .catch(() => setFetchError(true))
+                    .finally(() => setIsLoading(false));
+                }}
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                Retry
+              </button>
             </div>
           ) : activeSection === 'trending' ? (
             <InspireTrendingList

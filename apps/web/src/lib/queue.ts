@@ -220,7 +220,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
   });
 
   events.on('completed', (args) => {
-    logger.info(`Job completed in ${queueName}:`, { jobId: args.jobId });
+    logger.debug(`Job completed in ${queueName}:`, { jobId: args.jobId });
   });
 
   events.on('failed', async (args) => {
