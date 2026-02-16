@@ -129,6 +129,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
             />
           ) : (
             <InspireQuiz
+              key={`${activeSection}-${(activeSection === 'forYou' ? forYouQuestions : newsQuestions)[0]?.id ?? 'empty'}`}
               questions={activeSection === 'forYou' ? forYouQuestions : newsQuestions}
               onSelectTopic={handleSelectTopic}
               onLoadMore={() => handleLoadMore(activeSection)}
