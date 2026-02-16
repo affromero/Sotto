@@ -10,6 +10,7 @@ export interface BrowseVoice {
   name: string;
   description: string | null;
   sourceType: string;
+  priceInCents: number | null;
   createdAt: string;
   elevenLabsVoiceId: string;
   owner: {
@@ -18,8 +19,10 @@ export interface BrowseVoice {
     handle: string | null;
     image: string | null;
   };
+  ownerStripeOnboarded: boolean;
   approvedCount: number;
   requestStatus: string | null;
+  hasAccess: boolean;
 }
 
 interface VoiceMarketplaceCardProps {
@@ -169,6 +172,16 @@ export function VoiceMarketplaceCard({
           >
             {voice.sourceType === 'RECORD' ? 'Recorded' : 'Uploaded'}
           </span>
+          {voice.priceInCents && voice.priceInCents > 0 ? (
+            <span className={styles.priceBadge}>
+              ${(voice.priceInCents / 100).toFixed(2)} / podcast
+            </span>
+          ) : (
+            <span className={styles.freeBadge}>Free</span>
+          )}
+          {voice.hasAccess && !isOwner && voice.priceInCents && voice.priceInCents > 0 && (
+            <span className={styles.accessBadge}>Access Granted</span>
+          )}
           {voice.approvedCount > 0 && (
             <span className={styles.usedBy}>
               Used by {voice.approvedCount} {voice.approvedCount === 1 ? 'creator' : 'creators'}
