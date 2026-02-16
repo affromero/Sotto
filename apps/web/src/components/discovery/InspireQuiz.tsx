@@ -31,14 +31,6 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
   const total = questions.length;
   const progress = total > 0 ? (currentIndex / total) * 100 : 0;
 
-  // Reset state when questions change (new tab or load more)
-  useEffect(() => {
-    setCurrentIndex(0);
-    setIsDone(false);
-    setExitDirection(null);
-    setSwipeOffset(0);
-  }, [questions]);
-
   // Cleanup saved feedback timer
   useEffect(() => {
     return () => {
