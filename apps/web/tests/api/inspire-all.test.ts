@@ -107,7 +107,8 @@ describe('GET /api/inspire/all', () => {
       'user-123',
       6,
       ['AI and Music'],
-      '1w'
+      '1w',
+      undefined
     );
   });
 
