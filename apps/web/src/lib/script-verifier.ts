@@ -242,16 +242,16 @@ Analyze every factual claim. Return JSON only.`;
     durationFeedback = `The script is approximately ${Math.round(estimatedMinutes)} minutes (${totalWords} words), which exceeds the ${maxMinutes}-minute limit by more than 15%. Reduce the script length to fit within ${maxMinutes} minutes (~${maxMinutes * WORDS_PER_MINUTE} words).`;
   }
 
-  const score = parsed.overallScore ?? 0;
+  // Compute score from actual data rather than trusting AI's self-reported score
+  const score =
+    sourcingRequired.length === 0
+      ? 1
+      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length) /
+        sourcingRequired.length;
   const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
 
   const passed =
-    score >= 0.7 &&
-    unsupportedClaims.length === 0 &&
-    unreliableSourceClaims.length === 0 &&
-    !durationExceeded &&
-    (sourcingRequired.length === 0 ||
-      adequatelySourcedClaims.length / sourcingRequired.length >= threshold);
+    score >= threshold && unreliableSourceClaims.length === 0 && !durationExceeded;
 
   let feedback = parsed.feedback || '';
   if (durationFeedback) {
