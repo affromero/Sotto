@@ -536,11 +536,11 @@ export default function LandingPage() {
           <div className={`${styles.split} ${styles.splitReverse}`}>
             <div className={`${styles.splitText} ${styles.rev}`}>
               <span className={styles.overline}>Voice Sharing</span>
-              <h2 className={styles.h2}>Clone your voice. Let others create with it.</h2>
+              <h2 className={styles.h2}>Clone your voice. Share it — or sell it.</h2>
               <p className={styles.bodyLg}>
-                Upload a sample and Sotto clones your voice in seconds. Share it with specific
-                people or make it requestable — anyone on the network can ask to use your voice
-                for their podcasts. No paid tiers. Everyone gets voice cloning.
+                Upload a sample and Sotto clones your voice in seconds. Share it for free or set
+                a per-podcast price — you earn 90%, we handle the rest. Anyone on the network can
+                request access or purchase your voice for their podcasts.
               </p>
               <div className={styles.forkFeatures}>
                 <div className={styles.forkFeature}>
@@ -611,7 +611,23 @@ export default function LandingPage() {
                     <circle cx="8" cy="8" r="7" />
                     <path d="M5.5 8l2 2 3.5-4" />
                   </svg>
-                  <span>Free for everyone — no paid tiers</span>
+                  <span>Set your own price — or keep it free</span>
+                </div>
+                <div className={styles.forkFeature}>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M8 1v14M4 4h8M5 8h6M4 12h8" />
+                  </svg>
+                  <span>Earn 90% of every podcast sale</span>
                 </div>
               </div>
             </div>
@@ -629,12 +645,7 @@ export default function LandingPage() {
                       <span className={styles.vsMockVoiceMeta}>Uploaded · Warm baritone</span>
                     </div>
                   </div>
-                  <div className={styles.vsMockToggle}>
-                    <div className={styles.vsMockToggleTrack}>
-                      <div className={styles.vsMockToggleThumb} />
-                    </div>
-                    <span className={styles.vsMockToggleLabel}>Shared</span>
-                  </div>
+                  <div className={styles.vsMockPriceTag}>$2.00 / podcast</div>
                 </div>
                 <div className={styles.vsMockRequest}>
                   <div className={styles.vsMockRequestDot} aria-hidden="true" />
