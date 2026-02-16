@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useTrack } from '@/components/providers/EventProvider';
-import { detectUrls } from '@/lib/discovery-agent';
+import { detectUrls } from '@/lib/detect-urls';
 import { DiscoveryMessage, DiscoveryMetadata, DiscoveryState } from '@/types/discovery';
 
 export interface LinkPreviewData {
