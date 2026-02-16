@@ -277,7 +277,7 @@ Claude generates natural HOST segment addressing Q&A
 
 | Model                   | Purpose                                                                                                                                                                                                                  |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), Twitter handle + prefs                                                                                                                            |
+| `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), Twitter handle + prefs, Stripe Connect (stripeAccountId, stripeOnboarded)                                                                         |
 | `Follow`                | Social: follower → following                                                                                                                                                                                             |
 | `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), commentCount |
 | `Discovery`             | Chat metadata (audience, depth, tone, focus, duration)                                                                                                                                                                   |
@@ -294,7 +294,8 @@ Claude generates natural HOST segment addressing Q&A
 | `CollectionItem`        | Podcast membership in a collection (with ordering)                                                                                                                                                                       |
 | `CollectionFollow`      | Users following collections                                                                                                                                                                                              |
 | `Activity`              | Social activity feed events (PODCAST_CREATED, FORKED, LIKED, USER_FOLLOWED, COMMENT_POSTED, COLLECTION_CREATED)                                                                                                         |
-| `VoiceClone`            | User voice clones (name, ElevenLabs ID, source type)                                                                                                                                                                     |
+| `VoiceClone`            | User voice clones (name, ElevenLabs ID, source type, priceInCents for marketplace)                                                                                                                                       |
+| `VoicePurchase`         | Per-podcast voice payments: buyer, voiceClone, podcast, amountCents, platformFeeCents, status (authorized/captured/cancelled/refunded)                                                                                   |
 | `VoiceAllowlist`        | Pre-approved voice access: voice clone → allowed user                                                                                                                                                                    |
 | `UserTtsKey`            | BYOK encrypted API keys per TTS provider (AES-256-GCM), `@@unique([userId, provider])`                                                                                                                                   |
 | `UserAiKey`             | BYOK encrypted API keys per AI provider (Anthropic/OpenAI), `@@unique([userId, provider])`                                                                                                                               |
@@ -312,15 +313,17 @@ Claude generates natural HOST segment addressing Q&A
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → SCRIPT_READY → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
 
-## Pricing Model: Free + BYOK
+## Pricing Model: Free + BYOK + Voice Marketplace
 
-**100% free. No tiers, no credits, no Stripe.** Users bring their own API keys (BYOK) for both LLM and TTS providers.
+**Generation is free.** Users bring their own API keys (BYOK) for both LLM and TTS providers. **Voice marketplace** adds optional per-podcast pricing via Stripe Connect.
 
 | Requirement | Details |
 |-------------|---------|
 | AI key      | Anthropic or OpenAI — required for generation, Q&A, discovery chat |
 | TTS key     | ElevenLabs, OpenAI, PlayHT, Cartesia, or Hume — required for audio generation |
 | All features | Unlimited — voice clones, downloads, private podcasts, collections, everything |
+
+**Voice Marketplace Pricing**: Voice owners connect Stripe and set a per-podcast price (or keep voices free). Buyers pay once per podcast. Payment is authorized upfront, captured on READY, cancelled on FAILED. Platform takes 10% via `application_fee_amount`. Free access paths: owner, allowlisted, approved VoiceRequest, or existing purchase.
 
 **Rate limits** (abuse prevention): 20 generations/hour, 100/day per user. 60 interactions/hour.
 

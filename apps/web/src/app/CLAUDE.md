@@ -98,6 +98,10 @@
 | `/api/users/discover`                                            | GET              | No (opt)   | Search users by name/handle/bio/interests (enriches isFollowing if authed)  |
 | `/api/users/suggested`                                           | GET              | Yes        | Suggested follows via tag overlap + embedding + collaborative listening     |
 | `/api/users/search`                                              | GET              | Yes        | Search users by handle (for allowlist)                                      |
+| `/api/stripe/connect`                                            | GET/POST         | Yes        | Stripe Connect onboarding (POST: create account, GET: check status)         |
+| `/api/stripe/connect/callback`                                   | GET              | Yes        | Stripe Connect return URL handler                                           |
+| `/api/stripe/webhooks`                                           | POST             | No         | Stripe webhook handler (account.updated, payment_intent.payment_failed)     |
+| `/api/stripe/payment-intent`                                     | POST             | Yes        | Create PaymentIntent(s) for voice charges (manual capture)                  |
 | `/api/voices/clone`                                              | POST             | Yes        | Create voice clone                                                          |
 | `/api/voices/preview`                                            | POST             | Yes        | Preview voice sample                                                        |
 | `/api/voices/allowlist`                                          | GET/POST         | Yes        | List/add voice allowlist entries                                            |
