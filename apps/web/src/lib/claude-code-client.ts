@@ -113,7 +113,7 @@ export async function* streamClaudeCode(
   const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
   const timeoutMs = opts?.timeoutMs || 120_000;
 
-  const args = ['-p', '--model', model, '--output-format', 'stream-json'];
+  const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];
 
   if (systemPrompt) {
     args.push('--system-prompt', systemPrompt);
@@ -145,14 +145,28 @@ export async function* streamClaudeCode(
       for (const line of lines) {
         if (!line.trim()) continue;
         try {
-          const event = JSON.parse(line);
-          // Only yield text deltas — skip assistant metadata (object) and result (duplicates streamed text)
+          const raw = JSON.parse(line);
+          // Unwrap stream_event envelope if present
+          const event = raw.type === 'stream_event' && raw.event ? raw.event : raw;
+
           if (event.type === 'content_block_delta' && event.delta?.text) {
             hasDeltas = true;
             yield event.delta.text;
-          } else if (event.type === 'result' && event.result && !hasDeltas) {
+          } else if (event.type === 'result' && !hasDeltas) {
             // Fallback: yield complete result only if no deltas were received
-            yield event.result;
+            const text = typeof event.result === 'string' ? event.result : '';
+            if (text) yield text;
+          } else if (event.type === 'assistant' && !hasDeltas) {
+            // Fallback: extract text from assistant message content blocks
+            const blocks = event.message?.content ?? event.content;
+            if (Array.isArray(blocks)) {
+              for (const block of blocks) {
+                if (block.type === 'text' && block.text) {
+                  hasDeltas = true;
+                  yield block.text;
+                }
+              }
+            }
           }
         } catch {
           // Not valid JSON — skip partial lines
@@ -163,12 +177,24 @@ export async function* streamClaudeCode(
     // Process remaining buffer
     if (buffer.trim()) {
       try {
-        const event = JSON.parse(buffer);
+        const raw = JSON.parse(buffer);
+        const event = raw.type === 'stream_event' && raw.event ? raw.event : raw;
         if (event.type === 'content_block_delta' && event.delta?.text) {
           hasDeltas = true;
           yield event.delta.text;
-        } else if (event.type === 'result' && event.result && !hasDeltas) {
-          yield event.result;
+        } else if (event.type === 'result' && !hasDeltas) {
+          const text = typeof event.result === 'string' ? event.result : '';
+          if (text) yield text;
+        } else if (event.type === 'assistant' && !hasDeltas) {
+          const blocks = event.message?.content ?? event.content;
+          if (Array.isArray(blocks)) {
+            for (const block of blocks) {
+              if (block.type === 'text' && block.text) {
+                hasDeltas = true;
+                yield block.text;
+              }
+            }
+          }
         }
       } catch {
         // Final chunk wasn't JSON — yield raw if non-empty
@@ -179,6 +205,11 @@ export async function* streamClaudeCode(
     }
   } finally {
     clearTimeout(timer);
+    if (!hasDeltas) {
+      logger.warn('claude-code: stream ended with no text deltas', {
+        bufferRemainder: buffer.slice(0, 500),
+      });
+    }
     child.kill('SIGTERM');
   }
 }
