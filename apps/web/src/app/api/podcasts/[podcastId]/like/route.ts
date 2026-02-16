@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -58,6 +59,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       targetType: 'podcast',
     },
   }).catch(() => {});
+
+  // Fire-and-forget auto-tweet threshold check (after transaction committed)
+  checkAutoTweetThreshold(podcastId).catch(() => {});
 
   return NextResponse.json({ liked: true });
 }

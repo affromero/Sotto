@@ -6,6 +6,7 @@ import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/li
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
+import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -219,6 +220,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       metadata: { parentTitle: sourcePodcast.title },
     },
   }).catch(() => {});
+
+  // Fire-and-forget auto-tweet threshold check on the SOURCE podcast (after transaction committed)
+  checkAutoTweetThreshold(podcastId).catch(() => {});
 
   return NextResponse.json({ id: forkedPodcast.id }, { status: 201 });
 }
