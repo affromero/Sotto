@@ -1,107 +1,102 @@
-/* GenerationProgress — Vertical stepper for podcast generation pipeline */
+/* GenerationProgress — Horizontal pipeline stepper */
 
 .root {
   width: 100%;
-  max-width: 400px;
-  margin: 0 auto;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-sm);
+  position: relative;
 }
 
-/* Stepper list */
+/* ============================================ */
+/* PROGRESS TRACK (background line)             */
+/* ============================================ */
+
+.track {
+  position: absolute;
+  top: calc(var(--spacing-md) + 11px); /* center on dots (dot = 22px, half = 11px) */
+  left: var(--spacing-sm);
+  right: var(--spacing-sm);
+  height: 2px;
+  background: var(--color-border);
+  z-index: 0;
+}
+
+.trackFill {
+  height: 100%;
+  background: var(--color-success);
+  transition: width 0.6s ease;
+}
+
+/* ============================================ */
+/* STEPPER ROW                                  */
+/* ============================================ */
 
 .stepper {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
 }
 
-/* Individual step */
+/* ============================================ */
+/* INDIVIDUAL STEP                              */
+/* ============================================ */
 
 .step {
-  position: relative;
-}
-
-.stepRow {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-}
-
-/* Left indicator column: circle + connector line */
-
-.indicator {
   display: flex;
   flex-direction: column;
   align-items: center;
-  flex-shrink: 0;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
 }
 
-.circle {
-  width: 32px;
-  height: 32px;
+/* Dot */
+
+.dot {
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-body);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  transition: all var(--transition-base);
-  position: relative;
-  z-index: 1;
-}
-
-.connector {
-  width: 2px;
-  height: 24px;
-  background: var(--color-border);
-  transition: background var(--transition-base);
+  font-size: 10px;
+  font-weight: 700;
   flex-shrink: 0;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
-/* Step content (label, progress, error) */
-
-.content {
-  flex: 1;
-  min-height: 32px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding-bottom: var(--spacing-lg);
-}
-
-/* Remove bottom padding on last step content */
-.step:last-child .content {
-  padding-bottom: 0;
-}
-
-.label {
-  font-family: var(--font-body);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  line-height: 32px;
-  transition: color var(--transition-base);
-}
-
-.stepNumber {
+.dotNumber {
   line-height: 1;
 }
 
+/* Label below dot */
+
+.label {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  text-align: center;
+  transition: color 0.3s ease;
+  white-space: nowrap;
+}
+
 /* ============================================ */
-/* STEP STATES                                   */
+/* STEP STATES                                  */
 /* ============================================ */
 
 /* Completed */
 
-.completed .circle {
+.completed .dot {
   background: var(--color-success);
   color: var(--color-text-inverse);
-}
-
-.completed .connector {
-  background: var(--color-success);
 }
 
 .completed .label {
@@ -110,14 +105,10 @@
 
 /* Current */
 
-.current .circle {
+.current .dot {
   background: var(--color-primary);
   color: var(--color-text-inverse);
   animation: pulse 2s ease-in-out infinite;
-}
-
-.current .connector {
-  background: var(--color-border);
 }
 
 .current .label {
@@ -127,14 +118,10 @@
 
 /* Future */
 
-.future .circle {
-  background: transparent;
+.future .dot {
+  background: var(--color-surface);
   border: 2px solid var(--color-border);
   color: var(--color-text-tertiary);
-}
-
-.future .connector {
-  background: var(--color-border);
 }
 
 .future .label {
@@ -143,14 +130,10 @@
 
 /* Paused (SCRIPT_READY) */
 
-.paused .circle {
+.paused .dot {
   background: var(--color-primary);
   color: var(--color-text-inverse);
   animation: none;
-}
-
-.paused .connector {
-  background: var(--color-border);
 }
 
 .paused .label {
@@ -160,14 +143,10 @@
 
 /* Error */
 
-.error .circle {
+.error .dot {
   background: var(--color-error);
   color: var(--color-text-inverse);
   animation: none;
-}
-
-.error .connector {
-  background: var(--color-border);
 }
 
 .error .label {
@@ -176,7 +155,33 @@
 }
 
 /* ============================================ */
-/* PROGRESS BAR                                  */
+/* DETAIL ROW (active step info)                */
+/* ============================================ */
+
+.detail {
+  margin-top: var(--spacing-md);
+  text-align: center;
+}
+
+.detailLabel {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.detailPaused {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.detailError {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+/* ============================================ */
+/* PROGRESS BAR (within detail)                 */
 /* ============================================ */
 
 .progressWrap {
@@ -184,11 +189,14 @@
   align-items: center;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-xs);
+  max-width: 240px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .progressTrack {
   flex: 1;
-  height: 6px;
+  height: 4px;
   background: var(--color-primary-light);
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -206,12 +214,12 @@
   font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--color-primary);
-  min-width: 36px;
+  min-width: 32px;
   text-align: right;
 }
 
 /* ============================================ */
-/* ERROR MESSAGE                                 */
+/* ERROR MESSAGE                                */
 /* ============================================ */
 
 .errorMessage {
@@ -224,27 +232,94 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-error-light);
+  text-align: left;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* ============================================ */
-/* ANIMATION                                     */
+/* ANIMATION                                    */
 /* ============================================ */
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(217, 119, 6, 0);
+    box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
   }
 }
 
 /* ============================================ */
-/* RESPONSIVE                                    */
+/* RESPONSIVE                                   */
 /* ============================================ */
 
+/* Small phones: hide labels, only show dots */
+@media (max-width: 440px) {
+  .label {
+    display: none;
+  }
+
+  .root {
+    padding: var(--spacing-md) var(--spacing-xs);
+  }
+
+  .track {
+    left: var(--spacing-xs);
+    right: var(--spacing-xs);
+  }
+}
+
+/* Larger screens: more padding */
 @media (min-width: 768px) {
   .root {
-    padding: var(--spacing-xl);
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .track {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+  }
+
+  .dot {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .track {
+    top: calc(var(--spacing-lg) + 13px); /* center on 26px dots */
+  }
+
+  .label {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* ============================================ */
+/* REDUCED MOTION                               */
+/* ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .current .dot {
+    animation: none;
+  }
+
+  .trackFill {
+    transition: none;
+  }
+
+  .dot {
+    transition: none;
+  }
+
+  .label {
+    transition: none;
+  }
+
+  .progressFill {
+    transition: none;
   }
 }
