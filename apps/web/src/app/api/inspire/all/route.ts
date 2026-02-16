@@ -15,6 +15,20 @@ const inspireAllSchema = z.object({
 });
 
 /**
+ * Sanitize user topic input before interpolating into LLM prompts.
+ * Strips characters and patterns that could be used for prompt injection.
+ */
+function sanitizeTopic(raw: string): string {
+  return raw
+    .replace(/[""''`]/g, '') // curly/backtick quotes
+    .replace(/[{}[\]<>]/g, '') // brackets that could look like JSON/XML
+    .replace(/\n|\r/g, ' ') // newlines
+    .replace(/\b(ignore|forget|disregard|override|system|prompt|instruction|assistant|human)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * GET /api/inspire/all
  * Returns all three Inspire Me sections in one call.
  * Optional ?section=forYou|news for single-section refresh ("Load more").
@@ -34,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   const { section, timeRange, topic } = validation.data;
   const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
-  const topicHint = topic?.trim() || undefined;
+  const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
   const userId = session.user.id;
 
   const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
