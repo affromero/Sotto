@@ -36,6 +36,7 @@ import { CommentSection } from '@/components/player/CommentSection';
 import { Badge } from '@/components/ui/Badge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
+import { GenerationProgress } from '@/components/create/GenerationProgress';
 import type { PodcastDetail } from '@/types/podcast';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -120,6 +121,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
     searchParams.get('fork') === '1' && !isOwner && isAuthenticated
   );
   const [showAddToCollection, setShowAddToCollection] = useState(false);
+  const [liveStatus, setLiveStatus] = useState(podcast.status);
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -153,6 +155,27 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       })
       .catch(() => {});
   }, [isOwner, podcast.id, podcast.status]);
+
+  // Poll for status updates while podcast is processing
+  useEffect(() => {
+    if (liveStatus === 'READY' || liveStatus === 'FAILED') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/podcasts/${podcast.id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setLiveStatus(data.status);
+        if (data.status === 'READY') {
+          router.refresh();
+        }
+      } catch {
+        // Silently retry next interval
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [podcast.id, liveStatus, router]);
 
   // Fetch fork lineage for ForkGraph
   useEffect(() => {
@@ -280,8 +303,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
     seekRef.current?.(time);
   }, []);
 
-  const isReady = podcast.status === 'READY';
-  const isProcessing = !isReady && podcast.status !== 'FAILED';
+  const isReady = liveStatus === 'READY';
+  const isProcessing = !isReady && liveStatus !== 'FAILED';
 
   return (
     <>
@@ -345,9 +368,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
               <span className={styles.metaDuration}>{formatDuration(podcast.duration)}</span>
             </>
           )}
-          {podcast.status !== 'READY' && (
-            <Badge variant={statusVariants[podcast.status as PodcastStatus]}>
-              {podcast.status.replace(/_/g, ' ')}
+          {liveStatus !== 'READY' && (
+            <Badge variant={statusVariants[liveStatus as PodcastStatus]}>
+              {liveStatus.replace(/_/g, ' ')}
             </Badge>
           )}
         </div>
@@ -403,10 +426,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Processing state */}
       {isProcessing && (
         <div className={styles.processingState}>
-          <div className={styles.processingSpinner} aria-hidden="true" />
-          <p className={styles.processingText}>
-            Your podcast is being generated. This page will update automatically when it is ready.
-          </p>
+          <GenerationProgress status={liveStatus} />
         </div>
       )}
 
