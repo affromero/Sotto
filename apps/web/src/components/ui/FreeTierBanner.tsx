@@ -58,12 +58,12 @@ export function FreeTierBanner({ used, limit, isByokUser }: FreeTierBannerProps)
           </p>
           <p className={styles.description}>
             {exhausted
-              ? 'Add your own API keys to keep creating podcasts.'
-              : 'Add your own API keys for unlimited access.'}
+              ? 'Add a voice provider key to keep creating podcasts.'
+              : 'Add a voice provider key for unlimited generation.'}
           </p>
         </div>
         <Link href="/onboarding?step=keys" className={styles.link}>
-          {exhausted ? 'Unlock unlimited' : 'Add keys'}
+          Add voice key
           <svg
             className={styles.linkArrow}
             width="14"
