@@ -148,35 +148,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
           </button>
         </div>
 
-        {/* Topic input */}
-        <div className={styles.topicBar}>
-          <Search size={16} className={styles.topicIcon} aria-hidden="true" />
-          <input
-            ref={topicInputRef}
-            type="text"
-            className={styles.topicInput}
-            placeholder="Focus on... (e.g., politics, AI, europe)"
-            value={topicInput}
-            maxLength={50}
-            onChange={(e) => setTopicInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleTopicSubmit();
-            }}
-            disabled={isLoading}
-          />
-          {activeTopic && (
-            <button
-              type="button"
-              className={styles.topicClear}
-              onClick={handleTopicClear}
-              aria-label="Clear topic filter"
-            >
-              <X size={14} aria-hidden="true" />
-            </button>
-          )}
-        </div>
-
-        {/* Tabs */}
+        {/* Tabs + inline topic filter */}
         <div className={styles.tabs} role="tablist" aria-label="Inspiration sections">
           {(Object.keys(SECTION_LABELS) as Section[]).map((section) => (
             <button
@@ -190,6 +162,41 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
               {SECTION_LABELS[section]}
             </button>
           ))}
+
+          {/* Topic filter — lives in the tab row as a chip */}
+          <div className={styles.topicChipWrapper}>
+            {activeTopic ? (
+              <span className={styles.topicChipActive}>
+                <Search size={12} aria-hidden="true" />
+                {activeTopic}
+                <button
+                  type="button"
+                  className={styles.topicChipClear}
+                  onClick={handleTopicClear}
+                  aria-label="Clear topic filter"
+                >
+                  <X size={10} aria-hidden="true" />
+                </button>
+              </span>
+            ) : (
+              <label className={styles.topicChip}>
+                <Search size={12} aria-hidden="true" />
+                <input
+                  ref={topicInputRef}
+                  type="text"
+                  className={styles.topicInput}
+                  placeholder="Focus on..."
+                  value={topicInput}
+                  maxLength={50}
+                  onChange={(e) => setTopicInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTopicSubmit();
+                  }}
+                  disabled={isLoading}
+                />
+              </label>
+            )}
+          </div>
         </div>
 
         {/* Content */}
