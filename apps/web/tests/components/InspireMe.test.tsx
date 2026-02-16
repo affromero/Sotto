@@ -242,7 +242,7 @@ describe('InspireMe', () => {
     expect(handleClose).toHaveBeenCalled();
   });
 
-  it('shows empty state when no ForYou questions returned', async () => {
+  it('shows generate button when no ForYou questions returned', async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({ forYou: [], trending: [], news: [] }),
@@ -251,9 +251,7 @@ describe('InspireMe', () => {
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('No suggestions available right now. Try again later!')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Generate ideas')).toBeInTheDocument();
     });
   });
 
