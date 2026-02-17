@@ -1,3 +1,4 @@
+import { moderateOrThrow } from '../moderation';
 import { logger } from '../logger';
 import { getAiKey, hasAiKey } from '../byok';
 import type { AiProviderId } from './ai-registry';
@@ -11,6 +12,7 @@ export interface AIOptions {
   maxTokens?: number;
   temperature?: number;
   model?: string;
+  skipModeration?: boolean;
 }
 
 export interface AIResponse {
@@ -74,6 +76,11 @@ class OpenAIProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+    }
+
     const client = await this.getClient();
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
@@ -97,6 +104,11 @@ class OpenAIProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+    }
+
     const client = await this.getClient();
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 

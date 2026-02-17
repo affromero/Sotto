@@ -96,7 +96,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
           content: `Classify "${normalized}":\n- NAME if it is a common given name (first name) in any language or culture\n- OFFENSIVE if it is profane, vulgar, a slur, hate speech, or sexually explicit\n- OK otherwise`,
         },
       ],
-      { maxTokens: 3, model: 'claude-haiku-4-5-20251001', apiKeyOverride }
+      { maxTokens: 3, model: 'claude-haiku-4-5-20251001', apiKeyOverride, skipModeration: true }
     );
 
     const answer = content.trim().toUpperCase();
