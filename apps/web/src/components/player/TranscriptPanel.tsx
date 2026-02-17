@@ -57,9 +57,9 @@ export function TranscriptPanel({
                 {segment.speaker === 'HOST' ? 'Host' : 'Expert'}
                 {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
-              <p className={styles.text}>
+              <div className={styles.text}>
                 {hasRefs ? parseTextWithCitations(segment.text, references) : segment.text}
-              </p>
+              </div>
             </div>
           );
         })}
