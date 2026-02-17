@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/redis';
 import { createCommentSchema, paginationSchema } from '@/lib/validations';
+import { moderateOrThrow, ContentModerationError } from '@/lib/moderation';
+import { checkSuspension } from '@/lib/auth-guards';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -84,7 +87,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const suspended = checkSuspension(session);
+  if (suspended) return suspended;
+
   const userId = session.user.id;
+
+  // Rate limit: 30 comments per hour
+  const rateLimit = await checkRateLimit(`comment:${userId}`, 30, 3600);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many comments. Please try again later.', resetAt: rateLimit.resetAt },
+      { status: 429 }
+    );
+  }
 
   const body = await request.json();
   const parsed = createCommentSchema.safeParse(body);
@@ -97,6 +112,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const { content, parentId, timestamp } = parsed.data;
+
+  // Screen comment content for policy violations
+  try {
+    await moderateOrThrow(content);
+  } catch (err) {
+    if (err instanceof ContentModerationError) {
+      return NextResponse.json(
+        { error: 'Your comment was flagged by our content policy.', categories: err.categories },
+        { status: 400 }
+      );
+    }
+    throw err;
+  }
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },

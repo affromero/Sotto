@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
+import { ReportButton } from '@/components/ui/ReportButton';
 import { CommentCompose } from './CommentCompose';
 import type { CommentData } from './CommentCompose';
 import styles from './CommentCard.module.css';
@@ -177,6 +178,9 @@ export function CommentCard({
               >
                 <Trash2 size={14} />
               </button>
+            )}
+            {currentUserId && currentUserId !== comment.user.id && (
+              <ReportButton targetType="comment" targetId={comment.id} variant="icon" />
             )}
           </div>
         </div>

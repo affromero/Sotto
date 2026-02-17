@@ -16,6 +16,7 @@ import {
   ListMusic,
   Trash2,
   Check,
+  Flag,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -31,6 +32,7 @@ import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
+import { ReportModal } from '@/components/ui/ReportModal';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
@@ -141,6 +143,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [retrying, setRetrying] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [approving, setApproving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
@@ -679,6 +682,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                   onClick: () => setShowDeleteConfirm(true),
                   danger: true,
                 }] : []),
+                ...(!isOwner && isAuthenticated ? [{
+                  icon: <Flag size={16} />,
+                  label: 'Report',
+                  onClick: () => setShowReport(true),
+                  danger: true,
+                }] : []),
               ]}
             />
           )}
@@ -818,6 +827,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         isOpen={showAddToCollection}
         onClose={() => setShowAddToCollection(false)}
       />
+      {showReport && (
+        <ReportModal
+          targetType="podcast"
+          targetId={podcast.id}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
 
     {/* Sticky mini-player when main player scrolls out of view */}

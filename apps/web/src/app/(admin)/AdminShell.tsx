@@ -27,6 +27,7 @@ interface AdminShellProps {
     email: string | null;
     image: string | null;
   };
+  pendingReportCount?: number;
   children: React.ReactNode;
 }
 
@@ -50,7 +51,7 @@ const navItems: NavItem[] = [
   { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
 ];
 
-export function AdminShell({ user, children }: AdminShellProps) {
+export function AdminShell({ user, pendingReportCount, children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const displayName = user.name || user.email || 'Admin';
@@ -76,6 +77,10 @@ export function AdminShell({ user, children }: AdminShellProps) {
         <nav className={styles.nav} aria-label="Admin sections">
           {navItems.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
+            const showBadge =
+              href === '/admin/moderation' &&
+              pendingReportCount !== undefined &&
+              pendingReportCount > 0;
             return (
               <Link
                 key={href}
@@ -86,6 +91,11 @@ export function AdminShell({ user, children }: AdminShellProps) {
               >
                 <Icon className={styles.navIcon} aria-hidden="true" />
                 {label}
+                {showBadge && (
+                  <span className={styles.navBadge} aria-label={`${pendingReportCount} pending reports`}>
+                    {pendingReportCount}
+                  </span>
+                )}
               </Link>
             );
           })}

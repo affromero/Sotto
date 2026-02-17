@@ -383,6 +383,43 @@ export const podcastRatingSchema = z.object({
 });
 
 /**
+ * Report creation validation
+ */
+export const createReportSchema = z.object({
+  targetType: z.enum(['podcast', 'comment', 'user']),
+  targetId: z.string().min(1),
+  reason: z.enum([
+    'HARASSMENT',
+    'HATE_SPEECH',
+    'VIOLENCE',
+    'SEXUAL_CONTENT',
+    'MISINFORMATION',
+    'SPAM',
+    'IMPERSONATION',
+    'COPYRIGHT',
+    'OTHER',
+  ]),
+  description: z.string().max(2000).optional(),
+});
+
+/**
+ * Report resolution validation (admin)
+ */
+export const resolveReportSchema = z.object({
+  status: z.enum(['RESOLVED_ACTIONED', 'RESOLVED_DISMISSED']),
+  resolution: z.string().max(2000).optional(),
+});
+
+/**
+ * Admin user moderation validation
+ */
+export const moderateUserSchema = z.object({
+  action: z.enum(['warn', 'suspend', 'ban', 'unban', 'unsuspend']),
+  reason: z.string().min(1).max(2000),
+  durationDays: z.number().int().min(1).max(365).optional(),
+});
+
+/**
  * Twitter config update validation (admin)
  */
 export const twitterConfigUpdateSchema = z.object({

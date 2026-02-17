@@ -8,6 +8,7 @@ import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
+import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 export async function GET(request: NextRequest) {
@@ -33,8 +34,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Rate limit API key requests (60 requests per minute)
+  // Session-based suspension check (skip for API key auth — those have separate controls)
   const authHeader = request.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) {
+    const { auth } = await import('@/lib/auth');
+    const session = await auth();
+    if (session) {
+      const suspended = checkSuspension(session);
+      if (suspended) return suspended;
+    }
+  }
+
+  // Rate limit API key requests (60 requests per minute)
   if (authHeader?.startsWith('Bearer ')) {
     const rateLimit = await checkRateLimit(`api:create:${authResult.userId}`, 60, 60);
     if (!rateLimit.allowed) {
