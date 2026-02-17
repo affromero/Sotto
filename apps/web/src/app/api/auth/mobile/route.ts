@@ -7,10 +7,19 @@ const devLoginSchema = z.object({
   email: z.string().email(),
 });
 
-const oauthLoginSchema = z.object({
-  provider: z.enum(['apple', 'google', 'github', 'twitter']),
+const oauthIdTokenSchema = z.object({
+  provider: z.enum(['apple', 'twitter']),
   idToken: z.string().min(1),
 });
+
+const oauthCodeSchema = z.object({
+  provider: z.enum(['google', 'github']),
+  code: z.string().min(1),
+  codeVerifier: z.string().optional(),
+  redirectUri: z.string().min(1),
+});
+
+const oauthLoginSchema = z.union([oauthIdTokenSchema, oauthCodeSchema]);
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -71,14 +80,25 @@ async function handleOAuthLogin(body: unknown) {
   const parsed = oauthLoginSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'provider and idToken are required' },
+      { error: 'provider and idToken or code are required' },
       { status: 400 },
     );
   }
 
-  const { provider, idToken } = parsed.data;
+  const { provider } = parsed.data;
+  let providerUserId: string | null;
 
-  const providerUserId = await verifyOAuthToken(provider, idToken);
+  if ('idToken' in parsed.data) {
+    providerUserId = await verifyOAuthToken(provider, parsed.data.idToken);
+  } else {
+    const { code, codeVerifier, redirectUri } = parsed.data;
+    if (provider === 'google') {
+      providerUserId = await exchangeGoogleCode(code, codeVerifier, redirectUri);
+    } else {
+      providerUserId = await exchangeGithubCode(code, redirectUri);
+    }
+  }
+
   if (!providerUserId) {
     return NextResponse.json(
       { error: 'Invalid or expired token' },
@@ -122,6 +142,68 @@ async function handleOAuthLogin(body: unknown) {
     token: key,
     user: account.user,
   });
+}
+
+async function exchangeGoogleCode(
+  code: string,
+  codeVerifier: string | undefined,
+  redirectUri: string,
+): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID ?? '',
+      client_secret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    });
+    if (codeVerifier) {
+      params.set('code_verifier', codeVerifier);
+    }
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    });
+    if (!response.ok) return null;
+
+    const tokenData = await response.json();
+    if (typeof tokenData.id_token !== 'string') return null;
+
+    return verifyGoogleToken(tokenData.id_token);
+  } catch {
+    return null;
+  }
+}
+
+async function exchangeGithubCode(
+  code: string,
+  redirectUri: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID ?? '',
+        client_secret: process.env.GITHUB_CLIENT_SECRET ?? '',
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+    if (!response.ok) return null;
+
+    const tokenData = await response.json();
+    if (typeof tokenData.access_token !== 'string') return null;
+
+    return verifyGithubToken(tokenData.access_token);
+  } catch {
+    return null;
+  }
 }
 
 async function verifyOAuthToken(
