@@ -1,0 +1,221 @@
+/* Admin TTS Ratings Page */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+/* Range Nav */
+
+.rangeNav {
+  display: flex;
+  gap: var(--spacing-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 4px;
+}
+
+.rangeLink {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.rangeLink:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.rangeLinkActive {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.rangeLinkActive:hover {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+/* Stats Grid */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--color-border-hover);
+}
+
+.cardLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.cardValue {
+  font: var(--text-h2);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+/* Sections */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.empty {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+/* Table */
+
+.tableContainer {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table thead {
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+  transition: background var(--transition-fast);
+}
+
+.table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+
+.table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+}
+
+.numberCol {
+  text-align: right;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.providerCell {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.titleCell {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commentCell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+/* Score color coding */
+
+.scoreGreen {
+  color: var(--color-success) !important;
+}
+
+.scoreAmber {
+  color: var(--color-primary) !important;
+}
+
+.scoreRed {
+  color: var(--color-error) !important;
+}
