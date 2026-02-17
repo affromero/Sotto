@@ -98,6 +98,9 @@ model User {
   // Comments
   comments Comment[]
 
+  // Podcast ratings
+  podcastRatings PodcastRating[]
+
   // Activity feed
   activities Activity[]
 
@@ -259,6 +262,7 @@ model Podcast {
   savedIdea        SavedIdea?
   voicePurchases   VoicePurchase[]
   autoTweets       TwitterAutoTweet[]
+  ratings          PodcastRating[]
 
   @@index([userId])
   @@index([status])
@@ -522,6 +526,30 @@ model Save {
   userId    String
   podcastId String
   createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, podcastId])
+  @@index([podcastId])
+}
+
+// ============ PODCAST RATINGS ============
+
+model PodcastRating {
+  id        String   @id @default(cuid())
+  userId    String
+  podcastId String
+
+  voiceNaturalness    Int // 1-5: "How natural do the voices sound?"
+  contentAccuracy     Int // 1-5: "Did the AI get the facts right?"
+  conversationFlow    Int // 1-5: "Does the back-and-forth feel natural?"
+  overallSatisfaction Int // 1-5: overall summary
+
+  comment   String?  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
