@@ -38,7 +38,10 @@ import { Badge } from '@/components/ui/Badge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
+import { ScriptPreview } from '@/components/player/ScriptPreview';
+import { MiniPlayer } from '@/components/player/MiniPlayer';
 import type { PodcastDetail } from '@/types/podcast';
+import type { ReferenceData } from '@/types/reference';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
 
@@ -128,6 +131,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [approving, setApproving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
+  const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
+  const playerSectionRef = useRef<HTMLElement>(null);
+  const [playerInView, setPlayerInView] = useState(true);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -158,6 +165,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       })
       .catch(() => {});
   }, [isOwner, podcast.id, podcast.status]);
+
+  // Fetch script turns for review when SCRIPT_READY
+  useEffect(() => {
+    if (liveStatus !== 'SCRIPT_READY' || !isOwner) return;
+    fetch(`/api/podcasts/${podcast.id}/script`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.turns) setScriptTurns(data.turns);
+        if (data?.references) setScriptRefs(data.references);
+      })
+      .catch(() => {});
+  }, [liveStatus, isOwner, podcast.id]);
 
   // Poll for status updates while podcast is processing
   useEffect(() => {
@@ -190,6 +209,18 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       })
       .catch(() => {});
   }, [podcast.id, podcast.forkedFrom, podcast.forks.length]);
+
+  // Show mini-player when main player scrolls out of view
+  useEffect(() => {
+    const el = playerSectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setPlayerInView(entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [liveStatus]);
 
   const handleLike = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -473,6 +504,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
           <p className={styles.scriptReadyText}>
             Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
           </p>
+          {scriptTurns && scriptTurns.length > 0 && (
+            <ScriptPreview turns={scriptTurns} references={scriptRefs} />
+          )}
           <div className={styles.scriptReadyActions}>
             <Button onClick={handleApproveScript} loading={approving} disabled={approving || regenerating}>
               <Check size={16} />
@@ -488,7 +522,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
 
       {/* Player */}
       {isReady && podcast.audioUrl && (
-        <section className={styles.playerSection} aria-label="Audio player">
+        <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
           <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
         </section>
       )}
@@ -738,6 +772,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         onClose={() => setShowAddToCollection(false)}
       />
     </div>
+
+    {/* Sticky mini-player when main player scrolls out of view */}
+    {isReady && podcast.audioUrl && !playerInView && (
+      <MiniPlayer
+        podcastTitle={podcast.title}
+        onExpand={() => playerSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+      />
+    )}
     </>
   );
 }

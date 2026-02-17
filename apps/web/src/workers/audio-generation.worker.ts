@@ -5,6 +5,9 @@ import { resolveTtsProvider } from '@/lib/providers';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
+import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
+import { semaphore } from '@/lib/redis';
+import { getByokKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -21,11 +24,44 @@ function estimateDurationFromText(text: string): number {
   return text.length / charsPerSecond;
 }
 
+/**
+ * Strip non-speech markers from text before sending to TTS.
+ * Removes: [SFX: ...] markers, (delivery directions), [N] citation markers.
+ * Keeps the raw text in Segment records for transcript display.
+ */
+function cleanTextForTts(text: string): string {
+  return text
+    // Remove [SFX: ...] markers (e.g. "[SFX: upbeat music, 3s]")
+    .replace(/\[SFX:.*?\]/gi, '')
+    // Remove parenthetical delivery directions (e.g. "(laughing)", "(whispering)")
+    .replace(/\(([^)]{1,30})\)/g, (_, inner) => {
+      const directions = /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly)$/i;
+      return directions.test(inner.trim()) ? '' : `(${inner})`;
+    })
+    // Remove citation markers like [1], [2, 3], [1, 2, 3]
+    .replace(/\[\d+(?:,\s*\d+)*\]/g, '')
+    // Collapse multiple spaces and trim
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
   const { podcastId, segmentId, speaker, text } = job.data;
 
   logger.info('Generating audio for segment', { podcastId, segmentId, speaker });
   await job.updateProgress(10);
+
+  // Fail-fast: skip if podcast already failed (another segment errored first)
+  const podcastStatus = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { status: true },
+  });
+
+  if (podcastStatus?.status === 'FAILED') {
+    logger.info('Podcast already failed, skipping segment', { podcastId, segmentId });
+    await job.updateProgress(100);
+    return;
+  }
 
   // Idempotency: skip if segment already has audio
   const existingSegment = await prisma.segment.findUnique({
@@ -95,15 +131,60 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
   const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId);
 
+  // Resolve per-user concurrency limit for the TTS provider
+  let concurrencyLimit = 5;
+  if (providerId === 'elevenlabs') {
+    const apiKey = await getByokKey(podcast.userId, 'elevenlabs') || process.env.ELEVENLABS_API_KEY;
+    if (apiKey) {
+      concurrencyLimit = await getElevenLabsConcurrencyLimit(apiKey);
+    }
+  }
+
+  const semaphoreKey = `tts:sem:${podcast.userId}:${providerId}`;
+
   logger.info('Using TTS provider', {
     speaker,
     providerId,
     source,
     voiceId,
     podcastId,
+    concurrencyLimit,
   });
 
-  const audioBuffer = await provider.generateSpeech({ text, voiceId });
+  // Acquire a semaphore slot, retrying with backoff if all slots are taken
+  let acquired = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    acquired = await semaphore.acquire(semaphoreKey, concurrencyLimit);
+    if (acquired) break;
+    const delay = Math.min(1000 * Math.pow(1.5, attempt), 15000);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    // Re-check if podcast failed while waiting
+    const check = await prisma.podcast.findUnique({
+      where: { id: podcastId },
+      select: { status: true },
+    });
+    if (check?.status === 'FAILED') {
+      logger.info('Podcast failed while waiting for semaphore, skipping', { podcastId, segmentId });
+      await job.updateProgress(100);
+      return;
+    }
+  }
+
+  if (!acquired) {
+    throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
+  }
+
+  // Strip non-speech markers before sending to TTS
+  const ttsText = cleanTextForTts(text);
+
+  let audioBuffer: Buffer;
+  try {
+    audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
+  } finally {
+    await semaphore.release(semaphoreKey);
+  }
+
   const service = source === 'byok' ? `${providerId}_byok` : providerId;
 
   const durationMs = Date.now() - startTime;

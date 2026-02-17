@@ -45,7 +45,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }),
   ]);
 
-  const maxDurationMinutes = LIMITS.maxDurationMinutes;
+  const maxDurationMinutes = discovery.durationTarget || LIMITS.maxDurationMinutes;
 
   const turns = script.turns as ScriptTurn[];
   const generatedRefs: GeneratedReference[] = references.map((r) => ({
