@@ -71,7 +71,28 @@ export type NotificationType =
   | 'QUESTION_UPVOTED'
   | 'COMMENT_ON_YOUR_PODCAST'
   | 'COMMENT_REPLY'
-  | 'SCRIPT_READY';
+  | 'SCRIPT_READY'
+  | 'ACCOUNT_WARNING'
+  | 'ACCOUNT_SUSPENDED'
+  | 'ACCOUNT_BANNED'
+  | 'CONTENT_REMOVED';
+
+export type ReportReason =
+  | 'HARASSMENT'
+  | 'HATE_SPEECH'
+  | 'VIOLENCE'
+  | 'SEXUAL_CONTENT'
+  | 'MISINFORMATION'
+  | 'SPAM'
+  | 'IMPERSONATION'
+  | 'COPYRIGHT'
+  | 'OTHER';
+
+export type ReportStatus =
+  | 'PENDING'
+  | 'REVIEWING'
+  | 'RESOLVED_ACTIONED'
+  | 'RESOLVED_DISMISSED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
 

@@ -34,6 +34,7 @@ export enum JobType {
   AUTO_TWEET = 'auto_tweet',
   POLL_TWITTER_TRENDS = 'poll_twitter_trends',
   ADMIN_THREAD_TO_PODCAST = 'admin_thread_to_podcast',
+  MODERATE_CONTENT = 'moderate_content',
 }
 
 /**
@@ -180,6 +181,13 @@ export interface PollTwitterTrendsPayload {}
 export interface AdminThreadToPodcastPayload {
   tweetUrl: string;
   adminUserId: string;
+}
+
+export interface ModerateContentPayload {
+  targetType: 'podcast' | 'comment';
+  targetId: string;
+  content: string;
+  userId?: string;
 }
 
 /**
@@ -434,3 +442,4 @@ export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3 })
 export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempts: 3 });
 export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1 });
 export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2 });
+export const contentModerationQueue = createQueue('content-moderation', { attempts: 2 });

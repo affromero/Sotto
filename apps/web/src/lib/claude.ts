@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { moderateOrThrow, moderateContent } from './moderation';
 import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -28,8 +29,17 @@ export async function generateResponse(
     model?: string;
     apiKeyOverride?: string;
     tools?: Anthropic.MessageCreateParams['tools'];
+    skipModeration?: boolean;
   }
 ): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  // Screen user input before sending to LLM
+  if (!options?.skipModeration) {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg) {
+      await moderateOrThrow(lastUserMsg.content);
+    }
+  }
+
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     return executeClaudeCode(systemPrompt, serializeMessages(messages), {
@@ -56,6 +66,17 @@ export async function generateResponse(
   const textBlock = response.content.find((block) => block.type === 'text');
   const content = textBlock?.type === 'text' ? textBlock.text : '';
 
+  // Soft-block: log flagged output but don't throw (educational content may discuss sensitive topics)
+  if (!options?.skipModeration && content) {
+    moderateContent(content).then((result) => {
+      if (result.flagged) {
+        logger.warn('LLM output flagged by moderation', {
+          categories: result.blockedCategories.join(','),
+        });
+      }
+    }).catch(() => {});
+  }
+
   return {
     content,
     inputTokens: response.usage.input_tokens,
@@ -75,8 +96,17 @@ export async function* streamResponse(
     model?: string;
     apiKeyOverride?: string;
     tools?: Anthropic.MessageCreateParams['tools'];
+    skipModeration?: boolean;
   }
 ): AsyncGenerator<string> {
+  // Screen user input before starting stream
+  if (!options?.skipModeration) {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg) {
+      await moderateOrThrow(lastUserMsg.content);
+    }
+  }
+
   if (USE_CLAUDE_CODE && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {

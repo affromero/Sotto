@@ -1,4 +1,5 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
 
 export type ScriptTurn = {
   speaker: 'HOST' | 'EXPERT';
@@ -53,8 +54,7 @@ const AUDIENCE_GUIDANCE: Record<string, string> = {
   family:
     'This podcast is FAMILY-FRIENDLY — safe for all ages in the room together. Use inclusive language, no profanity or explicit content. Explain concepts so both kids and adults stay engaged. Think "dinner table conversation" — interesting for everyone.',
   general: 'Standard adult content with no special restrictions. This is the default audience.',
-  mature:
-    'This podcast is for a MATURE ADULT audience. No content restrictions — you can discuss controversial, sensitive, or complex topics frankly. Assume adult context and full comprehension. Be direct and unfiltered where the topic warrants it.',
+  mature: MATURE_AUDIENCE_GUIDANCE,
 };
 
 export interface SourceMetadata {
@@ -171,7 +171,7 @@ You have access to web search. Use it to:
 - Ground the podcast in real, current information rather than outdated training data
 For time-sensitive topics (current events, "what happened today/this week", latest developments), ALWAYS search the web first before writing the script.
 
-Only return the JSON object, nothing else.`;
+Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
 
   const userMessage = params.sourceContent
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
@@ -330,7 +330,7 @@ You have access to web search. Use it to verify facts, find accurate statistics,
 
 ## Output Format:
 Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
-Only return the JSON object, nothing else.`;
+Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
 
   const previousScriptText = params.previousScript
     .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)

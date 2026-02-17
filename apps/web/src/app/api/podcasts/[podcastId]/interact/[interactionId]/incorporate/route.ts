@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
 import { generateResponse, logApiUsage } from '@/lib/claude';
+import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { getAiKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
@@ -107,7 +108,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const aiKey = await getAiKey(session.user.id);
 
   // Generate the explanation segment text via Claude
-  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the HOST speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text.`;
+  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the HOST speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text.${CONTENT_SAFETY_INSTRUCTIONS}`;
 
   const response = await generateResponse(systemPrompt, [
     {

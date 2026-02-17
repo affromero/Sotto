@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { Badge } from '@/components/ui/Badge';
 import { FollowButton } from './FollowButton';
 import { FollowerCount } from './FollowerCount';
+import { ReportButton } from '@/components/ui/ReportButton';
 import styles from './ProfileHeader.module.css';
 
 interface ProfileUser {
@@ -102,7 +103,12 @@ export function ProfileHeader({
                     Edit Profile
                   </button>
                 )
-              : isAuthenticated && <FollowButton isFollowing={isFollowing} onClick={onFollow} />}
+              : isAuthenticated && (
+                  <>
+                    <FollowButton isFollowing={isFollowing} onClick={onFollow} />
+                    <ReportButton targetType="user" targetId={user.id} variant="icon" />
+                  </>
+                )}
           </div>
         </div>
 

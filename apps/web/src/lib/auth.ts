@@ -90,6 +90,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.role = token.role ?? 'USER';
+        session.user.bannedAt = token.bannedAt ?? null;
+        session.user.suspendedUntil = token.suspendedUntil ?? null;
       }
       return session;
     },
@@ -102,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if ((user || trigger === 'update') && token.sub) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.sub },
-          select: { email: true, role: true, handle: true, name: true },
+          select: { email: true, role: true, handle: true, name: true, bannedAt: true, suspendedUntil: true },
         });
 
         if (dbUser) {
@@ -116,6 +118,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           } else {
             token.role = dbUser.role;
           }
+
+          // Propagate ban/suspend state to JWT
+          token.bannedAt = dbUser.bannedAt?.toISOString() ?? null;
+          token.suspendedUntil = dbUser.suspendedUntil?.toISOString() ?? null;
 
           // Auto-generate handle if missing
           if (!dbUser.handle) {

@@ -113,6 +113,18 @@ model User {
   // Free tier
   freeGenerationsUsed Int @default(0)
 
+  // Moderation
+  bannedAt        DateTime?
+  bannedReason    String?    @db.Text
+  suspendedUntil  DateTime?
+  suspendedReason String?    @db.Text
+  warningCount    Int        @default(0)
+
+  // Moderation relations
+  moderationActions   ModerationAction[] @relation("ModeratedUser")
+  moderationPerformed ModerationAction[] @relation("Moderator")
+  reports             Report[]           @relation("Reporter")
+
   // Stripe Connect (voice monetization)
   stripeAccountId  String?
   stripeOnboarded  Boolean @default(false)
@@ -683,6 +695,27 @@ enum NotificationType {
   COMMENT_ON_YOUR_PODCAST
   COMMENT_REPLY
   SCRIPT_READY
+  ACCOUNT_WARNING
+  ACCOUNT_SUSPENDED
+  ACCOUNT_BANNED
+  CONTENT_REMOVED
+}
+
+// ============ MODERATION ============
+
+model ModerationAction {
+  id          String   @id @default(cuid())
+  userId      String
+  moderatorId String
+  action      String   // 'warn' | 'suspend' | 'ban' | 'unban' | 'unsuspend' | 'remove_content'
+  reason      String   @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user      User @relation("ModeratedUser", fields: [userId], references: [id], onDelete: Cascade)
+  moderator User @relation("Moderator", fields: [moderatorId], references: [id])
+
+  @@index([userId, createdAt])
 }
 
 // ============ PUSH SUBSCRIPTIONS ============
@@ -1412,4 +1445,60 @@ model TwitterAutoTweet {
   @@index([podcastId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============ REPORTS ============
+
+enum ReportReason {
+  HARASSMENT
+  HATE_SPEECH
+  VIOLENCE
+  SEXUAL_CONTENT
+  MISINFORMATION
+  SPAM
+  IMPERSONATION
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED_ACTIONED
+  RESOLVED_DISMISSED
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  targetType  String       // 'podcast' | 'comment' | 'user'
+  targetId    String
+  reason      ReportReason
+  description String?      @db.Text
+  status      ReportStatus @default(PENDING)
+  resolvedBy  String?
+  resolution  String?      @db.Text
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+model ContentFlag {
+  id         String   @id @default(cuid())
+  targetType String   // 'podcast' | 'comment' | 'discovery_message'
+  targetId   String
+  userId     String?
+  categories String[]
+  scores     Json
+  source     String   // 'auto_input' | 'auto_output' | 'worker_scan'
+  reviewed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([reviewed, createdAt])
+  @@index([targetType, targetId])
 }

@@ -2,6 +2,8 @@ import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateResponse, logApiUsage } from '@/lib/claude';
+import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
+import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
@@ -57,14 +59,28 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     .join('\n');
 
   const systemPrompt = `You are Sotto's Q&A assistant. The user is listening to a podcast and paused to ask a question.
-Answer concisely and helpfully, using the podcast context. Keep answers under 200 words.`;
+Answer concisely and helpfully, using the podcast context. Keep answers under 200 words.${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
 
-  const response = await generateResponse(systemPrompt, [
-    {
-      role: 'user',
-      content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
-    },
-  ], { apiKeyOverride: aiKey?.apiKey });
+  let response;
+  try {
+    response = await generateResponse(systemPrompt, [
+      {
+        role: 'user',
+        content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
+      },
+    ], { apiKeyOverride: aiKey?.apiKey });
+  } catch (err) {
+    if (err instanceof ContentModerationError) {
+      // Content policy violation — mark interaction failed, don't retry
+      await prisma.interaction.update({
+        where: { id: interactionId },
+        data: { answer: 'Unable to answer — content policy violation.', status: 'ANSWERED' },
+      });
+      logger.warn('Interaction blocked by content moderation', { interactionId, categories: err.categories });
+      return;
+    }
+    throw err;
+  }
 
   await job.updateProgress(80);
 

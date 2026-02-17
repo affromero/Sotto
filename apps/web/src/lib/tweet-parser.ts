@@ -1,4 +1,5 @@
 import { generateResponse } from './claude';
+import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logger } from './logger';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
@@ -14,6 +15,7 @@ Rules:
 - Extract focus areas if the user mentions specific subtopics
 - If the tweet contains a URL, extract it as sourceUrl
 - Strip @sottofm mention and any Twitter handles from the topic
+${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with ONLY valid JSON matching this shape:
 {
@@ -92,6 +94,7 @@ Rules:
 - If debate: tone should be "socratic"; if informational: infer from style
 - Focus areas should include key subtopics discussed across the thread
 - Strip @sottofm and other handles from the topic
+${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with ONLY valid JSON matching this shape:
 {

@@ -241,3 +241,80 @@
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
 }
+
+/* Moderation Actions */
+
+.actionsCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.moderationButtons {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.modBtn {
+  padding: 2px var(--spacing-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.modBtn:hover:not(:disabled) {
+  border-color: var(--color-text-secondary);
+  color: var(--color-text-primary);
+}
+
+.modBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modBtnWarn {
+  color: #d97706;
+  border-color: #d97706;
+}
+
+.modBtnWarn:hover:not(:disabled) {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #b45309;
+}
+
+.modBtnDanger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.modBtnDanger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 1px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.statusBanned {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.statusSuspended {
+  background: #fffbeb;
+  color: #d97706;
+}

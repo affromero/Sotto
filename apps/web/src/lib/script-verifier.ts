@@ -171,6 +171,7 @@ Analyze every factual claim. Return JSON only.`;
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
     tools: [WEB_SEARCH_TOOL],
+    skipModeration: true,
   });
 
   let parsed: {

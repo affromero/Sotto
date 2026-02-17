@@ -5,6 +5,7 @@ import { getFreeTierConfig } from './free-tier-config';
 import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
 import { WEB_SEARCH_TOOL } from './claude';
+import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logger } from './logger';
 
 function hashQuestion(text: string): string {
@@ -326,8 +327,11 @@ Your job is to COMBINE these interests in unexpected, creative ways. Examples:
 Also explore topics ADJACENT to their interests — things they haven't explicitly said but would likely enjoy based on their taste profile.`
     : `The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Aim for surprise and delight — topics that make someone think "I never knew I wanted to learn about that."`;
 
-  const topicContext = topic
-    ? `\n\nIMPORTANT: The user is specifically interested in "${topic}" right now. ALL questions must relate to this topic area. Still be creative and specific — don't just ask generic questions about "${topic}".`
+  // Strip quotes and newlines from user-supplied topic to prevent prompt injection
+  const safeTopic = topic?.replace(/["\n\r]/g, ' ').trim();
+
+  const topicContext = safeTopic
+    ? `\n\nIMPORTANT: The user is specifically interested in "${safeTopic}" right now. ALL questions must relate to this topic area. Still be creative and specific — don't just ask generic questions about "${safeTopic}".`
     : '';
 
   const requestCount = count + 5;
@@ -347,6 +351,7 @@ Rules:
 
 Taxonomy (parent: [children]):
 ${ctx.taxonomyLines.join('\n')}
+${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with a JSON array only, no markdown. Each item:
 {"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
@@ -438,14 +443,17 @@ export async function generateNewsQuestions(
     ? `\n\nIMPORTANT: The following topics are already shown in a different tab. Do NOT generate questions about similar subjects:\n${excludeTopics.map((t) => `- ${t}`).join('\n')}`
     : '';
 
-  const topicFocus = topic
-    ? `\n\nThe user wants news about "${topic}". Prioritize questions related to this area. If there are no recent news stories specifically about "${topic}", broaden to closely related fields, recent developments in the broader domain, or historically significant events in "${topic}" that remain relevant.`
+  // Strip quotes and newlines from user-supplied topic
+  const safeNewsTopic = topic?.replace(/["\n\r]/g, ' ').trim();
+
+  const topicFocus = safeNewsTopic
+    ? `\n\nThe user wants news about "${safeNewsTopic}". Prioritize questions related to this area. If there are no recent news stories specifically about "${safeNewsTopic}", broaden to closely related fields, recent developments in the broader domain, or historically significant events in "${safeNewsTopic}" that remain relevant.`
     : '';
 
   const requestCount = count + 5;
 
-  const diversityNote = topic
-    ? `Focus questions on "${topic}" and closely related areas`
+  const diversityNote = safeNewsTopic
+    ? `Focus questions on "${safeNewsTopic}" and closely related areas`
     : 'Cover diverse topics: science, politics, tech, business, culture, sports';
 
   const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
@@ -463,6 +471,7 @@ Rules:
 
 Taxonomy (parent: [children]):
 ${ctx.taxonomyLines.join('\n')}
+${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with a JSON array only, no markdown. Each item:
 {"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
