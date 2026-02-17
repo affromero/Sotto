@@ -103,6 +103,38 @@ export const cache = {
 };
 
 /**
+ * Redis-based semaphore for limiting concurrent operations per key.
+ * Each slot is a Redis key with a TTL; acquiring increments a counter,
+ * releasing decrements it. TTL acts as a safety net for leaked slots.
+ */
+export const semaphore = {
+  async acquire(
+    key: string,
+    maxSlots: number,
+    ttlSeconds: number = 120
+  ): Promise<boolean> {
+    const client = getRedisClient();
+    const count = await client.incr(key);
+    if (count === 1) {
+      await client.expire(key, ttlSeconds);
+    }
+    if (count > maxSlots) {
+      await client.decr(key);
+      return false;
+    }
+    return true;
+  },
+
+  async release(key: string): Promise<void> {
+    const client = getRedisClient();
+    const count = await client.decr(key);
+    if (count <= 0) {
+      await client.del(key);
+    }
+  },
+};
+
+/**
  * Rate limiting with sliding window
  */
 export async function checkRateLimit(

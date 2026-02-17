@@ -223,6 +223,57 @@ export async function getVoices(): Promise<
 }
 
 // ---------------------------------------------------------------------------
+// Subscription Concurrency
+// ---------------------------------------------------------------------------
+
+const TIER_CONCURRENCY: Record<string, number> = {
+  free: 2,
+  starter: 3,
+  creator: 5,
+  pro: 10,
+  scale: 15,
+  business: 15,
+};
+
+/**
+ * Query the ElevenLabs subscription tier and return the concurrent request limit.
+ * Caches the result in Redis for 5 minutes so plan upgrades are picked up quickly.
+ */
+export async function getElevenLabsConcurrencyLimit(apiKey: string): Promise<number> {
+  const { cache } = await import('./redis');
+  const crypto = await import('crypto');
+  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const cacheKey = `elevenlabs:concurrency:${keyHash}`;
+
+  const cached = await cache.get<number>(cacheKey);
+  if (cached !== null) return cached;
+
+  try {
+    const response = await fetch(`${ELEVENLABS_BASE_URL}/user/subscription`, {
+      headers: { 'xi-api-key': apiKey },
+    });
+
+    if (!response.ok) {
+      logger.warn('Failed to fetch ElevenLabs subscription', { status: response.status });
+      return 2;
+    }
+
+    const data = await response.json();
+    const tier = (data.tier || 'free').toLowerCase();
+    const limit = TIER_CONCURRENCY[tier] ?? 2;
+
+    await cache.set(cacheKey, limit, 300);
+    logger.info('ElevenLabs subscription concurrency resolved', { tier, limit });
+    return limit;
+  } catch (error) {
+    logger.warn('ElevenLabs subscription lookup failed, using default', {
+      error: error instanceof Error ? error.message : 'Unknown',
+    });
+    return 2;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Cost Tracking
 // ---------------------------------------------------------------------------
 

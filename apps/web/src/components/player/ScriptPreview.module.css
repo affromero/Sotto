@@ -1,0 +1,109 @@
+/* Script Preview — same visual language as Teleprompter, but scrollable with all turns visible */
+
+.root {
+  background: #1A1A1A;
+  border-radius: var(--radius-2xl);
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.viewport {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-2xl) var(--spacing-xl);
+  gap: var(--spacing-lg);
+}
+
+.turn {
+  width: 100%;
+  max-width: 720px;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-radius: var(--radius-xl);
+  border-left: 4px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.turnHost {
+  border-left-color: var(--color-speaker-host);
+}
+
+.turnExpert {
+  border-left-color: var(--color-speaker-expert);
+}
+
+.speaker {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.speakerHost {
+  color: var(--color-speaker-host);
+  background: rgba(217, 119, 6, 0.2);
+}
+
+.speakerExpert {
+  color: #93C5FD;
+  background: rgba(30, 58, 95, 0.4);
+}
+
+.text {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xl);
+  font-weight: 400;
+  color: #F5F5F5;
+  line-height: 1.7;
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .viewport {
+    padding: var(--spacing-3xl) var(--spacing-2xl);
+  }
+
+  .text {
+    font-size: var(--font-size-2xl);
+  }
+}
+
+@media (max-width: 768px) {
+  .root {
+    border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+    max-height: 50vh;
+  }
+
+  .viewport {
+    padding: var(--spacing-lg) var(--spacing-md);
+  }
+
+  .turn {
+    padding: var(--spacing-md) var(--spacing-lg);
+    max-width: 100%;
+  }
+
+  .text {
+    font-size: var(--font-size-lg);
+  }
+}
+
+@media (max-width: 374px) {
+  .viewport {
+    padding: var(--spacing-md) var(--spacing-sm);
+  }
+
+  .turn {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+
+  .text {
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+  }
+}
