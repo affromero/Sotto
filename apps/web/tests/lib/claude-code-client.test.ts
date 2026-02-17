@@ -288,7 +288,12 @@ describe('claude-code-client', () => {
       const gen = streamClaudeCode('System', 'Prompt');
 
       setTimeout(() => {
-        proc._stdout.write(JSON.stringify({ type: 'assistant', message: 'Hi there' }) + '\n');
+        proc._stdout.write(
+          JSON.stringify({
+            type: 'assistant',
+            message: { content: [{ type: 'text', text: 'Hi there' }] },
+          }) + '\n'
+        );
         proc._stdout.end();
       }, 0);
 

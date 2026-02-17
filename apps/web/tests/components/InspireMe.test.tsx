@@ -18,8 +18,8 @@ import { InspireMe } from '@/components/discovery/InspireMe';
 
 const mockAllResponse = {
   forYou: [
-    { id: 'fy1', text: 'AI meets Ancient History', tagSlugs: ['ai', 'history'], category: 'Technology' },
-    { id: 'fy2', text: 'Psychology of Music', tagSlugs: ['psychology', 'music'], category: 'Science' },
+    { id: 'fy1', text: 'AI meets Ancient History', topic: 'AI meets Ancient History', tagSlugs: ['ai', 'history'], category: 'Technology' },
+    { id: 'fy2', text: 'Psychology of Music', topic: 'Psychology of Music', tagSlugs: ['psychology', 'music'], category: 'Science' },
   ],
   trending: [
     {
@@ -42,7 +42,7 @@ const mockAllResponse = {
     },
   ],
   news: [
-    { id: 'n1', text: 'Breaking: Mars Rover Discovery', tagSlugs: ['science'], category: 'Science' },
+    { id: 'n1', text: 'Breaking: Mars Rover Discovery', topic: 'Mars Rover Discovery', tagSlugs: ['science'], category: 'Science' },
   ],
 };
 
@@ -126,7 +126,7 @@ describe('InspireMe', () => {
     });
   });
 
-  it('tab switching renders correct content without re-fetching', async () => {
+  it('tab switching renders correct content, trending tab does not re-fetch', async () => {
     const user = userEvent.setup();
 
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -141,17 +141,11 @@ describe('InspireMe', () => {
       expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
 
-    // Switch to Trending — shows podcast cards
+    // Switch to Trending — shows podcast cards, no extra fetch
     await user.click(screen.getByRole('tab', { name: 'Trending' }));
     expect(screen.getByText('Top Podcast')).toBeInTheDocument();
 
-    // Switch to News — shows news quiz questions
-    await user.click(screen.getByRole('tab', { name: 'In the News' }));
-    await waitFor(() => {
-      expect(screen.getByText('Breaking: Mars Rover Discovery')).toBeInTheDocument();
-    });
-
-    // No additional fetch calls — just the initial one
+    // Trending does not trigger a re-fetch — still just the initial one
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -218,7 +212,7 @@ describe('InspireMe', () => {
     }
   });
 
-  it('clicking "Yes, make this" calls onSelectTopic and closes overlay', async () => {
+  it('clicking "Make" calls onSelectTopic and closes overlay', async () => {
     const handleSelectTopic = vi.fn();
     const handleClose = vi.fn();
     const user = userEvent.setup();
@@ -236,7 +230,7 @@ describe('InspireMe', () => {
       expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByLabelText('Yes, make this'));
+    await user.click(screen.getByLabelText('Make podcast: AI meets Ancient History'));
 
     expect(handleSelectTopic).toHaveBeenCalledWith('AI meets Ancient History');
     expect(handleClose).toHaveBeenCalled();

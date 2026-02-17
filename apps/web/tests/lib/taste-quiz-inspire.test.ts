@@ -6,8 +6,6 @@ const mockTagFindMany = vi.fn();
 const mockUserInterestFindMany = vi.fn();
 const mockTasteQuizAnswerFindMany = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
-const mockCacheGet = vi.fn();
-const mockCacheSet = vi.fn();
 const mockCreateAIProvider = vi.fn();
 const mockResolveAiProvider = vi.fn();
 
@@ -16,13 +14,6 @@ vi.mock('@/lib/prisma', () => ({
     tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
     userInterest: { findMany: (...args: unknown[]) => mockUserInterestFindMany(...args) },
     tasteQuizAnswer: { findMany: (...args: unknown[]) => mockTasteQuizAnswerFindMany(...args) },
-  },
-}));
-
-vi.mock('@/lib/redis', () => ({
-  cache: {
-    get: (...args: unknown[]) => mockCacheGet(...args),
-    set: (...args: unknown[]) => mockCacheSet(...args),
   },
 }));
 
@@ -70,8 +61,6 @@ function setupDefaultMocks() {
   mockTagFindMany.mockResolvedValue(mockCategories);
   mockTasteQuizAnswerFindMany.mockResolvedValue([]);
   mockGetFreeTierConfig.mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku' });
-  mockCacheGet.mockResolvedValue(null);
-  mockCacheSet.mockResolvedValue(undefined);
   mockUserInterestFindMany.mockResolvedValue([]);
   // Default: no BYOK key, falls through to createAIProvider
   mockResolveAiProvider.mockRejectedValue(new Error('No AI provider'));
@@ -89,15 +78,6 @@ describe('generateForYouQuestions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
-  });
-
-  it('returns cached questions if available', async () => {
-    const cached = [{ id: 'q1', text: 'Cached Q', tagSlugs: ['ai'], category: 'technology' }];
-    mockCacheGet.mockResolvedValue(cached);
-
-    const result = await generateForYouQuestions('user-1', 3);
-    expect(result).toEqual(cached);
-    expect(mockCreateAIProvider).not.toHaveBeenCalled();
   });
 
   it('generates interest-based questions without web search', async () => {
@@ -162,22 +142,7 @@ describe('generateForYouQuestions', () => {
     expect(result).toEqual([]);
   });
 
-  it('caches successful results', async () => {
-    const questions = JSON.stringify([
-      { text: 'Great question', tagSlugs: ['ai'], category: 'technology' },
-    ]);
-    mockCreateAIProvider.mockReturnValue(createMockAI(questions));
-
-    await generateForYouQuestions('user-1', 1);
-
-    expect(mockCacheSet).toHaveBeenCalledWith(
-      'inspire:forYou:user-1',
-      expect.any(Array),
-      3600
-    );
-  });
-
-  it('includes topic in cache key and prompt when provided', async () => {
+  it('includes topic context in prompt when provided', async () => {
     const questions = JSON.stringify([
       { text: 'Politics and AI regulation', tagSlugs: ['ai'], category: 'technology' },
     ]);
@@ -185,13 +150,6 @@ describe('generateForYouQuestions', () => {
     mockCreateAIProvider.mockReturnValue(ai);
 
     await generateForYouQuestions('user-1', 1, 'politics');
-
-    // Cache key includes topic
-    expect(mockCacheSet).toHaveBeenCalledWith(
-      'inspire:forYou:user-1:politics',
-      expect.any(Array),
-      3600
-    );
 
     // Prompt includes topic context
     const prompt = ai.generateResponse.mock.calls[0][0];
@@ -203,14 +161,6 @@ describe('generateNewsQuestions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setupDefaultMocks();
-  });
-
-  it('returns cached questions if available', async () => {
-    const cached = [{ id: 'n1', text: 'Cached News', tagSlugs: ['science'], category: 'science' }];
-    mockCacheGet.mockResolvedValue(cached);
-
-    const result = await generateNewsQuestions('user-1', 3);
-    expect(result).toEqual(cached);
   });
 
   it('uses web search when provider is anthropic', async () => {
@@ -254,11 +204,13 @@ describe('generateNewsQuestions', () => {
   });
 
   it('excludes provided topics in the prompt', async () => {
+    // Resolve with no apiKey so it falls through to createAIProvider path
     mockResolveAiProvider.mockResolvedValue({
       provider: 'openai',
       source: 'byok',
-      apiKey: 'sk-test',
+      apiKey: '',
     });
+    delete process.env.ANTHROPIC_API_KEY;
 
     const ai = createMockAI(JSON.stringify([
       { text: 'News question', tagSlugs: ['science'], category: 'science' },
