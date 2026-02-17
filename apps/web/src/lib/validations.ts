@@ -372,6 +372,17 @@ export const tasteQuizAnswerSchema = z.object({
 });
 
 /**
+ * Podcast rating validation
+ */
+export const podcastRatingSchema = z.object({
+  voiceNaturalness: z.number().int().min(1).max(5),
+  contentAccuracy: z.number().int().min(1).max(5),
+  conversationFlow: z.number().int().min(1).max(5),
+  overallSatisfaction: z.number().int().min(1).max(5),
+  comment: z.string().max(2000).optional(),
+});
+
+/**
  * Twitter config update validation (admin)
  */
 export const twitterConfigUpdateSchema = z.object({

@@ -1,0 +1,79 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { podcastRatingSchema } from '@/lib/validations';
+
+interface RouteContext {
+  params: Promise<{ podcastId: string }>;
+}
+
+/**
+ * GET /api/podcasts/[podcastId]/rating — Get current user's rating for this podcast
+ */
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { podcastId } = await context.params;
+
+  const rating = await prisma.podcastRating.findUnique({
+    where: {
+      userId_podcastId: {
+        userId: session.user.id,
+        podcastId,
+      },
+    },
+  });
+
+  return NextResponse.json({ rating });
+}
+
+/**
+ * POST /api/podcasts/[podcastId]/rating — Submit or update rating (creator-only)
+ */
+export async function POST(request: NextRequest, context: RouteContext) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { podcastId } = await context.params;
+
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+
+  if (!podcast) {
+    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+  }
+
+  if (podcast.userId !== session.user.id) {
+    return NextResponse.json({ error: 'Only the podcast creator can rate it' }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const parsed = podcastRatingSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid rating data', details: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const rating = await prisma.podcastRating.upsert({
+    where: {
+      userId_podcastId: {
+        userId: session.user.id,
+        podcastId,
+      },
+    },
+    create: {
+      userId: session.user.id,
+      podcastId,
+      ...parsed.data,
+    },
+    update: parsed.data,
+  });
+
+  return NextResponse.json({ rating });
+}
