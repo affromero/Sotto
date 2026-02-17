@@ -88,6 +88,11 @@ body {
   --color-info-light: #DBEAFE;
   --color-info-lighter: #EFF6FF;
 
+  --color-teal: #0d9488;
+  --color-teal-hover: #14b8a6;
+  --color-teal-light: rgba(13, 148, 136, 0.08);
+  --color-teal-subtle: rgba(13, 148, 136, 0.04);
+
   /* Typography - Fonts */
   --font-heading: 'DM Serif Display', Georgia, 'Times New Roman', serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -174,6 +179,80 @@ body {
   --topbar-height: 64px;
   --mini-player-height: 72px;
   --max-content-width: 1200px;
+}
+
+/* ============================================ */
+/* DARK THEME: "Cozy Evening Reading"            */
+/* ============================================ */
+
+[data-theme='dark'] {
+  /* Background & Surface — warm dark, not pure black */
+  --color-background: #1A1917;
+  --color-surface: #262420;
+  --color-surface-hover: #302D28;
+  --color-surface-elevated: #2E2B26;
+  --color-border: #3A3733;
+  --color-border-hover: #4A4742;
+
+  /* Text */
+  --color-text-primary: #F0EDE8;
+  --color-text-secondary: #A09B93;
+  --color-text-tertiary: #6B6660;
+  --color-text-inverse: #1A1917;
+  --color-muted: #A09B93;
+
+  /* Primary — brighten amber for dark backgrounds */
+  --color-primary: #E8890F;
+  --color-primary-hover: #F09A2A;
+  --color-primary-active: #D97706;
+  --color-primary-light: #3D2E14;
+  --color-primary-lighter: #2D2418;
+  --color-primary-subtle: rgba(232, 137, 15, 0.12);
+
+  /* Accent — lighten navy (invisible on dark otherwise) */
+  --color-accent: #5B8ABD;
+  --color-accent-hover: #7BA3CF;
+  --color-accent-light: #1E2D3F;
+  --color-accent-lighter: #1A2535;
+  --color-accent-subtle: rgba(91, 138, 189, 0.12);
+
+  /* Speaker */
+  --color-speaker-host: #E8890F;
+  --color-speaker-host-bg: #3D2E14;
+  --color-speaker-expert: #5B8ABD;
+  --color-speaker-expert-bg: #1E2D3F;
+
+  /* Semantic — lighter base colors for dark bg readability */
+  --color-success: #34D399;
+  --color-success-hover: #10B981;
+  --color-success-light: #1A2E25;
+  --color-success-lighter: #162822;
+  --color-warning: #FBBF24;
+  --color-warning-hover: #F59E0B;
+  --color-warning-light: #3D3014;
+  --color-warning-lighter: #2D2518;
+  --color-error: #F87171;
+  --color-error-hover: #EF4444;
+  --color-error-light: #3D1A1A;
+  --color-error-lighter: #2D1818;
+  --color-info: #60A5FA;
+  --color-info-hover: #3B82F6;
+  --color-info-light: #1A2540;
+  --color-info-lighter: #182035;
+
+  --color-teal: #2DD4BF;
+  --color-teal-hover: #5EEAD4;
+  --color-teal-light: rgba(45, 212, 191, 0.12);
+  --color-teal-subtle: rgba(45, 212, 191, 0.06);
+
+  /* Shadows — stronger for dark backgrounds */
+  --shadow-xs: 0 1px 1px 0 rgba(0, 0, 0, 0.15);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-player: 0 -4px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* ============================================ */

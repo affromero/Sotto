@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, Inter } from 'next/font/google';
 import { SessionProvider } from '@/components/providers/SessionProvider';
+import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { EventProvider } from '@/components/providers/EventProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
+import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import '@/styles/globals.css';
 
 const dmSerifDisplay = DM_Serif_Display({
@@ -47,16 +49,19 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`}>
+    <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`} suppressHydrationWarning>
+      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       <body>
         <SessionProvider>
-          <EventProvider>
-            <AudioPlayerProvider>
-              <PageViewTracker />
-              {children}
-              <GlobalMiniPlayer />
-            </AudioPlayerProvider>
-          </EventProvider>
+          <ThemeProvider>
+            <EventProvider>
+              <AudioPlayerProvider>
+                <PageViewTracker />
+                {children}
+                <GlobalMiniPlayer />
+              </AudioPlayerProvider>
+            </EventProvider>
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>

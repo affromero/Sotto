@@ -40,9 +40,9 @@
 
 .card:hover {
   border-color: var(--color-primary);
-  background: #fffdf7;
+  background: var(--color-primary-lighter);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.08);
+  box-shadow: 0 2px 8px var(--color-primary-subtle);
 }
 
 .card:active {
@@ -51,16 +51,16 @@
 
 .cardExpanded {
   border-color: var(--color-primary);
-  background: #fffbeb;
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.12);
+  background: var(--color-primary-lighter);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
 
 .cardExpanded:hover {
-  background: #fff8e0;
+  background: var(--color-primary-light);
 }
 
 .cardHasSelections {
-  border-color: rgba(217, 119, 6, 0.4);
+  border-color: var(--color-primary);
 }
 
 /* ---- Icon ---- */
@@ -152,8 +152,8 @@
   border: 1.5px solid var(--color-primary);
   border-radius: var(--radius-xl);
   box-shadow:
-    0 4px 16px rgba(217, 119, 6, 0.08),
-    0 0 0 1px rgba(217, 119, 6, 0.06);
+    0 4px 16px var(--color-primary-subtle),
+    0 0 0 1px var(--color-primary-subtle);
   animation: panelSlideIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
@@ -201,7 +201,7 @@
 }
 
 .bulkAction:hover {
-  background: rgba(217, 119, 6, 0.08);
+  background: var(--color-primary-subtle);
 }
 
 /* ---- Sub-interest chips ---- */
@@ -236,7 +236,7 @@
 
 .chip:hover {
   border-color: var(--color-primary);
-  background: #fffdf7;
+  background: var(--color-primary-lighter);
   transform: translateY(-1px);
 }
 
@@ -246,14 +246,14 @@
 
 .chipSelected {
   border-color: var(--color-primary);
-  background: #fffbeb;
+  background: var(--color-primary-lighter);
   color: var(--color-primary);
-  box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.15);
+  box-shadow: 0 0 0 1px var(--color-primary-subtle);
   font-weight: 600;
 }
 
 .chipSelected:hover {
-  background: #fff8e0;
+  background: var(--color-primary-light);
 }
 
 .chipCheck {
@@ -307,7 +307,7 @@
 
 .otherField:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.12);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
 
 .otherField:disabled {
@@ -334,7 +334,7 @@
 
 .otherAdd:hover:not(:disabled) {
   border-color: var(--color-primary);
-  background: #fffbeb;
+  background: var(--color-primary-lighter);
   transform: scale(1.05);
 }
 
