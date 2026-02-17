@@ -36,7 +36,7 @@ jobs:
         run: echo "${{ secrets.ASC_API_KEY_P8 }}" > /tmp/asc-api-key.p8
 
       - name: Submit to TestFlight
-        run: eas submit --platform ios --latest --non-interactive
+        run: eas submit --platform ios --latest --non-interactive --no-wait
         working-directory: apps/mobile
         env:
           ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
