@@ -16,6 +16,7 @@ const mockPrismaAccountDeleteMany = vi.fn();
 const mockPrismaTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),

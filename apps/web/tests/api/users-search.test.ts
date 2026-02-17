@@ -9,6 +9,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     user: {
       findMany: (...args: unknown[]) => mockUserFindMany(...args),

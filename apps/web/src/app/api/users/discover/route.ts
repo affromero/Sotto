@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         handle: true,
         image: true,
         bio: true,
-        _count: { select: { followers: true, podcasts: true } },
+        _count: { select: { followers: true, podcasts: { where: { deletedAt: null } } } },
         interests: {
           select: { tag: { select: { name: true } } },
           take: 5,

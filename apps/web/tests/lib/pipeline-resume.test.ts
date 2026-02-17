@@ -11,6 +11,7 @@ const mockReferenceFindMany = vi.fn();
 const mockSegmentFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),

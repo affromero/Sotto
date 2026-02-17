@@ -15,6 +15,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     voiceClone: {
       findUnique: (...args: unknown[]) => mockVoiceCloneFindUnique(...args),

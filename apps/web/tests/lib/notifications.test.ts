@@ -9,6 +9,7 @@ import {
 import { prisma } from '@/lib/prisma';
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     notification: {
       create: vi.fn(),

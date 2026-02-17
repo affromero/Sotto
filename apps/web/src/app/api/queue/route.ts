@@ -25,7 +25,7 @@ export async function GET() {
   }
 
   const queue = await prisma.listeningQueue.findMany({
-    where: { userId: session.user.id },
+    where: { userId: session.user.id, podcast: { deletedAt: null } },
     orderBy: { position: 'asc' },
     include: {
       podcast: {

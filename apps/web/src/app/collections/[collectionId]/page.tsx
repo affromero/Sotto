@@ -36,6 +36,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
         select: { id: true, name: true, handle: true, image: true },
       },
       items: {
+        where: { podcast: { deletedAt: null } },
         orderBy: { order: 'asc' },
         include: {
           podcast: {

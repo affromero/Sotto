@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getProviders } from '@/lib/providers';
 import type { DataExportPayload } from '@/lib/queue';

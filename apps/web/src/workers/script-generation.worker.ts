@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, type SourceMetadata } from '@/lib/script-generator';
 import { logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';

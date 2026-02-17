@@ -8,6 +8,7 @@ const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaPodcastCreate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),

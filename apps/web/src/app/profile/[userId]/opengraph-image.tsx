@@ -15,7 +15,7 @@ export default async function OgImage({ params }: { params: { userId: string } }
       bio: true,
       _count: {
         select: {
-          podcasts: { where: { status: 'READY', visibility: 'PUBLIC' } },
+          podcasts: { where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null } },
           followers: true,
         },
       },

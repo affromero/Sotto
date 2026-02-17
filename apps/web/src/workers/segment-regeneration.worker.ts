@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { RegenerateSegmentPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveTtsProvider } from '@/lib/providers';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';

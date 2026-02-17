@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { ReplyTwitterPayload } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { replyToTweet } from '@/lib/twitter';
 import { logger } from '@/lib/logger';
 

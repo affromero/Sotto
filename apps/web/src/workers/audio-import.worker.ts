@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { ImportAudioPayload, notificationQueue, addJob, JobType } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
 import { logger } from '@/lib/logger';

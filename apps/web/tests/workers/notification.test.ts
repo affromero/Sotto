@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockPrismaNotificationCreate = vi.fn().mockResolvedValue({ id: 'notif-001' });
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     notification: {
       create: (...args: unknown[]) => mockPrismaNotificationCreate(...args),

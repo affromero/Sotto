@@ -8,6 +8,7 @@ const mockAiKeyFindMany = vi.fn().mockResolvedValue([]);
 const mockAiKeyUpdate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     userTtsKey: {
       findMany: (...args: unknown[]) => mockTtsKeyFindMany(...args),

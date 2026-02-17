@@ -14,6 +14,7 @@ const mockPrismaFollowCreate = vi.fn();
 const mockPrismaFollowDelete = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),

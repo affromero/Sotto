@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { ReplyTelegramPayload } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { sendMessage } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 

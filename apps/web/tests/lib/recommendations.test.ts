@@ -3,6 +3,7 @@ import { findSimilarPodcasts } from '@/lib/recommendations';
 import { prisma } from '@/lib/prisma';
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findMany: vi.fn(),

@@ -20,6 +20,7 @@ const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     reference: {
       findMany: (...args: unknown[]) => mockPrismaReferenceFindMany(...args),

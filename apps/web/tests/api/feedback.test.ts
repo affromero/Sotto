@@ -6,6 +6,7 @@ const mockFeedbackCreate = vi.fn();
 const mockFeedbackFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     feedback: {
       create: (...args: unknown[]) => mockFeedbackCreate(...args),

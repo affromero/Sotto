@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest) {
       name: true,
       slug: true,
       _count: {
-        select: { podcasts: true },
+        select: { podcasts: { where: { podcast: { deletedAt: null } } } },
       },
     },
     orderBy: {
