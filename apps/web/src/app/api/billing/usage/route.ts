@@ -36,7 +36,7 @@ export async function GET(_request: NextRequest) {
         maxDurationMinutes: freeTier.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES,
         maxVoiceClones: LIMITS.maxVoiceClones,
         canDownload: LIMITS.canDownload,
-        canMakePrivate: LIMITS.canMakePrivate,
+        canMakePrivate: freeTier.isByokUser,
         canExportPdf: LIMITS.canExportPdf,
         hasPremiumSfx: LIMITS.hasPremiumSfx,
       },

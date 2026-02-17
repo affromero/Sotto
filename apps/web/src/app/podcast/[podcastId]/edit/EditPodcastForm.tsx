@@ -11,6 +11,7 @@ interface EditPodcastFormProps {
   initialTitle: string;
   initialTopic: string;
   initialVisibility: string;
+  canMakePrivate?: boolean;
 }
 
 export function EditPodcastForm({
@@ -18,6 +19,7 @@ export function EditPodcastForm({
   initialTitle,
   initialTopic,
   initialVisibility,
+  canMakePrivate,
 }: EditPodcastFormProps) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -40,7 +42,10 @@ export function EditPodcastForm({
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.error?.fieldErrors ? 'Please check the form fields.' : 'Failed to save changes.');
+        const message = typeof data.error === 'string' ? data.error
+          : data.error?.fieldErrors ? 'Please check the form fields.'
+          : 'Failed to save changes.';
+        setError(message);
         return;
       }
 
@@ -89,7 +94,7 @@ export function EditPodcastForm({
         >
           <option value="PUBLIC">Public</option>
           <option value="UNLISTED">Unlisted</option>
-          <option value="PRIVATE">Private</option>
+          {canMakePrivate !== false && <option value="PRIVATE">Private</option>}
         </select>
       </div>
 
