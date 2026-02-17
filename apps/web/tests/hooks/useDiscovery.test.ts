@@ -229,7 +229,7 @@ describe('useDiscovery', () => {
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: 'Update', podcastId: 'podcast-123' }),
+          body: JSON.stringify({ content: 'Update', history: [], podcastId: 'podcast-123' }),
         })
       );
     });
