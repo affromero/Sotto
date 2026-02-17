@@ -92,8 +92,8 @@ export default function NotificationsScreen() {
   } = useQuery<NotificationData[]>({
     queryKey: ['notifications'],
     queryFn: async () => {
-      const response = await api.get<NotificationData[]>('/notifications');
-      return response.data;
+      const response = await api.get<{ notifications: NotificationData[] }>('/notifications');
+      return response.data.notifications;
     },
   });
 

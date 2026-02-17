@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
-export async function POST(_request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function POST(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const result = await prisma.notification.updateMany({
     where: {
-      userId: session.user.id,
+      userId: authed.userId,
       read: false,
     },
     data: { read: true },

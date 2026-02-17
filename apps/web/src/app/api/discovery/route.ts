@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { streamDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
@@ -8,8 +8,8 @@ import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
   }
 
   // Resolve user's AI key for BYOK passthrough
-  const aiKey = await getAiKey(session.user.id);
+  const aiKey = await getAiKey(authed.userId);
 
   // Inline URL extraction: detect URLs in the latest message and inject context
   const detectedUrls = detectUrls(userMessage);
   if (detectedUrls.length > 0) {
-    const { allowed } = await checkRateLimit(`url-extract:${session.user.id}`, 10, 60);
+    const { allowed } = await checkRateLimit(`url-extract:${authed.userId}`, 10, 60);
     if (allowed) {
       try {
         const extracted = await extractContent(detectedUrls[0]);
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 
         if (isAuthError && aiKey) {
           await prisma.userAiKey.updateMany({
-            where: { userId: session.user.id, provider: aiKey.provider },
+            where: { userId: authed.userId, provider: aiKey.provider },
             data: { isValid: false },
           });
         }

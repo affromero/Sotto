@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/redis';
 import { generateQuestions } from '@/lib/taste-quiz';
@@ -11,12 +11,12 @@ import { tasteQuizQuerySchema, tasteQuizAnswerSchema } from '@/lib/validations';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = authed.userId;
 
     // Rate limit: 10 requests/hour (each triggers LLM generation)
     const rateLimit = await checkRateLimit(`taste-quiz:${userId}`, 10, 3600);
@@ -49,12 +49,12 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = authed.userId;
     const body = await request.json();
     const validation = tasteQuizAnswerSchema.safeParse(body);
     if (!validation.success) {
@@ -130,14 +130,14 @@ export async function POST(request: NextRequest) {
  * DELETE /api/taste-quiz
  * Reset all taste quiz data for the user.
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authed = await authenticateRequest(request);
+    if (!authed) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const userId = authed.userId;
 
     await prisma.$transaction([
       prisma.tasteQuizAnswer.deleteMany({ where: { userId } }),

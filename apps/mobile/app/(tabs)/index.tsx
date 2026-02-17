@@ -53,7 +53,7 @@ export default function FeedScreen() {
       lastPage.hasMore ? lastPage.page + 1 : undefined,
   });
 
-  const podcasts = data?.pages.flatMap((page) => page.podcasts) ?? [];
+  const podcasts = data?.pages.flatMap((page) => page.podcasts ?? []).filter(Boolean) ?? [];
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
