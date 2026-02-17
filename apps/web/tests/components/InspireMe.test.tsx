@@ -46,6 +46,52 @@ const mockAllResponse = {
   ],
 };
 
+/**
+ * Create a mock fetch response that mimics the JSON path (all-cached).
+ * The component checks content-type to decide between JSON and SSE parsing.
+ */
+function createJsonResponse(data: unknown, opts?: { ok?: boolean; status?: number }) {
+  const ok = opts?.ok ?? true;
+  const status = opts?.status ?? 200;
+  return {
+    ok,
+    status,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: async () => data,
+    text: async () => JSON.stringify(data),
+    body: null,
+  };
+}
+
+/**
+ * Create a mock fetch response that mimics the SSE stream path.
+ */
+function createSseResponse(data: Record<string, unknown>) {
+  let sseBody = '';
+  if (data.trending !== undefined) sseBody += `data: ${JSON.stringify({ section: 'trending', data: data.trending })}\n\n`;
+  if (data.forYou !== undefined) sseBody += `data: ${JSON.stringify({ section: 'forYou', data: data.forYou })}\n\n`;
+  if (data.news !== undefined) sseBody += `data: ${JSON.stringify({ section: 'news', data: data.news })}\n\n`;
+  sseBody += `data: ${JSON.stringify({ done: true })}\n\n`;
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(sseBody));
+      controller.close();
+    },
+  });
+
+  return {
+    ok: true,
+    status: 200,
+    headers: new Headers({ 'content-type': 'text/event-stream' }),
+    json: async () => { throw new Error('Not JSON'); },
+    text: async () => sseBody,
+    body: stream,
+    getReader: () => stream.getReader(),
+  };
+}
+
 describe('InspireMe', () => {
   beforeEach(() => {
     global.fetch = vi.fn();
@@ -63,10 +109,9 @@ describe('InspireMe', () => {
   });
 
   it('renders dialog with proper ARIA attributes when open', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -75,10 +120,9 @@ describe('InspireMe', () => {
   });
 
   it('renders section tabs', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -88,18 +132,19 @@ describe('InspireMe', () => {
   });
 
   it('fetches all tabs with a single API call on open', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/inspire/all');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/inspire/all',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
 
-    // Only one call, not per-tab
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
@@ -113,11 +158,22 @@ describe('InspireMe', () => {
     expect(screen.getByText('Finding ideas for you...')).toBeInTheDocument();
   });
 
-  it('displays ForYou quiz questions once loaded', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
+  it('displays ForYou quiz questions once loaded (JSON path)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
+
+    render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
+  });
+
+  it('displays ForYou quiz questions once loaded (SSE path)', async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createSseResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -129,19 +185,16 @@ describe('InspireMe', () => {
   it('tab switching renders correct content, trending tab does not re-fetch', async () => {
     const user = userEvent.setup();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
-    // Wait for initial load
     await waitFor(() => {
       expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
 
-    // Switch to Trending — shows podcast cards, no extra fetch
     await user.click(screen.getByRole('tab', { name: 'Trending' }));
     expect(screen.getByText('Top Podcast')).toBeInTheDocument();
 
@@ -154,10 +207,9 @@ describe('InspireMe', () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(
       <InspireMe open={true} onClose={handleClose} onSelectTopic={handleSelectTopic} />
@@ -181,10 +233,9 @@ describe('InspireMe', () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={handleClose} onSelectTopic={vi.fn()} />);
 
@@ -196,10 +247,9 @@ describe('InspireMe', () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={handleClose} onSelectTopic={vi.fn()} />);
 
@@ -217,10 +267,9 @@ describe('InspireMe', () => {
     const handleClose = vi.fn();
     const user = userEvent.setup();
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(
       <InspireMe open={true} onClose={handleClose} onSelectTopic={handleSelectTopic} />
@@ -237,10 +286,9 @@ describe('InspireMe', () => {
   });
 
   it('shows generate button when no ForYou questions returned', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => ({ forYou: [], trending: [], news: [] }),
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse({ forYou: [], trending: [], news: [] })
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -250,11 +298,9 @@ describe('InspireMe', () => {
   });
 
   it('handles fetch error gracefully with retry button', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({ error: 'Server error' }),
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse({ error: 'Server error' }, { ok: false, status: 500 })
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -268,10 +314,9 @@ describe('InspireMe', () => {
   });
 
   it('renders topic input field', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
@@ -282,26 +327,29 @@ describe('InspireMe', () => {
 
   it('submitting a topic re-fetches with topic param', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
     global.fetch = fetchMock;
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
-    // Wait for initial fetch
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/inspire/all',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
 
     const input = screen.getByPlaceholderText(/Focus on/);
     await user.type(input, 'politics');
     await user.keyboard('{Enter}');
 
-    // Should re-fetch with topic param
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all?topic=politics');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/inspire/all?topic=politics',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
   });
 
@@ -316,19 +364,16 @@ describe('InspireMe', () => {
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
-    // Resolve initial fetch
-    resolveFirst({ ok: true, json: async () => mockAllResponse });
+    resolveFirst(createJsonResponse(mockAllResponse));
 
     await waitFor(() => {
       expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
 
-    // Type and submit topic
     const input = screen.getByPlaceholderText(/Focus on/);
     await user.type(input, 'AI');
     await user.keyboard('{Enter}');
 
-    // Should show topic-specific loading
     await waitFor(() => {
       expect(screen.getByText(/Finding ideas about "AI"/)).toBeInTheDocument();
     });
@@ -336,33 +381,35 @@ describe('InspireMe', () => {
 
   it('clearing topic re-fetches without topic param', async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => mockAllResponse,
-    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      createJsonResponse(mockAllResponse)
+    );
     global.fetch = fetchMock;
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/inspire/all',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
 
-    // Set a topic
     const input = screen.getByPlaceholderText(/Focus on/);
     await user.type(input, 'europe');
     await user.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/inspire/all?topic=europe');
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/inspire/all?topic=europe',
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
 
-    // Clear button should appear and clearing should re-fetch without topic
     const clearBtn = screen.getByLabelText('Clear topic filter');
     await user.click(clearBtn);
 
     await waitFor(() => {
-      // Should have called without topic again (3rd call)
       const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string);
       expect(calls.filter((url) => url === '/api/inspire/all').length).toBeGreaterThanOrEqual(2);
     });

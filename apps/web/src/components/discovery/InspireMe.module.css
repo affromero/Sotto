@@ -231,6 +231,37 @@
   border-radius: var(--radius-full);
 }
 
+/* Pulsing dot on tabs that are still loading (non-active tabs only) */
+.tabLoading::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  animation: tabPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes tabPulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabLoading::before {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
 /* Content */
 
 .content {
