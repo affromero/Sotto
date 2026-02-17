@@ -1,0 +1,41 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: none;
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+  line-height: 1;
+}
+
+.pill:hover {
+  filter: brightness(0.92);
+}
+
+.public {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.unlisted {
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}
+
+.private {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.disabled:hover {
+  filter: none;
+}

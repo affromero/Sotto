@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
+import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -302,6 +303,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className={styles.miniGradientBody}>
                       <p className={styles.miniGradientTopic}>{podcast.topic}</p>
+                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} />
                       <div className={styles.miniGradientMeta}>
                         <span>{formatDuration(podcast.duration)}</span>
                         <span>{formatDate(podcast.createdAt)}</span>
