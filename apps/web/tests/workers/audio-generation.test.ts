@@ -14,6 +14,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   hostVoiceId: null,
   expertVoiceId: null,
   ttsProvider: null,
+  ttsModel: null,
 });
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
@@ -121,6 +122,10 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/tts-text-cleaner', () => ({
+  cleanTextForTts: vi.fn((text: string) => text),
+}));
+
 // ---- Import under test ----
 import { processAudioGeneration } from '@/workers/audio-generation.worker';
 import type { GenerateAudioPayload } from '@/lib/queue';
@@ -147,6 +152,7 @@ function setupPremiumProvider() {
     provider: {
       generateSpeech: (...args: unknown[]) => mockPremiumGenerateSpeech(...args),
       getVoiceId: (...args: unknown[]) => mockProviderGetVoiceId(...args),
+      getModelId: () => 'eleven_v3',
       providerId: 'elevenlabs',
     },
     source: 'platform',
@@ -159,6 +165,7 @@ function setupStandardProvider() {
     provider: {
       generateSpeech: (...args: unknown[]) => mockStandardGenerateSpeech(...args),
       getVoiceId: (...args: unknown[]) => mockStandardGetVoiceId(...args),
+      getModelId: () => 'tts-1-hd',
       providerId: 'openai',
     },
     source: 'platform',
@@ -176,6 +183,7 @@ function setupByokProvider(providerId: 'elevenlabs' | 'openai' = 'elevenlabs') {
       getVoiceId: isElevenLabs
         ? (...args: unknown[]) => mockProviderGetVoiceId(...args)
         : (...args: unknown[]) => mockStandardGetVoiceId(...args),
+      getModelId: () => (isElevenLabs ? 'eleven_v3' : 'tts-1-hd'),
       providerId,
     },
     source: 'byok',
@@ -197,6 +205,7 @@ describe('processAudioGeneration', () => {
       hostVoiceId: null,
       expertVoiceId: null,
       ttsProvider: null,
+      ttsModel: null,
     });
     // Default: no pending segments (all done)
     mockPrismaSegmentCount.mockResolvedValue(0);
@@ -269,6 +278,7 @@ describe('processAudioGeneration', () => {
           hostVoiceId: true,
           expertVoiceId: true,
           ttsProvider: true,
+          ttsModel: true,
         },
       });
     });
@@ -302,6 +312,7 @@ describe('processAudioGeneration', () => {
         hostVoiceId: 'custom-host-voice',
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processAudioGeneration(job);
@@ -317,6 +328,7 @@ describe('processAudioGeneration', () => {
         hostVoiceId: null,
         expertVoiceId: 'custom-expert-voice',
         ttsProvider: null,
+        ttsModel: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processAudioGeneration(job);
@@ -360,6 +372,7 @@ describe('processAudioGeneration', () => {
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       setupStandardProvider();
     });
@@ -622,12 +635,13 @@ describe('processAudioGeneration', () => {
   describe('stitching queue (segments still pending)', () => {
     beforeEach(() => {
       mockPrismaSegmentCount.mockResolvedValue(3);
-      // Set ttsProvider so the write-back update is skipped
+      // Set ttsProvider + ttsModel so the write-back update is skipped
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
       });
     });
 
@@ -750,12 +764,13 @@ describe('processAudioGeneration', () => {
       mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('expert-audio'));
       mockUploadSegmentAudio.mockResolvedValue('https://r2.example.com/expert-audio.mp3');
       mockPrismaSegmentCount.mockResolvedValue(5);
-      // Set ttsProvider so the write-back update is skipped
+      // Set ttsProvider + ttsModel so the write-back update is skipped
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
       });
 
       const job = createMockJob({

@@ -92,11 +92,14 @@ export type { PodcastBadge } from './content-badge';
 export {
   AI_PROVIDER_DISPLAY,
   AI_MODEL_DISPLAY,
+  AI_MODEL_SHORT_DISPLAY,
   TTS_PROVIDER_DISPLAY,
+  TTS_MODEL_DISPLAY,
   LANGUAGE_DISPLAY,
   getAiProviderLabel,
   getAiModelLabel,
   getTtsProviderLabel,
+  getTtsModelLabel,
   getLanguageLabel,
 } from './provider-display';
 

@@ -39,6 +39,24 @@ export const AI_MODEL_DISPLAY: Record<string, string> = {
   'gpt-4o': 'GPT-4o',
 };
 
+/** Short model names without the provider prefix (for "Provider · Model" badges) */
+export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
+  'claude-haiku-4-5-20251001': 'Haiku 4.5',
+  'claude-sonnet-4-5-20250929': 'Sonnet 4.5',
+  'claude-opus-4-6': 'Opus 4.6',
+  'gpt-4o-mini': '4o Mini',
+  'gpt-4o': '4o',
+};
+
+export const TTS_MODEL_DISPLAY: Record<string, string> = {
+  eleven_v3: 'v3',
+  eleven_multilingual_v2: 'v2',
+  'tts-1-hd': 'HD',
+  'sonic-2': 'Sonic 2',
+  premium: 'Premium',
+  octave: 'Octave',
+};
+
 export function getAiProviderLabel(id: string | null | undefined): string | null {
   if (!id) return null;
   return AI_PROVIDER_DISPLAY[id]?.shortLabel ?? id;
@@ -52,6 +70,11 @@ export function getAiModelLabel(modelId: string | null | undefined): string | nu
 export function getTtsProviderLabel(id: string | null | undefined): string | null {
   if (!id) return null;
   return TTS_PROVIDER_DISPLAY[id]?.shortLabel ?? id;
+}
+
+export function getTtsModelLabel(modelId: string | null | undefined): string | null {
+  if (!modelId) return null;
+  return TTS_MODEL_DISPLAY[modelId] ?? modelId;
 }
 
 export function getLanguageLabel(code: string | null | undefined): string | null {
