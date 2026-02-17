@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/redis';
 import { createCommentSchema, paginationSchema } from '@/lib/validations';
 import { moderateOrThrow, ContentModerationError } from '@/lib/moderation';
 import { checkSuspension } from '@/lib/auth-guards';
@@ -90,6 +91,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (suspended) return suspended;
 
   const userId = session.user.id;
+
+  // Rate limit: 30 comments per hour
+  const rateLimit = await checkRateLimit(`comment:${userId}`, 30, 3600);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many comments. Please try again later.', resetAt: rateLimit.resetAt },
+      { status: 429 }
+    );
+  }
 
   const body = await request.json();
   const parsed = createCommentSchema.safeParse(body);
