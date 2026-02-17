@@ -26,9 +26,8 @@ const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<un
   return callback(tx);
 });
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
@@ -42,8 +41,9 @@ vi.mock('@/lib/prisma', () => ({
       update: (...args: unknown[]) => mockPrismaInteractionUpdate(...args),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockPrismaTransaction(fn),
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/elevenlabs', () => ({
   getVoiceId: vi.fn().mockReturnValue('voice-abc'),

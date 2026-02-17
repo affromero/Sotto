@@ -5,15 +5,15 @@ import { NextRequest } from 'next/server';
 const mockFeedbackCreate = vi.fn();
 const mockFeedbackFindMany = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     feedback: {
       create: (...args: unknown[]) => mockFeedbackCreate(...args),
       findMany: (...args: unknown[]) => mockFeedbackFindMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 import { POST, GET } from '@/app/api/feedback/route';
 

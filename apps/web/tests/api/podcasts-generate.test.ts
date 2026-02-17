@@ -23,9 +23,8 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
   sourceContent: null,
 });
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
@@ -52,8 +51,9 @@ vi.mock('@/lib/prisma', () => ({
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockAddJob = vi.fn();
 

@@ -12,9 +12,8 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     voiceClone: {
       findMany: (...args: unknown[]) => mockVoiceCloneFindMany(...args),
       count: (...args: unknown[]) => mockVoiceCloneCount(...args),
@@ -28,8 +27,9 @@ vi.mock('@/lib/prisma', () => ({
     voiceAllowlist: {
       findMany: (...args: unknown[]) => mockVoiceAllowlistFindMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 import { GET } from '@/app/api/voices/browse/route';
 

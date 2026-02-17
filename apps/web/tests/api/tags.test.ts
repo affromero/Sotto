@@ -4,14 +4,14 @@ import { NextRequest } from 'next/server';
 // Define mock fn at module scope so it's properly typed as Mock
 const mockTagFindMany = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     tag: {
       findMany: (...args: unknown[]) => mockTagFindMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 import { GET } from '@/app/api/tags/route';
 

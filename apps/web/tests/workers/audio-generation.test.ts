@@ -18,9 +18,8 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     segment: {
       findUnique: (...args: unknown[]) => mockPrismaSegmentFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
@@ -35,8 +34,9 @@ vi.mock('@/lib/prisma', () => ({
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/elevenlabs', () => ({
   getVoiceId: vi.fn().mockReturnValue('voice-abc'),

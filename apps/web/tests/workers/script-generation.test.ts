@@ -34,9 +34,8 @@ const mockPrismaTagFindUnique = vi
   .mockResolvedValue({ id: 'tag-general', slug: 'general-audience' });
 const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
     },
@@ -60,8 +59,9 @@ vi.mock('@/lib/prisma', () => ({
     podcastTag: {
       upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGenerateScript = vi.fn().mockResolvedValue({
   turns: [

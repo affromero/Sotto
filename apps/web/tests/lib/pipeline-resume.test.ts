@@ -10,9 +10,8 @@ const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
 const mockSegmentFindMany = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPodcastFindUniqueOrThrow(...args),
@@ -30,8 +29,9 @@ vi.mock('@/lib/prisma', () => ({
     segment: {
       findMany: (...args: unknown[]) => mockSegmentFindMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: {

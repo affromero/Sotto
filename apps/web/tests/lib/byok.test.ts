@@ -5,9 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockTtsKeyUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 const mockAiKeyUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     userTtsKey: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -26,8 +25,9 @@ vi.mock('@/lib/prisma', () => ({
       update: vi.fn(),
       updateMany: (...args: unknown[]) => mockAiKeyUpdateMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

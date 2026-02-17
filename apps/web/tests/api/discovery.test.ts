@@ -15,17 +15,17 @@ vi.mock('@/lib/auth', () => ({
 
 const mockUserAiKeyUpdateMany = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockDiscoveryFindUniqueOrThrow(...args),
     },
     userAiKey: {
       updateMany: (...args: unknown[]) => mockUserAiKeyUpdateMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),

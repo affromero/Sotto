@@ -8,9 +8,8 @@ const mockApiKeyCreate = vi.fn();
 const mockApiKeyUpdate = vi.fn();
 const mockApiKeyCount = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     apiKey: {
       findMany: (...args: unknown[]) => mockApiKeyFindMany(...args),
       findUnique: (...args: unknown[]) => mockApiKeyFindUnique(...args),
@@ -18,8 +17,9 @@ vi.mock('@/lib/prisma', () => ({
       update: (...args: unknown[]) => mockApiKeyUpdate(...args),
       count: (...args: unknown[]) => mockApiKeyCount(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockAuth = vi.fn();
 vi.mock('@/lib/auth', () => ({
