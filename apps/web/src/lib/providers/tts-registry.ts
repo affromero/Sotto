@@ -12,6 +12,12 @@ export interface TtsProviderAuthField {
   placeholder: string;
 }
 
+export interface TtsModelOption {
+  id: string;
+  displayName: string;
+  tier: 'standard' | 'premium' | 'ultra';
+}
+
 export interface TtsProviderMeta {
   id: TtsProviderId;
   displayName: string;
@@ -20,6 +26,7 @@ export interface TtsProviderMeta {
   supportsStreaming: boolean;
   maxSegmentChars: number;
   defaultModel: string;
+  models: TtsModelOption[];
   supportsAudioTags: boolean;
   qualityTier: 'standard' | 'premium' | 'ultra';
   platformCostPerKChar: number;
@@ -38,6 +45,11 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'eleven_v3',
+    models: [
+      { id: 'eleven_v3', displayName: 'Eleven v3', tier: 'premium' },
+      { id: 'eleven_turbo_v2', displayName: 'Eleven Turbo v2', tier: 'standard' },
+      { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium' },
+    ],
     supportsAudioTags: true,
     qualityTier: 'premium',
     platformCostPerKChar: 0.17,
@@ -64,6 +76,11 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: true,
     maxSegmentChars: 4096,
     defaultModel: 'tts-1-hd',
+    models: [
+      { id: 'tts-1-hd', displayName: 'TTS-1 HD', tier: 'premium' },
+      { id: 'tts-1', displayName: 'TTS-1', tier: 'standard' },
+      { id: 'gpt-4o-mini-tts', displayName: 'GPT-4o Mini TTS', tier: 'standard' },
+    ],
     supportsAudioTags: false,
     qualityTier: 'standard',
     platformCostPerKChar: 0.015,
@@ -90,6 +107,9 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'premium',
+    models: [
+      { id: 'premium', displayName: 'Premium', tier: 'premium' },
+    ],
     supportsAudioTags: false,
     qualityTier: 'premium',
     platformCostPerKChar: 0.2,
@@ -122,6 +142,9 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: true,
     maxSegmentChars: 5000,
     defaultModel: 'sonic-2',
+    models: [
+      { id: 'sonic-2', displayName: 'Sonic 2', tier: 'premium' },
+    ],
     supportsAudioTags: false,
     qualityTier: 'premium',
     platformCostPerKChar: 0.15,
@@ -151,6 +174,9 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsStreaming: false,
     maxSegmentChars: 5000,
     defaultModel: 'octave',
+    models: [
+      { id: 'octave', displayName: 'Octave', tier: 'ultra' },
+    ],
     supportsAudioTags: false,
     qualityTier: 'ultra',
     platformCostPerKChar: 0.25,

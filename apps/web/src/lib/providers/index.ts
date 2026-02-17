@@ -47,15 +47,24 @@ export {
 } from './tts';
 export type { ResolvedProvider } from './tts';
 export { createSttProvider } from './stt';
-export type { TranscriptionResult, SttProvider } from './stt';
+export type { TranscriptionResult, SttProvider, SttProviderId } from './stt';
 export { createStorageProvider } from './storage';
 export { createMLProvider } from './ml';
 
 // TTS registry
-export type { TtsProviderId, TtsProviderMeta } from './tts-registry';
+export type { TtsProviderId, TtsProviderMeta, TtsModelOption } from './tts-registry';
 export {
   getProviderMeta,
   getAllProviderMeta,
   getProviderIds,
   isValidProviderId,
 } from './tts-registry';
+
+// STT registry
+export type { SttProviderMeta, SttModelOption } from './stt-registry';
+export {
+  getAllSttProviderMeta,
+  getSttProviderMeta,
+  getSttProviderIds,
+  isValidSttProviderId,
+} from './stt-registry';

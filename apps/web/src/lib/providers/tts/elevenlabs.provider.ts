@@ -10,9 +10,11 @@ export class ElevenLabsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'elevenlabs';
   private clientPromise: Promise<typeof import('../../elevenlabs')> | null = null;
   private byokApiKey: string | undefined;
+  private model: string;
 
-  constructor(byokApiKey?: string) {
+  constructor(byokApiKey?: string, model?: string) {
     this.byokApiKey = byokApiKey;
+    this.model = model ?? 'eleven_v3';
   }
 
   private async getClient() {
@@ -25,7 +27,7 @@ export class ElevenLabsProvider implements TtsProvider {
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const el = await this.getClient();
     const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
-    return el.generateSpeech({ ...params, apiKeyOverride });
+    return el.generateSpeech({ ...params, modelId: params.modelId ?? this.model, apiKeyOverride });
   }
 
   async generateSoundEffect(params: SfxParams): Promise<Buffer> {
@@ -43,6 +45,6 @@ export class ElevenLabsProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'eleven_v3';
+    return this.model;
   }
 }

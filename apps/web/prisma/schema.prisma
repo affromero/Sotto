@@ -1348,6 +1348,9 @@ model FreeTierConfig {
   aiProvider      String   @default("anthropic")
   aiModel         String   @default("claude-haiku-4-5-20251001")
   ttsProvider     String   @default("openai")
+  ttsModel        String   @default("tts-1-hd")
+  sttProvider     String   @default("groq")
+  sttModel        String   @default("whisper-large-v3-turbo")
   generationLimit Int      @default(3)
   updatedAt       DateTime @updatedAt
   updatedBy       String?
