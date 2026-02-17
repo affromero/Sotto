@@ -7,11 +7,21 @@ interface UserActionsProps {
   userId: string;
   currentRole: string;
   isOwnUser: boolean;
+  isBanned: boolean;
+  isSuspended: boolean;
 }
 
-export function UserActions({ userId, currentRole, isOwnUser }: UserActionsProps) {
+export function UserActions({
+  userId,
+  currentRole,
+  isOwnUser,
+  isBanned: initialBanned,
+  isSuspended: initialSuspended,
+}: UserActionsProps) {
   const [role, setRole] = useState(currentRole);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBanned, setIsBanned] = useState(initialBanned);
+  const [isSuspended, setIsSuspended] = useState(initialSuspended);
 
   async function handleRoleChange(newRole: string) {
     if (isOwnUser) {
@@ -47,17 +57,106 @@ export function UserActions({ userId, currentRole, isOwnUser }: UserActionsProps
     }
   }
 
+  async function handleModerate(action: string) {
+    const reason = prompt(`Reason for ${action}:`);
+    if (!reason) return;
+
+    let durationDays: number | undefined;
+    if (action === 'suspend') {
+      const days = prompt('Suspension duration (days):', '7');
+      if (!days) return;
+      durationDays = parseInt(days, 10);
+      if (isNaN(durationDays) || durationDays < 1) {
+        alert('Invalid duration');
+        return;
+      }
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/moderate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, reason, durationDays }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Failed to ${action}`);
+      }
+
+      if (action === 'ban') setIsBanned(true);
+      if (action === 'unban') setIsBanned(false);
+      if (action === 'suspend') setIsSuspended(true);
+      if (action === 'unsuspend') setIsSuspended(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : `Failed to ${action}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const isAdmin = role === 'ADMIN';
+
   return (
-    <select
-      value={role}
-      onChange={(e) => handleRoleChange(e.target.value)}
-      disabled={isOwnUser || isLoading}
-      className={styles.roleSelect}
-      aria-label="User role"
-    >
-      <option value="USER">User</option>
-      <option value="CREATOR">Creator</option>
-      <option value="ADMIN">Admin</option>
-    </select>
+    <div className={styles.actionsCell}>
+      <select
+        value={role}
+        onChange={(e) => handleRoleChange(e.target.value)}
+        disabled={isOwnUser || isLoading}
+        className={styles.roleSelect}
+        aria-label="User role"
+      >
+        <option value="USER">User</option>
+        <option value="CREATOR">Creator</option>
+        <option value="ADMIN">Admin</option>
+      </select>
+      {!isOwnUser && !isAdmin && (
+        <div className={styles.moderationButtons}>
+          <button
+            className={styles.modBtn}
+            onClick={() => handleModerate('warn')}
+            disabled={isLoading}
+          >
+            Warn
+          </button>
+          {isSuspended ? (
+            <button
+              className={styles.modBtn}
+              onClick={() => handleModerate('unsuspend')}
+              disabled={isLoading}
+            >
+              Unsuspend
+            </button>
+          ) : (
+            <button
+              className={`${styles.modBtn} ${styles.modBtnWarn}`}
+              onClick={() => handleModerate('suspend')}
+              disabled={isLoading}
+            >
+              Suspend
+            </button>
+          )}
+          {isBanned ? (
+            <button
+              className={styles.modBtn}
+              onClick={() => handleModerate('unban')}
+              disabled={isLoading}
+            >
+              Unban
+            </button>
+          ) : (
+            <button
+              className={`${styles.modBtn} ${styles.modBtnDanger}`}
+              onClick={() => handleModerate('ban')}
+              disabled={isLoading}
+            >
+              Ban
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

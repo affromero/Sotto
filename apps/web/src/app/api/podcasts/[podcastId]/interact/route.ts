@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, addJob, JobType } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
+import { checkSuspension } from '@/lib/auth-guards';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -15,6 +16,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const suspended = checkSuspension(session);
+  if (suspended) return suspended;
 
   // Rate limit: 60/hour
   const hourly = await checkRateLimit(`interact:hour:${session.user.id}`, 60, 3600);

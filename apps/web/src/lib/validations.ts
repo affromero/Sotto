@@ -383,6 +383,15 @@ export const podcastRatingSchema = z.object({
 });
 
 /**
+ * Admin user moderation validation
+ */
+export const moderateUserSchema = z.object({
+  action: z.enum(['warn', 'suspend', 'ban', 'unban', 'unsuspend']),
+  reason: z.string().min(1).max(2000),
+  durationDays: z.number().int().min(1).max(365).optional(),
+});
+
+/**
  * Twitter config update validation (admin)
  */
 export const twitterConfigUpdateSchema = z.object({

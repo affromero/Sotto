@@ -71,7 +71,11 @@ export type NotificationType =
   | 'QUESTION_UPVOTED'
   | 'COMMENT_ON_YOUR_PODCAST'
   | 'COMMENT_REPLY'
-  | 'SCRIPT_READY';
+  | 'SCRIPT_READY'
+  | 'ACCOUNT_WARNING'
+  | 'ACCOUNT_SUSPENDED'
+  | 'ACCOUNT_BANNED'
+  | 'CONTENT_REMOVED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
 
