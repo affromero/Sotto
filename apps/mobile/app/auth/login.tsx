@@ -14,7 +14,7 @@ import { router, Stack } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
-import { setToken } from '../../lib/auth';
+import { setToken, notifyAuthSuccess } from '../../lib/auth';
 
 const IS_DEV = __DEV__;
 const GOOGLE_CONFIGURED = !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
@@ -58,6 +58,7 @@ export default function LoginScreen() {
         return;
       }
       await setToken(token);
+      notifyAuthSuccess();
       router.replace('/(tabs)');
     } catch (err: unknown) {
       const axiosError = err as {
@@ -171,6 +172,7 @@ export default function LoginScreen() {
           return;
         }
         await setToken(token);
+        notifyAuthSuccess();
         router.replace('/(tabs)');
       } catch (err: unknown) {
         const axiosError = err as {
