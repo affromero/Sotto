@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockPrismaTwitterConfigUpsert = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     twitterConfig: {
       upsert: (...args: unknown[]) => mockPrismaTwitterConfigUpsert(...args),

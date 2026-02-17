@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { Prisma } from '@prisma/client';
 import { ExtractContentPayload, addJob, JobType, scriptGenerationQueue } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { extractContent } from '@/lib/extractors';
 import { logger } from '@/lib/logger';
 

@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateResponse, logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';

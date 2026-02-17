@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import type { ValidateKeysPayload } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { decryptApiKey } from '@/lib/byok';
 import { validateProviderCredentials, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { validateAiProviderCredentials, type AiProviderId } from '@/lib/providers/ai-registry';

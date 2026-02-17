@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Readable } from 'stream';
 import busboy from 'busboy';
 import { authenticateRequest } from '@/lib/api-keys';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
     const sttApiKey = await resolveSttApiKey(authResult.userId, validatedSttProvider);
 
     if (!sttApiKey && !transcriptText) {
-      await prisma.podcast.delete({ where: { id: podcast.id } });
+      await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
       const provider = validatedSttProvider ?? 'openai';
       return NextResponse.json(
         {

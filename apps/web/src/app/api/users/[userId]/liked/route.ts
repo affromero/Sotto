@@ -27,6 +27,7 @@ export async function GET(
         podcast: {
           status: 'READY',
           visibility: 'PUBLIC',
+          deletedAt: null,
         },
       },
       skip,
@@ -67,6 +68,7 @@ export async function GET(
         podcast: {
           status: 'READY',
           visibility: 'PUBLIC',
+          deletedAt: null,
         },
       },
     }),

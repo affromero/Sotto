@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { postTweet } from '@/lib/twitter';
 import { getTwitterConfig } from '@/lib/twitter-config';
 import { logger } from '@/lib/logger';

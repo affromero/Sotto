@@ -13,6 +13,7 @@ const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),

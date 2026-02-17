@@ -188,6 +188,7 @@ model Podcast {
   failureReason  String?       @db.Text
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
 
   // Audio
   audioUrl  String?
@@ -271,6 +272,7 @@ model Podcast {
   @@index([createdAt])
   @@index([playCount])
   @@index([likeCount])
+  @@index([deletedAt])
 }
 
 enum PodcastStatus {
