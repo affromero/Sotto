@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { prisma } from '@/lib/prisma';
 import { generateApiKey } from '@/lib/api-keys';
+
+const appleJWKS = createRemoteJWKSet(
+  new URL('https://appleid.apple.com/auth/keys'),
+);
 
 const devLoginSchema = z.object({
   email: z.string().email(),
@@ -234,21 +239,12 @@ async function verifyOAuthToken(
 
 async function verifyAppleToken(idToken: string): Promise<string | null> {
   try {
-    const response = await fetch('https://appleid.apple.com/auth/keys');
-    if (!response.ok) return null;
+    const { payload } = await jwtVerify(idToken, appleJWKS, {
+      issuer: 'https://appleid.apple.com',
+      audience: process.env.APPLE_CLIENT_ID,
+    });
 
-    // Decode the JWT payload without verification for the subject claim
-    // Apple's idToken is a JWT — extract the `sub` (user ID)
-    const parts = idToken.split('.');
-    if (parts.length !== 3) return null;
-
-    const payload = JSON.parse(
-      Buffer.from(parts[1], 'base64url').toString('utf-8'),
-    );
-
-    if (payload.iss !== 'https://appleid.apple.com') return null;
     if (typeof payload.sub !== 'string') return null;
-    if (payload.exp && payload.exp * 1000 < Date.now()) return null;
 
     return payload.sub;
   } catch {
