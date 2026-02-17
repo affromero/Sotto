@@ -8,6 +8,7 @@ const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCount = vi.fn().mockResolvedValue(0);
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ status: 'GENERATING_AUDIO' });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
   hostVoiceId: null,
@@ -26,6 +27,7 @@ vi.mock('@/lib/prisma', () => ({
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
     apiUsageLog: {
@@ -39,6 +41,7 @@ vi.mock('@/lib/elevenlabs', () => ({
   getVoiceProfile: vi.fn().mockReturnValue({}),
   getElevenLabsPerKCharRate: vi.fn().mockReturnValue(0.3),
   getOpenAiPerKCharRate: vi.fn().mockReturnValue(0.03),
+  getElevenLabsConcurrencyLimit: vi.fn().mockResolvedValue(5),
 }));
 
 const mockPremiumGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
@@ -96,6 +99,17 @@ vi.mock('@/lib/queue', () => ({
     STITCH_AUDIO: 'stitch_audio',
   },
   audioStitchingQueue: { name: 'audio-stitching' },
+}));
+
+vi.mock('@/lib/redis', () => ({
+  semaphore: {
+    acquire: vi.fn().mockResolvedValue(true),
+    release: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getByokKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -159,6 +173,8 @@ describe('processAudioGeneration', () => {
     vi.clearAllMocks();
     // Default: segment has no existing audio
     mockPrismaSegmentFindUnique.mockResolvedValue(null);
+    // Default: podcast not failed (fail-fast check passes)
+    mockPrismaPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
       hostVoiceId: null,
