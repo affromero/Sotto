@@ -3,6 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
+# Expo
+.expo/
+
 # Next.js
 .next/
 out/
