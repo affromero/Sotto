@@ -149,6 +149,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
+  const [questionsRefreshTrigger, setQuestionsRefreshTrigger] = useState(0);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -699,6 +700,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
           currentTime={currentTime}
           existingInteractions={podcast.interactions}
           onClose={() => setShowInterruptChat(false)}
+          onQuestionAnswered={() => setQuestionsRefreshTrigger((n) => n + 1)}
         />
       )}
 
@@ -756,7 +758,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Community Questions */}
       {isReady && podcast.visibility === 'PUBLIC' && (
         <section className={styles.questionsSection}>
-          <CommunityQuestions podcastId={podcast.id} />
+          <CommunityQuestions podcastId={podcast.id} refreshTrigger={questionsRefreshTrigger} />
         </section>
       )}
 
