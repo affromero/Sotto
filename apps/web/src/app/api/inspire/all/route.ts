@@ -1,9 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
+import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
-import { checkRateLimit } from '@/lib/redis';
-import { generateForYouQuestions, generateNewsQuestions } from '@/lib/taste-quiz';
+import { cache, checkRateLimit, counters } from '@/lib/redis';
+import {
+  generateForYouQuestions,
+  generateNewsQuestions,
+  loadInspireContext,
+} from '@/lib/taste-quiz';
 import type { NewsTimeRange } from '@/lib/taste-quiz';
+import type { TasteQuestion } from '@sotto/shared';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
 import { logger } from '@/lib/logger';
@@ -28,67 +34,36 @@ function sanitizeTopic(raw: string): string {
     .trim();
 }
 
-/**
- * GET /api/inspire/all
- * Returns all three Inspire Me sections in one call.
- * Optional ?section=forYou|news for single-section refresh ("Load more").
- * Optional ?timeRange=1h|12h|24h|1w|1m for news time range.
- */
-export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+// Cache TTLs in seconds
+const CACHE_TTL = {
+  forYou: 600, // 10 min
+  news: 300, // 5 min
+  trending: 120, // 2 min (global)
+} as const;
 
-  const params = Object.fromEntries(request.nextUrl.searchParams);
-  const validation = inspireAllSchema.safeParse(params);
-  if (!validation.success) {
-    return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
-  }
+type Section = 'forYou' | 'trending' | 'news';
 
-  const { section, timeRange, topic } = validation.data;
-  const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
-  const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
-  const userId = session.user.id;
+function cacheKey(section: Section, userId: string, topic?: string, timeRange?: string): string {
+  if (section === 'trending') return 'inspire:trending';
+  const topicHash = topic ? createHash('md5').update(topic).digest('hex').slice(0, 8) : '_';
+  const suffix = section === 'news' && timeRange ? `:${timeRange}` : '';
+  return `inspire:${section}:${userId}:${topicHash}${suffix}`;
+}
 
-  const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again later.', resetAt: rateLimit.resetAt },
-      { status: 429 }
-    );
-  }
+function today(): string {
+  return new Date().toISOString().split('T')[0];
+}
 
-  // Single-section refresh
-  if (section === 'forYou') {
-    const forYou = await generateForYouQuestions(userId, 6, topicHint);
-    return NextResponse.json({ forYou });
-  }
+function trackCacheMetric(section: Section, hit: boolean): void {
+  const date = today();
+  const kind = hit ? 'hits' : 'misses';
+  counters.increment(`inspire:${kind}:${section}:${date}`).catch(() => {});
+}
 
-  if (section === 'news') {
-    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
-    return NextResponse.json({ news });
-  }
-
-  // Full fetch: trending + forYou in parallel, then news sequentially (needs forYou for dedup)
-  const [trendingRaw, forYou] = await Promise.all([
-    getTrending().catch((err) => {
-      logger.warn('Failed to fetch trending for inspire', { error: (err as Error).message });
-      return [];
-    }),
-    generateForYouQuestions(userId, 6, topicHint),
-  ]);
-
-  const news = await generateNewsQuestions(
-    userId,
-    6,
-    forYou.map((q) => q.text),
-    newsTimeRange,
-    topicHint
-  );
-
-  // Map RecommendedPodcast to PodcastSummary shape
-  const trending: PodcastSummary[] = trendingRaw.map((p) => ({
+function mapTrendingToPodcastSummary(
+  trendingRaw: Awaited<ReturnType<typeof getTrending>>
+): PodcastSummary[] {
+  return trendingRaw.map((p) => ({
     id: p.podcastId,
     title: p.title,
     topic: p.topic,
@@ -106,6 +81,172 @@ export async function GET(request: NextRequest) {
     user: { ...p.user, handle: null },
     tags: p.tags,
   }));
+}
 
-  return NextResponse.json({ forYou, trending, news });
+/**
+ * GET /api/inspire/all
+ * Returns all three Inspire Me sections.
+ *
+ * Full fetch (no ?section=): returns SSE stream with progressive loading.
+ * Single-section refresh (?section=forYou|news): returns JSON, bypasses cache read.
+ */
+export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const params = Object.fromEntries(request.nextUrl.searchParams);
+  const validation = inspireAllSchema.safeParse(params);
+  if (!validation.success) {
+    return new Response(JSON.stringify({ error: validation.error.errors[0].message }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const { section, timeRange, topic } = validation.data;
+  const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
+  const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
+  const userId = session.user.id;
+
+  // Single-section refresh — always bypass cache read, return JSON
+  if (section === 'forYou' || section === 'news') {
+    const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
+    if (!rateLimit.allowed) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Try again later.', resetAt: rateLimit.resetAt }),
+        { status: 429, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (section === 'forYou') {
+      const forYou = await generateForYouQuestions(userId, 6, topicHint);
+      // Cache fresh result for subsequent full fetches
+      await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
+      return new Response(JSON.stringify({ forYou }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
+    await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
+    return new Response(JSON.stringify({ news }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Full fetch — check cache for all 3 sections in parallel
+  const [cachedForYou, cachedTrending, cachedNews] = await Promise.all([
+    cache.get<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)),
+    cache.get<PodcastSummary[]>(cacheKey('trending', userId)),
+    cache.get<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)),
+  ]);
+
+  const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null;
+
+  // Track cache metrics per section
+  trackCacheMetric('forYou', cachedForYou !== null);
+  trackCacheMetric('trending', cachedTrending !== null);
+  trackCacheMetric('news', cachedNews !== null);
+
+  // All cached — return immediately, skip rate limit
+  if (allCached) {
+    logger.debug('Inspire: all sections cached, returning immediately');
+    return new Response(JSON.stringify({ forYou: cachedForYou, trending: cachedTrending, news: cachedNews }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // At least one section needs generation — rate limit check
+  const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
+  if (!rateLimit.allowed) {
+    // Return whatever we have cached + empty arrays for uncached
+    return new Response(
+      JSON.stringify({
+        forYou: cachedForYou ?? [],
+        trending: cachedTrending ?? [],
+        news: cachedNews ?? [],
+        error: 'Rate limit exceeded. Try again later.',
+        resetAt: rateLimit.resetAt,
+      }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  // SSE progressive loading — stream each section as it resolves
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      function send(data: Record<string, unknown>) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      }
+
+      // Load shared context once for both generators
+      const ctxPromise = loadInspireContext(userId);
+
+      // Fire all 3 sections in parallel
+      const results = await Promise.allSettled([
+        // Trending
+        (async () => {
+          if (cachedTrending !== null) {
+            send({ section: 'trending', data: cachedTrending });
+            return;
+          }
+          const trendingRaw = await getTrending().catch((err) => {
+            logger.warn('Failed to fetch trending for inspire', { error: (err as Error).message });
+            return [];
+          });
+          const trending = mapTrendingToPodcastSummary(trendingRaw);
+          await cache.set(cacheKey('trending', userId), trending, CACHE_TTL.trending);
+          send({ section: 'trending', data: trending });
+        })(),
+
+        // ForYou
+        (async () => {
+          if (cachedForYou !== null) {
+            send({ section: 'forYou', data: cachedForYou });
+            return;
+          }
+          const ctx = await ctxPromise;
+          const forYou = await generateForYouQuestions(userId, 6, topicHint, ctx);
+          await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
+          send({ section: 'forYou', data: forYou });
+        })(),
+
+        // News
+        (async () => {
+          if (cachedNews !== null) {
+            send({ section: 'news', data: cachedNews });
+            return;
+          }
+          const ctx = await ctxPromise;
+          const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx);
+          await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
+          send({ section: 'news', data: news });
+        })(),
+      ]);
+
+      // Log any failures
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          logger.error('Inspire section generation failed', { error: (result.reason as Error).message });
+        }
+      }
+
+      send({ done: true });
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  });
 }
