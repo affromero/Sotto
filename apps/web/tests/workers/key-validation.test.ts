@@ -7,9 +7,8 @@ const mockTtsKeyUpdate = vi.fn().mockResolvedValue({});
 const mockAiKeyFindMany = vi.fn().mockResolvedValue([]);
 const mockAiKeyUpdate = vi.fn().mockResolvedValue({});
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     userTtsKey: {
       findMany: (...args: unknown[]) => mockTtsKeyFindMany(...args),
       update: (...args: unknown[]) => mockTtsKeyUpdate(...args),
@@ -18,8 +17,9 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...args: unknown[]) => mockAiKeyFindMany(...args),
       update: (...args: unknown[]) => mockAiKeyUpdate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

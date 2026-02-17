@@ -13,9 +13,8 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     save: {
       findUnique: (...args: unknown[]) => mockSaveFindUnique(...args),
       create: (...args: unknown[]) => mockSaveCreate(...args),
@@ -26,8 +25,9 @@ vi.mock('@/lib/prisma', () => ({
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 import { POST, DELETE } from '@/app/api/podcasts/[podcastId]/save/route';
 import { auth } from '@/lib/auth';

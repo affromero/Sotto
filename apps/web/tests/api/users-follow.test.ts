@@ -13,9 +13,8 @@ const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaFollowCreate = vi.fn();
 const mockPrismaFollowDelete = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
@@ -26,8 +25,9 @@ vi.mock('@/lib/prisma', () => ({
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 // ---- Import under test ----
 import { POST, DELETE } from '@/app/api/users/[userId]/follow/route';

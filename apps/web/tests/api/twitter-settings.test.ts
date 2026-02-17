@@ -15,9 +15,8 @@ const mockPrismaAccountFindFirst = vi.fn();
 const mockPrismaAccountDeleteMany = vi.fn();
 const mockPrismaTransaction = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaUserUpdate(...args),
@@ -27,8 +26,9 @@ vi.mock('@/lib/prisma', () => ({
       deleteMany: (...args: unknown[]) => mockPrismaAccountDeleteMany(...args),
     },
     $transaction: (operations: unknown) => mockPrismaTransaction(operations),
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 // ---- Import under test ----
 import { GET, PATCH, DELETE } from '@/app/api/users/me/twitter/route';

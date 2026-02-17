@@ -9,14 +9,14 @@ const mockGetFreeTierConfig = vi.fn();
 const mockCreateAIProvider = vi.fn();
 const mockResolveAiProvider = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
     userInterest: { findMany: (...args: unknown[]) => mockUserInterestFindMany(...args) },
     tasteQuizAnswer: { findMany: (...args: unknown[]) => mockTasteQuizAnswerFindMany(...args) },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),

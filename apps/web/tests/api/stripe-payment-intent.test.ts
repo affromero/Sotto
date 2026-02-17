@@ -106,7 +106,7 @@ describe('POST /api/stripe/payment-intent', () => {
       voiceCharges: [{ voiceCloneId: 'vc_2' }],
     });
     const response = await POST(request);
-    const body = await response.json();
+    await response.json();
 
     expect(response.status).toBe(200);
     expect(mockCreateVoicePayment).toHaveBeenCalledWith('user-1', 'vc_2', 'pending');

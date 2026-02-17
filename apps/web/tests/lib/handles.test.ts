@@ -5,17 +5,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockReservedHandleFindUnique = vi.fn();
 const mockUserFindUnique = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     reservedHandle: {
       findUnique: (...args: unknown[]) => mockReservedHandleFindUnique(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGenerateResponse = vi.fn();
 vi.mock('@/lib/claude', () => ({

@@ -31,7 +31,7 @@ vi.mock('@/lib/logger', () => ({
 import { GET, PATCH, DELETE } from '@/app/api/collections/[collectionId]/route';
 
 function createRequest(method = 'GET', body?: unknown): NextRequest {
-  const opts: RequestInit = { method };
+  const opts: { method: string; headers?: Record<string, string>; body?: string } = { method };
   if (body) {
     opts.headers = { 'Content-Type': 'application/json' };
     opts.body = JSON.stringify(body);

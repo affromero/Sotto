@@ -21,9 +21,8 @@ const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     segment: {
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
       update: (...args: unknown[]) => mockPrismaSegmentUpdate(...args),
@@ -49,8 +48,9 @@ vi.mock('@/lib/prisma', () => ({
     twitterAutoTweet: {
       findFirst: (...args: unknown[]) => mockPrismaTwitterAutoTweetFindFirst(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockStitchWithEffects = vi.fn().mockResolvedValue({ duration: 300 });
 const mockGetAudioDuration = vi.fn().mockResolvedValue(300);
