@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -9,10 +10,10 @@
     },
     "preview": {
       "distribution": "internal",
-      "autoIncrement": "version"
+      "autoIncrement": true
     },
     "production": {
-      "autoIncrement": "version"
+      "autoIncrement": true
     }
   },
   "submit": {
