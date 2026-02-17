@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY packages/shared ./packages/shared/
 COPY apps/web ./apps/web/
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY tsconfig.base.json ./
 
 ARG COMMIT_SHA=dev
