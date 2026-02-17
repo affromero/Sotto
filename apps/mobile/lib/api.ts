@@ -34,9 +34,14 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Only revoke auth if we actually sent a token and got 401 back.
+    // Skip revocation for requests that had no token (pre-login background queries).
     if (error.response?.status === 401) {
-      await deleteToken();
-      notifyAuthRevoked();
+      const hadToken = !!error.config?.headers?.Authorization;
+      if (hadToken) {
+        await deleteToken();
+        notifyAuthRevoked();
+      }
     }
     return Promise.reject(error);
   },

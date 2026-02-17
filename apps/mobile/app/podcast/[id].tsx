@@ -47,6 +47,7 @@ export default function PodcastScreen() {
   const [questionModalVisible, setQuestionModalVisible] = useState(false);
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
+  const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
 
   const { position, duration: trackDuration } = useProgress(250);
   const playbackState = usePlaybackState();
@@ -179,16 +180,16 @@ export default function PodcastScreen() {
     ? findCurrentSegmentIndex(podcast.segments, position)
     : -1;
 
-  // Auto-scroll transcript to current segment
+  // Auto-scroll transcript to current segment (teleprompter mode only)
   useEffect(() => {
-    if (currentSegmentIndex >= 0 && isPlaying) {
+    if (teleprompterEnabled && currentSegmentIndex >= 0 && isPlaying) {
       transcriptRef.current?.scrollToIndex({
         index: currentSegmentIndex,
         animated: true,
-        viewPosition: 0.3,
+        viewPosition: 0.4,
       });
     }
-  }, [currentSegmentIndex, isPlaying]);
+  }, [teleprompterEnabled, currentSegmentIndex, isPlaying]);
 
   if (isLoading) {
     return (
@@ -211,17 +212,8 @@ export default function PodcastScreen() {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          title: '',
-          headerStyle: { backgroundColor: colors.background },
-          headerTintColor: colors.textPrimary,
-        }}
-      />
-
+  const listHeader = (
+    <>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={2}>
@@ -356,27 +348,73 @@ export default function PodcastScreen() {
         </View>
       </View>
 
-      {/* Transcript */}
+      {/* Player Error */}
+      {playerError && (
+        <View style={styles.playerErrorContainer}>
+          <Text style={styles.playerErrorText}>
+            Audio unavailable: {playerError}
+          </Text>
+        </View>
+      )}
+
+      {/* Transcript Header with Teleprompter Toggle */}
       <View style={styles.transcriptHeader}>
         <Text style={styles.transcriptTitle}>Transcript</Text>
+        <Pressable
+          onPress={() => setTeleprompterEnabled((prev) => !prev)}
+          style={[
+            styles.teleprompterToggle,
+            teleprompterEnabled && styles.teleprompterToggleActive,
+          ]}
+          accessibilityLabel={`Teleprompter: ${teleprompterEnabled ? 'on' : 'off'}`}
+          accessibilityRole="switch"
+        >
+          <Text
+            style={[
+              styles.teleprompterToggleText,
+              teleprompterEnabled && styles.teleprompterToggleTextActive,
+            ]}
+          >
+            Teleprompter
+          </Text>
+        </Pressable>
       </View>
+    </>
+  );
+
+  return (
+    <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: '',
+          headerStyle: { backgroundColor: colors.background },
+          headerTintColor: colors.textPrimary,
+        }}
+      />
+
       <FlatList<SegmentData>
         ref={transcriptRef}
         data={podcast.segments}
         keyExtractor={(item) => item.id}
-        style={styles.transcript}
-        contentContainerStyle={styles.transcriptContent}
+        contentContainerStyle={[
+          styles.transcriptContent,
+          { paddingBottom: Math.max(100, insets.bottom + 80) },
+        ]}
+        ListHeaderComponent={listHeader}
         onScrollToIndexFailed={() => {
           // Silently handle scroll failures for segments not yet rendered
         }}
         renderItem={({ item, index }) => {
           const isCurrent = index === currentSegmentIndex;
+          const isDimmed = teleprompterEnabled && !isCurrent;
           const isHost = item.speaker === 'HOST';
           return (
             <View
               style={[
                 styles.segmentRow,
                 isCurrent && styles.segmentRowActive,
+                isDimmed && styles.segmentRowDimmed,
               ]}
               accessibilityLabel={`${item.speaker} says: ${item.text}`}
             >
@@ -399,6 +437,7 @@ export default function PodcastScreen() {
                 style={[
                   styles.segmentText,
                   isCurrent && styles.segmentTextActive,
+                  isDimmed && styles.segmentTextDimmed,
                 ]}
               >
                 {item.text}
@@ -410,15 +449,6 @@ export default function PodcastScreen() {
           <Text style={styles.emptyTranscript}>No transcript available.</Text>
         }
       />
-
-      {/* Player Error */}
-      {playerError && (
-        <View style={styles.playerErrorContainer}>
-          <Text style={styles.playerErrorText}>
-            Audio unavailable: {playerError}
-          </Text>
-        </View>
-      )}
 
       {/* Ask a Question FAB */}
       <Pressable
@@ -714,8 +744,12 @@ const styles = StyleSheet.create({
 
   // Transcript
   transcriptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
+    paddingTop: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
@@ -724,13 +758,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.textPrimary,
   },
-  transcript: {
-    flex: 1,
+  teleprompterToggle: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  teleprompterToggleActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  teleprompterToggleText: {
+    fontFamily: typography.fontBody,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  teleprompterToggleTextActive: {
+    color: colors.textInverse,
   },
   transcriptContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: 100, // room for the FAB + safe area
   },
   segmentRow: {
     paddingVertical: spacing.sm + 2,
@@ -776,6 +827,14 @@ const styles = StyleSheet.create({
   segmentTextActive: {
     color: colors.textPrimary,
     fontWeight: '500',
+    fontSize: 17,
+    lineHeight: 26,
+  },
+  segmentRowDimmed: {
+    opacity: 0.35,
+  },
+  segmentTextDimmed: {
+    color: colors.textTertiary,
   },
   emptyTranscript: {
     fontFamily: typography.fontBody,
