@@ -36,12 +36,11 @@ jobs:
         run: echo "${{ secrets.ASC_API_KEY_P8 }}" > /tmp/asc-api-key.p8
 
       - name: Submit to TestFlight
-        run: |
-          eas submit --platform ios --latest --non-interactive \
-            --asc-api-key-id ${{ secrets.ASC_API_KEY_ID }} \
-            --asc-api-key-issuer-id ${{ secrets.ASC_ISSUER_ID }} \
-            --asc-api-key-path /tmp/asc-api-key.p8
+        run: eas submit --platform ios --latest --non-interactive
         working-directory: apps/mobile
+        env:
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
 
       - name: Clean up API key
         if: always()
