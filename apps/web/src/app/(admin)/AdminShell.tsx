@@ -14,6 +14,7 @@ import {
   AtSign,
   Settings,
   MessageSquareShare,
+  Star,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -44,6 +45,7 @@ const navItems: NavItem[] = [
   { href: '/admin/moderation', label: 'Moderation', icon: Shield },
   { href: '/admin/config', label: 'Config', icon: Settings },
   { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
+  { href: '/admin/ratings', label: 'TTS Ratings', icon: Star },
 ];
 
 export function AdminShell({ user, children }: AdminShellProps) {
