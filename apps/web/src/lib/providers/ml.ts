@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getEmbeddingProvider } from '@/lib/embeddings';
 import { logger } from '@/lib/logger';
 

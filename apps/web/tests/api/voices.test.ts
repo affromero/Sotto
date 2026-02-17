@@ -21,6 +21,7 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),

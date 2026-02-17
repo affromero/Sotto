@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getTweet, getThread } from '@/lib/twitter';
 import { parseThreadIntent, parseTweetIntent } from '@/lib/tweet-parser';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';

@@ -6,7 +6,7 @@ import {
   JobType,
   contentExtractionQueue,
 } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getUpdates, sendMessage, answerCallbackQuery, editMessageText } from '@/lib/telegram';
 import { parseTelegramIntent } from '@/lib/telegram-parser';

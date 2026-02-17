@@ -1,7 +1,7 @@
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { logger } from './logger';
-import { prisma } from './prisma';
+import { prismaUnfiltered as prisma } from './prisma';
 import { markPodcastFailed } from './pipeline-resume';
 import { classifyError, isKeyInvalidationError, userMessage } from './byok-errors';
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';

@@ -7,6 +7,7 @@ const mockPrismaApiKeyFindUnique = vi.fn();
 const mockPrismaApiKeyUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     apiKey: {
       findUnique: (...args: unknown[]) => mockPrismaApiKeyFindUnique(...args),

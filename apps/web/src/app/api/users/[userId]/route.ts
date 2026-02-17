@@ -20,7 +20,7 @@ export async function GET(
       createdAt: true,
       _count: {
         select: {
-          podcasts: { where: { status: 'READY', visibility: 'PUBLIC' } },
+          podcasts: { where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null } },
           followers: true,
           following: true,
         },

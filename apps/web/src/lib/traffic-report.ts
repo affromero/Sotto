@@ -463,7 +463,7 @@ export async function buildTrafficReport(
       FROM "PodcastTag" pt
       JOIN "Tag" t ON t."id" = pt."tagId"
       JOIN "Podcast" p ON p."id" = pt."podcastId"
-      WHERE p."createdAt" >= ${since}
+      WHERE p."createdAt" >= ${since} AND p."deletedAt" IS NULL
       GROUP BY t."name", t."slug"
       ORDER BY count DESC
       LIMIT 20
@@ -539,7 +539,7 @@ export async function buildTrafficReport(
         COALESCE((SELECT COUNT(*) FROM "Like" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS likes,
         COALESCE((SELECT COUNT(*) FROM "Save" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS saves,
         COALESCE((SELECT COUNT(*) FROM "Comment" WHERE "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS comments,
-        COALESCE((SELECT COUNT(*) FROM "Podcast" WHERE "forkedFromId" IS NOT NULL AND "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS forks
+        COALESCE((SELECT COUNT(*) FROM "Podcast" WHERE "forkedFromId" IS NOT NULL AND "deletedAt" IS NULL AND "createdAt"::date = d.day AND "createdAt" >= ${since}), 0)::bigint AS forks
       FROM days d
       ORDER BY d.day ASC
     `,
@@ -662,7 +662,7 @@ export async function buildTrafficReport(
         END AS bucket,
         COUNT(*)::bigint AS count
       FROM "Podcast"
-      WHERE "status" = 'READY'
+      WHERE "status" = 'READY' AND "deletedAt" IS NULL
       GROUP BY bucket
       ORDER BY bucket ASC
     `,
@@ -709,6 +709,7 @@ export async function buildTrafficReport(
       SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")))::float AS avg
       FROM "Podcast"
       WHERE "status" = 'READY'
+        AND "deletedAt" IS NULL
         AND "source" != 'IMPORT'
         AND "createdAt" >= ${since}
     `,

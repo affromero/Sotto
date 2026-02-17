@@ -29,7 +29,7 @@ async function getRatingStats(days: number | null) {
         AVG(r."overallSatisfaction")::float AS "avgOverallSatisfaction"
       FROM "PodcastRating" r
       JOIN "Podcast" p ON r."podcastId" = p.id
-      WHERE p."ttsProvider" IS NOT NULL AND r."createdAt" >= ${since}
+      WHERE p."ttsProvider" IS NOT NULL AND p."deletedAt" IS NULL AND r."createdAt" >= ${since}
       GROUP BY p."ttsProvider"
       ORDER BY "ratingCount" DESC
     `,

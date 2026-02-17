@@ -6,6 +6,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
 const mockPrismaTweetMentionUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),

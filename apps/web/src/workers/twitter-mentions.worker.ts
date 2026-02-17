@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, getThread, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';

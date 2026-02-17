@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getEmbeddingProvider } from '@/lib/embeddings';
 import type { ComputeFeaturesPayload } from '@/lib/queue';

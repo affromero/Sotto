@@ -10,6 +10,7 @@ const mockCreateAIProvider = vi.fn();
 const mockResolveAiProvider = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
     userInterest: { findMany: (...args: unknown[]) => mockUserInterestFindMany(...args) },

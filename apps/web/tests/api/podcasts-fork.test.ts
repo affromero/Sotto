@@ -17,6 +17,7 @@ vi.mock('@/lib/auth', () => ({
 
 // Mock prisma
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered } from '@/lib/prisma';
 
 export async function DELETE(
   _request: NextRequest,
@@ -21,16 +21,20 @@ export async function DELETE(
   const { podcastId } = await context.params;
 
   try {
-    const podcast = await prisma.podcast.findUnique({
+    const podcast = await prismaUnfiltered.podcast.findUnique({
       where: { id: podcastId },
-      select: { forkedFromId: true },
+      select: { forkedFromId: true, deletedAt: true },
     });
 
     if (!podcast) {
       return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
     }
 
-    await prisma.$transaction(async (tx) => {
+    if (podcast.deletedAt) {
+      return NextResponse.json({ error: 'Podcast already deleted' }, { status: 409 });
+    }
+
+    await prismaUnfiltered.$transaction(async (tx) => {
       await tx.podcast.updateMany({
         where: { forkedFromId: podcastId },
         data: { forkedFromId: null },
@@ -49,7 +53,10 @@ export async function DELETE(
         }
       }
 
-      await tx.podcast.delete({ where: { id: podcastId } });
+      await tx.podcast.update({
+        where: { id: podcastId },
+        data: { deletedAt: new Date() },
+      });
     });
 
     return NextResponse.json({ success: true });

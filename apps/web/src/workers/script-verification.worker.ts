@@ -7,7 +7,7 @@ import {
   notificationQueue,
   scriptVerificationQueue,
 } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { verifyScript } from '@/lib/script-verifier';
 import {

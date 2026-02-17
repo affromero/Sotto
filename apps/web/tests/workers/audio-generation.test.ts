@@ -19,6 +19,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     segment: {
       findUnique: (...args: unknown[]) => mockPrismaSegmentFindUnique(...args),

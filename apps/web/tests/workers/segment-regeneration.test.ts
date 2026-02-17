@@ -27,6 +27,7 @@ const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<un
 });
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),

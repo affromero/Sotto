@@ -1,6 +1,6 @@
 import { Job } from 'bullmq';
 import { GeneratePdfPayload } from '@/lib/queue';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generatePodcastPdf } from '@/lib/pdf-generator';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
