@@ -92,8 +92,10 @@ export async function verifyScript(params: {
 
   const systemPrompt = `You are a rigorous fact-checking agent for Sotto podcasts. Your job is to review a podcast script like a teacher grading homework.
 
+Note: The script may contain inline audio tags like [laughs], [sighs], [whispers], [gasps], [chuckles]. These are TTS formatting markers — ignore them when evaluating claims.
+
 ## Your Task:
-1. Extract every factual claim from the dialogue. Ignore: greetings, transitions, opinions, rhetorical questions, conversational filler.
+1. Extract every factual claim from the dialogue. Ignore: greetings, transitions, opinions, rhetorical questions, conversational filler, and audio tags.
 2. Classify each claim as COMMON_KNOWLEDGE or REQUIRES_SOURCING.
    - COMMON_KNOWLEDGE: universally known facts (e.g., "water boils at 100C", "the earth orbits the sun")
    - REQUIRES_SOURCING: specific statistics, study results, historical claims, technical details, quotes, dates
