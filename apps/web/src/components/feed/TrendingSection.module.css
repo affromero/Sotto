@@ -5,6 +5,7 @@
   background: var(--color-primary-subtle);
   border-radius: var(--radius-2xl);
   padding: var(--space-5);
+  margin-bottom: var(--space-8);
 }
 
 .header {

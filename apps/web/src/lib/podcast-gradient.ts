@@ -4,18 +4,18 @@
  */
 
 const PALETTES = [
-  { from: '#D97706', to: '#DC2626' },   // amber → red
-  { from: '#7C3AED', to: '#2563EB' },   // purple → blue
-  { from: '#059669', to: '#06B6D4' },   // emerald → cyan
-  { from: '#F43F5E', to: '#D97706' },   // rose → amber
-  { from: '#1E3A5F', to: '#7C3AED' },   // navy → purple
-  { from: '#D97706', to: '#059669' },   // amber → emerald
-  { from: '#DC2626', to: '#7C3AED' },   // red → purple
-  { from: '#06B6D4', to: '#059669' },   // cyan → emerald
+  { from: '#D97706', to: '#B45309' },   // golden amber → deep amber
+  { from: '#1E3A5F', to: '#0F4C75' },   // deep navy → ocean blue
+  { from: '#D97706', to: '#1E3A5F' },   // amber → navy (brand pair)
   { from: '#92400E', to: '#D97706' },   // brown → amber
-  { from: '#1E3A5F', to: '#06B6D4' },   // navy → cyan
-  { from: '#F43F5E', to: '#7C3AED' },   // rose → purple
-  { from: '#7C3AED', to: '#D97706' },   // purple → amber
+  { from: '#1E3A5F', to: '#065F46' },   // navy → dark emerald
+  { from: '#D97706', to: '#065F46' },   // amber → dark emerald
+  { from: '#0F4C75', to: '#1E3A5F' },   // ocean blue → navy
+  { from: '#B45309', to: '#78350F' },   // deep amber → espresso
+  { from: '#065F46', to: '#0F4C75' },   // dark emerald → ocean
+  { from: '#1E3A5F', to: '#92400E' },   // navy → brown
+  { from: '#78350F', to: '#D97706' },   // espresso → amber
+  { from: '#0F4C75', to: '#D97706' },   // ocean blue → amber
 ] as const;
 
 function hashString(str: string): number {
