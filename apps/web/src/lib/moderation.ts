@@ -1,5 +1,6 @@
 import { createHash } from 'crypto';
 import { cache } from './redis';
+import { prisma } from './prisma';
 import { logger } from './logger';
 
 const OPENAI_MODERATION_KEY = process.env.OPENAI_MODERATION_KEY;
@@ -146,4 +147,35 @@ export async function moderateOrThrow(text: string): Promise<void> {
   if (result.flagged) {
     throw new ContentModerationError(result.blockedCategories);
   }
+}
+
+/**
+ * Record a content flag for audit purposes. Fire-and-forget — never throws.
+ * Used by the content moderation worker and inline screening.
+ */
+export function recordContentFlag(params: {
+  targetType: string;
+  targetId: string;
+  userId?: string;
+  result: ModerationResult;
+  source: 'auto_input' | 'auto_output' | 'worker_scan';
+}): void {
+  if (!params.result.flagged) return;
+
+  prisma.contentFlag
+    .create({
+      data: {
+        targetType: params.targetType,
+        targetId: params.targetId,
+        userId: params.userId ?? null,
+        categories: params.result.blockedCategories,
+        scores: params.result.scores,
+        source: params.source,
+      },
+    })
+    .catch((err) => {
+      logger.warn('Failed to record content flag', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
 }

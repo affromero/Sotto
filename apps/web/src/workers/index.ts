@@ -31,6 +31,7 @@ import { processTelegramReply } from './telegram-reply.worker';
 import { processAutoTweet } from './twitter-auto-tweet.worker';
 import { processTrendPoll } from './twitter-trend-poll.worker';
 import { processAdminThreadToPodcast } from './admin-thread-to-podcast.worker';
+import { processContentModeration } from './content-moderation.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -58,6 +59,7 @@ const workers = [
   createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
   createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
   createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
+  createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

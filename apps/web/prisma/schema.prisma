@@ -1487,3 +1487,18 @@ model Report {
   @@index([status, createdAt])
   @@index([targetType, targetId])
 }
+
+model ContentFlag {
+  id         String   @id @default(cuid())
+  targetType String   // 'podcast' | 'comment' | 'discovery_message'
+  targetId   String
+  userId     String?
+  categories String[]
+  scores     Json
+  source     String   // 'auto_input' | 'auto_output' | 'worker_scan'
+  reviewed   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([reviewed, createdAt])
+  @@index([targetType, targetId])
+}
