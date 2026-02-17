@@ -51,4 +51,8 @@ export class PlayHTProvider implements TtsProvider {
     const pair = selectVoicePairFromPool(PLAYHT_VOICE_POOL, podcastId);
     return speaker === 'HOST' ? pair.host.id : pair.expert.id;
   }
+
+  getModelId(): string {
+    return 'premium';
+  }
 }

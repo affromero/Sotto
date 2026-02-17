@@ -61,4 +61,8 @@ export class HumeProvider implements TtsProvider {
     const pair = selectVoicePairFromPool(HUME_VOICE_POOL, podcastId);
     return speaker === 'HOST' ? pair.host.id : pair.expert.id;
   }
+
+  getModelId(): string {
+    return 'octave';
+  }
 }

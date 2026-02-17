@@ -19,6 +19,8 @@ export interface TtsProviderMeta {
   supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
   maxSegmentChars: number;
+  defaultModel: string;
+  supportsAudioTags: boolean;
   qualityTier: 'standard' | 'premium' | 'ultra';
   platformCostPerKChar: number;
   auth: {
@@ -35,6 +37,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
+    defaultModel: 'eleven_v3',
+    supportsAudioTags: true,
     qualityTier: 'premium',
     platformCostPerKChar: 0.17,
     auth: {
@@ -59,6 +63,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: false,
     supportsStreaming: true,
     maxSegmentChars: 4096,
+    defaultModel: 'tts-1-hd',
+    supportsAudioTags: false,
     qualityTier: 'standard',
     platformCostPerKChar: 0.015,
     auth: {
@@ -83,6 +89,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
+    defaultModel: 'premium',
+    supportsAudioTags: false,
     qualityTier: 'premium',
     platformCostPerKChar: 0.2,
     auth: {
@@ -113,6 +121,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
+    defaultModel: 'sonic-2',
+    supportsAudioTags: false,
     qualityTier: 'premium',
     platformCostPerKChar: 0.15,
     auth: {
@@ -140,6 +150,8 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
+    defaultModel: 'octave',
+    supportsAudioTags: false,
     qualityTier: 'ultra',
     platformCostPerKChar: 0.25,
     auth: {
