@@ -50,7 +50,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`} suppressHydrationWarning>
-      <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body>
         <SessionProvider>
           <ThemeProvider>
