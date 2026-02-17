@@ -28,8 +28,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
-  // Private/unlisted podcasts require ownership
-  if (podcast.visibility !== 'PUBLIC') {
+  // Private podcasts require ownership
+  if (podcast.visibility === 'PRIVATE') {
     if (!authResult || authResult.userId !== podcast.userId) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
