@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import styles from './ConfigForm.module.css';
 
-interface AiModel {
+interface ModelOption {
   id: string;
   displayName: string;
   tier: string;
@@ -12,12 +12,19 @@ interface AiModel {
 interface AiProvider {
   id: string;
   displayName: string;
-  models: AiModel[];
+  models: ModelOption[];
 }
 
 interface TtsProvider {
   id: string;
   displayName: string;
+  models: ModelOption[];
+}
+
+interface SttProvider {
+  id: string;
+  displayName: string;
+  models: ModelOption[];
 }
 
 interface ConfigFormProps {
@@ -25,30 +32,53 @@ interface ConfigFormProps {
     aiProvider: string;
     aiModel: string;
     ttsProvider: string;
+    ttsModel: string;
+    sttProvider: string;
+    sttModel: string;
     generationLimit: number;
   };
   aiProviders: AiProvider[];
   ttsProviders: TtsProvider[];
+  sttProviders: SttProvider[];
 }
 
-export function ConfigForm({ initialConfig, aiProviders, ttsProviders }: ConfigFormProps) {
+export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProviders }: ConfigFormProps) {
   const [aiProvider, setAiProvider] = useState(initialConfig.aiProvider);
   const [aiModel, setAiModel] = useState(initialConfig.aiModel);
   const [ttsProvider, setTtsProvider] = useState(initialConfig.ttsProvider);
+  const [ttsModel, setTtsModel] = useState(initialConfig.ttsModel);
+  const [sttProvider, setSttProvider] = useState(initialConfig.sttProvider);
+  const [sttModel, setSttModel] = useState(initialConfig.sttModel);
   const [generationLimit, setGenerationLimit] = useState(initialConfig.generationLimit);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedAiProvider = aiProviders.find((p) => p.id === aiProvider);
-  const models = selectedAiProvider?.models ?? [];
+  const aiModels = aiProviders.find((p) => p.id === aiProvider)?.models ?? [];
+  const ttsModels = ttsProviders.find((p) => p.id === ttsProvider)?.models ?? [];
+  const sttModels = sttProviders.find((p) => p.id === sttProvider)?.models ?? [];
 
-  // When AI provider changes, reset model to the first available
   const handleAiProviderChange = (newProvider: string) => {
     setAiProvider(newProvider);
     const provider = aiProviders.find((p) => p.id === newProvider);
     if (provider && provider.models.length > 0) {
       setAiModel(provider.models[0].id);
+    }
+  };
+
+  const handleTtsProviderChange = (newProvider: string) => {
+    setTtsProvider(newProvider);
+    const provider = ttsProviders.find((p) => p.id === newProvider);
+    if (provider && provider.models.length > 0) {
+      setTtsModel(provider.models[0].id);
+    }
+  };
+
+  const handleSttProviderChange = (newProvider: string) => {
+    setSttProvider(newProvider);
+    const provider = sttProviders.find((p) => p.id === newProvider);
+    if (provider && provider.models.length > 0) {
+      setSttModel(provider.models[0].id);
     }
   };
 
@@ -61,7 +91,12 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders }: ConfigF
       const res = await fetch('/api/admin/config', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ aiProvider, aiModel, ttsProvider, generationLimit }),
+        body: JSON.stringify({
+          aiProvider, aiModel,
+          ttsProvider, ttsModel,
+          sttProvider, sttModel,
+          generationLimit,
+        }),
       });
 
       if (!res.ok) {
@@ -109,7 +144,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders }: ConfigF
           value={aiModel}
           onChange={(e) => setAiModel(e.target.value)}
         >
-          {models.map((m) => (
+          {aiModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.displayName} ({m.tier})
             </option>
@@ -126,7 +161,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders }: ConfigF
           id="ttsProvider"
           className={styles.select}
           value={ttsProvider}
-          onChange={(e) => setTtsProvider(e.target.value)}
+          onChange={(e) => handleTtsProviderChange(e.target.value)}
         >
           {ttsProviders.map((p) => (
             <option key={p.id} value={p.id}>
@@ -135,6 +170,63 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders }: ConfigF
           ))}
         </select>
         <span className={styles.hint}>Voice provider for free tier audio generation</span>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="ttsModel">
+          TTS Model
+        </label>
+        <select
+          id="ttsModel"
+          className={styles.select}
+          value={ttsModel}
+          onChange={(e) => setTtsModel(e.target.value)}
+        >
+          {ttsModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName} ({m.tier})
+            </option>
+          ))}
+        </select>
+        <span className={styles.hint}>Model used for free tier voice generation</span>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="sttProvider">
+          STT Provider
+        </label>
+        <select
+          id="sttProvider"
+          className={styles.select}
+          value={sttProvider}
+          onChange={(e) => handleSttProviderChange(e.target.value)}
+        >
+          {sttProviders.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.displayName}
+            </option>
+          ))}
+        </select>
+        <span className={styles.hint}>Speech-to-text provider for free tier transcription</span>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="sttModel">
+          STT Model
+        </label>
+        <select
+          id="sttModel"
+          className={styles.select}
+          value={sttModel}
+          onChange={(e) => setSttModel(e.target.value)}
+        >
+          {sttModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.displayName} ({m.tier})
+            </option>
+          ))}
+        </select>
+        <span className={styles.hint}>Model used for free tier transcription</span>
       </div>
 
       <div className={styles.field}>

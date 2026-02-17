@@ -12,9 +12,11 @@ type OpenAIVoice = (typeof OPENAI_VOICES)[number];
 export class OpenAITtsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'openai';
   private apiKeyOverride: string | undefined;
+  private model: string;
 
-  constructor(byokApiKey?: string) {
+  constructor(byokApiKey?: string, model?: string) {
     this.apiKeyOverride = byokApiKey;
+    this.model = model ?? 'tts-1-hd';
   }
 
   private async getClient() {
@@ -38,7 +40,7 @@ export class OpenAITtsProvider implements TtsProvider {
       : 'alloy';
 
     const response = await client.audio.speech.create({
-      model: 'tts-1-hd',
+      model: this.model,
       voice,
       input: params.text,
       response_format: 'mp3',
@@ -58,6 +60,6 @@ export class OpenAITtsProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'tts-1-hd';
+    return this.model;
   }
 }

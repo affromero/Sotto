@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
+import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { ConfigForm } from './ConfigForm';
 import styles from './page.module.css';
 
@@ -23,6 +24,21 @@ export default async function AdminConfigPage() {
   const ttsProviders = getAllProviderMeta().map((p) => ({
     id: p.id,
     displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+    })),
+  }));
+
+  const sttProviders = getAllSttProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+    })),
   }));
 
   const totalUsers = await prisma.user.count();
@@ -45,6 +61,7 @@ export default async function AdminConfigPage() {
         initialConfig={config}
         aiProviders={aiProviders}
         ttsProviders={ttsProviders}
+        sttProviders={sttProviders}
       />
     </div>
   );

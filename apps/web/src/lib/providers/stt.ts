@@ -159,13 +159,15 @@ class OpenAIWhisperProvider implements SttProvider {
  */
 class ElevenLabsScribeProvider implements SttProvider {
   private apiKey: string;
+  private model: string;
 
-  constructor(apiKey?: string) {
+  constructor(apiKey?: string, model?: string) {
     const key = apiKey || process.env.ELEVENLABS_API_KEY;
     if (!key) {
       throw new Error('No ElevenLabs API key provided — Scribe STT will not work');
     }
     this.apiKey = key;
+    this.model = model ?? 'scribe_v1';
     logger.info('ElevenLabs Scribe STT provider initialized');
   }
 
@@ -176,7 +178,7 @@ class ElevenLabsScribeProvider implements SttProvider {
     const uint8Array = new Uint8Array(audio);
     const blob = new Blob([uint8Array], { type: 'audio/mpeg' });
     formData.append('file', blob, 'audio.mp3');
-    formData.append('model_id', 'scribe_v1');
+    formData.append('model_id', this.model);
     formData.append('tag_audio_events', 'false');
     formData.append('diarize', 'false');
 
@@ -275,21 +277,30 @@ class ElevenLabsScribeProvider implements SttProvider {
   }
 }
 
-export type SttProviderId = 'openai' | 'elevenlabs' | 'groq';
+export type { SttProviderId } from '@sotto/shared';
+import type { SttProviderId } from '@sotto/shared';
 
 /**
  * Create an STT provider instance
  */
-export function createSttProvider(provider?: SttProviderId, apiKey?: string): SttProvider {
+export function createSttProvider(provider?: SttProviderId, apiKey?: string, model?: string): SttProvider {
   const target = provider ?? 'openai';
 
   switch (target) {
     case 'elevenlabs':
-      return new ElevenLabsScribeProvider(apiKey);
-    case 'groq':
-      return new OpenAIWhisperProvider(apiKey, GROQ_WHISPER_CONFIG);
+      return new ElevenLabsScribeProvider(apiKey, model);
+    case 'groq': {
+      const config = model
+        ? { ...GROQ_WHISPER_CONFIG, model }
+        : GROQ_WHISPER_CONFIG;
+      return new OpenAIWhisperProvider(apiKey, config);
+    }
     case 'openai':
-    default:
-      return new OpenAIWhisperProvider(apiKey);
+    default: {
+      const config = model
+        ? { ...OPENAI_WHISPER_CONFIG, model }
+        : OPENAI_WHISPER_CONFIG;
+      return new OpenAIWhisperProvider(apiKey, config);
+    }
   }
 }
