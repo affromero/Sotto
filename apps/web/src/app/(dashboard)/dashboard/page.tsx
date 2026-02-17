@@ -303,7 +303,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className={styles.miniGradientBody}>
                       <p className={styles.miniGradientTopic}>{podcast.topic}</p>
-                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} />
+                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={freeTier.isByokUser} />
                       <div className={styles.miniGradientMeta}>
                         <span>{formatDuration(podcast.duration)}</span>
                         <span>{formatDate(podcast.createdAt)}</span>

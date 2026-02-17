@@ -52,6 +52,7 @@ interface PodcastPlayerViewProps {
   isOwner: boolean;
   isAuthenticated: boolean;
   currentUserId?: string;
+  canMakePrivate?: boolean;
 }
 
 type ViewMode = 'transcript' | 'teleprompter';
@@ -120,7 +121,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId, canMakePrivate }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
@@ -472,7 +473,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             </Badge>
           )}
           {isOwner && (
-            <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} />
+            <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={canMakePrivate} />
           )}
         </div>
 
