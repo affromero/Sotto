@@ -87,7 +87,12 @@ export default function RootLayout() {
               headerTintColor: colors.textPrimary,
               contentStyle: { backgroundColor: colors.background },
             }}
-          />
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+            <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="user/[userId]" options={{ title: '' }} />
+          </Stack>
         </QueryClientProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>

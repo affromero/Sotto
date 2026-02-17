@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { storeAiKey, removeAiKey, listAiProviders, validateAiKey } from '@/lib/byok';
 import { isValidAiProviderId } from '@/lib/providers/ai-registry';
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const keys = await listAiProviders(session.user.id);
+  const keys = await listAiProviders(authed.userId);
   return NextResponse.json({ keys });
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -37,13 +37,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await storeAiKey(session.user.id, provider, apiKey);
+  await storeAiKey(authed.userId, provider, apiKey);
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -59,6 +59,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
   }
 
-  await removeAiKey(session.user.id, provider);
+  await removeAiKey(authed.userId, provider);
   return NextResponse.json({ success: true });
 }

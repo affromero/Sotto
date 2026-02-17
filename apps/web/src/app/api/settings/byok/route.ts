@@ -1,21 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { byokSchema } from '@/lib/validations';
 import { storeByokKey, removeByokKey, listByokProviders, validateByokKey } from '@/lib/byok';
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const keys = await listByokProviders(session.user.id);
+  const keys = await listByokProviders(authed.userId);
   return NextResponse.json({ keys });
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -38,13 +38,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await storeByokKey(session.user.id, provider, { apiKey, userId });
+  await storeByokKey(authed.userId, provider, { apiKey, userId });
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest) {
   const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
 
   await removeByokKey(
-    session.user.id,
+    authed.userId,
     targetProvider as 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
   );
   return NextResponse.json({ success: true });
