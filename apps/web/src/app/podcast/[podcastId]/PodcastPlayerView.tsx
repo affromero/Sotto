@@ -31,6 +31,7 @@ import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
+import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
@@ -468,6 +469,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             <Badge variant={statusVariants[liveStatus as PodcastStatus]}>
               {liveStatus.replace(/_/g, ' ')}
             </Badge>
+          )}
+          {isOwner && (
+            <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} />
           )}
         </div>
 
