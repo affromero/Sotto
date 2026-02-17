@@ -123,6 +123,7 @@ model User {
   // Moderation relations
   moderationActions   ModerationAction[] @relation("ModeratedUser")
   moderationPerformed ModerationAction[] @relation("Moderator")
+  reports             Report[]           @relation("Reporter")
 
   // Stripe Connect (voice monetization)
   stripeAccountId  String?
@@ -1444,4 +1445,45 @@ model TwitterAutoTweet {
   @@index([podcastId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============ REPORTS ============
+
+enum ReportReason {
+  HARASSMENT
+  HATE_SPEECH
+  VIOLENCE
+  SEXUAL_CONTENT
+  MISINFORMATION
+  SPAM
+  IMPERSONATION
+  COPYRIGHT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED_ACTIONED
+  RESOLVED_DISMISSED
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  targetType  String       // 'podcast' | 'comment' | 'user'
+  targetId    String
+  reason      ReportReason
+  description String?      @db.Text
+  status      ReportStatus @default(PENDING)
+  resolvedBy  String?
+  resolution  String?      @db.Text
+  resolvedAt  DateTime?
+  createdAt   DateTime     @default(now())
+
+  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
 }
