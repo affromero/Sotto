@@ -30,6 +30,7 @@ export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
   getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string;
+  getModelId(): string;
   readonly providerId: TtsProviderId;
 }
 
@@ -114,6 +115,10 @@ class FallbackTtsProvider implements TtsProvider {
 
   getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
     return this.primary.getVoiceId(speaker, podcastId);
+  }
+
+  getModelId(): string {
+    return this.primary.getModelId();
   }
 }
 

@@ -54,4 +54,8 @@ export class CartesiaProvider implements TtsProvider {
     const pair = selectVoicePairFromPool(CARTESIA_VOICE_POOL, podcastId);
     return speaker === 'HOST' ? pair.host.id : pair.expert.id;
   }
+
+  getModelId(): string {
+    return 'sonic-2';
+  }
 }
