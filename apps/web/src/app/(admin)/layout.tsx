@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { AdminShell } from './AdminShell';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -15,6 +16,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect('/dashboard');
   }
 
+  const pendingReportCount = await prisma.report.count({
+    where: { status: 'PENDING' },
+  });
+
   return (
     <AdminShell
       user={{
@@ -22,6 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         email: session.user.email ?? null,
         image: session.user.image ?? null,
       }}
+      pendingReportCount={pendingReportCount}
     >
       {children}
     </AdminShell>
