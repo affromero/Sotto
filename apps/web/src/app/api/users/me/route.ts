@@ -20,6 +20,7 @@ const updateUserSchema = z
     handle: handleSchema.optional(),
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
+    preferredLanguage: z.string().max(5).nullable().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
   })
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
       twitterEnabled: user.twitterEnabled,
       preferredHostVoiceId: user.preferredHostVoiceId,
       preferredExpertVoiceId: user.preferredExpertVoiceId,
+      preferredLanguage: user.preferredLanguage,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch user';
@@ -194,6 +196,7 @@ export async function PATCH(request: NextRequest) {
       twitterEnabled: updatedUser.twitterEnabled,
       preferredHostVoiceId: updatedUser.preferredHostVoiceId,
       preferredExpertVoiceId: updatedUser.preferredExpertVoiceId,
+      preferredLanguage: updatedUser.preferredLanguage,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update user';

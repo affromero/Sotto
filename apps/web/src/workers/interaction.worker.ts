@@ -3,6 +3,7 @@ import { ProcessInteractionPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateResponse, logApiUsage } from '@/lib/claude';
 import { getAiKey } from '@/lib/byok';
+import { getLanguageLabel } from '@sotto/shared';
 import { logger } from '@/lib/logger';
 
 export async function processInteraction(job: Job<ProcessInteractionPayload>): Promise<void> {
@@ -11,7 +12,11 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   logger.info('Processing interaction', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  const aiKey = await getAiKey(userId);
+  const [aiKey, podcast, user] = await Promise.all([
+    getAiKey(userId),
+    prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
+  ]);
 
   // Get podcast script context
   const script = await prisma.script.findUnique({ where: { podcastId } });
@@ -56,8 +61,12 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     .map((t) => `${t.speaker}: ${t.text}`)
     .join('\n');
 
+  // Language priority: user preference > podcast language > English
+  const responseLanguage = user?.preferredLanguage || podcast?.language || 'en';
+  const languageLabel = getLanguageLabel(responseLanguage) || 'English';
+
   const systemPrompt = `You are Sotto's Q&A assistant. The user is listening to a podcast and paused to ask a question.
-Answer concisely and helpfully, using the podcast context. Keep answers under 200 words.`;
+Answer concisely and helpfully, using the podcast context. Keep answers under 200 words. Respond in ${languageLabel}.`;
 
   const response = await generateResponse(systemPrompt, [
     {

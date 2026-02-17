@@ -40,6 +40,7 @@ model User {
   twitterEnabled         Boolean   @default(false)
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
+  preferredLanguage      String?
 
   // Telegram integration
   telegramEnabled Boolean @default(false)

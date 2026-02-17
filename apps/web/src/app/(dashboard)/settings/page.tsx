@@ -30,6 +30,7 @@ export default async function SettingsPage() {
         twitterEnabled: true,
         preferredHostVoiceId: true,
         preferredExpertVoiceId: true,
+        preferredLanguage: true,
       },
     }),
     prisma.account.findMany({
@@ -96,6 +97,7 @@ export default async function SettingsPage() {
         twitterEnabled={user.twitterEnabled}
         preferredHostVoiceId={user.preferredHostVoiceId}
         preferredExpertVoiceId={user.preferredExpertVoiceId}
+        preferredLanguage={user.preferredLanguage}
         voiceClones={voiceClones}
         interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
