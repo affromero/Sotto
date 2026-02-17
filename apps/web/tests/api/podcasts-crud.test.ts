@@ -14,6 +14,7 @@ const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
 const mockTryIncrementFreeGeneration = vi.fn();
+const mockGetFreeTierStatus = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
 const mockAddJob = vi.fn();
 
@@ -72,6 +73,7 @@ vi.mock('@/lib/queue', () => ({
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
   tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
+  getFreeTierStatus: (...args: unknown[]) => mockGetFreeTierStatus(...args),
 }));
 
 vi.mock('@/lib/free-tier-config', () => ({
@@ -721,9 +723,10 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     expect(body.topic).toBe('Updated topic');
   });
 
-  it('updates podcast visibility', async () => {
+  it('updates podcast visibility to PRIVATE for BYOK user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockGetFreeTierStatus.mockResolvedValue({ isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 3, freeGenerationsRemaining: 3 });
     mockPrisma.podcast.update.mockResolvedValue({
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',
@@ -737,6 +740,39 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.visibility).toBe('PRIVATE');
+  });
+
+  it('rejects PRIVATE visibility for free tier user', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockGetFreeTierStatus.mockResolvedValue({ isByokUser: false, freeGenerationsUsed: 1, freeGenerationsLimit: 3, freeGenerationsRemaining: 2 });
+
+    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
+    const response = await updatePodcast(request, {
+      params: Promise.resolve({ podcastId: 'pod-1' }),
+    });
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.error).toContain('Free tier podcasts cannot be private');
+  });
+
+  it('allows UNLISTED visibility for free tier user', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.update.mockResolvedValue({
+      ...mockPodcastWithRelations,
+      visibility: 'UNLISTED',
+    });
+
+    const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'UNLISTED' });
+    const response = await updatePodcast(request, {
+      params: Promise.resolve({ podcastId: 'pod-1' }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.visibility).toBe('UNLISTED');
   });
 
   it('returns 400 for invalid visibility value', async () => {
