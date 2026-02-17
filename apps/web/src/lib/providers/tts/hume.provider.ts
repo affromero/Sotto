@@ -16,9 +16,11 @@ interface HumeTtsResponse {
 export class HumeProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'hume';
   private apiKey: string;
+  private model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
+    this.model = model ?? 'octave';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
@@ -63,6 +65,6 @@ export class HumeProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'octave';
+    return this.model;
   }
 }

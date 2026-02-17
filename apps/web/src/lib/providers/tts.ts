@@ -129,7 +129,7 @@ class FallbackTtsProvider implements TtsProvider {
 /**
  * Create a TTS provider instance by ID, optionally with a BYOK API key.
  */
-export function createTtsProvider(type?: string, byokApiKey?: string): TtsProvider {
+export function createTtsProvider(type?: string, byokApiKey?: string, model?: string): TtsProvider {
   const providerType = type || process.env.TTS_PROVIDER || 'openai';
   // Use lazy-loaded classes synchronously via pre-instantiated inline classes
   // that delegate to the async providers. For backward compat, we keep
@@ -138,16 +138,16 @@ export function createTtsProvider(type?: string, byokApiKey?: string): TtsProvid
     case 'elevenlabs': {
       // Inline sync version using the same lazy-loading pattern
       const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
-      return new ElevenLabsProvider(byokApiKey);
+      return new ElevenLabsProvider(byokApiKey, model);
     }
     case 'openai': {
       const { OpenAITtsProvider } = require('./tts/openai.provider');
-      return new OpenAITtsProvider(byokApiKey);
+      return new OpenAITtsProvider(byokApiKey, model);
     }
     default:
       logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to openai`);
       const { OpenAITtsProvider: Fallback } = require('./tts/openai.provider');
-      return new Fallback(byokApiKey);
+      return new Fallback(byokApiKey, model);
   }
 }
 
@@ -157,32 +157,33 @@ export function createTtsProvider(type?: string, byokApiKey?: string): TtsProvid
 export async function createTtsProviderAsync(
   providerId: TtsProviderId,
   apiKey?: string,
-  extraData?: Record<string, string>
+  extraData?: Record<string, string>,
+  model?: string
 ): Promise<TtsProvider> {
   switch (providerId) {
     case 'elevenlabs': {
       const Cls = await importElevenLabs();
-      return new Cls(apiKey);
+      return new Cls(apiKey, model);
     }
     case 'openai': {
       const Cls = await importOpenAI();
-      return new Cls(apiKey);
+      return new Cls(apiKey, model);
     }
     case 'playht': {
       if (!apiKey) throw new Error('PlayHT requires an API key');
       if (!extraData?.userId) throw new Error('PlayHT requires a userId in extraData');
       const Cls = await importPlayHT();
-      return new Cls(apiKey, extraData.userId);
+      return new Cls(apiKey, extraData.userId, model);
     }
     case 'cartesia': {
       if (!apiKey) throw new Error('Cartesia requires an API key');
       const Cls = await importCartesia();
-      return new Cls(apiKey);
+      return new Cls(apiKey, model);
     }
     case 'hume': {
       if (!apiKey) throw new Error('Hume AI requires an API key');
       const Cls = await importHume();
-      return new Cls(apiKey);
+      return new Cls(apiKey, model);
     }
     default:
       throw new Error(`Unknown TTS provider: ${providerId}`);
@@ -193,9 +194,9 @@ export async function createTtsProviderAsync(
  * Get the premium (ElevenLabs) TTS provider.
  * Always returns ElevenLabs regardless of TTS_PROVIDER env var.
  */
-export function createPremiumTtsProvider(byokApiKey?: string): TtsProvider {
+export function createPremiumTtsProvider(byokApiKey?: string, model?: string): TtsProvider {
   const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
-  return new ElevenLabsProvider(byokApiKey);
+  return new ElevenLabsProvider(byokApiKey, model);
 }
 
 /**
@@ -249,16 +250,21 @@ export async function resolveTtsProvider(context: {
     }
 
     // Platform fallback for elevenlabs/openai (we have platform keys)
+    // Use admin-configured model when falling back to platform keys
     if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
+      const config = await getFreeTierConfig();
+      const model = config.ttsProvider === 'elevenlabs' ? config.ttsModel : undefined;
       return {
-        provider: createPremiumTtsProvider(),
+        provider: createPremiumTtsProvider(undefined, model),
         source: 'platform',
         providerId: 'elevenlabs',
       };
     }
     if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
+      const config = await getFreeTierConfig();
+      const model = config.ttsProvider === 'openai' ? config.ttsModel : undefined;
       return {
-        provider: createTtsProvider('openai'),
+        provider: createTtsProvider('openai', undefined, model),
         source: 'platform',
         providerId: 'openai',
       };
@@ -294,10 +300,10 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Default: use admin-configured free tier TTS provider
+  // Default: use admin-configured free tier TTS provider + model
   const config = await getFreeTierConfig();
   return {
-    provider: createTtsProvider(config.ttsProvider),
+    provider: createTtsProvider(config.ttsProvider, undefined, config.ttsModel),
     source: 'platform',
     providerId: config.ttsProvider,
   };

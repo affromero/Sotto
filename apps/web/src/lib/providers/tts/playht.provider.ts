@@ -10,10 +10,12 @@ export class PlayHTProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'playht';
   private apiKey: string;
   private userId: string;
+  private model: string;
 
-  constructor(apiKey: string, userId: string) {
+  constructor(apiKey: string, userId: string, model?: string) {
     this.apiKey = apiKey;
     this.userId = userId;
+    this.model = model ?? 'premium';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
@@ -29,7 +31,7 @@ export class PlayHTProvider implements TtsProvider {
         text: params.text,
         voice: params.voiceId,
         output_format: 'mp3',
-        quality: 'premium',
+        quality: this.model,
         speed: 1,
       }),
     });
@@ -53,6 +55,6 @@ export class PlayHTProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'premium';
+    return this.model;
   }
 }
