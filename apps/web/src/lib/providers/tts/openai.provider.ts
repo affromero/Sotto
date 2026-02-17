@@ -56,4 +56,8 @@ export class OpenAITtsProvider implements TtsProvider {
     const entry = speaker === 'HOST' ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'openai');
   }
+
+  getModelId(): string {
+    return 'tts-1-hd';
+  }
 }

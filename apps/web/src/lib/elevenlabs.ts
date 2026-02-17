@@ -104,7 +104,7 @@ export async function generateSpeech(params: {
     },
     body: JSON.stringify({
       text: params.text,
-      model_id: params.modelId || 'eleven_multilingual_v2',
+      model_id: params.modelId || 'eleven_v3',
       voice_settings: {
         stability: params.stability ?? 0.5,
         similarity_boost: params.similarityBoost ?? 0.75,

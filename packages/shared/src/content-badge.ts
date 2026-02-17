@@ -1,6 +1,12 @@
 import type { PodcastSummary } from './types/podcast';
 import { SOURCE_PLATFORMS } from './types/import';
-import { getAiProviderLabel, getAiModelLabel, getTtsProviderLabel, getLanguageLabel } from './provider-display';
+import {
+  AI_PROVIDER_DISPLAY,
+  AI_MODEL_SHORT_DISPLAY,
+  getTtsProviderLabel,
+  getTtsModelLabel,
+  getLanguageLabel,
+} from './provider-display';
 
 export function getContentBadgeLabel(
   podcast: Pick<PodcastSummary, 'source' | 'isHumanContent' | 'sourcePlatform'>
@@ -23,7 +29,7 @@ export interface PodcastBadge {
 export function getPodcastBadges(
   podcast: Pick<
     PodcastSummary,
-    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'language'
+    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
   >
 ): PodcastBadge[] {
   const badges: PodcastBadge[] = [];
@@ -38,9 +44,24 @@ export function getPodcastBadges(
     variant: isHuman ? 'success' : isImport ? 'default' : 'info',
   });
 
-  // 2. AI model/provider badge — prefer model name (e.g. "Claude Sonnet 4.5") over provider
+  // 2. AI badge — "Provider · Model" format (e.g. "Claude · Sonnet 4.5")
   if (!isImport) {
-    const aiLabel = getAiModelLabel(podcast.aiModel) ?? getAiProviderLabel(podcast.aiProvider);
+    const providerShort = podcast.aiProvider
+      ? AI_PROVIDER_DISPLAY[podcast.aiProvider]?.shortLabel
+      : null;
+    const modelShort = podcast.aiModel
+      ? AI_MODEL_SHORT_DISPLAY[podcast.aiModel]
+      : null;
+
+    let aiLabel: string | null = null;
+    if (providerShort && modelShort) {
+      aiLabel = `${providerShort} · ${modelShort}`;
+    } else if (modelShort) {
+      aiLabel = modelShort;
+    } else if (providerShort) {
+      aiLabel = providerShort;
+    }
+
     if (aiLabel) {
       badges.push({
         category: 'ai',
@@ -51,9 +72,18 @@ export function getPodcastBadges(
     }
   }
 
-  // 3. TTS provider badge — only for non-import podcasts
+  // 3. TTS badge — "Provider · Model" format (e.g. "ElevenLabs · v3")
   if (!isImport) {
-    const ttsLabel = getTtsProviderLabel(podcast.ttsProvider);
+    const ttsProviderShort = getTtsProviderLabel(podcast.ttsProvider);
+    const ttsModelShort = getTtsModelLabel(podcast.ttsModel);
+
+    let ttsLabel: string | null = null;
+    if (ttsProviderShort && ttsModelShort) {
+      ttsLabel = `${ttsProviderShort} · ${ttsModelShort}`;
+    } else if (ttsProviderShort) {
+      ttsLabel = ttsProviderShort;
+    }
+
     if (ttsLabel) {
       badges.push({
         category: 'tts',

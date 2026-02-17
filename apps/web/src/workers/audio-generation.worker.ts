@@ -8,6 +8,7 @@ import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
+import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -22,27 +23,6 @@ import { writeFile, rm } from 'fs/promises';
 function estimateDurationFromText(text: string): number {
   const charsPerSecond = 12.5;
   return text.length / charsPerSecond;
-}
-
-/**
- * Strip non-speech markers from text before sending to TTS.
- * Removes: [SFX: ...] markers, (delivery directions), [N] citation markers.
- * Keeps the raw text in Segment records for transcript display.
- */
-function cleanTextForTts(text: string): string {
-  return text
-    // Remove [SFX: ...] markers (e.g. "[SFX: upbeat music, 3s]")
-    .replace(/\[SFX:.*?\]/gi, '')
-    // Remove parenthetical delivery directions (e.g. "(laughing)", "(whispering)")
-    .replace(/\(([^)]{1,30})\)/g, (_, inner) => {
-      const directions = /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly)$/i;
-      return directions.test(inner.trim()) ? '' : `(${inner})`;
-    })
-    // Remove citation markers like [1], [2, 3], [1, 2, 3]
-    .replace(/\[\d+(?:,\s*\d+)*\]/g, '')
-    // Collapse multiple spaces and trim
-    .replace(/\s{2,}/g, ' ')
-    .trim();
 }
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
@@ -107,6 +87,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       hostVoiceId: true,
       expertVoiceId: true,
       ttsProvider: true,
+      ttsModel: true,
     },
   });
 
@@ -119,11 +100,13 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
   });
 
-  // Write back resolved provider if not already set
-  if (!podcast.ttsProvider) {
+  const ttsModelId = provider.getModelId();
+
+  // Write back resolved provider and model if not already set
+  if (!podcast.ttsProvider || !podcast.ttsModel) {
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { ttsProvider: providerId },
+      data: { ttsProvider: providerId, ttsModel: ttsModelId },
     }).catch(() => {});
   }
 
@@ -175,8 +158,8 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
   }
 
-  // Strip non-speech markers before sending to TTS
-  const ttsText = cleanTextForTts(text);
+  // Strip non-speech markers before sending to TTS (preserves audio tags for ElevenLabs)
+  const ttsText = cleanTextForTts(text, { providerId });
 
   let audioBuffer: Buffer;
   try {
