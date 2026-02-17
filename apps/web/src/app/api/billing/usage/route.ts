@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { LIMITS } from '@/lib/stripe';
+import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 
@@ -33,7 +33,7 @@ export async function GET(_request: NextRequest) {
         isByokUser: freeTier.isByokUser,
       },
       limits: {
-        maxDurationMinutes: LIMITS.maxDurationMinutes,
+        maxDurationMinutes: freeTier.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES,
         maxVoiceClones: LIMITS.maxVoiceClones,
         canDownload: LIMITS.canDownload,
         canMakePrivate: LIMITS.canMakePrivate,

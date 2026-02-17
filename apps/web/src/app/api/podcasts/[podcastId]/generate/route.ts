@@ -12,7 +12,7 @@ import {
   addJob,
   JobType,
 } from '@/lib/queue';
-import { LIMITS } from '@/lib/stripe';
+import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { checkRateLimit } from '@/lib/redis';
@@ -101,12 +101,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Duration validation
+  // Duration validation — free tier users capped at 5 min, BYOK at 40 min
+  const effectiveMaxDuration = gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
   const durationTarget = podcast.discovery?.durationTarget;
-  if (durationTarget && durationTarget > LIMITS.maxDurationMinutes) {
+  if (durationTarget && durationTarget > effectiveMaxDuration) {
     return NextResponse.json(
       {
-        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${LIMITS.maxDurationMinutes} minutes.`,
+        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${effectiveMaxDuration} minutes.`,
       },
       { status: 400 }
     );

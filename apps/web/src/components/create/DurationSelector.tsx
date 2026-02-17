@@ -7,14 +7,17 @@ const DURATION_OPTIONS = [5, 10, 15, 20, 25, 30, 35, 40] as const;
 interface DurationSelectorProps {
   value: number;
   onChange: (minutes: number) => void;
+  max?: number;
 }
 
-export function DurationSelector({ value, onChange }: DurationSelectorProps) {
+export function DurationSelector({ value, onChange, max = 40 }: DurationSelectorProps) {
+  const options = DURATION_OPTIONS.filter((m) => m <= max);
+
   return (
     <div className={styles.root}>
       <label className={styles.label}>Duration</label>
       <div className={styles.options}>
-        {DURATION_OPTIONS.map((minutes) => (
+        {options.map((minutes) => (
           <button
             key={minutes}
             type="button"

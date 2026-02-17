@@ -15,6 +15,7 @@ import { ImportUploader } from '@/components/import/ImportUploader';
 import { ImportProgress } from '@/components/import/ImportProgress';
 import { StripeProvider } from '@/components/providers/StripeProvider';
 import { VoicePaymentModal, type VoiceChargeItem } from '@/components/voices/VoicePaymentModal';
+import { FREE_TIER_MAX_DURATION_MINUTES, LIMITS } from '@/lib/stripe';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
@@ -54,7 +55,8 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
-  const [durationTarget, setDurationTarget] = useState(10);
+  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
+  const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
@@ -78,8 +80,8 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
     setMetadata(meta);
     if (meta.durationTarget) {
-      // Clamp to nearest valid step (5–40, step 5)
-      const clamped = Math.max(5, Math.min(40, Math.round(meta.durationTarget / 5) * 5));
+      // Clamp to nearest valid step (5–max, step 5)
+      const clamped = Math.max(5, Math.min(maxDuration, Math.round(meta.durationTarget / 5) * 5));
       setDurationTarget(clamped);
     }
     setStep('voice');
@@ -411,7 +413,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
             {isByokUser && <AiModelSelector value={aiModel} onChange={setAiModel} />}
             <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
-            <DurationSelector value={durationTarget} onChange={setDurationTarget} />
+            <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
             <div className={styles.voiceActions}>
               <button
                 type="button"
