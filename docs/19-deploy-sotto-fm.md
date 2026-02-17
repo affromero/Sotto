@@ -589,6 +589,8 @@ ls ~/sotto
 
 ### 4.3 Create the environment file
 
+> **Production uses Doppler.** After initial setup, production secrets are managed via [Doppler](https://dashboard.doppler.com/workplace/projects/sotto/configs/prd). The deploy workflow runs `doppler secrets download` to regenerate `.env` on every deploy — you should never need to SSH in and edit `.env` manually after the first time. See the Doppler setup steps below in section 4.3a.
+
 `.env.example` is a template showing all the environment variables the app needs, with placeholder values. We copy it to `.env` (the actual file the app reads) and then fill in real values.
 
 ```bash
@@ -685,6 +687,40 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID_STARTER=price_...
 STRIPE_PRICE_ID_PRO=price_...
 STRIPE_PRICE_ID_STUDIO=price_...
+```
+
+### 4.3a Import secrets into Doppler (one-time)
+
+After your `.env` is fully configured and working, import it into Doppler so future deploys regenerate `.env` automatically:
+
+```bash
+# On your LOCAL machine:
+brew install dopplerhq/cli/doppler
+doppler login
+doppler projects create sotto
+doppler secrets upload --project sotto --config prd ~/path/to/prod.env
+
+# Create a service token for the VPS:
+doppler configs tokens create --project sotto --config prd vps-token --plain
+# Copy the dp.st.prd.xxx token
+
+# On the VPS:
+sudo apt update && sudo apt install -y apt-transport-https ca-certificates curl gnupg
+curl -sLf --retry 3 --tlsv1.2 --proto "=https" "https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key" | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+sudo apt update && sudo apt install doppler
+
+# Configure the service token:
+echo 'dp.st.prd.xxx' | doppler configure set token --scope ~/sotto
+
+# Verify:
+cd ~/sotto && doppler secrets  # should list all secrets
+```
+
+After the first successful Doppler-powered deploy, delete the static `.env`:
+
+```bash
+rm ~/sotto/.env  # next deploy regenerates it from Doppler
 ```
 
 ---
