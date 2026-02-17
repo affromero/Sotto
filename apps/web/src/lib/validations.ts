@@ -77,6 +77,7 @@ export const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   search: z.string().max(200).optional(),
   tag: z.string().optional(),
+  language: z.string().max(5).optional(),
   sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).default('recent'),
   tags: z.string().optional(), // comma-separated tag slugs
   depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),

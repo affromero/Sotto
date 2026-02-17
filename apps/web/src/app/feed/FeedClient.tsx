@@ -79,6 +79,7 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
         if (filters.depth) params.set('depth', filters.depth);
         if (filters.audience) params.set('audience', filters.audience);
         if (filters.tone) params.set('tone', filters.tone);
+        if (filters.language) params.set('language', filters.language);
         if (filters.durationMin !== undefined)
           params.set('durationMin', String(filters.durationMin));
         if (filters.durationMax !== undefined)
