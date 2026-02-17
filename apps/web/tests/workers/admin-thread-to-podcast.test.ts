@@ -7,17 +7,17 @@ import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaPodcastCreate = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
     podcast: {
       create: (...args: unknown[]) => mockPrismaPodcastCreate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGetTweet = vi.fn();
 const mockGetThread = vi.fn();

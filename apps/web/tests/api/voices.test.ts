@@ -20,9 +20,8 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
@@ -40,8 +39,9 @@ vi.mock('@/lib/prisma', () => ({
       findMany: (...args: unknown[]) => mockVoiceRequestFindMany(...args),
       deleteMany: (...args: unknown[]) => mockVoiceRequestDeleteMany(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/stripe', () => ({
   LIMITS: {

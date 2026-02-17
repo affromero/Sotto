@@ -14,9 +14,8 @@ const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
@@ -35,8 +34,9 @@ vi.mock('@/lib/prisma', () => ({
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGenerateResponse = vi.fn().mockResolvedValue({
   content: 'Here is the answer to your question.',

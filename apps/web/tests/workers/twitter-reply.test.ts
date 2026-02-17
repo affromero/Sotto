@@ -5,17 +5,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
 const mockPrismaTweetMentionUpdate = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
     tweetMention: {
       update: (...args: unknown[]) => mockPrismaTweetMentionUpdate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockReplyToTweet = vi.fn();
 

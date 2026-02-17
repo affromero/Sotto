@@ -57,15 +57,15 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGeneratePodcastPdf = vi.fn().mockResolvedValue(Buffer.from('fake-pdf-content'));
 
