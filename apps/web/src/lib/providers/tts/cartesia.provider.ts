@@ -9,9 +9,11 @@ import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 export class CartesiaProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'cartesia';
   private apiKey: string;
+  private model: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
+    this.model = model ?? 'sonic-2';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
@@ -24,7 +26,7 @@ export class CartesiaProvider implements TtsProvider {
       },
       body: JSON.stringify({
         transcript: params.text,
-        model_id: 'sonic-2',
+        model_id: this.model,
         voice: { mode: 'id', id: params.voiceId },
         output_format: {
           container: 'mp3',
@@ -56,6 +58,6 @@ export class CartesiaProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'sonic-2';
+    return this.model;
   }
 }

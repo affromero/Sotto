@@ -1,11 +1,15 @@
 import { prisma } from './prisma';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
+import type { SttProviderId } from '@sotto/shared';
 
 export interface FreeTierConfig {
   aiProvider: AiProviderId;
   aiModel: string;
   ttsProvider: TtsProviderId;
+  ttsModel: string;
+  sttProvider: SttProviderId;
+  sttModel: string;
   generationLimit: number;
 }
 
@@ -13,6 +17,9 @@ const DEFAULTS: FreeTierConfig = {
   aiProvider: 'anthropic',
   aiModel: 'claude-haiku-4-5-20251001',
   ttsProvider: 'openai',
+  ttsModel: 'tts-1-hd',
+  sttProvider: 'groq',
+  sttModel: 'whisper-large-v3-turbo',
   generationLimit: 3,
 };
 
@@ -29,6 +36,9 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
       aiProvider: DEFAULTS.aiProvider,
       aiModel: DEFAULTS.aiModel,
       ttsProvider: DEFAULTS.ttsProvider,
+      ttsModel: DEFAULTS.ttsModel,
+      sttProvider: DEFAULTS.sttProvider,
+      sttModel: DEFAULTS.sttModel,
       generationLimit: DEFAULTS.generationLimit,
     },
   });
@@ -37,6 +47,9 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
     aiProvider: row.aiProvider as AiProviderId,
     aiModel: row.aiModel,
     ttsProvider: row.ttsProvider as TtsProviderId,
+    ttsModel: row.ttsModel,
+    sttProvider: row.sttProvider as SttProviderId,
+    sttModel: row.sttModel,
     generationLimit: row.generationLimit,
   };
 }
@@ -54,6 +67,9 @@ export async function setFreeTierConfig(
       ...(data.aiProvider !== undefined && { aiProvider: data.aiProvider }),
       ...(data.aiModel !== undefined && { aiModel: data.aiModel }),
       ...(data.ttsProvider !== undefined && { ttsProvider: data.ttsProvider }),
+      ...(data.ttsModel !== undefined && { ttsModel: data.ttsModel }),
+      ...(data.sttProvider !== undefined && { sttProvider: data.sttProvider }),
+      ...(data.sttModel !== undefined && { sttModel: data.sttModel }),
       ...(data.generationLimit !== undefined && { generationLimit: data.generationLimit }),
       updatedBy: adminId,
     },
@@ -62,6 +78,9 @@ export async function setFreeTierConfig(
       aiProvider: data.aiProvider ?? DEFAULTS.aiProvider,
       aiModel: data.aiModel ?? DEFAULTS.aiModel,
       ttsProvider: data.ttsProvider ?? DEFAULTS.ttsProvider,
+      ttsModel: data.ttsModel ?? DEFAULTS.ttsModel,
+      sttProvider: data.sttProvider ?? DEFAULTS.sttProvider,
+      sttModel: data.sttModel ?? DEFAULTS.sttModel,
       generationLimit: data.generationLimit ?? DEFAULTS.generationLimit,
       updatedBy: adminId,
     },

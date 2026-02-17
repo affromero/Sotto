@@ -29,6 +29,9 @@ const updateConfigSchema = z.object({
   aiProvider: z.enum(['anthropic', 'openai']).optional(),
   aiModel: z.string().min(1).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
+  ttsModel: z.string().min(1).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'groq']).optional(),
+  sttModel: z.string().min(1).optional(),
   generationLimit: z.number().int().min(0).max(100).optional(),
 });
 
