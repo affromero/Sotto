@@ -59,7 +59,7 @@ export function FreeTierBanner({ used, limit, isByokUser }: FreeTierBannerProps)
           <p className={styles.description}>
             {exhausted
               ? 'Add a voice provider key to keep creating podcasts.'
-              : 'Add a voice provider key for unlimited generation.'}
+              : 'Free podcasts are public by default. Add a voice provider key for unlimited generation and private podcasts.'}
           </p>
         </div>
         <Link href="/onboarding?step=keys" className={styles.link}>
