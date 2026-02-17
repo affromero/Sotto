@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createCommentSchema, paginationSchema } from '@/lib/validations';
 import { moderateOrThrow, ContentModerationError } from '@/lib/moderation';
+import { checkSuspension } from '@/lib/auth-guards';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -84,6 +85,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const suspended = checkSuspension(session);
+  if (suspended) return suspended;
 
   const userId = session.user.id;
 

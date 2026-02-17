@@ -8,6 +8,7 @@ import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
+import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -19,6 +20,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const suspended = checkSuspension(session);
+  if (suspended) return suspended;
 
   const userId = session.user.id;
 

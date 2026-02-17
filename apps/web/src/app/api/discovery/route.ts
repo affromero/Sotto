@@ -6,11 +6,22 @@ import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { auth } from '@/lib/auth';
+import { checkSuspension } from '@/lib/auth-guards';
 
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Suspension check — only for session-based auth
+  if (!request.headers.get('authorization')?.startsWith('Bearer ')) {
+    const session = await auth();
+    if (session) {
+      const suspended = checkSuspension(session);
+      if (suspended) return suspended;
+    }
   }
 
   const body = await request.json();
