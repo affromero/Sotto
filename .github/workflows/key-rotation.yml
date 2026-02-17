@@ -1,0 +1,39 @@
+name: Key Rotation Reminder
+
+on:
+  schedule:
+    # Run every Monday at 9am UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  doppler-health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Doppler reachable from VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: sotto
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            set -e
+            cd ~/sotto
+
+            echo "Checking Doppler CLI..."
+            if ! command -v doppler &> /dev/null; then
+              echo "::error::Doppler CLI not installed on VPS"
+              exit 1
+            fi
+
+            echo "Verifying Doppler access..."
+            SECRET_COUNT=$(doppler secrets --json 2>/dev/null | jq 'length')
+            if [ "$SECRET_COUNT" -lt 1 ]; then
+              echo "::error::Doppler returned no secrets — check service token"
+              exit 1
+            fi
+            echo "Doppler OK: $SECRET_COUNT secrets configured"
+
+            echo ""
+            echo "Review and rotate secrets at:"
+            echo "  https://dashboard.doppler.com/workplace/projects/sotto/configs/prd"
