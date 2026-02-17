@@ -7,6 +7,7 @@ import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generatio
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
+import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -142,7 +143,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         audience: sourcePodcast.discovery?.audience || 'general',
         focusAreas: focusAreas || sourcePodcast.discovery?.focusAreas || [],
         tone: tone || sourcePodcast.discovery?.tone || 'casual',
-        durationTarget: sourcePodcast.discovery?.durationTarget || 10,
+        durationTarget: Math.min(
+          sourcePodcast.discovery?.durationTarget || 10,
+          gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES
+        ),
         sourceContent: sourcePodcast.script?.markdown || null,
       },
     });

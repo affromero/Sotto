@@ -4,7 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { LIMITS } from '@/lib/stripe';
+import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
@@ -77,12 +77,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
-  // Duration validation
+  // Duration validation — free tier users capped at 5 min, BYOK at 40 min
+  const effectiveMaxDuration = gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
   const durationTarget = parsed.data.metadata?.durationTarget;
-  if (durationTarget && durationTarget > LIMITS.maxDurationMinutes) {
+  if (durationTarget && durationTarget > effectiveMaxDuration) {
     return NextResponse.json(
       {
-        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${LIMITS.maxDurationMinutes} minutes.`,
+        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${effectiveMaxDuration} minutes.`,
       },
       { status: 400 }
     );
@@ -155,7 +156,9 @@ export async function POST(request: NextRequest) {
         audience: meta.audience,
         focusAreas: meta.focusAreas ?? [],
         tone: meta.tone,
-        durationTarget: meta.durationTarget,
+        durationTarget: meta.durationTarget
+          ? Math.min(meta.durationTarget, effectiveMaxDuration)
+          : undefined,
         sourceUrl: meta.sourceUrl,
         sourceContent: meta.sourceContent,
       },

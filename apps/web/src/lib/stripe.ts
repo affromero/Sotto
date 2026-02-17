@@ -1,5 +1,8 @@
 import Stripe from 'stripe';
 
+/** Max podcast duration for free tier users (minutes) */
+export const FREE_TIER_MAX_DURATION_MINUTES = 5;
+
 /**
  * Flat feature limits — all features free for everyone.
  */
