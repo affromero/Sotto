@@ -52,6 +52,7 @@ export async function generateCreatorRssFeed(userId: string): Promise<string | n
       topic: true,
       audioUrl: true,
       duration: true,
+      language: true,
       createdAt: true,
     },
   });
@@ -93,7 +94,7 @@ export async function generateCreatorRssFeed(userId: string): Promise<string | n
     <description>${creatorBio}</description>
     <link>${profileUrl}</link>
     <atom:link href="${feedUrl}" rel="self" type="application/rss+xml" />
-    <language>en</language>
+    <language>${podcasts[0]?.language ?? 'en'}</language>
     <generator>Sotto</generator>
     <lastBuildDate>${formatRfc822Date(new Date())}</lastBuildDate>${
       user.image

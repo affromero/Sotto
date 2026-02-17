@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import styles from './FilterPanel.module.css';
 
 export interface AdvancedFilters {
   depth?: string;
   audience?: string;
   tone?: string;
+  language?: string;
   durationMin?: number;
   durationMax?: number;
   dateFrom?: string;
@@ -36,11 +38,17 @@ const TONE_OPTIONS = [
   { value: 'socratic', label: 'Socratic' },
 ];
 
+const LANGUAGE_OPTIONS = Object.entries(LANGUAGE_DISPLAY).map(([value, label]) => ({
+  value,
+  label,
+}));
+
 function countActiveFilters(filters: AdvancedFilters): number {
   let count = 0;
   if (filters.depth) count++;
   if (filters.audience) count++;
   if (filters.tone) count++;
+  if (filters.language) count++;
   if (filters.durationMin !== undefined) count++;
   if (filters.durationMax !== undefined) count++;
   if (filters.dateFrom) count++;
@@ -141,6 +149,22 @@ export function FilterPanel({ filters, onChange }: FilterPanelProps) {
                   key={value}
                   className={`${styles.pill} ${filters.tone === value ? styles.pillActive : ''}`}
                   onClick={() => handlePillToggle('tone', value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.filterGroup}>
+            <span className={styles.filterLabel}>Language</span>
+            <div className={styles.pills}>
+              {LANGUAGE_OPTIONS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  className={`${styles.pill} ${filters.language === value ? styles.pillActive : ''}`}
+                  onClick={() => handlePillToggle('language', value)}
                   type="button"
                 >
                   {label}

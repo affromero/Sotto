@@ -13,6 +13,7 @@ export type FeedSort = 'recent' | 'popular' | 'trending' | 'most_forked';
 export interface FeedFilters {
   search?: string;
   tag?: string;
+  language?: string;
   sort: FeedSort;
   page: number;
   limit: number;
