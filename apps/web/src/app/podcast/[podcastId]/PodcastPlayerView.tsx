@@ -34,6 +34,7 @@ import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
+import { PostListenRating } from '@/components/player/PostListenRating';
 import { Badge } from '@/components/ui/Badge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
@@ -95,17 +96,26 @@ function formatDuration(seconds: number | null): string {
 function PlayerBridge({
   onTimeUpdate,
   seekRef,
+  onComplete,
 }: {
   onTimeUpdate: (time: number) => void;
   seekRef: React.MutableRefObject<((time: number) => void) | null>;
+  onComplete?: () => void;
 }) {
-  const { currentTime, seek } = usePlayer();
+  const { currentTime, seek, duration } = usePlayer();
+  const completeFiredRef = useRef(false);
   useEffect(() => {
     seekRef.current = seek;
   }, [seek, seekRef]);
   useEffect(() => {
     onTimeUpdate(currentTime);
   }, [currentTime, onTimeUpdate]);
+  useEffect(() => {
+    if (duration > 0 && currentTime / duration >= 0.95 && !completeFiredRef.current) {
+      completeFiredRef.current = true;
+      onComplete?.();
+    }
+  }, [currentTime, duration, onComplete]);
   return null;
 }
 
@@ -135,6 +145,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
   const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
   const playerSectionRef = useRef<HTMLElement>(null);
   const [playerInView, setPlayerInView] = useState(true);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -148,6 +160,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       user: { name: string | null; handle: string | null };
     }>;
   } | null>(null);
+
+  // Check if owner has already rated this podcast
+  useEffect(() => {
+    if (!isOwner || liveStatus !== 'READY') return;
+    fetch(`/api/podcasts/${podcast.id}/rating`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.rating) setHasRated(true);
+      })
+      .catch(() => {});
+  }, [isOwner, liveStatus, podcast.id]);
 
   // Fetch knowledge gaps for owner
   useEffect(() => {
@@ -375,7 +398,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
 
   return (
     <>
-    <PlayerBridge onTimeUpdate={setCurrentTime} seekRef={seekRef} />
+    <PlayerBridge
+      onTimeUpdate={setCurrentTime}
+      seekRef={seekRef}
+      onComplete={() => {
+        if (isOwner && !hasRated) setShowRatingPrompt(true);
+      }}
+    />
     <div className={styles.playerView}>
       {/* Back nav */}
       <nav className={styles.breadcrumb}>
@@ -525,6 +554,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
           <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
         </section>
+      )}
+
+      {/* Post-Listen Rating Prompt */}
+      {showRatingPrompt && !hasRated && (
+        <PostListenRating
+          podcastId={podcast.id}
+          onDismiss={() => {
+            setShowRatingPrompt(false);
+            setHasRated(true);
+          }}
+        />
       )}
 
       {/* Stats & Actions */}
