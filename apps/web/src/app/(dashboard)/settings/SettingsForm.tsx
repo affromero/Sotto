@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input';
 import { InterestGrid } from '@/components/discovery/InterestGrid';
 import type { CustomTag } from '@/components/discovery/InterestGrid';
 import type { TasteQuestion, TasteAnswer } from '@sotto/shared';
+import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
@@ -47,6 +48,7 @@ interface SettingsFormProps {
   twitterEnabled: boolean;
   preferredHostVoiceId: string | null;
   preferredExpertVoiceId: string | null;
+  preferredLanguage: string | null;
   voiceClones: VoiceCloneData[];
   interestCategories: CategoryTag[];
   selectedInterestTagIds: string[];
@@ -75,6 +77,7 @@ export function SettingsForm({
   twitterEnabled: initialTwitterEnabled,
   preferredHostVoiceId: initialHostVoiceId,
   preferredExpertVoiceId: initialExpertVoiceId,
+  preferredLanguage: initialPreferredLanguage,
   voiceClones,
   interestCategories,
   selectedInterestTagIds,
@@ -132,6 +135,11 @@ export function SettingsForm({
   const [avatarUrl, setAvatarUrl] = useState(image);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Language preference state
+  const [preferredLanguage, setPreferredLanguage] = useState<string | null>(initialPreferredLanguage);
+  const [languageSaving, setLanguageSaving] = useState(false);
+  const [languageSaved, setLanguageSaved] = useState(false);
 
   // Twitter state
   const isTwitterConnected = connectedProviders.includes('twitter');
@@ -410,6 +418,61 @@ export function SettingsForm({
             </Button>
           </div>
         </form>
+      </section>
+
+      {/* Language Preference Section */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Language</h2>
+        <p className={styles.sectionDesc}>
+          Choose your preferred language for Q&amp;A interactions. If not set, responses will match
+          the podcast&apos;s language.
+        </p>
+        <div className={styles.form}>
+          <div className={styles.fieldGroup}>
+            <label htmlFor="preferredLanguage" className={styles.fieldLabel}>
+              Preferred Language
+            </label>
+            <select
+              id="preferredLanguage"
+              className={styles.handleInput}
+              value={preferredLanguage ?? ''}
+              onChange={(e) => setPreferredLanguage(e.target.value || null)}
+              aria-label="Preferred interaction language"
+            >
+              <option value="">Not set (use podcast language)</option>
+              {Object.entries(LANGUAGE_DISPLAY).map(([code, label]) => (
+                <option key={code} value={code}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className={styles.formActions}>
+            <Button
+              onClick={async () => {
+                setLanguageSaving(true);
+                setLanguageSaved(false);
+                try {
+                  const response = await fetch('/api/users/me', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ preferredLanguage }),
+                  });
+                  if (response.ok) {
+                    setLanguageSaved(true);
+                    setTimeout(() => setLanguageSaved(false), 3000);
+                  }
+                } finally {
+                  setLanguageSaving(false);
+                }
+              }}
+              loading={languageSaving}
+              disabled={languageSaving}
+            >
+              {languageSaved ? 'Saved' : 'Save Language'}
+            </Button>
+          </div>
+        </div>
       </section>
 
       {/* Taste Quiz Section */}
