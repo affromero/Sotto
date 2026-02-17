@@ -6,7 +6,7 @@ import { Globe, Link2, Lock } from 'lucide-react';
 import type { PodcastVisibility } from '@prisma/client';
 import styles from './VisibilityToggle.module.css';
 
-const CYCLE: PodcastVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
+const ALL_VISIBILITIES: PodcastVisibility[] = ['PUBLIC', 'UNLISTED', 'PRIVATE'];
 
 const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; className: string }> = {
   PUBLIC: { icon: Globe, label: 'Public', className: styles.public },
@@ -17,12 +17,18 @@ const config: Record<PodcastVisibility, { icon: typeof Globe; label: string; cla
 interface VisibilityToggleProps {
   podcastId: string;
   visibility: PodcastVisibility;
+  canMakePrivate?: boolean;
 }
 
-export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProps) {
+export function VisibilityToggle({ podcastId, visibility, canMakePrivate }: VisibilityToggleProps) {
   const router = useRouter();
   const [current, setCurrent] = useState(visibility);
   const [updating, setUpdating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const cycle = canMakePrivate !== false
+    ? ALL_VISIBILITIES
+    : ALL_VISIBILITIES.filter((v) => v !== 'PRIVATE');
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -30,12 +36,13 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
       e.stopPropagation();
       if (updating) return;
 
-      const currentIndex = CYCLE.indexOf(current);
-      const next = CYCLE[(currentIndex + 1) % CYCLE.length];
+      const currentIndex = cycle.indexOf(current);
+      const next = cycle[(currentIndex + 1) % cycle.length];
       const previous = current;
 
       setCurrent(next);
       setUpdating(true);
+      setErrorMessage(null);
 
       try {
         const response = await fetch(`/api/podcasts/${podcastId}`, {
@@ -45,7 +52,12 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
         });
 
         if (!response.ok) {
+          const data = await response.json().catch(() => null);
           setCurrent(previous);
+          if (data?.error && typeof data.error === 'string') {
+            setErrorMessage(data.error);
+            setTimeout(() => setErrorMessage(null), 4000);
+          }
         } else {
           router.refresh();
         }
@@ -55,7 +67,7 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
         setUpdating(false);
       }
     },
-    [current, updating, podcastId, router],
+    [current, updating, podcastId, router, cycle],
   );
 
   const { icon: Icon, label, className } = config[current];
@@ -67,9 +79,10 @@ export function VisibilityToggle({ podcastId, visibility }: VisibilityToggleProp
       onClick={handleClick}
       disabled={updating}
       aria-label={`Visibility: ${label}. Click to change.`}
+      title={errorMessage ?? undefined}
     >
       <Icon size={12} />
-      <span>{label}</span>
+      <span>{errorMessage ?? label}</span>
     </button>
   );
 }

@@ -7,6 +7,7 @@ import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
 import { getAiKey, getByokKey } from '@/lib/byok';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 import { logger } from '@/lib/logger';
 import type { SttProviderId } from '@sotto/shared';
 
@@ -189,6 +190,8 @@ export async function POST(request: NextRequest) {
     const validatedTopic = validation.data.topic || '';
     const generateMetadata = !validation.data.title;
 
+    const freeTier = await getFreeTierStatus(authResult.userId);
+
     const podcast = await prisma.podcast.create({
       data: {
         userId: authResult.userId,
@@ -198,7 +201,7 @@ export async function POST(request: NextRequest) {
         source: 'IMPORT',
         isHumanContent,
         sourcePlatform: validatedSourcePlatform ?? null,
-        visibility: 'PRIVATE',
+        visibility: freeTier.isByokUser ? 'PRIVATE' : 'PUBLIC',
       },
     });
 

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 import { EditPodcastForm } from './EditPodcastForm';
 import styles from './page.module.css';
 
@@ -39,6 +40,8 @@ export default async function EditPodcastPage({ params }: EditPodcastPageProps) 
     notFound();
   }
 
+  const freeTier = await getFreeTierStatus(userId);
+
   return (
     <main className={styles.main}>
       <div className={styles.container}>
@@ -55,6 +58,7 @@ export default async function EditPodcastPage({ params }: EditPodcastPageProps) 
           initialTitle={podcast.title}
           initialTopic={podcast.topic}
           initialVisibility={podcast.visibility}
+          canMakePrivate={freeTier.isByokUser}
         />
       </div>
     </main>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
+import { getFreeTierStatus } from '@/lib/generation-gate';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -85,6 +86,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const { dismissSuggestion, ...updateData } = parsed.data;
+
+  if (updateData.visibility === 'PRIVATE') {
+    const freeTier = await getFreeTierStatus(authResult.userId);
+    if (!freeTier.isByokUser) {
+      return NextResponse.json(
+        { error: 'Free tier podcasts cannot be private. Add your own API keys to unlock private podcasts.' },
+        { status: 403 }
+      );
+    }
+  }
 
   const updated = await prisma.podcast.update({
     where: { id: podcastId },
