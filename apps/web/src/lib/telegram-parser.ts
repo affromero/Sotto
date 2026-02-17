@@ -1,4 +1,5 @@
 import { generateResponse } from './claude';
+import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logger } from './logger';
 import type { TelegramParseResult } from '@/types/telegram';
 
@@ -14,6 +15,7 @@ Rules:
 - Extract focus areas if the user mentions specific subtopics
 - If the message contains a URL, extract it as sourceUrl
 - Set isComplete to true ONLY if the message provides enough detail to generate a podcast directly (clear topic + at least some specificity). Set to false if the topic is too vague (e.g., just "AI" or "science") and would benefit from a discovery conversation.
+${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with ONLY valid JSON matching this shape:
 {
