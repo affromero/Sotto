@@ -86,7 +86,7 @@ export default function LoginScreen() {
       setLoading(true);
 
       try {
-        let idToken: string;
+        let res: { data: AuthResponse };
 
         if (provider === 'apple') {
           const AppleAuthentication = await import('expo-apple-authentication');
@@ -101,7 +101,10 @@ export default function LoginScreen() {
             setErrorMessage('Apple Sign In failed — no identity token.');
             return;
           }
-          idToken = credential.identityToken;
+          res = await api.post<AuthResponse>('/auth/mobile', {
+            provider,
+            idToken: credential.identityToken,
+          });
         } else {
           const AuthSession = await import('expo-auth-session');
           const WebBrowser = await import('expo-web-browser');
@@ -109,25 +112,21 @@ export default function LoginScreen() {
 
           const configs: Record<
             string,
-            { authorizationEndpoint: string; tokenEndpoint: string; scopes: string[] }
+            { authorizationEndpoint: string; scopes: string[] }
           > = {
             google: {
               authorizationEndpoint:
                 'https://accounts.google.com/o/oauth2/v2/auth',
-              tokenEndpoint: 'https://oauth2.googleapis.com/token',
               scopes: ['openid', 'profile', 'email'],
             },
             github: {
               authorizationEndpoint:
                 'https://github.com/login/oauth/authorize',
-              tokenEndpoint:
-                'https://github.com/login/oauth/access_token',
               scopes: ['read:user', 'user:email'],
             },
             twitter: {
               authorizationEndpoint:
                 'https://twitter.com/i/oauth2/authorize',
-              tokenEndpoint: 'https://api.twitter.com/2/oauth2/token',
               scopes: ['users.read', 'tweet.read'],
             },
           };
@@ -158,31 +157,14 @@ export default function LoginScreen() {
             return;
           }
 
-          const tokenResult = await AuthSession.exchangeCodeAsync(
-            {
-              clientId,
-              code: result.params.code,
-              redirectUri,
-              extraParams: {
-                code_verifier: request.codeVerifier ?? '',
-              },
-            },
-            { tokenEndpoint: config.tokenEndpoint },
-          );
-
-          idToken =
-            tokenResult.idToken ?? tokenResult.accessToken ?? '';
+          res = await api.post<AuthResponse>('/auth/mobile', {
+            provider,
+            code: result.params.code,
+            codeVerifier: request.codeVerifier ?? undefined,
+            redirectUri,
+          });
         }
 
-        if (!idToken) {
-          setErrorMessage('Failed to get authentication token.');
-          return;
-        }
-
-        const res = await api.post<AuthResponse>('/auth/mobile', {
-          provider,
-          idToken,
-        });
         const { token } = res.data;
         if (!token) {
           setErrorMessage('Invalid response from server.');
