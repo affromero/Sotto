@@ -87,6 +87,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
       hostVoiceId: true,
       expertVoiceId: true,
       ttsProvider: true,
+      ttsModel: true,
     },
   });
 
@@ -99,11 +100,13 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
   });
 
-  // Write back resolved provider if not already set
-  if (!podcast.ttsProvider) {
+  const ttsModelId = provider.getModelId();
+
+  // Write back resolved provider and model if not already set
+  if (!podcast.ttsProvider || !podcast.ttsModel) {
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: { ttsProvider: providerId },
+      data: { ttsProvider: providerId, ttsModel: ttsModelId },
     }).catch(() => {});
   }
 
