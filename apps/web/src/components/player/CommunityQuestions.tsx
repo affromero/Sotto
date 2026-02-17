@@ -7,6 +7,7 @@ import styles from './CommunityQuestions.module.css';
 
 interface CommunityQuestionsProps {
   podcastId: string;
+  refreshTrigger?: number;
 }
 
 interface QuestionsResponse {
@@ -17,7 +18,7 @@ interface QuestionsResponse {
   totalPages: number;
 }
 
-export function CommunityQuestions({ podcastId }: CommunityQuestionsProps) {
+export function CommunityQuestions({ podcastId, refreshTrigger }: CommunityQuestionsProps) {
   const [questions, setQuestions] = useState<QuestionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -48,6 +49,13 @@ export function CommunityQuestions({ podcastId }: CommunityQuestionsProps) {
   useEffect(() => {
     fetchQuestions(1);
   }, [fetchQuestions]);
+
+  // Re-fetch when a new question is answered
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchQuestions(1);
+    }
+  }, [refreshTrigger, fetchQuestions]);
 
   if (!loading && total === 0) {
     return (

@@ -13,6 +13,7 @@ interface InterruptChatPanelProps {
   currentTime: number;
   existingInteractions: InteractionSummary[];
   onClose: () => void;
+  onQuestionAnswered?: () => void;
 }
 
 type PanelState =
@@ -32,6 +33,7 @@ export function InterruptChatPanel({
   currentTime,
   existingInteractions,
   onClose,
+  onQuestionAnswered,
 }: InterruptChatPanelProps) {
   const [state, setState] = useState<PanelState>('idle');
   const [question, setQuestion] = useState('');
@@ -81,6 +83,7 @@ export function InterruptChatPanel({
             pollRef.current = null;
             setAnswer(pollData.answer);
             setState('answered');
+            onQuestionAnswered?.();
           }
         } catch {
           // Silently retry on next interval
@@ -102,7 +105,7 @@ export function InterruptChatPanel({
       setError(err instanceof Error ? err.message : 'An error occurred');
       setState('idle');
     }
-  }, [question, podcastId, currentTime, state]);
+  }, [question, podcastId, currentTime, state, onQuestionAnswered]);
 
   const handleResolve = useCallback(
     async (helpful: boolean, incorporate: boolean) => {

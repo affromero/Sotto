@@ -198,6 +198,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
   const handleTimeRangeChange = useCallback(
     async (range: NewsTimeRange) => {
+      if (range === newsTimeRange) return;
       setNewsTimeRange(range);
       setIsLoadingNews(true);
       try {
@@ -211,7 +212,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         setIsLoadingNews(false);
       }
     },
-    [activeTopic]
+    [activeTopic, newsTimeRange]
   );
 
   const handleTopicSubmit = useCallback(() => {
