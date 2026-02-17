@@ -1,4 +1,4 @@
-import { prisma } from './prisma';
+import { prismaUnfiltered as prisma } from './prisma';
 import { logger } from './logger';
 import { cancelPodcastPayments } from './voice-pricing';
 

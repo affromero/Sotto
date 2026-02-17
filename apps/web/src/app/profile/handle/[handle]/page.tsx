@@ -50,6 +50,7 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
         where: {
           status: 'READY',
           visibility: 'PUBLIC',
+          deletedAt: null,
         },
         orderBy: { createdAt: 'desc' },
         select: {
@@ -80,7 +81,7 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
       _count: {
         select: {
           podcasts: {
-            where: { status: 'READY', visibility: 'PUBLIC' },
+            where: { status: 'READY', visibility: 'PUBLIC', deletedAt: null },
           },
           followers: true,
           following: true,

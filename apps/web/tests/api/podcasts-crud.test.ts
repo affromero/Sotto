@@ -49,7 +49,7 @@ vi.mock('@/lib/prisma', () => {
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
-  return { prisma: txProxy };
+  return { prisma: txProxy, prismaUnfiltered: txProxy };
 });
 
 vi.mock('@/lib/api-keys', () => ({
@@ -896,10 +896,10 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     expect(body).toEqual({ error: 'Forbidden' });
   });
 
-  it('deletes podcast when user is owner', async () => {
+  it('soft-deletes podcast when user is owner', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
-    mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
+    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {
@@ -908,15 +908,16 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(204);
     expect(mockTransaction).toHaveBeenCalled();
-    expect(mockPrisma.podcast.delete).toHaveBeenCalledWith({
+    expect(mockPrisma.podcast.update).toHaveBeenCalledWith({
       where: { id: 'pod-1' },
+      data: { deletedAt: expect.any(Date) },
     });
   });
 
-  it('returns 204 with no content on successful deletion', async () => {
+  it('returns 204 with no content on successful soft-delete', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
-    mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
+    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {
@@ -928,10 +929,10 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     expect(body).toBe('');
   });
 
-  it('checks ownership with forkedFromId before deletion', async () => {
+  it('checks ownership with forkedFromId before soft-delete', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1', forkedFromId: null });
-    mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
+    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     await deletePodcast(request, {
@@ -944,12 +945,12 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
     });
   });
 
-  it('decrements parent forkCount when deleting a forked podcast', async () => {
+  it('decrements parent forkCount when soft-deleting a forked podcast', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique
       .mockResolvedValueOnce({ userId: 'user-1', forkedFromId: 'parent-1' })
       .mockResolvedValueOnce({ id: 'parent-1' });
-    mockPrisma.podcast.delete.mockResolvedValue(mockPodcast);
+    mockPrisma.podcast.update.mockResolvedValue(mockPodcast);
 
     const request = createDeleteRequest('/api/podcasts/pod-1');
     const response = await deletePodcast(request, {

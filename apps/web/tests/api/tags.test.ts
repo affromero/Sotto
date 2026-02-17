@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 const mockTagFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     tag: {
       findMany: (...args: unknown[]) => mockTagFindMany(...args),

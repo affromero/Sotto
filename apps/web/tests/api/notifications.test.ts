@@ -10,6 +10,7 @@ const mockNotificationUpdateMany = vi.fn();
 const mockAuth = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     notification: {
       findMany: (...args: unknown[]) => mockNotificationFindMany(...args),

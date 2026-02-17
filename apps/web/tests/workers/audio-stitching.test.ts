@@ -22,6 +22,7 @@ const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     segment: {
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),

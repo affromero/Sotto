@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     const config = await getFreeTierConfig();
     const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
     if (!ok) {
-      await prisma.podcast.delete({ where: { id: podcast.id } });
+      await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
       return NextResponse.json(
         { error: 'Free generations used.', code: 'free_tier_exhausted' },
         { status: 403 }

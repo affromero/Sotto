@@ -7,6 +7,7 @@ const mockReservedHandleFindUnique = vi.fn();
 const mockUserFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     reservedHandle: {
       findUnique: (...args: unknown[]) => mockReservedHandleFindUnique(...args),

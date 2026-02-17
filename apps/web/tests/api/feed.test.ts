@@ -7,6 +7,7 @@ const mockPodcastCount = vi.fn();
 const mockFollowFindMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findMany: (...args: unknown[]) => mockPodcastFindMany(...args),

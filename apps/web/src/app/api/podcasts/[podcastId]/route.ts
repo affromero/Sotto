@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
 import { getFreeTierStatus } from '@/lib/generation-gate';
@@ -133,7 +133,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await prisma.$transaction(async (tx) => {
+  await prismaUnfiltered.$transaction(async (tx) => {
     // Disconnect forks so child podcasts aren't orphaned
     await tx.podcast.updateMany({
       where: { forkedFromId: podcastId },
@@ -154,7 +154,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    await tx.podcast.delete({ where: { id: podcastId } });
+    await tx.podcast.update({
+      where: { id: podcastId },
+      data: { deletedAt: new Date() },
+    });
   });
 
   return new NextResponse(null, { status: 204 });

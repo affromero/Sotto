@@ -16,6 +16,7 @@ vi.mock('@/lib/auth', () => ({
 const mockUserAiKeyUpdateMany = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockDiscoveryFindUniqueOrThrow(...args),

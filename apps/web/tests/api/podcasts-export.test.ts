@@ -12,6 +12,7 @@ vi.mock('@/lib/auth', () => ({
 const mockPrismaPodcastFindUnique = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     podcast: {
       findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),

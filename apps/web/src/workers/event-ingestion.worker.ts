@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { prisma } from '@/lib/prisma';
+import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import type { IngestEventsPayload } from '@/lib/queue';

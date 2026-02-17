@@ -9,6 +9,7 @@ const mockApiKeyUpdate = vi.fn();
 const mockApiKeyCount = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
+  get prismaUnfiltered() { return this.prisma; },
   prisma: {
     apiKey: {
       findMany: (...args: unknown[]) => mockApiKeyFindMany(...args),
