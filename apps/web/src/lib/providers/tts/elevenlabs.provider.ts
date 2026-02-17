@@ -41,4 +41,8 @@ export class ElevenLabsProvider implements TtsProvider {
     const entry = speaker === 'HOST' ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'elevenlabs');
   }
+
+  getModelId(): string {
+    return 'eleven_v3';
+  }
 }

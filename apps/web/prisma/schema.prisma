@@ -198,6 +198,7 @@ model Podcast {
   hostVoiceId     String?
   expertVoiceId   String?
   ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
   language        String?  // ISO 639-1, e.g. 'en', 'es', 'ja'

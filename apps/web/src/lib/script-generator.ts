@@ -95,10 +95,20 @@ export async function generateScript(params: {
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture
 - Include natural speech patterns: "So here's the thing...", "Wait, really?", "That's fascinating because..."
-- Add delivery directions in parentheses when tone shifts: (laughing), (leaning in), (excited), (thoughtful pause), (whispering for emphasis)
 - Let speakers occasionally overlap in energy — the HOST can finish the EXPERT's thought, or react mid-explanation
 - Build tension and payoffs: set up interesting questions, then deliver satisfying answers
 - Use the "cliffhanger" technique between segments: end a thought with intrigue before the next turn picks it up
+
+## Audio Expression Tags:
+For richer vocal expression, embed inline audio tags in the turn TEXT:
+- [laughs], [chuckles] — genuine amusement
+- [sighs] — exasperation, relief, or contemplation
+- [whispers] — emphasis or dramatic effect
+- [gasps] — surprise or shock
+Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
+Example: "Wait, really? [laughs] That's incredible."
+These go inline in the text field, NOT in the direction field.
+You may still use parenthetical directions like (leaning in), (thoughtful pause) in the direction field for context.
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language, pop culture references' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery' : ''}
@@ -282,6 +292,16 @@ Key rules for this revision:
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture
 - Include natural speech patterns and delivery directions in parentheses when tone shifts
+
+## Audio Expression Tags:
+For richer vocal expression, embed inline audio tags in the turn TEXT:
+- [laughs], [chuckles] — genuine amusement
+- [sighs] — exasperation, relief, or contemplation
+- [whispers] — emphasis or dramatic effect
+- [gasps] — surprise or shock
+Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
+These go inline in the text field, NOT in the direction field.
+
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}

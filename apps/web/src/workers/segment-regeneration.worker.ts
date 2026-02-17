@@ -5,6 +5,7 @@ import { resolveTtsProvider } from '@/lib/providers';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
+import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -57,7 +58,8 @@ export async function processSegmentRegeneration(
     podcastId,
   });
 
-  const audioBuffer = await provider.generateSpeech({ text: newText, voiceId });
+  const ttsText = cleanTextForTts(newText, { providerId });
+  const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
 
   await job.updateProgress(40);
 

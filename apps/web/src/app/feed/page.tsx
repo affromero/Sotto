@@ -27,6 +27,11 @@ const podcastSelect = {
   source: true,
   sourcePlatform: true,
   isHumanContent: true,
+  aiProvider: true,
+  aiModel: true,
+  ttsProvider: true,
+  ttsModel: true,
+  language: true,
   forkedFromId: true,
   user: {
     select: {
