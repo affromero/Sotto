@@ -40,6 +40,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    const [podcastCount, followerCount, followingCount] = await Promise.all([
+      prisma.podcast.count({ where: { userId: authResult.userId } }),
+      prisma.follow.count({ where: { followingId: authResult.userId } }),
+      prisma.follow.count({ where: { followerId: authResult.userId } }),
+    ]);
+
     return NextResponse.json({
       id: user.id,
       name: user.name,
@@ -47,6 +53,9 @@ export async function GET(request: NextRequest) {
       handle: user.handle,
       image: user.image,
       bio: user.bio,
+      podcastCount,
+      followerCount,
+      followingCount,
       createdAt: user.createdAt.toISOString(),
       twitterHandle: user.twitterHandle,
       twitterEnabled: user.twitterEnabled,
