@@ -21,8 +21,8 @@
 ; Claude Code — $200/mo personal subscription (flat rate, shared across all projects)
 ; Not allocated to Sotto — cost doesn't change with Sotto usage
 ;
-; ElevenLabs — free tier used for proof-of-concept
-; No charge; will become a Sotto expense when upgraded to a paid plan
+; ElevenLabs — Pro plan ($99/mo monthly billing)
+; Upgraded from free tier February 2026
 
 ; ============================================================
 ; API Usage Costs
@@ -57,3 +57,7 @@
 2026-02-17 * "Apple" "Developer Program — annual membership"
   Expenses:Software:DevTools                   99.00 USD
   Assets:Current:Cash:Bank                    -99.00 USD
+
+2026-02-17 * "ElevenLabs" "Pro subscription — February 2026"
+  Expenses:TTS:ElevenLabs:Standard             99.00 USD
+  Liabilities:AccountsPayable:ElevenLabs      -99.00 USD
