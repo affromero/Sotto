@@ -255,6 +255,7 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
           id="feed-discover-panel"
           role="tabpanel"
           aria-labelledby={isAuthenticated ? 'feed-discover-tab' : undefined}
+          className={styles.discoverPanel}
         >
           {showHero && <HeroSection podcasts={heroPodcasts} />}
 

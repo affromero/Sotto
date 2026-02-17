@@ -17,7 +17,6 @@
   display: flex;
   gap: var(--spacing-xs);
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: var(--spacing-sm);
 }
 
 .feedTab {
@@ -47,7 +46,7 @@
 .feedContent {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 /* Filters */
@@ -56,6 +55,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+}
+
+/* ── Discover tab panel ──────────────────── */
+
+.discoverPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
 }
 
 /* Search row with mode toggle */
