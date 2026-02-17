@@ -8,6 +8,8 @@ const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue({
     { speaker: 'EXPERT', text: 'Thanks for having me.' },
   ],
 });
+const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ language: null });
+const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ preferredLanguage: null });
 const mockPrismaSegmentFindMany = vi.fn().mockResolvedValue([]);
 const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
@@ -17,6 +19,12 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     script: {
       findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
+    },
+    podcast: {
+      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
     segment: {
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
@@ -83,6 +91,8 @@ const defaultPayload: ProcessInteractionPayload = {
 describe('processInteraction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrismaPodcastFindUnique.mockResolvedValue({ language: null });
+    mockPrismaUserFindUnique.mockResolvedValue({ preferredLanguage: null });
     mockPrismaScriptFindUnique.mockResolvedValue({
       turns: [
         { speaker: 'HOST', text: 'Welcome to the show!' },
