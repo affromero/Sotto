@@ -15,6 +15,7 @@ import {
   Settings,
   MessageSquareShare,
   Star,
+  Sparkles,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { href: '/admin/config', label: 'Config', icon: Settings },
   { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
   { href: '/admin/ratings', label: 'TTS Ratings', icon: Star },
+  { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
 ];
 
 export function AdminShell({ user, children }: AdminShellProps) {
