@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
@@ -42,11 +41,6 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { GET, POST } from '@/app/api/stripe/connect/route';
-
-function createRequest(method: string = 'POST'): NextRequest {
-  const url = new URL('http://localhost:3000/api/stripe/connect');
-  return new NextRequest(url, { method });
-}
 
 describe('POST /api/stripe/connect', () => {
   beforeEach(() => {

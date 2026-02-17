@@ -19,9 +19,8 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaSegmentCreate = vi.fn().mockResolvedValue({ id: 'segment-001' });
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     reference: {
       findMany: (...args: unknown[]) => mockPrismaReferenceFindMany(...args),
       update: (...args: unknown[]) => mockPrismaReferenceUpdate(...args),
@@ -39,8 +38,9 @@ vi.mock('@/lib/prisma', () => ({
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockVerifyUrl = vi.fn().mockResolvedValue({
   layer: 'url',

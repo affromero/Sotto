@@ -21,9 +21,8 @@ const mockPrismaAccountFindFirst = vi.fn();
 const mockPrismaUserFindUniqueOrThrow = vi.fn();
 const mockPrismaPodcastCreate = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     tweetMention: {
       findUnique: (...args: unknown[]) => mockPrismaTweetMentionFindUnique(...args),
       create: (...args: unknown[]) => mockPrismaTweetMentionCreate(...args),
@@ -38,8 +37,9 @@ vi.mock('@/lib/prisma', () => ({
     podcast: {
       create: (...args: unknown[]) => mockPrismaPodcastCreate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockGetMentions = vi.fn();
 const mockGetTweet = vi.fn();

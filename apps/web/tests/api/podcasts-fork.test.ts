@@ -16,9 +16,8 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 // Mock prisma
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
       create: (...args: unknown[]) => mockPodcastCreate(...args),
@@ -34,8 +33,9 @@ vi.mock('@/lib/prisma', () => ({
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
     $transaction: (callback: unknown) => mockTransaction(callback),
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 // Mock queue
 const mockAddJob = vi.fn();

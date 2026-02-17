@@ -45,7 +45,7 @@ import { POST as saveInterests } from '@/app/api/onboarding/interests/route';
 
 function createRequest(body?: object): NextRequest {
   const url = new URL('http://localhost:3000/api/onboarding/interests');
-  const init: RequestInit = { method: 'POST' };
+  const init: { method: string; body?: string; headers?: Record<string, string> } = { method: 'POST' };
   if (body) {
     init.body = JSON.stringify(body);
     init.headers = { 'Content-Type': 'application/json' };

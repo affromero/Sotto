@@ -6,15 +6,15 @@ import crypto from 'crypto';
 const mockPrismaApiKeyFindUnique = vi.fn();
 const mockPrismaApiKeyUpdate = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     apiKey: {
       findUnique: (...args: unknown[]) => mockPrismaApiKeyFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaApiKeyUpdate(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockAuth = vi.fn();
 

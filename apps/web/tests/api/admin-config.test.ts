@@ -25,10 +25,6 @@ vi.mock('@/lib/free-tier-config', () => ({
 
 import { GET, PATCH } from '@/app/api/admin/config/route';
 
-function createGetRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/admin/config'));
-}
-
 function createPatchRequest(body: Record<string, unknown>): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/admin/config'), {
     method: 'PATCH',

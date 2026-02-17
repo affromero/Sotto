@@ -26,7 +26,7 @@ import { GET, POST, DELETE } from '@/app/api/settings/byok/route';
 
 function createRequest(method: string, body?: object): NextRequest {
   const url = new URL('http://localhost:3000/api/settings/byok');
-  const init: RequestInit = { method };
+  const init: { method: string; body?: string; headers?: Record<string, string> } = { method };
   if (body) {
     init.body = JSON.stringify(body);
     init.headers = { 'Content-Type': 'application/json' };

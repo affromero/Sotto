@@ -8,9 +8,8 @@ import {
 } from '@/lib/notifications';
 import { prisma } from '@/lib/prisma';
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     notification: {
       create: vi.fn(),
       findMany: vi.fn(),
@@ -18,8 +17,9 @@ vi.mock('@/lib/prisma', () => ({
       updateMany: vi.fn(),
       count: vi.fn(),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 describe('createNotification', () => {
   beforeEach(() => {

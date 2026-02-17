@@ -67,7 +67,7 @@ describe('GET /api/admin/costs', () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     const mockBreakdown = { total: 100, byProvider: {} };
     const mockTrend = [{ date: '2026-01-01', cost: 10 }];
-    const mockWarnings = [];
+    const mockWarnings: Array<{ level: string; message: string }> = [];
     mockGetCostBreakdown.mockResolvedValue(mockBreakdown);
     mockGetDailyCostTrend.mockResolvedValue(mockTrend);
     mockCheckCostThresholds.mockResolvedValue(mockWarnings);

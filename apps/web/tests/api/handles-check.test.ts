@@ -6,17 +6,17 @@ import { NextRequest } from 'next/server';
 const mockReservedHandleFindUnique = vi.fn();
 const mockUserFindUnique = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     reservedHandle: {
       findUnique: (...args: unknown[]) => mockReservedHandleFindUnique(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 vi.mock('@/lib/claude', () => ({
   generateResponse: vi.fn().mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1 }),

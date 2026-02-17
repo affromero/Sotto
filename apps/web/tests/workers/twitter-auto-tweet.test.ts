@@ -8,9 +8,8 @@ const mockPrismaTwitterAutoTweetFindFirst = vi.fn();
 const mockPrismaTwitterAutoTweetUpdate = vi.fn();
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
 
-vi.mock('@/lib/prisma', () => ({
-  get prismaUnfiltered() { return this.prisma; },
-  prisma: {
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
     twitterAutoTweet: {
       findFirst: (...args: unknown[]) => mockPrismaTwitterAutoTweetFindFirst(...args),
       update: (...args: unknown[]) => mockPrismaTwitterAutoTweetUpdate(...args),
@@ -18,8 +17,9 @@ vi.mock('@/lib/prisma', () => ({
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
-  },
-}));
+  };
+  return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
+});
 
 const mockPostTweet = vi.fn();
 

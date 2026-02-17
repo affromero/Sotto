@@ -27,10 +27,6 @@ vi.mock('@/lib/logger', () => ({
 
 import { GET, POST } from '@/app/api/collections/route';
 
-function createGetRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/collections'));
-}
-
 function createPostRequest(body: unknown): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/collections'), {
     method: 'POST',
