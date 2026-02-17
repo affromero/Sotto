@@ -14,6 +14,14 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { DiscoveryMetadata } from '@sotto/shared';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { api } from '../../lib/api';
 import { SwipeQuiz } from '../../components/SwipeQuiz';
 
@@ -80,7 +88,7 @@ export default function CreateScreen() {
   const [discoveryId, setDiscoveryId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [latestChips, setLatestChips] = useState<string[]>([]);
-  const [showQuiz, setShowQuiz] = useState(!topic);
+  const [showQuiz, setShowQuiz] = useState(false);
   const topicHandled = useRef(false);
 
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
@@ -198,6 +206,25 @@ export default function CreateScreen() {
   const isDiscovering = discoveryMutation.isPending;
   const isCreating = createMutation.isPending;
 
+  const inspirePulse = useSharedValue(0);
+
+  useEffect(() => {
+    inspirePulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [inspirePulse]);
+
+  const inspireAnimatedStyle = useAnimatedStyle(() => ({
+    shadowOpacity: 0.15 + inspirePulse.value * 0.25,
+    shadowRadius: 4 + inspirePulse.value * 10,
+    transform: [{ scale: 1 + inspirePulse.value * 0.02 }],
+  }));
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -258,6 +285,18 @@ export default function CreateScreen() {
             understand your interests, then generate a conversational podcast
             just for you.
           </Text>
+          <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.inspireMeButton,
+                pressed && styles.inspireMeButtonPressed,
+              ]}
+              onPress={() => setShowQuiz(true)}
+            >
+              <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
+              <Text style={styles.inspireMeButtonText}>Inspire me</Text>
+            </Pressable>
+          </Animated.View>
         </View>
       ) : (
         <FlatList
@@ -455,6 +494,35 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 24,
     marginBottom: spacing.lg,
+  },
+  inspireMeGlow: {
+    alignSelf: 'flex-start',
+    borderRadius: borderRadius.full,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  inspireMeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.full,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.lg,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  inspireMeButtonPressed: {
+    backgroundColor: colors.primaryLighter,
+  },
+  inspireMeIcon: {
+    fontSize: 16,
+  },
+  inspireMeButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.primary,
   },
   messageList: {
     paddingHorizontal: spacing.md,
