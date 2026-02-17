@@ -21,7 +21,10 @@
       "ios": {
         "appleId": "me@afromero.co",
         "ascAppId": "6759265446",
-        "appleTeamId": "2HVQQ4W769"
+        "appleTeamId": "2HVQQ4W769",
+        "ascApiKeyId": "$ASC_API_KEY_ID",
+        "ascApiKeyIssuerId": "$ASC_ISSUER_ID",
+        "ascApiKeyPath": "/tmp/asc-api-key.p8"
       }
     }
   }
