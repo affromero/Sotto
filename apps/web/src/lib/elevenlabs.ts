@@ -226,17 +226,11 @@ export async function getVoices(): Promise<
 // Subscription Concurrency
 // ---------------------------------------------------------------------------
 
-const TIER_CONCURRENCY: Record<string, number> = {
-  free: 2,
-  starter: 3,
-  creator: 5,
-  pro: 10,
-  scale: 15,
-  business: 15,
-};
+const DEFAULT_CONCURRENCY = 2;
 
 /**
- * Query the ElevenLabs subscription tier and return the concurrent request limit.
+ * Query the ElevenLabs API and read the `maximum-concurrent-requests` response
+ * header to determine the concurrency limit for the given API key.
  * Caches the result in Redis for 5 minutes so plan upgrades are picked up quickly.
  */
 export async function getElevenLabsConcurrencyLimit(apiKey: string): Promise<number> {
@@ -255,21 +249,25 @@ export async function getElevenLabsConcurrencyLimit(apiKey: string): Promise<num
 
     if (!response.ok) {
       logger.warn('Failed to fetch ElevenLabs subscription', { status: response.status });
-      return 2;
+      return DEFAULT_CONCURRENCY;
     }
 
-    const data = await response.json();
-    const tier = (data.tier || 'free').toLowerCase();
-    const limit = TIER_CONCURRENCY[tier] ?? 2;
+    const maxConcurrent = response.headers.get('maximum-concurrent-requests');
+    const limit = maxConcurrent ? parseInt(maxConcurrent, 10) : DEFAULT_CONCURRENCY;
+
+    if (isNaN(limit) || limit <= 0) {
+      logger.warn('Invalid maximum-concurrent-requests header', { maxConcurrent });
+      return DEFAULT_CONCURRENCY;
+    }
 
     await cache.set(cacheKey, limit, 300);
-    logger.info('ElevenLabs subscription concurrency resolved', { tier, limit });
+    logger.info('ElevenLabs concurrency resolved from API header', { limit });
     return limit;
   } catch (error) {
     logger.warn('ElevenLabs subscription lookup failed, using default', {
       error: error instanceof Error ? error.message : 'Unknown',
     });
-    return 2;
+    return DEFAULT_CONCURRENCY;
   }
 }
 

@@ -40,7 +40,7 @@ const workers = [
   createWorker('script-generation', processScriptGeneration, { concurrency: 2 }),
   createWorker('script-verification', processScriptVerification, { concurrency: 2 }),
   createWorker('reference-validation', processReferenceValidation, { concurrency: 2 }),
-  createWorker('audio-generation', processAudioGeneration, { concurrency: 5 }),
+  createWorker('audio-generation', processAudioGeneration, { concurrency: 15 }),
   createWorker('audio-stitching', processAudioStitching, { concurrency: 1 }),
   createWorker('interactions', processInteraction, { concurrency: 3 }),
   createWorker('segment-regeneration', processSegmentRegeneration, { concurrency: 2 }),
