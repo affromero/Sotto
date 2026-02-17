@@ -135,6 +135,23 @@ export const semaphore = {
 };
 
 /**
+ * Simple Redis counter helpers for tracking metrics (e.g., cache hit/miss counts).
+ * Keys auto-expire after the given TTL.
+ */
+export const counters = {
+  async increment(key: string, ttlSeconds = 86400): Promise<void> {
+    const client = getRedisClient();
+    const count = await client.incr(key);
+    if (count === 1) await client.expire(key, ttlSeconds);
+  },
+  async get(key: string): Promise<number> {
+    const client = getRedisClient();
+    const val = await client.get(key);
+    return val ? parseInt(val, 10) : 0;
+  },
+};
+
+/**
  * Rate limiting with sliding window
  */
 export async function checkRateLimit(
