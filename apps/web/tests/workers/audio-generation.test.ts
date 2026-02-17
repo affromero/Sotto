@@ -166,6 +166,23 @@ function setupStandardProvider() {
   });
 }
 
+function setupByokProvider(providerId: 'elevenlabs' | 'openai' = 'elevenlabs') {
+  const isElevenLabs = providerId === 'elevenlabs';
+  mockResolveTtsProvider.mockResolvedValue({
+    provider: {
+      generateSpeech: isElevenLabs
+        ? (...args: unknown[]) => mockPremiumGenerateSpeech(...args)
+        : (...args: unknown[]) => mockStandardGenerateSpeech(...args),
+      getVoiceId: isElevenLabs
+        ? (...args: unknown[]) => mockProviderGetVoiceId(...args)
+        : (...args: unknown[]) => mockStandardGetVoiceId(...args),
+      providerId,
+    },
+    source: 'byok',
+    providerId,
+  });
+}
+
 // ---- Tests ----
 
 describe('processAudioGeneration', () => {
@@ -497,6 +514,45 @@ describe('processAudioGeneration', () => {
           category: 'audio_generation',
         }),
       });
+    });
+
+    it('calculates non-zero totalCost for platform source', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      const callArgs = mockPrismaApiUsageLogCreate.mock.calls[0][0];
+      // "Welcome to the show!" = 20 chars → (20/1000) * 0.3 = 0.006
+      expect(callArgs.data.totalCost).toBeCloseTo(0.006, 6);
+    });
+
+    it('calculates non-zero totalCost for BYOK source', async () => {
+      setupByokProvider('elevenlabs');
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      const callArgs = mockPrismaApiUsageLogCreate.mock.calls[0][0];
+      // Same rate applies: (20/1000) * 0.3 = 0.006
+      expect(callArgs.data.totalCost).toBeCloseTo(0.006, 6);
+      expect(callArgs.data.service).toBe('elevenlabs_byok');
+    });
+
+    it('calculates cost using the correct provider rate for BYOK OpenAI', async () => {
+      setupByokProvider('openai');
+      const { getProviderMeta } = await import('@/lib/providers/tts-registry');
+      (getProviderMeta as ReturnType<typeof vi.fn>).mockReturnValue({
+        id: 'openai',
+        displayName: 'OpenAI',
+        platformCostPerKChar: 0.015,
+        qualityTier: 'standard',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      const callArgs = mockPrismaApiUsageLogCreate.mock.calls[0][0];
+      // (20/1000) * 0.015 = 0.0003
+      expect(callArgs.data.totalCost).toBeCloseTo(0.0003, 6);
+      expect(callArgs.data.service).toBe('openai_byok');
     });
 
     it('checks the count of pending segments for this podcast', async () => {
