@@ -243,7 +243,7 @@ export async function getDailyPicks(
  */
 export async function searchPodcasts(
   query: string,
-  filters?: { tag?: string; depth?: string; audience?: string; tone?: string },
+  filters?: { tag?: string; depth?: string; audience?: string; tone?: string; language?: string },
   userId?: string
 ): Promise<RecommendedPodcast[]> {
   const where: Record<string, unknown> = {
@@ -257,6 +257,9 @@ export async function searchPodcasts(
 
   if (filters?.tag) {
     where.tags = { some: { tag: { slug: filters.tag } } };
+  }
+  if (filters?.language) {
+    where.language = filters.language;
   }
   if (filters?.depth || filters?.audience || filters?.tone) {
     const discoveryFilter: Record<string, string> = {};

@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         depth: searchParams.depth,
         audience: searchParams.audience,
         tone: searchParams.tone,
+        language: searchParams.language,
       },
       session?.user?.id
     );
@@ -53,12 +54,17 @@ export async function GET(request: NextRequest) {
       select: { followingId: true },
     });
 
+    const followingWhere: Prisma.PodcastWhereInput = {
+      status: 'READY',
+      visibility: 'PUBLIC',
+      userId: { in: followedIds.map((f) => f.followingId) },
+    };
+    if (searchParams.language) {
+      followingWhere.language = searchParams.language;
+    }
+
     const podcasts = await prisma.podcast.findMany({
-      where: {
-        status: 'READY',
-        visibility: 'PUBLIC',
-        userId: { in: followedIds.map((f) => f.followingId) },
-      },
+      where: followingWhere,
       orderBy: { createdAt: 'desc' },
       take: 20,
       include: {
@@ -92,6 +98,10 @@ export async function GET(request: NextRequest) {
       visibility: 'PUBLIC',
       forkedFromId: { not: null },
     };
+
+    if (parsed.data.language) {
+      where.language = parsed.data.language;
+    }
 
     const [podcasts, total] = await Promise.all([
       prisma.podcast.findMany({
@@ -128,6 +138,7 @@ export async function GET(request: NextRequest) {
     limit,
     search,
     tag,
+    language,
     sort,
     tags,
     depth,
@@ -144,6 +155,10 @@ export async function GET(request: NextRequest) {
     status: 'READY',
     visibility: 'PUBLIC',
   };
+
+  if (language) {
+    where.language = language;
+  }
 
   if (search) {
     where.OR = [
