@@ -41,9 +41,20 @@ function buildUrl(params: Record<string, string | undefined>): string {
   return `/api/inspire/all${qs ? `?${qs}` : ''}`;
 }
 
+interface SseEvent {
+  section?: Section;
+  data?: TasteQuestion[] | PodcastSummary[];
+  done?: boolean;
+  error?: string;
+}
+
 export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<Section>('forYou');
-  const [isLoading, setIsLoading] = useState(open);
+  const [sectionsLoading, setSectionsLoading] = useState<Record<Section, boolean>>({
+    forYou: false,
+    trending: false,
+    news: false,
+  });
   const [forYouQuestions, setForYouQuestions] = useState<TasteQuestion[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<PodcastSummary[]>([]);
   const [newsQuestions, setNewsQuestions] = useState<TasteQuestion[]>([]);
@@ -54,28 +65,109 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const [topicInput, setTopicInput] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | undefined>();
   const topicInputRef = useRef<HTMLInputElement>(null);
-  const prevSectionRef = useRef<Section>(activeSection);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const isAnyLoading = sectionsLoading.forYou || sectionsLoading.trending || sectionsLoading.news;
 
   const fetchAll = useCallback((topic?: string) => {
-    setIsLoading(true);
+    // Abort any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setSectionsLoading({ forYou: true, trending: true, news: true });
     setFetchError(false);
 
-    fetch(buildUrl({ topic }))
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-      .then((data) => {
-        setForYouQuestions(data.forYou ?? []);
-        setTrendingPodcasts(data.trending ?? []);
-        setNewsQuestions(data.news ?? []);
+    const url = buildUrl({ topic });
+
+    fetch(url, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const contentType = res.headers.get('content-type') ?? '';
+
+        // JSON response = all sections cached, returned at once
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          setForYouQuestions(data.forYou ?? []);
+          setTrendingPodcasts(data.trending ?? []);
+          setNewsQuestions(data.news ?? []);
+          setSectionsLoading({ forYou: false, trending: false, news: false });
+          return;
+        }
+
+        // SSE response — read progressively
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('No response body');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          // Keep the last incomplete line in the buffer
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr) continue;
+
+            try {
+              const event: SseEvent = JSON.parse(jsonStr);
+
+              if (event.done) {
+                setSectionsLoading({ forYou: false, trending: false, news: false });
+                return;
+              }
+
+              if (event.section && event.data) {
+                switch (event.section) {
+                  case 'trending':
+                    setTrendingPodcasts(event.data as PodcastSummary[]);
+                    break;
+                  case 'forYou':
+                    setForYouQuestions(event.data as TasteQuestion[]);
+                    break;
+                  case 'news':
+                    setNewsQuestions(event.data as TasteQuestion[]);
+                    break;
+                }
+                setSectionsLoading((prev) => ({ ...prev, [event.section!]: false }));
+              }
+            } catch {
+              // Skip malformed SSE lines
+            }
+          }
+        }
+
+        // Stream ended without explicit done event
+        setSectionsLoading({ forYou: false, trending: false, news: false });
       })
-      .catch(() => setFetchError(true))
-      .finally(() => setIsLoading(false));
+      .catch((err) => {
+        if ((err as Error).name === 'AbortError') return;
+        setFetchError(true);
+        setSectionsLoading({ forYou: false, trending: false, news: false });
+      });
+
+    return () => controller.abort();
   }, []);
 
   // Pre-fetch all tabs on open
   useEffect(() => {
     if (!open) return;
-    fetchAll(activeTopic);
+    const cleanup = fetchAll(activeTopic);
+    return cleanup;
   }, [open, fetchAll, activeTopic]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
   const handleSelectTopic = useCallback(
     (topic: string) => {
@@ -103,18 +195,6 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     },
     [activeTopic]
   );
-
-  // Regenerate fresh cards when switching back to forYou or news tabs
-  useEffect(() => {
-    const prev = prevSectionRef.current;
-    prevSectionRef.current = activeSection;
-    if (activeSection === 'forYou' && prev !== 'forYou') {
-      handleLoadMore('forYou');
-    }
-    if (activeSection === 'news' && prev !== 'news') {
-      handleLoadMore('news', newsTimeRange);
-    }
-  }, [activeSection, handleLoadMore, newsTimeRange]);
 
   const handleTimeRangeChange = useCallback(
     async (range: NewsTimeRange) => {
@@ -146,6 +226,8 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
   if (!open) return null;
 
+  const activeTabLoading = sectionsLoading[activeSection];
+
   return (
     <div className={styles.overlay} role="dialog" aria-modal="true" aria-label="Inspire Me">
       <div className={styles.backdrop} onClick={onClose} />
@@ -163,16 +245,16 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
         {/* Tabs + inline topic filter */}
         <div className={styles.tabs} role="tablist" aria-label="Inspiration sections">
-          {(Object.keys(SECTION_LABELS) as Section[]).map((section) => (
+          {(Object.keys(SECTION_LABELS) as Section[]).map((sec) => (
             <button
-              key={section}
+              key={sec}
               type="button"
               role="tab"
-              aria-selected={activeSection === section}
-              className={`${styles.tab} ${activeSection === section ? styles.tabActive : ''}`}
-              onClick={() => setActiveSection(section)}
+              aria-selected={activeSection === sec}
+              className={`${styles.tab} ${activeSection === sec ? styles.tabActive : ''} ${sectionsLoading[sec] && activeSection !== sec ? styles.tabLoading : ''}`}
+              onClick={() => setActiveSection(sec)}
             >
-              {SECTION_LABELS[section]}
+              {SECTION_LABELS[sec]}
             </button>
           ))}
 
@@ -205,7 +287,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleTopicSubmit();
                   }}
-                  disabled={isLoading}
+                  disabled={isAnyLoading}
                 />
               </label>
             )}
@@ -214,12 +296,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
         {/* Content */}
         <div className={styles.content}>
-          {isLoading ? (
-            <div className={styles.loadingState}>
-              <Spinner size="large" />
-              <p>{activeTopic ? `Finding ideas about "${activeTopic}"...` : 'Finding ideas for you...'}</p>
-            </div>
-          ) : fetchError ? (
+          {fetchError ? (
             <div className={styles.emptyState}>
               <p>Something went wrong. Please try again.</p>
               <button
@@ -230,6 +307,19 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                 <RefreshCw size={16} aria-hidden="true" />
                 Retry
               </button>
+            </div>
+          ) : activeTabLoading ? (
+            <div className={styles.loadingState}>
+              <Spinner size="large" />
+              <p>
+                {activeSection === 'news'
+                  ? 'Searching for news...'
+                  : activeSection === 'trending'
+                    ? 'Loading trending podcasts...'
+                    : activeTopic
+                      ? `Finding ideas about "${activeTopic}"...`
+                      : 'Finding ideas for you...'}
+              </p>
             </div>
           ) : activeSection === 'trending' ? (
             <InspireTrendingList
