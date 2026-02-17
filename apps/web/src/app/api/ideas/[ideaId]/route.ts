@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -7,11 +7,11 @@ import { prisma } from '@/lib/prisma';
  * Remove a saved idea.
  */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ ideaId: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -26,7 +26,7 @@ export async function DELETE(
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  if (idea.userId !== session.user.id) {
+  if (idea.userId !== authed.userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

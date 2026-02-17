@@ -24,46 +24,40 @@ const queryClient = new QueryClient();
 function useProtectedRoute() {
   const segments = useSegments();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
-  const [isAuthed, setIsAuthed] = useState(false);
+  const [isReady, setIsReady] = useState(false);
 
+  // Instant navigation on login/logout events
   useEffect(() => {
-    isAuthenticated().then((authed) => {
-      setIsAuthed(authed);
-      setIsChecking(false);
-    });
-  }, []);
-
-  // Listen for auth revocation (401 interceptor)
-  useEffect(() => {
-    const unsubscribe = onAuthRevoked(() => {
-      setIsAuthed(false);
+    const unsubRevoke = onAuthRevoked(() => {
       queryClient.clear();
-    });
-    return unsubscribe;
-  }, []);
-
-  // Listen for successful login
-  useEffect(() => {
-    const unsubscribe = onAuthSuccess(() => {
-      setIsAuthed(true);
-    });
-    return unsubscribe;
-  }, []);
-
-  useEffect(() => {
-    if (isChecking) return;
-
-    const inAuthGroup = segments[0] === 'auth';
-
-    if (!isAuthed && !inAuthGroup) {
       router.replace('/auth/login');
-    } else if (isAuthed && inAuthGroup) {
+    });
+    const unsubSuccess = onAuthSuccess(() => {
       router.replace('/(tabs)');
-    }
-  }, [isChecking, isAuthed, segments, router]);
+    });
+    return () => { unsubRevoke(); unsubSuccess(); };
+  }, [router]);
 
-  return { isChecking };
+  // Auth check + navigation guard — always verifies SecureStore
+  useEffect(() => {
+    let cancelled = false;
+
+    isAuthenticated().then((authed) => {
+      if (cancelled) return;
+      if (!isReady) setIsReady(true);
+
+      const inAuthGroup = segments[0] === 'auth';
+      if (!authed && !inAuthGroup) {
+        router.replace('/auth/login');
+      } else if (authed && inAuthGroup) {
+        router.replace('/(tabs)');
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [segments, router, isReady]);
+
+  return { isChecking: !isReady };
 }
 
 export default function RootLayout() {

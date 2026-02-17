@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { savedIdeaSchema, paginationSchema } from '@/lib/validations';
 
@@ -8,8 +8,8 @@ import { savedIdeaSchema, paginationSchema } from '@/lib/validations';
  * List user's saved ideas, newest first, paginated.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
   const [ideas, total] = await Promise.all([
     prisma.savedIdea.findMany({
-      where: { userId: session.user.id },
+      where: { userId: authed.userId },
       orderBy: { createdAt: 'desc' },
       skip,
       take: limit,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
       },
     }),
-    prisma.savedIdea.count({ where: { userId: session.user.id } }),
+    prisma.savedIdea.count({ where: { userId: authed.userId } }),
   ]);
 
   return NextResponse.json({
@@ -54,8 +54,8 @@ export async function GET(request: NextRequest) {
  * Save a quiz question as an idea (upsert by userId + questionId).
  */
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authed = await authenticateRequest(request);
+  if (!authed) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -69,10 +69,10 @@ export async function POST(request: NextRequest) {
 
   const idea = await prisma.savedIdea.upsert({
     where: {
-      userId_questionId: { userId: session.user.id, questionId },
+      userId_questionId: { userId: authed.userId, questionId },
     },
     create: {
-      userId: session.user.id,
+      userId: authed.userId,
       questionId,
       question,
       tagSlugs,

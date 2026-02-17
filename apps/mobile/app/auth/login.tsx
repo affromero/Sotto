@@ -10,7 +10,7 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
@@ -59,7 +59,6 @@ export default function LoginScreen() {
       }
       await setToken(token);
       notifyAuthSuccess();
-      router.replace('/(tabs)');
     } catch (err: unknown) {
       const axiosError = err as {
         response?: { data?: { error?: string }; status?: number };
@@ -173,7 +172,6 @@ export default function LoginScreen() {
         }
         await setToken(token);
         notifyAuthSuccess();
-        router.replace('/(tabs)');
       } catch (err: unknown) {
         const axiosError = err as {
           response?: { data?: { error?: string }; status?: number };
