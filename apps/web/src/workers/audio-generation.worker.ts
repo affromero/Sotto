@@ -216,13 +216,10 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     data: { audioUrl, duration: segmentDuration },
   });
 
-  // Log TTS cost — BYOK = $0 platform cost
+  // Log TTS cost — always calculate regardless of key source
   const charCount = text.length;
-  let totalCost = 0;
-  if (source === 'platform') {
-    const meta = getProviderMeta(providerId);
-    totalCost = (charCount / 1000) * meta.platformCostPerKChar;
-  }
+  const meta = getProviderMeta(providerId);
+  const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
 
   await prisma.apiUsageLog.create({
     data: {
