@@ -67,6 +67,10 @@ jobs:
             git remote set-url origin "https://x-access-token:${REPO_TOKEN}@github.com/affromero/Sotto.git"
             git pull origin main
 
+            echo "Downloading secrets from Doppler..."
+            doppler secrets download --no-file --format env > .env
+            chmod 600 .env
+
             echo "Building containers..."
             export COMMIT_SHA=$(git rev-parse --short HEAD)
             docker compose -f docker-compose.prod.yml build
