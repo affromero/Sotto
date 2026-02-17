@@ -284,7 +284,7 @@ import type { SttProviderId } from '@sotto/shared';
  * Create an STT provider instance
  */
 export function createSttProvider(provider?: SttProviderId, apiKey?: string, model?: string): SttProvider {
-  const target = provider ?? 'openai';
+  const target = provider ?? 'groq';
 
   switch (target) {
     case 'elevenlabs':

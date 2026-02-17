@@ -10,9 +10,9 @@
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
-    "dev": "npm run dev --workspace=@sotto/web",
-    "dev:web": "npm run dev:web --workspace=@sotto/web",
-    "dev:workers": "npm run dev:workers --workspace=@sotto/web",
+    "dev": "doppler run -- npm run dev --workspace=@sotto/web",
+    "dev:web": "doppler run -- npm run dev:web --workspace=@sotto/web",
+    "dev:workers": "doppler run -- npm run dev:workers --workspace=@sotto/web",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "lint": "npm run lint --workspace=@sotto/web",
