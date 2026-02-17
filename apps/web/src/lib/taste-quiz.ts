@@ -159,14 +159,14 @@ Respond with a JSON array only, no markdown. Each item:
   return questions;
 }
 
-interface InspireContext {
+export interface InspireContext {
   taxonomyLines: string[];
   validSlugs: Set<string>;
   priorQuestionIds: Set<string>;
   freeTierConfig: { aiProvider: string; aiModel: string };
 }
 
-async function loadInspireContext(userId: string): Promise<InspireContext> {
+export async function loadInspireContext(userId: string): Promise<InspireContext> {
   const [categories, priorAnswers, freeTierConfig] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
@@ -300,11 +300,12 @@ function parseAndFilterQuestions(
 export async function generateForYouQuestions(
   userId: string,
   count: number,
-  topic?: string
+  topic?: string,
+  preloadedCtx?: InspireContext
 ): Promise<TasteQuestion[]> {
 
   const [ctx, existingInterests] = await Promise.all([
-    loadInspireContext(userId),
+    preloadedCtx ?? loadInspireContext(userId),
     prisma.userInterest.findMany({
       where: { userId },
       select: { tag: { select: { name: true, slug: true } }, weight: true },
@@ -354,6 +355,7 @@ Respond with a JSON array only, no markdown. Each item:
     // Use user's BYOK key if available (faster than platform claude-code CLI)
     const resolved = await resolveAiProvider(userId).catch(() => null);
     let responseText: string;
+    const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
@@ -375,9 +377,27 @@ Respond with a JSON array only, no markdown. Each item:
       responseText = result.content;
     }
 
+    const durationMs = Date.now() - llmStart;
+
     const questions = parseAndFilterQuestions(
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds
     );
+
+    // Fire-and-forget timing log
+    prisma.apiUsageLog.create({
+      data: {
+        userId,
+        service: 'anthropic',
+        category: 'inspire_foryou',
+        totalCost: 0,
+        durationMs,
+        metadata: {
+          model: ctx.freeTierConfig.aiModel,
+          questionCount: questions.length,
+          topic: topic ?? null,
+        },
+      },
+    }).catch(() => {});
 
     return questions;
   } catch (err) {
@@ -406,10 +426,11 @@ export async function generateNewsQuestions(
   count: number,
   excludeTopics: string[] = [],
   timeRange: NewsTimeRange = '1w',
-  topic?: string
+  topic?: string,
+  preloadedCtx?: InspireContext
 ): Promise<TasteQuestion[]> {
 
-  const ctx = await loadInspireContext(userId);
+  const ctx = preloadedCtx ?? await loadInspireContext(userId);
 
   const timeLabel = NEWS_TIME_LABELS[timeRange];
 
@@ -449,6 +470,7 @@ Respond with a JSON array only, no markdown. Each item:
   try {
     const resolved = await resolveAiProvider(userId);
     let responseText: string;
+    const llmStart = Date.now();
 
     const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
     if (anthropicApiKey) {
@@ -474,10 +496,29 @@ Respond with a JSON array only, no markdown. Each item:
       responseText = result.content;
     }
 
+    const durationMs = Date.now() - llmStart;
+
     const questions = parseAndFilterQuestions(
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
+
+    // Fire-and-forget timing log
+    prisma.apiUsageLog.create({
+      data: {
+        userId,
+        service: 'anthropic',
+        category: 'inspire_news',
+        totalCost: 0,
+        durationMs,
+        metadata: {
+          model: 'claude-haiku-4-5-20251001',
+          questionCount: questions.length,
+          topic: topic ?? null,
+          timeRange,
+        },
+      },
+    }).catch(() => {});
 
     return questions;
   } catch (err) {
