@@ -35,6 +35,7 @@
 | `/admin/handles`             | `(admin)/admin/handles/page.tsx`           | Yes (ADMIN only)            | Reserved handle management                               |
 | `/admin/config`              | `(admin)/admin/config/page.tsx`            | Yes (ADMIN only)            | Free tier config (AI/TTS provider, model, generation limit) |
 | `/admin/twitter`             | `(admin)/admin/twitter/page.tsx`           | Yes (ADMIN only)            | Twitter dashboard (analytics, auto-tweet, trends, thread→podcast) |
+| `/admin/ratings`             | `(admin)/admin/ratings/page.tsx`           | Yes (ADMIN only)            | TTS quality ratings by provider (creator feedback)       |
 
 ## API Route Index
 
@@ -65,6 +66,7 @@
 | `/api/podcasts/[podcastId]/comments`                             | GET/POST         | Yes (POST) | List/create threaded comments                                               |
 | `/api/podcasts/[podcastId]/comments/[commentId]`                 | DELETE           | Yes        | Delete own comment                                                          |
 | `/api/podcasts/[podcastId]/comments/[commentId]/replies`         | GET              | No         | List replies to a comment                                                   |
+| `/api/podcasts/[podcastId]/rating`                               | GET/POST         | Yes        | Get/submit creator rating (upsert, creator-only)                            |
 | `/api/podcasts/[podcastId]/export`                               | POST/GET         | Yes        | Trigger PDF generation / check status                                       |
 | `/api/feed`                                                      | GET              | No         | Public feed with search/filter/sort (includes most_forked, remixes mode)    |
 | `/api/activity`                                                  | GET              | Yes        | Activity feed from followed users                                           |
@@ -115,6 +117,7 @@
 | `/api/admin/podcasts/[podcastId]`                                | DELETE           | ADMIN      | Delete podcast (admin removal)                                              |
 | `/api/admin/waitlist/export`                                     | GET              | ADMIN      | Export waitlist as CSV                                                      |
 | `/api/admin/costs`                                               | GET              | ADMIN      | Provider cost breakdown dashboard                                           |
+| `/api/admin/ratings`                                             | GET              | ADMIN      | Aggregate podcast ratings by TTS provider                                   |
 | `/api/admin/traffic-report`                                      | GET              | Bearer key | Full analytics JSON (traffic, users, podcasts, playback, costs)             |
 | `/api/users/me/avatar`                                           | POST             | Yes        | Upload avatar image (multipart/form-data)                                   |
 | `/api/onboarding/interests`                                      | POST             | Yes        | Save onboarding interest selections + mark onboarded                        |
