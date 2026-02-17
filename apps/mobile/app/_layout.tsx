@@ -16,7 +16,7 @@ import {
   Inter_600SemiBold,
 } from '@expo-google-fonts/inter';
 import { colors } from '@sotto/shared';
-import { isAuthenticated } from '../lib/auth';
+import { isAuthenticated, onAuthSuccess } from '../lib/auth';
 import { onAuthRevoked } from '../lib/api';
 
 const queryClient = new QueryClient();
@@ -39,6 +39,14 @@ function useProtectedRoute() {
     const unsubscribe = onAuthRevoked(() => {
       setIsAuthed(false);
       queryClient.clear();
+    });
+    return unsubscribe;
+  }, []);
+
+  // Listen for successful login
+  useEffect(() => {
+    const unsubscribe = onAuthSuccess(() => {
+      setIsAuthed(true);
     });
     return unsubscribe;
   }, []);

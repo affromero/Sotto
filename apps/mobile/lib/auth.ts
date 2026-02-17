@@ -18,3 +18,17 @@ export async function isAuthenticated(): Promise<boolean> {
   const token = await getToken();
   return token !== null;
 }
+
+type AuthSuccessListener = () => void;
+const authSuccessListeners = new Set<AuthSuccessListener>();
+
+export function onAuthSuccess(listener: AuthSuccessListener): () => void {
+  authSuccessListeners.add(listener);
+  return () => {
+    authSuccessListeners.delete(listener);
+  };
+}
+
+export function notifyAuthSuccess() {
+  authSuccessListeners.forEach((listener) => listener());
+}
