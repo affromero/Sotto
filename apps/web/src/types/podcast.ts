@@ -20,6 +20,7 @@ export interface PodcastSummary {
   aiProvider?: string | null;
   aiModel?: string | null;
   ttsProvider?: string | null;
+  ttsModel?: string | null;
   language?: string | null;
   forkedFromId: string | null;
   user: {
