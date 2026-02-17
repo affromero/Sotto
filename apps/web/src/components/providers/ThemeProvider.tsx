@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 
@@ -29,50 +29,37 @@ function isLightOnlyRoute(pathname: string): boolean {
   );
 }
 
-function getSystemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function resolveTheme(theme: Theme): ResolvedTheme {
-  return theme === 'system' ? getSystemTheme() : theme;
-}
-
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { status } = useSession();
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light');
-
-  // Read stored preference on mount
-  useEffect(() => {
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'system';
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      setThemeState(stored);
-    }
-  }, []);
+    return stored && ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
+  });
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => {
+    if (typeof window === 'undefined') return 'light';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
 
-  // Compute effective theme based on route, auth status, and preference
-  useEffect(() => {
-    const forcedLight = isLightOnlyRoute(pathname) || status === 'unauthenticated';
-    const effective: ResolvedTheme = forcedLight ? 'light' : resolveTheme(theme);
-    setResolvedTheme(effective);
-    document.documentElement.dataset.theme = effective;
-  }, [theme, pathname, status]);
-
-  // Listen for OS theme changes when preference is 'system'
+  // Listen for OS theme changes
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme !== 'system') return;
-      const forcedLight = isLightOnlyRoute(pathname) || status === 'unauthenticated';
-      const effective: ResolvedTheme = forcedLight ? 'light' : getSystemTheme();
-      setResolvedTheme(effective);
-      document.documentElement.dataset.theme = effective;
-    };
+    const handler = (e: MediaQueryListEvent) => setSystemTheme(e.matches ? 'dark' : 'light');
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
-  }, [theme, pathname, status]);
+  }, []);
+
+  const resolvedTheme = useMemo<ResolvedTheme>(() => {
+    const forcedLight = isLightOnlyRoute(pathname) || status === 'unauthenticated';
+    if (forcedLight) return 'light';
+    return theme === 'system' ? systemTheme : theme;
+  }, [theme, systemTheme, pathname, status]);
+
+  // Sync to DOM
+  useEffect(() => {
+    document.documentElement.dataset.theme = resolvedTheme;
+  }, [resolvedTheme]);
 
   const setTheme = useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
