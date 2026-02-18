@@ -662,6 +662,10 @@ export function SettingsForm({
               <p className={styles.twitterDescription}>
                 Connect your Twitter account to generate podcasts by tweeting at @sottofm.
               </p>
+              <p className={styles.twitterDisclaimer}>
+                We only read your username to link your account. Sotto can&apos;t post tweets, read
+                your DMs, or see private data. You can disconnect anytime from this page.
+              </p>
               <div className={styles.formActions}>
                 <Button onClick={() => signIn('twitter', { callbackUrl: '/settings' })}>Connect Twitter</Button>
               </div>

@@ -351,6 +351,13 @@
 .twitterDescription {
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.twitterDisclaimer {
+  font: var(--text-body-sm);
+  font-size: 12px;
+  color: var(--color-text-tertiary);
   margin-bottom: var(--spacing-md);
 }
 

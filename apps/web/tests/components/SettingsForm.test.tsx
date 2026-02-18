@@ -30,6 +30,7 @@ const defaultProps = {
   twitterEnabled: false,
   preferredHostVoiceId: null,
   preferredExpertVoiceId: null,
+  preferredLanguage: null,
   voiceClones: [],
   interestCategories: [],
   selectedInterestTagIds: [],
