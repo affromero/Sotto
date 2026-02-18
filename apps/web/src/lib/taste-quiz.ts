@@ -6,6 +6,7 @@ import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
 import { WEB_SEARCH_TOOL } from './claude';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
 function hashQuestion(text: string): string {
@@ -104,6 +105,15 @@ Respond with a JSON array only, no markdown. Each item:
     [{ role: 'user', content: `Generate ${requestCount} taste quiz questions.` }],
     { model: freeTierConfig.aiModel, maxTokens: 4096, temperature: 1.0 }
   );
+
+  logUsage({
+    service: freeTierConfig.aiProvider === 'openai' ? 'openai' : 'anthropic',
+    model: response.model,
+    category: 'taste_quiz',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId,
+  });
 
   // Parse the JSON response
   let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string }>;
@@ -360,18 +370,23 @@ Respond with a JSON array only, no markdown. Each item:
     // Use user's BYOK key if available (faster than platform claude-code CLI)
     const resolved = await resolveAiProvider(userId).catch(() => null);
     let responseText: string;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let usedModel = ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001';
     const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: resolved.apiKey });
       const response = await client.messages.create({
-        model: ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001',
+        model: usedModel,
         max_tokens: 2048,
         messages: [{ role: 'user', content: systemPrompt }],
       });
       const textBlock = response.content.find((block) => block.type === 'text');
       responseText = textBlock?.type === 'text' ? textBlock.text : '';
+      inputTokens = response.usage.input_tokens;
+      outputTokens = response.usage.output_tokens;
     } else {
       const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
       const result = await ai.generateResponse(
@@ -380,6 +395,9 @@ Respond with a JSON array only, no markdown. Each item:
         { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
+      usedModel = result.model;
     }
 
     const durationMs = Date.now() - llmStart;
@@ -388,21 +406,16 @@ Respond with a JSON array only, no markdown. Each item:
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds
     );
 
-    // Fire-and-forget timing log
-    prisma.apiUsageLog.create({
-      data: {
-        userId,
-        service: 'anthropic',
-        category: 'inspire_foryou',
-        totalCost: 0,
-        durationMs,
-        metadata: {
-          model: ctx.freeTierConfig.aiModel,
-          questionCount: questions.length,
-          topic: topic ?? null,
-        },
-      },
-    }).catch(() => {});
+    logUsage({
+      service: resolved?.provider === 'openai' ? 'openai' : 'anthropic',
+      model: usedModel,
+      category: 'inspire_foryou',
+      inputTokens,
+      outputTokens,
+      durationMs,
+      userId,
+      metadata: { questionCount: questions.length, topic: topic ?? null },
+    });
 
     return questions;
   } catch (err) {
@@ -479,6 +492,9 @@ Respond with a JSON array only, no markdown. Each item:
   try {
     const resolved = await resolveAiProvider(userId);
     let responseText: string;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let usedModel = 'claude-haiku-4-5-20251001';
     const llmStart = Date.now();
 
     const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
@@ -487,7 +503,7 @@ Respond with a JSON array only, no markdown. Each item:
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: anthropicApiKey });
       const response = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: usedModel,
         max_tokens: 2048,
         messages: [{ role: 'user', content: systemPrompt }],
         tools: [WEB_SEARCH_TOOL],
@@ -499,6 +515,8 @@ Respond with a JSON array only, no markdown. Each item:
         )
         .map((block) => block.text)
         .join('\n\n');
+      inputTokens = response.usage.input_tokens;
+      outputTokens = response.usage.output_tokens;
     } else {
       // Use AI provider (claude-code CLI has built-in web search)
       const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
@@ -508,6 +526,9 @@ Respond with a JSON array only, no markdown. Each item:
         { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
+      usedModel = result.model;
     }
 
     const durationMs = Date.now() - llmStart;
@@ -517,22 +538,16 @@ Respond with a JSON array only, no markdown. Each item:
       { lenient: true }
     );
 
-    // Fire-and-forget timing log
-    prisma.apiUsageLog.create({
-      data: {
-        userId,
-        service: 'anthropic',
-        category: 'inspire_news',
-        totalCost: 0,
-        durationMs,
-        metadata: {
-          model: 'claude-haiku-4-5-20251001',
-          questionCount: questions.length,
-          topic: topic ?? null,
-          timeRange,
-        },
-      },
-    }).catch(() => {});
+    logUsage({
+      service: resolved.provider === 'openai' ? 'openai' : 'anthropic',
+      model: usedModel,
+      category: 'inspire_news',
+      inputTokens,
+      outputTokens,
+      durationMs,
+      userId,
+      metadata: { questionCount: questions.length, topic: topic ?? null, timeRange },
+    });
 
     return questions;
   } catch (err) {

@@ -1,4 +1,5 @@
 import { generateResponse } from './claude';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
 const SYSTEM_PROMPT = `You are a metadata generator for podcasts. Given a transcript excerpt, generate:
@@ -27,6 +28,14 @@ export async function generateImportMetadata(
     [{ role: 'user', content: `Transcript:\n${truncated}` }],
     { maxTokens: 256, apiKeyOverride }
   );
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'import_metadata',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  });
 
   const jsonMatch = response.content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {

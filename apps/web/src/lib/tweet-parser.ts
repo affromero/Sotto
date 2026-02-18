@@ -1,5 +1,6 @@
 import { generateResponse } from './claude';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
@@ -51,6 +52,14 @@ export async function parseTweetIntent(
     [{ role: 'user', content: userMessage }],
     { maxTokens: 512, apiKeyOverride }
   );
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'tweet_parse',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  });
 
   logger.info('Tweet intent parsed', {
     inputTokens: String(response.inputTokens),
@@ -151,6 +160,15 @@ ${threadText}`;
     [{ role: 'user', content: userMessage }],
     { maxTokens: 1024, apiKeyOverride }
   );
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'tweet_parse',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    metadata: { tweetCount: thread.tweetCount },
+  });
 
   logger.info('Thread intent parsed', {
     inputTokens: String(response.inputTokens),

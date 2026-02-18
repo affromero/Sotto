@@ -17,7 +17,7 @@ import {
   type SourceMetadata,
 } from '@/lib/script-generator';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
-import { logApiUsage } from '@/lib/claude';
+import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { LIMITS } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
@@ -77,12 +77,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   await job.updateProgress(50);
 
-  await logApiUsage({
-    podcastId,
-    userId,
+  await logUsage({
+    service: 'anthropic',
+    model: verdict.model,
     category: 'script_verification',
     inputTokens: verdict.inputTokens,
     outputTokens: verdict.outputTokens,
+    podcastId,
+    userId,
   });
 
   logger.info('Script verification result', {
@@ -227,12 +229,14 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   await job.updateProgress(80);
 
-  await logApiUsage({
-    podcastId,
-    userId,
+  await logUsage({
+    service: 'anthropic',
+    model: revised.model,
     category: 'script_generation',
     inputTokens: revised.inputTokens,
     outputTokens: revised.outputTokens,
+    podcastId,
+    userId,
   });
 
   // Save revised script (increment version)

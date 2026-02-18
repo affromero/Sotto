@@ -19,6 +19,7 @@ export interface AIResponse {
   content: string;
   inputTokens: number;
   outputTokens: number;
+  model: string;
 }
 
 export interface AIProvider {
@@ -96,6 +97,7 @@ class OpenAIProvider implements AIProvider {
       content,
       inputTokens: response.usage?.prompt_tokens || 0,
       outputTokens: response.usage?.completion_tokens || 0,
+      model,
     };
   }
 
@@ -141,9 +143,11 @@ class ClaudeCodeLazyProvider implements AIProvider {
     opts?: AIOptions
   ): Promise<AIResponse> {
     const { executeClaudeCode, serializeMessages } = await this.getClient();
-    return executeClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
+    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const result = await executeClaudeCode(system, serializeMessages(messages), {
+      model: ccModel,
     });
+    return { ...result, model: ccModel };
   }
 
   async *streamResponse(
