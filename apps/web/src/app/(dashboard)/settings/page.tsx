@@ -48,7 +48,7 @@ export default async function SettingsPage() {
       },
     }),
     prisma.userInterest.findMany({
-      where: { userId },
+      where: { userId, weight: { gt: 0 } },
       select: { tagId: true },
     }),
     prisma.tag.findMany({
