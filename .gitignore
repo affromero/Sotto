@@ -75,5 +75,8 @@ accounting/imports/*.ofx
 accounting/imports/*.csv
 .fava-cache/
 
+# MCP config (contains API tokens)
+.mcp.json
+
 # VS Code
 Sotto.code-workspace
