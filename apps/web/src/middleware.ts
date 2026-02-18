@@ -26,6 +26,25 @@ const PUBLIC_ROUTES = new Set([
 ]);
 const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
 
+async function constantTimeEqual(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.generateKey(
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const [sigA, sigB] = await Promise.all([
+    crypto.subtle.sign('HMAC', key, encoder.encode(a)),
+    crypto.subtle.sign('HMAC', key, encoder.encode(b)),
+  ]);
+  const arrA = new Uint8Array(sigA);
+  const arrB = new Uint8Array(sigB);
+  if (arrA.length !== arrB.length) return false;
+  let diff = 0;
+  for (let i = 0; i < arrA.length; i++) diff |= arrA[i] ^ arrB[i];
+  return diff === 0;
+}
+
 async function verifyAccessCookie(value: string, secret: string): Promise<boolean> {
   const separatorIndex = value.indexOf(':');
   if (separatorIndex === -1) return false;
@@ -51,7 +70,7 @@ async function verifyAccessCookie(value: string, secret: string): Promise<boolea
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 
-  return expected === signature;
+  return constantTimeEqual(expected, signature);
 }
 
 function isPublicRoute(pathname: string): boolean {

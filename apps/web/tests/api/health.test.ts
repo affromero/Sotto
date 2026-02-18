@@ -5,6 +5,7 @@ const mockPing = vi.fn();
 const mockLlen = vi.fn();
 const mockZcard = vi.fn();
 const mockS3Send = vi.fn();
+const mockAuth = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -31,6 +32,10 @@ vi.mock('@aws-sdk/client-s3', () => ({
   },
 }));
 
+vi.mock('@/lib/auth', () => ({
+  auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
 import { GET } from '@/app/api/health/route';
 
 describe('GET /api/health', () => {
@@ -46,11 +51,38 @@ describe('GET /api/health', () => {
     mockLlen.mockResolvedValue(0);
     mockZcard.mockResolvedValue(0);
     mockS3Send.mockResolvedValue({});
+    // Default: admin session for detailed checks
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
     globalThis.fetch = originalFetch;
+  });
+
+  it('returns minimal response for unauthenticated requests', async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('healthy');
+    expect(body.timestamp).toBeDefined();
+    expect(body.checks).toBeUndefined();
+    expect(body.env).toBeUndefined();
+    expect(body.oauth).toBeUndefined();
+  });
+
+  it('returns minimal response for non-admin users', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.status).toBe('healthy');
+    expect(body.checks).toBeUndefined();
   });
 
   it('returns 200 healthy when DB and Redis pass', async () => {
@@ -85,6 +117,18 @@ describe('GET /api/health', () => {
     expect(response.status).toBe(503);
     expect(body.status).toBe('degraded');
     expect(body.checks.redis.status).toBe('error');
+  });
+
+  it('returns minimal degraded response for non-admin when DB fails', async () => {
+    mockAuth.mockResolvedValue(null);
+    mockQueryRaw.mockRejectedValue(new Error('Connection refused'));
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body.status).toBe('degraded');
+    expect(body.checks).toBeUndefined();
   });
 
   it('reports storage not_configured when R2 env vars are missing', async () => {

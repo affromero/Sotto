@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
   }
 
   const expectedSig = crypto.createHmac('sha256', secret).update(timestamp).digest('hex');
-  const hasAccess = expectedSig === signature;
+  const expectedBuf = Buffer.from(expectedSig);
+  const signatureBuf = Buffer.from(signature);
+  const hasAccess = expectedBuf.length === signatureBuf.length && crypto.timingSafeEqual(expectedBuf, signatureBuf);
 
   return NextResponse.json({ gated: true, hasAccess });
 }
