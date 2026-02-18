@@ -54,7 +54,7 @@ describe('Sidebar', () => {
 
   it('shows creator/admin nav items when role is CREATOR', () => {
     const creatorUser = { ...mockUser, role: 'CREATOR' };
-    render(<Sidebar currentPath="/dashboard" user={creatorUser} />);
+    render(<Sidebar currentPath="/dashboard" user={creatorUser} hasPodcasts />);
 
     expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Voices')).toBeInTheDocument();
@@ -64,7 +64,7 @@ describe('Sidebar', () => {
 
   it('shows admin panel link for ADMIN role', () => {
     const adminUser = { ...mockUser, role: 'ADMIN' };
-    render(<Sidebar currentPath="/dashboard" user={adminUser} />);
+    render(<Sidebar currentPath="/dashboard" user={adminUser} hasPodcasts />);
 
     expect(screen.getByText('Admin Panel')).toBeInTheDocument();
     expect(screen.getByText('Analytics')).toBeInTheDocument();
