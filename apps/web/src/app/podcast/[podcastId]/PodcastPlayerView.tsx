@@ -17,6 +17,7 @@ import {
   Trash2,
   Check,
   Flag,
+  BarChart2,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -665,6 +666,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                   icon: <ListMusic size={16} />,
                   label: 'Add to Collection',
                   onClick: () => setShowAddToCollection(true),
+                }] : []),
+                ...(isOwner ? [{
+                  icon: <BarChart2 size={16} />,
+                  label: 'Analytics',
+                  onClick: () => router.push(`/podcast/${podcast.id}/analytics`),
                 }] : []),
                 ...(isOwner ? [{
                   icon: <Pencil size={16} />,

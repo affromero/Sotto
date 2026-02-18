@@ -4,4 +4,10 @@ export type {
   UsageDataPoint,
   AnalyticsSummary,
   AnalyticsResponse,
+  CreatorOverview,
+  CreatorTopPodcast,
+  CreatorDailyPlays,
+  CreatorEngagement,
+  CreatorAudienceInsights,
+  CreatorAnalyticsResponse,
 } from '@sotto/shared';
