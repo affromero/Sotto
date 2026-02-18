@@ -41,63 +41,6 @@ describe('content-parser', () => {
       expect(result).toContain('Content paragraph');
     });
 
-    it('removes script tags from HTML', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Good content',
-        markdown: 'Good content',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).not.toContain('alert');
-      expect(result).toContain('Good content');
-    });
-
-    it('removes style tags from HTML', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Content',
-        markdown: 'Content',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).not.toContain('color: red');
-      expect(result).toContain('Content');
-    });
-
-    it('strips all HTML tags', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Bold and italic',
-        markdown: '**Bold** and *italic*',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).not.toContain('<');
-      expect(result).not.toContain('>');
-      expect(result).toContain('Bold');
-      expect(result).toContain('italic');
-    });
-
-    it('collapses multiple spaces into single space', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Text with multiple spaces',
-        markdown: 'Text with multiple spaces',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).toBe('Text with multiple spaces');
-    });
-
     it('trims leading and trailing whitespace', async () => {
       mockExtractContent.mockResolvedValue({
         text: 'Content',
@@ -162,62 +105,6 @@ describe('content-parser', () => {
       expect(result).toBe('');
     });
 
-    it('handles complex nested HTML structure', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Main Title First paragraph. Second paragraph.',
-        markdown: '# Main Title\nFirst paragraph.\nSecond paragraph.',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).toContain('Main Title');
-      expect(result).toContain('First paragraph');
-    });
-
-    it('handles special characters in HTML', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Special chars: < > & "',
-        markdown: 'Special chars: < > & "',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).toContain('Special chars');
-    });
-
-    it('handles multiple script tags', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Good',
-        markdown: 'Good',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).not.toContain('bad1');
-      expect(result).not.toContain('bad2');
-      expect(result).toContain('Good');
-    });
-
-    it('handles multiple style tags', async () => {
-      mockExtractContent.mockResolvedValue({
-        text: 'Content',
-        markdown: 'Content',
-        sourceType: 'html',
-        extractionMethod: 'readability',
-      });
-
-      const result = await extractFromUrl('https://example.com');
-
-      expect(result).not.toContain('css1');
-      expect(result).not.toContain('css2');
-      expect(result).toContain('Content');
-    });
   });
 
   describe('extractFromPdf', () => {

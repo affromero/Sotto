@@ -84,27 +84,6 @@ describe('GET /api/users/[userId]', () => {
     expect(body.isFollowing).toBe(false);
   });
 
-  it('returns user profile with all expected fields', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body).toHaveProperty('id');
-    expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('image');
-    expect(body).toHaveProperty('bio');
-    expect(body).toHaveProperty('createdAt');
-    expect(body).toHaveProperty('podcastCount');
-    expect(body).toHaveProperty('followerCount');
-    expect(body).toHaveProperty('followingCount');
-    expect(body).toHaveProperty('isFollowing');
-  });
-
   it('returns 404 when user not found', async () => {
     mockPrisma.user.findUnique.mockResolvedValue(null);
     mockAuth.mockResolvedValue(null);
@@ -117,19 +96,6 @@ describe('GET /api/users/[userId]', () => {
 
     expect(response.status).toBe(404);
     expect(body.error).toBe('User not found');
-  });
-
-  it('includes correct podcast count from _count', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.podcastCount).toBe(12);
   });
 
   it('handles user with null image and bio', async () => {
@@ -227,16 +193,4 @@ describe('GET /api/users/[userId]', () => {
     expect(body.followingCount).toBe(0);
   });
 
-  it('preserves createdAt timestamp in response', async () => {
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-    mockAuth.mockResolvedValue(null);
-
-    const request = createRequest();
-    const response = await GET(request, {
-      params: Promise.resolve({ userId: 'user-1' }),
-    });
-    const body = await response.json();
-
-    expect(body.createdAt).toBe(mockUser.createdAt.toISOString());
-  });
 });

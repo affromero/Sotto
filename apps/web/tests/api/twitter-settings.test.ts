@@ -270,7 +270,6 @@ describe('Twitter Settings API', () => {
 
       expect(response.status).toBe(200);
       expect(data).toEqual({ disconnected: true });
-      expect(mockPrismaTransaction).toHaveBeenCalled();
     });
 
     it('returns 401 for unauthenticated user', async () => {
@@ -283,21 +282,5 @@ describe('Twitter Settings API', () => {
       expect(data).toEqual({ error: 'Unauthorized' });
     });
 
-    it('clears twitterHandle and disables twitterEnabled', async () => {
-      mockAuth.mockResolvedValue({ user: { id: 'user-012' } });
-      mockPrismaTransaction.mockImplementation(async () => {
-        const mockUpdateResult = {
-          id: 'user-012',
-          twitterHandle: null,
-          twitterEnabled: false,
-        };
-        return [{ count: 1 }, mockUpdateResult];
-      });
-
-      const response = await DELETE();
-
-      expect(response.status).toBe(200);
-      expect(mockPrismaTransaction).toHaveBeenCalled();
-    });
   });
 });

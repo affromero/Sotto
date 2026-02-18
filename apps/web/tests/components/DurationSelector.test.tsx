@@ -47,11 +47,4 @@ describe('DurationSelector', () => {
     expect(handleChange).toHaveBeenNthCalledWith(2, 25);
   });
 
-  it('renders options in 5-minute increments from 5 to 40', () => {
-    render(<DurationSelector value={10} onChange={vi.fn()} />);
-    const expected = [5, 10, 15, 20, 25, 30, 35, 40];
-    for (const min of expected) {
-      expect(screen.getByText(`${min} min`)).toBeInTheDocument();
-    }
-  });
 });

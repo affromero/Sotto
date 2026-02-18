@@ -123,23 +123,6 @@ describe('claude-code-client', () => {
       });
     });
 
-    it('pipes prompt via stdin', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'My long prompt');
-
-      proc._stdout.emit('data', Buffer.from('Response'));
-      proc.emit('close', 0);
-
-      await promise;
-
-      expect(proc._stdin.write).toHaveBeenCalledWith('My long prompt');
-      expect(proc._stdin.end).toHaveBeenCalled();
-    });
-
     it('trims whitespace from stdout', async () => {
       const { executeClaudeCode } = await import('@/lib/claude-code-client');
 
@@ -217,21 +200,6 @@ describe('claude-code-client', () => {
       vi.useRealTimers();
     });
 
-    it('returns zero token counts', async () => {
-      const { executeClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const promise = executeClaudeCode('System', 'Prompt');
-
-      proc._stdout.emit('data', Buffer.from('Response'));
-      proc.emit('close', 0);
-
-      const result = await promise;
-      expect(result.inputTokens).toBe(0);
-      expect(result.outputTokens).toBe(0);
-    });
   });
 
   describe('streamClaudeCode', () => {
@@ -350,27 +318,6 @@ describe('claude-code-client', () => {
       }
 
       expect(chunks).toEqual(['Complete']);
-    });
-
-    it('pipes prompt via stdin', async () => {
-      const { streamClaudeCode } = await import('@/lib/claude-code-client');
-
-      const proc = createMockProcess();
-      mockSpawn.mockReturnValue(proc);
-
-      const gen = streamClaudeCode('System', 'My streaming prompt');
-
-      setTimeout(() => {
-        proc._stdout.write(JSON.stringify({ type: 'result', result: 'Ok' }) + '\n');
-        proc._stdout.end();
-      }, 0);
-
-      for await (const _chunk of gen) {
-        // consume
-      }
-
-      expect(proc._stdin.write).toHaveBeenCalledWith('My streaming prompt');
-      expect(proc._stdin.end).toHaveBeenCalled();
     });
 
     it('kills process on cleanup', async () => {

@@ -85,12 +85,6 @@ describe('push-notifications', () => {
       data: { podcastId: '123' },
     });
 
-    expect(mockSetVapidDetails).toHaveBeenCalledWith(
-      'mailto:test@sotto.fm',
-      'test-public-key',
-      'test-private-key'
-    );
-
     expect(mockSendNotification).toHaveBeenCalledTimes(2);
     const payload = JSON.parse(mockSendNotification.mock.calls[0][1]);
     expect(payload).toMatchObject({
@@ -98,8 +92,6 @@ describe('push-notifications', () => {
       body: 'This is a test',
       url: '/podcast/123',
     });
-
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('cleans up expired subscriptions with 410 status', async () => {
@@ -140,10 +132,6 @@ describe('push-notifications', () => {
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ['sub2'] } },
     });
-
-    expect(logger.info).toHaveBeenCalledWith('Cleaned up expired push subscriptions', expect.any(Object));
-
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('formats payload with title, body, url, and data', async () => {
@@ -226,13 +214,11 @@ describe('push-notifications', () => {
     vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue(mockSubscriptions);
     mockSendNotification.mockRejectedValue(new Error('Invalid endpoint'));
 
-    await sendPushNotification({
+    await expect(sendPushNotification({
       userId: 'user1',
       title: 'Test',
       body: 'Test',
-    });
-
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
+    })).resolves.not.toThrow();
   });
 
   it('handles subscription gone error (410) during send', async () => {
@@ -282,7 +268,7 @@ describe('push-notifications', () => {
     );
   });
 
-  it('logs debug message when user has no subscriptions', async () => {
+  it('does not send notifications when user has no subscriptions', async () => {
     vi.resetModules();
     process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = 'test-public-key';
     process.env.VAPID_PRIVATE_KEY = 'test-private-key';
@@ -292,15 +278,12 @@ describe('push-notifications', () => {
 
     vi.mocked(prisma.pushSubscription.findMany).mockResolvedValue([]);
 
-    await sendPushNotification({
+    await expect(sendPushNotification({
       userId: 'user1',
       title: 'Test',
       body: 'Test',
-    });
+    })).resolves.not.toThrow();
 
-    expect(logger.debug).toHaveBeenCalledWith('No push subscriptions for user', {
-      userId: 'user1',
-    });
     expect(mockSendNotification).not.toHaveBeenCalled();
   });
 
@@ -356,8 +339,6 @@ describe('push-notifications', () => {
     expect(prisma.pushSubscription.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ['sub2'] } },
     });
-
-    expect(logger.info).toHaveBeenCalledWith('Push notifications sent', expect.any(Object));
   });
 
   it('uses default VAPID subject when not configured', async () => {

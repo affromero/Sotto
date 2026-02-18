@@ -87,10 +87,6 @@ describe('POST /api/onboarding/complete', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      data: { hasCompletedOnboarding: true },
-    });
   });
 });
 

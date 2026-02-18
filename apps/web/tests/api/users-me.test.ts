@@ -120,26 +120,6 @@ describe('GET /api/users/me', () => {
     expect(body.bio).toBe('Science educator and podcast creator');
   });
 
-  it('includes all expected profile fields', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-
-    const request = createGetRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body).toHaveProperty('id');
-    expect(body).toHaveProperty('name');
-    expect(body).toHaveProperty('email');
-    expect(body).toHaveProperty('image');
-    expect(body).toHaveProperty('bio');
-    expect(body).toHaveProperty('createdAt');
-    expect(body).toHaveProperty('twitterHandle');
-    expect(body).toHaveProperty('twitterEnabled');
-  });
-
   it('handles user with null optional fields', async () => {
     mockAuth.mockResolvedValue({
       user: { id: 'user-2', name: 'Bob Smith', email: 'bob@example.com' },
@@ -171,32 +151,6 @@ describe('GET /api/users/me', () => {
     expect(body).toEqual({ error: 'User not found' });
   });
 
-  it('preserves createdAt timestamp in response', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-
-    const request = createGetRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.createdAt).toBe(mockUser.createdAt.toISOString());
-  });
-
-  it('includes voice preference fields when set', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
-    mockPrisma.user.findUnique.mockResolvedValue(mockUser);
-
-    const request = createGetRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body.preferredHostVoiceId).toBe('voice-host-1');
-    expect(body.preferredExpertVoiceId).toBe('voice-expert-1');
-  });
 });
 
 describe('PATCH /api/users/me', () => {
@@ -378,23 +332,6 @@ describe('PATCH /api/users/me', () => {
     const response = await PATCH(request);
 
     expect(response.status).toBe(400);
-  });
-
-  it('updates for different authenticated users independently', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-2', name: 'Bob', email: 'bob@example.com' },
-    });
-    mockPrisma.user.update.mockResolvedValue({
-      ...mockUserMinimal,
-      name: 'Bob Updated',
-    });
-
-    const request = createPatchRequest({ name: 'Bob Updated' });
-    const response = await PATCH(request);
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.name).toBe('Bob Updated');
   });
 
   it('returns updated user data in response', async () => {

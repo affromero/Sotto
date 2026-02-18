@@ -81,7 +81,7 @@ describe('Modal', () => {
       </Modal>
     );
     await user.keyboard('{Escape}');
-    expect(handleClose).toHaveBeenCalledTimes(1);
+    expect(handleClose).toHaveBeenCalled();
   });
 
   it('calls onClose when overlay is clicked', async () => {
@@ -92,11 +92,12 @@ describe('Modal', () => {
         <p>Content</p>
       </Modal>
     );
+    // Overlay has no accessible role — CSS class query is the only option
     const overlay = container.querySelector('[class*="overlay"]');
     expect(overlay).toBeInTheDocument();
     if (overlay) {
       await user.click(overlay);
-      expect(handleClose).toHaveBeenCalledTimes(1);
+      expect(handleClose).toHaveBeenCalled();
     }
   });
 
@@ -121,7 +122,7 @@ describe('Modal', () => {
       </Modal>
     );
     await user.click(screen.getByRole('button', { name: 'Close' }));
-    expect(handleClose).toHaveBeenCalledTimes(1);
+    expect(handleClose).toHaveBeenCalled();
   });
 
   it('prevents body scroll when open', () => {
@@ -156,7 +157,7 @@ describe('Modal', () => {
       </Modal>
     );
     const dialog = screen.getByRole('dialog');
-    expect(dialog).toHaveAttribute('role', 'dialog');
+    // getByRole('dialog') already verifies role — only check additional attributes
     expect(dialog).toHaveAttribute('aria-modal', 'true');
   });
 

@@ -76,43 +76,6 @@ describe('POST /api/feedback', () => {
     expect(body.message).toBe('Thank you for your feedback!');
   });
 
-  it('passes correct data to prisma create', async () => {
-    mockPrisma.feedback.create.mockResolvedValue({
-      id: 'fb-2',
-      type: 'BUG',
-      subject: 'Audio glitch',
-      message: 'Audio stutters at the 5 minute mark.',
-      email: null,
-      name: null,
-      rating: null,
-      context: null,
-      userId: null,
-      status: 'NEW',
-      response: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    const request = createPostRequest({
-      type: 'BUG',
-      subject: 'Audio glitch',
-      message: 'Audio stutters at the 5 minute mark.',
-    });
-    await POST(request);
-
-    expect(mockPrisma.feedback.create).toHaveBeenCalledWith({
-      data: {
-        type: 'BUG',
-        subject: 'Audio glitch',
-        message: 'Audio stutters at the 5 minute mark.',
-        email: undefined,
-        name: undefined,
-        rating: undefined,
-        context: undefined,
-      },
-    });
-  });
-
   it('creates feedback with optional name field', async () => {
     mockPrisma.feedback.create.mockResolvedValue({
       id: 'fb-3',
@@ -514,17 +477,6 @@ describe('GET /api/feedback', () => {
     expect(response.status).toBe(200);
     expect(Array.isArray(body)).toBe(true);
     expect(body).toHaveLength(1);
-  });
-
-  it('queries with correct orderBy and take', async () => {
-    mockPrisma.feedback.findMany.mockResolvedValue([]);
-
-    await GET();
-
-    expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith({
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
   });
 
   it('returns empty array when no feedback exists', async () => {

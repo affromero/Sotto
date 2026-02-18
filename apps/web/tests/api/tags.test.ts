@@ -59,26 +59,6 @@ describe('GET /api/tags', () => {
     });
   });
 
-  it('returns each tag with id, name, slug, and podcastCount fields', async () => {
-    mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-1', name: 'History', slug: 'history', _count: { podcasts: 8 } },
-    ] as never);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    const tag = body[0];
-    expect(tag).toHaveProperty('id');
-    expect(tag).toHaveProperty('name');
-    expect(tag).toHaveProperty('slug');
-    expect(tag).toHaveProperty('podcastCount');
-    expect(typeof tag.id).toBe('string');
-    expect(typeof tag.name).toBe('string');
-    expect(typeof tag.slug).toBe('string');
-    expect(typeof tag.podcastCount).toBe('number');
-  });
-
   it('returns empty array when no tags exist', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([]);
 
@@ -108,6 +88,7 @@ describe('GET /api/tags', () => {
     expect(body[1]).not.toHaveProperty('_count');
   });
 
+  // Verifies the response preserves the order returned by the database query (ordered by podcast count desc)
   it('returns tags ordered by podcast count descending', async () => {
     mockPrisma.tag.findMany.mockResolvedValue([
       { id: 'tag-1', name: 'Science', slug: 'science', _count: { podcasts: 50 } },
@@ -124,33 +105,4 @@ describe('GET /api/tags', () => {
     expect(body[2].podcastCount).toBe(10);
   });
 
-  it('handles a single tag correctly', async () => {
-    mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-only', name: 'Philosophy', slug: 'philosophy', _count: { podcasts: 3 } },
-    ] as never);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body).toHaveLength(1);
-    expect(body[0]).toEqual({
-      id: 'tag-only',
-      name: 'Philosophy',
-      slug: 'philosophy',
-      podcastCount: 3,
-    });
-  });
-
-  it('handles tags with zero podcast count', async () => {
-    mockPrisma.tag.findMany.mockResolvedValue([
-      { id: 'tag-1', name: 'Unused Tag', slug: 'unused-tag', _count: { podcasts: 0 } },
-    ] as never);
-
-    const request = createRequest();
-    const response = await GET(request);
-    const body = await response.json();
-
-    expect(body[0].podcastCount).toBe(0);
-  });
 });

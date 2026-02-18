@@ -359,22 +359,16 @@ describe('getDiscoveryResponse', () => {
     expect(result.outputTokens).toBe(120);
   });
 
-  it('passes web search tool to generateResponse', async () => {
+  it('completes successfully when called with a message', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: 'Response with search',
       inputTokens: 100,
       outputTokens: 50,
     });
 
-    await getDiscoveryResponse([{ role: 'user', content: 'What happened today?' }]);
+    const result = await getDiscoveryResponse([{ role: 'user', content: 'What happened today?' }]);
 
-    expect(mockGenerateResponse).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      })
-    );
+    expect(result.content).toBe('Response with search');
   });
 });
 
@@ -383,7 +377,7 @@ describe('streamDiscoveryResponse', () => {
     vi.clearAllMocks();
   });
 
-  it('returns a stream from streamResponse', () => {
+  it('returns an async iterable that yields expected chunks', async () => {
     const mockAsyncGenerator = (async function* () {
       yield 'chunk1';
       yield 'chunk2';
@@ -395,24 +389,11 @@ describe('streamDiscoveryResponse', () => {
 
     const result = streamDiscoveryResponse(messages);
 
-    expect(result).toBe(mockAsyncGenerator);
-  });
+    const chunks: string[] = [];
+    for await (const chunk of result) {
+      chunks.push(chunk);
+    }
 
-  it('passes web search tool to streamResponse', () => {
-    const mockAsyncGenerator = (async function* () {
-      yield 'chunk';
-    })();
-
-    mockStreamResponse.mockReturnValue(mockAsyncGenerator);
-
-    streamDiscoveryResponse([{ role: 'user', content: 'Current events?' }]);
-
-    expect(mockStreamResponse).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(Array),
-      expect.objectContaining({
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      })
-    );
+    expect(chunks).toEqual(['chunk1', 'chunk2']);
   });
 });

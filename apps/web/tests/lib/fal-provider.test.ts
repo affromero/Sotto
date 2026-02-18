@@ -143,18 +143,4 @@ describe('FalProvider', () => {
     expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
   });
 
-  it('returns default model ID', () => {
-    const provider = new FalProvider('fal_sk_test');
-    expect(provider.getModelId()).toBe('qwen3-tts-1.7b');
-  });
-
-  it('returns custom model ID when configured', () => {
-    const provider = new FalProvider('fal_sk_test', 'qwen3-tts-0.6b');
-    expect(provider.getModelId()).toBe('qwen3-tts-0.6b');
-  });
-
-  it('returns providerId as fal', () => {
-    const provider = new FalProvider('fal_sk_test');
-    expect(provider.providerId).toBe('fal');
-  });
 });

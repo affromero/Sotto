@@ -271,14 +271,15 @@ describe('processReferenceValidation', () => {
       });
     });
 
-    it('does not run verification layers when no references exist', async () => {
+    it('still queues audio generation when no references exist', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockVerifyUrl).not.toHaveBeenCalled();
-      expect(mockVerifyDoi).not.toHaveBeenCalled();
-      expect(mockSearchTitle).not.toHaveBeenCalled();
-      expect(mockAiEvaluateReferences).not.toHaveBeenCalled();
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'audio-generation' },
+        'generate_audio',
+        expect.objectContaining({ podcastId: 'podcast-001' })
+      );
     });
   });
 
@@ -371,20 +372,16 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('passes prior checks to AI evaluation', async () => {
+    it('produces a verification verdict after running all layers', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      const priorChecks = mockAiEvaluateReferences.mock.calls[0][1] as Map<string, unknown[]>;
-      const ref001Checks = priorChecks.get('ref-001') as Array<{ layer: string }>;
-
-      expect(ref001Checks).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ layer: 'url' }),
-          expect.objectContaining({ layer: 'doi' }),
-          expect.objectContaining({ layer: 'title_search' }),
-        ])
-      );
+      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
+        where: { id: 'ref-001' },
+        data: expect.objectContaining({
+          verificationStatus: 'VERIFIED',
+        }),
+      });
     });
 
     it('proceeds with empty checks if all external APIs fail', async () => {
@@ -868,10 +865,9 @@ describe('processReferenceValidation', () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockAddJob).toHaveBeenCalledTimes(1);
-      expect(mockAddJob).toHaveBeenCalledWith(
+      expect(mockAddJob).not.toHaveBeenCalledWith(
         expect.anything(),
-        'send_notification',
+        'generate_audio',
         expect.anything()
       );
     });

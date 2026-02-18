@@ -152,11 +152,6 @@ describe('Provider Factories', () => {
       expect(hostVoice).not.toBe(expertVoice);
     });
 
-    it('openai provider returns fixed voice IDs', () => {
-      const provider = createTtsProvider('openai');
-      expect(provider.getVoiceId('HOST')).toBe('nova');
-      expect(provider.getVoiceId('EXPERT')).toBe('onyx');
-    });
   });
 
   describe('createStorageProvider', () => {

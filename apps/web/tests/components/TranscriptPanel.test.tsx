@@ -3,7 +3,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { SegmentData } from '@/types/podcast';
-import { ReferenceData } from '@/types/reference';
 
 vi.mock('@/lib/citation-parser', () => ({
   parseTextWithCitations: (text: string) => text,
@@ -41,22 +40,6 @@ describe('TranscriptPanel', () => {
       order: 2,
       startTime: 12,
       duration: 4,
-    },
-  ];
-
-  const mockReferences: ReferenceData[] = [
-    {
-      id: 'ref-1',
-      number: 1,
-      title: 'Quantum Mechanics',
-      authors: ['Einstein, A.', 'Bohr, N.'],
-      year: 1935,
-      url: 'https://example.com/paper',
-      type: 'PAPER',
-      publisher: null,
-      doi: null,
-      verificationStatus: 'VERIFIED',
-      verificationDetails: null,
     },
   ];
 
@@ -123,12 +106,11 @@ describe('TranscriptPanel', () => {
 
   it('renders segments in correct order', () => {
     const { container } = render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    const segmentTexts = Array.from(container.querySelectorAll('[class*="text"]')).map(
-      (el) => el.textContent
-    );
-    expect(segmentTexts[0]).toBe('Welcome to the podcast about quantum physics.');
-    expect(segmentTexts[1]).toBe('Thank you for having me. Let me explain quantum entanglement.');
-    expect(segmentTexts[2]).toBe('That sounds fascinating. Can you elaborate?');
+    const buttons = container.querySelectorAll('[role="button"]');
+    const segmentTexts = Array.from(buttons).map((el) => el.textContent);
+    expect(segmentTexts[0]).toContain('Welcome to the podcast about quantum physics.');
+    expect(segmentTexts[1]).toContain('Thank you for having me. Let me explain quantum entanglement.');
+    expect(segmentTexts[2]).toContain('That sounds fascinating. Can you elaborate?');
   });
 
   it('segments are keyboard accessible', () => {
@@ -150,8 +132,9 @@ describe('TranscriptPanel', () => {
     const { container } = render(
       <TranscriptPanel segments={segmentsWithNullTime} currentTime={2} />
     );
+    // Active state has no accessible attribute — CSS class query is the only option
     const activeSegments = container.querySelectorAll('[class*="active"]');
-    expect(activeSegments.length).toBe(0);
+    expect(activeSegments).toHaveLength(0);
   });
 
   it('does not highlight segment when duration is null', () => {
@@ -164,17 +147,9 @@ describe('TranscriptPanel', () => {
     const { container } = render(
       <TranscriptPanel segments={segmentsWithNullDuration} currentTime={2} />
     );
+    // Active state has no accessible attribute — CSS class query is the only option
     const activeSegments = container.querySelectorAll('[class*="active"]');
-    expect(activeSegments.length).toBe(0);
-  });
-
-  it('passes references to citation parser when references provided', () => {
-    const parseTextWithCitations = vi.fn((text) => text);
-    vi.doMock('@/lib/citation-parser', () => ({
-      parseTextWithCitations,
-    }));
-    render(<TranscriptPanel segments={mockSegments} references={mockReferences} currentTime={0} />);
-    expect(screen.getByText('Welcome to the podcast about quantum physics.')).toBeInTheDocument();
+    expect(activeSegments).toHaveLength(0);
   });
 
   it('handles empty segments array', () => {

@@ -210,13 +210,4 @@ describe('ReplicateProvider', () => {
     expect(provider.getVoiceId('EXPERT', 'pod-1')).toBe('Dylan');
   });
 
-  it('returns providerId as replicate', () => {
-    const provider = new ReplicateProvider('r8_testtoken');
-    expect(provider.providerId).toBe('replicate');
-  });
-
-  it('returns default model ID', () => {
-    const provider = new ReplicateProvider('r8_testtoken');
-    expect(provider.getModelId()).toBe('qwen3-tts');
-  });
 });

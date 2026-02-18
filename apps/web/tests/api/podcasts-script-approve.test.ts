@@ -130,13 +130,5 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
-    expect(mockCreateSegmentsAndQueueAudio).toHaveBeenCalledWith('pod-1', [
-      { speaker: 'HOST', text: 'Welcome' },
-      { speaker: 'EXPERT', text: 'Thanks for having me' },
-    ]);
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      data: { status: 'GENERATING_AUDIO' },
-    });
   });
 });

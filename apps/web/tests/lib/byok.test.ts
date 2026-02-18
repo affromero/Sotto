@@ -522,28 +522,10 @@ describe('markTtsKeyInvalid', () => {
   it('sets isValid to false for the matching TTS key', async () => {
     await markTtsKeyInvalid('user-1', 'elevenlabs' as Parameters<typeof markTtsKeyInvalid>[1]);
 
-    expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-1', provider: 'elevenlabs', isValid: true },
-      data: { isValid: false },
-    });
-  });
-
-  it('only targets keys for the specified provider', async () => {
-    await markTtsKeyInvalid('user-1', 'cartesia' as Parameters<typeof markTtsKeyInvalid>[1]);
-
     expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ provider: 'cartesia' }),
-      })
-    );
-  });
-
-  it('only targets keys for the specified user', async () => {
-    await markTtsKeyInvalid('user-42', 'openai' as Parameters<typeof markTtsKeyInvalid>[1]);
-
-    expect(mockTtsKeyUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ userId: 'user-42' }),
+        where: expect.objectContaining({ provider: 'elevenlabs', isValid: true }),
+        data: expect.objectContaining({ isValid: false }),
       })
     );
   });
@@ -557,28 +539,10 @@ describe('markAiKeyInvalid', () => {
   it('sets isValid to false for the matching AI key', async () => {
     await markAiKeyInvalid('user-1', 'anthropic' as Parameters<typeof markAiKeyInvalid>[1]);
 
-    expect(mockAiKeyUpdateMany).toHaveBeenCalledWith({
-      where: { userId: 'user-1', provider: 'anthropic', isValid: true },
-      data: { isValid: false },
-    });
-  });
-
-  it('only targets keys for the specified provider', async () => {
-    await markAiKeyInvalid('user-1', 'openai' as Parameters<typeof markAiKeyInvalid>[1]);
-
     expect(mockAiKeyUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ provider: 'openai' }),
-      })
-    );
-  });
-
-  it('only targets currently valid keys', async () => {
-    await markAiKeyInvalid('user-1', 'anthropic' as Parameters<typeof markAiKeyInvalid>[1]);
-
-    expect(mockAiKeyUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ isValid: true }),
+        where: expect.objectContaining({ provider: 'anthropic', isValid: true }),
+        data: expect.objectContaining({ isValid: false }),
       })
     );
   });

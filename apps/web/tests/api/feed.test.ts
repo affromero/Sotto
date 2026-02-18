@@ -191,50 +191,43 @@ describe('GET /api/feed', () => {
   });
 
   it('filters by search query on title and topic', async () => {
+    // TODO: needs integration test for real filtering — the mock returns data
+    // regardless of the search query, so this only verifies the endpoint accepts
+    // a search parameter without error.
     mockPrisma.podcast.findMany.mockResolvedValue([mockPodcast]);
     mockPrisma.podcast.count.mockResolvedValue(1);
 
     const request = createRequest({ search: 'quantum' });
     const response = await GET(request);
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.podcasts).toHaveLength(1);
   });
 
   it('filters by tag slug', async () => {
+    // TODO: needs integration test for real filtering — the mock returns data
+    // regardless of the tag parameter, so this only verifies the endpoint accepts
+    // a tag parameter without error.
     mockPrisma.podcast.findMany.mockResolvedValue([mockPodcast]);
     mockPrisma.podcast.count.mockResolvedValue(1);
 
     const request = createRequest({ tag: 'science' });
     const response = await GET(request);
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.podcasts).toHaveLength(1);
   });
 
-  it('accepts recent sort parameter', async () => {
+  it.each(['recent', 'popular', 'trending'])('accepts %s sort parameter', async (sort) => {
+    // NOTE: The mock returns the same data regardless of sort order, so these
+    // tests only verify the endpoint accepts each sort value without error.
+    // Real sort ordering needs integration tests.
     mockPrisma.podcast.findMany.mockResolvedValue([]);
     mockPrisma.podcast.count.mockResolvedValue(0);
 
-    const request = createRequest({ sort: 'recent' });
-    const response = await GET(request);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('accepts popular sort parameter', async () => {
-    mockPrisma.podcast.findMany.mockResolvedValue([]);
-    mockPrisma.podcast.count.mockResolvedValue(0);
-
-    const request = createRequest({ sort: 'popular' });
-    const response = await GET(request);
-
-    expect(response.status).toBe(200);
-  });
-
-  it('accepts trending sort parameter', async () => {
-    mockPrisma.podcast.findMany.mockResolvedValue([]);
-    mockPrisma.podcast.count.mockResolvedValue(0);
-
-    const request = createRequest({ sort: 'trending' });
+    const request = createRequest({ sort });
     const response = await GET(request);
 
     expect(response.status).toBe(200);
@@ -302,12 +295,16 @@ describe('GET /api/feed', () => {
   });
 
   it('handles combined search and tag filter', async () => {
+    // TODO: needs integration test for real filtering — the mock returns data
+    // regardless of search + tag combination.
     mockPrisma.podcast.findMany.mockResolvedValue([mockPodcast]);
     mockPrisma.podcast.count.mockResolvedValue(1);
 
     const request = createRequest({ search: 'quantum', tag: 'science' });
     const response = await GET(request);
+    const body = await response.json();
 
     expect(response.status).toBe(200);
+    expect(body.podcasts).toHaveLength(1);
   });
 });

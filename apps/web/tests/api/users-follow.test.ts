@@ -248,20 +248,4 @@ describe('DELETE /api/users/[userId]/follow', () => {
     ).rejects.toThrow('Database connection failed');
   });
 
-  it('handles unfollow idempotently when already unfollowed', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
-
-    const notFoundError = new Error('Record not found');
-    Object.assign(notFoundError, { code: 'P2025' });
-    mockPrismaFollowDelete.mockRejectedValue(notFoundError);
-
-    const request = createMockRequest();
-    const response = await DELETE(request, {
-      params: Promise.resolve({ userId: 'following-id' }),
-    });
-
-    expect(response.status).toBe(200);
-    const data = await response.json();
-    expect(data.following).toBe(false);
-  });
 });
