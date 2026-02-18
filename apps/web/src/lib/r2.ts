@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { logger } from './logger';
 
@@ -131,4 +131,39 @@ export async function deleteFile(urlOrKey: string): Promise<void> {
   );
 
   logger.info('File deleted from R2', { key });
+}
+
+/**
+ * List all object keys under a given prefix, handling pagination
+ */
+export async function listFiles(prefix: string): Promise<string[]> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured');
+  }
+
+  const keys: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: R2_BUCKET_NAME,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (response.Contents) {
+      for (const object of response.Contents) {
+        if (object.Key) {
+          keys.push(object.Key);
+        }
+      }
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  logger.info('Listed files from R2', { prefix, count: String(keys.length) });
+  return keys;
 }

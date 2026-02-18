@@ -25,8 +25,6 @@ vi.mock('ioredis', () => ({
   default: MockRedis,
 }));
 
-import { getRedisClient } from '@/lib/redis';
-
 // Mock logger
 vi.mock('@/lib/logger', () => ({
   logger: {

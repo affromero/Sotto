@@ -41,11 +41,11 @@ export async function stitchWithEffects(params: {
       '-c:a',
       'libmp3lame',
       '-b:a',
-      '192k',
+      '64k',
       '-ar',
       '44100',
       '-ac',
-      '2',
+      '1',
       '-filter:a',
       'loudnorm=I=-16:TP=-1.5:LRA=11',
       outputPath,
@@ -80,7 +80,7 @@ export async function stitchWithEffects(params: {
   // Step 1: Normalize each speech segment to consistent format
   for (let i = 0; i < segmentPaths.length; i++) {
     filters.push(
-      `[${i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[seg${i}]`
+      `[${i}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono[seg${i}]`
     );
   }
 
@@ -110,7 +110,7 @@ export async function stitchWithEffects(params: {
       // Ambient SFX are quieter, intro/outro at moderate volume, transitions subtle
       const volume = sfx.type === 'ambient' ? '0.15' : sfx.type === 'transition' ? '0.3' : '0.4';
       filters.push(
-        `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,volume=${volume}[sfx${i}]`
+        `[${sfxIdx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=mono,volume=${volume}[sfx${i}]`
       );
     }
 
@@ -153,7 +153,9 @@ export async function stitchWithEffects(params: {
     '-c:a',
     'libmp3lame',
     '-b:a',
-    '192k',
+    '64k',
+    '-ac',
+    '1',
     outputPath,
   ];
 
@@ -203,11 +205,11 @@ export async function stitchSegments(segmentPaths: string[], outputPath: string)
       '-c:a',
       'libmp3lame',
       '-b:a',
-      '192k',
+      '64k',
       '-ar',
       '44100',
       '-ac',
-      '2',
+      '1',
       '-filter:a',
       'loudnorm=I=-16:TP=-1.5:LRA=11',
       outputPath,
