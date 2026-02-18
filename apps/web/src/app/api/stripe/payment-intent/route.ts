@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { createVoicePayment } from '@/lib/voice-pricing';
+
+const paymentIntentSchema = z.object({
+  voiceCharges: z.array(z.object({
+    voiceCloneId: z.string().min(1),
+    podcastId: z.string().min(1).optional(),
+  })).min(1).max(20),
+});
 
 /**
  * POST: Create PaymentIntent(s) for voice charges.
@@ -13,12 +21,11 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const voiceCharges: Array<{ voiceCloneId: string; podcastId?: string }> =
-    body.voiceCharges;
-
-  if (!Array.isArray(voiceCharges) || voiceCharges.length === 0) {
-    return NextResponse.json({ error: 'voiceCharges is required' }, { status: 400 });
+  const parsed = paymentIntentSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
+  const { voiceCharges } = parsed.data;
 
   const results: Array<{ voiceCloneId: string; clientSecret: string; paymentIntentId: string }> =
     [];
