@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 import { z } from 'zod';
 
 const feedbackSchema = z.object({
@@ -35,8 +36,12 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ id: feedback.id, message: 'Thank you for your feedback!' }, { status: 201 });
 }
 
-export async function GET(_request: NextRequest) {
-  // Admin-only in production — for now, simple listing
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const feedbacks = await prisma.feedback.findMany({
     orderBy: { createdAt: 'desc' },
     take: 50,

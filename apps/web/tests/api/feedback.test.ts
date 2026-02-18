@@ -5,6 +5,8 @@ import { NextRequest } from 'next/server';
 const mockFeedbackCreate = vi.fn();
 const mockFeedbackFindMany = vi.fn();
 
+const mockAuth = vi.fn();
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     feedback: {
@@ -14,6 +16,10 @@ vi.mock('@/lib/prisma', () => {
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/auth', () => ({
+  auth: (...args: unknown[]) => mockAuth(...args),
+}));
 
 import { POST, GET } from '@/app/api/feedback/route';
 
@@ -32,9 +38,6 @@ function createPostRequest(body: unknown): NextRequest {
   });
 }
 
-function createGetRequest(): NextRequest {
-  return new NextRequest(new URL('http://localhost:3000/api/feedback'));
-}
 
 const validFeedback = {
   type: 'GENERAL',
@@ -468,9 +471,24 @@ describe('POST /api/feedback', () => {
 describe('GET /api/feedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
   });
 
-  it('returns a list of feedbacks', async () => {
+  it('returns 403 for non-admin users', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 403 for unauthenticated requests', async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const response = await GET();
+    expect(response.status).toBe(403);
+  });
+
+  it('returns a list of feedbacks for admin', async () => {
     const mockFeedbacks = [
       {
         id: 'fb-1',
@@ -490,8 +508,7 @@ describe('GET /api/feedback', () => {
     ];
     mockPrisma.feedback.findMany.mockResolvedValue(mockFeedbacks);
 
-    const request = createGetRequest();
-    const response = await GET(request);
+    const response = await GET();
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -502,8 +519,7 @@ describe('GET /api/feedback', () => {
   it('queries with correct orderBy and take', async () => {
     mockPrisma.feedback.findMany.mockResolvedValue([]);
 
-    const request = createGetRequest();
-    await GET(request);
+    await GET();
 
     expect(mockPrisma.feedback.findMany).toHaveBeenCalledWith({
       orderBy: { createdAt: 'desc' },
@@ -514,8 +530,7 @@ describe('GET /api/feedback', () => {
   it('returns empty array when no feedback exists', async () => {
     mockPrisma.feedback.findMany.mockResolvedValue([]);
 
-    const request = createGetRequest();
-    const response = await GET(request);
+    const response = await GET();
     const body = await response.json();
 
     expect(response.status).toBe(200);

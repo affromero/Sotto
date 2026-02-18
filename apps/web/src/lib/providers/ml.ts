@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getEmbeddingProvider } from '@/lib/embeddings';
 import { logger } from '@/lib/logger';
@@ -50,18 +51,15 @@ export class SottoMLProvider implements MLProvider {
     const vectorStr = `[${embedding.join(',')}]`;
     const excludeClause =
       excludeIds.length > 0
-        ? `AND "podcastId" NOT IN (${excludeIds.map((id) => `'${id}'`).join(',')})`
-        : '';
+        ? Prisma.sql`AND "podcastId" NOT IN (${Prisma.join(excludeIds)})`
+        : Prisma.empty;
 
-    const results = await prisma.$queryRawUnsafe<Array<{ podcastId: string; similarity: number }>>(
-      `SELECT "podcastId", 1 - (embedding <=> $1::vector) as similarity
-       FROM "PodcastFeature"
-       WHERE embedding IS NOT NULL ${excludeClause}
-       ORDER BY embedding <=> $1::vector
-       LIMIT $2`,
-      vectorStr,
-      limit
-    );
+    const results = await prisma.$queryRaw<Array<{ podcastId: string; similarity: number }>>`
+      SELECT "podcastId", 1 - (embedding <=> ${vectorStr}::vector) as similarity
+      FROM "PodcastFeature"
+      WHERE embedding IS NOT NULL ${excludeClause}
+      ORDER BY embedding <=> ${vectorStr}::vector
+      LIMIT ${limit}`;
 
     return results;
   }

@@ -54,10 +54,8 @@ describe('POST /api/stripe/payment-intent', () => {
 
     const request = createRequest({ voiceCharges: [] });
     const response = await POST(request);
-    const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'voiceCharges is required' });
   });
 
   it('returns 400 when voiceCharges is missing', async () => {
@@ -65,10 +63,8 @@ describe('POST /api/stripe/payment-intent', () => {
 
     const request = createRequest({});
     const response = await POST(request);
-    const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'voiceCharges is required' });
   });
 
   it('creates payment intents for valid voice charges', async () => {

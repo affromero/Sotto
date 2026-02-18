@@ -28,11 +28,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Admin check: only the platform admin can trigger exports.
-  // In production, check against an admin role or specific user ID.
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (adminEmail && session.user.email !== adminEmail) {
-    return NextResponse.json({ error: 'Forbidden — admin only' }, { status: 403 });
+  if (session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const body = await request.json();

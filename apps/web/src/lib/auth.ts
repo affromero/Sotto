@@ -18,7 +18,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Google({
             clientId: process.env.GOOGLE_CLIENT_ID,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-            allowDangerousEmailAccountLinking: true,
+
           }),
         ]
       : []),
@@ -27,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           GitHub({
             clientId: process.env.GITHUB_CLIENT_ID,
             clientSecret: process.env.GITHUB_CLIENT_SECRET,
-            allowDangerousEmailAccountLinking: true,
+
           }),
         ]
       : []),
@@ -36,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Twitter({
             clientId: process.env.TWITTER_CLIENT_ID,
             clientSecret: process.env.TWITTER_CLIENT_SECRET,
-            allowDangerousEmailAccountLinking: true,
+
           }),
         ]
       : []),
@@ -45,7 +45,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Apple({
             clientId: process.env.APPLE_CLIENT_ID,
             clientSecret: process.env.APPLE_CLIENT_SECRET,
-            allowDangerousEmailAccountLinking: true,
+
           }),
         ]
       : []),

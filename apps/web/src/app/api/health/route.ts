@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
+import { auth } from '@/lib/auth';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,20 @@ export async function GET() {
     checks.redis = { status: 'error', latencyMs: Date.now() - redisStart };
     healthy = false;
   }
+
+  // Unauthenticated requests get minimal response (sufficient for Docker healthcheck)
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== 'ADMIN') {
+    return NextResponse.json(
+      {
+        status: healthy ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
+      },
+      { status: healthy ? 200 : 503 }
+    );
+  }
+
+  // --- Admin-only detailed checks below ---
 
   // --- R2 Storage (non-critical) ---
   const r2Start = Date.now();

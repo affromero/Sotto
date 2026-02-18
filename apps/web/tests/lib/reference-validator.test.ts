@@ -21,6 +21,16 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/url-validator', () => ({
+  validateUrl: vi.fn().mockResolvedValue(undefined),
+  UrlValidationError: class UrlValidationError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = 'UrlValidationError';
+    }
+  },
+}));
+
 // ---- Import under test ----
 import {
   verifyUrl,
