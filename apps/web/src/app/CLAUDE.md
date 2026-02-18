@@ -144,6 +144,7 @@
 | `/api/voices/request/[id]`                                       | PATCH            | Yes        | Update voice request status                                                 |
 | `/api/tts-providers`                                             | GET              | Yes        | List available TTS providers + user BYOK status                             |
 | `/api/ai-models`                                                 | GET              | Yes        | List available AI models for user's BYOK provider                           |
+| `/api/tts-models`                                                | GET              | Yes        | List available TTS models for user's BYOK provider (by ?provider= param)    |
 | `/api/settings/byok`                                             | GET/POST/DELETE  | Yes        | Multi-provider TTS BYOK key management (5 providers)                        |
 | `/api/admin/config`                                              | GET/PATCH        | ADMIN      | Free tier configuration (AI/TTS provider, model, generation limit)          |
 | `/api/admin/twitter/config`                                      | GET/PATCH        | ADMIN      | Twitter admin config (auto-tweet thresholds, trend polling, template)        |
