@@ -269,7 +269,7 @@ async function handleUnlinkedUser(tweet: TwitterTweet): Promise<void> {
   try {
     await replyToTweet(
       tweet.id,
-      `Sign up at ${SOTTO_APP_URL} and connect your Twitter account to generate podcasts from tweets!`
+      `Sign up at ${SOTTO_APP_URL} and get 3 free podcasts! Connect your Twitter account to generate podcasts directly from tweets.`
     );
     await redis.set(ctaKey, '1');
 
