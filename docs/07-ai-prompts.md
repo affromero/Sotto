@@ -81,7 +81,7 @@ End your final message with a metadata block:
 [METADATA]
 {
   "topic": "...",
-  "depth": "quick_overview|standard|deep_dive",
+  "depth": "eli5|quick_overview|standard|deep_dive",
   "audience": "kids|teens|family|general|nerds|mature",
   "audience_level": "beginner|intermediate|expert",
   "focus_areas": ["...", "..."],

@@ -49,6 +49,7 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   deep_dive: 0.9,
   standard: 0.8,
   quick_overview: 0.7,
+  eli5: 0.6,
 };
 
 import { wordCountBounds } from './duration';

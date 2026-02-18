@@ -252,6 +252,7 @@ async function main() {
       name: 'Episode Type',
       slug: 'episode-type',
       children: [
+        { name: 'ELI5', slug: 'type-eli5' },
         { name: 'Deep Dive', slug: 'type-deep-dive' },
         { name: 'Quick Overview', slug: 'type-quick-overview' },
         { name: 'Current Events', slug: 'type-current-events' },

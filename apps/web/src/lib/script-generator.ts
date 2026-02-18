@@ -114,6 +114,15 @@ You may still use parenthetical directions like (leaning in), (thoughtful pause)
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery' : ''}
 - ${params.tone === 'storytelling' ? 'Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.' : ''}
+${params.depth === 'eli5' ? `## ELI5 Depth — Explain Like I'm 5:
+- Use the simplest possible language — imagine explaining to a curious 5-year-old
+- Rely heavily on analogies, metaphors, and comparisons to everyday objects/experiences
+- Break complex ideas into tiny, digestible pieces
+- Use lots of "imagine...", "it's kind of like...", "you know how..."
+- Keep sentences short and punchy
+- Avoid jargon entirely — if a technical term is unavoidable, immediately explain it in plain words
+- Make it fun and engaging — wonder and curiosity over precision
+- It's OK to simplify — accuracy matters less than comprehension at this depth` : ''}
 
 ## Audience: ${params.audience || 'general'}
 ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
@@ -129,7 +138,7 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 ## Inline Citations:
 You MUST include inline citations in the dialogue using [N] notation (e.g. [1], [2]):
 - Only cite REAL, verifiable sources — published papers, books, reputable news outlets, official reports
-- Use 5-15 citations depending on depth level (more for deep_dive, fewer for quick_overview)
+- Use 3-15 citations depending on depth level (deep_dive: 10-15, standard: 5-10, quick_overview: 3-8, eli5: 3-8)
 - HOST introduces citations conversationally: "I read that researchers at MIT found..." [3]
 - EXPERT cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim

@@ -21,6 +21,7 @@ interface FilterPanelProps {
 }
 
 const DEPTH_OPTIONS = [
+  { value: 'eli5', label: 'ELI5' },
   { value: 'quick_overview', label: 'Quick Overview' },
   { value: 'standard', label: 'Standard' },
   { value: 'deep_dive', label: 'Deep Dive' },
