@@ -63,8 +63,10 @@ export async function generateResponse(
     ...(options?.tools?.length ? { tools: options.tools } : {}),
   });
 
-  const textBlock = response.content.find((block) => block.type === 'text');
-  const content = textBlock?.type === 'text' ? textBlock.text : '';
+  const textBlocks = response.content.filter(
+    (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
+  );
+  const content = textBlocks.map((block) => block.text).join('\n\n');
 
   // Soft-block: log flagged output but don't throw (educational content may discuss sensitive topics)
   if (!options?.skipModeration && content) {
