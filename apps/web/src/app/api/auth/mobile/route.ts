@@ -41,7 +41,7 @@ const devLoginSchema = z.object({
 });
 
 const oauthIdTokenSchema = z.object({
-  provider: z.enum(['apple', 'twitter']),
+  provider: z.enum(['apple']),
   idToken: z.string().min(1),
   userName: z.string().optional(),
 });
@@ -393,8 +393,6 @@ async function verifyOAuthToken(
       return verifyGoogleToken(idToken);
     case 'github':
       return verifyGithubToken(idToken);
-    case 'twitter':
-      return verifyTwitterToken(idToken);
     default:
       return null;
   }
@@ -502,31 +500,3 @@ async function verifyGithubToken(
   }
 }
 
-async function verifyTwitterToken(
-  accessToken: string,
-): Promise<OAuthProfile | null> {
-  try {
-    const response = await fetch(
-      'https://api.twitter.com/2/users/me?user.fields=profile_image_url,name',
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    if (!response.ok) return null;
-
-    const result = await response.json();
-    if (typeof result.data?.id !== 'string') return null;
-
-    return {
-      providerUserId: result.data.id,
-      name:
-        typeof result.data.name === 'string'
-          ? result.data.name
-          : undefined,
-      image:
-        typeof result.data.profile_image_url === 'string'
-          ? result.data.profile_image_url
-          : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
