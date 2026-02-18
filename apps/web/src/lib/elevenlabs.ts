@@ -4,6 +4,7 @@ import {
   selectVoicePair as selectPair,
   findByVoiceId,
   type VoicePoolEntry,
+  type VoiceMatchMetadata,
 } from './voice-pool';
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
@@ -45,8 +46,11 @@ function toLegacy(entry: VoicePoolEntry): VoiceProfile {
 
 const VOICE_POOL: VoiceProfile[] = POOL.map(toLegacy);
 
-export function selectVoicePair(podcastId: string): { host: VoiceProfile; expert: VoiceProfile } {
-  const pair = selectPair(podcastId);
+export function selectVoicePair(
+  podcastId: string,
+  metadata?: VoiceMatchMetadata
+): { host: VoiceProfile; expert: VoiceProfile } {
+  const pair = selectPair(podcastId, metadata);
   return { host: toLegacy(pair.host), expert: toLegacy(pair.expert) };
 }
 

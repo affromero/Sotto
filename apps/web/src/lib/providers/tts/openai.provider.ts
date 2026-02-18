@@ -4,7 +4,7 @@
  */
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
-import { selectVoicePair, resolveVoiceId, findByVoiceId } from '../../voice-pool';
+import { selectVoicePair, resolveVoiceId, findByVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 
 const OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
 type OpenAIVoice = (typeof OPENAI_VOICES)[number];
@@ -50,11 +50,11 @@ export class OpenAITtsProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
     if (!podcastId) {
       return speaker === 'HOST' ? 'nova' : 'onyx';
     }
-    const pair = selectVoicePair(podcastId);
+    const pair = selectVoicePair(podcastId, metadata);
     const entry = speaker === 'HOST' ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'openai');
   }

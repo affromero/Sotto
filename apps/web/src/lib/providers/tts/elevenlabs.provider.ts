@@ -4,7 +4,7 @@
  */
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
-import { VOICE_POOL, selectVoicePair, resolveVoiceId } from '../../voice-pool';
+import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 
 export class ElevenLabsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'elevenlabs';
@@ -35,11 +35,11 @@ export class ElevenLabsProvider implements TtsProvider {
     return el.generateSoundEffect(params);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
     if (!podcastId) {
       return speaker === 'HOST' ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
     }
-    const pair = selectVoicePair(podcastId);
+    const pair = selectVoicePair(podcastId, metadata);
     const entry = speaker === 'HOST' ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'elevenlabs');
   }
