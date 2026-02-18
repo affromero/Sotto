@@ -10,6 +10,7 @@ import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metada
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
 import { detectLanguage } from '@/lib/language-detect';
+import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
@@ -302,6 +303,28 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         update: {},
         create: { podcastId, tagId: prodTag.id },
       });
+    }
+
+    // Auto-assign topic tags from podcast metadata
+    const podcastForTopics = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { topic: true, suggestedTopic: true },
+    });
+    const topicText = podcastForTopics.topic || podcastForTopics.suggestedTopic || '';
+    const topicSlugs = matchTopicTags({ topic: topicText, focusAreas: [] });
+    for (const slug of topicSlugs) {
+      const parent = TAG_PARENT_MAP[slug];
+      const slugsToAssign = parent ? [slug, parent] : [slug];
+      for (const s of slugsToAssign) {
+        const tag = await prisma.tag.findUnique({ where: { slug: s } });
+        if (tag) {
+          await prisma.podcastTag.upsert({
+            where: { podcastId_tagId: { podcastId, tagId: tag.id } },
+            update: {},
+            create: { podcastId, tagId: tag.id },
+          });
+        }
+      }
     }
 
     await prisma.podcast.update({

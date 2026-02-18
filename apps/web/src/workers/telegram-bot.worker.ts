@@ -489,7 +489,14 @@ async function handleGenerate(chatId: string, messageId?: number): Promise<void>
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.userId },
-    select: { preferredHostVoiceId: true, preferredExpertVoiceId: true },
+    select: {
+      preferredHostVoiceId: true,
+      preferredExpertVoiceId: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      preferredAiProvider: true,
+      preferredAiModel: true,
+    },
   });
 
   // Generate a title from the topic
@@ -523,6 +530,9 @@ async function handleGenerate(chatId: string, messageId?: number): Promise<void>
       source: 'TELEGRAM',
       hostVoiceId,
       expertVoiceId,
+      ttsProvider: user.preferredTtsProvider ?? undefined,
+      ttsModel: user.preferredTtsModel ?? undefined,
+      aiModel: user.preferredAiModel ?? undefined,
       visibility: 'PUBLIC',
       discovery: {
         create: {

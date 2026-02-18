@@ -7,6 +7,8 @@ export interface TweetParseResult {
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
   tone: 'casual' | 'professional' | 'socratic';
   focusAreas: string[];
+  audience?: 'general' | 'kids' | 'mature';
+  durationTarget?: number;
   sourceUrl?: string;
   sourceUrls?: string[];
   isDebate?: boolean;
@@ -70,6 +72,10 @@ export interface TwitterSettingsData {
   twitterEnabled: boolean;
   preferredHostVoiceId: string | null;
   preferredExpertVoiceId: string | null;
+  preferredTtsProvider: string | null;
+  preferredTtsModel: string | null;
+  preferredAiProvider: string | null;
+  preferredAiModel: string | null;
 }
 
 export interface TweetMentionData {

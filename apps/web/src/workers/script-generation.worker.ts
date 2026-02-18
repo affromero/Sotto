@@ -7,6 +7,7 @@ import { getAiKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
+import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { logger } from '@/lib/logger';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
@@ -170,6 +171,26 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         update: {},
         create: { podcastId, tagId: typeTag.id },
       });
+    }
+  }
+
+  // Auto-assign topic tags from discovery metadata
+  const topicSlugs = matchTopicTags({
+    topic: discovery.topic || '',
+    focusAreas: discovery.focusAreas ?? [],
+  });
+  for (const slug of topicSlugs) {
+    const parent = TAG_PARENT_MAP[slug];
+    const slugsToAssign = parent ? [slug, parent] : [slug];
+    for (const s of slugsToAssign) {
+      const tag = await prisma.tag.findUnique({ where: { slug: s } });
+      if (tag) {
+        await prisma.podcastTag.upsert({
+          where: { podcastId_tagId: { podcastId, tagId: tag.id } },
+          update: {},
+          create: { podcastId, tagId: tag.id },
+        });
+      }
     }
   }
 

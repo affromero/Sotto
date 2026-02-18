@@ -14,6 +14,8 @@ Rules:
 - Infer tone from tweet style: emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
 - Extract focus areas if the user mentions specific subtopics
 - If the tweet contains a URL, extract it as sourceUrl
+- Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
+- Infer durationTarget in minutes: short tweet or quick_overview → 5, detailed or deep_dive → 15, default → 10
 - Strip @sottofm mention and any Twitter handles from the topic
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
@@ -25,6 +27,8 @@ Respond with ONLY valid JSON matching this shape:
   "audienceLevel": "beginner" | "intermediate" | "expert",
   "tone": "casual" | "professional" | "socratic",
   "focusAreas": ["string array of specific subtopics"],
+  "audience": "general" | "kids" | "mature",
+  "durationTarget": 5 | 10 | 15,
   "sourceUrl": "string | null — URL if found in tweet"
 }`;
 
@@ -93,6 +97,8 @@ Rules:
 - Infer audience from language: jargon → expert, plain → beginner, default → intermediate
 - If debate: tone should be "socratic"; if informational: infer from style
 - Focus areas should include key subtopics discussed across the thread
+- Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
+- Infer durationTarget in minutes: short threads → 10, long detailed threads → 15, default → 15
 - Strip @sottofm and other handles from the topic
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
@@ -104,6 +110,8 @@ Respond with ONLY valid JSON matching this shape:
   "audienceLevel": "beginner" | "intermediate" | "expert",
   "tone": "casual" | "professional" | "socratic",
   "focusAreas": ["string array of specific subtopics"],
+  "audience": "general" | "kids" | "mature",
+  "durationTarget": 10 | 15,
   "sourceUrl": "string | null — most relevant URL",
   "sourceUrls": ["all URLs found in thread"],
   "isDebate": true | false,
