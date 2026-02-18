@@ -101,9 +101,16 @@ export default function LoginScreen() {
             setErrorMessage('Apple Sign In failed — no identity token.');
             return;
           }
+          const { fullName } = credential;
+          const userName = fullName
+            ? [fullName.givenName, fullName.familyName]
+                .filter(Boolean)
+                .join(' ') || undefined
+            : undefined;
           res = await api.post<AuthResponse>('/auth/mobile', {
             provider,
             idToken: credential.identityToken,
+            userName,
           });
         } else {
           const AuthSession = await import('expo-auth-session');
