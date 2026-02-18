@@ -6,6 +6,7 @@ import { EventProvider } from '@/components/providers/EventProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
+import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import '@/styles/globals.css';
 
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <SessionProvider>
+          <ImpersonationBanner />
           <ThemeProvider>
             <EventProvider>
               <AudioPlayerProvider>

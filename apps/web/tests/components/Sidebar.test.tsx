@@ -3,6 +3,12 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Sidebar } from '@/components/layout/Sidebar';
 
+vi.mock('@/components/layout/AccountSwitcher', () => ({
+  AccountSwitcher: ({ variant }: { variant: string }) => (
+    <div data-testid="account-switcher" data-variant={variant} />
+  ),
+}));
+
 const mockUser = {
   name: 'John Doe',
   email: 'john@example.com',
@@ -71,37 +77,11 @@ describe('Sidebar', () => {
     expect(screen.getByText('API Keys')).toBeInTheDocument();
   });
 
-  it('displays user name when provided', () => {
-    render(<Sidebar currentPath="/dashboard" user={mockUser} />);
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
-  });
-
-  it('displays user email as fallback when no name', () => {
-    const userNoName = { ...mockUser, name: null };
-    render(<Sidebar currentPath="/dashboard" user={userNoName} />);
-    expect(screen.getByText('john@example.com')).toBeInTheDocument();
-  });
-
-  it('displays generic User when no user info', () => {
+  it('renders AccountSwitcher with dashboard variant', () => {
     render(<Sidebar currentPath="/dashboard" />);
-    expect(screen.getByText('User')).toBeInTheDocument();
-  });
-
-  it('displays user avatar image when provided', () => {
-    render(<Sidebar currentPath="/dashboard" user={mockUser} />);
-    const avatar = screen.getByAltText("John Doe's avatar");
-    expect(avatar).toBeInTheDocument();
-  });
-
-  it('displays user initials when no avatar image', () => {
-    const userNoImage = { ...mockUser, image: null };
-    render(<Sidebar currentPath="/dashboard" user={userNoImage} />);
-    expect(screen.getByText('J')).toBeInTheDocument();
-  });
-
-  it('renders sign out button', () => {
-    render(<Sidebar currentPath="/dashboard" user={mockUser} />);
-    expect(screen.getByLabelText('Sign out')).toBeInTheDocument();
+    const switcher = screen.getByTestId('account-switcher');
+    expect(switcher).toBeInTheDocument();
+    expect(switcher).toHaveAttribute('data-variant', 'dashboard');
   });
 
   it('renders overlay when open', () => {
