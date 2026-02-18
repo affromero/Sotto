@@ -82,6 +82,10 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       twitterEnabled: true,
       preferredHostVoiceId: true,
       preferredExpertVoiceId: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      preferredAiProvider: true,
+      preferredAiModel: true,
     },
   });
 
@@ -185,7 +189,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     const focusAreas = isThreadPodcast && parsed.viewpoints
       ? [...parsed.focusAreas, ...parsed.viewpoints]
       : parsed.focusAreas;
-    const durationTarget = isThreadPodcast ? 15 : 10;
+    const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
     const sourceText = isThreadPodcast && threadData
       ? formatThreadAsSourceText(threadData, parsed)
       : undefined;
@@ -201,6 +205,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         sourceTweetId: tweet.id,
         hostVoiceId,
         expertVoiceId,
+        ttsProvider: user.preferredTtsProvider ?? undefined,
+        ttsModel: user.preferredTtsModel ?? undefined,
+        aiModel: user.preferredAiModel ?? undefined,
         visibility: 'PUBLIC',
         discovery: {
           create: {
@@ -208,6 +215,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
             topic: parsed.topic,
             depth: parsed.depth,
             audienceLevel: parsed.audienceLevel,
+            audience: parsed.audience ?? 'general',
             tone,
             focusAreas,
             durationTarget,
