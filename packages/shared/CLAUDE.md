@@ -19,10 +19,11 @@ src/
 │   ├── version.ts        # PodcastVersionSummary, PodcastVersionDetail
 │   ├── analytics.ts      # AnalyticsResponse, AnalyticsSummary
 │   ├── api-key.ts        # ApiKeyData, ApiKeyCreated
-│   ├── team.ts           # TeamSummary, TeamMember, TeamInviteData
 │   ├── import.ts         # ImportPodcastRequest, ImportProgress
 │   ├── events.ts         # EventPayload (23 event types), EventContext
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
+├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
+├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
 ├── validations.ts        # Shared Zod schemas (createPodcast, interaction, feed, etc.)
 ├── theme.ts              # Design tokens: colors, spacing, typography, borderRadius
 └── index.ts              # Barrel export

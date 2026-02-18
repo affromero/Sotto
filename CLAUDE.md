@@ -20,7 +20,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                          |
 | Database  | PostgreSQL 16 + Prisma ORM                                                                               |
 | Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                           |
-| Queue     | Redis 7 + BullMQ (13 worker types)                                                                       |
+| Queue     | Redis 7 + BullMQ (24 worker types)                                                                       |
 | AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                  |
 | Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume (multi-provider TTS) — resolved via resolveTtsProvider()      |
 | Stitching | FFmpeg (segment concatenation + normalization)                                                           |
@@ -91,9 +91,10 @@ Sotto/
 │   ├── web/                    # Next.js web app (@sotto/web)
 │   │   ├── src/
 │   │   │   ├── app/            # Next.js App Router (pages + API routes)
+│   │   │   ├── assets/          # Static assets (SFX audio files)
 │   │   │   ├── components/     # UI components (CSS Modules)
 │   │   │   ├── lib/            # Core libraries + external service clients
-│   │   │   ├── workers/        # BullMQ workers (13 types)
+│   │   │   ├── workers/        # BullMQ workers (24 types)
 │   │   │   ├── styles/         # globals.css (design system tokens)
 │   │   │   └── types/          # TypeScript types (re-exports from @sotto/shared)
 │   │   ├── prisma/             # Prisma schema + seeds
@@ -119,7 +120,13 @@ Sotto/
 │   └── shared/                 # Shared package (@sotto/shared)
 │       └── src/
 │           ├── types/          # String union enums, interfaces (Prisma-free)
+│           │   ├── enums.ts, podcast.ts, discovery.ts, interaction.ts, reference.ts
+│           │   ├── feed.ts, notification.ts, twitter.ts, player.ts, version.ts
+│           │   ├── analytics.ts, api-key.ts, events.ts, import.ts, pitch.ts
+│           │   └── index.ts
 │           ├── validations.ts  # Shared Zod schemas
+│           ├── content-badge.ts # Content badge logic (human vs AI labels)
+│           ├── provider-display.ts # Provider display names + icons
 │           ├── theme.ts        # Design tokens (colors, spacing, typography)
 │           └── index.ts        # Barrel export
 ├── scripts/                    # Setup, deploy, pitch rebuild scripts
@@ -141,13 +148,22 @@ src/
 │   ├── layout.tsx              # Root layout (DM Serif Display + Inter fonts)
 │   ├── page.tsx                # Landing page
 │   ├── auth/                   # Login, signup pages
-│   ├── (dashboard)/            # Dashboard, billing, settings, analytics, team (auth required)
+│   ├── (dashboard)/            # Dashboard, billing, settings, analytics, ideas (auth required)
 │   ├── (admin)/                # Admin dashboard (ADMIN only)
 │   ├── create/                 # Chat-based discovery → generation
 │   ├── podcast/[podcastId]/    # Playback + interrupt + fork
 │   ├── feed/                   # Public social feed
 │   ├── profile/[userId]/       # Public profile + follow
 │   ├── collections/            # Collection detail pages
+│   ├── connect/                # Stripe Connect onboarding
+│   ├── onboarding/             # New user onboarding flow
+│   ├── voices/                 # Voice marketplace browsing
+│   ├── brand/                  # Brand guidelines page
+│   ├── feedback/               # Early-access feedback form
+│   ├── pitch/                  # Investor pitch deck
+│   ├── privacy/                # Privacy policy
+│   ├── terms/                  # Terms of service
+│   ├── support/                # Support page
 │   └── api/                    # API routes
 │       ├── auth/[...nextauth]/ # NextAuth handlers
 │       ├── podcasts/           # CRUD, generate, interact, fork, like, save
@@ -158,15 +174,48 @@ src/
 │       ├── activity/           # Social activity feed
 │       ├── collections/        # Collection CRUD, items, follow
 │       ├── notifications/      # List, mark read, push registration
-│       └── admin/              # Admin API — ADMIN only
+│       ├── admin/              # Admin API — ADMIN only
+│       ├── access/             # Early-access gate
+│       ├── ai-models/          # Available AI model listing
+│       ├── analytics/          # Listening analytics + funnel metrics
+│       ├── connect/            # Stripe Connect onboarding
+│       ├── events/             # Behavioral event ingestion
+│       ├── export/             # Data export (GDPR)
+│       ├── feedback/           # Early-access feedback
+│       ├── handles/            # Handle reservation + validation
+│       ├── health/             # Health check
+│       ├── ideas/              # Saved podcast ideas CRUD
+│       ├── inspire/            # Trending topic inspiration
+│       ├── keys/               # BYOK key management
+│       ├── oembed/             # oEmbed endpoint for podcast embeds
+│       ├── onboarding/         # Onboarding flow data
+│       ├── picks/              # Editor's picks
+│       ├── pitch/              # Pitch deck access
+│       ├── queue/              # Queue status monitoring
+│       ├── recommendations/    # Personalized podcast recommendations
+│       ├── reports/            # Admin traffic + analytics reports
+│       ├── settings/           # User settings
+│       ├── stripe/             # Stripe webhooks + Connect
+│       ├── stt-providers/      # Available STT providers
+│       ├── tags/               # Tag CRUD + search
+│       ├── taste-quiz/         # Taste quiz for recommendations
+│       ├── tts-providers/      # Available TTS providers
+│       ├── voices/             # Voice clone CRUD + marketplace
+│       └── waitlist/           # Waitlist signup
 ├── components/
 │   ├── ui/                     # Button, Input, Card, Modal, Toast, Badge, Chip, Spinner
 │   ├── player/                 # AudioPlayer, MiniPlayer, TranscriptPanel, InterruptChatPanel, CommunityQuestions, CommentSection
 │   ├── chat/                   # ChatContainer, ChatMessage, ChatChips
+│   ├── create/                 # Create podcast flow components
 │   ├── discovery/              # DiscoveryChat, SuggestionChips, RecommendationCard
 │   ├── feed/                   # PodcastCard, FeedGrid, TagFilter, SearchBar, ActivityFeed, ActivityItem
+│   ├── import/                 # Podcast import flow components
+│   ├── landing/                # Landing page sections
 │   ├── profile/                # ProfileHeader, PodcastList, FollowButton, UserCard, FollowListModal
 │   ├── collections/            # CollectionCard, AddToCollectionModal, CollectionDetail
+│   ├── notifications/          # Notification list + push prompt
+│   ├── settings/               # User settings panels
+│   ├── voices/                 # Voice marketplace + clone management
 │   ├── layout/                 # Sidebar, TopBar, Footer, MobileNav
 │   └── providers/              # SessionProvider, AudioPlayerProvider, NotificationProvider
 ├── lib/
@@ -177,10 +226,12 @@ src/
 │   ├── claude.ts               # Anthropic Claude client
 │   ├── byok.ts                 # BYOK key management (AI + TTS, AES-256-GCM encrypted)
 │   ├── validations.ts          # Zod schemas (web-only; shared schemas in @sotto/shared)
-│   ├── providers/              # Modular provider architecture (ai, tts, stt, storage)
-│   └── hooks/                  # React hooks (useAuth, useAudioPlayer, usePodcast, etc.)
+│   ├── validations/            # Domain-specific Zod schemas (events, etc.)
+│   ├── extractors/             # Content extractors (html, pdf, youtube)
+│   ├── providers/              # Modular provider architecture (ai, tts, stt, storage, ml)
+│   └── hooks/                  # React hooks (useAuth, useAudioPlayer, useDiscovery, useImpressionTracker, useNotifications, usePlaybackTelemetry, usePodcast)
 ├── workers/
-│   ├── index.ts                # Worker orchestrator (13 workers)
+│   ├── index.ts                # Worker orchestrator (24 workers)
 │   ├── script-generation.worker.ts
 │   ├── audio-generation.worker.ts
 │   ├── audio-stitching.worker.ts
@@ -232,7 +283,7 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
     ↓
 [reference-validation] → Source quality filter + 4-layer verification (URL, CrossRef, OpenAlex, AI)
     ↓
-[SCRIPT_READY pause] → User reviews/edits script (WEB/IMPORT only; auto-approve for TWITTER/API)
+[SCRIPT_READY pause] → User reviews/edits script (WEB/IMPORT only; auto-approve for TWITTER/TELEGRAM/API)
     ↓
 [audio-generation] × N → TTS per segment (multi-provider: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) (parallel, 5 concurrent)
     ↓
@@ -241,6 +292,8 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
 [notification] → Push notification: "Your podcast is ready!"
     ↓ (if source=TWITTER)
 [twitter-reply] → Reply to original tweet with podcast link
+    ↓ (if source=TELEGRAM)
+[telegram-reply] → Reply in Telegram chat with podcast link
 ```
 
 ### Twitter @sottofm Integration
@@ -253,6 +306,18 @@ User tweets: "@sottofm make a podcast about quantum computing"
 Creates Podcast (source: TWITTER) → kicks off pipeline above
     ↓
 [twitter-reply] posts reply: "Your podcast is ready! Listen: sotto.fm/podcast/xyz"
+```
+
+### Telegram @SottoFMBot Integration
+
+```
+User messages: "@SottoFMBot make a podcast about quantum computing"
+    ↓
+[telegram-bot] polls via long-polling → parse intent via Claude
+    ↓
+Creates Podcast (source: TELEGRAM) → kicks off pipeline above
+    ↓
+[telegram-reply] posts reply in chat with podcast link
 ```
 
 ### Interactive Playback
@@ -279,7 +344,7 @@ Claude generates natural HOST segment addressing Q&A
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `User`                  | Auth, profile, bio, avatar, role (USER/CREATOR/ADMIN), Twitter handle + prefs, Stripe Connect (stripeAccountId, stripeOnboarded)                                                                         |
 | `Follow`                | Social: follower → following                                                                                                                                                                                             |
-| `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), commentCount |
+| `Podcast`               | Title, topic, status, audioUrl, pdfUrl, visibility, source (WEB/TWITTER/TELEGRAM/API/IMPORT), fork tracking, import fields (importedAudioKey, isHumanContent), versioning (currentVersion), fork fields (remixNote), commentCount |
 | `Discovery`             | Chat metadata (audience, depth, tone, focus, duration)                                                                                                                                                                   |
 | `DiscoveryMessage`      | Individual chat messages (role, content, chips)                                                                                                                                                                          |
 | `Script`                | Structured JSON turns + raw markdown, versioned                                                                                                                                                                          |
@@ -310,6 +375,31 @@ Claude generates natural HOST segment addressing Q&A
 | `PushSubscription`      | Web Push API endpoints                                                                                                                                                                                                   |
 | `TweetMention`          | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                                                                                                                   |
 | `ApiUsageLog`           | Cost tracking (Claude/ElevenLabs/FFmpeg)                                                                                                                                                                                 |
+| `Account`               | NextAuth OAuth account links (Google, GitHub, Apple, Twitter)                                                                                                                                                            |
+| `Session`               | NextAuth sessions                                                                                                                                                                                                        |
+| `VerificationToken`     | NextAuth email verification tokens                                                                                                                                                                                       |
+| `VoiceRequest`          | Voice clone sharing requests (requester, owner, clone, status, message)                                                                                                                                                  |
+| `ReservedHandle`        | Reserved handles (handle @unique, reason, createdBy)                                                                                                                                                                     |
+| `TwitterConfig`         | Per-user Twitter integration settings (autoTweet, templates)                                                                                                                                                             |
+| `TwitterAutoTweet`      | Scheduled/automatic tweet tracking for podcast promotions                                                                                                                                                                |
+| `TelegramMessage`       | Telegram message tracking (dedup, status, linked podcast)                                                                                                                                                                |
+| `UserInterest`          | User topic interests for recommendations (onboarding/manual/behavioral)                                                                                                                                                 |
+| `TasteQuizAnswer`       | Taste quiz responses for personalized recommendations                                                                                                                                                                    |
+| `SavedIdea`             | Saved podcast ideas for later creation                                                                                                                                                                                   |
+| `PodcastRating`         | Creator quality ratings (voice, accuracy, flow, overall) per podcast                                                                                                                                                     |
+| `Feedback`              | Early access user feedback                                                                                                                                                                                               |
+| `Report`                | Content/user reports for moderation                                                                                                                                                                                      |
+| `ContentFlag`           | Moderation flags on content                                                                                                                                                                                              |
+| `ModerationAction`      | Admin moderation actions taken                                                                                                                                                                                           |
+| `Waitlist`              | Waitlist signups                                                                                                                                                                                                         |
+| `ExpoPushToken`         | Expo push notification tokens (mobile app)                                                                                                                                                                               |
+| `BehavioralEvent`       | Raw behavioral event log for analytics pipeline                                                                                                                                                                          |
+| `UserFeature`           | Computed per-user ML features for recommendations                                                                                                                                                                        |
+| `PodcastFeature`        | Computed per-podcast ML features for recommendations                                                                                                                                                                     |
+| `RecommendationLog`     | Recommendation impressions + click tracking                                                                                                                                                                              |
+| `PlaybackSession`       | Listening session tracking (duration, completion, drops)                                                                                                                                                                 |
+| `UserSession`           | App session tracking (visits, device, referrer)                                                                                                                                                                          |
+| `ListeningQueue`        | User's up-next podcast queue                                                                                                                                                                                             |
 
 **Status Flow**: PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → SCRIPT_READY → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → READY
 
@@ -486,6 +576,10 @@ Apple Sign In (optional):
 
 - `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET` — Apple OAuth credentials
 
+Google iOS (optional):
+
+- `GOOGLE_IOS_CLIENT_ID` — Google OAuth client ID for mobile app (native public client)
+
 Twitter integration (optional):
 
 - `TWITTER_BEARER_TOKEN` — Twitter API v2 read access
@@ -494,12 +588,27 @@ Twitter integration (optional):
 - `TWITTER_SOTTO_USER_ID` — Numeric user ID for @sottofm
 - `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET` — Twitter OAuth for user login
 
+Telegram integration (optional):
+
+- `TELEGRAM_BOT_TOKEN` — Bot token from @BotFather for @SottoFMBot
+
+Content safety (optional):
+
+- `OPENAI_MODERATION_KEY` — OpenAI Moderation API key (free omni-moderation-latest, fail-open)
+
+Analytics & admin (optional):
+
+- `ADMIN_REPORT_KEY` — API key for /traffic-report analytics endpoint
+- `GROQ_API_KEY` — Groq API key for fast Whisper STT transcription
+
 Provider selection (swap services via env):
 
 - `AI_PROVIDER` — `anthropic` (default) | `openai` | `claude-code` (dev only)
+- `CLAUDE_CODE_MODEL` — `opus` (default) | `sonnet` | `haiku` (only when AI_PROVIDER=claude-code)
 - `TTS_PROVIDER` — `elevenlabs` (default) | `openai`
 - `STT_PROVIDER` — `openai` (default) | `elevenlabs` | `groq`
 - `STORAGE_PROVIDER` — `r2` (default) | `s3` | `local`
+- `PAYMENT_PROVIDER` — `stripe` (default) | `none`
 
 ## Reference
 

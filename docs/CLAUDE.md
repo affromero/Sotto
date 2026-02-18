@@ -25,7 +25,7 @@ Docs are numbered to match the investor pitch order in `scripts/rebuild-pitch.sh
 | 15  | `15-ios-app-strategy.md`       |                     | Three-phase iOS plan                                   |
 | 16  | `16-technical-architecture.md` | **Appendix**        | System design, data flow diagrams                      |
 | 17  | `17-authentication-setup.md`   |                     | NextAuth config, OAuth provider setup                  |
-| 18  | `18-hosting-infrastructure.md` |                     | Hosting: Vercel + Railway + R2                         |
+| 18  | `18-hosting-infrastructure.md` |                     | Hosting: Hetzner VPS + Docker Compose + Caddy          |
 | 19  | `19-deploy-sotto-fm.md`        |                     | Hetzner VPS deployment, early access gate              |
 | 20  | `20-roles-and-dashboards.md`   |                     | User roles, admin capabilities                         |
 | 21  | `21-logo-brief.md`             |                     | Logo design brief                                      |
@@ -33,6 +33,7 @@ Docs are numbered to match the investor pitch order in `scripts/rebuild-pitch.sh
 | 23  | `23-local-development.md`      |                     | Local dev setup, env vars, what works without API keys |
 | 24  | `24-ios-testflight-appstore-guide.md` |              | TestFlight builds, App Store submission, OTA updates   |
 | 25  | `25-twitter-integration.md`   |                     | @sottofm bot: Twitter Developer setup, pipeline, testing |
+| 26  | `26-telegram-integration.md`  |                     | @SottoFMBot Telegram bot: BotFather setup, discovery chat, pipeline |
 | —   | `accounting/`                  | —                   | Beancount ledger, import scripts, monthly close        |
 
 ```bash
