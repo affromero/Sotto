@@ -7,6 +7,8 @@ const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
 const mockUserInterestDeleteMany = vi.fn();
 const mockUserInterestCreateMany = vi.fn();
+const mockPodcastCount = vi.fn();
+const mockFollowCount = vi.fn();
 
 const txClient = {
   user: { update: (...args: unknown[]) => mockUserUpdate(...args) },
@@ -27,6 +29,8 @@ vi.mock('@/lib/prisma', () => {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       update: (...args: unknown[]) => mockUserUpdate(...args),
     },
+    podcast: { count: (...args: unknown[]) => mockPodcastCount(...args) },
+    follow: { count: (...args: unknown[]) => mockFollowCount(...args) },
     $transaction: (fn: (tx: typeof txClient) => Promise<unknown>) => fn(txClient),
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -84,6 +88,8 @@ const mockUserMinimal = {
 describe('GET /api/users/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPodcastCount.mockResolvedValue(0);
+    mockFollowCount.mockResolvedValue(0);
   });
 
   it('returns 401 when user is not authenticated', async () => {
