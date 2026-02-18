@@ -29,6 +29,12 @@
 | `/admin`                     | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                                 |
 | `/admin/users`               | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment                        |
 | `/admin/podcasts`            | `(admin)/admin/podcasts/page.tsx`          | Yes (ADMIN only)            | Podcast management                                       |
+| `/admin/revenue`             | `(admin)/admin/revenue/page.tsx`           | Yes (ADMIN only)            | Voice marketplace revenue, purchases, seller metrics     |
+| `/admin/costs`               | `(admin)/admin/costs/page.tsx`             | Yes (ADMIN only)            | API cost tracking by provider, daily trends, alerts      |
+| `/admin/engagement`          | `(admin)/admin/engagement/page.tsx`        | Yes (ADMIN only)            | Social engagement metrics, top content, Q&A stats        |
+| `/admin/playback`            | `(admin)/admin/playback/page.tsx`          | Yes (ADMIN only)            | Playback analytics: listen hours, completion, speed      |
+| `/admin/pipeline`            | `(admin)/admin/pipeline/page.tsx`          | Yes (ADMIN only)            | Pipeline health + BYOK conversion funnel                 |
+| `/admin/retention`           | `(admin)/admin/retention/page.tsx`         | Yes (ADMIN only)            | DAU/WAU/MAU, stickiness, weekly cohort heatmap           |
 | `/admin/waitlist`            | `(admin)/admin/waitlist/page.tsx`          | Yes (ADMIN only)            | Waitlist entries + CSV export                            |
 | `/admin/analytics`           | `(admin)/admin/analytics/page.tsx`         | Yes (ADMIN only)            | Site analytics (page views, visitors, devices)           |
 | `/admin/moderation`          | `(admin)/admin/moderation/page.tsx`        | Yes (ADMIN only)            | Failed podcasts + feedback review                        |
