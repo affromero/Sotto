@@ -3,6 +3,8 @@ import { RegenerateSegmentPayload, addJob, JobType, audioStitchingQueue } from '
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveTtsProvider } from '@/lib/providers';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
+import { getProviderMeta } from '@/lib/providers/tts-registry';
+import { logUsage } from '@/lib/usage-logger';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
@@ -69,6 +71,18 @@ export async function processSegmentRegeneration(
 
   const ttsText = cleanTextForTts(newText, { providerId });
   const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
+
+  const charCount = ttsText.length;
+  const ttsMeta = getProviderMeta(providerId);
+  logUsage({
+    service: providerId,
+    category: 'segment_regeneration',
+    inputTokens: charCount,
+    totalCost: (charCount / 1000) * ttsMeta.platformCostPerKChar,
+    podcastId,
+    userId: podcast.userId,
+    metadata: { voiceId, speaker },
+  });
 
   await job.updateProgress(40);
 

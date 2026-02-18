@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { logUsage } from './usage-logger';
 
 const EMBEDDING_DIM = 384;
 
@@ -84,7 +85,18 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
     const data = (await response.json()) as {
       data: Array<{ embedding: number[] }>;
+      usage?: { total_tokens: number };
     };
+
+    if (data.usage) {
+      logUsage({
+        service: 'openai',
+        model: 'text-embedding-3-small',
+        category: 'embedding',
+        inputTokens: data.usage.total_tokens,
+        totalCost: (data.usage.total_tokens / 1_000_000) * 0.02,
+      });
+    }
 
     return data.data.map((d) => d.embedding);
   }
