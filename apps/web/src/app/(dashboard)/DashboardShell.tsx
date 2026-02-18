@@ -32,6 +32,7 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         hasPodcasts={hasPodcasts}
+        hasActivePlayer={hasActivePlayer}
         user={user}
       />
 

@@ -136,6 +136,10 @@
   flex-shrink: 0;
 }
 
+.userSectionWithPlayer {
+  padding-bottom: calc(var(--spacing-md) + var(--mini-player-height));
+}
+
 .avatar {
   width: 36px;
   height: 36px;

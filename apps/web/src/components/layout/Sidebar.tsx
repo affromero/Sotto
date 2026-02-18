@@ -22,6 +22,7 @@ interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   hasPodcasts?: boolean;
+  hasActivePlayer?: boolean;
   user?: {
     name?: string | null;
     image?: string | null;
@@ -60,7 +61,7 @@ function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
   return items;
 }
 
-export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, user }: SidebarProps) {
+export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, hasActivePlayer = false, user }: SidebarProps) {
   const displayName = user?.name || user?.email || 'User';
   const initials = displayName.charAt(0).toUpperCase();
   const role = user?.role || 'USER';
@@ -103,7 +104,7 @@ export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = fa
           </div>
         )}
 
-        <div className={styles.userSection}>
+        <div className={`${styles.userSection} ${hasActivePlayer ? styles.userSectionWithPlayer : ''}`}>
           <div className={styles.avatar}>
             {user?.image ? (
               <Image src={user.image} alt={`${displayName}'s avatar`} width={32} height={32} />
