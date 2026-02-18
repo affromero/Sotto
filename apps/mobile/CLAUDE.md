@@ -88,6 +88,10 @@ app/
 │   └── profile.tsx        # Current user profile — podcasts list, logout
 ├── auth/
 │   └── login.tsx          # Login screen (dev: email, prod: OAuth)
+├── ideas.tsx              # Saved podcast ideas (from taste quiz) — swipe to dismiss, tap to generate
+├── settings.tsx           # Settings hub — BYOK API keys, app info, logout
+├── settings/
+│   └── api-keys.tsx       # BYOK key management — add/remove AI + TTS provider keys
 ├── podcast/
 │   └── [id].tsx           # Full-screen player — audio, transcript, Q&A
 └── user/
@@ -113,6 +117,8 @@ app/
 | `EmptyState.tsx` | Centered icon + title + subtitle pattern |
 | `ErrorState.tsx` | Error message + optional retry button |
 | `PodcastCard.tsx` | Unified podcast card with `variant="feed"` (full card with avatar, tags, stats) and `variant="compact"` (list row) |
+| `SwipeCard.tsx` | Gesture-driven swipe card (reanimated + gesture-handler) for taste quiz yes/no/skip interactions |
+| `SwipeQuiz.tsx` | Taste quiz flow — renders SwipeCard stack, handles responses, saves ideas on "yes" |
 
 ## Environment Variables
 

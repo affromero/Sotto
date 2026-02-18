@@ -8,7 +8,7 @@
 
 ## The Honest Truth
 
-Every feature in the pivot plan is implemented. The codebase has 16 workers, 50+ API routes, 30+ components, multi-provider TTS, BYOK encryption, fork/remix culture, audio import, version history, and a full social feed.
+Every feature in the pivot plan is implemented. The codebase has 23 workers, 50+ API routes, 30+ components, multi-provider TTS, BYOK encryption, fork/remix culture, audio import, version history, and a full social feed.
 
 None of it has been tested with real users.
 
@@ -87,24 +87,7 @@ npx prisma generate   # Regenerate client
 
 ---
 
-### 3. Stripe POWER Tier Product
-
-**Status**: `TIER_LIMITS.POWER` exists in code. No Stripe product/price created.
-
-The checkout route maps `env.STRIPE_PRICE_ID_*` to tiers. POWER tier has no price ID env var, so users literally cannot subscribe to it.
-
-**Action**:
-
-1. Create Stripe product "Sotto Power" ($9/mo, recurring)
-2. Add `STRIPE_PRICE_ID_POWER` to `.env` and production environment
-3. Add price-to-tier mapping in webhook handler
-4. Test full subscribe → webhook → tier upgrade flow
-
-**Estimate**: 1 hour
-
----
-
-### 4. Legal Pages
+### 3. Legal Pages
 
 **Status**: None exist. No Terms of Service, no Privacy Policy.
 
@@ -125,9 +108,9 @@ Users upload voice recordings, provide email/OAuth identity, create public conte
 
 ---
 
-### 5. Health Check: Register New Queues
+### 4. Health Check: Register New Queues
 
-**Status**: `/api/health` monitors 12 of 16 queues. Missing: `event-ingestion`, `feature-computation`, `data-export`, `audio-import`.
+**Status**: `/api/health` monitors a subset of 23 queues. Missing: `event-ingestion`, `feature-computation`, `data-export`, `audio-import`.
 
 If the audio-import queue dies, imported podcasts silently hang at IMPORTING forever. Nobody gets alerted.
 
@@ -167,26 +150,7 @@ The twitter-mentions worker polls every 60 seconds. The twitter-reply worker pos
 
 ### 7. API Rate Limiting
 
-**Status**: Only the password gate has rate limiting. All other endpoints are unprotected.
-
-A single user (or bot) can:
-
-- Hit `/api/podcasts` POST repeatedly (1 credit each, but if free tier has 3 credits, they burn through in seconds)
-- Spam `/api/discovery` (streaming Claude calls at $0.003-0.006 each, no credit cost)
-- Flood `/api/podcasts/import` with large files
-- DDoS `/api/feed` (public, no auth)
-
-**Action**:
-
-1. Add rate limiting middleware using existing `checkRateLimit()` Redis helper:
-   - `/api/discovery`: 30 req/min per user
-   - `/api/podcasts` POST: 10 req/min per user
-   - `/api/podcasts/import`: 5 req/min per user
-   - `/api/feed`: 60 req/min per IP
-   - `/api/podcasts/*/interact`: 20 req/min per user
-2. Return 429 with `Retry-After` header
-
-**Estimate**: 2 hours
+**Status**: DONE. Rate limiting implemented via Redis-based `checkRateLimit()` helper. Limits enforced per-user and per-IP on generation (20/hour, 100/day), interactions (60/hour), and public endpoints.
 
 ---
 
@@ -285,18 +249,7 @@ Users who "Add to Home Screen" get a blurry or missing icon.
 
 ### 13. Content Moderation Pipeline
 
-**Status**: Handle profanity screening exists (LLM-based). No content moderation for podcasts.
-
-A user could generate a podcast about harmful content. The script generator has safety prompts, but there's no post-generation review or flagging system.
-
-**Action**:
-
-1. Add content flags to script-verification worker (already does claim checking — add safety check)
-2. Auto-flag podcasts with sensitive topics for admin review
-3. Add "Report" button on podcast pages
-4. Admin moderation queue already exists at `/admin/moderation` — wire up flagged content
-
-**Estimate**: 4 hours
+**Status**: DONE. Content moderation worker (`content-moderation.worker.ts`) implemented with LLM-based safety screening. Admin moderation queue at `/admin/moderation` wired up for flagged content. Report button on podcast pages.
 
 ---
 
@@ -369,34 +322,15 @@ Dynamic OG images implemented via `next/og` (Satori):
 
 ---
 
-### 19. Mobile App (PWA Improvements)
+### 19. Mobile App
 
-**Status**: Basic PWA manifest. No offline support, no install prompt.
-
-**Action**:
-
-1. Service worker for offline audio playback (cache playing podcast)
-2. Install prompt component ("Add Sotto to Home Screen")
-3. Offline fallback page
-4. Background audio playback improvements
-
-**Estimate**: 2-3 days
+**Status**: DONE. Native iOS app shipped via React Native + Expo (`apps/mobile/`). Includes feed, player with background audio (react-native-track-player), create flow, profile, notifications, settings, BYOK API key management, and push notifications. Available on TestFlight.
 
 ---
 
-### 20. Creator Monetization (Deferred)
+### 20. Creator Monetization (Voice Marketplace)
 
-**Status**: Not built. Listed as "vaporware" in post-pivot analysis.
-
-Until there's traction (1000+ WAU), building monetization is premature. But the promise of creator economics is part of the social platform pitch.
-
-**Action** (when ready):
-
-- Tip jar (Stripe Connect)
-- Premium podcast access (per-creator paywall)
-- Revenue share on forked content
-
-**Estimate**: 2-3 weeks (when prioritized)
+**Status**: DONE. Voice marketplace implemented via Stripe Connect. Voice owners set per-podcast prices, platform takes 10% via `application_fee_amount`. Payment flow: authorize on generation start → capture on READY → cancel on FAILED. Free access paths: owner, allowlisted, approved VoiceRequest, or existing purchase. Admin monetization dashboard at `/admin/monetization`.
 
 ---
 
@@ -407,8 +341,7 @@ Until there's traction (1000+ WAU), building monetization is premature. But the 
 | Day | Task                                               | Est. |
 | --- | -------------------------------------------------- | ---- |
 | Mon | Database migration + indexes + health check queues | 1h   |
-| Mon | Stripe POWER product + env vars                    | 1h   |
-| Mon | Rate limiting on critical endpoints                | 2h   |
+| Mon | ~~Rate limiting on critical endpoints~~             | DONE |
 | Tue | Twitter @sottofm bot activation + end-to-end test  | 3h   |
 | Tue | Sentry error tracking setup                        | 1h   |
 | Wed | End-to-end smoke test (full pipeline)              | 8h   |
@@ -426,7 +359,7 @@ Until there's traction (1000+ WAU), building monetization is premature. But the 
 | Mon     | Sitemap generation                 | 1h   |
 | Mon     | PWA icon set                       | 30m  |
 | Mon     | Monitoring dashboard (UptimeRobot) | 1h   |
-| Tue     | Content moderation pipeline        | 4h   |
+| Tue     | ~~Content moderation pipeline~~    | DONE |
 | Wed     | Invite 10 beta testers, observe    | —    |
 | Thu-Fri | Fix bugs from beta feedback        | —    |
 
@@ -438,6 +371,12 @@ Until there's traction (1000+ WAU), building monetization is premature. But the 
 | ------------------------------------- | ------ |
 | Automated test suite (critical paths) | 2 days |
 | ~~Social sharing OG images~~          | DONE   |
+| ~~Mobile app~~                        | DONE   |
+| ~~Rate limiting~~                     | DONE   |
+| ~~Content moderation~~                | DONE   |
+| ~~Creator monetization~~              | DONE   |
+| Telegram integration                  | DONE   |
+| ML recommendation engine              | DONE   |
 | Analytics setup                       | 1 day  |
 
 ---
@@ -459,18 +398,18 @@ If the answer is no, nothing else matters. Get 5 people using it this week. The 
 | Podcast generation pipeline |      ✅       |     ⚠️     | Needs smoke test on prod                                                                   |
 | Twitter @sottofm bot        |      ✅       |     ❌     | Needs activation + E2E test                                                                |
 | Audio import                |      ✅       |     ⚠️     | Needs smoke test                                                                           |
-| BYOK multi-provider TTS     |      ✅       |     ⚠️     | Needs Stripe POWER product                                                                 |
+| BYOK multi-provider TTS     |      ✅       |     ✅     | Working (5 providers via resolveTtsProvider)                                                |
 | Fork/remix flow             |      ✅       |     ✅     | Working (credit check, synthetic Discovery, pipeline enqueue, PODCAST_FORKED notification) |
 | Version history             |      ✅       |     ⚠️     | Needs smoke test                                                                           |
 | Feed + social               |      ✅       |     ✅     | Working                                                                                    |
 | Landing page                |      ✅       |     ✅     | Working                                                                                    |
-| Pricing page                |      ✅       |     ⚠️     | POWER tier not purchasable                                                                 |
+| Pricing page                |      ✅       |     ✅     | Working (BYOK model, no subscription tiers)                                                |
 | Auth + profiles             |      ✅       |     ✅     | Working                                                                                    |
 | Push notifications          |      ✅       |     ✅     | Working                                                                                    |
 | Voice clones + allowlist    |      ✅       |     ⚠️     | Needs TTS provider keys                                                                    |
 | Admin dashboard             |      ✅       |     ✅     | Working                                                                                    |
 | CI/CD + deploy              |      ✅       |     ✅     | Working                                                                                    |
-| Rate limiting               |      ❌       |     ❌     | Not implemented                                                                            |
+| Rate limiting               |      ✅       |     ✅     | Redis-based per-user + per-IP limits                                                       |
 | Error tracking              |      ❌       |     ❌     | Not implemented                                                                            |
 | Email notifications         |      ❌       |     ❌     | Not implemented                                                                            |
 | Legal pages                 |      ❌       |     ❌     | Not implemented                                                                            |
@@ -480,4 +419,6 @@ If the answer is no, nothing else matters. Get 5 people using it this week. The 
 | RSS feeds                   |      ✅       |     ✅     | Per-creator RSS at /api/users/[userId]/rss                                                 |
 | Interrupt Q&A               |      ✅       |     ⚠️     | Full InterruptChatPanel lifecycle with resolution feedback — needs smoke test              |
 | Knowledge gap aggregation   |      ✅       |     ⚠️     | Per-segment question density badges for owners — needs smoke test                          |
+| Telegram @SottoFMDevBot     |      ✅       |     ⚠️     | telegram-bot + telegram-reply workers implemented — needs E2E test                         |
+| ML recommendation engine    |      ✅       |     ⚠️     | event-ingestion + feature-computation workers — needs smoke test                           |
 | Sitemap                     |      ❌       |     ❌     | Not implemented                                                                            |

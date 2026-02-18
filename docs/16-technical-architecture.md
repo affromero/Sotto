@@ -2,20 +2,20 @@
 
 > **Date**: 2026-02-08
 >
-> **Summary**: System design for Sotto's interactive podcast platform. Covers the end-to-end data flow from user chat through script generation, audio synthesis, stitching, and delivery. Details the worker pipeline architecture, database schema, authentication flow, storage strategy, queue system, and scaling considerations. The architecture prioritizes async processing via BullMQ workers, keeping API routes thin and responsive while heavy AI and audio processing runs in background workers.
+> **Summary**: System design for Sotto's interactive podcast platform. Covers the end-to-end data flow from user chat through script generation, verification, audio synthesis, stitching, and delivery. Details the 23-worker pipeline architecture, database schema, authentication flow, storage strategy, queue system, and scaling considerations. The architecture prioritizes async processing via BullMQ workers, keeping API routes thin and responsive while heavy AI and audio processing runs in background workers.
 
 ---
 
 ## 1. System Overview
 
-Sotto's architecture follows a three-layer pattern: a Next.js web application handles user-facing requests, a BullMQ worker pool processes heavy computation asynchronously, and external services (Claude, ElevenLabs, Cloudflare R2) provide AI and storage capabilities.
+Sotto's architecture follows a three-layer pattern: a Next.js web application handles user-facing requests, a BullMQ worker pool (23 workers) processes heavy computation asynchronously, and external services (Claude, multi-provider TTS, Cloudflare R2) provide AI and storage capabilities. Everything runs on a single Hetzner VPS via Docker Compose with Caddy as the reverse proxy.
 
 ```
                     +-------------------+
                     |   User (Browser)  |
                     +--------+----------+
                              |
-                    HTTPS (Vercel/Caddy)
+                    HTTPS (Caddy)
                              |
                     +--------v----------+
                     |   Next.js App     |
@@ -38,20 +38,15 @@ Sotto's architecture follows a three-layer pattern: a Next.js web application ha
             +--------->|   Workers   |----------+
                        |  (BullMQ)   |
                        |             |
-                       | - content   |
-                       | - script    |
-                       | - audio     |
-                       | - stitch    |
-                       | - interact  |
-                       | - regen     |
-                       | - notify    |
+                       | 23 workers  |
+                       | (see §4.1)  |
                        +--+------+--+
                           |      |
                 +---------+      +----------+
                 |                           |
         +-------v-------+          +-------v-------+
-        |   Anthropic   |          |  ElevenLabs   |
-        |   Claude API  |          |   TTS API     |
+        |   Anthropic   |          | Multi-Provider|
+        |   Claude API  |          |   TTS APIs    |
         +---------------+          +---------------+
 ```
 
@@ -150,14 +145,69 @@ script-generation.worker.ts
     |    {speaker: "EXPERT", text: "...", direction: "enthusiastic"}, ...]
     |
     |-- Create Script record (turns JSON + raw markdown + version)
-    |-- Create Segment records for each turn (text, speaker, order)
-    |-- Podcast status -> GENERATING_AUDIO
-    |-- Enqueue audio-generation job
+    |-- Create Reference records for cited sources ([N] citations)
+    |-- Podcast status -> VERIFYING_SCRIPT
+    |-- Enqueue script-verification job
 ```
 
 **Script structure**: Each turn is 2-4 sentences. A 10-minute podcast has approximately 40-60 turns. The Host asks questions, makes observations, and provides transitions. The Expert delivers explanations, examples, and analogies. Delivery directions are embedded in square brackets before each turn.
 
-### 2.4 Phase 4: Audio Generation
+### 2.4 Phase 4: Script Verification
+
+A "teacher" agent reviews the generated script for factual claims and sourcing quality:
+
+```
+script-verification.worker.ts
+    |-- Podcast status -> VERIFYING_SCRIPT
+    |-- Extract claims from script turns
+    |-- Check each claim against cited references
+    |-- If claims unsupported or poorly sourced:
+    |   |-- Request revision from Claude (up to 3 loops)
+    |   |-- Re-check revised script
+    |-- If passes verification:
+    |   |-- Podcast status -> VALIDATING_REFERENCES
+    |   |-- Enqueue reference-validation job
+    |-- If fails after 3 attempts:
+    |   |-- Re-enqueue script-generation with feedback
+```
+
+### 2.5 Phase 5: Reference Validation
+
+4-layer verification ensures source quality:
+
+```
+reference-validation.worker.ts
+    |-- Podcast status -> VALIDATING_REFERENCES
+    |-- For each Reference:
+    |   |-- Layer 1: URL validation (HEAD request, check HTTP 200)
+    |   |-- Layer 2: CrossRef DOI lookup
+    |   |-- Layer 3: OpenAlex metadata enrichment
+    |   |-- Layer 4: AI verification (Claude cross-check)
+    |-- Set verificationStatus per reference (VERIFIED, UNVERIFIED, REPLACED, REMOVED)
+    |-- Source quality filter: remove low-quality references
+    |
+    |-- Route based on podcast source:
+    |   |-- WEB / IMPORT: Podcast status -> SCRIPT_READY (pause for user review)
+    |   |-- TWITTER / API: Auto-approve, create Segments, enqueue audio-generation
+```
+
+### 2.6 Phase 6: Script Review (SCRIPT_READY Pause)
+
+For WEB and IMPORT sources, the pipeline pauses for user review:
+
+```
+SCRIPT_READY state:
+    |-- User reviews script + verified references at /podcast/{id}
+    |-- Three options:
+    |   |-- Edit: PATCH /api/podcasts/[id]/script (save edits, stay in SCRIPT_READY)
+    |   |-- Approve: POST /api/podcasts/[id]/script/approve
+    |   |   |-- Creates Segment records for each turn
+    |   |   |-- Enqueue audio-generation job
+    |   |-- Regenerate: POST /api/podcasts/[id]/script/regenerate
+    |       |-- Re-enqueue script-generation
+```
+
+### 2.7 Phase 7: Audio Generation
 
 ```
 audio-generation.worker.ts
@@ -166,17 +216,20 @@ audio-generation.worker.ts
     |   - HOST voice: selected from 8 host voices
     |   - EXPERT voice: selected from 8 expert voices (contrasting gender/accent)
     |
-    |-- Process segments in parallel (concurrency: 5)
+    |-- Resolve TTS provider via resolveTtsProvider():
+    |   - Check user's BYOK TTS key (UserTtsKey)
+    |   - Fall back to platform TTS key if no BYOK
+    |   - Supports: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume
+    |
+    |-- Process segments in parallel (concurrency: 15)
     |   For each segment:
-    |   |-- Map delivery direction to TTS parameters:
-    |   |   stability, similarity_boost, style, use_speaker_boost
-    |   |-- Call ElevenLabs TTS API with:
-    |   |   - Voice ID (host or expert)
-    |   |   - Segment text
-    |   |   - TTS parameters
+    |   |-- Map delivery direction to TTS parameters
+    |   |-- Call resolved TTS provider API
     |   |-- Receive audio buffer (MP3)
     |   |-- Upload segment audio to R2: podcasts/{podcastId}/segments/{order}.mp3
+    |   |-- FFprobe: measure actual duration
     |   |-- Update Segment record: audioUrl, duration
+    |   |-- Log cost to ApiUsageLog
     |   |-- Report progress (segment N of M)
     |
     |-- Generate sound effects via ElevenLabs SFX API:
@@ -190,9 +243,9 @@ audio-generation.worker.ts
     |-- Enqueue audio-stitching job
 ```
 
-**Parallelism**: Audio generation is the most time-consuming step. With 5 concurrent ElevenLabs API calls, a 50-segment podcast takes approximately 60-90 seconds (vs. 5-7 minutes sequential). Each segment is independent, so parallelism is safe.
+**Parallelism**: Audio generation is the most time-consuming step. With 15 concurrent TTS API calls, a 50-segment podcast completes much faster than sequential processing. Each segment is independent, so parallelism is safe.
 
-### 2.5 Phase 5: Audio Stitching
+### 2.8 Phase 8: Audio Stitching
 
 ```
 audio-stitching.worker.ts
@@ -202,15 +255,17 @@ audio-stitching.worker.ts
     |
     |-- Build FFmpeg filter graph:
     |   1. Concatenate: intro + segments (in order) + outro
-    |   2. Insert transition sounds between major topic shifts
+    |   2. Insert transition sounds with adelay positioning
     |   3. Apply crossfade (100ms) between consecutive segments
     |   4. Apply loudness normalization (EBU R128, target: -16 LUFS)
     |   5. Output: MP3, 128kbps, 44.1kHz
     |
     |-- Execute FFmpeg command
+    |-- Duration hard check (verify against target)
     |-- Calculate final duration and file size
     |-- Upload final audio to R2: podcasts/{podcastId}/audio.mp3
-    |-- Update Podcast record: audioUrl, duration, fileSize
+    |-- Create PodcastVersion record (immutable snapshot)
+    |-- Update Podcast record: audioUrl, duration, fileSize, currentVersion
     |-- Update Segment records: startTime (calculated from concat order)
     |-- Podcast status -> READY
     |-- Enqueue notification job
@@ -228,7 +283,7 @@ ffmpeg -i intro.mp3 -i seg_001.mp3 -i seg_002.mp3 ... -i outro.mp3 \
   output.mp3
 ```
 
-### 2.6 Phase 6: Notification and Delivery
+### 2.9 Phase 9: Notification and Delivery
 
 ```
 notification.worker.ts
@@ -240,6 +295,11 @@ notification.worker.ts
     |
     |-- Create Notification record (type: PODCAST_READY)
     |-- Mark notification as pushed: true
+    |
+    |-- If source == TWITTER:
+    |   |-- Enqueue twitter-reply job
+    |-- If source == TELEGRAM:
+    |   |-- Enqueue telegram-reply job
 ```
 
 ---
@@ -261,7 +321,7 @@ POST /api/podcasts/{id}/interact
     v
 API route:
     |-- Validate session (auth required)
-    |-- Check credit balance (0.25 credits per interaction)
+    |-- Check rate limit (60 interactions/hour)
     |-- Create Interaction record (status: PENDING)
     |-- Enqueue interaction job
     |-- Return interaction ID
@@ -306,16 +366,12 @@ segment-regeneration.worker.ts
     |-- Load current Script + resolved Interaction
     |-- Determine affected segments (around timestamp T)
     |
-    |-- Call Claude to generate revised turns:
-    |   "The listener asked: {question}
-    |    Original explanation: {original turns around timestamp}
-    |    Your answer: {interaction answer}
-    |    Rewrite the relevant turns to incorporate the clarification naturally."
+    |-- Call Claude to generate natural HOST segment addressing Q&A
     |
-    |-- Update Script (increment version, replace affected turns)
-    |-- Update affected Segment records (new text)
-    |-- Re-generate audio for affected segments (ElevenLabs, same voices)
-    |-- Re-run audio stitching (full re-stitch for timing consistency)
+    |-- TTS via resolveTtsProvider (matching podcast voice + provider config)
+    |-- Transactional insert: new segment at correct position
+    |-- Queue audio-stitching (skipSfx flag — no re-generated SFX)
+    |-- Re-concat + update startTimes
     |-- Interaction status -> INCORPORATED
     |-- Podcast status -> READY
 ```
@@ -326,26 +382,58 @@ segment-regeneration.worker.ts
 
 ### 4.1 Worker Types and Configuration
 
-| Worker               | Queue Name           | Concurrency              | Timeout | Retry | Priority |
-| -------------------- | -------------------- | ------------------------ | ------- | ----- | -------- |
-| Content Extraction   | `content-extraction` | 3                        | 60s     | 2     | Normal   |
-| Script Generation    | `script-generation`  | 2                        | 120s    | 2     | Normal   |
-| Audio Generation     | `audio-generation`   | 2 (x5 internal parallel) | 300s    | 3     | Normal   |
-| Audio Stitching      | `audio-stitching`    | 2                        | 180s    | 2     | Normal   |
-| Interaction          | `interaction`        | 5                        | 30s     | 2     | High     |
-| Segment Regeneration | `segment-regen`      | 1                        | 300s    | 2     | Normal   |
-| Notification         | `notification`       | 5                        | 10s     | 3     | Low      |
+Sotto runs **23 BullMQ workers**, each with its own Redis connection pair:
+
+| Worker                  | Queue Name                | Concurrency | Purpose                                                              |
+| ----------------------- | ------------------------- | ----------- | -------------------------------------------------------------------- |
+| Content Extraction      | `content-extraction`      | 2           | URL/PDF → extracted text for script context                          |
+| Script Generation       | `script-generation`       | 2           | Discovery metadata → 2-voice script with `[N]` citations            |
+| Script Verification     | `script-verification`     | 2           | Claim extraction + sourcing check (≤3 revision loops)                |
+| Reference Validation    | `reference-validation`    | 2           | 4-layer source verification (URL, CrossRef, OpenAlex, AI)           |
+| Audio Generation        | `audio-generation`        | 15          | Segment text → TTS via `resolveTtsProvider` (5 providers, BYOK)     |
+| Audio Stitching         | `audio-stitching`         | 1           | FFmpeg concat + SFX overlay + normalization → final.mp3              |
+| Interaction             | `interactions`            | 3           | User Q&A → Claude answer + segmentOrder computation                  |
+| Segment Regeneration    | `segment-regeneration`    | 2           | Q&A incorporation → TTS + transactional insert → re-stitch          |
+| Notification            | `notifications`           | 5           | In-app + Web Push notifications                                      |
+| PDF Generation          | `pdf-generation`          | 2           | Podcast → pdfmake PDF → R2 upload                                    |
+| Twitter Mentions        | `twitter-mentions`        | 1           | Poll @sottofm mentions → parse intent → create podcast               |
+| Twitter Reply           | `twitter-reply`           | 2           | Podcast ready → compose reply → post to Twitter                      |
+| Twitter Auto-Tweet      | `twitter-auto-tweet`      | 1           | Interpolate template → post promotional tweet                        |
+| Twitter Trend Poll      | `twitter-trend-poll`      | 1           | Search trending tweets → score + deduplicate → create podcast        |
+| Admin Thread-to-Podcast | `admin-thread-to-podcast` | 1           | Tweet URL → fetch thread → create podcast as @sotto                  |
+| Telegram Bot            | `telegram-bot`            | 1           | Process Telegram bot updates → parse commands → create podcast       |
+| Telegram Reply          | `telegram-reply`          | 2           | Podcast ready → reply in Telegram chat with link                     |
+| Audio Import            | `audio-import`            | 2           | Import existing audio → transcribe → create script + segments        |
+| Event Ingestion         | `event-ingestion`         | 5           | Ingest social activity events for the activity feed                  |
+| Feature Computation     | `feature-computation`     | 2           | ML feature extraction for recommendation engine                      |
+| Data Export             | `data-export`             | 1           | User data export (GDPR compliance)                                   |
+| Key Validation          | `key-validation`          | 1           | Periodic BYOK API key validation (24h cycle)                         |
+| Content Moderation      | `content-moderation`      | 3           | OpenAI Moderation API check on generated scripts                     |
 
 **Interaction worker**: In addition to generating the answer via Claude, the interaction worker computes `segmentOrder` — mapping the question's playback timestamp to the corresponding segment order number — and writes it alongside the answer to the Interaction record.
 
 ### 4.2 Worker Orchestration
 
-The worker entry point (`src/workers/index.ts`) initializes all seven workers, each with its own Redis connection (BullMQ requirement). Workers are orchestrated through job chaining — each worker enqueues the next job upon completion:
+The worker entry point (`src/workers/index.ts`) initializes all 23 workers, each with its own Redis connection pair (BullMQ requirement). Workers are orchestrated through job chaining — each worker enqueues the next job upon completion:
 
 ```
-content-extraction -> script-generation -> audio-generation -> audio-stitching -> notification
-                                                                                        |
-interaction -> segment-regeneration -> audio-generation -> audio-stitching ------>-------+
+content-extraction → script-generation → script-verification → reference-validation → [SCRIPT_READY]
+                                              ↑       │                                      │
+                                              │  FAIL (≤3)                         WEB/IMPORT: pause
+                                              └───────┘                            TWITTER/API: auto-approve
+                                                                                         │
+                          audio-generation (×N, parallel) ← ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
+                                    │
+                          audio-stitching → notification → pdf-generation (on-demand)
+                                    │                            │
+                          twitter-reply (if TWITTER)             └→ telegram-reply (if TELEGRAM)
+
+interaction → segment-regeneration → audio-stitching (skipSfx) → READY
+
+twitter-mentions (polls every 60s) → creates Podcast → kicks off pipeline
+twitter-trend-poll (polls every 2hrs) → creates Podcast as @sotto → kicks off pipeline
+telegram-bot (polls every 35s) → creates Podcast → kicks off pipeline
+content-moderation → runs on generated scripts before audio generation
 ```
 
 ### 4.3 Job Tracking
@@ -365,29 +453,34 @@ This allows the dashboard to show real-time generation progress and the API to r
 
 | Error Type                  | Handling Strategy                                          |
 | --------------------------- | ---------------------------------------------------------- |
-| ElevenLabs rate limit (429) | Exponential backoff: 5s, 15s, 45s                          |
+| TTS rate limit (429)        | Exponential backoff: 5s, 15s, 45s                          |
 | Claude API timeout          | Retry with same payload, max 2 retries                     |
 | FFmpeg processing failure   | Retry once, then mark podcast as FAILED                    |
 | R2 upload failure           | Retry with exponential backoff, max 3 retries              |
 | Unrecoverable error         | Mark podcast as FAILED, create error notification for user |
 
-Failed jobs update the Podcast status to `FAILED` and create a Notification for the user with a "Retry" action.
+Failed jobs trigger the centralized failure handler in `queue.ts`, which records `failedAtStatus` and sets podcast status to `FAILED`, then queues a notification.
 
 ### 4.5 Progress Reporting
 
 Workers report progress via `job.updateProgress(percentage)`. The client polls `GET /api/podcasts/{id}` to display real-time progress:
 
-| Status           | Progress Display                         |
-| ---------------- | ---------------------------------------- |
-| PENDING          | "Queued..."                              |
-| DISCOVERING      | "Chatting..." (real-time in UI)          |
-| EXTRACTING       | "Reading your source..."                 |
-| SCRIPTING        | "Writing the script..."                  |
-| GENERATING_AUDIO | "Generating voices... (segment 3 of 48)" |
-| STITCHING        | "Putting it all together..."             |
-| READY            | "Your podcast is ready!"                 |
-| UPDATING         | "Updating with your feedback..."         |
-| FAILED           | "Something went wrong. Retry?"           |
+| Status                 | Progress Display                         |
+| ---------------------- | ---------------------------------------- |
+| PENDING                | "Queued..."                              |
+| DISCOVERING            | "Chatting..." (real-time in UI)          |
+| EXTRACTING             | "Reading your source..."                 |
+| SCRIPTING              | "Writing the script..."                  |
+| VERIFYING_SCRIPT       | "Verifying claims..."                    |
+| VALIDATING_REFERENCES  | "Checking sources..."                    |
+| SCRIPT_READY           | "Script ready for review"                |
+| GENERATING_AUDIO       | "Generating voices... (segment 3 of 48)" |
+| STITCHING              | "Putting it all together..."             |
+| READY                  | "Your podcast is ready!"                 |
+| UPDATING               | "Updating with your feedback..."         |
+| IMPORTING              | "Importing podcast..."                   |
+| TRANSCRIBING           | "Transcribing audio..."                  |
+| FAILED                 | "Something went wrong. Retry?"           |
 
 ---
 
@@ -399,50 +492,64 @@ Workers report progress via `job.updateProgress(percentage)`. The client polls `
 User ──< Podcast ──< Segment
   |         |──── Script (1:1)
   |         |──── Discovery (1:1) ──< DiscoveryMessage
-  |         |──< Interaction
+  |         |──< Interaction ──< InteractionVote
+  |         |──< Reference
   |         |──< Like
   |         |──< Save
+  |         |──< Comment (threaded, self-referential via parentId)
   |         |──< PodcastTag >── Tag
+  |         |──< PodcastVersion ──< PodcastVersionSegment
+  |         |──< VoicePurchase
   |         |──< Job
   |         └── Podcast (forkedFrom, self-referential)
   |
   |──< Follow (follower/following, self-referential through User)
+  |──< UserAiKey (BYOK: Anthropic, OpenAI — AES-256-GCM encrypted)
+  |──< UserTtsKey (BYOK: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)
+  |──< VoiceClone ──< VoicePurchase
+  |──< Collection ──< CollectionItem
+  |──< Activity
   |──< Notification
   |──< PushSubscription
-  |──< Subscription
+  |──< ApiKey (developer API keys)
   |──< ApiUsageLog
   |── Team (membership + ownership)
 ```
 
 ### 5.2 Core Models
 
-| Model                 | Primary Key | Key Fields                                                                                                                                         | Indexes                                                     |
-| --------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| **User**              | `id` (cuid) | email (unique), name, image, bio, role (USER/CREATOR/ADMIN), teamId                                                                                | teamId, role                                                |
-| **Podcast**           | `id` (cuid) | userId, title, topic, status, audioUrl, duration, visibility, forkedFromId, playCount, likeCount, forkCount                                        | userId, status, visibility, createdAt, playCount, likeCount |
-| **Discovery**         | `id` (cuid) | podcastId (unique), userId, topic, depth, audienceLevel, focusAreas[], tone, durationTarget, sourceUrl, sourceContent                              | userId                                                      |
-| **DiscoveryMessage**  | `id` (cuid) | discoveryId, role, content, chips (JSON)                                                                                                           | discoveryId                                                 |
-| **Script**            | `id` (cuid) | podcastId (unique), turns (JSON), markdown, context, version                                                                                       |                                                             |
-| **Segment**           | `id` (cuid) | podcastId, speaker (HOST/EXPERT), text, audioUrl, order, startTime, duration, version                                                              | podcastId, order                                            |
-| **Interaction**       | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, resolved, incorporated, helpful (Boolean?), segmentOrder (Int?)                            | podcastId, userId, status                                   |
-| **Subscription**      | `id` (cuid) | userId (unique), stripeCustomerId, stripeSubscriptionId, stripePriceId, status, tier, creditsBalance, creditsMonthly, rolloverCredits, maxRollover | status, tier                                                |
-| **CreditTransaction** | `id` (cuid) | userId, amount, type (GRANT/CONSUMPTION/REFUND/PURCHASE), podcastId, description, balanceAfter, createdAt                                          | userId, type, createdAt                                     |
+| Model                | Primary Key | Key Fields                                                                                                                    | Indexes                                                     |
+| -------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **User**             | `id` (cuid) | email (unique), name, image, bio, role (USER/CREATOR/ADMIN), twitterHandle, stripeAccountId                                  | teamId, role                                                |
+| **Podcast**          | `id` (cuid) | userId, title, topic, status, audioUrl, duration, visibility, forkedFromId, source (WEB/TWITTER/API), currentVersion, commentCount | userId, status, visibility, createdAt, playCount, likeCount |
+| **Discovery**        | `id` (cuid) | podcastId (unique), userId, topic, depth, audienceLevel, focusAreas[], tone, durationTarget, sourceUrl, sourceContent         | userId                                                      |
+| **DiscoveryMessage** | `id` (cuid) | discoveryId, role, content, chips (JSON)                                                                                      | discoveryId                                                 |
+| **Script**           | `id` (cuid) | podcastId (unique), turns (JSON), markdown, context, version                                                                  |                                                             |
+| **Segment**          | `id` (cuid) | podcastId, speaker (HOST/EXPERT), text, audioUrl, order, startTime, duration, version                                         | podcastId, order                                            |
+| **Reference**        | `id` (cuid) | podcastId, number, title, authors, year, url, type, verificationStatus                                                        | podcastId                                                   |
+| **Interaction**      | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, helpful, segmentOrder, visibility (PUBLIC/PRIVATE), upvoteCount       | podcastId, userId, status                                   |
+| **UserAiKey**        | `id` (cuid) | userId, provider (ANTHROPIC/OPENAI), encryptedKey, isValid — `@@unique([userId, provider])`                                   | userId                                                      |
+| **UserTtsKey**       | `id` (cuid) | userId, provider (ELEVENLABS/OPENAI/PLAYHT/CARTESIA/HUME), encryptedKey, isValid — `@@unique([userId, provider])`             | userId                                                      |
+| **VoiceClone**       | `id` (cuid) | userId, name, elevenLabsVoiceId, priceInCents                                                                                 | userId                                                      |
+| **VoicePurchase**    | `id` (cuid) | buyerId, voiceCloneId, podcastId, amountCents, platformFeeCents, status (authorized/captured/cancelled/refunded)              | buyerId, voiceCloneId                                       |
+| **FreeTierConfig**   | `id` (cuid) | aiProvider, aiModel, ttsProvider, generationLimit — singleton row                                                              |                                                             |
 
 ### 5.3 Key Enums
 
-| Enum                 | Values                                                                                            | Usage                                      |
-| -------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `PodcastStatus`      | PENDING, DISCOVERING, EXTRACTING, SCRIPTING, GENERATING_AUDIO, STITCHING, READY, UPDATING, FAILED | Tracks podcast through generation pipeline |
-| `Speaker`            | HOST, EXPERT                                                                                      | Identifies speaker in segments             |
-| `InteractionStatus`  | PENDING, ANSWERING, ANSWERED, RESOLVED, INCORPORATING, INCORPORATED                               | Tracks Q&A lifecycle                       |
-| `PodcastVisibility`  | PUBLIC, UNLISTED, PRIVATE                                                                         | Access control                             |
-| `SubscriptionTier`   | FREE, STARTER, PRO, STUDIO                                                                        | Billing tier                               |
-| `SubscriptionStatus` | PENDING, ACTIVE, PAST_DUE, CANCELED, UNPAID, TRIALING                                             | Stripe subscription state                  |
-| `NotificationType`   | PODCAST_READY, PODCAST_LIKED, PODCAST_FORKED, NEW_FOLLOWER, SIMILAR_PODCAST_CREATED               | Notification categorization                |
+| Enum                | Values                                                                                                                              | Usage                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `PodcastStatus`     | PENDING, DISCOVERING, EXTRACTING, SCRIPTING, VERIFYING_SCRIPT, VALIDATING_REFERENCES, SCRIPT_READY, GENERATING_AUDIO, STITCHING, READY, UPDATING, FAILED, IMPORTING, TRANSCRIBING | Tracks podcast through generation pipeline |
+| `Speaker`           | HOST, EXPERT                                                                                                                        | Identifies speaker in segments             |
+| `InteractionStatus` | PENDING, ANSWERING, ANSWERED, RESOLVED, INCORPORATING, INCORPORATED                                                                 | Tracks Q&A lifecycle                       |
+| `PodcastVisibility` | PUBLIC, UNLISTED, PRIVATE                                                                                                           | Access control                             |
+| `PodcastSource`     | WEB, TWITTER, API, IMPORT                                                                                                           | How podcast was created                    |
+| `UserRole`          | USER, CREATOR, ADMIN                                                                                                                | Authorization level                        |
+| `NotificationType`  | PODCAST_READY, PODCAST_LIKED, PODCAST_FORKED, NEW_FOLLOWER, SIMILAR_PODCAST_CREATED, COMMENT_POSTED                                 | Notification categorization                |
+| `ActivityType`      | PODCAST_CREATED, FORKED, LIKED, USER_FOLLOWED, COMMENT_POSTED, COLLECTION_CREATED                                                   | Social activity feed events                |
 
 ### 5.4 Denormalized Counters
 
-The Podcast model maintains denormalized counters (`playCount`, `likeCount`, `forkCount`, `saveCount`) that are incremented atomically via Prisma's `increment` operation. This avoids expensive COUNT queries on the social feed:
+The Podcast model maintains denormalized counters (`playCount`, `likeCount`, `forkCount`, `saveCount`, `commentCount`) that are incremented atomically via Prisma's `increment` operation. This avoids expensive COUNT queries on the social feed:
 
 ```typescript
 await prisma.podcast.update({
@@ -457,14 +564,14 @@ await prisma.podcast.update({
 
 ### 6.1 NextAuth.js v5 Configuration
 
-Sotto uses NextAuth.js v5 with four authentication providers:
+Sotto uses NextAuth.js v5 with four OAuth authentication providers (no email/password):
 
-| Provider               | Use Case                           | Configuration                           |
-| ---------------------- | ---------------------------------- | --------------------------------------- |
-| **Email (Magic Link)** | Primary signup/login for all users | Resend email provider, 10-minute expiry |
-| **Google OAuth**       | One-click login for Google users   | Google Cloud Console OAuth 2.0 client   |
-| **GitHub OAuth**       | Developer-friendly login           | GitHub OAuth App                        |
-| **Apple Sign In**      | Required for future iOS app        | Apple Developer Program                 |
+| Provider          | Use Case                           | Configuration                         |
+| ----------------- | ---------------------------------- | ------------------------------------- |
+| **Google OAuth**  | One-click login for Google users   | Google Cloud Console OAuth 2.0 client |
+| **GitHub OAuth**  | Developer-friendly login           | GitHub OAuth App                      |
+| **Twitter OAuth** | Social login for Twitter users     | Twitter Developer App (OAuth 2.0)     |
+| **Apple Sign In** | Required for iOS app               | Apple Developer Program               |
 
 ### 6.2 Auth Flow
 
@@ -472,15 +579,13 @@ Sotto uses NextAuth.js v5 with four authentication providers:
 User visits /auth/login
     |
     v
-Selects provider (Email / Google / GitHub / Apple)
-    |
-    +-- Email: enters email -> receives magic link -> clicks -> authenticated
+Selects provider (Google / GitHub / Twitter / Apple)
     |
     +-- OAuth: redirected to provider -> grants access -> callback -> authenticated
     |
     v
 NextAuth creates Session + Account records
-    |-- If new user: creates User record with defaults (tier: FREE) + Subscription (creditsBalance: 2, tier: FREE)
+    |-- If new user: creates User record with defaults (role: USER)
     |-- If existing user: refreshes session token
     |
     v
@@ -501,7 +606,7 @@ Middleware (src/middleware.ts) checks session on protected routes:
 
 NextAuth is configured with a database session strategy (not JWT) for the following reasons:
 
-- Sessions can be revoked server-side (important for subscription changes)
+- Sessions can be revoked server-side
 - Session data stays in sync with User record changes
 - No token size limitations
 - Suitable for server-side rendering in Next.js App Router
@@ -526,6 +631,7 @@ sotto-audio-bucket/
 ├── podcasts/
 │   ├── {podcastId}/
 │   │   ├── audio.mp3              # Final stitched podcast (public URL)
+│   │   ├── transcript.pdf         # Generated PDF transcript
 │   │   ├── segments/
 │   │   │   ├── 001.mp3            # Individual segment audio
 │   │   │   ├── 002.mp3
@@ -538,8 +644,8 @@ sotto-audio-bucket/
 ├── avatars/
 │   └── {userId}.jpg               # User profile images
 └── exports/
-    └── {podcastId}/
-        └── transcript.md          # Exported transcripts (Pro+)
+    └── {userId}/
+        └── data-export.zip        # GDPR data export
 ```
 
 ### 7.3 Access Control
@@ -569,53 +675,56 @@ Average podcast file size: ~15 MB (10 min, 128kbps MP3).
 
 ### 8.1 Queue Architecture
 
-BullMQ manages all asynchronous work through named queues. Each queue corresponds to one worker type. Redis serves as the message broker.
+BullMQ manages all asynchronous work through 23 named queues. Each queue corresponds to one worker type. Redis serves as the message broker.
 
 ```
 Redis (port 6379)
     |
     +-- Queue: content-extraction
-    |   +-- Job: {podcastId, sourceUrl}
-    |
     +-- Queue: script-generation
-    |   +-- Job: {podcastId, discoveryId}
-    |
+    +-- Queue: script-verification
+    +-- Queue: reference-validation
     +-- Queue: audio-generation
-    |   +-- Job: {podcastId, scriptId}
-    |
     +-- Queue: audio-stitching
-    |   +-- Job: {podcastId}
-    |
-    +-- Queue: interaction
-    |   +-- Job: {interactionId, podcastId, question, timestamp}
-    |
-    +-- Queue: segment-regen
-    |   +-- Job: {podcastId, interactionId}
-    |
-    +-- Queue: notification
-        +-- Job: {userId, type, title, message, data}
+    +-- Queue: interactions
+    +-- Queue: segment-regeneration
+    +-- Queue: notifications
+    +-- Queue: pdf-generation
+    +-- Queue: twitter-mentions (repeatable, every 60s)
+    +-- Queue: twitter-reply
+    +-- Queue: twitter-auto-tweet
+    +-- Queue: twitter-trend-poll (repeatable, every 2hrs)
+    +-- Queue: admin-thread-to-podcast
+    +-- Queue: telegram-bot (repeatable, every 35s)
+    +-- Queue: telegram-reply
+    +-- Queue: audio-import
+    +-- Queue: event-ingestion
+    +-- Queue: feature-computation
+    +-- Queue: data-export
+    +-- Queue: key-validation (repeatable, every 24hrs)
+    +-- Queue: content-moderation
 ```
 
 ### 8.2 Redis Connection Strategy
 
-BullMQ requires separate Redis connections for each worker (one for the worker, one for the queue client). With 7 workers, Sotto uses 14 Redis connections plus 1 for the web application's queue client:
+BullMQ requires separate Redis connections for each worker (one for the worker, one for the queue client). With 23 workers, Sotto uses ~48 Redis connections:
 
-| Component                        | Connections | Purpose                                 |
-| -------------------------------- | ----------- | --------------------------------------- |
-| Web app queue client             | 1           | Enqueue jobs from API routes            |
-| Worker instances (7 workers x 2) | 14          | Process jobs + internal communication   |
-| Cache client                     | 1           | General caching (feed, recommendations) |
-| **Total**                        | **16**      |                                         |
+| Component                         | Connections | Purpose                                 |
+| --------------------------------- | ----------- | --------------------------------------- |
+| Web app queue client              | 1           | Enqueue jobs from API routes            |
+| Worker instances (23 workers × 2) | 46          | Process jobs + internal communication   |
+| Cache client                      | 1           | General caching (feed, recommendations) |
+| **Total**                         | **~48**     |                                         |
 
 Redis 7 supports up to 10,000 concurrent connections by default, so this is well within limits.
 
 ### 8.3 Job Priority
 
-| Priority Level | Queues                                                                                  | Rationale                                        |
-| -------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| High (1)       | interaction                                                                             | User is waiting with podcast paused              |
-| Normal (5)     | content-extraction, script-generation, audio-generation, audio-stitching, segment-regen | Standard generation pipeline                     |
-| Low (10)       | notification                                                                            | Notifications can be delayed without user impact |
+| Priority Level | Queues                                                                                                               | Rationale                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| High (1)       | interaction                                                                                                          | User is waiting with podcast paused              |
+| Normal (5)     | content-extraction, script-generation, script-verification, reference-validation, audio-generation, audio-stitching, segment-regeneration, audio-import | Standard generation pipeline |
+| Low (10)       | notification, event-ingestion, feature-computation, pdf-generation, data-export, content-moderation                  | Background tasks, can be delayed                 |
 
 ### 8.4 Redis Memory Management
 
@@ -627,7 +736,7 @@ Redis 7 supports up to 10,000 concurrent connections by default, so this is well
 | Cache: user profile     | ~500 bytes     | 30 minutes                          |
 | Cache: recommendations  | ~10 KB         | 15 minutes                          |
 
-Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on Upstash or a standard Redis instance).
+Estimated Redis memory at 10,000 users: ~500 MB (well within the 512MB default Docker allocation, increase as needed).
 
 ---
 
@@ -642,9 +751,13 @@ Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on U
 | POST   | `/api/podcasts`                             | Required | Create new podcast                                       |
 | GET    | `/api/podcasts/[id]`                        | Optional | Get podcast details (public or owned)                    |
 | POST   | `/api/podcasts/[id]/generate`               | Required | Start generation pipeline                                |
+| PATCH  | `/api/podcasts/[id]/script`                 | Required | Edit script (at SCRIPT_READY)                            |
+| POST   | `/api/podcasts/[id]/script/approve`         | Required | Approve script, proceed to audio generation              |
+| POST   | `/api/podcasts/[id]/script/regenerate`      | Required | Regenerate script from scratch                           |
 | POST   | `/api/podcasts/[id]/interact`               | Required | Ask a question during playback                           |
 | GET    | `/api/podcasts/[id]/interact/[iid]`         | Required | Get single interaction (polling for answer)              |
 | PATCH  | `/api/podcasts/[id]/interact/[iid]/resolve` | Required | Resolve interaction with helpful/unhelpful feedback      |
+| POST   | `/api/podcasts/[id]/interact/[iid]/incorporate` | Required | Incorporate Q&A into podcast                         |
 | GET    | `/api/podcasts/[id]/knowledge-gaps`         | Required | Knowledge gap aggregation by segment (owner/admin)       |
 | GET    | `/api/podcasts/[id]/download`               | Public   | Download podcast audio (Content-Disposition: attachment) |
 | POST   | `/api/podcasts/[id]/fork`                   | Required | Fork a public podcast                                    |
@@ -656,14 +769,13 @@ Estimated Redis memory at 10,000 users: ~500 MB (well within 1 GB free tier on U
 | POST   | `/api/users/[id]/follow`                    | Required | Follow/unfollow a user                                   |
 | GET    | `/api/users/handle/[handle]/rss`            | Public   | Per-creator RSS feed resolved by handle                  |
 | GET    | `/api/oembed`                               | Public   | oEmbed 1.0 JSON for podcast embeds                       |
-| POST   | `/api/billing/checkout`                     | Required | Create Stripe checkout session                           |
-| GET    | `/api/billing/subscription`                 | Required | Get current subscription                                 |
-| POST   | `/api/billing/portal`                       | Required | Create Stripe customer portal session                    |
+| GET    | `/api/billing/usage`                        | Required | BYOK key status + usage stats                            |
+| POST   | `/api/billing/keys`                         | Required | Add/update BYOK API keys                                 |
 | GET    | `/api/notifications`                        | Required | List notifications                                       |
 | PATCH  | `/api/notifications/[id]`                   | Required | Mark notification as read                                |
 | POST   | `/api/notifications/push/register`          | Required | Register push subscription                               |
 | GET    | `/api/tags`                                 | Public   | List all tags                                            |
-| POST   | `/api/webhooks/stripe`                      | Webhook  | Handle Stripe webhook events                             |
+| POST   | `/api/webhooks/stripe`                      | Webhook  | Handle Stripe Connect webhook events                     |
 
 ### 9.2 API Validation
 
@@ -685,16 +797,16 @@ const interactSchema = z.object({
 
 ### 9.3 Rate Limiting
 
-Rate limiting is applied at the API route level using Redis-backed sliding window counters:
+Rate limiting is applied at the API route level using Redis-backed sliding window counters. No subscription tiers or credits — abuse prevention only:
 
-| Route Group                | Limit               | Window   |
-| -------------------------- | ------------------- | -------- |
-| `/api/discovery`           | 30 requests/minute  | Per user |
-| `/api/podcasts/*/generate` | 5 requests/hour     | Per user |
-| `/api/podcasts/*/interact` | 20 requests/hour    | Per user |
-| `/api/feed`                | 60 requests/minute  | Per IP   |
-| `/api/billing/*`           | 10 requests/minute  | Per user |
-| All other API routes       | 100 requests/minute | Per user |
+| Route Group                | Limit                | Window   |
+| -------------------------- | -------------------- | -------- |
+| `/api/discovery`           | 30 requests/minute   | Per user |
+| `/api/podcasts/*/generate` | 20 generations/hour  | Per user |
+| Generation daily cap       | 100 generations/day  | Per user |
+| `/api/podcasts/*/interact` | 60 interactions/hour | Per user |
+| `/api/feed`                | 60 requests/minute   | Per IP   |
+| All other API routes       | 100 requests/minute  | Per user |
 
 ---
 
@@ -702,25 +814,27 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 
 ### 10.1 Current Architecture Limits
 
-| Component                         | Current Limit                      | Bottleneck                      |
-| --------------------------------- | ---------------------------------- | ------------------------------- |
-| Web app (single Vercel instance)  | ~500 concurrent users              | Serverless function cold starts |
-| Workers (single Railway instance) | ~10 concurrent podcast generations | CPU + memory for FFmpeg         |
-| PostgreSQL (single instance)      | ~1,000 queries/second              | Connection pool size            |
-| Redis (single instance)           | ~50,000 operations/second          | Memory (queue depth)            |
-| ElevenLabs API                    | ~100 concurrent requests           | API rate limits                 |
-| Claude API                        | ~50 concurrent requests            | API rate limits                 |
+| Component                              | Current Limit                      | Bottleneck                   |
+| -------------------------------------- | ---------------------------------- | ---------------------------- |
+| Web app (Hetzner CPX31, Docker)        | ~500 concurrent users              | CPU + memory (8GB shared)    |
+| Workers (same VPS, 23 workers)         | ~10 concurrent podcast generations | CPU + memory for FFmpeg      |
+| PostgreSQL (Docker, single instance)   | ~1,000 queries/second              | Connection pool size         |
+| Redis (Docker, 512MB)                  | ~50,000 operations/second          | Memory (queue depth)         |
+| TTS APIs (multi-provider, BYOK)        | Per-user rate limits               | Provider API rate limits     |
+| Claude API                             | ~50 concurrent requests            | API rate limits              |
 
 ### 10.2 Scaling Strategy by User Count
 
 | User Count | Architecture Change                                                          | Estimated Cost |
 | ---------- | ---------------------------------------------------------------------------- | -------------- |
-| 0-500      | Single server (Hetzner CPX31): web + workers + DB + Redis                    | $17/month      |
-| 500-2K     | Upgrade to CPX41, separate worker process                                    | $27/month      |
+| 0-500      | Single server (Hetzner CPX31): web + workers + DB + Redis                    | $11/month      |
+| 500-2K     | Upgrade to CPX41, separate worker process                                    | $21/month      |
 | 2K-5K      | Dedicated CPU (CCX33), separate PostgreSQL instance, external Redis          | $80/month      |
 | 5K-10K     | Split web and workers to separate servers, connection pooling (PgBouncer)    | $150/month     |
 | 10K-50K    | Multiple worker instances, read replicas for PostgreSQL, Redis cluster       | $500/month     |
 | 50K+       | Container orchestration (Kubernetes), auto-scaling workers, managed database | $2,000+/month  |
+
+**Key insight**: The BYOK model means platform AI/TTS costs stay low regardless of user count. Infrastructure scaling is the primary cost driver, not API usage.
 
 ### 10.3 Performance Optimization Strategies
 
@@ -735,6 +849,7 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 | **Audio segment caching**       | >10K users    | If same text + voice + params, reuse cached audio            |
 | **PostgreSQL full-text search** | MVP           | `to_tsvector` on podcast title + topic for feed search       |
 | **Vector similarity search**    | >10K podcasts | pgvector extension for semantic podcast discovery            |
+| **ML recommendations**          | >1K podcasts  | Feature computation worker + recommendation engine           |
 
 ### 10.4 Monitoring and Observability
 
@@ -746,6 +861,7 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 | Queue          | BullMQ Dashboard (Bull Board) | Queue depth, processing time, failure rate |
 | External APIs  | ApiUsageLog model             | Cost per service, latency, error rates     |
 | User behavior  | PostHog                       | Funnel analysis, feature usage, retention  |
+| Content safety | Content Moderation worker     | Flagged content, false positive rate       |
 
 ### 10.5 Disaster Recovery
 
@@ -756,3 +872,24 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 | Redis data loss     | Workers re-process any in-flight jobs (idempotent design) | 5 minutes  | 0 (ephemeral queue data)        |
 | R2 outage           | Cloudflare manages redundancy internally                  | N/A        | N/A                             |
 | External API outage | Queue jobs with retry, notify users of delay              | Automatic  | 0                               |
+
+---
+
+## 11. Additional Systems
+
+### 11.1 Telegram Bot Integration
+
+The `@SottoFMBot` Telegram bot allows users to create podcasts via chat:
+
+- `telegram-bot` worker polls for updates every 35s
+- Parses commands and natural language intent via Claude
+- Creates podcasts and kicks off the standard pipeline
+- `telegram-reply` worker sends podcast link back to chat when ready
+
+### 11.2 Content Moderation
+
+The `content-moderation` worker uses OpenAI's Moderation API to check generated scripts for harmful content before audio generation. Flagged content is logged and can be reviewed by admins.
+
+### 11.3 ML Recommendations
+
+The `feature-computation` worker extracts features from podcasts (topic embeddings, engagement signals, creator graphs) that power the recommendation engine. Combined with pgvector for semantic similarity search on podcast discovery.

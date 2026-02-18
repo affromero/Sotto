@@ -10,7 +10,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `script-generation`    | `script-generation`    | 2           | Discovery metadata → 2-voice script with `[N]` citations                                                         | Creates Script + References, routes to script verification                             |
 | `script-verification`  | `script-verification`  | 2           | Script + References → claim extraction + sourcing check (≤3 revision loops)                                      | Passes → routes to ref validation or audio; Fails → regenerates script                 |
 | `reference-validation` | `reference-validation` | 2           | References + Script → source quality filter + 4-layer verification                                               | Verifies/replaces/removes refs, sets SCRIPT_READY (WEB/IMPORT) or creates Segments + queues audio (TWITTER/API) |
-| `audio-generation`     | `audio-generation`     | 5           | Segment text → TTS via `resolveTtsProvider` (BYOK or platform, 5 providers) + FFprobe duration                   | Uploads segment audio to R2, writes `segment.duration`, logs cost to `ApiUsageLog`     |
+| `audio-generation`     | `audio-generation`     | 15          | Segment text → TTS via `resolveTtsProvider` (BYOK or platform, 5 providers) + FFprobe duration                   | Uploads segment audio to R2, writes `segment.duration`, logs cost to `ApiUsageLog`     |
 | `audio-stitching`      | `audio-stitching`      | 1           | All segments → FFmpeg concat + SFX overlay (with `adelay`) + normalization                                       | Uploads final podcast audio, creates `PodcastVersion`, computes startTimes, sets READY |
 | `interaction`          | `interactions`         | 3           | User question + segment-based timestamp lookup → Claude answer + segmentOrder computation                        | Updates Interaction.answer, status, segmentOrder                                       |
 | `segment-regeneration` | `segment-regeneration` | 2           | Text → TTS via `resolveTtsProvider` (matches podcast voice + provider config) → transactional insert → re-stitch | Queues audio-stitching (`skipSfx`), marks INCORPORATED                                 |
@@ -20,6 +20,14 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `twitter-reply`        | `twitter-reply`        | 2           | Podcast ready → compose reply → post to Twitter                                                                  | Updates TweetMention.status to REPLIED                                                 |
 | `twitter-auto-tweet`   | `twitter-auto-tweet`   | 1           | Podcast ID + trigger → interpolate template → post tweet                                                         | Updates TwitterAutoTweet record (tweetId, status)                                      |
 | `twitter-trend-poll`   | `twitter-trend-poll`   | 1           | Poll trending tweets → score + deduplicate → create podcast as @sotto                                            | Creates Podcast + TwitterAutoTweet, kicks off pipeline                                 |
+| `audio-import`         | `audio-import`         | 2           | Uploaded audio → FFmpeg normalize → STT transcribe → diarize → create segments + version                         | Transcribes, creates Script + Segments + PodcastVersion, auto-tags, sets READY         |
+| `event-ingestion`      | `event-ingestion`      | 5           | Batch of behavioral events → upsert sessions + insert events + update playback aggregates                        | Creates UserSession + BehavioralEvent records, updates PlaybackSession                 |
+| `feature-computation`  | `feature-computation`  | 2           | Scope (user/podcast/all) → aggregate sessions + engagement into feature vectors                                  | Upserts UserFeature / PodcastFeature with embeddings, runs hourly or on-demand         |
+| `data-export`          | `data-export`          | 1           | Export type + date range + format → stream large result sets to JSONL/CSV                                        | Uploads export file to R2, returns fileUrl                                             |
+| `key-validation`       | `key-validation`       | 1           | Scheduled (every 24h) → re-validate all BYOK TTS + AI keys against provider APIs                                | Marks invalid keys `isValid=false`, sends KEY_INVALID notification to affected users   |
+| `telegram-bot`         | `telegram-bot`         | 1           | Poll Telegram updates (every 35s) → route commands + discovery chat + generate podcasts                          | Creates TelegramMessage + Podcast, kicks off pipeline (source: TELEGRAM)               |
+| `telegram-reply`       | `telegram-reply`       | 2           | Podcast ready/failed → send Telegram message with "Listen Now" link                                              | Updates TelegramMessage.status to REPLIED/FAILED                                       |
+| `content-moderation`   | `content-moderation`   | 3           | Content text → OpenAI Moderation API scan                                                                        | Creates ContentFlag records for flagged content                                        |
 | `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as @sotto                                               | Creates Podcast, kicks off pipeline                                                    |
 
 ## Pipeline Flow
@@ -27,14 +35,16 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 ```
 content-extraction → script-generation → script-verification ──→ reference-validation → [SCRIPT_READY] → audio-generation (×N) → audio-stitching → notification
                                               ↑       │                                      │                                                          ↕
-                                              │  FAIL (≤3)                         WEB/IMPORT: pause      pdf-generation         twitter-reply
-                                              └───────┘                            for user review         (on-demand)            (if TWITTER)
-                                                                                   TWITTER/API: auto-approve
+                                              │  FAIL (≤3)                         WEB/IMPORT: pause      pdf-generation         twitter-reply (if TWITTER)
+                                              └───────┘                            for user review         (on-demand)            telegram-reply (if TELEGRAM)
+                                                                                   TWITTER/API/TELEGRAM: auto-approve
 
 twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast → kicks off pipeline above
 twitter-trend-poll (repeatable, every 2hrs) → searches trending tweets → creates Podcast as @sotto → kicks off pipeline above
 admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as @sotto → kicks off pipeline above
 twitter-auto-tweet (on-demand) → interpolates template → posts tweet → updates TwitterAutoTweet record
+telegram-bot (repeatable, every 35s) → polls Telegram updates → discovery chat → creates Podcast → kicks off pipeline above
+telegram-reply (on completion) → sends "Listen Now" link to Telegram chat (if TELEGRAM)
 
 Script review (at SCRIPT_READY):
   User edits script → PATCH /api/podcasts/[id]/script (save edits)
@@ -45,6 +55,10 @@ Incorporation (post-READY):
   incorporate endpoint → segment-regeneration → audio-stitching (skipSfx) → READY
   (ANSWERED → INCORPORATING)  (TTS + insert)    (re-concat + startTimes)   (INCORPORATED)
 ```
+
+## Standalone Utility Workers
+
+**`content-moderation`** is NOT part of the generation pipeline. It's an async content scanner that runs on-demand — triggered when comments or podcast scripts need moderation review. It calls the OpenAI Moderation API and creates `ContentFlag` records for flagged content. Admins review flags in the moderation dashboard.
 
 ## Centralized Failure Handler
 

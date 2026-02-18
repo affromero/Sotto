@@ -84,8 +84,9 @@ The canonical reference is `.env.example` — it documents every variable with `
 | `ANTHROPIC_API_KEY` | For AI features | Discovery chat, script generation, Q&A |
 | TTS key (`ELEVENLABS_API_KEY` or `OPENAI_API_KEY`) | For audio | Audio generation pipeline |
 | `R2_*` / `AWS_*` | No | Set `STORAGE_PROVIDER=local` instead |
-| `STRIPE_*` | No | Set `PAYMENT_PROVIDER=none` instead |
+| `STRIPE_*` | No | Voice marketplace only (Stripe Connect for voice payments) — set `PAYMENT_PROVIDER=none` for local dev |
 | `TWITTER_*` | No | Only needed for @sottofm tweet-to-podcast bot |
+| `TELEGRAM_BOT_TOKEN` | No | Only needed for Telegram dev notifications (`@SottoFMDevBot`) |
 | `VAPID_*` | No | Web push notifications won't send |
 
 Items marked **(auto)** are handled by `npm run setup`.
