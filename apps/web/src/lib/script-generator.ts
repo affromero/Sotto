@@ -1,5 +1,6 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
+import { minutesToWords, wordCountBounds } from './duration';
 
 export type ScriptTurn = {
   speaker: 'HOST' | 'EXPERT';
@@ -121,7 +122,7 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 - Start with a HOOK in the first 15 seconds — a surprising fact, provocative question, or bold claim
 - Alternate between high-energy and reflective moments
 - Every 2-3 minutes, introduce a new angle or surprising connection
-- Target approximately ${params.durationTarget} minutes (~${params.durationTarget * 150} words)
+- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
 - Audience level: ${params.audienceLevel}
 - Focus areas: ${params.focusAreas.join(', ')}
 
@@ -311,7 +312,7 @@ These go inline in the text field, NOT in the direction field.
 ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 
 ## Pacing:
-- Target approximately ${params.durationTarget} minutes (~${params.durationTarget * 150} words)
+- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
 - Audience level: ${params.audienceLevel}
 - Focus areas: ${params.focusAreas.join(', ')}
 

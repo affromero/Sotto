@@ -202,8 +202,8 @@ describe('verifyScript', () => {
     expect(result.unreliableSourceClaims).toHaveLength(1);
   });
 
-  it('adds duration feedback when script exceeds time limit', async () => {
-    const longText = 'word '.repeat(2000); // ~2000 words = ~13 minutes
+  it('fails when script exceeds word count bounds', async () => {
+    const longText = 'word '.repeat(2000); // ~2000 words, well above 1575 max for 10 min
 
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
@@ -227,6 +227,62 @@ describe('verifyScript', () => {
 
     expect(result.passed).toBe(false);
     expect(result.durationFeedback).toContain('exceeds');
+    expect(result.durationFeedback).toContain('Reduce');
+  });
+
+  it('fails when script is too short', async () => {
+    const shortText = 'word '.repeat(500); // ~500 words, well below 1425 min for 10 min
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 0.9,
+        feedback: '',
+      }),
+      inputTokens: 800,
+      outputTokens: 200,
+    });
+
+    const result = await verifyScript({
+      topic: 'Short Script',
+      turns: [{ speaker: 'HOST', text: shortText }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+      maxDurationMinutes: 10,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.durationFeedback).toContain('below');
+    expect(result.durationFeedback).toContain('Expand');
+  });
+
+  it('passes when script is within tolerance', async () => {
+    const okText = 'word '.repeat(1500); // ~1500 words, right at target for 10 min
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 800,
+      outputTokens: 200,
+    });
+
+    const result = await verifyScript({
+      topic: 'Good Script',
+      turns: [{ speaker: 'HOST', text: okText }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+      maxDurationMinutes: 10,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.durationFeedback).toBeNull();
   });
 
   it('handles unparseable AI response', async () => {

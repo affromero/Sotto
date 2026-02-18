@@ -51,7 +51,7 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   quick_overview: 0.7,
 };
 
-const WORDS_PER_MINUTE = 150;
+import { wordCountBounds } from './duration';
 
 /**
  * Verify a podcast script by extracting factual claims and evaluating sourcing.
@@ -234,15 +234,24 @@ Analyze every factual claim. Return JSON only.`;
     (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource
   );
 
-  // Duration check
+  // Duration check — bidirectional (too long OR too short), only when target is set
   const totalWords = turns.reduce((sum, t) => sum + t.text.split(/\s+/).length, 0);
-  const estimatedMinutes = totalWords / WORDS_PER_MINUTE;
-  const maxMinutes = maxDurationMinutes || 10;
-  const durationExceeded = estimatedMinutes > maxMinutes * 1.15;
+  let tooLong = false;
+  let tooShort = false;
+  if (maxDurationMinutes) {
+    const bounds = wordCountBounds(maxDurationMinutes);
+    tooLong = totalWords > bounds.max;
+    tooShort = totalWords < bounds.min;
+  }
 
   let durationFeedback: string | null = null;
-  if (durationExceeded) {
-    durationFeedback = `The script is approximately ${Math.round(estimatedMinutes)} minutes (${totalWords} words), which exceeds the ${maxMinutes}-minute limit by more than 15%. Reduce the script length to fit within ${maxMinutes} minutes (~${maxMinutes * WORDS_PER_MINUTE} words).`;
+  if (maxDurationMinutes && (tooLong || tooShort)) {
+    const bounds = wordCountBounds(maxDurationMinutes);
+    if (tooLong) {
+      durationFeedback = `The script is ${totalWords} words, which exceeds the maximum of ${bounds.max} words for a ${maxDurationMinutes}-minute podcast. Reduce to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+    } else {
+      durationFeedback = `The script is ${totalWords} words, which is below the minimum of ${bounds.min} words for a ${maxDurationMinutes}-minute podcast. Expand to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+    }
   }
 
   // Compute score from actual data rather than trusting AI's self-reported score
@@ -254,7 +263,7 @@ Analyze every factual claim. Return JSON only.`;
   const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
 
   const passed =
-    score >= threshold && unreliableSourceClaims.length === 0 && !durationExceeded;
+    score >= threshold && unreliableSourceClaims.length === 0 && !tooLong && !tooShort;
 
   let feedback = parsed.feedback || '';
   if (durationFeedback) {

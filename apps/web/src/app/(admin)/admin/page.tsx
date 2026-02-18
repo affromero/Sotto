@@ -1,5 +1,39 @@
 import { prisma } from '@/lib/prisma';
+import { DURATION_TOLERANCE_SECONDS } from '@/lib/duration';
 import styles from './page.module.css';
+
+async function getDurationAccuracyStats() {
+  const [tracked, withinTarget, deviationStats] = await Promise.all([
+    prisma.podcast.count({
+      where: { durationDeviation: { not: null }, status: 'READY' },
+    }),
+    prisma.podcast.count({
+      where: {
+        durationDeviation: {
+          gte: -DURATION_TOLERANCE_SECONDS,
+          lte: DURATION_TOLERANCE_SECONDS,
+        },
+        status: 'READY',
+      },
+    }),
+    prisma.$queryRaw<[{ mean_abs: number | null; avg_dev: number | null }]>`
+      SELECT
+        AVG(ABS("durationDeviation"))::float AS mean_abs,
+        AVG("durationDeviation")::float AS avg_dev
+      FROM "Podcast"
+      WHERE "durationDeviation" IS NOT NULL
+        AND "status" = 'READY'
+        AND "deletedAt" IS NULL
+    `,
+  ]);
+
+  return {
+    tracked,
+    withinTargetPct: tracked > 0 ? Math.round((withinTarget / tracked) * 100) : 0,
+    meanAbsDeviation: Math.round(deviationStats[0]?.mean_abs ?? 0),
+    avgDeviation: Math.round(deviationStats[0]?.avg_dev ?? 0),
+  };
+}
 
 async function getOverviewStats() {
   const now = new Date();
@@ -100,7 +134,10 @@ async function getOverviewStats() {
 }
 
 export default async function AdminOverviewPage() {
-  const stats = await getOverviewStats();
+  const [stats, durationStats] = await Promise.all([
+    getOverviewStats(),
+    getDurationAccuracyStats(),
+  ]);
 
   return (
     <div className={styles.container}>
@@ -197,6 +234,24 @@ export default async function AdminOverviewPage() {
           <div className={styles.statCard}>
             <span className={styles.statLabel}>BYOK Users</span>
             <span className={styles.statValue}>{stats.byokUsers.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Duration Accuracy</h2>
+        <div className={styles.statsGrid}>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Tracked</span>
+            <span className={styles.statValue}>{durationStats.tracked.toLocaleString()}</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Within ±30s</span>
+            <span className={styles.statValue}>{durationStats.withinTargetPct}%</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.statLabel}>Mean Abs. Deviation</span>
+            <span className={styles.statValue}>{durationStats.meanAbsDeviation}s</span>
           </div>
         </div>
       </div>

@@ -208,9 +208,10 @@ model Podcast {
   deletedAt      DateTime?
 
   // Audio
-  audioUrl  String?
-  duration  Int?    // seconds
-  fileSize  Int?    // bytes
+  audioUrl           String?
+  duration           Int?    // seconds
+  durationDeviation  Int?    // seconds: (actual - target*60), null if no target set
+  fileSize           Int?    // bytes
 
   // Voice selection
   hostVoiceId     String?
