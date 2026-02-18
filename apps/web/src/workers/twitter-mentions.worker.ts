@@ -82,6 +82,10 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       twitterEnabled: true,
       preferredHostVoiceId: true,
       preferredExpertVoiceId: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      preferredAiProvider: true,
+      preferredAiModel: true,
     },
   });
 
@@ -201,6 +205,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         sourceTweetId: tweet.id,
         hostVoiceId,
         expertVoiceId,
+        ttsProvider: user.preferredTtsProvider ?? undefined,
+        ttsModel: user.preferredTtsModel ?? undefined,
+        aiModel: user.preferredAiModel ?? undefined,
         visibility: 'PUBLIC',
         discovery: {
           create: {

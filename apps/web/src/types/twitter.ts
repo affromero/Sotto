@@ -72,6 +72,10 @@ export interface TwitterSettingsData {
   twitterEnabled: boolean;
   preferredHostVoiceId: string | null;
   preferredExpertVoiceId: string | null;
+  preferredTtsProvider: string | null;
+  preferredTtsModel: string | null;
+  preferredAiProvider: string | null;
+  preferredAiModel: string | null;
 }
 
 export interface TweetMentionData {

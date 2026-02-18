@@ -56,6 +56,10 @@ describe('Twitter Settings API', () => {
         twitterEnabled: true,
         preferredHostVoiceId: 'voice-host-1',
         preferredExpertVoiceId: 'voice-expert-1',
+        preferredTtsProvider: 'elevenlabs',
+        preferredTtsModel: null,
+        preferredAiProvider: 'anthropic',
+        preferredAiModel: null,
       });
       mockPrismaAccountFindFirst.mockResolvedValue({
         providerAccountId: 'twitter-account-123',
@@ -70,6 +74,10 @@ describe('Twitter Settings API', () => {
         twitterEnabled: true,
         preferredHostVoiceId: 'voice-host-1',
         preferredExpertVoiceId: 'voice-expert-1',
+        preferredTtsProvider: 'elevenlabs',
+        preferredTtsModel: null,
+        preferredAiProvider: 'anthropic',
+        preferredAiModel: null,
         connected: true,
       });
     });
@@ -91,6 +99,10 @@ describe('Twitter Settings API', () => {
         twitterEnabled: false,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockPrismaAccountFindFirst.mockResolvedValue(null);
 
@@ -108,6 +120,10 @@ describe('Twitter Settings API', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockPrismaAccountFindFirst.mockResolvedValue({
         providerAccountId: 'twitter-123',
