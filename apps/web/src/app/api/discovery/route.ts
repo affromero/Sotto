@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { streamDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
-import { logApiUsage } from '@/lib/claude';
+import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
@@ -102,11 +102,13 @@ export async function POST(request: NextRequest) {
       try {
         let fullResponse = '';
         for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey, undefined, (usage) => {
-          logApiUsage({
-            userId: authed.userId,
+          logUsage({
+            service: 'anthropic',
+            model: usage.model,
             category: 'discovery',
             inputTokens: usage.inputTokens,
             outputTokens: usage.outputTokens,
+            userId: authed.userId,
           });
         })) {
           // Only stream string chunks (skip objects from claude-code stream-json)

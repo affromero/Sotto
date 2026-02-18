@@ -86,6 +86,7 @@ export async function generateScript(params: {
   markdown: string;
   inputTokens: number;
   outputTokens: number;
+  model: string;
 }> {
   const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive 2-voice podcast scripts that listeners can't stop playing.
 
@@ -253,6 +254,7 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     markdown,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
+    model: response.model,
   };
 }
 
@@ -282,6 +284,7 @@ export async function generateScriptWithFeedback(params: {
   markdown: string;
   inputTokens: number;
   outputTokens: number;
+  model: string;
 }> {
   const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on fact-checking feedback.
 
@@ -427,6 +430,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     markdown,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
+    model: response.model,
   };
 }
 

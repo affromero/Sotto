@@ -25,6 +25,7 @@ export interface VerificationVerdict {
   feedback: string;
   inputTokens: number;
   outputTokens: number;
+  model: string;
 }
 
 const UNRELIABLE_DOMAINS = [
@@ -210,6 +211,7 @@ Analyze every factual claim. Return JSON only.`;
       feedback: 'Script verification failed: could not parse AI response. Will retry.',
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
+      model: response.model,
     };
   }
 
@@ -284,6 +286,7 @@ Analyze every factual claim. Return JSON only.`;
     feedback,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
+    model: response.model,
   };
 }
 

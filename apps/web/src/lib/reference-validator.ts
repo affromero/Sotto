@@ -8,6 +8,7 @@
  */
 
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { validateUrl, UrlValidationError } from './url-validator';
 
@@ -461,6 +462,15 @@ Evaluate each reference. Return JSON only.`;
         tools: [WEB_SEARCH_TOOL],
       }
     );
+
+    logUsage({
+      service: 'anthropic',
+      model: response.model,
+      category: 'reference_validation',
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      metadata: { refCount: refs.length },
+    });
 
     // Parse the JSON response
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
-import { generateResponse, logApiUsage } from '@/lib/claude';
+import { generateResponse } from '@/lib/claude';
+import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { getAiKey } from '@/lib/byok';
 import { getLanguageLabel } from '@sotto/shared';
@@ -122,12 +123,14 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     },
   ], { apiKeyOverride: aiKey?.apiKey });
 
-  await logApiUsage({
-    podcastId,
-    userId: session.user.id,
+  await logUsage({
+    service: 'anthropic',
+    model: response.model,
     category: 'incorporation',
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
+    podcastId,
+    userId: session.user.id,
   });
 
   // Queue segment regeneration
