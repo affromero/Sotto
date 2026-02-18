@@ -9,7 +9,7 @@ Users tag @sottofm on Twitter to request podcast generation. Extract structured 
 Rules:
 - Extract the core topic they want a podcast about
 - Generate a concise, engaging title (max 80 chars)
-- Infer depth from cues: short tweets → quick_overview, detailed requests → deep_dive, default → standard
+- Infer depth from cues: "eli5" or "explain like I'm 5" → eli5, short tweets → quick_overview, detailed requests → deep_dive, default → standard
 - Infer audience from language complexity: jargon-heavy → expert, plain language → beginner, default → intermediate
 - Infer tone from tweet style: emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
 - Extract focus areas if the user mentions specific subtopics
@@ -23,7 +23,7 @@ Respond with ONLY valid JSON matching this shape:
 {
   "topic": "string — the core topic",
   "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "quick_overview" | "standard" | "deep_dive",
+  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
   "audienceLevel": "beginner" | "intermediate" | "expert",
   "tone": "casual" | "professional" | "socratic",
   "focusAreas": ["string array of specific subtopics"],
@@ -93,7 +93,7 @@ Rules:
 - If there are opposing viewpoints, set isDebate: true and list each viewpoint
 - Extract ALL URLs from the thread into sourceUrls array
 - Pick the single most relevant URL as sourceUrl (or null if none)
-- Infer depth from thread complexity: short threads → standard, long detailed threads → deep_dive
+- Infer depth from thread complexity: "eli5" or "explain like I'm 5" → eli5, short threads → standard, long detailed threads → deep_dive
 - Infer audience from language: jargon → expert, plain → beginner, default → intermediate
 - If debate: tone should be "socratic"; if informational: infer from style
 - Focus areas should include key subtopics discussed across the thread
@@ -106,7 +106,7 @@ Respond with ONLY valid JSON matching this shape:
 {
   "topic": "string — the core topic",
   "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "quick_overview" | "standard" | "deep_dive",
+  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
   "audienceLevel": "beginner" | "intermediate" | "expert",
   "tone": "casual" | "professional" | "socratic",
   "focusAreas": ["string array of specific subtopics"],

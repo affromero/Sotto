@@ -334,7 +334,7 @@ model Discovery {
 
   // Extracted metadata from chat
   topic          String?  @db.Text
-  depth          String?  // quick_overview, standard, deep_dive
+  depth          String?  // eli5, quick_overview, standard, deep_dive
   audienceLevel  String?  // beginner, intermediate, expert
   audience       String?  // kids, teens, family, general, mature
   focusAreas     String[] // array of focus topics
@@ -966,7 +966,7 @@ model UserFeature {
   optimalDuration   Float @default(10) // minutes where highest completion
 
   // Preferences (inferred from behavior)
-  preferredDepth         String? // quick_overview, standard, deep_dive
+  preferredDepth         String? // eli5, quick_overview, standard, deep_dive
   preferredTone          String? // casual, professional, socratic
   preferredAudienceLevel String? // beginner, intermediate, expert
   preferredDuration      Float?  // minutes
