@@ -25,20 +25,24 @@ export async function logUsage(params: {
     totalCost = getAiCost(params.model, params.inputTokens ?? 0, params.outputTokens ?? 0);
   }
 
-  prisma.apiUsageLog
-    .create({
-      data: {
-        service: params.service,
-        modelId: params.model ?? null,
-        category: params.category,
-        inputTokens: params.inputTokens ?? null,
-        outputTokens: params.outputTokens ?? null,
-        totalCost: totalCost ?? 0,
-        durationMs: params.durationMs ?? null,
-        podcastId: params.podcastId ?? null,
-        userId: params.userId ?? null,
-        metadata: params.metadata ?? {},
-      },
-    })
-    .catch(() => {});
+  try {
+    prisma.apiUsageLog
+      .create({
+        data: {
+          service: params.service,
+          modelId: params.model ?? null,
+          category: params.category,
+          inputTokens: params.inputTokens ?? null,
+          outputTokens: params.outputTokens ?? null,
+          totalCost: totalCost ?? 0,
+          durationMs: params.durationMs ?? null,
+          podcastId: params.podcastId ?? null,
+          userId: params.userId ?? null,
+          metadata: params.metadata ?? {},
+        },
+      })
+      .catch(() => {});
+  } catch {
+    // Silently ignore — prisma.apiUsageLog may not exist in test environments
+  }
 }

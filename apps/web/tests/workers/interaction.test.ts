@@ -44,11 +44,14 @@ const mockGenerateResponse = vi.fn().mockResolvedValue({
   outputTokens: 50,
 });
 
-const mockLogApiUsage = vi.fn().mockResolvedValue(undefined);
+const mockLogUsage = vi.fn();
 
 vi.mock('@/lib/claude', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
-  logApiUsage: (...args: unknown[]) => mockLogApiUsage(...args),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
 
 vi.mock('@/lib/byok', () => ({
@@ -121,7 +124,7 @@ describe('processInteraction', () => {
       outputTokens: 50,
     });
     mockPrismaInteractionUpdate.mockResolvedValue({});
-    mockLogApiUsage.mockResolvedValue(undefined);
+    mockLogUsage.mockReset();
   });
 
   describe('script context lookup', () => {
@@ -362,13 +365,16 @@ describe('processInteraction', () => {
       const job = createMockJob(defaultPayload);
       await processInteraction(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalledWith({
-        podcastId: 'podcast-001',
-        userId: 'user-001',
-        category: 'interaction',
-        inputTokens: 225,
-        outputTokens: 90,
-      });
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'anthropic',
+          category: 'interaction',
+          inputTokens: 225,
+          outputTokens: 90,
+          podcastId: 'podcast-001',
+          userId: 'user-001',
+        })
+      );
     });
 
     it('logs correct userId from payload', async () => {
@@ -378,7 +384,7 @@ describe('processInteraction', () => {
       });
       await processInteraction(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalledWith(
+      expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-abc-123',
         })
@@ -392,7 +398,7 @@ describe('processInteraction', () => {
       });
       await processInteraction(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalledWith(
+      expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           podcastId: 'podcast-xyz-456',
         })
@@ -437,12 +443,7 @@ describe('processInteraction', () => {
       await expect(processInteraction(job)).rejects.toThrow('Interaction not found');
     });
 
-    it('propagates error from logApiUsage', async () => {
-      mockLogApiUsage.mockRejectedValue(new Error('Database connection lost'));
-      const job = createMockJob(defaultPayload);
-
-      await expect(processInteraction(job)).rejects.toThrow('Database connection lost');
-    });
+    // logUsage is fire-and-forget — errors are silently caught
   });
 
   describe('edge cases', () => {
@@ -551,13 +552,16 @@ describe('processInteraction', () => {
         },
       });
 
-      expect(mockLogApiUsage).toHaveBeenCalledWith({
-        podcastId: 'podcast-final',
-        userId: 'user-final',
-        category: 'interaction',
-        inputTokens: 180,
-        outputTokens: 65,
-      });
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'anthropic',
+          category: 'interaction',
+          inputTokens: 180,
+          outputTokens: 65,
+          podcastId: 'podcast-final',
+          userId: 'user-final',
+        })
+      );
 
       expect(job.updateProgress).toHaveBeenCalledTimes(3);
     });
