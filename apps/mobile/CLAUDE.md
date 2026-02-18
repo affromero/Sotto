@@ -66,7 +66,7 @@ Mobile uses API key-based auth (`sk_sotto_` tokens), not NextAuth sessions.
 
 **Dev mode** (`__DEV__`): Email-only login → `POST /api/auth/mobile` with `{email}` → receives `{token, user}`.
 
-**Production**: OAuth buttons (Apple, Google, GitHub, Twitter) → native/browser OAuth flow → sends `{provider, idToken}` to `POST /api/auth/mobile` → receives `{token, user}`.
+**Production**: OAuth buttons (Apple, Google, GitHub) → native/browser OAuth flow → sends `{provider, idToken}` to `POST /api/auth/mobile` → receives `{token, user}`.
 
 Token lifecycle:
 1. Token stored in `expo-secure-store` via `lib/auth.ts`
@@ -130,7 +130,6 @@ See `.env.example`. Key variables:
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | For builds | — | EAS Build project ID |
 | `EXPO_PUBLIC_GOOGLE_CLIENT_ID` | For prod auth | — | Google OAuth client ID |
 | `EXPO_PUBLIC_GITHUB_CLIENT_ID` | For prod auth | — | GitHub OAuth client ID |
-| `EXPO_PUBLIC_TWITTER_CLIENT_ID` | For prod auth | — | Twitter OAuth client ID |
 
 In dev, set `EXPO_PUBLIC_API_URL` to your machine's LAN IP so the iOS Simulator can reach the web backend.
 
