@@ -20,7 +20,7 @@ import styles from './page.module.css';
 interface VoiceCloneData {
   id: string;
   name: string;
-  elevenLabsVoiceId: string;
+  externalVoiceId: string;
 }
 
 interface SubTag {

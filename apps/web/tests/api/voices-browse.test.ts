@@ -48,7 +48,7 @@ const mockVoice = {
   sourceType: 'UPLOAD',
   priceInCents: null,
   createdAt: new Date('2026-01-15T10:00:00Z'),
-  elevenLabsVoiceId: 'el-voice-1',
+  externalVoiceId: 'el-voice-1',
   user: {
     id: 'user-1',
     name: 'Test User',
@@ -68,7 +68,7 @@ const mockVoice2 = {
   sourceType: 'RECORD',
   priceInCents: null,
   createdAt: new Date('2026-01-16T10:00:00Z'),
-  elevenLabsVoiceId: 'el-voice-2',
+  externalVoiceId: 'el-voice-2',
   user: {
     id: 'user-2',
     name: 'Other User',

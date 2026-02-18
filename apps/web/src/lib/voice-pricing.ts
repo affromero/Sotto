@@ -52,11 +52,11 @@ export async function getVoicePricing(voiceCloneId: string): Promise<VoicePricin
 }
 
 /**
- * Look up a VoiceClone by its ElevenLabs voice ID.
+ * Look up a VoiceClone by its external voice ID.
  */
-export async function findVoiceCloneByElevenLabsId(elevenLabsVoiceId: string) {
+export async function findVoiceCloneByExternalId(externalVoiceId: string) {
   return prisma.voiceClone.findUnique({
-    where: { elevenLabsVoiceId },
+    where: { externalVoiceId },
     select: {
       id: true,
       name: true,
@@ -252,8 +252,8 @@ export async function computeVoiceCharges(
   const charges: VoiceCharge[] = [];
   const voiceIds = [hostVoiceId, expertVoiceId].filter(Boolean) as string[];
 
-  for (const elevenLabsVoiceId of voiceIds) {
-    const voice = await findVoiceCloneByElevenLabsId(elevenLabsVoiceId);
+  for (const externalVoiceId of voiceIds) {
+    const voice = await findVoiceCloneByExternalId(externalVoiceId);
     if (!voice || !voice.priceInCents || voice.priceInCents <= 0) continue;
 
     const hasFreeAccess = await checkFreeAccess(userId, voice.id);

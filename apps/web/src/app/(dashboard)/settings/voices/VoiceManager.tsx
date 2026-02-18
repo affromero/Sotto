@@ -7,7 +7,7 @@ interface VoiceClone {
   id: string;
   name: string;
   description: string | null;
-  elevenLabsVoiceId: string;
+  externalVoiceId: string;
   sourceType: 'UPLOAD' | 'RECORD';
   requestable: boolean;
   priceInCents: number | null;
@@ -358,21 +358,21 @@ export function VoiceManager() {
     }
   }
 
-  async function handlePlayPreview(elevenLabsVoiceId: string) {
+  async function handlePlayPreview(externalVoiceId: string) {
     try {
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
 
-      setPlaying(elevenLabsVoiceId);
+      setPlaying(externalVoiceId);
       setError(null);
 
       const response = await fetch('/api/voices/preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          voiceId: elevenLabsVoiceId,
+          voiceId: externalVoiceId,
           text: 'Hello, this is a preview of my cloned voice on Sotto.',
         }),
       });
@@ -603,11 +603,11 @@ export function VoiceManager() {
                     <button
                       type="button"
                       className={styles.playButton}
-                      onClick={() => handlePlayPreview(voice.elevenLabsVoiceId)}
-                      disabled={playing === voice.elevenLabsVoiceId}
+                      onClick={() => handlePlayPreview(voice.externalVoiceId)}
+                      disabled={playing === voice.externalVoiceId}
                       aria-label={`Preview ${voice.name}`}
                     >
-                      {playing === voice.elevenLabsVoiceId ? (
+                      {playing === voice.externalVoiceId ? (
                         <span className={styles.spinnerSmall} />
                       ) : (
                         <svg
