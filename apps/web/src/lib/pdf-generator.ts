@@ -1,180 +1,93 @@
 import type { ReferenceData } from '@/types/reference';
 
-interface PdfSegment {
+interface TranscriptSegment {
   speaker: 'HOST' | 'EXPERT';
   text: string;
+  startTime: number | null;
 }
 
-interface PodcastPdfData {
+interface PodcastTranscriptData {
   title: string;
   topic: string;
   creatorName: string;
   createdAt: Date;
-  segments: PdfSegment[];
+  segments: TranscriptSegment[];
   references: ReferenceData[];
 }
 
-const HOST_COLOR = '#D97706';
-const EXPERT_COLOR = '#1E3A5F';
-
 /**
- * Parse text for [N] citation markers and return inline content pieces for pdfmake.
+ * Format seconds as [MM:SS], or [--:--] if null.
  */
-function parseCitationsForPdf(text: string): Array<string | Record<string, unknown>> {
-  const regex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
-  const parts: Array<string | Record<string, unknown>> = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  regex.lastIndex = 0;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(text.slice(lastIndex, match.index));
-    }
-    parts.push({
-      text: match[0],
-      bold: true,
-      fontSize: 7,
-      color: HOST_COLOR,
-    });
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
-  }
-
-  return parts.length > 0 ? parts : [text];
+function formatTimestamp(seconds: number | null): string {
+  if (seconds === null) return '[--:--]';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `[${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}]`;
 }
 
 /**
- * Generate a PDF document buffer for a podcast transcript with references.
- * Uses pdfmake's server-side Printer for Node.js environments.
+ * Generate a markdown transcript for a podcast with timestamps and references.
  */
-export async function generatePodcastPdf(data: PodcastPdfData): Promise<Buffer> {
-  // Dynamic import for pdfmake
-  const PdfPrinterModule = await import('pdfmake');
-
+export function generatePodcastTranscript(data: PodcastTranscriptData): string {
   const dateStr = data.createdAt.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
 
-  // Build the content array
-  const content: Array<Record<string, unknown>> = [];
+  const lines: string[] = [];
 
-  // Title page
-  content.push(
-    { text: data.title, fontSize: 28, bold: true, color: '#1A1A1A', alignment: 'center', margin: [0, 120, 0, 16] },
-    { text: data.topic, fontSize: 14, color: '#6B7280', alignment: 'center', margin: [0, 0, 0, 32] },
-    { text: `By ${data.creatorName}`, fontSize: 12, color: '#1A1A1A', alignment: 'center' },
-    { text: dateStr, fontSize: 11, color: '#6B7280', alignment: 'center', margin: [0, 8, 0, 0] },
-  );
-
-  if (data.references.length > 0) {
-    content.push({
-      text: `${data.references.length} reference${data.references.length === 1 ? '' : 's'} cited`,
-      fontSize: 10, color: '#9CA3AF', alignment: 'center', margin: [0, 8, 0, 0],
-    });
-  }
-
-  content.push({ text: '', pageBreak: 'after' });
-
-  // Transcript header
-  content.push({ text: 'Transcript', fontSize: 20, bold: true, color: '#1A1A1A', margin: [0, 0, 0, 16] });
+  // Header
+  lines.push(`# ${data.title}`);
+  lines.push('');
+  lines.push(`${data.topic} · By ${data.creatorName} · ${dateStr}`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
 
   // Transcript body
   for (const segment of data.segments) {
-    const speakerColor = segment.speaker === 'HOST' ? HOST_COLOR : EXPERT_COLOR;
+    const timestamp = formatTimestamp(segment.startTime);
     const speakerLabel = segment.speaker === 'HOST' ? 'Host' : 'Expert';
 
-    content.push({
-      text: speakerLabel,
-      fontSize: 9,
-      bold: true,
-      color: speakerColor,
-      margin: [0, 12, 0, 4],
-    });
-
-    content.push({
-      text: parseCitationsForPdf(segment.text),
-      fontSize: 10,
-      color: '#1A1A1A',
-      lineHeight: 1.6,
-    });
+    lines.push(`${timestamp} **${speakerLabel}**`);
+    lines.push(segment.text);
+    lines.push('');
   }
 
-  // References page
+  // References section
   if (data.references.length > 0) {
-    content.push(
-      { text: '', pageBreak: 'before' },
-      { text: 'References', fontSize: 20, bold: true, color: '#1A1A1A', margin: [0, 0, 0, 16] },
-    );
+    lines.push('---');
+    lines.push('');
+    lines.push('## References');
+    lines.push('');
 
     const sorted = [...data.references].sort((a, b) => a.number - b.number);
     for (const ref of sorted) {
-      const parts: Array<string | Record<string, unknown>> = [];
-
-      parts.push({ text: `[${ref.number}] `, bold: true, color: HOST_COLOR, fontSize: 9 });
-      parts.push({ text: ref.title, italics: true, fontSize: 9 });
+      let line = `[${ref.number}] *${ref.title}*`;
 
       if (ref.authors.length > 0) {
-        parts.push({ text: ` — ${ref.authors.join(', ')}`, fontSize: 9, color: '#6B7280' });
+        line += ` — ${ref.authors.join(', ')}`;
       }
       if (ref.year) {
-        parts.push({ text: ` (${ref.year})`, fontSize: 9, color: '#6B7280' });
+        line += ` (${ref.year})`;
       }
       if (ref.publisher) {
-        parts.push({ text: `. ${ref.publisher}`, fontSize: 9, color: '#6B7280' });
+        line += `. ${ref.publisher}`;
       }
       if (ref.doi) {
-        parts.push({ text: `. DOI: ${ref.doi}`, fontSize: 8, color: '#9CA3AF' });
-      }
-      if (ref.url) {
-        parts.push({ text: '\n' });
-        parts.push({ text: ref.url, fontSize: 8, color: HOST_COLOR, link: ref.url, decoration: 'underline' });
+        line += `. DOI: ${ref.doi}`;
       }
 
-      content.push({ text: parts, margin: [0, 0, 0, 10], lineHeight: 1.4 });
+      lines.push(line);
+
+      if (ref.url) {
+        lines.push(`    ${ref.url}`);
+      }
+
+      lines.push('');
     }
   }
 
-  // Build the document definition
-  const docDefinition = {
-    pageSize: 'LETTER' as const,
-    pageMargins: [60, 60, 60, 60] as [number, number, number, number],
-    content,
-    footer: (currentPage: number, pageCount: number) => ({
-      columns: [
-        { text: 'Generated by Sotto', fontSize: 8, color: '#9CA3AF', alignment: 'left' as const, margin: [60, 0, 0, 0] },
-        { text: `${currentPage} / ${pageCount}`, fontSize: 8, color: '#9CA3AF', alignment: 'right' as const, margin: [0, 0, 60, 0] },
-      ],
-    }),
-    info: {
-      title: data.title,
-      author: data.creatorName,
-      subject: data.topic,
-      creator: 'Sotto - Podcasts that listen back',
-    },
-  };
-
-  // Use pdfmake's createPdf to generate the document
-  // Cast to TDocumentDefinitions since our content uses Record<string, unknown>
-  // which is structurally compatible but not strictly assignable
-  return new Promise<Buffer>((resolve, reject) => {
-    try {
-      const pdfDoc = PdfPrinterModule.createPdf(
-        docDefinition as unknown as Parameters<typeof PdfPrinterModule.createPdf>[0]
-      );
-      // pdfmake's getBuffer accepts a callback but types don't reflect it
-      (pdfDoc as unknown as { getBuffer: (cb: (buf: Uint8Array) => void) => void }).getBuffer(
-        (buf: Uint8Array) => {
-          resolve(Buffer.from(buf));
-        }
-      );
-    } catch (err) {
-      reject(err);
-    }
-  });
+  return lines.join('\n');
 }

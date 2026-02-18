@@ -78,11 +78,13 @@ vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     SEND_NOTIFICATION: 'send_notification',
+    GENERATE_PDF: 'generate_pdf',
     REPLY_TWITTER: 'reply_twitter',
     REPLY_TELEGRAM: 'reply_telegram',
     AUTO_TWEET: 'AUTO_TWEET',
   },
   notificationQueue: { name: 'notifications' },
+  pdfGenerationQueue: { name: 'pdf-generation' },
   twitterReplyQueue: { name: 'twitter-reply' },
   telegramReplyQueue: { name: 'telegram-reply' },
   twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
@@ -627,7 +629,7 @@ describe('processAudioStitching', () => {
       await processAudioStitching(job);
 
       expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledTimes(1); // only notification
+      expect(mockAddJob).toHaveBeenCalledTimes(2); // notification + transcript
     });
 
     it('does not queue Twitter reply when mention is not found', async () => {

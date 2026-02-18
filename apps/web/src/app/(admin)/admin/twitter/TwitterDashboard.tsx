@@ -36,11 +36,19 @@ export function TwitterDashboard() {
         ))}
       </nav>
 
-      <div className={styles.content} role="tabpanel">
-        {activeTab === 'analytics' && <AnalyticsSection />}
-        {activeTab === 'auto-tweet' && <AutoTweetSection />}
-        {activeTab === 'trends' && <TrendsSection />}
-        {activeTab === 'thread' && <ThreadSection />}
+      <div className={styles.content}>
+        <div role="tabpanel" hidden={activeTab !== 'analytics'}>
+          <AnalyticsSection />
+        </div>
+        <div role="tabpanel" hidden={activeTab !== 'auto-tweet'}>
+          <AutoTweetSection />
+        </div>
+        <div role="tabpanel" hidden={activeTab !== 'trends'}>
+          <TrendsSection />
+        </div>
+        <div role="tabpanel" hidden={activeTab !== 'thread'}>
+          <ThreadSection />
+        </div>
       </div>
     </div>
   );

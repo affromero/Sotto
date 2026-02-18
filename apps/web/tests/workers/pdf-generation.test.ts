@@ -9,8 +9,8 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   createdAt: new Date('2024-01-15T10:00:00Z'),
   user: { name: 'Alice Researcher' },
   segments: [
-    { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].' },
-    { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].' },
+    { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+    { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
   ],
   references: [
     {
@@ -67,15 +67,15 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockGeneratePodcastPdf = vi.fn().mockResolvedValue(Buffer.from('fake-pdf-content'));
+const mockGeneratePodcastTranscript = vi.fn().mockReturnValue('# Fake Transcript\n\nContent here.');
 
 vi.mock('@/lib/pdf-generator', () => ({
-  generatePodcastPdf: (...args: unknown[]) => mockGeneratePodcastPdf(...args),
+  generatePodcastTranscript: (...args: unknown[]) => mockGeneratePodcastTranscript(...args),
 }));
 
 const mockUploadFile = vi
   .fn()
-  .mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.pdf');
+  .mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.md');
 
 vi.mock('@/lib/r2', () => ({
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
@@ -123,8 +123,8 @@ describe('processPdfGeneration', () => {
       createdAt: new Date('2024-01-15T10:00:00Z'),
       user: { name: 'Alice Researcher' },
       segments: [
-        { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].' },
-        { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].' },
+        { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+        { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
       ],
       references: [
         {
@@ -142,8 +142,8 @@ describe('processPdfGeneration', () => {
         },
       ],
     });
-    mockGeneratePodcastPdf.mockResolvedValue(Buffer.from('fake-pdf-content'));
-    mockUploadFile.mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.pdf');
+    mockGeneratePodcastTranscript.mockReturnValue('# Fake Transcript\n\nContent here.');
+    mockUploadFile.mockResolvedValue('https://r2.example.com/podcasts/podcast-001/transcript.md');
   });
 
   describe('podcast lookup', () => {
@@ -154,21 +154,34 @@ describe('processPdfGeneration', () => {
       await expect(processPdfGeneration(job)).rejects.toThrow('No Podcast found');
     });
 
-  });
-
-  describe('PDF generation', () => {
-    it('calls generatePodcastPdf with complete podcast data', async () => {
+    it('includes startTime in segment select', async () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith({
+      expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        include: expect.objectContaining({
+          segments: expect.objectContaining({
+            select: { speaker: true, text: true, startTime: true },
+          }),
+        }),
+      });
+    });
+  });
+
+  describe('transcript generation', () => {
+    it('calls generatePodcastTranscript with complete podcast data', async () => {
+      const job = createMockJob(defaultPayload);
+      await processPdfGeneration(job);
+
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith({
         title: 'Introduction to Quantum Computing',
         topic: 'Quantum Computing Basics',
         creatorName: 'Alice Researcher',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         segments: [
-          { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].' },
-          { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].' },
+          { speaker: 'HOST', text: 'Welcome to our podcast on quantum computing [1].', startTime: 0 },
+          { speaker: 'EXPERT', text: 'Thanks for having me. Quantum bits are fascinating [2, 3].', startTime: 45 },
         ],
         references: expect.arrayContaining([
           expect.objectContaining({
@@ -200,7 +213,7 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith(
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           creatorName: 'Anonymous',
         })
@@ -220,7 +233,7 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith(
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           segments: [],
         })
@@ -234,13 +247,13 @@ describe('processPdfGeneration', () => {
         topic: 'Opinion Piece',
         createdAt: new Date('2024-01-15T10:00:00Z'),
         user: { name: 'Test User' },
-        segments: [{ speaker: 'HOST', text: 'This is my opinion.' }],
+        segments: [{ speaker: 'HOST', text: 'This is my opinion.', startTime: 0 }],
         references: [],
       });
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith(
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           references: [],
         })
@@ -274,7 +287,7 @@ describe('processPdfGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith(
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith(
         expect.objectContaining({
           references: [
             {
@@ -294,39 +307,19 @@ describe('processPdfGeneration', () => {
         })
       );
     });
-
-    it('handles generation failure', async () => {
-      mockGeneratePodcastPdf.mockRejectedValue(new Error('pdfmake rendering failed'));
-      const job = createMockJob(defaultPayload);
-
-      await expect(processPdfGeneration(job)).rejects.toThrow('pdfmake rendering failed');
-    });
   });
 
   describe('R2 upload', () => {
-    it('uploads PDF buffer to R2 with correct key and content type', async () => {
-      const pdfBuffer = Buffer.from('actual-pdf-bytes-xyz');
-      mockGeneratePodcastPdf.mockResolvedValue(pdfBuffer);
+    it('uploads markdown buffer to R2 with correct key and content type', async () => {
+      const markdown = '# Test Transcript\n\nContent.';
+      mockGeneratePodcastTranscript.mockReturnValue(markdown);
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-001/transcript.pdf',
-        pdfBuffer,
-        'application/pdf'
-      );
-    });
-
-    it('uploads the buffer from generatePodcastPdf', async () => {
-      const specificBuffer = Buffer.from('specific-pdf-content-abcdef123456');
-      mockGeneratePodcastPdf.mockResolvedValue(specificBuffer);
-      const job = createMockJob(defaultPayload);
-      await processPdfGeneration(job);
-
-      expect(mockUploadFile).toHaveBeenCalledWith(
-        expect.any(String),
-        specificBuffer,
-        'application/pdf'
+        'podcasts/podcast-001/transcript.md',
+        Buffer.from(markdown, 'utf-8'),
+        'text/markdown'
       );
     });
 
@@ -335,9 +328,9 @@ describe('processPdfGeneration', () => {
       await processPdfGeneration(job);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-special-123/transcript.pdf',
+        'podcasts/podcast-special-123/transcript.md',
         expect.any(Buffer),
-        'application/pdf'
+        'text/markdown'
       );
     });
 
@@ -351,24 +344,24 @@ describe('processPdfGeneration', () => {
 
   describe('database updates', () => {
     it('updates podcast with pdfUrl from R2', async () => {
-      mockUploadFile.mockResolvedValue('https://cdn.sotto.fm/podcasts/001/transcript.pdf');
+      mockUploadFile.mockResolvedValue('https://cdn.sotto.fm/podcasts/001/transcript.md');
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { pdfUrl: 'https://cdn.sotto.fm/podcasts/001/transcript.pdf' },
+        data: { pdfUrl: 'https://cdn.sotto.fm/podcasts/001/transcript.md' },
       });
     });
 
     it('uses the exact pdfUrl returned by uploadFile', async () => {
-      mockUploadFile.mockResolvedValue('https://custom-cdn.example.com/path/to/file.pdf');
+      mockUploadFile.mockResolvedValue('https://custom-cdn.example.com/path/to/file.md');
       const job = createMockJob(defaultPayload);
       await processPdfGeneration(job);
 
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-001' },
-        data: { pdfUrl: 'https://custom-cdn.example.com/path/to/file.pdf' },
+        data: { pdfUrl: 'https://custom-cdn.example.com/path/to/file.md' },
       });
     });
 
@@ -402,8 +395,8 @@ describe('processPdfGeneration', () => {
         createdAt: new Date('2024-02-01T15:30:00Z'),
         user: { name: 'E2E Tester' },
         segments: [
-          { speaker: 'HOST', text: 'Intro segment [1].' },
-          { speaker: 'EXPERT', text: 'Response segment [2].' },
+          { speaker: 'HOST', text: 'Intro segment [1].', startTime: 0 },
+          { speaker: 'EXPERT', text: 'Response segment [2].', startTime: 30 },
         ],
         references: [
           {
@@ -435,10 +428,10 @@ describe('processPdfGeneration', () => {
         ],
       });
 
-      const pdfBuffer = Buffer.from('complete-e2e-pdf-content');
-      mockGeneratePodcastPdf.mockResolvedValue(pdfBuffer);
+      const markdown = '# End to End Test\n\nTranscript content.';
+      mockGeneratePodcastTranscript.mockReturnValue(markdown);
       mockUploadFile.mockResolvedValue(
-        'https://r2.example.com/podcasts/podcast-e2e/transcript.pdf'
+        'https://r2.example.com/podcasts/podcast-e2e/transcript.md'
       );
 
       const job = createMockJob({ podcastId: 'podcast-e2e', userId: 'user-123' });
@@ -450,15 +443,15 @@ describe('processPdfGeneration', () => {
         include: expect.any(Object),
       });
 
-      // PDF generated with correct data
-      expect(mockGeneratePodcastPdf).toHaveBeenCalledWith({
+      // Transcript generated with correct data
+      expect(mockGeneratePodcastTranscript).toHaveBeenCalledWith({
         title: 'End to End Test',
         topic: 'Testing',
         creatorName: 'E2E Tester',
         createdAt: new Date('2024-02-01T15:30:00Z'),
         segments: [
-          { speaker: 'HOST', text: 'Intro segment [1].' },
-          { speaker: 'EXPERT', text: 'Response segment [2].' },
+          { speaker: 'HOST', text: 'Intro segment [1].', startTime: 0 },
+          { speaker: 'EXPERT', text: 'Response segment [2].', startTime: 30 },
         ],
         references: expect.arrayContaining([
           expect.objectContaining({ id: 'ref-e2e-1', number: 1 }),
@@ -466,17 +459,17 @@ describe('processPdfGeneration', () => {
         ]),
       });
 
-      // Uploaded to R2
+      // Uploaded to R2 as markdown
       expect(mockUploadFile).toHaveBeenCalledWith(
-        'podcasts/podcast-e2e/transcript.pdf',
-        pdfBuffer,
-        'application/pdf'
+        'podcasts/podcast-e2e/transcript.md',
+        Buffer.from(markdown, 'utf-8'),
+        'text/markdown'
       );
 
       // Podcast updated
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
         where: { id: 'podcast-e2e' },
-        data: { pdfUrl: 'https://r2.example.com/podcasts/podcast-e2e/transcript.pdf' },
+        data: { pdfUrl: 'https://r2.example.com/podcasts/podcast-e2e/transcript.md' },
       });
 
       // Progress tracked
@@ -492,15 +485,6 @@ describe('processPdfGeneration', () => {
       const job = createMockJob({ podcastId: 'podcast-missing', userId: 'user-123' });
 
       await expect(processPdfGeneration(job)).rejects.toThrow('Podcast not found: podcast-missing');
-    });
-
-    it('propagates errors from generatePodcastPdf', async () => {
-      mockGeneratePodcastPdf.mockRejectedValue(new Error('PDF rendering failed: out of memory'));
-      const job = createMockJob(defaultPayload);
-
-      await expect(processPdfGeneration(job)).rejects.toThrow(
-        'PDF rendering failed: out of memory'
-      );
     });
 
     it('propagates errors from uploadFile', async () => {
