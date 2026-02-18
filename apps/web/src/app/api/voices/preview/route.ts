@@ -3,6 +3,8 @@ import { auth } from '@/lib/auth';
 import { generateSpeech } from '@/lib/elevenlabs';
 import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
+import { getProviderMeta } from '@/lib/providers/tts-registry';
+import { logUsage } from '@/lib/usage-logger';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -28,6 +30,16 @@ export async function POST(request: NextRequest) {
   const { voiceId, text } = parsed.data;
 
   const audioBuffer = await generateSpeech({ text, voiceId });
+
+  const meta = getProviderMeta('elevenlabs');
+  logUsage({
+    service: 'elevenlabs',
+    category: 'voice_preview',
+    inputTokens: text.length,
+    totalCost: (text.length / 1000) * meta.platformCostPerKChar,
+    userId: session.user.id,
+  });
+
   const uint8 = new Uint8Array(audioBuffer);
 
   return new NextResponse(uint8, {
