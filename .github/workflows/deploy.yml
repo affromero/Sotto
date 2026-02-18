@@ -58,13 +58,11 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: sotto
           key: ${{ secrets.SSH_KEY }}
-          envs: REPO_TOKEN
           script: |
             set -e
             cd ~/sotto
 
             echo "Pulling latest code..."
-            git remote set-url origin "https://x-access-token:${REPO_TOKEN}@github.com/affromero/Sotto.git"
             git pull origin main
 
             echo "Downloading secrets from Doppler..."
@@ -100,8 +98,6 @@ jobs:
             docker image prune -f
 
             echo "Deploy complete!"
-        env:
-          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rebuild pitch deck
         id: pitch
