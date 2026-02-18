@@ -1,14 +1,14 @@
 import { Job } from 'bullmq';
 import { GeneratePdfPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generatePodcastPdf } from '@/lib/pdf-generator';
+import { generatePodcastTranscript } from '@/lib/pdf-generator';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 
 export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promise<void> {
   const { podcastId } = job.data;
 
-  logger.info('Generating PDF', { podcastId });
+  logger.info('Generating transcript', { podcastId });
   await job.updateProgress(10);
 
   // Load podcast with segments and references
@@ -16,15 +16,15 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
     where: { id: podcastId },
     include: {
       user: { select: { name: true } },
-      segments: { orderBy: { order: 'asc' }, select: { speaker: true, text: true } },
+      segments: { orderBy: { order: 'asc' }, select: { speaker: true, text: true, startTime: true } },
       references: { orderBy: { number: 'asc' } },
     },
   });
 
   await job.updateProgress(30);
 
-  // Generate PDF buffer
-  const pdfBuffer = await generatePodcastPdf({
+  // Generate markdown transcript
+  const markdown = generatePodcastTranscript({
     title: podcast.title,
     topic: podcast.topic,
     creatorName: podcast.user.name || 'Anonymous',
@@ -48,8 +48,9 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
   await job.updateProgress(70);
 
   // Upload to R2
-  const key = `podcasts/${podcastId}/transcript.pdf`;
-  const pdfUrl = await uploadFile(key, pdfBuffer, 'application/pdf');
+  const key = `podcasts/${podcastId}/transcript.md`;
+  const buffer = Buffer.from(markdown, 'utf-8');
+  const pdfUrl = await uploadFile(key, buffer, 'text/markdown');
 
   await job.updateProgress(90);
 
@@ -60,5 +61,5 @@ export async function processPdfGeneration(job: Job<GeneratePdfPayload>): Promis
   });
 
   await job.updateProgress(100);
-  logger.info('PDF generation complete', { podcastId, pdfUrl });
+  logger.info('Transcript generation complete', { podcastId, pdfUrl });
 }
