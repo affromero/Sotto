@@ -38,7 +38,7 @@ The palette must serve these specific product surfaces:
 | **Audio player**   | Playback controls, waveform visualization, transcript panel           | Speaker differentiation (Host vs. Expert), progress indicators |
 | **Social feed**    | Grid of podcast cards with tags, likes, creator avatars               | Card backgrounds, metadata text, tag colors, engagement icons  |
 | **Transcript**     | Alternating turns between Host and Expert with citations              | Two distinct speaker colors with readable backgrounds          |
-| **Pricing page**   | Three tiers (Free / Pro / Creator) with feature comparison            | Tier differentiation, CTA hierarchy, "SOON" badges             |
+| **BYOK setup**     | Key configuration flow, provider selection                            | Provider distinction, status indicators, validation states     |
 | **Dashboard**      | Usage stats, podcast list, settings, billing                          | Data visualization, status indicators, navigation highlights   |
 
 ---
@@ -336,19 +336,7 @@ These describe how the palette should look in specific product contexts. The des
 - **Trending section**: Slight background tint (primary-lighter or accent-lighter)
 - **Overall feeling**: Clean, browsable, inviting — like a curated bookstore shelf
 
-### 6.4 Pricing Page
-
-- **Background**: Page background
-- **Free tier card**: Surface, standard border, no special highlight
-- **Starter tier card**: Subtle primary background tint — accessible entry point
-- **Pro tier card**: Primary border or stronger primary background tint — this is the "recommended" tier
-- **Studio tier card**: Accent border or subtle accent background tint — premium positioning
-- **CTA buttons**: Primary fill for the recommended tier; outline for others
-- **"SOON" badges**: Primary-light background with primary text, small rounded pill
-- **Feature checkmarks**: Success color
-- **Overall feeling**: Clear hierarchy, the Pro tier visually "pops" without being garish
-
-### 6.5 Dark Mode (any screen)
+### 6.4 Dark Mode (any screen)
 
 - **Background**: Warm dark (not pure black — suggest `#1A1917` or similar warm-tinted dark)
 - **Surface**: Slightly lighter than background (like `#262420` — warm dark gray)
@@ -421,7 +409,7 @@ A flat-design color palette moodboard for a podcast app. The palette features wa
 | **Gradient definitions**   | 3-4 subtle gradients with specific use cases                                    |
 | **Contrast matrix**        | Full WCAG testing results for all foreground/background pairings                |
 | **Color blindness report** | Simulations for protanopia, deuteranopia, tritanopia                            |
-| **Application mockups**    | At minimum: discovery chat, player, feed, pricing — in both light and dark      |
+| **Application mockups**    | At minimum: discovery chat, player, feed — in both light and dark               |
 | **CSS variable mapping**   | Token names and values for developer handoff                                    |
 | **Figma color styles**     | If using Figma, organized color style library                                   |
 

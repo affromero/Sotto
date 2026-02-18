@@ -371,13 +371,19 @@ PARSING ──→ GENERATING ──→ READY ──→ REPLIED ✓
 
 | File | Purpose |
 |---|---|
-| `src/lib/twitter.ts` | Twitter API client: `getMentions()`, `getTweet()`, `replyToTweet()`, `isTwitterConfigured()` |
-| `src/lib/tweet-parser.ts` | Claude-powered tweet intent extraction: topic, title, depth, tone |
+| `src/lib/twitter.ts` | Twitter API client: `getMentions()`, `getTweet()`, `getThread()`, `replyToTweet()`, `postTweet()`, `searchPopularTweets()`, `isTwitterConfigured()` |
+| `src/lib/tweet-parser.ts` | Claude-powered tweet intent extraction: topic, title, depth, tone; thread parsing |
+| `src/lib/twitter-config.ts` | Singleton `TwitterConfig` row: auto-tweet thresholds, trend polling settings, tweet template |
+| `src/lib/twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet()` for admin |
 | `src/workers/twitter-mentions.worker.ts` | Polls mentions, matches users, creates podcasts, kicks off pipeline |
 | `src/workers/twitter-reply.worker.ts` | Posts reply tweets with podcast links (or failure messages) |
-| `src/workers/index.ts` | Schedules the repeatable polling job on startup |
+| `src/workers/twitter-auto-tweet.worker.ts` | Auto-tweets when a podcast crosses engagement thresholds (likes, plays, forks) |
+| `src/workers/twitter-trend-poll.worker.ts` | Polls trending tweets (repeatable, every 2hrs), scores + deduplicates, creates podcasts as @sotto |
+| `src/workers/admin-thread-to-podcast.worker.ts` | Fetches a Twitter thread by URL, parses intent, creates podcast as @sotto (admin-triggered) |
+| `src/workers/index.ts` | Schedules the repeatable polling jobs on startup |
 | `src/lib/auth.ts` | `linkAccount` event: auto-sets `twitterEnabled` + `twitterHandle` on Twitter OAuth |
 | `src/app/api/users/me/twitter/route.ts` | API for checking/toggling Twitter connection and preferences |
+| `src/app/(admin)/admin/twitter/page.tsx` | Admin Twitter dashboard: analytics, auto-tweet config, trend monitoring, thread→podcast |
 
 All paths are relative to `apps/web/`.
 
@@ -450,4 +456,27 @@ The @sottofm app needs **Read and write** permissions. If you changed permission
 | **No TTS pre-check** | The worker checks for AI key availability but not TTS. If TTS is missing, the pipeline fails at audio generation and posts a failure reply. |
 | **No rate limit enforcement** | The platform rate limits (20 generations/hour, 100/day) are enforced at the API route level, not in the Twitter worker. A user could potentially exceed limits via tweet spam. |
 | **Public only** | Twitter-generated podcasts are always `visibility: PUBLIC`. |
-| **No thread parsing** | Only the direct mention tweet (and one parent tweet if it's a reply) are parsed. Long threads are not aggregated. |
+| **No thread parsing (mentions)** | The mention worker parses only the direct tweet (and one parent if it's a reply). For full thread parsing, use the admin thread-to-podcast feature. |
+
+---
+
+## Admin Twitter Dashboard (`/admin/twitter`)
+
+The admin dashboard at `/admin/twitter` provides controls for the extended Twitter features:
+
+| Section | Description |
+|---|---|
+| **Analytics** | 30-day engagement metrics: impressions, mentions processed, podcasts generated, replies posted |
+| **Auto-Tweet** | Configure thresholds (min likes, plays, forks) for auto-tweeting popular podcasts. Toggle on/off, customize tweet template with `{{title}}`, `{{topic}}`, `{{url}}` placeholders. Manual "Tweet this" for any podcast. |
+| **Trend Polling** | Search trending tweets by configurable queries, score by engagement, auto-generate podcasts as @sotto. Configurable interval (default 2hrs) and max podcasts/day. |
+| **Thread→Podcast** | Paste a tweet/thread URL → fetches the full thread → generates a podcast as @sotto. Useful for turning viral threads into audio content. |
+
+### Admin API Routes
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/admin/twitter/config` | GET/PATCH | Read/update TwitterConfig singleton (thresholds, template, trend settings) |
+| `/api/admin/twitter/auto-tweet` | GET/POST | List recent auto-tweets / manually trigger a tweet for a podcast |
+| `/api/admin/twitter/trends` | GET/POST | Fetch live trending topics / generate podcast from a trending topic |
+| `/api/admin/twitter/thread-to-podcast` | POST | Queue a thread-to-podcast conversion job |
+| `/api/admin/twitter/analytics` | GET | 30-day Twitter engagement analytics |

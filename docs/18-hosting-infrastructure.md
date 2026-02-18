@@ -7,7 +7,9 @@
 
 ## Hosting Options Compared
 
-### Option 1: Vercel + Railway (Easiest)
+### Option 1: Vercel + Railway (Deprecated)
+
+> **Note**: Sotto currently runs on Hetzner VPS (Option 2). This section is kept for reference but is not the active deployment.
 
 | Component | Service       | Cost/Month    | Pros                              | Cons                               |
 | --------- | ------------- | ------------- | --------------------------------- | ---------------------------------- |
@@ -106,8 +108,8 @@ apt install -y nodejs
 
 # Install Caddy (reverse proxy + auto HTTPS)
 apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.gpg' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.list' | tee /etc/apt/sources.list.d/caddy-stable.list
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install caddy
 
 # Enable firewall
@@ -397,3 +399,14 @@ curl -s https://YOUR_DOMAIN/api/health | jq .
 | `scripts/backup.sh`            | Daily PostgreSQL backup with 30-day retention                       |
 | `.github/workflows/ci.yml`     | CI pipeline (lint, typecheck, test, build)                          |
 | `.github/workflows/deploy.yml` | Auto-deploy to production on push to main                           |
+
+### Hosted Services
+
+| Service | Description | Env Vars |
+| ------- | ----------- | -------- |
+| Next.js web app | App Router + API routes | `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_*` |
+| BullMQ workers (15 types) | Background job processing | Same as web + provider keys |
+| PostgreSQL 16 | Primary database | `DATABASE_URL` |
+| Redis 7 | Queues, caching, rate limiting | `REDIS_URL` |
+| Caddy | Reverse proxy + auto HTTPS | Caddyfile |
+| Telegram bot | `@SottoFMDevBot` — dev notifications | `TELEGRAM_BOT_TOKEN` |
