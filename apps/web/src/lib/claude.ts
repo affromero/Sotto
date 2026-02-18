@@ -5,11 +5,11 @@ import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-function useClaudeCode(): boolean {
+function isClaudeCodeMode(): boolean {
   return process.env.AI_PROVIDER === 'claude-code';
 }
 
-if (!ANTHROPIC_API_KEY && !useClaudeCode()) {
+if (!ANTHROPIC_API_KEY && !isClaudeCodeMode()) {
   logger.warn('ANTHROPIC_API_KEY is not set — Claude features will not work');
 }
 
@@ -44,7 +44,7 @@ export async function generateResponse(
     }
   }
 
-  if (useClaudeCode() && !options?.apiKeyOverride) {
+  if (isClaudeCodeMode() && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     return executeClaudeCode(systemPrompt, serializeMessages(messages), {
       model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
@@ -114,7 +114,7 @@ export async function* streamResponse(
     }
   }
 
-  if (useClaudeCode() && !options?.apiKeyOverride) {
+  if (isClaudeCodeMode() && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
       model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
