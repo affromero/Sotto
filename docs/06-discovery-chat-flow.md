@@ -86,6 +86,18 @@ Agent: Hey! What are you curious about today? I'll create a podcast just for you
 
 The opening chips cover the most popular broad categories. They serve as inspiration, not constraints. The user can type anything.
 
+### Audience (Content Rating)
+
+After the topic, the agent asks about the intended audience:
+
+```
+Agent: Who's this for?
+
+[chips: Kids (6-10) · Teens (11-16) · Family-friendly · General · Nerds/enthusiasts · Mature]
+```
+
+This determines the content rating and language filter applied during script generation. The `audience` field maps to content safety levels in the generation pipeline.
+
 ### Topic Exploration (1-2 exchanges)
 
 After the user states a topic, the agent may probe for specificity:
@@ -203,25 +215,29 @@ When the agent has gathered enough information (typically 3-5 exchanges), it pro
 {
   "topic": "Quantum Computing",
   "depth": "standard",
+  "audience": "general",
   "audience_level": "intermediate",
   "focus_areas": ["qubit intuition", "superposition", "practical applications"],
   "tone": "casual",
   "duration_target": 10,
+  "source_url": "https://example.com/article",
   "ready": true
 }
 ```
 
 ### Field Descriptions
 
-| Field             | Type     | Values                                               | Description                               |
-| ----------------- | -------- | ---------------------------------------------------- | ----------------------------------------- |
-| `topic`           | string   | Free text                                            | The primary topic for the podcast         |
-| `depth`           | string   | `quick_overview`, `standard`, `deep_dive`            | How detailed the coverage should be       |
-| `audience_level`  | string   | `beginner`, `intermediate`, `expert`                 | The listener's background knowledge       |
-| `focus_areas`     | string[] | Free text array                                      | Specific angles or subtopics to emphasize |
-| `tone`            | string   | `casual`, `professional`, `socratic`, `storytelling` | The conversational style                  |
-| `duration_target` | number   | 5-30                                                 | Target duration in minutes                |
-| `ready`           | boolean  | `true`                                               | Signals that metadata is complete         |
+| Field             | Type     | Values                                                            | Description                                              |
+| ----------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
+| `topic`           | string   | Free text                                                         | The primary topic for the podcast                        |
+| `depth`           | string   | `quick_overview`, `standard`, `deep_dive`                         | How detailed the coverage should be                      |
+| `audience`        | string   | `kids`, `teens`, `family`, `general`, `nerds`, `mature`           | Content rating / target audience                         |
+| `audience_level`  | string   | `beginner`, `intermediate`, `expert`                              | The listener's background knowledge                      |
+| `focus_areas`     | string[] | Free text array                                                   | Specific angles or subtopics to emphasize                |
+| `tone`            | string   | `casual`, `professional`, `socratic`, `storytelling`              | The conversational style                                 |
+| `duration_target` | number   | 5-30                                                              | Target duration in minutes                               |
+| `source_url`      | string   | URL (optional)                                                    | Included if the user shared a URL; omitted otherwise     |
+| `ready`           | boolean  | `true`                                                            | Signals that metadata is complete                        |
 
 ### Extraction Function
 
@@ -538,7 +554,7 @@ When the user confirms and the metadata is extracted, the following sequence occ
 4. **Update Podcast status** to `DISCOVERING` (then immediately to `EXTRACTING` or `SCRIPTING` depending on whether there is source content)
 5. **Queue content-extraction job** (if a URL/PDF was provided in the chat)
 6. **Queue script-generation job** with the discovery metadata
-7. **Consume credit via `consumeCredit()` (1 credit standard, +1 if premium voice)**
+7. **Check generation gate via `checkGenerationGate()`** — verifies BYOK TTS key or free tier availability
 8. **Return the podcast ID** to the client so it can show progress and navigate to the playback page when ready
 
 ### Pipeline Trigger
@@ -584,26 +600,42 @@ await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, {
   discoveryId: discovery.id,
 });
 
-// Consume credit
-await consumeCredit(session.user.id, 1, 'Podcast generation', podcast.id);
+// Check generation gate (BYOK key or free tier)
+const gate = await checkGenerationGate(session.user.id);
+if (!gate.allowed) throw new Error(gate.reason);
 ```
 
 ---
 
 ## Edge Cases
 
-### User Provides Source Material
+### User Provides Source Material (URL Handling)
 
-If the user pastes a URL or mentions a PDF during the discovery chat, the agent recognizes it and stores it:
+If the user pastes a URL or mentions a PDF during the discovery chat, the API route pre-fetches and extracts the content before passing it to the agent. The extracted content is injected as a `[URL_CONTEXT]` block in the system prompt, so the agent can reference it naturally:
 
 ```
 User: "I want a podcast about this paper: https://arxiv.org/abs/1706.03762"
 
-Agent: I see you've shared a link! I'll use that as source material for the podcast.
-The paper "Attention Is All You Need" — a classic. What angle interests you most?
+Agent: I see you've shared the "Attention Is All You Need" paper — a classic!
+What angle interests you most? The mathematical foundations, the architectural innovations,
+or how it changed the field?
 ```
 
-The URL is stored in `Discovery.sourceUrl`. The content-extraction worker runs first to parse the URL/PDF content, which is then passed to the script generation worker as source material.
+The URL is stored in `Discovery.sourceUrl` and the extracted text in `Discovery.sourceContent`. The content-extraction worker runs first to parse the URL/PDF content, which is then passed to the script generation worker as source material.
+
+### Web Search Integration
+
+The discovery agent has access to web search for current events and time-sensitive topics. When the user asks about recent news or trending subjects, the agent can search the web to ground its suggestions:
+
+```
+User: "What's the latest on the Mars mission?"
+
+Agent: [searches web for recent Mars mission updates]
+There's been some exciting news! NASA's Perseverance rover just...
+Want me to focus on the recent discoveries, or the engineering behind the mission?
+```
+
+Web search is passed as a tool (`WEB_SEARCH_TOOL`) to the Claude API call. The agent decides when to use it based on the user's query.
 
 ### User Changes Mind Mid-Chat
 

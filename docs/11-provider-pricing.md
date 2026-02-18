@@ -67,33 +67,30 @@ A typical 10-minute podcast uses approximately:
 
 TTS is **97% of Sotto's COGS**. This is the most critical cost decision.
 
-### Pricing Comparison
+### Pricing Comparison (Sotto's 5 Integrated Providers)
 
-| Provider         | Model/Tier       | Cost per 1K chars | Cost for 10-min podcast (~15K chars) | Quality (1-5) | Pricing Page                                                                                                        |
-| ---------------- | ---------------- | ----------------- | ------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **ElevenLabs**   | Creator ($22/mo) | ~$0.22            | **$3.30**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                                                          |
-| **ElevenLabs**   | Pro ($99/mo)     | ~$0.20            | **$3.00**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                                                          |
-| **ElevenLabs**   | Scale ($330/mo)  | ~$0.17            | **$2.55**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                                                          |
-| **OpenAI**       | TTS-1            | $0.015            | **$0.23**                            | ★★★★          | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)                                             |
-| **OpenAI**       | TTS-1-HD         | $0.030            | **$0.45**                            | ★★★★½         | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)                                             |
-| **Google Cloud** | WaveNet/Neural2  | $0.016            | **$0.24**                            | ★★★★          | [cloud.google.com/tts/pricing](https://cloud.google.com/text-to-speech/pricing)                                     |
-| **Google Cloud** | Standard         | $0.004            | **$0.06**                            | ★★★           | [cloud.google.com/tts/pricing](https://cloud.google.com/text-to-speech/pricing)                                     |
-| **Google Cloud** | Studio           | $0.160            | **$2.40**                            | ★★★★★         | [cloud.google.com/tts/pricing](https://cloud.google.com/text-to-speech/pricing)                                     |
-| **Amazon Polly** | Neural           | $0.016            | **$0.24**                            | ★★★★          | [aws.amazon.com/polly/pricing](https://aws.amazon.com/polly/pricing/)                                               |
-| **Amazon Polly** | Standard         | $0.005            | **$0.075**                           | ★★★           | [aws.amazon.com/polly/pricing](https://aws.amazon.com/polly/pricing/)                                               |
-| **Azure Speech** | Neural TTS       | $0.016            | **$0.24**                            | ★★★★          | [azure.microsoft.com/speech](https://azure.microsoft.com/en-us/pricing/details/cognitive-services/speech-services/) |
-| **Play.ht**      | Professional     | $0.02-0.24        | **$0.30-$3.60**                      | ★★★★          | [play.ht/pricing](https://play.ht/pricing/)                                                                         |
-| **Cartesia**     | Sonic            | ~$0.05            | **$0.75**                            | ★★★★          | [cartesia.ai/pricing](https://cartesia.ai/pricing)                                                                  |
+These are the TTS providers actually integrated in Sotto's codebase (resolved via `resolveTtsProvider()` in `src/lib/providers/tts.ts`). Users bring their own key for any one of these via BYOK.
+
+| Provider       | Model/Tier       | Cost per 1K chars | Cost for 10-min podcast (~15K chars) | Quality (1-5) | Pricing Page                                                                    |
+| -------------- | ---------------- | ----------------- | ------------------------------------ | ------------- | ------------------------------------------------------------------------------- |
+| **ElevenLabs** | Creator ($22/mo) | ~$0.22            | **$3.30**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                      |
+| **ElevenLabs** | Pro ($99/mo)     | ~$0.20            | **$3.00**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                      |
+| **ElevenLabs** | Scale ($330/mo)  | ~$0.17            | **$2.55**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                      |
+| **OpenAI**     | TTS-1            | $0.015            | **$0.23**                            | ★★★★          | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)         |
+| **OpenAI**     | TTS-1-HD         | $0.030            | **$0.45**                            | ★★★★½         | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)         |
+| **PlayHT**     | Professional     | $0.02-0.24        | **$0.30-$3.60**                      | ★★★★          | [play.ht/pricing](https://play.ht/pricing/)                                     |
+| **Cartesia**   | Sonic            | ~$0.05            | **$0.75**                            | ★★★★          | [cartesia.ai/pricing](https://cartesia.ai/pricing)                              |
+| **Hume**       | Octave           | ~$0.05            | **$0.75**                            | ★★★★★         | [hume.ai/pricing](https://www.hume.ai/pricing)                                  |
 
 ### Free Tiers
 
-| Provider         | Free Tier                                             | Enough for          |
-| ---------------- | ----------------------------------------------------- | ------------------- |
-| Google Cloud TTS | 1M chars/month (WaveNet)                              | ~66 podcasts/month  |
-| Azure Speech     | 5M chars/month                                        | ~333 podcasts/month |
-| Amazon Polly     | 5M chars/month (standard) + 1M (neural) for 12 months | ~66-333 podcasts    |
-| ElevenLabs       | 10K chars/month                                       | ~0.7 podcasts/month |
-| OpenAI TTS       | No free tier                                          | —                   |
+| Provider   | Free Tier           | Enough for          |
+| ---------- | ------------------- | ------------------- |
+| ElevenLabs | 10K chars/month     | ~0.7 podcasts/month |
+| OpenAI TTS | No free tier        | —                   |
+| PlayHT     | Trial credits       | ~1-2 podcasts       |
+| Cartesia   | Trial credits       | ~1-2 podcasts       |
+| Hume       | Trial credits       | ~1-2 podcasts       |
 
 ### Self-Hosted Open-Source TTS
 
@@ -149,69 +146,102 @@ For the future "driver mode" where users interact with Sotto by voice while driv
 
 ---
 
-## 4. Total Cost Per User Per Month (All Scenarios)
+## 4. BYOK Cost Per Podcast (What Users Pay)
 
-### Scenario: Free Tier User (1 podcast/month, 1 interaction)
+With the free BYOK model, Sotto's platform costs are near-zero (~$0.002/podcast for storage + compute). Users pay their own AI providers directly. Here's what a typical 10-minute podcast costs the **user** depending on their provider choices:
 
-| Strategy                                    | LLM   | TTS   | Voice Agent | Storage | Total/User/Month |
-| ------------------------------------------- | ----- | ----- | ----------- | ------- | ---------------- |
-| **Premium** (Claude Sonnet + ElevenLabs)    | $0.11 | $3.00 | $0          | $0.01   | **$3.12**        |
-| **Balanced** (Claude Haiku + OpenAI TTS-HD) | $0.08 | $0.45 | $0          | $0.01   | **$0.54**        |
-| **Budget** (Gemini Flash + Google WaveNet)  | $0.00 | $0.24 | $0          | $0.01   | **$0.25**        |
-| **Self-hosted** (Gemini Flash + XTTS v2)    | $0.00 | $0.05 | $0          | $0.01   | **$0.06**        |
+### LLM + TTS Combined Cost Per Podcast
 
-### Scenario: Pro Tier User ($24/mo, 10 podcasts/month avg: 8 standard + 2 premium)
+| LLM Provider      | TTS Provider | LLM Cost | TTS Cost | **Total/Podcast** |
+| ------------------ | ------------ | -------- | -------- | ----------------- |
+| Claude Sonnet 4.5  | ElevenLabs   | $0.108   | $3.00    | **$3.11**         |
+| Claude Sonnet 4.5  | OpenAI HD    | $0.108   | $0.45    | **$0.56**         |
+| Claude Haiku 4.5   | OpenAI       | $0.076   | $0.23    | **$0.31**         |
+| Claude Haiku 4.5   | Cartesia     | $0.076   | $0.75    | **$0.83**         |
+| Claude Haiku 4.5   | Hume Octave  | $0.076   | $0.75    | **$0.83**         |
+| Claude Haiku 4.5   | PlayHT       | $0.076   | $0.30    | **$0.38**         |
+| GPT-4o-mini        | OpenAI       | $0.005   | $0.23    | **$0.24**         |
 
-| Strategy                                       | LLM   | TTS    | Voice Agent | Storage | Total COGS | Gross Margin      |
-| ---------------------------------------------- | ----- | ------ | ----------- | ------- | ---------- | ----------------- |
-| **Premium** (all ElevenLabs)                   | $1.08 | $30.00 | $0          | $0.08   | **$31.16** | **-$7.16 (-30%)** |
-| **Balanced** (OpenAI std + ElevenLabs premium) | $1.08 | $9.60  | $0          | $0.08   | **$10.76** | **$13.24 (55%)**  |
-| **Budget** (all OpenAI)                        | $0.05 | $4.50  | $0          | $0.08   | **$4.63**  | **$19.37 (81%)**  |
-| **Self-hosted**                                | $0.05 | $0.50  | $0          | $0.08   | **$0.63**  | **$23.37 (97%)**  |
+### Sotto's Platform Cost Per Podcast
 
-### Scenario: Studio Tier User ($49/mo, 25 podcasts/month avg: 10 standard + 15 premium)
-
-| Strategy                                       | LLM   | TTS    | Voice Agent | Storage | Total COGS | Gross Margin       |
-| ---------------------------------------------- | ----- | ------ | ----------- | ------- | ---------- | ------------------ |
-| **Premium** (all ElevenLabs)                   | $2.70 | $75.00 | $0          | $0.20   | **$77.90** | **-$28.90 (-59%)** |
-| **Balanced** (OpenAI std + ElevenLabs premium) | $2.70 | $49.50 | $0          | $0.20   | **$52.40** | **-$3.40 (-7%)**   |
-| **Budget** (all OpenAI)                        | $0.13 | $11.25 | $0          | $0.20   | **$11.58** | **$37.42 (76%)**   |
-| **Self-hosted**                                | $0.13 | $1.25  | $0          | $0.20   | **$1.58**  | **$47.42 (97%)**   |
+| Component              | Cost    |
+| ---------------------- | ------- |
+| R2 storage (~15MB)     | $0.0002 |
+| FFmpeg compute         | $0.001  |
+| Redis/Postgres overhead | ~$0.001 |
+| **Total platform cost** | **~$0.002** |
 
 ### Key Takeaway
 
-The "Balanced" strategy (Claude Haiku + OpenAI TTS-1-HD for standard, ElevenLabs for premium) achieves:
-
-- **55% gross margin** on Pro tier
-- **-7% gross margin** on Studio tier (acceptable for creator-focused tier)
-
-Studio tier profitability depends on usage patterns. If users mix more standard podcasts, margins improve. This is the recommended starting point, with migration to self-hosted TTS planned for scale.
+TTS is **97% of user COGS**. The cheapest path is OpenAI TTS-1 ($0.23/podcast). The premium path is ElevenLabs ($3.00/podcast). Users choose their own quality/cost tradeoff via BYOK.
 
 ---
 
-## 5. Provider Selection Decision Matrix
+## 5. Speech-to-Text Providers (Audio Import + Transcription)
 
-| Criteria           | Weight | ElevenLabs | OpenAI TTS | Google TTS | Self-hosted |
-| ------------------ | ------ | ---------- | ---------- | ---------- | ----------- |
-| Voice quality      | 30%    | 10         | 8          | 7          | 7           |
-| Cost at scale      | 25%    | 3          | 8          | 9          | 10          |
-| API simplicity     | 15%    | 9          | 10         | 7          | 4           |
-| Latency            | 10%    | 9          | 8          | 7          | 8           |
-| Voice variety      | 10%    | 10         | 6          | 9          | 5           |
-| Reliability        | 10%    | 8          | 9          | 10         | 6           |
-| **Weighted Score** |        | **7.15**   | **8.15**   | **7.85**   | **7.05**    |
+Sotto supports STT for importing existing podcasts (human or AI). Three providers are integrated in `src/lib/providers/stt.ts`.
 
-**Winner for MVP: OpenAI TTS** — best balance of quality, cost, and simplicity.
-**Winner for scale: Self-hosted** — but only when engineering capacity allows.
-**Winner for premium: ElevenLabs** — offer as Pro/Studio perk.
+| Provider       | Model                        | Cost               | Quality | Speed    | Pricing Page                                                            |
+| -------------- | ---------------------------- | ------------------- | ------- | -------- | ----------------------------------------------------------------------- |
+| **Groq**       | whisper-large-v3-turbo       | Free (rate-limited) | ★★★★    | Fastest  | [groq.com/pricing](https://groq.com/pricing/)                          |
+| **Groq**       | whisper-large-v3             | Free (rate-limited) | ★★★★½   | Fast     | [groq.com/pricing](https://groq.com/pricing/)                          |
+| **OpenAI**     | whisper-1                    | $0.006/min          | ★★★★    | Moderate | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing) |
+| **OpenAI**     | gpt-4o-transcribe            | ~$0.01/min          | ★★★★½   | Moderate | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing) |
+| **ElevenLabs** | scribe_v1                    | Credits-based       | ★★★★    | Fast     | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)             |
+
+**Default provider**: Groq (free, fast). Configurable via `STT_PROVIDER` env var.
+
+**Cost for importing a 30-min podcast**:
+- Groq: Free
+- OpenAI whisper-1: ~$0.18
+- ElevenLabs Scribe: ~credits equivalent
 
 ---
 
-## 6. Voice Diversity & Immersive Audio Production
+## 6. Voice Marketplace Pricing
+
+The voice marketplace lets voice clone owners sell access on a per-podcast basis via Stripe Connect.
+
+| Component         | Details                                                      |
+| ----------------- | ------------------------------------------------------------ |
+| Payment model     | Per-podcast, authorized upfront, captured on READY           |
+| Platform fee      | 10% via Stripe `application_fee_amount`                      |
+| Free access paths | Voice owner, allowlisted user, approved VoiceRequest, existing purchase |
+| Failed podcasts   | Payment authorization cancelled automatically                |
+| Refunds           | Supported via `refunded` status                              |
+
+### Example Transaction
+
+| Scenario                        | Voice Price | Platform Fee (10%) | Creator Receives |
+| ------------------------------- | ----------- | ------------------ | ---------------- |
+| Budget voice ($0.50/podcast)    | $0.50       | $0.05              | $0.45            |
+| Standard voice ($2.00/podcast)  | $2.00       | $0.20              | $1.80            |
+| Premium voice ($5.00/podcast)   | $5.00       | $0.50              | $4.50            |
+
+---
+
+## 7. Provider Selection Decision Matrix (Integrated Providers Only)
+
+| Criteria           | Weight | ElevenLabs | OpenAI TTS | PlayHT | Cartesia | Hume   |
+| ------------------ | ------ | ---------- | ---------- | ------ | -------- | ------ |
+| Voice quality      | 30%    | 10         | 8          | 8      | 8        | 9      |
+| Cost               | 25%    | 3          | 9          | 7      | 7        | 7      |
+| API simplicity     | 15%    | 9          | 10         | 7      | 8        | 7      |
+| Voice variety      | 15%    | 10         | 6          | 8      | 7        | 8      |
+| Emotion control    | 15%    | 7          | 4          | 6      | 6        | 10     |
+| **Weighted Score** |        | **7.30**   | **7.45**   | **7.15** | **7.15** | **8.00** |
+
+**Best overall quality: ElevenLabs** — widest voice library, voice cloning, proven at scale.
+**Best budget option: OpenAI TTS** — simple API, low cost, good enough for most use cases.
+**Best emotional delivery: Hume Octave** — native emotion detection, most expressive output.
+
+---
+
+## 8. Voice Diversity & Immersive Audio Production
 
 **This is Sotto's differentiator.** If every podcast sounds like the same two people reading a script, there's no reason to come back. The goal is "4K podcast" quality — rich, diverse voices, sound effects, natural interactions, and production value that makes episodes addictive.
 
-### 6.1 Voice Diversity Strategy
+### 8.1 Voice Diversity Strategy
 
 Every podcast MUST have a unique voice pair. The `elevenlabs.ts` voice pool contains 16 curated voices (8 male, 8 female) spanning American, British, and Australian accents, across young/middle/mature age ranges. Voice selection is deterministic per podcast ID, ensuring consistency across re-listens while maximizing variety across the catalog.
 
@@ -224,7 +254,7 @@ Every podcast MUST have a unique voice pair. The `elevenlabs.ts` voice pool cont
 | **Languages**                 | 70+                                  | 30+                                       | 24                        | 10+                      | 6          |
 | **Multi-speaker in one call** | No (per-segment)                     | No (per-segment)                          | Yes (2 speakers natively) | No                       | No         |
 
-### 6.2 Sound Effects & Production Value
+### 8.2 Sound Effects & Production Value
 
 Sound effects transform a flat conversation into an immersive audio experience. Sotto uses ElevenLabs Sound Effects v2 API for:
 
@@ -243,7 +273,7 @@ Sound effects transform a flat conversation into an immersive audio experience. 
 | **Stability AI (Stable Audio)** | Text-to-music/SFX, 45s max                       | ★★★★    | $0.01-0.04/gen                    | [stability.ai](https://stability.ai/)                              |
 | **FFmpeg built-in**             | Silence, fade-in/out, crossfade between segments | ★★★     | Free                              | Local processing                                                   |
 
-### 6.3 Natural Interaction Quality
+### 8.3 Natural Interaction Quality
 
 The script generator now includes delivery directions that influence TTS parameters:
 
@@ -255,7 +285,7 @@ The script generator now includes delivery directions that influence TTS paramet
 | `(thoughtful pause)` | Insert 0.5s silence before segment | Creates dramatic pacing                      |
 | `(leaning in)`       | similarity_boost: 0.9, style: 0.5  | More intense, focused delivery               |
 
-### 6.4 Competitive Voice Quality Benchmarks
+### 8.4 Competitive Voice Quality Benchmarks
 
 | Feature                   | Sotto (Current)                          | NotebookLM        | Podbean AI    | Spotify AI |
 | ------------------------- | ---------------------------------------- | ----------------- | ------------- | ---------- |
@@ -266,7 +296,7 @@ The script generator now includes delivery directions that influence TTS paramet
 | Accent diversity          | American, British, Australian            | American only     | American only | N/A        |
 | Interactive Q&A           | Yes (mid-playback interrupt)             | No                | No            | No         |
 
-### 6.5 Recommended Voice Diversity Strategy
+### 8.5 Recommended Voice Diversity Strategy
 
 | Phase      | Voice Approach                                                                         | Sound Effects                                   | Cost per Podcast               |
 | ---------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------ |
@@ -275,7 +305,7 @@ The script generator now includes delivery directions that influence TTS paramet
 | **Growth** | User voice selection UI + Voice cloning for "listen in my voice" premium feature       | Curated SFX library (pre-generated, cached)     | $0.05-3.00                     |
 | **Scale**  | Self-hosted XTTS v2 for Free tier + ElevenLabs for Pro/Studio + Fish Audio as fallback | Mixed (self-hosted + cached + generated)        | $0.05-2.00                     |
 
-### 6.6 Alternative TTS Providers for Voice Diversity
+### 8.6 Alternative TTS Providers for Voice Diversity
 
 | Provider              | Voices                        | Emotion Control                | Cost/Hour     | Best For                         | Pricing Page                                                           |
 | --------------------- | ----------------------------- | ------------------------------ | ------------- | -------------------------------- | ---------------------------------------------------------------------- |
@@ -285,7 +315,7 @@ The script generator now includes delivery directions that influence TTS paramet
 | **Rime**              | 300+ demographic-profiled     | Conversational training data   | Contact sales | Most natural "real person" feel  | [rime.ai](https://rime.ai/)                                            |
 | **MiniMax**           | 300+ voices, 30 languages     | Style control                  | ~$0.50/hr     | Long-form (200K chars/request)   | [minimax.io](https://www.minimaxi.com/)                                |
 
-### 6.7 The "4K Podcast" Quality Checklist
+### 8.7 The "4K Podcast" Quality Checklist
 
 For every generated podcast to feel premium and addictive:
 

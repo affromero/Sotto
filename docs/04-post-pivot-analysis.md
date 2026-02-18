@@ -65,7 +65,7 @@ ElevenLabs ($11B) shipped GenFM. Google ships NotebookLM. OpenAI, Hume, and ever
 | Dimension | Old Model (5 Tiers) | New Model (Free BYOK) |
 |---|---|---|
 | Pricing | Free / Starter $14 / Pro $34 / Studio $69 / Power $9 | Free. Everything. |
-| Payment processor | Stripe (checkout, portal, webhooks) | None. Stripe removed entirely. |
+| Payment processor | Stripe (checkout, portal, webhooks) | Stripe Connect for voice marketplace only. |
 | Credits | 1-50/month depending on tier | No credits. No limits (rate-limited only). |
 | Feature gates | Download, private, PDF, SFX, voice clones gated by tier | All features available to all users. |
 | LLM keys | Platform-provided (Anthropic) | User BYOK required (Anthropic or OpenAI) |
@@ -81,7 +81,7 @@ ElevenLabs ($11B) shipped GenFM. Google ships NotebookLM. OpenAI, Hume, and ever
 - Social feed, fork, remix, import, citation verification, interactive Q&A
 - Multi-provider TTS architecture (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)
 - 16-voice diversity pool, sound effects, production quality
-- Twitter bot (@sottofm), admin dashboard, team features
+- Twitter bot (@sottofm), Telegram bot, admin dashboard, team features
 
 ---
 
@@ -191,10 +191,6 @@ Mitigations:
 - Feed/social features accessible without keys — only creation requires them
 - "Skip for now" lets users explore before committing
 
-### No mobile app
-
-Web app only. No background audio on iOS Safari, no offline, no push reliability. This is a serious handicap for a podcast product. The React Native + Expo app is scaffolded but not functional.
-
 ### Variable audio quality
 
 AI voices are detectably synthetic. ElevenLabs (MOS 4.6) is close to human (4.7), but cheaper providers like OpenAI TTS are noticeably more robotic. BYOK means users choose their own quality/cost tradeoff — which is fine, but it means the feed will have inconsistent audio quality.
@@ -242,7 +238,7 @@ The 75% failure case: BYOK is too niche, the network never reaches critical mass
 | Factor | Assessment |
 |---|---|
 | Runway | Infinite. $240/year is pocket change. |
-| Constraints | No mobile app (can't afford contractor). Growth is purely organic. |
+| Constraints | Growth is purely organic. Solo developer. |
 | Advantage | No deadline, no investors, no pressure. Iterate for 5 years if needed. |
 | Risk | Burnout from maintaining a complex product solo with no revenue. |
 | Odds of 10K users within 3 years | **30%** |
@@ -256,7 +252,7 @@ The 75% failure case: BYOK is too niche, the network never reaches critical mass
 | Factor | Assessment |
 |---|---|
 | Fundability | Moderate. "GitHub for podcasts" is a compelling pitch. Working product is impressive. |
-| What it buys | Mobile app ($30-50K), content seeding, 18-24 months of focus. |
+| What it buys | Growth marketing, content seeding, 18-24 months of focus. |
 | What it costs | 10-20% equity. Mild pressure for traction. |
 | Odds of 10K users within 2 years | **25%** |
 
@@ -287,7 +283,7 @@ The 75% failure case: BYOK is too niche, the network never reaches critical mass
 
 ### The pitch (updated for free BYOK)
 
-> "We're GitHub for podcasts. Create AI podcasts from any topic, fork and remix anyone's episode, share on a social feed. Everything is free — users bring their own API keys. One person built the entire platform: 13 async workers, 5 TTS providers, full social stack. We need YC to help us reach critical mass."
+> "We're GitHub for podcasts. Create AI podcasts from any topic, fork and remix anyone's episode, share on a social feed. Everything is free — users bring their own API keys. One person built the entire platform: 23 async workers, 5 TTS providers, full social stack. We need YC to help us reach critical mass."
 
 ### Updated application answers
 
@@ -326,7 +322,7 @@ The 75% failure case: BYOK is too niche, the network never reaches critical mass
 4. **Launch on HN** with "GitHub for podcasts — fork any episode" angle
 5. **Find 10 power users** — educators, AI enthusiasts, content creators
 6. **Measure WAL** (weekly active listeners) — if people come back to the feed, everything else follows
-7. **Ship mobile** when the network has traction (not before)
+7. **Iterate on mobile** — iOS app shipped, refine based on user feedback
 
 **Timeline**: Pivot implementation (Phases 1-5) in 1-2 weeks. Community features (Phase 6) in 2-3 weeks. Content seeding in parallel. Launch when the feed has 200+ diverse podcasts.
 
