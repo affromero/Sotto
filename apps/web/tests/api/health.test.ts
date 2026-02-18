@@ -197,6 +197,41 @@ describe('GET /api/health', () => {
     expect(body.checks.anthropic.latencyMs).toBeTypeOf('number');
   });
 
+  it('reports openai not_configured when key is missing', async () => {
+    delete process.env.OPENAI_API_KEY;
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.checks.openai.status).toBe('not_configured');
+  });
+
+  it('reports openai ok when API returns ok', async () => {
+    process.env.OPENAI_API_KEY = 'sk-test';
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ELEVENLABS_API_KEY;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.checks.openai.status).toBe('ok');
+    expect(body.checks.openai.latencyMs).toBeTypeOf('number');
+  });
+
+  it('reports openai error when API returns non-ok', async () => {
+    process.env.OPENAI_API_KEY = 'sk-test';
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ELEVENLABS_API_KEY;
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.checks.openai.status).toBe('error');
+    expect(body.checks.openai.detail).toContain('401');
+  });
+
   it('reports elevenlabs not_configured when key is missing', async () => {
     delete process.env.ELEVENLABS_API_KEY;
 
