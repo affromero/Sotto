@@ -157,6 +157,26 @@ export async function GET() {
     checks.elevenlabs = { status: 'error', latencyMs: Date.now() - elStart };
   }
 
+  // --- Groq API (non-critical, default STT provider) ---
+  const groqStart = Date.now();
+  try {
+    if (process.env.GROQ_API_KEY) {
+      const res = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      checks.groq = {
+        status: res.ok ? 'ok' : 'error',
+        latencyMs: Date.now() - groqStart,
+        ...(!res.ok && { detail: `HTTP ${res.status}` }),
+      };
+    } else {
+      checks.groq = { status: 'not_configured', latencyMs: 0 };
+    }
+  } catch {
+    checks.groq = { status: 'error', latencyMs: Date.now() - groqStart };
+  }
+
   // --- BullMQ Queues (non-critical, uses existing Redis) ---
   try {
     const redis = getRedisClient();
@@ -188,6 +208,7 @@ export async function GET() {
     'ANTHROPIC_API_KEY',
     'OPENAI_API_KEY',
     'ELEVENLABS_API_KEY',
+    'GROQ_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY_ID',
     'R2_SECRET_ACCESS_KEY',
