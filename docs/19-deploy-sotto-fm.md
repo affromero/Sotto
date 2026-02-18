@@ -69,7 +69,7 @@ This means if someone tries to access port 5432 (PostgreSQL) from the internet, 
 
 ### What is PostgreSQL?
 
-**PostgreSQL** (often just "Postgres") is a **relational database** — it stores your app's data in structured tables (users, podcasts, subscriptions, etc.). Think of it like a spreadsheet application that's extremely fast, can handle thousands of simultaneous reads/writes, and guarantees your data won't get corrupted. It runs as a separate program (in its own Docker container) and your app talks to it over a local network connection using SQL (Structured Query Language).
+**PostgreSQL** (often just "Postgres") is a **relational database** — it stores your app's data in structured tables (users, podcasts, interactions, etc.). Think of it like a spreadsheet application that's extremely fast, can handle thousands of simultaneous reads/writes, and guarantees your data won't get corrupted. It runs as a separate program (in its own Docker container) and your app talks to it over a local network connection using SQL (Structured Query Language).
 
 ### What is Redis?
 
@@ -107,7 +107,7 @@ This means if someone tries to access port 5432 (PostgreSQL) from the internet, 
 4. When done, the worker updates the database status to "READY"
 5. The user gets a notification that their podcast is ready
 
-We have 11 different worker types, each handling a different stage of the pipeline.
+We have 23 different worker types, each handling a different stage of the pipeline.
 
 ### What are Environment Variables?
 
@@ -144,17 +144,15 @@ Why R2 instead of storing files on our server?
 
 ### What is Stripe?
 
-**Stripe** is a payment processing platform. Instead of dealing with credit card numbers directly (which requires PCI compliance — a massive security burden), Stripe handles all the money stuff:
+**Stripe** is a payment processing platform. Sotto uses **Stripe Connect** for the voice marketplace — voice clone owners connect their Stripe accounts, set per-podcast prices, and get paid directly when someone uses their voice. The platform takes a 10% fee via `application_fee_amount`.
 
-1. **Checkout** — When a user clicks "Subscribe to Starter ($14/mo)", we redirect them to a Stripe-hosted payment page. Stripe collects their credit card info (never touches our server), processes the payment, and redirects them back
-2. **Subscriptions** — Stripe manages recurring billing automatically. Every month, it charges the card and sends us the money (minus their ~2.9% + $0.30 fee)
-3. **Webhooks** — When something happens (payment succeeds, subscription cancels, card declines), Stripe sends an HTTP request to our `/api/webhooks/stripe` endpoint with the details. Our code then updates the database accordingly (e.g., downgrade user to Free tier)
-4. **Customer Portal** — Stripe provides a pre-built page where users can update their credit card, cancel, or change plans. We just redirect them to it
+1. **Connect Onboarding** — Voice owners connect their Stripe account via an onboarding flow (`/api/stripe/connect`). Stripe handles identity verification and bank account setup
+2. **Payment Intents** — When a buyer uses a paid voice, a payment is authorized upfront and captured when the podcast reaches READY status (cancelled on FAILED)
+3. **Webhooks** — Stripe sends events to our `/api/stripe/webhooks` endpoint. We handle `account.updated` (Connect onboarding status changes) and `payment_intent.payment_failed` (voice purchase failures)
 
 Key Stripe concepts:
 
-- **Secret Key** (`sk_live_...`) — used server-side to create charges and manage subscriptions. Never expose this publicly
-- **Publishable Key** (`pk_live_...`) — used client-side (in the browser) to initialize Stripe's payment form. Safe to expose
+- **Secret Key** (`sk_live_...`) — used server-side to create payment intents and manage Connect accounts. Never expose this publicly
 - **Webhook Secret** (`whsec_...`) — used to verify that webhook requests actually came from Stripe, not an impersonator
 
 ### What is ElevenLabs?
@@ -194,7 +192,7 @@ In Next.js, an **API route** is a backend endpoint defined as a file. `src/app/a
 
 ### What is a Webhook?
 
-A **webhook** is a "reverse API call" — instead of _us_ calling Stripe to check if a payment went through, _Stripe calls us_ when it happens. Stripe sends an HTTP POST request to our `/api/webhooks/stripe` endpoint with details like "user X's subscription was renewed" or "user Y's card was declined." This is how we keep our database in sync with Stripe's records without polling.
+A **webhook** is a "reverse API call" — instead of _us_ calling Stripe to check if something happened, _Stripe calls us_ when it happens. Stripe sends an HTTP POST request to our `/api/stripe/webhooks` endpoint with details like "voice seller X completed onboarding" or "payment intent Y failed." This is how we keep our database in sync with Stripe's records without polling.
 
 ### What is NextAuth?
 
@@ -217,9 +215,9 @@ We use Server Components by default and only opt into Client Components when we 
 
 **CSS Modules** is a styling approach where each component has its own `.module.css` file. Class names are automatically scoped — so `.button` in `Card.module.css` won't conflict with `.button` in `Header.module.css`. The build system transforms `.button` into something like `.Card_button_a3f2x` to guarantee uniqueness. We use this instead of Tailwind CSS (utility-first classes like `className="flex p-4 bg-blue-500"`) for more readable, maintainable styles.
 
-### What is a PWA?
+### What about Mobile?
 
-**PWA (Progressive Web App)** makes a website installable on phones — users can add it to their home screen and it behaves like a native app (full screen, offline support, push notifications). We use this as our mobile strategy instead of building a separate iOS/Android app. The `manifest.json` and `sw.js` (service worker) files make this possible.
+Sotto has a **native iOS app** built with React Native + Expo (`apps/mobile/`). It's distributed via TestFlight during development and the App Store for production (see `docs/24-ios-testflight-appstore-guide.md`). The web app also works on mobile browsers.
 
 ---
 
@@ -680,13 +678,12 @@ R2_SECRET_ACCESS_KEY=...
 R2_BUCKET_NAME=sotto-storage
 R2_PUBLIC_URL=https://pub-xxxxx.r2.dev
 
-# Payments - get from https://dashboard.stripe.com/
+# Stripe Connect (voice marketplace) - get from https://dashboard.stripe.com/
 STRIPE_SECRET_KEY=sk_live_...
-STRIPE_PUBLISHABLE_KEY=pk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_STARTER=price_...
-STRIPE_PRICE_ID_PRO=price_...
-STRIPE_PRICE_ID_STUDIO=price_...
+
+# Telegram bot - get from @BotFather on Telegram
+# TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
 
 ### 4.3a Import secrets into Doppler (one-time)
@@ -843,9 +840,9 @@ After setup, the app automatically stores files at these paths:
 
 ---
 
-## Step 4B: Set Up Stripe (Payments)
+## Step 4B: Set Up Stripe Connect (Voice Marketplace)
 
-> **What we're doing:** Stripe handles all money: monthly subscriptions, one-time credit pack purchases, and the customer billing portal. Instead of dealing with credit card numbers directly (which requires PCI compliance — a massive security burden), users enter payment info on Stripe's hosted checkout page. Stripe processes the payment and notifies our server via webhooks. We never see or store credit card numbers.
+> **What we're doing:** Stripe Connect powers the voice marketplace. Voice clone owners connect their Stripe accounts to receive payments when others use their voices. Payments are authorized when a buyer starts generating a podcast with a paid voice, captured when the podcast reaches READY, and cancelled if generation fails. The platform takes a 10% fee. Stripe handles identity verification, bank setup, and payouts — we never touch seller funds directly.
 
 ### 4B.1 Create a Stripe account
 
@@ -853,89 +850,55 @@ After setup, the app automatically stores files at these paths:
 2. Verify your email
 3. **Start in Sandbox** — toggle the **"Sandbox"** switch in the top-right corner (previously called "Test mode"). Sandbox uses fake money so you can verify everything works before going live
 
-### 4B.2 Get your API keys
+### 4B.2 Enable Stripe Connect
 
-1. Go to **Developers** → **API keys** (or click the key icon in the top-right)
-2. You'll see two keys:
-   - **Publishable key** (`pk_test_...`) — used in the browser to initialize Stripe checkout. Safe to expose publicly
-   - **Secret key** (`sk_test_...`) — used server-side to create charges. **Never expose this**. Click **Reveal key** to see it
-3. Copy both — they go into your `.env`
+1. Go to **Settings** → **Connect** (or navigate to **Connect** in the left sidebar)
+2. Click **Get started with Connect**
+3. Platform profile:
+   - **Platform type**: select **Marketplace** (buyers pay sellers through your platform)
+   - **Business type**: fill in your details
+4. Under **Connected account types**, enable **Standard** (sellers use their own Stripe dashboard)
+5. Under **Branding**, set:
+   - **Platform name**: `Sotto`
+   - **Icon**: upload your logo
+   - **Brand color**: `#D97706` (Sotto amber)
 
-### 4B.3 Create subscription products
+### 4B.3 Get your API keys
 
-Sotto has 3 paid tiers. Each needs a **Product** with a **Price** in Stripe.
+1. Go to **Developers** → **API keys**
+2. Copy the **Secret key** (`sk_test_...`) — used server-side for Connect and payment intents. **Never expose this**
+3. This goes into `STRIPE_SECRET_KEY` in your `.env`
 
-1. Go to **Products** → **Add product**
+### 4B.4 Create the webhook endpoint
 
-**Product 1: Sotto Starter**
-
-- **Name**: `Sotto Starter`
-- **Description**: `3 credits/month, 10 min podcasts, 5 interactions per podcast, 1 voice clone`
-- Under **Pricing**, click **Add price**:
-  - **Price**: `$14.00`
-  - **Billing period**: `Monthly`
-  - **Currency**: `USD`
-- Click **Save product**
-- Copy the **Price ID** (starts with `price_...`) — visible on the product page under the price → `STRIPE_PRICE_ID_STARTER`
-
-**Product 2: Sotto Pro**
-
-- **Name**: `Sotto Pro`
-- **Description**: `10 credits/month, 10 min podcasts, unlimited interactions, 3 voice clones, private podcasts`
-- **Price**: `$34.00` / Monthly / USD
-- Copy the Price ID → `STRIPE_PRICE_ID_PRO`
-
-**Product 3: Sotto Studio**
-
-- **Name**: `Sotto Studio`
-- **Description**: `20 credits/month, 10 min podcasts, unlimited interactions, 10 voice clones, premium SFX`
-- **Price**: `$69.00` / Monthly / USD
-- Copy the Price ID → `STRIPE_PRICE_ID_STUDIO`
-
-### 4B.4 Credit packs (no Stripe setup needed)
-
-Credit packs (3 for $7, 10 for $20, 25 for $45) are one-time purchases for users who need extra credits beyond their monthly allowance. These are created as **inline prices** at checkout time — no Stripe Products or Price IDs needed. The amounts are hardcoded in `src/app/api/billing/checkout/route.ts`.
-
-### 4B.5 Create the webhook endpoint
-
-**Webhooks** are how Stripe tells our server about payment events ("user X subscribed," "user Y's card was declined"). Without webhooks, our database wouldn't know about subscription changes.
+**Webhooks** tell our server about Connect account changes and payment outcomes.
 
 1. Go to **Developers** → **Webhooks**
 2. Click **Add endpoint**
 3. Set:
-   - **Endpoint URL**: `https://sotto.fm/api/webhooks/stripe`
-   - (For local testing, use the Stripe CLI instead — see 4B.8)
-4. Under **Events to send**, click **Select events** and check these 5:
+   - **Endpoint URL**: `https://sotto.fm/api/stripe/webhooks`
+   - (For local testing, use the Stripe CLI — see 4B.7)
+4. Under **Events to send**, click **Select events** and check:
 
-| Event                           | When it fires                                        | What our server does                                           |
-| ------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
-| `checkout.session.completed`    | User finishes payment on Stripe checkout page        | Creates subscription record, grants monthly credits            |
-| `customer.subscription.updated` | Subscription renews, plan changes, or status changes | Updates tier, resets credits on renewal, handles plan switches |
-| `customer.subscription.deleted` | Subscription fully canceled                          | Downgrades user to Free tier, resets credits to 2              |
-| `invoice.payment_failed`        | Card declined on renewal                             | Sets status to PAST_DUE, sends in-app notification             |
-| `invoice.paid`                  | Successful renewal payment                           | Grants monthly credits + rollover                              |
+| Event                             | When it fires                                       | What our server does                                            |
+| --------------------------------- | --------------------------------------------------- | --------------------------------------------------------------- |
+| `account.updated`                 | Connected account completes onboarding or changes   | Updates `stripeOnboarded` status on User model                  |
+| `payment_intent.payment_failed`   | Voice purchase payment fails                        | Updates VoicePurchase status to `cancelled`, notifies buyer     |
 
 5. Click **Add endpoint**
 6. On the endpoint page, click **Reveal** under **Signing secret**
 7. Copy the signing secret (`whsec_...`) → `STRIPE_WEBHOOK_SECRET`
 
-**What is the signing secret?** When Stripe sends a webhook to our server, it includes a cryptographic signature. Our server uses this secret to verify the request actually came from Stripe, not an impersonator trying to fake a subscription.
+### 4B.5 How the payment flow works
 
-### 4B.6 Configure the Customer Portal
+The voice marketplace uses an authorize-then-capture pattern:
 
-The **Customer Portal** is a Stripe-hosted page where users can update their credit card, switch plans, cancel, and view invoices — without us building any of that UI.
+1. **Authorize** — When a buyer generates a podcast with a paid voice, a `PaymentIntent` is created with `capture_method: 'manual'`. The buyer's card is validated and funds are held
+2. **Capture** — When the podcast reaches READY status, the payment is captured (funds transferred to seller minus 10% platform fee)
+3. **Cancel** — If generation fails (podcast status = FAILED), the hold is released and the buyer is not charged
+4. **Free paths** — Voice owners, allowlisted users, approved VoiceRequest holders, and existing purchasers bypass payment entirely
 
-1. Go to **Settings** → **Billing** → **Customer portal** (or search "Customer portal" in the Stripe dashboard)
-2. Enable these features:
-   - **Invoices**: Allow viewing invoice history ✓
-   - **Payment methods**: Allow updating payment method ✓
-   - **Subscriptions**: Allow canceling and switching plans ✓
-   - **Cancel subscriptions**: Set to **Cancel at end of billing period** (not immediate — users keep access until their paid period ends)
-3. Under **Products**, add all 3 subscription products (Starter, Pro, Studio) so users can switch between them
-4. Set **Default return URL**: `https://sotto.fm/billing`
-5. Click **Save**
-
-### 4B.7 Update your .env
+### 4B.6 Update your .env
 
 SSH into the server and add the Stripe variables:
 
@@ -947,20 +910,14 @@ nano ~/sotto/.env
 Add these lines:
 
 ```env
-# === STRIPE PAYMENTS ===
+# === STRIPE CONNECT (VOICE MARKETPLACE) ===
 STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxx
-STRIPE_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxx
 STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
-STRIPE_PRICE_ID_STARTER=price_xxxxxxxxxxxxx
-STRIPE_PRICE_ID_PRO=price_xxxxxxxxxxxxx
-STRIPE_PRICE_ID_STUDIO=price_xxxxxxxxxxxxx
 ```
 
-**Note:** Credit pack prices ($5/3 credits, $14/10 credits, $30/25 credits) don't need Stripe Price IDs — they're created as inline prices at checkout time.
+**Note:** If `STRIPE_SECRET_KEY` is missing, voice marketplace features gracefully disable — the app still runs, users just can't buy/sell voices. Safe to leave unset during early testing.
 
-**Note:** If `STRIPE_SECRET_KEY` is missing, billing features gracefully disable — the app still runs, users just can't subscribe. Safe to leave unset during early testing.
-
-### 4B.8 Test locally with Stripe CLI (optional but recommended)
+### 4B.7 Test locally with Stripe CLI (optional but recommended)
 
 The Stripe CLI lets you test webhooks on `localhost` without deploying. It forwards Stripe events to your local dev server.
 
@@ -977,38 +934,38 @@ sudo apt update && sudo apt install stripe
 stripe login
 
 # Forward webhooks to your local server
-stripe listen --forward-to localhost:3000/api/webhooks/stripe
+stripe listen --forward-to localhost:3000/api/stripe/webhooks
 # Outputs: whsec_xxxxx → use this as STRIPE_WEBHOOK_SECRET for local dev
 ```
 
-**Test the full flow:**
+**Test the Connect flow:**
 
 1. Start your local dev server (`npm run dev`)
 2. Start Stripe CLI forwarding (command above)
-3. Visit `localhost:3000/pricing` and click "Subscribe to Starter"
-4. Use test card number `4242 4242 4242 4242` (any future date, any CVC)
-5. Complete checkout
-6. Check your terminal — you should see the webhook events arrive
-7. Verify the subscription was created: check the database or visit `/billing`
+3. Create a voice clone and set a price in `/settings/voices`
+4. Click "Connect Stripe" — complete the Connect onboarding
+5. From a different account, generate a podcast using the paid voice
+6. Check your terminal — you should see `account.updated` events arrive
+7. Verify VoicePurchase records in the database
 
-**Other test card numbers:**
+**Test card numbers:**
 
+- `4242 4242 4242 4242` — Successful payment
 - `4000 0000 0000 9995` — Card declined
 - `4000 0000 0000 3220` — Requires 3D Secure authentication
 
-### 4B.9 Going live (when ready)
+### 4B.8 Going live (when ready)
 
 When you're done testing and want real money:
 
 1. Complete Stripe's **account activation** (Settings → Account details — requires business info, bank account for payouts)
 2. Toggle off **Sandbox** in the dashboard (switch to live mode)
-3. Create the same 3 products with **live prices** (sandbox prices don't work in live mode)
-4. Get **live API keys** (`sk_live_...`, `pk_live_...`) from Developers → API keys
-5. Create a **live webhook endpoint** at `https://sotto.fm/api/webhooks/stripe` with the same 5 events
-6. Update your production `.env` with the live keys and price IDs
-7. Restart the web container: `docker compose -f docker-compose.prod.yml restart web`
+3. Get **live API keys** (`sk_live_...`) from Developers → API keys
+4. Create a **live webhook endpoint** at `https://sotto.fm/api/stripe/webhooks` with the same events
+5. Update your production `.env` with the live keys
+6. Restart the web container: `docker compose -f docker-compose.prod.yml restart web`
 
-**Important:** Sandbox and live mode are completely separate. Sandbox products, customers, and webhooks don't exist in live mode. You need to recreate everything.
+**Important:** Sandbox and live mode are completely separate. Sandbox Connected accounts, payment intents, and webhooks don't exist in live mode. You need to recreate everything.
 
 ---
 
@@ -1099,7 +1056,7 @@ The login/signup pages automatically show buttons only for configured providers.
 | `postgres` | `postgres:16-alpine`            | PostgreSQL database — stores all app data (users, podcasts, etc.)                                                             | Internal only    |
 | `redis`    | `redis:7-alpine`                | Job queue + cache — stores temporary data in RAM for speed (512MB max, LRU eviction means oldest data gets deleted when full) | Internal only    |
 | `web`      | Built from `Dockerfile`         | Next.js app (standalone mode) — serves the website and API                                                                    | `127.0.0.1:3000` |
-| `workers`  | Built from `Dockerfile.workers` | Background job processors (11 types) + FFmpeg (audio/video tool) — handles podcast generation, TTS, stitching                 | Internal only    |
+| `workers`  | Built from `Dockerfile.workers` | Background job processors (23 types) + FFmpeg (audio/video tool) — handles podcast generation, TTS, stitching, notifications, Telegram, Twitter, and more | Internal only    |
 
 "Alpine" in the image names (e.g., `postgres:16-alpine`) means using Alpine Linux as the base — a tiny Linux distribution (~5MB vs ~100MB for regular Ubuntu). Smaller images = faster downloads and less disk usage.
 

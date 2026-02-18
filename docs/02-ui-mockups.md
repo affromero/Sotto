@@ -16,7 +16,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ```
 +============================================================+
-|  [Logo: Sotto]                    [Feed] [Pricing] [Login]  |
+|  [Logo: Sotto]                             [Feed] [Login]   |
 +============================================================+
 |                                                              |
 |            "Podcasts that listen back."                       |
@@ -72,8 +72,11 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
-|  PRICING          [See docs/pricing page for full layout]    |
-|  Embedded PricingCard x4 (Free / Starter / Pro / Studio)        |
+|  BRING YOUR OWN KEYS                                         |
+|  All features free. Bring your own AI + TTS API keys.        |
+|  No subscriptions, no credits, no limits.                    |
+|                                                              |
+|  [Get Started — It's Free]                                   |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
@@ -88,7 +91,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 1.3 Section Details
 
-**Navigation bar**: Fixed top. Logo (DM Serif Display, amber) left-aligned. Navigation links right-aligned: Feed, Pricing, Login. On mobile, Login becomes a button and Feed/Pricing collapse into a hamburger menu.
+**Navigation bar**: Fixed top. Logo (DM Serif Display, amber) left-aligned. Navigation links right-aligned: Feed, Login. On mobile, Login becomes a button and Feed collapses into a hamburger menu.
 
 **Hero section**: Cream background. Headline in DM Serif Display, 48px. Subheadline in Inter, 18px, text-secondary color. Two CTAs: primary button "Create Your First Podcast" (amber, full-width on mobile) and secondary outline button "Explore the Feed." Vertical padding: 64px top, 48px bottom.
 
@@ -98,7 +101,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 **What Makes Sotto Different**: 2x2 grid of feature cards (single column on mobile). Each card has an icon (Lucide), heading, and 2-sentence description.
 
-**Pricing Preview**: Four PricingCard components side-by-side (stacked on mobile, 2x2 on tablet). Abbreviated version of the pricing page.
+**BYOK Section**: Single card explaining the BYOK model: all features free, bring your own AI and TTS API keys, no subscriptions or credits. Includes a CTA button linking to signup.
 
 **Final CTA**: Full-width amber background. White text headline. Single centered button.
 
@@ -113,7 +116,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 | How It Works cards | Stacked vertically  | 3 columns      | 3 columns          |
 | Featured Podcasts  | Horizontal scroll   | 2 columns      | 3 columns          |
 | Feature grid       | Single column       | 2 columns      | 2 columns          |
-| Pricing cards      | Stacked vertically  | 2 columns      | 4 columns          |
+| BYOK section       | Full width, stacked | Centered card  | Centered card      |
 
 ---
 
@@ -133,6 +136,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |              |   [Continue with Google]   |    signup)        |
 |              |   [Continue with GitHub]   |                  |
 |              |   [Continue with Apple]    |                  |
+|              |   [Continue with Twitter]  |                  |
 |              |                            |                  |
 |              |   -------- or --------     |                  |
 |              |                            |                  |
@@ -189,9 +193,9 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |          |                                                     |
 | [Home]   |  Good morning, Priya.                              |
 |[Discover]|                                                     |
-| [Create] |  USAGE THIS MONTH                                  |
-|[Billing] |  +------------------------------------------------+|
-|[Settings]|  | [====........] 1 of 2 credits used    [Upgrade]||
+| [Create] |  API KEYS                                          |
+|[Keys]   |  +------------------------------------------------+|
+|[Settings]|  | AI Key: ✓ Anthropic    TTS Key: ✓ ElevenLabs   ||
 |          |  +------------------------------------------------+|
 |          |                                                     |
 |          |  YOUR PODCASTS                                      |
@@ -232,13 +236,13 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 
 ### 3.2 Section Details
 
-**Sidebar** (desktop only): Fixed left, 260px wide. Background: white surface. Logo at top, navigation links below. Active link has amber left border and amber text. Links: Dashboard, Discover (feed), Create. Role-dependent links follow: Analytics, Voices, Team (CREATOR/ADMIN only). Then Billing (non-admin), Settings. Admin users also see an "Admin Panel" link.
+**Sidebar** (desktop only): Fixed left, 260px wide. Background: white surface. Logo at top, navigation links below. Active link has amber left border and amber text. Links: Dashboard, Discover (feed), Create. Role-dependent links follow: Analytics, Voices, Team (CREATOR/ADMIN only). Then API Keys (non-admin), Settings. Admin users also see an "Admin Panel" link.
 
 **TopBar**: Fixed top, extends right of sidebar. Page title left, notification bell and user avatar/dropdown right. Bell shows unread count badge (amber circle with white number).
 
 **Greeting**: Personalized "Good morning/afternoon/evening, {name}." DM Serif Display, h2.
 
-**Usage meter**: Card with progress bar. Shows "X of Y credits used this month." Progress bar fills with amber. If near limit (>80%), shows warning color. Upgrade button (outline) links to pricing page.
+**API Keys status**: Card showing BYOK key configuration status. Displays provider name and status indicator for each key type: AI key (e.g., "Anthropic ✓" or "Not configured") and TTS key (e.g., "ElevenLabs ✓" or "Not configured"). Unconfigured keys show an amber "Add Key" link to the API Keys page.
 
 **Your Podcasts**: Grid of the user's own podcasts. Each card shows title, status badge (color-coded: READY=green, GENERATING_AUDIO=amber pulsing, FAILED=red), duration, play count. In-progress podcasts show a progress bar instead of play count. Empty state: single "Create New" card with plus icon.
 
@@ -646,88 +650,94 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ---
 
-## 8. Pricing (`/pricing`)
+## 8. How It Works (`/pricing`)
 
 ### 8.1 Layout Structure
 
 ```
 +============================================================+
-|  [Nav: Logo    Feed  Pricing  Login]                        |
+|  [Nav: Logo    Feed  Login]                                  |
 +============================================================+
 |                                                              |
-|        Choose your plan                                      |
-|        Start free, upgrade when you need more.               |
+|        Every feature. Zero cost.                             |
+|        Bring your own API keys and start creating.           |
 |                                                              |
-|  +-------------+  +-------------+  +-------------+  +-------------+  |
-|  |             |  |             |  | MOST POPULAR|  |             |  |
-|  |  FREE       |  |  STARTER    |  |  PRO        |  |  STUDIO     |  |
-|  |  $0/month   |  |  $9/month   |  |  $24/month  |  |  $49/month  |  |
-|  |             |  |             |  |             |  |             |  |
-|  |  ✓ 2 credits|  |  ✓ 5 credits|  |  ✓ 15 credits|  |  ✓ 50 credits|  |
-|  |  ✓ 10 min   |  |  ✓ 10 min   |  |  ✓ 10 min   |  |  ✓ 10 min   |  |
-|  |  ✓ 2 Q&As   |  |  ✓ 5 Q&As   |  |  ✓ Unlimited|  |  ✓ Unlimited|  |
-|  |  ✓ Public   |  |  ✓ 1 clone  |  |  ✓ Private  |  |  ✓ Premium  |  |
-|  |  ✓ Community|  |  ✓ Download |  |  ✓ Analytics|  |  ✓ Marketplace|
-|  |             |  |             |  |  ✓ 3 clones |  |  ✓ 10 clones|  |
-|  |             |  |             |  |  ✓ PDF export|  |  ✓ 0 premium|  |
-|  |             |  |             |  |             |  |  ✓ Premium SFX|
-|  |  [Start]    |  |  [Upgrade]  |  |  [Upgrade]  |  |  [Go Studio]|  |
-|  |             |  |             |  |             |  |             |  |
-|  +-------------+  +-------------+  +-------------+  +-------------+  |
+|  +----------------------------------------------------------+|
+|  |                                                          ||
+|  |  HOW BYOK WORKS                                         ||
+|  |                                                          ||
+|  |  1. Sign up for free                                     ||
+|  |  2. Add your AI key (Anthropic or OpenAI)                ||
+|  |  3. Add your TTS key (ElevenLabs, OpenAI, PlayHT,       ||
+|  |     Cartesia, or Hume)                                   ||
+|  |  4. Start creating — unlimited podcasts, Q&A,            ||
+|  |     voice clones, downloads, everything                  ||
+|  |                                                          ||
+|  +----------------------------------------------------------+|
+|                                                              |
+|  WHAT YOU GET                                                |
+|                                                              |
+|  +----------------------------+  +------------------------+  |
+|  | ✓ Unlimited podcasts       |  | ✓ Voice cloning        |  |
+|  | ✓ Unlimited Q&A            |  | ✓ Voice marketplace    |  |
+|  | ✓ Private podcasts         |  | ✓ PDF transcripts      |  |
+|  | ✓ Downloads                |  | ✓ Collections          |  |
+|  | ✓ Fork & remix             |  | ✓ Analytics            |  |
+|  | ✓ Social feed              |  | ✓ Import any podcast   |  |
+|  +----------------------------+  +------------------------+  |
+|                                                              |
++--------------------------------------------------------------+
+|                                                              |
+|  VOICE MARKETPLACE                                           |
+|                                                              |
+|  Create and sell custom voice clones. Set per-podcast        |
+|  pricing via Stripe Connect. Platform takes 10%.             |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
 |  COMING SOON                                                 |
 |                                                              |
 |  +-------------------------+  +-------------------------+    |
-|  | Video Explainers [SOON] |  | Voice Cloning    [SOON] |    |
-|  | AI-generated visuals    |  | Clone your own voice    |    |
-|  | synced to audio         |  | as Host or Expert       |    |
+|  | Video Explainers [SOON] |  | Course Mode      [SOON] |    |
+|  | AI-generated visuals    |  | Series with knowledge   |    |
+|  | synced to audio         |  | checks and progress     |    |
 |  +-------------------------+  +-------------------------+    |
 |  +-------------------------+  +-------------------------+    |
-|  | Course Mode      [SOON] |  | Multi-Language   [SOON] |    |
-|  | Series with knowledge   |  | Generate in 29          |    |
-|  | checks and progress     |  | languages               |    |
-|  +-------------------------+  +-------------------------+    |
-|  +-------------------------+  +-------------------------+    |
-|  | Live Collab      [SOON] |  | Embed Widget     [SOON] |    |
-|  | Listen together with    |  | Embeddable player       |    |
-|  | shared Q&A              |  | for blogs and docs      |    |
-|  +-------------------------+  +-------------------------+    |
-|  +-------------------------+  +-------------------------+    |
-|  | Custom Intro     [SOON] |  | Playlists        [SOON] |    |
-|  | Branded podcast         |  | Curated ordered         |    |
-|  | intro music             |  | collections             |    |
+|  | Multi-Language   [SOON] |  | Live Collab      [SOON] |    |
+|  | Generate in 29          |  | Listen together with    |    |
+|  | languages               |  | shared Q&A              |    |
 |  +-------------------------+  +-------------------------+    |
 |                                                              |
 +--------------------------------------------------------------+
 |                                                              |
 |  FAQ                                                         |
 |                                                              |
-|  [▸ What counts as a podcast?               ]                |
-|  [▸ Can I cancel anytime?                   ]                |
-|  [▸ What happens to my podcasts if I cancel?]                |
-|  [▸ How does the Creator plan work?         ]                |
+|  [▸ Where do I get API keys?                 ]               |
+|  [▸ How much do API keys cost?               ]               |
+|  [▸ What happens to my podcasts if I remove keys?]           |
+|  [▸ How does the voice marketplace work?     ]               |
 |                                                              |
 +--------------------------------------------------------------+
 ```
 
 ### 8.2 Section Details
 
-**Pricing cards**: Four cards side by side. Pro card is slightly elevated (larger shadow, "MOST POPULAR" badge at top in amber). Each card: white background, border, tier name (h3), price (display size, DM Serif Display), feature list (checkmarks in amber), CTA button (Free=outline, Starter=outline, Pro=primary amber, Studio=secondary accent).
+**BYOK explanation**: Single centered card with a numbered step list explaining the onboarding flow. Headline in DM Serif Display: "Every feature. Zero cost." Subheadline: "Bring your own API keys and start creating."
 
-**SOON badges**: Small amber pill badges next to feature names. Uses the SoonBadge component.
+**What You Get**: 2-column grid of feature checkmarks (single column on mobile). All features listed with amber checkmarks. No tier distinctions — every user gets everything.
+
+**Voice Marketplace**: Card explaining the Stripe Connect voice marketplace. Voice owners set per-podcast pricing, buyers pay once per podcast, platform takes 10%.
 
 **Coming Soon section**: 2-column grid (single column on mobile) of feature preview cards. Each card has a feature name, SOON badge, and 1-2 sentence description. Subtle styling (lighter border, text-secondary descriptions) to indicate these are not yet available.
 
-**FAQ section**: Accordion-style collapsible questions. Chevron icon rotates on expand. Single question open at a time. Answers appear below with slide-down animation.
+**FAQ section**: Accordion-style collapsible questions. Chevron icon rotates on expand. Single question open at a time. Answers appear below with slide-down animation. Questions updated for BYOK model (key sources, cost expectations, voice marketplace).
 
 ### 8.3 Responsive Behavior
 
 | Element           | Mobile             | Tablet             | Desktop            |
 | ----------------- | ------------------ | ------------------ | ------------------ |
-| Pricing cards     | Stacked vertically | 2 columns          | 4 columns          |
-| Pro card emphasis | Amber top border   | Elevated, larger   | Elevated, larger   |
+| BYOK card         | Full width         | Max 600px centered | Max 600px centered |
+| Feature grid      | 1 column           | 2 columns          | 2 columns          |
 | Coming Soon grid  | 1 column           | 2 columns          | 2 columns          |
 | FAQ               | Full width         | Max 700px centered | Max 700px centered |
 
@@ -783,6 +793,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |          |  |  Google    Connected as priya@gmail.com         ||
 |          |  |  GitHub    [Connect]                            ||
 |          |  |  Apple     [Connect]                            ||
+|          |  |  Twitter   [Connect]                            ||
 |          |  +------------------------------------------------+|
 |          |                                                     |
 |          |  DANGER ZONE                                        |
@@ -819,94 +830,65 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 ---
 
-## 10. Billing (`/(dashboard)/billing`)
+## 10. API Keys & Usage (`/(dashboard)/billing`)
 
 ### 10.1 Layout Structure
 
 ```
 +----------+====================================================+
-|          |  [TopBar: Billing]                                  |
+|          |  [TopBar: API Keys & Usage]                         |
 | Sidebar  |====================================================|
 |          |                                                     |
-|          |  CURRENT PLAN                                       |
+|          |  AI KEYS                                            |
 |          |  +------------------------------------------------+|
-|          |  |  Free Plan                                     ||
-|          |  |  $0/month                                      ||
-|          |  |                                                ||
-|          |  |  1 of 2 credits used this month                ||
-|          |  |  [=====...............] 50%                    ||
-|          |  |                                                ||
-|          |  |  Resets on March 1, 2026                       ||
-|          |  |                                                ||
-|          |  |  [Upgrade to Pro]  [View All Plans]            ||
-|          |  |                                                ||
+|          |  |  Anthropic   ✓ Configured    [Update] [Remove] ||
+|          |  |  OpenAI      ○ Not configured         [Add Key]||
 |          |  +------------------------------------------------+|
 |          |                                                     |
-|          |  USAGE DETAILS                                      |
+|          |  TTS KEYS                                           |
 |          |  +------------------------------------------------+|
-|          |  |  Credits used:      1 / 2                      ||
-|          |  |  Max duration:      10 min                     ||
-|          |  |  Interactions used: 2 / 4 (2 per podcast)      ||
-|          |  |  Visibility:        Public only                ||
+|          |  |  ElevenLabs  ✓ Configured    [Update] [Remove] ||
+|          |  |  OpenAI      ○ Not configured         [Add Key]||
+|          |  |  PlayHT      ○ Not configured         [Add Key]||
+|          |  |  Cartesia    ○ Not configured         [Add Key]||
+|          |  |  Hume        ○ Not configured         [Add Key]||
 |          |  +------------------------------------------------+|
 |          |                                                     |
-|          |  BILLING HISTORY                                    |
+|          |  USAGE STATS                                        |
 |          |  +------------------------------------------------+|
-|          |  |  No billing history (Free plan)                ||
+|          |  |  Podcasts generated:  23 (this month)           ||
+|          |  |  Interactions:        47 (this month)           ||
+|          |  |  Audio generated:     4h 12m (this month)       ||
+|          |  +------------------------------------------------+|
+|          |                                                     |
+|          |  VOICE MARKETPLACE EARNINGS                         |
+|          |  +------------------------------------------------+|
+|          |  |  Stripe Connect: ✓ Connected                   ||
+|          |  |  Earnings this month:  $12.40                   ||
+|          |  |  Pending payout:       $8.20                    ||
+|          |  |  [View Stripe Dashboard]                        ||
 |          |  +------------------------------------------------+|
 |          |                                                     |
 +----------+-----------------------------------------------------+
 ```
 
-**For paid users, the billing section shows:**
-
-```
-          |  CURRENT PLAN                                       |
-          |  +------------------------------------------------+|
-          |  |  Pro Plan                                      ||
-          |  |  $24/month                                     ||
-          |  |                                                ||
-          |  |  Next billing date: March 8, 2026              ||
-          |  |  Payment method: Visa ending 4242              ||
-          |  |                                                ||
-          |  |  [Manage Subscription]  [Change Plan]          ||
-          |  |                                                ||
-          |  +------------------------------------------------+|
-          |                                                     |
-          |  USAGE THIS PERIOD                                  |
-          |  +------------------------------------------------+|
-          |  |  Credits: 8 / 15                               ||
-          |  |  [==========..........] 53%                     ||
-          |  |                                                ||
-          |  |  Rollover: 2 / 5 max                            ||
-          |  |  Interactions: 45 (unlimited per podcast)       ||
-          |  +------------------------------------------------+|
-          |                                                     |
-          |  BILLING HISTORY                                    |
-          |  +------------------------------------------------+|
-          |  |  Feb 8, 2026   Pro Plan    $24.00   [Receipt]  ||
-          |  |  Jan 8, 2026   Pro Plan    $24.00   [Receipt]  ||
-          |  |  Dec 8, 2025   Pro Plan    $24.00   [Receipt]  ||
-          |  +------------------------------------------------+|
-```
-
 ### 10.2 Section Details
 
-**Current plan card**: Shows tier name, price, usage progress bar, and billing cycle dates. Free users see upgrade CTA. Paid users see "Manage Subscription" (opens Stripe customer portal) and "Change Plan" options.
+**AI Keys section**: Card listing supported AI providers (Anthropic, OpenAI). Each row shows provider name, configuration status (green checkmark if configured, gray circle if not), and action buttons. Configured keys show "Update" and "Remove" buttons. Unconfigured keys show "Add Key" button that opens a modal with a masked input field. Keys are encrypted with AES-256-GCM via the BYOK system.
 
-**Usage details**: Detailed breakdown of all tier limits with current usage. Progress bars for countable limits (credits, rollover). Text for non-countable limits (duration, visibility, interactions).
+**TTS Keys section**: Same pattern as AI Keys but for all 5 TTS providers (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). At least one TTS key is required for audio generation.
 
-**Billing history**: Table of past charges with date, description, amount, and receipt link (opens Stripe-hosted receipt). Empty state for free users.
+**Usage Stats**: Card showing generation activity this month. Displays podcast count, interaction count, and total audio duration generated. No limits — purely informational.
 
-**Cancel subscription**: For paid users, a "Cancel subscription" link at the bottom. Opens a confirmation modal: "Your plan will remain active until {periodEnd}. After that, you'll be moved to the Free plan. Your existing podcasts will remain accessible."
+**Voice Marketplace Earnings**: Card showing Stripe Connect status and earnings from voice clone sales. Displays monthly earnings, pending payout amount, and a link to the Stripe dashboard. Only visible to users with at least one voice clone listed on the marketplace. Users without Stripe Connect see a "Connect Stripe" CTA instead.
 
 ### 10.3 Responsive Behavior
 
-| Element         | Mobile       | Desktop       |
-| --------------- | ------------ | ------------- |
-| Plan card       | Full width   | Max 600px     |
-| Usage details   | Stacked rows | 2-column grid |
-| Billing history | Card list    | Table         |
+| Element             | Mobile       | Desktop       |
+| ------------------- | ------------ | ------------- |
+| Key sections        | Full width   | Max 600px     |
+| Usage stats         | Stacked rows | 2-column grid |
+| Marketplace section | Full width   | Max 600px     |
 
 ---
 
@@ -988,7 +970,7 @@ LandingPage
 ├── HowItWorks (3x FeatureCard)
 ├── FeaturedPodcasts (3x PodcastCard)
 ├── DifferentiatorGrid (4x FeatureCard)
-├── PricingPreview (3x PricingCard)
+├── BYOKSection (BYOK explainer card, CTA)
 ├── FinalCTA (headline, button)
 └── Footer
 ```
@@ -1001,7 +983,7 @@ DashboardLayout
 ├── TopBar (title, NotificationBell, UserMenu)
 ├── DashboardPage
 │   ├── Greeting
-│   ├── UsageMeter (progress bar, upgrade CTA)
+│   ├── ApiKeyStatus (BYOK key configuration indicators)
 │   ├── PodcastGrid (PodcastCard[])
 │   │   └── CreateCard (empty state CTA)
 │   ├── LikedSavedSection (PodcastCard[])
@@ -1087,7 +1069,7 @@ Every list and grid has a designed empty state:
 | Feed - No Podcasts        | "The feed is empty. Be the first to create a podcast!" with [Create Podcast] button                                         |
 | Profile - No Podcasts     | "This creator hasn't published any podcasts yet." (viewing others) or "You haven't created any podcasts yet." (viewing own) |
 | Notifications             | "All caught up! You'll see notifications here when someone likes, forks, or follows."                                       |
-| Billing History           | "No billing history. You're on the Free plan."                                                                              |
+| Marketplace Earnings      | "No voice marketplace earnings yet. List a voice clone to start earning."                                                    |
 
 All empty states use text-secondary color, centered layout, and include a relevant action button or link when applicable.
 

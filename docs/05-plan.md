@@ -136,13 +136,13 @@ When tapped:
 
 ### Platforms
 
-| Platform    | Technology            | Priority      |
-| ----------- | --------------------- | ------------- |
-| **Web**     | Next.js (PWA-capable) | Phase 1 (MVP) |
-| **iOS**     | React Native + Expo   | Phase 2       |
-| **Android** | React Native + Expo   | Phase 3       |
+| Platform    | Technology            | Status  |
+| ----------- | --------------------- | ------- |
+| **Web**     | Next.js (App Router)  | Shipped |
+| **iOS**     | React Native + Expo   | Shipped |
+| **Android** | React Native + Expo   | Planned |
 
-Web-first for MVP, but designed mobile-first from day one. The chat-based discovery and Spotify-style player work equally well on web and native.
+Web and iOS are both live. Designed mobile-first from day one. The chat-based discovery and Spotify-style player work equally well on web and native.
 
 ---
 
@@ -161,69 +161,52 @@ This discovery feeds into the Claude system prompt as structured context, produc
 
 ---
 
-## Pricing & Tiers
+## Pricing Model: Free + BYOK + Voice Marketplace
 
-### Free
+**Generation is free.** Users bring their own API keys (BYOK) for both LLM and TTS providers. No subscriptions, no tiers, no credits.
 
-- **$0/month**
-- 2 credits/month (no rollover)
-- Listen unlimited (anyone's public podcasts)
-- Up to 10 min per podcast
-- 2 interactions per podcast
-- 0 voice clones
-- +1 premium voice surcharge
-- Public podcasts only
-- No download, no private, no analytics, no PDF export
-- Community feed access
+### BYOK (Bring Your Own Key)
 
-### Starter — $9/month
+| Requirement | Details |
+|-------------|---------|
+| AI key      | Anthropic or OpenAI — required for generation, Q&A, discovery chat |
+| TTS key     | ElevenLabs, OpenAI, PlayHT, Cartesia, or Hume — required for audio generation |
+| All features | Unlimited — voice clones, downloads, private podcasts, collections, analytics, PDF export |
 
-- **Everything in Free, plus:**
-- 5 credits/month (2 rollover)
-- 5 interactions per podcast
-- 1 voice clone
-- +1 premium voice surcharge
-- Download MP3s
+Keys are encrypted with AES-256-GCM (`BYOK_ENCRYPTION_KEY`) and stored in `UserAiKey` / `UserTtsKey` models.
 
-### Pro — $24/month
+### Voice Marketplace (Stripe Connect)
 
-- **Everything in Starter, plus:**
-- 15 credits/month (5 rollover)
-- Unlimited interactions
-- 3 voice clones
-- +1 premium voice surcharge
-- Private & unlisted podcasts
-- Voice library browsing
-- Analytics dashboard
-- PDF transcript export
+Voice owners connect Stripe and set a per-podcast price (or keep voices free). Buyers pay once per podcast.
 
-### Studio — $49/month
+- **Payment flow**: `VoicePurchase` authorized upfront → captured on podcast READY → cancelled on FAILED
+- **Platform fee**: 10% via Stripe Connect `application_fee_amount`
+- **Free access paths**: owner, allowlisted user, approved VoiceRequest, existing purchase
 
-- **Everything in Pro, plus:**
-- 50 credits/month (20 rollover)
-- 10 voice clones
-- 0 premium voice surcharge (included)
-- Premium sound effects (ElevenLabs SFX)
-- Voice marketplace listing
+### FreeTierConfig
 
-### Credit Packs (One-Time, Paid Tiers Only)
+Admin-configurable singleton row controlling platform defaults for users without BYOK keys:
 
-- 3 credits — $5
-- 10 credits — $15
-- 25 credits — $30
+- AI provider/model (default: Anthropic Claude Haiku 4.5)
+- TTS provider/model (default: OpenAI tts-1-hd)
+- Generation limit (default: 3 free generations)
 
-Each podcast generation costs **1 credit** (+ premium voice surcharge if applicable and not included in tier).
+### Rate Limiting
 
-### Premium Add-ons (SOON badges on pricing page)
+`checkGenerationGate(userId)` enforces access:
+- BYOK users and admins: always allowed, no counting
+- Free tier users: limited by `FreeTierConfig.generationLimit` (default 3), tracked via `User.freeGenerationsUsed`
+- Abuse prevention: 20 generations/hour, 100/day per user; 60 interactions/hour
 
-| Feature                | Tier    | Status  | Description                                                                          |
-| ---------------------- | ------- | ------- | ------------------------------------------------------------------------------------ |
-| **Video Explainers**   | Pro+    | SOON    | AI-generated visual companion (Manim/motion graphics) synced to podcast audio        |
-| **Course Mode**        | Pro+    | SOON    | Series of podcasts with knowledge checks, progress tracking, completion certificates |
-| **Multi-Language**     | Pro+    | SOON    | Generate the same podcast in 29 languages via ElevenLabs multilingual v2             |
-| **Custom Intro/Outro** | Creator | SOON    | Branded podcast intro music and outro with your name/company                         |
-| **Podcast Playlists**  | Free    | SOON    | Curate and share ordered collections of public podcasts                              |
-| **Embed Widget**       | Pro+    | Shipped | Embeddable player at `/podcast/[podcastId]/embed` with oEmbed at `/api/oembed`       |
+### Feature Add-ons
+
+| Feature               | Status  | Description                                                                          |
+| --------------------- | ------- | ------------------------------------------------------------------------------------ |
+| **Collections**       | Shipped | Curate and share ordered collections of public podcasts                              |
+| **Embed Widget**      | Shipped | Embeddable player at `/podcast/[podcastId]/embed` with oEmbed at `/api/oembed`       |
+| **Video Explainers**  | SOON    | AI-generated visual companion (Manim/motion graphics) synced to podcast audio        |
+| **Course Mode**       | SOON    | Series of podcasts with knowledge checks, progress tracking, completion certificates |
+| **Multi-Language**    | SOON    | Generate the same podcast in 29 languages via ElevenLabs multilingual v2             |
 
 ---
 
@@ -233,21 +216,22 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 
 ## Tech Stack
 
-| Layer         | Technology                                                                   |
-| ------------- | ---------------------------------------------------------------------------- |
-| Web Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind), PWA-capable |
-| Mobile (SOON) | React Native + Expo (iOS first, then Android)                                |
-| Database      | PostgreSQL + Prisma ORM                                                      |
-| Auth          | NextAuth.js v5 (email, Google, GitHub OAuth, Apple Sign In for iOS)          |
-| Queue         | Redis + BullMQ (6 worker types)                                              |
-| AI            | Anthropic Claude (discovery chat, script generation, Q&A interactions)       |
-| Audio         | ElevenLabs (multi-voice TTS per segment)                                     |
-| Stitching     | FFmpeg (segment concatenation + normalization)                               |
-| Storage       | Cloudflare R2 (S3-compatible, podcast audio + assets)                        |
-| Search        | PostgreSQL full-text search (MVP) → vector similarity (later)                |
-| Notifications | Web Push API (web) + Expo Push (mobile SOON)                                 |
-| Payments      | Stripe (Free $0/Starter $9/Pro $24/Studio $49 + credit packs)                |
-| Hosting       | Vercel (web) + Railway (workers)                                             |
+| Layer         | Technology                                                                        |
+| ------------- | --------------------------------------------------------------------------------- |
+| Web Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                   |
+| Mobile        | React Native + Expo (iOS app shipped)                                             |
+| Database      | PostgreSQL 16 + Prisma ORM (58+ models)                                           |
+| Auth          | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                    |
+| Queue         | Redis 7 + BullMQ (23 worker types)                                                |
+| AI            | Anthropic/OpenAI (swappable via `AI_PROVIDER` env var)                            |
+| Audio         | Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)                  |
+| Stitching     | FFmpeg (segment concatenation + normalization)                                    |
+| Storage       | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                  |
+| Search        | PostgreSQL full-text search                                                       |
+| Notifications | Web Push API (web) + Expo Push (mobile)                                           |
+| BYOK          | Users bring own LLM keys (Anthropic/OpenAI) + TTS keys (5 providers)             |
+| Payments      | Stripe Connect (voice marketplace, 10% platform fee) — no subscriptions           |
+| Hosting       | Hetzner VPS (Docker Compose + Caddy)                                              |
 
 ## Design System: "Warm Intimacy"
 
@@ -260,123 +244,77 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 
 ## Directory Structure
 
+npm workspaces monorepo with two apps and one shared package:
+
 ```
 ~/Code/Sotto/
-├── .env.example
-├── CLAUDE.md
-├── README.md
-├── docker-compose.yml          # PostgreSQL + Redis
-├── package.json
-├── tsconfig.json / next.config.js / eslint / prettier / vitest
-│
-├── docs/                       # Comprehensive docs (Quvo pattern)
-│   ├── 00-mvp-execution-plan.md      # Phase 1 roadmap, milestones, what to build first
-│   ├── 01-product-vision.md          # Problem, solution, target users, personas, positioning
-│   ├── 02-market-analysis.md         # TAM/SAM/SOM, competitors, moat, pricing rationale
-│   ├── 03-technical-architecture.md  # System design, worker pipeline, data flow, infra
-│   ├── 04-design-system.md           # Colors, typography, spacing, component specs
-│   ├── 05-ui-mockups.md              # Page-by-page layout specs, component hierarchy
-│   ├── 06-authentication-setup.md    # NextAuth config, OAuth providers, middleware
-│   ├── 07-stripe-billing.md          # Stripe products, webhooks, subscription lifecycle
-│   ├── 08-ai-prompts.md             # System prompts for discovery chat, script gen, Q&A
-│   ├── 09-discovery-chat-flow.md     # Chat agent behavior, recommendation logic, metadata extraction
-│   └── 10-mobile-strategy.md         # PWA now, React Native roadmap, push notifications
-│
-├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts
-├── scripts/setup.sh
-├── public/ (favicon, logo, fonts, manifest.json for PWA)
-│
-└── src/
-    ├── middleware.ts
-    ├── app/
-    │   ├── layout.tsx / page.tsx (landing)
-    │   ├── auth/ (login, signup)
-    │   ├── (dashboard)/ (dashboard, billing, settings)
-    │   ├── create/ (chat-based discovery → generation)
-    │   ├── podcast/[podcastId]/ (playback + interrupt + fork)
-    │   │   └── embed/ (embeddable player widget)
-    │   ├── feed/ (public social feed, search, tag browse)
-    │   ├── profile/[userId]/ (public profile, follow, their podcasts)
-    │   ├── pricing/ (pricing page with SOON badges)
-    │   └── api/
-    │       ├── auth/[...nextauth]/
-    │       ├── podcasts/ (CRUD, generate, interact, fork, like, save)
-    │       │   └── [podcastId]/
-    │       │       ├── interact/[interactionId]/ (GET single interaction)
-    │       │       ├── interact/[interactionId]/resolve/ (PATCH resolve)
-    │       │       ├── knowledge-gaps/ (GET knowledge gaps from interactions)
-    │       │       └── download/ (GET audio download)
-    │       ├── discovery/ (chat endpoint: streaming Claude responses + chip suggestions)
-    │       ├── recommendations/ (search similar podcasts by topic/metadata)
-    │       ├── feed/ (public feed, trending, search)
-    │       ├── users/ (profile, follow/unfollow, followers/following)
-    │       │   ├── [userId]/rss/ (GET RSS feed for user)
-    │       │   └── handle/[handle]/rss/ (GET RSS feed by handle)
-    │       ├── billing/ (checkout, subscription, portal, usage)
-    │       ├── notifications/ (list, mark read, push registration)
-    │       ├── tags/
-    │       ├── oembed/ (GET oEmbed JSON for embeddable player)
-    │       └── webhooks/stripe/
-    ├── components/
-    │   ├── ui/ (Button, Input, Card, Modal, Toast, Badge, SoonBadge, Chip, etc.)
-    │   ├── player/ (AudioPlayer, Waveform, PlaybackControls, InterruptButton, MiniPlayer, TranscriptPanel, InterruptChatPanel, SegmentQuestionBadge, ShareMenu, EmbedCodeModal, EmbedPlayer)
-    │   ├── chat/ (ChatContainer, ChatMessage, ChatChips, ResolutionPrompt)
-    │   ├── discovery/ (DiscoveryChat, SuggestionChips, RecommendationCard, CreatorSuggestion)
-    │   ├── create/ (GenerationProgress, ScriptPreview)
-    │   ├── feed/ (PodcastCard, FeedGrid, TagFilter, SearchBar, TrendingSection)
-    │   ├── pricing/ (PricingCard, FeatureList, SoonBadge, TierComparison)
-    │   ├── profile/ (ProfileHeader, PodcastList, FollowButton, FollowerCount)
-    │   ├── notifications/ (NotificationBell, NotificationList, PushPrompt)
-    │   ├── layout/ (Sidebar, TopBar, Footer, MobileNav)
-    │   └── providers/ (SessionProvider, AudioPlayerProvider, NotificationProvider)
-    ├── lib/
-    │   ├── auth.ts / prisma.ts / redis.ts / queue.ts
-    │   ├── claude.ts / elevenlabs.ts / stripe.ts
-    │   ├── r2.ts / audio-stitcher.ts / content-parser.ts / script-generator.ts
-    │   ├── discovery-agent.ts        # Chat-based discovery: Claude streaming + chip generation
-    │   ├── recommendations.ts        # Search similar podcasts, rank by relevance
-    │   ├── push-notifications.ts     # Web Push API registration + send
-    │   ├── rss.ts                    # RSS 2.0 feed generation (per-user podcast feeds)
-    │   ├── subscription.ts / notifications.ts / validations.ts
-    │   └── hooks/ (useAuth, useAudioPlayer, usePodcast, useDiscovery, useNotifications)
-    ├── workers/
-    │   ├── index.ts
-    │   ├── content-extraction.worker.ts
-    │   ├── script-generation.worker.ts
-    │   ├── audio-generation.worker.ts
-    │   ├── audio-stitching.worker.ts
-    │   ├── interaction.worker.ts
-    │   ├── segment-regeneration.worker.ts
-    │   └── notification.worker.ts     # Send push notifications when podcast is ready
-    ├── styles/globals.css
-    └── types/ (podcast.ts, player.ts, interaction.ts, feed.ts, discovery.ts, notification.ts)
+├── apps/
+│   ├── web/                        # Next.js web app (@sotto/web)
+│   │   ├── src/
+│   │   │   ├── app/                # Next.js App Router (pages + API routes)
+│   │   │   ├── components/         # UI components (CSS Modules)
+│   │   │   ├── lib/                # Core libraries + external service clients
+│   │   │   │   └── providers/      # Modular provider architecture (ai, tts, stt, storage)
+│   │   │   ├── workers/            # BullMQ workers (23 types)
+│   │   │   ├── styles/             # globals.css (design system tokens)
+│   │   │   └── types/              # TypeScript types
+│   │   ├── prisma/                 # Prisma schema (58+ models) + seeds
+│   │   ├── tests/                  # Vitest test suites
+│   │   └── package.json
+│   └── mobile/                     # React Native + Expo iOS app (@sotto/mobile)
+│       ├── app/                    # expo-router screens
+│       ├── components/             # RN components
+│       ├── lib/                    # API client, auth, audio player
+│       └── package.json
+├── packages/
+│   └── shared/                     # Shared package (@sotto/shared)
+│       └── src/                    # Types, Zod validations, design tokens
+├── docs/                           # 25+ product docs (pitch deck order)
+├── scripts/                        # Setup, deploy, pitch rebuild scripts
+├── docker-compose.yml              # Dev: PostgreSQL + Redis
+├── docker-compose.prod.yml         # Prod: web + workers + postgres + redis
+├── Caddyfile                       # Reverse proxy config
+├── package.json                    # Root workspace orchestrator
+└── tsconfig.base.json              # Shared TypeScript compiler options
 ```
 
 ## Database Schema (Key Models)
 
-| Model                | Purpose                                                                                                                                                                         |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `User`               | Auth, profile, bio, avatar, usage tracking, team membership                                                                                                                     |
-| `Follow`             | Social: follower → following relationship (unique per pair)                                                                                                                     |
-| `Podcast`            | Title, topic, source, status, audioUrl, visibility, fork tracking, play/like/fork counts                                                                                        |
-| `Discovery`          | Chat-based discovery: stores extracted metadata (audience, depth, tone, focus, duration) + full chat transcript                                                                 |
-| `DiscoveryMessage`   | Individual messages in the discovery chat (role, content, chips, timestamp)                                                                                                     |
-| `Script`             | Structured JSON turns + raw markdown + source context, versioned                                                                                                                |
-| `Segment`            | Per-speaker audio chunk: text, audioUrl, startTime, duration, order                                                                                                             |
-| `Interaction`        | Question at timestamp, answer, resolved, incorporated flags, `helpful Boolean?` (user feedback), `segmentOrder Int?` (computed by worker -- which segment the question maps to) |
-| `Like` / `Save`      | Social engagement (unique per user+podcast)                                                                                                                                     |
-| `Follow`             | Social follow (unique per follower+following pair)                                                                                                                              |
-| `Tag` / `PodcastTag` | Discovery taxonomy                                                                                                                                                              |
-| `Subscription`       | Stripe integration (FREE/STARTER/PRO/STUDIO tiers + credit balance)                                                                                                             |
-| `CreditTransaction`  | Credit audit trail (grants, consumption, refunds, purchases)                                                                                                                    |
-| `Job`                | BullMQ job tracking                                                                                                                                                             |
-| `Notification`       | In-app + push notifications (type, read status, push delivery status)                                                                                                           |
-| `PushSubscription`   | Web Push API subscription endpoints per user/device                                                                                                                             |
-| `ApiUsageLog`        | Cost tracking per service (claude/elevenlabs/ffmpeg)                                                                                                                            |
+The full schema has 58+ Prisma models (see `apps/web/prisma/schema.prisma`). Key models:
 
-**Key enums**: `PodcastStatus` (PENDING → DISCOVERING → EXTRACTING → SCRIPTING → GENERATING_AUDIO → STITCHING → READY → UPDATING), `Speaker` (HOST/EXPERT), `InteractionStatus` (PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED), `NotificationType` (PODCAST_READY / PODCAST_LIKED / NEW_FOLLOWER / PODCAST_FORKED / SIMILAR_PODCAST_CREATED)
+| Model                   | Purpose                                                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `User`                  | Auth, profile, role (USER/CREATOR/ADMIN), Twitter handle, Stripe Connect (stripeAccountId, stripeOnboarded)                  |
+| `Follow`                | Social: follower → following                                                                                                 |
+| `Podcast`               | Title, topic, status, audioUrl, visibility, source (WEB/TWITTER/API), fork tracking, import fields, versioning, commentCount |
+| `Discovery`             | Chat metadata (audience, depth, tone, focus, duration)                                                                       |
+| `DiscoveryMessage`      | Individual chat messages (role, content, chips)                                                                              |
+| `Script`                | Structured JSON turns + raw markdown, versioned                                                                              |
+| `Segment`               | Per-speaker audio chunk: text, audioUrl, timing, order                                                                       |
+| `Reference`             | Per-podcast citation: number, title, authors, year, URL, type, verificationStatus                                            |
+| `Interaction`           | Question at timestamp, answer, resolution status, visibility (PUBLIC/PRIVATE), upvoteCount                                   |
+| `Comment`               | Threaded comments on podcasts (parentId self-ref, optional timestamp pin)                                                    |
+| `Like` / `Save`         | Social engagement                                                                                                           |
+| `Tag` / `PodcastTag`    | Discovery taxonomy                                                                                                          |
+| `Collection`            | Curated podcast playlists (name, description, isPublic)                                                                      |
+| `CollectionItem`        | Podcast membership in a collection (with ordering)                                                                           |
+| `VoiceClone`            | User voice clones (name, ElevenLabs ID, priceInCents for marketplace)                                                        |
+| `VoicePurchase`         | Per-podcast voice payments: buyer, voiceClone, amountCents, platformFeeCents, status (authorized/captured/cancelled/refunded) |
+| `VoiceAllowlist`        | Pre-approved voice access: voice clone → allowed user                                                                        |
+| `UserTtsKey`            | BYOK encrypted API keys per TTS provider (AES-256-GCM)                                                                       |
+| `UserAiKey`             | BYOK encrypted API keys per AI provider (Anthropic/OpenAI)                                                                   |
+| `FreeTierConfig`        | Singleton: admin-configurable free tier settings (AI provider/model, TTS provider, generation limit)                         |
+| `PodcastVersion`        | Version snapshots (immutable segments, stitched audio per version)                                                            |
+| `ApiKey`                | Developer API keys (hashed, prefix, usage tracking)                                                                          |
+| `Team` / `TeamInvite`   | Team ownership + member management + invite tokens                                                                           |
+| `TweetMention`          | Twitter mention tracking (dedup, status, reply thread, linked podcast)                                                       |
+| `Activity`              | Social activity feed events (PODCAST_CREATED, FORKED, LIKED, etc.)                                                           |
+| `Job`                   | BullMQ job tracking                                                                                                         |
+| `Notification`          | In-app + push notifications                                                                                                 |
+| `PushSubscription`      | Web Push API endpoints                                                                                                      |
+| `ApiUsageLog`           | Cost tracking per service (Claude/ElevenLabs/FFmpeg)                                                                         |
+
+**Key enums**: `PodcastStatus` (PENDING → DISCOVERING → EXTRACTING → SCRIPTING → VERIFYING_SCRIPT → VALIDATING_REFERENCES → SCRIPT_READY → GENERATING_AUDIO → STITCHING → READY → UPDATING | IMPORTING → TRANSCRIBING → FAILED), `Speaker` (HOST/EXPERT), `InteractionStatus` (PENDING → ANSWERING → ANSWERED → RESOLVED → INCORPORATING → INCORPORATED)
 
 ## Worker Pipeline
 
@@ -393,16 +331,28 @@ User chats with Discovery Agent (streaming Claude)
 [content-extraction] → Parse URL/PDF if provided → sourceContext
     │
     ▼
-[script-generation] → Claude generates 2-voice script (using discovery metadata as context) → Script model
+[script-generation] → Claude generates 2-voice script with [N] citations → Script model
     │
     ▼
-[audio-generation] × N → ElevenLabs TTS per segment → Segment audioUrls (parallel, 5 concurrent)
+[script-verification] → "Teacher" agent: claim extraction + sourcing check (≤3 revision loops)
     │
     ▼
-[audio-stitching] → FFmpeg concat + normalize → final.mp3 → READY
+[reference-validation] → Source quality filter + 4-layer verification (URL, CrossRef, OpenAlex, AI)
     │
     ▼
-[notification] → Push notification: "Your podcast is ready!" → user taps → playback page
+[SCRIPT_READY pause] → User reviews/edits script (WEB/IMPORT only; auto-approve for TWITTER/API)
+    │
+    ▼
+[audio-generation] × N → Multi-provider TTS per segment (parallel, 5 concurrent)
+    │
+    ▼
+[audio-stitching] → FFmpeg concat + normalize + duration hard check → final.mp3 → READY
+    │
+    ▼
+[notification] → Push notification: "Your podcast is ready!"
+    │
+    ▼ (if source=TWITTER)
+[twitter-reply] → Reply to original tweet with podcast link
 ```
 
 ### Interactive Playback Flow
@@ -428,7 +378,7 @@ User browsing feed → finds interesting podcast → taps play
     ├── Likes → increments count, appears in user's liked list
     ├── Saves → bookmarked for later
     ├── Follows creator → gets notified of their new podcasts
-    └── Forks → credit check via `canGenerate()`, creates synthetic Discovery record with source metadata + remix params, enqueues content-extraction pipeline, sends PODCAST_FORKED notification to source owner. Source podcast's forkCount is incremented.
+    └── Forks → gate check via `checkGenerationGate()`, creates synthetic Discovery record with source metadata + remix params, enqueues content-extraction pipeline, sends PODCAST_FORKED notification to source owner. Source podcast's forkCount is incremented.
 ```
 
 ## Implementation Order
@@ -493,10 +443,10 @@ User browsing feed → finds interesting podcast → taps play
 
 ### Phase 7: Billing, Pricing & Polish
 
-41. Stripe integration (lib/stripe.ts, lib/subscription.ts)
-42. Pricing page (/pricing) with tiers + SOON badges for premium features
-43. Billing pages + Stripe webhook handler
-44. Dashboard page (my podcasts, usage meter, create CTA)
+41. Stripe Connect integration (lib/stripe.ts, lib/voice-pricing.ts, lib/byok.ts)
+42. BYOK key management + generation gate
+43. Voice marketplace (voice pricing, payment flow, Stripe Connect)
+44. Dashboard page (my podcasts, BYOK status, create CTA)
 45. Landing page (hero, how it works, featured podcasts, social proof, pricing)
 46. PWA manifest + service worker for offline-capable mobile web
 
@@ -507,9 +457,9 @@ User browsing feed → finds interesting podcast → taps play
 | `src/lib/queue.ts`           | `src/lib/queue.ts`              | Same BullMQ pattern, podcast job types + notification queue                 |
 | `src/lib/r2.ts`              | `src/lib/r2.ts`                 | Same S3 client, `podcasts/` key prefix                                      |
 | `src/lib/claude.ts`          | `src/lib/claude.ts`             | Same wrapper, add streaming for discovery chat + script gen                 |
-| `src/workers/index.ts`       | `src/workers/index.ts`          | Same orchestration, 7 Sotto workers                                         |
+| `src/workers/index.ts`       | `src/workers/index.ts`          | Same orchestration, 23 Sotto workers                                        |
 | `prisma/schema.prisma`       | `prisma/schema.prisma`          | Same conventions, podcast + social models                                   |
-| `src/lib/stripe.ts`          | `src/lib/stripe.ts`             | Same integration, Sotto pricing tiers                                       |
+| `src/lib/stripe.ts`          | `src/lib/stripe.ts`             | Stripe Connect for voice marketplace (no subscriptions)                     |
 | `src/components/chat/`       | `src/components/discovery/`     | Quvo has chat for project discovery; Sotto adapts for podcast creation chat |
 | `docs/01-product-vision.md`  | `docs/01-product-vision.md`     | Same depth and rigor, Sotto product                                         |
 | `docs/02-market-analysis.md` | `docs/02-market-analysis.md`    | Same structure, podcast market data                                         |
@@ -528,7 +478,7 @@ User browsing feed → finds interesting podcast → taps play
 7. `/create` page opens chat-based discovery flow
 8. Discovery chat streams AI responses with suggestion chips
 9. `/feed` page renders with podcast cards + search
-10. `/pricing` page renders with tiers + SOON badges
+10. `/billing` page renders with BYOK key status + voice marketplace
 11. MiniPlayer component renders (empty state)
 12. All component stubs render without errors
 13. All 11 docs/ files are comprehensive and self-contained

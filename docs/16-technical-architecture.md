@@ -15,7 +15,7 @@ Sotto's architecture follows a three-layer pattern: a Next.js web application ha
                     |   User (Browser)  |
                     +--------+----------+
                              |
-                    HTTPS (Vercel/Caddy)
+                    HTTPS (Caddy)
                              |
                     +--------v----------+
                     |   Next.js App     |
@@ -38,13 +38,8 @@ Sotto's architecture follows a three-layer pattern: a Next.js web application ha
             +--------->|   Workers   |----------+
                        |  (BullMQ)   |
                        |             |
-                       | - content   |
-                       | - script    |
-                       | - audio     |
-                       | - stitch    |
-                       | - interact  |
-                       | - regen     |
-                       | - notify    |
+                       | 23 workers  |
+                       | (see §4.1)  |
                        +--+------+--+
                           |      |
                 +---------+      +----------+
