@@ -277,6 +277,7 @@ describe('processTwitterMentions', () => {
               topic: mockParseResult.topic,
               depth: mockParseResult.depth,
               audienceLevel: mockParseResult.audienceLevel,
+              audience: 'general',
               tone: mockParseResult.tone,
               focusAreas: mockParseResult.focusAreas,
               durationTarget: 10,

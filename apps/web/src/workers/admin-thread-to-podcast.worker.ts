@@ -71,7 +71,7 @@ export async function processAdminThreadToPodcast(
 
   const isThreadPodcast = threadData && threadData.replies.length >= 2;
   const tone = parsed.isDebate ? 'socratic' : parsed.tone;
-  const durationTarget = isThreadPodcast ? 15 : 10;
+  const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
 
   // Build source text for threads
   let sourceText: string | undefined;
@@ -111,6 +111,7 @@ export async function processAdminThreadToPodcast(
           topic: parsed.topic,
           depth: parsed.depth,
           audienceLevel: parsed.audienceLevel,
+          audience: parsed.audience ?? 'general',
           tone,
           focusAreas: parsed.focusAreas,
           durationTarget,
