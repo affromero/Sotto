@@ -19,7 +19,6 @@ import { setToken, notifyAuthSuccess } from '../../lib/auth';
 const IS_DEV = __DEV__;
 const GOOGLE_CONFIGURED = !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 const GITHUB_CONFIGURED = !!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
-const TWITTER_CONFIGURED = !!process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID;
 
 interface AuthResponse {
   token: string;
@@ -81,7 +80,7 @@ export default function LoginScreen() {
   }, [email]);
 
   const handleOAuthSignIn = useCallback(
-    async (provider: 'apple' | 'google' | 'github' | 'twitter') => {
+    async (provider: 'apple' | 'google' | 'github') => {
       setErrorMessage('');
       setLoading(true);
 
@@ -131,11 +130,6 @@ export default function LoginScreen() {
                 'https://github.com/login/oauth/authorize',
               scopes: ['read:user', 'user:email'],
             },
-            twitter: {
-              authorizationEndpoint:
-                'https://twitter.com/i/oauth2/authorize',
-              scopes: ['users.read', 'tweet.read'],
-            },
           };
 
           const config = configs[provider];
@@ -143,9 +137,7 @@ export default function LoginScreen() {
           const clientId =
             provider === 'google'
               ? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? ''
-              : provider === 'github'
-                ? process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? ''
-                : process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID ?? '';
+              : process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
 
           const request = new AuthSession.AuthRequest({
             clientId,
@@ -309,20 +301,6 @@ export default function LoginScreen() {
               </Pressable>
             )}
 
-            {TWITTER_CONFIGURED && (
-              <Pressable
-                onPress={() => handleOAuthSignIn('twitter')}
-                style={[styles.oauthButton, styles.oauthButtonTwitter]}
-                disabled={loading}
-                accessibilityLabel="Sign in with Twitter"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
-                  Sign in with Twitter
-                </Text>
-              </Pressable>
-            )}
-
             {loading && (
               <ActivityIndicator
                 size="small"
@@ -481,10 +459,6 @@ const styles = StyleSheet.create({
   oauthButtonGithub: {
     backgroundColor: '#24292e',
     borderColor: '#24292e',
-  },
-  oauthButtonTwitter: {
-    backgroundColor: '#1DA1F2',
-    borderColor: '#1DA1F2',
   },
   oauthButtonText: {
     fontFamily: typography.fontBody,
