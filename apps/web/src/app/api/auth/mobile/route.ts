@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit } from '@/lib/redis';
 import { generateApiKey } from '@/lib/api-keys';
 import { generateUniqueHandle } from '@/lib/handles';
 import { isAdminEmail } from '@/lib/admin-emails';
@@ -58,6 +59,13 @@ const oauthLoginSchema = z.union([oauthIdTokenSchema, oauthCodeSchema]);
 // --- Route handler ---
 
 export async function POST(request: NextRequest) {
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+  const { allowed } = await checkRateLimit(`auth:mobile:${ip}`, 10, 15 * 60);
+  if (!allowed) {
+    return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
+  }
+
   const body = await request.json();
 
   if (process.env.NODE_ENV === 'development') {
