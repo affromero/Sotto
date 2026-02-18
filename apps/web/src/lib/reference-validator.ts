@@ -9,6 +9,7 @@
 
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { logger } from './logger';
+import { validateUrl, UrlValidationError } from './url-validator';
 
 export interface VerificationCheck {
   layer: 'url' | 'doi' | 'title_search' | 'ai';
@@ -134,6 +135,15 @@ export function assessSourceQuality(ref: ReferenceInput): {
 export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck> {
   if (!ref.url) {
     return { layer: 'url', passed: false, confidence: 0, detail: 'No URL provided' };
+  }
+
+  try {
+    await validateUrl(ref.url);
+  } catch (err) {
+    if (err instanceof UrlValidationError) {
+      return { layer: 'url', passed: false, confidence: 0, detail: `SSRF blocked: ${err.message}` };
+    }
+    return { layer: 'url', passed: false, confidence: 0, detail: `URL validation failed: ${(err as Error).message}` };
   }
 
   try {
