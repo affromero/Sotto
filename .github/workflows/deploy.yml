@@ -191,7 +191,7 @@ jobs:
 
               # Build per-service check lines
               CHECKS_LINE=""
-              for svc in database redis storage claudeCode anthropic elevenlabs stripe; do
+              for svc in database redis storage claudeCode anthropic openai elevenlabs stripe; do
                 SVC_STATUS=$(echo "$HEALTH" | jq -r ".checks.${svc}.status // empty")
                 SVC_MS=$(echo "$HEALTH" | jq -r ".checks.${svc}.latencyMs // empty")
                 SVC_DETAIL=$(echo "$HEALTH" | jq -r ".checks.${svc}.detail // empty")

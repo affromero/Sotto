@@ -117,6 +117,26 @@ export async function GET() {
     checks.anthropic = { status: 'error', latencyMs: Date.now() - anthropicStart };
   }
 
+  // --- OpenAI API (non-critical) ---
+  const openaiStart = Date.now();
+  try {
+    if (process.env.OPENAI_API_KEY) {
+      const res = await fetch('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      checks.openai = {
+        status: res.ok ? 'ok' : 'error',
+        latencyMs: Date.now() - openaiStart,
+        ...(!res.ok && { detail: `HTTP ${res.status}` }),
+      };
+    } else {
+      checks.openai = { status: 'not_configured', latencyMs: 0 };
+    }
+  } catch {
+    checks.openai = { status: 'error', latencyMs: Date.now() - openaiStart };
+  }
+
   // --- ElevenLabs API (non-critical) ---
   const elStart = Date.now();
   try {
@@ -166,6 +186,7 @@ export async function GET() {
     'SITE_PASSWORD',
     'PITCH_PASSWORD',
     'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
     'ELEVENLABS_API_KEY',
     'R2_ACCOUNT_ID',
     'R2_ACCESS_KEY_ID',
