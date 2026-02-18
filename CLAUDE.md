@@ -19,7 +19,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | --------- | -------------------------------------------------------------------------------------------------------- |
 | Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                          |
 | Database  | PostgreSQL 16 + Prisma ORM                                                                               |
-| Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                           |
+| Auth      | NextAuth.js v5 (Google, GitHub, Apple Sign In; Twitter for account linking only)                         |
 | Queue     | Redis 7 + BullMQ (24 worker types)                                                                       |
 | AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                  |
 | Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate (multi-provider TTS) — resolved via resolveTtsProvider() |
