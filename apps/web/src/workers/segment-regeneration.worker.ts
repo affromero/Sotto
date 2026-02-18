@@ -30,6 +30,7 @@ export async function processSegmentRegeneration(
       hostVoiceId: true,
       expertVoiceId: true,
       ttsProvider: true,
+      ttsModel: true,
     },
   });
 
@@ -52,6 +53,7 @@ export async function processSegmentRegeneration(
     userId: podcast.userId,
     podcastId,
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+    requestedModel: podcast.ttsModel,
   });
 
   const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;

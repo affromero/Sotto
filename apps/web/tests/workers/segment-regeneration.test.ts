@@ -13,6 +13,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   hostVoiceId: null,
   expertVoiceId: null,
   ttsProvider: null,
+  ttsModel: null,
 });
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
@@ -179,6 +180,7 @@ describe('processSegmentRegeneration', () => {
       hostVoiceId: null,
       expertVoiceId: null,
       ttsProvider: null,
+      ttsModel: null,
     });
     mockPrismaSegmentCreate.mockResolvedValue({ id: 'segment-new-001' });
     mockPrismaSegmentUpdate.mockResolvedValue({});
@@ -229,6 +231,7 @@ describe('processSegmentRegeneration', () => {
         hostVoiceId: 'custom-host-voice',
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
@@ -245,6 +248,7 @@ describe('processSegmentRegeneration', () => {
         hostVoiceId: null,
         expertVoiceId: 'custom-expert-voice',
         ttsProvider: null,
+        ttsModel: null,
       });
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processSegmentRegeneration(job);
@@ -290,6 +294,7 @@ describe('processSegmentRegeneration', () => {
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       setupStandardProvider();
     });
@@ -593,6 +598,7 @@ describe('processSegmentRegeneration', () => {
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       setupStandardProvider();
       mockStandardGetVoiceId.mockReturnValue('openai-expert-voice');
@@ -682,6 +688,7 @@ describe('processSegmentRegeneration', () => {
         hostVoiceId: null,
         expertVoiceId: null,
         ttsProvider: null,
+        ttsModel: null,
       });
       setupStandardProvider();
       mockStandardGenerateSpeech.mockRejectedValue(new Error('OpenAI TTS error'));

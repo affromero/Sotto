@@ -7,6 +7,7 @@ import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
 import { AiModelSelector } from '@/components/create/AiModelSelector';
+import { TtsModelSelector } from '@/components/create/TtsModelSelector';
 import { DurationSelector } from '@/components/create/DurationSelector';
 import { FreeTierCounter } from '@/components/ui/FreeTierCounter';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
@@ -55,6 +56,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
+  const [ttsModel, setTtsModel] = useState<string | undefined>();
   const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
   const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +122,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
             hostVoiceId: voiceSelection.hostVoiceId,
             expertVoiceId: voiceSelection.expertVoiceId,
             ttsProvider,
+            ttsModel,
             aiModel,
             ...(paymentIntentIds ? { paymentIntentIds } : {}),
           }),
@@ -146,7 +149,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, aiModel, durationTarget, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, createAsSotto]);
 
   const handleGenerate = useCallback(async () => {
     await createPodcast();
@@ -413,6 +416,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
             {isByokUser && <AiModelSelector value={aiModel} onChange={setAiModel} />}
             <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
+            {isByokUser && <TtsModelSelector provider={ttsProvider} value={ttsModel} onChange={setTtsModel} />}
             <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
             <div className={styles.voiceActions}>
               <button

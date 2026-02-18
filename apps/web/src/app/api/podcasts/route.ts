@@ -142,6 +142,7 @@ export async function POST(request: NextRequest) {
       hostVoiceId: parsed.data.hostVoiceId,
       expertVoiceId: parsed.data.expertVoiceId,
       ttsProvider: parsed.data.ttsProvider ?? null,
+      ttsModel: parsed.data.ttsModel ?? null,
       aiModel: parsed.data.aiModel ?? null,
     },
   });
