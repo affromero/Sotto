@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
         sourceType: true,
         priceInCents: true,
         createdAt: true,
-        elevenLabsVoiceId: true,
+        externalVoiceId: true,
         user: {
           select: {
             id: true,
@@ -128,7 +128,7 @@ export async function GET(request: NextRequest) {
       sourceType: v.sourceType,
       priceInCents: v.priceInCents,
       createdAt: v.createdAt.toISOString(),
-      elevenLabsVoiceId: v.elevenLabsVoiceId,
+      externalVoiceId: v.externalVoiceId,
       owner: {
         id: v.user.id,
         name: v.user.name,

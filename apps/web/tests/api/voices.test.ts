@@ -114,7 +114,7 @@ const mockVoiceClone = {
   id: 'clone-1',
   userId: 'user-1',
   name: 'My Voice',
-  elevenLabsVoiceId: 'el-voice-1',
+  externalVoiceId: 'el-voice-1',
   sourceType: 'UPLOAD',
   createdAt: new Date('2025-01-15T10:00:00Z'),
   updatedAt: new Date('2025-01-15T10:00:00Z'),
@@ -124,7 +124,7 @@ const mockVoiceClone2 = {
   id: 'clone-2',
   userId: 'user-1',
   name: 'Another Voice',
-  elevenLabsVoiceId: 'el-voice-2',
+  externalVoiceId: 'el-voice-2',
   sourceType: 'RECORD',
   createdAt: new Date('2025-01-16T10:00:00Z'),
   updatedAt: new Date('2025-01-16T10:00:00Z'),
@@ -175,7 +175,7 @@ describe('GET /api/voices', () => {
       {
         id: 'clone-1',
         name: 'My Voice',
-        elevenLabsVoiceId: 'el-voice-1',
+        externalVoiceId: 'el-voice-1',
         sourceType: 'UPLOAD',
         description: null,
         requestable: false,
@@ -186,7 +186,7 @@ describe('GET /api/voices', () => {
       {
         id: 'clone-2',
         name: 'Another Voice',
-        elevenLabsVoiceId: 'el-voice-2',
+        externalVoiceId: 'el-voice-2',
         sourceType: 'RECORD',
         description: null,
         requestable: false,
@@ -203,7 +203,7 @@ describe('GET /api/voices', () => {
     expect(body.userClones[0]).toMatchObject({
       id: 'clone-1',
       name: 'My Voice',
-      elevenLabsVoiceId: 'el-voice-1',
+      externalVoiceId: 'el-voice-1',
       sourceType: 'UPLOAD',
     });
   });
@@ -217,7 +217,7 @@ describe('GET /api/voices', () => {
         voiceClone: {
           id: 'clone-shared',
           name: 'Shared Voice',
-          elevenLabsVoiceId: 'el-shared-1',
+          externalVoiceId: 'el-shared-1',
           sourceType: 'UPLOAD',
           createdAt: new Date('2026-01-10T00:00:00Z'),
           user: { id: 'user-other', name: 'Other User' },
@@ -336,7 +336,7 @@ describe('POST /api/voices/clone', () => {
       id: 'clone-new',
       userId: 'user-1',
       name: 'My Custom Voice',
-      elevenLabsVoiceId: 'el-voice-new',
+      externalVoiceId: 'el-voice-new',
       sourceType: 'UPLOAD',
       createdAt: new Date('2025-01-20T10:00:00Z'),
       updatedAt: new Date('2025-01-20T10:00:00Z'),
@@ -368,7 +368,7 @@ describe('POST /api/voices/clone', () => {
     expect(response.status).toBe(201);
     expect(body.id).toBe('clone-new');
     expect(body.name).toBe('My Custom Voice');
-    expect(body.elevenLabsVoiceId).toBe('el-voice-new');
+    expect(body.externalVoiceId).toBe('el-voice-new');
   });
 
   it('successfully creates voice clone with RECORD source type', async () => {
@@ -379,7 +379,7 @@ describe('POST /api/voices/clone', () => {
       id: 'clone-studio',
       userId: 'user-1',
       name: 'Studio Voice',
-      elevenLabsVoiceId: 'el-voice-studio',
+      externalVoiceId: 'el-voice-studio',
       sourceType: 'RECORD',
       createdAt: new Date('2025-01-20T10:00:00Z'),
       updatedAt: new Date('2025-01-20T10:00:00Z'),
@@ -468,7 +468,7 @@ describe('DELETE /api/voices/clone', () => {
       id: 'clone-1',
       userId: 'user-2',
       name: 'Other User Voice',
-      elevenLabsVoiceId: 'el-voice-1',
+      externalVoiceId: 'el-voice-1',
       sourceType: 'UPLOAD',
     });
 

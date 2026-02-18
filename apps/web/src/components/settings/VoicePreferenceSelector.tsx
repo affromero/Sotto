@@ -12,7 +12,7 @@ interface Voice {
 interface VoiceClone {
   id: string;
   name: string;
-  elevenLabsVoiceId: string;
+  externalVoiceId: string;
 }
 
 interface VoicePreferenceSelectorProps {
@@ -54,7 +54,7 @@ export function VoicePreferenceSelector({
         {voiceClones.length > 0 && (
           <optgroup label="Your Voice Clones">
             {voiceClones.map((clone) => (
-              <option key={clone.elevenLabsVoiceId} value={clone.elevenLabsVoiceId}>
+              <option key={clone.externalVoiceId} value={clone.externalVoiceId}>
                 {clone.name}
               </option>
             ))}

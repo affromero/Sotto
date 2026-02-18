@@ -16,7 +16,7 @@ interface VoiceProfile {
 interface VoiceClone {
   id: string;
   name: string;
-  elevenLabsVoiceId: string;
+  externalVoiceId: string;
   sourceType: string;
   createdAt: string;
 }
@@ -146,13 +146,13 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                 <div className={styles.voiceGrid}>
                   {userClones.map((clone) => (
                     <VoiceCard
-                      key={clone.elevenLabsVoiceId}
-                      voiceId={clone.elevenLabsVoiceId}
+                      key={clone.externalVoiceId}
+                      voiceId={clone.externalVoiceId}
                       name={clone.name}
                       accent="custom"
                       character="Cloned voice"
-                      isSelected={hostVoiceId === clone.elevenLabsVoiceId}
-                      onSelect={() => setHostVoiceId(clone.elevenLabsVoiceId)}
+                      isSelected={hostVoiceId === clone.externalVoiceId}
+                      onSelect={() => setHostVoiceId(clone.externalVoiceId)}
                     />
                   ))}
                 </div>
@@ -165,13 +165,13 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                 <div className={styles.voiceGrid}>
                   {sharedVoices.map((voice) => (
                     <VoiceCard
-                      key={voice.elevenLabsVoiceId}
-                      voiceId={voice.elevenLabsVoiceId}
+                      key={voice.externalVoiceId}
+                      voiceId={voice.externalVoiceId}
                       name={voice.name}
                       accent="shared"
                       character={`by ${voice.owner.name || 'Unknown'}`}
-                      isSelected={hostVoiceId === voice.elevenLabsVoiceId}
-                      onSelect={() => setHostVoiceId(voice.elevenLabsVoiceId)}
+                      isSelected={hostVoiceId === voice.externalVoiceId}
+                      onSelect={() => setHostVoiceId(voice.externalVoiceId)}
                     />
                   ))}
                 </div>
@@ -201,13 +201,13 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                 <div className={styles.voiceGrid}>
                   {userClones.map((clone) => (
                     <VoiceCard
-                      key={clone.elevenLabsVoiceId}
-                      voiceId={clone.elevenLabsVoiceId}
+                      key={clone.externalVoiceId}
+                      voiceId={clone.externalVoiceId}
                       name={clone.name}
                       accent="custom"
                       character="Cloned voice"
-                      isSelected={expertVoiceId === clone.elevenLabsVoiceId}
-                      onSelect={() => setExpertVoiceId(clone.elevenLabsVoiceId)}
+                      isSelected={expertVoiceId === clone.externalVoiceId}
+                      onSelect={() => setExpertVoiceId(clone.externalVoiceId)}
                     />
                   ))}
                 </div>
@@ -220,13 +220,13 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                 <div className={styles.voiceGrid}>
                   {sharedVoices.map((voice) => (
                     <VoiceCard
-                      key={voice.elevenLabsVoiceId}
-                      voiceId={voice.elevenLabsVoiceId}
+                      key={voice.externalVoiceId}
+                      voiceId={voice.externalVoiceId}
                       name={voice.name}
                       accent="shared"
                       character={`by ${voice.owner.name || 'Unknown'}`}
-                      isSelected={expertVoiceId === voice.elevenLabsVoiceId}
-                      onSelect={() => setExpertVoiceId(voice.elevenLabsVoiceId)}
+                      isSelected={expertVoiceId === voice.externalVoiceId}
+                      onSelect={() => setExpertVoiceId(voice.externalVoiceId)}
                     />
                   ))}
                 </div>
