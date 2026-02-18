@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { moderateOrThrow, moderateContent } from './moderation';
+import { prisma } from './prisma';
 import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -102,6 +103,7 @@ export async function* streamResponse(
     apiKeyOverride?: string;
     tools?: Anthropic.MessageCreateParams['tools'];
     skipModeration?: boolean;
+    onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void;
   }
 ): AsyncGenerator<string> {
   // Screen user input before starting stream
@@ -141,10 +143,18 @@ export async function* streamResponse(
       yield event.delta.text;
     }
   }
+
+  if (options?.onComplete) {
+    const finalMessage = await stream.finalMessage();
+    options.onComplete({
+      inputTokens: finalMessage.usage.input_tokens,
+      outputTokens: finalMessage.usage.output_tokens,
+    });
+  }
 }
 
 /**
- * Log AI API usage for cost tracking
+ * Log AI API usage for cost tracking — persists to ApiUsageLog table.
  */
 export async function logApiUsage(params: {
   podcastId?: string;
@@ -157,11 +167,18 @@ export async function logApiUsage(params: {
   // Cost calculation (Claude Sonnet 4.5 pricing)
   const inputCost = (params.inputTokens / 1_000_000) * 3.0;
   const outputCost = (params.outputTokens / 1_000_000) * 15.0;
+  const totalCost = inputCost + outputCost;
 
-  logger.info('AI API usage', {
-    category: params.category,
-    inputTokens: String(params.inputTokens),
-    outputTokens: String(params.outputTokens),
-    totalCost: String(inputCost + outputCost),
-  });
+  prisma.apiUsageLog.create({
+    data: {
+      service: 'anthropic',
+      category: params.category,
+      inputTokens: params.inputTokens,
+      outputTokens: params.outputTokens,
+      totalCost,
+      durationMs: params.durationMs ?? null,
+      podcastId: params.podcastId ?? null,
+      userId: params.userId ?? null,
+    },
+  }).catch(() => {});
 }

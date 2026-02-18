@@ -31,6 +31,10 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
+vi.mock('@/lib/claude', () => ({
+  logApiUsage: vi.fn(),
+}));
+
 vi.mock('@/lib/discovery-agent', () => ({
   streamDiscoveryResponse: (...args: unknown[]) => mockStreamDiscoveryResponse(...args),
   parseChips: (...args: unknown[]) => mockParseChips(...args),
@@ -195,7 +199,9 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: 'I want to learn something new' }],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -253,7 +259,9 @@ describe('POST /api/discovery', () => {
           { role: 'user', content: 'Quantum computing' },
           { role: 'user', content: 'What is a qubit?' },
         ],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -491,7 +499,9 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: longMessage }],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -529,7 +539,9 @@ describe('POST /api/discovery', () => {
 
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: 'Hello' }],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -638,7 +650,9 @@ describe('POST /api/discovery', () => {
           { role: 'assistant', content: 'Answer 1' },
           { role: 'user', content: 'Question 2' },
         ],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -683,7 +697,9 @@ describe('POST /api/discovery', () => {
       expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         expect.any(Array),
-        'user-anthropic-key-123'
+        'user-anthropic-key-123',
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -700,7 +716,9 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         expect.any(Array),
-        undefined
+        undefined,
+        undefined,
+        expect.any(Function)
       );
     });
   });
@@ -748,7 +766,9 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
       expect(mockStreamDiscoveryResponse).toHaveBeenCalledWith(
         [{ role: 'user', content: 'Line 1\nLine 2\nLine 3' }],
-        'test-ai-key'
+        'test-ai-key',
+        undefined,
+        expect.any(Function)
       );
     });
   });

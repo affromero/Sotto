@@ -122,12 +122,14 @@ export async function getDiscoveryResponse(
 export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void
 ): AsyncGenerator<string> {
   return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,
     apiKeyOverride,
     model,
     tools: [WEB_SEARCH_TOOL],
+    onComplete,
   });
 }
