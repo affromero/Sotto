@@ -29,6 +29,26 @@ vi.mock('@/lib/prisma', () => ({
   },
 }));
 
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true, remaining: 29, resetAt: 0 }),
+}));
+
+vi.mock('@/lib/moderation', () => ({
+  moderateOrThrow: vi.fn().mockResolvedValue(undefined),
+  ContentModerationError: class ContentModerationError extends Error {
+    categories: string[];
+    constructor(categories: string[]) {
+      super(`Content flagged for: ${categories.join(', ')}`);
+      this.name = 'ContentModerationError';
+      this.categories = categories;
+    }
+  },
+}));
+
+vi.mock('@/lib/auth-guards', () => ({
+  checkSuspension: vi.fn().mockReturnValue(null),
+}));
+
 import { GET, POST } from '@/app/api/podcasts/[podcastId]/comments/route';
 
 function createGetRequest(queryParams?: Record<string, string>): NextRequest {
