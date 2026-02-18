@@ -2,13 +2,13 @@
 
 > NextAuth v5 configuration, OAuth provider setup, session strategy, protected routes, and local testing guide.
 
-**Date:** 2026-02-08
+**Date:** 2026-02-18
 
 ---
 
 ## Overview
 
-Sotto uses **NextAuth.js v5** (also known as Auth.js) with the Prisma adapter for authentication. Users can sign in with Google, GitHub, or Apple (for iOS). The session strategy is JWT-based for stateless, edge-compatible auth. Protected routes are enforced at the middleware level before any page or API route executes.
+Sotto uses **NextAuth.js v5** (also known as Auth.js) with the Prisma adapter for authentication. Users can sign in with Google, GitHub, Twitter, or Apple. The session strategy is JWT-based for stateless, edge-compatible auth. Protected routes are enforced at the middleware level before any page or API route executes.
 
 | Component        | Technology             | File                                           |
 | ---------------- | ---------------------- | ---------------------------------------------- |
@@ -26,12 +26,16 @@ All auth-related environment variables required for the system to function:
 
 | Variable               | Required         | Description                                       | Example                             |
 | ---------------------- | ---------------- | ------------------------------------------------- | ----------------------------------- |
-| `NEXTAUTH_SECRET`      | Yes              | Encryption key for JWT tokens and session cookies | `openssl rand -base64 32` output    |
+| `AUTH_SECRET`          | Yes              | Primary encryption key (fallback: `NEXTAUTH_SECRET`) | `openssl rand -base64 32` output |
+| `NEXTAUTH_SECRET`      | Fallback         | Legacy name — `AUTH_SECRET` takes precedence      | `openssl rand -base64 32` output    |
 | `NEXTAUTH_URL`         | Yes (production) | Canonical URL of the app                          | `https://sotto.fm`                  |
 | `GOOGLE_CLIENT_ID`     | No               | Google OAuth client ID                            | `123456.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | No               | Google OAuth client secret                        | `GOCSPX-xxxxxxxxxxxx`               |
+| `GOOGLE_IOS_CLIENT_ID` | No               | Google OAuth client ID for iOS app                | `123456.apps.googleusercontent.com` |
 | `GITHUB_CLIENT_ID`     | No               | GitHub OAuth app client ID                        | `Iv1.xxxxxxxxxxxx`                  |
 | `GITHUB_CLIENT_SECRET` | No               | GitHub OAuth app client secret                    | `xxxxxxxxxxxxxxxxxxxx`              |
+| `TWITTER_CLIENT_ID`    | No               | Twitter OAuth 2.0 client ID                       | `xxxxxxxxxxxxxxxxxxxx`              |
+| `TWITTER_CLIENT_SECRET`| No               | Twitter OAuth 2.0 client secret                   | `xxxxxxxxxxxxxxxxxxxx`              |
 | `APPLE_CLIENT_ID`      | No               | Apple Services ID                                 | `com.sotto.app`                     |
 | `APPLE_CLIENT_SECRET`  | No               | Apple client secret (generated JWT)               | `eyJhbGciOi...`                     |
 
@@ -56,26 +60,26 @@ import NextAuth from 'next-auth';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import Google from 'next-auth/providers/google';
 import GitHub from 'next-auth/providers/github';
+import Twitter from 'next-auth/providers/twitter';
+import Apple from 'next-auth/providers/apple';
 import { prisma } from './prisma';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  trustHost: true,
+  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   adapter: PrismaAdapter(prisma),
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          Google({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          }),
-        ]
+      ? [Google({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET })]
       : []),
     ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
-      ? [
-          GitHub({
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET,
-          }),
-        ]
+      ? [GitHub({ clientId: process.env.GITHUB_CLIENT_ID, clientSecret: process.env.GITHUB_CLIENT_SECRET })]
+      : []),
+    ...(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET
+      ? [Twitter({ clientId: process.env.TWITTER_CLIENT_ID, clientSecret: process.env.TWITTER_CLIENT_SECRET })]
+      : []),
+    ...(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET
+      ? [Apple({ clientId: process.env.APPLE_CLIENT_ID, clientSecret: process.env.APPLE_CLIENT_SECRET })]
       : []),
   ],
   session: {
@@ -83,18 +87,45 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   pages: {
     signIn: '/auth/login',
-    newUser: '/create',
+    newUser: '/onboarding',
+  },
+  events: {
+    async linkAccount({ user, account, profile }) {
+      // Sync Twitter handle when user links their Twitter account
+      if (account.provider === 'twitter' && user.id) {
+        const twitterHandle = (profile as Record<string, unknown>)?.username as string | undefined;
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { twitterEnabled: true, ...(twitterHandle ? { twitterHandle } : {}) },
+        });
+      }
+    },
   },
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        session.user.role = token.role ?? 'USER';
+        session.user.bannedAt = token.bannedAt ?? null;
+        session.user.suspendedUntil = token.suspendedUntil ?? null;
       }
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.sub = user.id;
+      }
+      // On sign-in or session update, fetch role + ban state from DB
+      if ((user || trigger === 'update') && token.sub) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true, bannedAt: true, suspendedUntil: true },
+        });
+        if (dbUser) {
+          token.role = dbUser.role;
+          token.bannedAt = dbUser.bannedAt?.toISOString() ?? null;
+          token.suspendedUntil = dbUser.suspendedUntil?.toISOString() ?? null;
+        }
       }
       return token;
     },
@@ -112,11 +143,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 - Session data is available in middleware without a database call
 - The `Session` model in Prisma exists for NextAuth adapter compatibility but is not actively used for session storage
 
-**Conditional providers:** Providers are wrapped in conditional spread operators so the app starts even when OAuth credentials are missing. This is critical for local development where you might not have Google or GitHub OAuth apps configured.
+**Secret fallback:** `AUTH_SECRET` is the primary secret. `NEXTAUTH_SECRET` is supported as a fallback for backward compatibility. The `trustHost: true` flag is required for Hetzner VPS deployment (non-Vercel).
 
-**Custom pages:** The `signIn` page is `/auth/login` (not the default NextAuth sign-in page). After a brand-new user signs up, they are redirected to `/create` to immediately start the podcast creation flow.
+**Conditional providers:** Providers are wrapped in conditional spread operators so the app starts even when OAuth credentials are missing. This is critical for local development where you might not have all OAuth apps configured.
 
-**User ID in session:** The `jwt` callback copies the database user ID (`user.id`) into the JWT token as `token.sub`. The `session` callback then copies it into `session.user.id`. This ensures every API route and server component can access the authenticated user's database ID.
+**Custom pages:** The `signIn` page is `/auth/login` (not the default NextAuth sign-in page). After a brand-new user signs up, they are redirected to `/onboarding` to select interests and configure their profile.
+
+**User ID + role in session:** The `jwt` callback copies the database user ID, role, ban state, and suspension state into the JWT token. The `session` callback propagates these to `session.user`. This ensures every API route and server component can access the authenticated user's role and moderation status.
+
+**Twitter handle sync:** The `events.linkAccount` hook automatically syncs the user's Twitter handle when they link their Twitter account, enabling the @sottofm bot integration.
 
 ---
 
@@ -256,6 +291,29 @@ GITHUB_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - GitHub automatically provides `email` and `profile` scopes.
 - Unlike Google, there is no verification process required.
 
+### Twitter Developer Portal
+
+1. Go to [Twitter Developer Portal](https://developer.twitter.com/en/portal/projects-and-apps)
+2. Create a new project and app (or use an existing one)
+3. Navigate to **User authentication settings** → **Set up**
+4. Configure OAuth 2.0:
+   - Type of app: **Web App**
+   - Callback URI: `http://localhost:3000/api/auth/callback/twitter` (development) or `https://sotto.fm/api/auth/callback/twitter` (production)
+   - Website URL: `https://sotto.fm`
+5. Copy the **Client ID** and **Client Secret**
+6. Add to `.env`:
+
+```bash
+TWITTER_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+TWITTER_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxx
+```
+
+**Important notes:**
+
+- Twitter uses OAuth 2.0 with PKCE for NextAuth v5 (not OAuth 1.0a)
+- The `events.linkAccount` hook automatically syncs the user's Twitter handle to enable @sottofm bot features
+- Users who sign in with Twitter get `twitterEnabled: true` set on their User record
+
 ### Apple Sign In
 
 Apple Sign In is more involved than Google or GitHub. It requires an Apple Developer account ($99/year) and several configuration steps.
@@ -363,6 +421,7 @@ NextAuth v5 exports `handlers` from the main config. This route handles all auth
 - `/api/auth/signin` — Sign in page redirect
 - `/api/auth/callback/google` — Google OAuth callback
 - `/api/auth/callback/github` — GitHub OAuth callback
+- `/api/auth/callback/twitter` — Twitter OAuth callback
 - `/api/auth/callback/apple` — Apple OAuth callback
 - `/api/auth/signout` — Sign out
 - `/api/auth/session` — Current session data (JSON)
@@ -557,7 +616,7 @@ NEXTAUTH_URL=http://localhost:3000
 7. Navigate to `http://localhost:3000/auth/login`
 8. Click "Sign in with Google"
 9. Complete the OAuth flow
-10. You should be redirected to `/create` (as a new user) or `/dashboard` (returning user)
+10. You should be redirected to `/onboarding` (as a new user) or `/dashboard` (returning user)
 
 ### With GitHub OAuth
 
@@ -617,22 +676,49 @@ export async function GET(request: NextRequest) {
 
 ## Production Deployment
 
-For production deployment on Vercel:
+Sotto is deployed on a Hetzner VPS with Docker Compose + Caddy reverse proxy:
 
-1. Set all environment variables in the Vercel dashboard:
-   - `NEXTAUTH_SECRET` (generate a strong random string)
+1. Set all environment variables in the production `.env` file on the VPS:
+   - `AUTH_SECRET` (generate a strong random string — primary secret)
    - `NEXTAUTH_URL` = `https://sotto.fm`
    - All OAuth provider credentials with production redirect URIs
-2. Update OAuth provider settings to use the production domain (`sotto.fm`)
-3. Verify redirect URIs match exactly (including `https://`)
+2. The `trustHost: true` flag in the NextAuth config is required for non-Vercel deployments (Caddy proxies HTTPS)
+3. Update all OAuth provider callback URIs to use `https://sotto.fm/api/auth/callback/{provider}`
 4. For Google: submit the app for verification to remove the "unverified app" warning
 5. For Apple: ensure the Services ID is configured with the production domain
 
 ### Security Considerations
 
-- `NEXTAUTH_SECRET` must be at least 32 characters and cryptographically random
+- `AUTH_SECRET` must be at least 32 characters and cryptographically random
 - Never commit `.env` files to version control
 - Rotate the Apple client secret before it expires (every 6 months)
 - Use `Secure` cookies in production (handled automatically by NextAuth when `NEXTAUTH_URL` uses `https://`)
 - The `sameSite` attribute on cookies is set to `lax` by default, which protects against CSRF in most scenarios
 - All OAuth tokens stored in the `Account` table are encrypted at rest by the database
+
+---
+
+## Mobile Auth (iOS)
+
+The React Native iOS app (`apps/mobile/`) authenticates against the same NextAuth backend.
+
+### Environment Variables
+
+| Variable               | Description                                  |
+| ---------------------- | -------------------------------------------- |
+| `GOOGLE_IOS_CLIENT_ID` | Google OAuth client ID for iOS (different from web) |
+
+### Authentication Flow
+
+1. User taps "Sign in with Google/Apple/GitHub/Twitter" in the mobile app
+2. `expo-auth-session` opens the OAuth flow in a system browser
+3. On callback, the mobile app receives the auth token
+4. Token is stored securely via `expo-secure-store`
+5. All subsequent API calls include the token in the `Authorization` header
+
+### Social Login Providers
+
+- **Google Sign-In**: `expo-auth-session` with `GOOGLE_IOS_CLIENT_ID` (separate iOS client in Google Cloud Console)
+- **Apple Sign-In**: `expo-apple-authentication` (native SDK, required for App Store)
+- **GitHub**: Same OAuth flow as web via `expo-auth-session`
+- **Twitter**: Same OAuth 2.0 flow via `expo-auth-session`

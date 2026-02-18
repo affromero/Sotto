@@ -8,14 +8,27 @@
 
 ## Overview
 
-Sotto uses Anthropic Claude (Sonnet 4.5) for four distinct AI tasks. Each task has a carefully designed system prompt optimized for its specific purpose. All prompts flow through the shared client in `src/lib/claude.ts`, which supports both streaming (for discovery chat) and non-streaming (for script generation, Q&A, segment regeneration) modes.
+Sotto uses Anthropic Claude for 15+ distinct AI tasks across the pipeline. Each task has a carefully designed system prompt optimized for its specific purpose. All prompts flow through the shared client in `src/lib/claude.ts`, which supports both streaming (for discovery chat) and non-streaming modes. Content safety instructions (`CONTENT_SAFETY_INSTRUCTIONS` + `INPUT_SANITIZATION_INSTRUCTIONS` from `src/lib/safety-prompts.ts`) are appended to all user-facing prompts.
 
-| Prompt               | File                                         | Model             | Streaming | Max Tokens | Avg Cost            |
-| -------------------- | -------------------------------------------- | ----------------- | --------- | ---------- | ------------------- |
-| Discovery Chat Agent | `src/lib/discovery-agent.ts`                 | claude-sonnet-4-5 | Yes       | 1,024      | ~$0.01/exchange     |
-| Script Generation    | `src/lib/script-generator.ts`                | claude-sonnet-4-5 | No        | 8,192      | ~$0.08/script       |
-| Q&A Interaction      | `src/workers/interaction.worker.ts`          | claude-sonnet-4-5 | No        | 4,096      | ~$0.02/question     |
-| Segment Regeneration | `src/workers/segment-regeneration.worker.ts` | claude-sonnet-4-5 | No        | 4,096      | ~$0.03/regeneration |
+| Prompt                    | File                                                   | Model             | Streaming | Purpose                                              |
+| ------------------------- | ------------------------------------------------------ | ----------------- | --------- | ---------------------------------------------------- |
+| Discovery Chat Agent      | `src/lib/discovery-agent.ts`                           | claude-sonnet-4-5 | Yes       | Conversational metadata extraction + web search      |
+| Script Generation         | `src/lib/script-generator.ts`                          | claude-sonnet-4-5 | No        | 2-voice podcast script from metadata                 |
+| Script Revision           | `src/lib/script-generator.ts`                          | claude-sonnet-4-5 | No        | Revise script based on verification feedback         |
+| Script Verification       | `src/lib/script-verifier.ts`                           | claude-sonnet-4-5 | No        | "Teacher" agent: fact-check claims, source citations |
+| Reference Validation      | `src/lib/reference-validator.ts`                       | claude-sonnet-4-5 | No        | AI layer of 4-layer citation verification            |
+| Q&A Interaction           | `src/workers/interaction.worker.ts`                    | claude-sonnet-4-5 | No        | Answer questions during playback (multilingual)      |
+| Q&A Incorporation         | `src/app/api/.../incorporate/route.ts`                 | claude-sonnet-4-5 | No        | Adapt Q&A answer into natural HOST segment           |
+| Tweet Intent Parser       | `src/lib/tweet-parser.ts`                              | claude-sonnet-4-5 | No        | Parse @sottofm mentions into podcast metadata        |
+| Tweet Thread Parser       | `src/lib/tweet-parser.ts`                              | claude-sonnet-4-5 | No        | Multi-tweet thread analysis for complex requests     |
+| Telegram Intent Parser    | `src/lib/telegram-parser.ts`                           | claude-sonnet-4-5 | No        | Parse Telegram bot messages into metadata            |
+| Taste Quiz (Onboarding)   | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | No        | Generate personalized onboarding questions           |
+| Taste Quiz (For You)      | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | No        | Interest-based personalized questions                |
+| Taste Quiz (In the News)  | `src/lib/taste-quiz.ts`                                | claude-sonnet-4-5 | Yes       | Current events questions (with web search)           |
+| Import Metadata Generator | `src/lib/import-metadata-generator.ts`                 | claude-sonnet-4-5 | No        | Generate title + topic from imported transcript      |
+| Transcript Parser         | `src/lib/transcript-parser.ts`                         | claude-sonnet-4-5 | No        | Speaker diarization (assign HOST/EXPERT to segments) |
+
+Content moderation (`src/workers/content-moderation.worker.ts`) uses the **OpenAI Moderation API**, not Claude.
 
 ---
 
@@ -35,11 +48,21 @@ You are warm, curious, and conversational — like a knowledgeable friend who's 
 
 ## Your conversation flow:
 1. Ask about the TOPIC they're curious about
-2. Ask about DEPTH (quick overview, standard, deep dive)
-3. Ask about their BACKGROUND/AUDIENCE LEVEL (beginner, some knowledge, expert)
-4. Ask about FOCUS — what specific angle interests them
-5. Ask about TONE (casual, professional, socratic/questioning)
-6. Optionally ask about DURATION preference
+2. Ask about AUDIENCE — who's this for? (kids 6-10, teens 11-16, family-friendly, general, nerds/enthusiasts, mature/unfiltered)
+3. Ask about DEPTH (quick overview, standard, deep dive)
+4. Ask about their BACKGROUND/AUDIENCE LEVEL (beginner, some knowledge, expert)
+5. Ask about FOCUS — what specific angle interests them
+6. Ask about TONE (casual, professional, socratic/questioning)
+7. Optionally ask about DURATION preference
+
+## URL handling:
+If the user's message includes a [URL_CONTEXT] block, you've been given the extracted content
+from their link. Acknowledge the source naturally, infer topic/focus from it, but still ask
+about audience, tone, and duration.
+
+## Web search:
+You have access to web search. When the user asks about current events, recent news, or
+time-sensitive topics, search the web to ground your suggestions in real, recent information.
 
 ## Rules:
 - Ask ONE question at a time
@@ -59,13 +82,18 @@ End your final message with a metadata block:
 {
   "topic": "...",
   "depth": "quick_overview|standard|deep_dive",
+  "audience": "kids|teens|family|general|nerds|mature",
   "audience_level": "beginner|intermediate|expert",
   "focus_areas": ["...", "..."],
   "tone": "casual|professional|socratic",
   "duration_target": 10,
+  "source_url": "https://... (if user shared a URL, otherwise omit)",
   "ready": true
 }
 [/METADATA]
+
+[CONTENT_SAFETY_INSTRUCTIONS appended]
+[INPUT_SANITIZATION_INSTRUCTIONS appended]
 ```
 
 ### Design Rationale
@@ -355,7 +383,15 @@ if (!parsed.soundCues || parsed.soundCues.length === 0) {
 ```
 You are Sotto's Q&A assistant. The user is listening to a podcast and paused to ask a question.
 Answer concisely and helpfully, using the podcast context. Keep answers under 200 words.
+Respond in {languageLabel}.
+
+[CONTENT_SAFETY_INSTRUCTIONS appended]
+[INPUT_SANITIZATION_INSTRUCTIONS appended]
 ```
+
+**Language support:** The response language is determined by priority: user's `preferredLanguage` > podcast's `language` > `'en'`. Uses `getLanguageLabel()` from `@sotto/shared` to get the display name.
+
+**Content safety:** Both `CONTENT_SAFETY_INSTRUCTIONS` and `INPUT_SANITIZATION_INSTRUCTIONS` are appended. If a `ContentModerationError` is caught, the interaction is marked as answered with "Unable to answer — content policy violation."
 
 ### User Message Format
 
@@ -376,18 +412,25 @@ User's question: [the question they asked]
 
 **Context window:** The worker calculates which turns the user has heard based on the playback timestamp and provides the last 5 turns as context. This gives the model enough context to understand what was being discussed at the point the user paused, without overwhelming it with the entire script.
 
-**Position calculation:** The approximate position in the script is calculated from the timestamp:
+**Position calculation:** The worker uses a **segment-based approach** as the primary method, with a text-length fallback:
+
+1. **Primary (segment timing):** Iterates through segments ordered by `order`, using each segment's `startTime` + `duration` to find which segment the playback timestamp falls within.
+2. **Fallback (text-length estimation):** If no timing data exists (e.g., `segments[0].startTime === null`), estimates position from text length using a `CHARS_PER_SECOND` constant from `lib/duration.ts`.
 
 ```typescript
-// Approximate: ~10 seconds per turn on average
-const contextTurns = turns.slice(0, Math.min(turns.length, Math.ceil(timestamp / 10)));
-const recentContext = contextTurns
-  .slice(-5)
-  .map((t) => `${t.speaker}: ${t.text}`)
-  .join('\n');
+// Primary: segment-based lookup using actual timing data
+for (const segment of segments) {
+  if (segment.startTime !== null && segment.duration !== null) {
+    if (timestamp >= segment.startTime && timestamp < segment.startTime + segment.duration) {
+      currentSegmentOrder = segment.order;
+      break;
+    }
+  }
+}
+// Fallback: estimate from text length if no timing data
 ```
 
-This is a rough approximation. Each turn averages about 10 seconds of audio, so dividing the timestamp by 10 gives an approximate turn index. The last 5 turns from that position provide the relevant context.
+The last 5 segments from the calculated position provide the relevant context for the Q&A model. The `segmentOrder` is also stored on the `Interaction` record for use during incorporation.
 
 ### Expected Output Format
 

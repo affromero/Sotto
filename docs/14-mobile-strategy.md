@@ -1,8 +1,8 @@
 # Mobile Strategy
 
-> PWA implementation for launch, React Native roadmap for the future, mobile-first CSS approach, audio playback on mobile, performance budgets, and app store considerations.
+> PWA implementation, React Native iOS app (shipped), mobile-first CSS approach, audio playback on mobile, performance budgets, and app store considerations.
 
-**Date:** 2026-02-08
+**Date:** 2026-02-18
 
 ---
 
@@ -10,13 +10,13 @@
 
 Sotto is designed mobile-first. The primary usage scenario is a user on their commute creating and listening to podcasts on their phone. The platform strategy is:
 
-| Phase         | Platform               | Technology          | Timeline    |
+| Phase         | Platform               | Technology          | Status      |
 | ------------- | ---------------------- | ------------------- | ----------- |
-| Phase 1 (MVP) | Web (mobile + desktop) | Next.js PWA         | Launch      |
-| Phase 2       | iOS                    | React Native + Expo | Post-launch |
-| Phase 3       | Android                | React Native + Expo | After iOS   |
+| Phase 1       | Web (mobile + desktop) | Next.js PWA         | Complete    |
+| Phase 2       | iOS                    | React Native + Expo | **Shipped** |
+| Phase 3       | Android                | React Native + Expo | Planned     |
 
-The web app is a Progressive Web App (PWA) from day one, providing a near-native experience on mobile browsers with offline support, push notifications, and add-to-homescreen capability. Native apps will be built later using React Native with Expo, sharing API endpoints and design tokens with the web app.
+The web app is a Progressive Web App (PWA) providing a near-native experience on mobile browsers with offline support, push notifications, and add-to-homescreen capability. The iOS app (`apps/mobile/`) is built with React Native + Expo, sharing API endpoints and design tokens via `@sotto/shared`.
 
 ---
 
@@ -619,9 +619,9 @@ Key dependencies to keep small:
 
 ---
 
-## React Native Roadmap
+## React Native Implementation
 
-React Native apps are planned for Phase 2 (iOS) and Phase 3 (Android), built with Expo.
+The iOS app (Phase 2) is shipped. Android (Phase 3) is planned.
 
 ### Architecture
 
@@ -665,16 +665,16 @@ The React Native app shares the backend API with the web app. No separate backen
 | Offline audio download | Robust file management for downloaded podcasts                                |
 | Widgets                | iOS 14+ widgets showing latest podcast or generation progress                 |
 
-### Implementation Plan
+### Implementation Status
 
-| Phase | Milestone      | Features                                                |
-| ----- | -------------- | ------------------------------------------------------- |
-| 2a    | iOS Alpha      | Core playback, auth, feed, basic create flow            |
-| 2b    | iOS Beta       | Push notifications, offline downloads, background audio |
-| 2c    | iOS Launch     | CarPlay, Siri Shortcuts, App Store submission           |
-| 3a    | Android Alpha  | Core playback, auth, feed                               |
-| 3b    | Android Beta   | Push notifications, offline downloads                   |
-| 3c    | Android Launch | Android Auto, Play Store submission                     |
+| Phase | Milestone      | Features                                                | Status      |
+| ----- | -------------- | ------------------------------------------------------- | ----------- |
+| 2a    | iOS Alpha      | Core playback, auth, feed, basic create flow            | Complete    |
+| 2b    | iOS Beta       | Push notifications, offline downloads, background audio | Complete    |
+| 2c    | iOS Launch     | App Store submission                                    | Complete    |
+| 3a    | Android Alpha  | Core playback, auth, feed                               | Planned     |
+| 3b    | Android Beta   | Push notifications, offline downloads                   | Planned     |
+| 3c    | Android Launch | Android Auto, Play Store submission                     | Planned     |
 
 ---
 
@@ -695,42 +695,13 @@ The React Native app shares the backend API with the web app. No separate backen
 
 ### iOS App Store Strategy
 
-Apple's App Store guidelines require that apps offering digital content subscriptions use In-App Purchase (IAP), which takes a 30% commission (15% after the first year of a subscription through the Small Business Program).
+Sotto uses a BYOK (Bring Your Own Key) model — all features are free when users provide their own API keys. No subscriptions or IAP needed. The Voice Marketplace handles per-podcast voice payments via Stripe Connect (web-based checkout), bypassing the 30% Apple IAP tax entirely.
 
-| Subscription | Direct (Stripe) | IAP Price (covering 30% cut)      |
-| ------------ | --------------- | --------------------------------- |
-| Starter      | $9/mo           | $9.99/mo (exact Apple tier match) |
-| Pro          | $24/mo          | $29.99/mo (nearest Apple tier)    |
-| Studio       | $49/mo          | $59.99/mo (nearest Apple tier)    |
+### PWA as Complement
 
-Credit packs would be priced as consumable IAPs:
-
-| Credit Pack | Direct (Stripe) | IAP Price (covering 30% cut) |
-| ----------- | --------------- | ---------------------------- |
-| 3 credits   | $5              | $5.99                        |
-| 10 credits  | $15             | $19.99                       |
-| 25 credits  | $30             | $34.99                       |
-
-Options to mitigate the IAP tax:
-
-1. **Reader rule**: If Sotto qualifies as a "reader" app (consuming pre-existing content), the app can link out to the web for purchases. This is unlikely since Sotto generates content.
-2. **Web-first pricing**: Keep the web app at $9/$24/$49, price the iOS app at $9.99/$29.99/$59.99 to maintain margin.
-3. **Delayed native launch**: Focus on PWA for the first year. By the time a native app is needed, the platform may have better economics to absorb the Apple tax.
-4. **StoreKit 2 external purchase links**: As of 2024-2025, Apple allows apps to link to external purchase pages in certain regions with conditions. Monitor policy changes.
-
-### Android Play Store
-
-Google Play takes a 15% commission on the first $1M in annual revenue (then 30%). The same IAP strategy applies. However, Android allows sideloading and alternative app stores, giving more flexibility.
-
-### PWA as Primary
-
-For MVP and early growth, the PWA is the primary mobile distribution channel:
+The PWA remains available for users who prefer browser access or are on Android:
 
 - No app store approval process
-- No revenue share with Apple/Google
 - Instant updates
-- Single codebase
-- Users install directly from the browser
 - Full push notification support on Android; limited but functional on iOS 16.4+
-
-iOS 16.4+ added Web Push support for PWAs added to the homescreen, making the PWA strategy viable for iOS push notifications without a native app.
+- iOS native app recommended for best experience (background audio, native push)
