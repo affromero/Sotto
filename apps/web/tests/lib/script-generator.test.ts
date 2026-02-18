@@ -268,8 +268,8 @@ describe('generateScript', () => {
       });
 
       const systemPrompt = mockGenerateResponse.mock.calls[0][0];
-      expect(systemPrompt).toContain('Target approximately 5 minutes');
-      expect(systemPrompt).toContain('~750 words'); // 5 * 150
+      expect(systemPrompt).toContain('Target exactly 5 minutes');
+      expect(systemPrompt).toContain('750 ideal'); // 5 * 150
     });
   });
 

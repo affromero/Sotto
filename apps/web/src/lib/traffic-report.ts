@@ -9,6 +9,7 @@ import { subDays, startOfDay } from 'date-fns';
 import { prisma } from './prisma';
 import { getCostBreakdown, getDailyCostTrend } from './cost-monitor';
 import { getFreeTierConfig } from './free-tier-config';
+import { DURATION_TOLERANCE_SECONDS } from './duration';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -129,6 +130,13 @@ export interface ContentSection {
   visibilityDistribution: Array<{ visibility: string; count: number }>;
   podcastsWithForks: number;
   durationDistribution: Array<{ bucket: string; count: number }>;
+  durationAccuracy: {
+    total: number;
+    withinTarget: number;
+    withinTargetPct: number;
+    meanAbsDeviation: number;
+    avgDeviation: number;
+  };
 }
 
 export interface FreeTierSection {
@@ -298,12 +306,15 @@ export async function buildTrafficReport(
     speedBuckets,
     completionBuckets,
 
-    // === Content (5) ===
+    // === Content (8) ===
     contentAgg,
     avgSegments,
     visibilityDistribution,
     podcastsWithForks,
     durationBuckets,
+    durationAccuracyTotal,
+    durationAccuracyWithinTarget,
+    durationAccuracyStats,
 
     // === Free Tier (5) ===
     freeTierConfig,
@@ -665,6 +676,28 @@ export async function buildTrafficReport(
       WHERE "status" = 'READY' AND "deletedAt" IS NULL
       GROUP BY bucket
       ORDER BY bucket ASC
+    `,
+    prisma.podcast.count({
+      where: { durationDeviation: { not: null }, status: 'READY', deletedAt: null },
+    }),
+    prisma.podcast.count({
+      where: {
+        durationDeviation: {
+          gte: -DURATION_TOLERANCE_SECONDS,
+          lte: DURATION_TOLERANCE_SECONDS,
+        },
+        status: 'READY',
+        deletedAt: null,
+      },
+    }),
+    prisma.$queryRaw<[{ mean_abs: number | null; avg_dev: number | null }]>`
+      SELECT
+        AVG(ABS("durationDeviation"))::float AS mean_abs,
+        AVG("durationDeviation")::float AS avg_dev
+      FROM "Podcast"
+      WHERE "durationDeviation" IS NOT NULL
+        AND "status" = 'READY'
+        AND "deletedAt" IS NULL
     `,
 
     // -----------------------------------------------------------------------
@@ -1028,6 +1061,16 @@ export async function buildTrafficReport(
         bucket: r.bucket,
         count: n(r.count),
       })),
+      durationAccuracy: {
+        total: durationAccuracyTotal,
+        withinTarget: durationAccuracyWithinTarget,
+        withinTargetPct:
+          durationAccuracyTotal > 0
+            ? Math.round((durationAccuracyWithinTarget / durationAccuracyTotal) * 100)
+            : 0,
+        meanAbsDeviation: Math.round(durationAccuracyStats[0]?.mean_abs ?? 0),
+        avgDeviation: Math.round(durationAccuracyStats[0]?.avg_dev ?? 0),
+      },
     },
 
     freeTier: {
