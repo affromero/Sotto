@@ -783,7 +783,8 @@ model ApiUsageLog {
 
   podcastId String?
   userId    String?
-  service   String   // claude, elevenlabs, ffmpeg
+  service   String   // anthropic, openai, elevenlabs, etc.
+  modelId   String?  // e.g. 'claude-sonnet-4-5-20250929', 'whisper-1', 'eleven_v3'
   category  String   // discovery, script_generation, audio_generation, interaction
 
   // Cost tracking
@@ -802,6 +803,7 @@ model ApiUsageLog {
   @@index([userId])
   @@index([createdAt])
   @@index([service])
+  @@index([modelId])
 }
 
 // ============ FEEDBACK (Early Access) ============

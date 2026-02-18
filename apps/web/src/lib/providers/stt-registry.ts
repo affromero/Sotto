@@ -17,6 +17,7 @@ export interface SttProviderMeta {
   displayName: string;
   defaultModel: string;
   models: SttModelOption[];
+  platformCostPerMinute: number;
 }
 
 const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
@@ -29,6 +30,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
       { id: 'gpt-4o-transcribe', displayName: 'GPT-4o Transcribe', tier: 'best' },
       { id: 'gpt-4o-mini-transcribe', displayName: 'GPT-4o Mini Transcribe', tier: 'fast' },
     ],
+    platformCostPerMinute: 0.006,
   },
 
   groq: {
@@ -40,6 +42,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
       { id: 'whisper-large-v3', displayName: 'Whisper Large v3', tier: 'best' },
       { id: 'distil-whisper-large-v3-en', displayName: 'Distil Whisper Large v3 (EN)', tier: 'fast' },
     ],
+    platformCostPerMinute: 0,
   },
 
   elevenlabs: {
@@ -49,6 +52,7 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     models: [
       { id: 'scribe_v1', displayName: 'Scribe v1', tier: 'best' },
     ],
+    platformCostPerMinute: 0,
   },
 };
 
