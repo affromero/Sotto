@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
   const job = await addJob(adminThreadToPodcastQueue, JobType.ADMIN_THREAD_TO_PODCAST, {
     tweetUrl: parsed.data.tweetUrl,
     adminUserId: adminId,
+    message: parsed.data.message,
   });
 
   return NextResponse.json({ jobId: job.id }, { status: 201 });
