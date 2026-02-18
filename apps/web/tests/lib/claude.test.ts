@@ -136,7 +136,7 @@ describe('claude', () => {
         { role: 'user', content: 'Test' },
       ]);
 
-      expect(result.content).toBe('First text block');
+      expect(result.content).toBe('First text block\n\nSecond text block');
     });
 
     it('throws error when API key is not set', async () => {

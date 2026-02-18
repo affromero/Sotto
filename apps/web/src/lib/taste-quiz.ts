@@ -492,8 +492,13 @@ Respond with a JSON array only, no markdown. Each item:
         messages: [{ role: 'user', content: systemPrompt }],
         tools: [WEB_SEARCH_TOOL],
       });
-      const textBlock = response.content.find((block) => block.type === 'text');
-      responseText = textBlock && textBlock.type === 'text' ? textBlock.text : '';
+      responseText = response.content
+        .filter(
+          (block): block is Extract<(typeof response.content)[number], { type: 'text' }> =>
+            block.type === 'text'
+        )
+        .map((block) => block.text)
+        .join('\n\n');
     } else {
       // Use AI provider (claude-code CLI has built-in web search)
       const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
