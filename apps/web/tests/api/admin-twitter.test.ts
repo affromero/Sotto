@@ -29,6 +29,15 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/auth-guards', () => ({
+  requireAdmin: async () => {
+    const session = await mockAuth();
+    if (!session?.user?.id) return null;
+    if (session.user.role !== 'ADMIN') return null;
+    return session.user.id;
+  },
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
@@ -110,13 +119,11 @@ import { GET as getAnalytics } from '@/app/api/admin/twitter/analytics/route';
 import { GET as getTrends, POST as postTrends } from '@/app/api/admin/twitter/trends/route';
 
 function mockAdmin() {
-  mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-  mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+  mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 }
 
 function mockNonAdmin() {
-  mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-  mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+  mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 }
 
 function createRequest(url: string, body?: Record<string, unknown>): NextRequest {
@@ -435,10 +442,7 @@ describe('POST /api/admin/twitter/trends', () => {
       success: true,
       data: { tweetText: 'AI trends', tweetId: 't1' },
     });
-    // First call returns ADMIN role, second returns null for sotto user
-    mockUserFindUnique
-      .mockResolvedValueOnce({ role: 'ADMIN' })
-      .mockResolvedValueOnce(null);
+    mockUserFindUnique.mockResolvedValueOnce(null);
 
     const request = createRequest('/api/admin/twitter/trends', { tweetText: 'AI trends' });
     const response = await postTrends(request);
@@ -451,9 +455,7 @@ describe('POST /api/admin/twitter/trends', () => {
       success: true,
       data: { tweetText: 'AI trends', tweetId: 't1' },
     });
-    mockUserFindUnique
-      .mockResolvedValueOnce({ role: 'ADMIN' })
-      .mockResolvedValueOnce({ id: 'sotto-id' });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
     mockParseTweetIntent.mockResolvedValue({
       title: 'AI Trends',
       topic: 'AI',

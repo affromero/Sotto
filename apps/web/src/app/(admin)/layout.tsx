@@ -21,14 +21,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   });
 
   return (
-    <AdminShell
-      user={{
-        name: session.user.name ?? null,
-        email: session.user.email ?? null,
-        image: session.user.image ?? null,
-      }}
-      pendingReportCount={pendingReportCount}
-    >
+    <AdminShell pendingReportCount={pendingReportCount}>
       {children}
     </AdminShell>
   );

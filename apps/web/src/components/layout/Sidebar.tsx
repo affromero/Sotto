@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -11,10 +10,9 @@ import {
   BarChart2,
   Mic,
   Bookmark,
-  LogOut,
   Shield,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+import { AccountSwitcher } from './AccountSwitcher';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -22,6 +20,7 @@ interface SidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   hasPodcasts?: boolean;
+  hasActivePlayer?: boolean;
   user?: {
     name?: string | null;
     image?: string | null;
@@ -60,9 +59,7 @@ function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
   return items;
 }
 
-export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, user }: SidebarProps) {
-  const displayName = user?.name || user?.email || 'User';
-  const initials = displayName.charAt(0).toUpperCase();
+export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, hasActivePlayer = false, user }: SidebarProps) {
   const role = user?.role || 'USER';
   const navItems = getNavItems(role, hasPodcasts);
 
@@ -103,31 +100,7 @@ export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = fa
           </div>
         )}
 
-        <div className={styles.userSection}>
-          <div className={styles.avatar}>
-            {user?.image ? (
-              <Image src={user.image} alt={`${displayName}'s avatar`} width={32} height={32} />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className={styles.userInfo}>
-            <div className={styles.userNameRow}>
-              <span className={styles.userName}>{displayName}</span>
-              {role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
-              {role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
-            </div>
-            <button
-              className={styles.signOut}
-              onClick={() => {
-                /* signOut handled by parent */
-              }}
-              aria-label="Sign out"
-            >
-              <LogOut size={12} aria-hidden="true" /> Sign out
-            </button>
-          </div>
-        </div>
+        <AccountSwitcher variant="dashboard" hasActivePlayer={hasActivePlayer} />
       </aside>
     </div>
   );

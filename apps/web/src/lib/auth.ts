@@ -80,7 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (token.impersonateUserId) {
           session.user.id = token.impersonateUserId;
           session.user.name = token.impersonateName ?? null;
-          session.user.email = token.impersonateEmail ?? null;
+          session.user.email = token.impersonateEmail ?? '';
           session.user.image = token.impersonateImage ?? null;
           session.user.role = token.role ?? 'ADMIN';
           session.user.isImpersonating = true;

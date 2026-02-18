@@ -179,6 +179,7 @@ body {
   --topbar-height: 64px;
   --mini-player-height: 72px;
   --max-content-width: 1200px;
+  --impersonation-banner-height: 0px;
 }
 
 /* ============================================ */
