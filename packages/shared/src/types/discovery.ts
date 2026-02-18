@@ -8,7 +8,7 @@ export interface DiscoveryMessage {
 
 export interface DiscoveryMetadata {
   topic: string;
-  depth: 'quick_overview' | 'standard' | 'deep_dive';
+  depth: 'eli5' | 'quick_overview' | 'standard' | 'deep_dive';
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
   audience: 'kids' | 'teens' | 'family' | 'general' | 'nerds' | 'mature';
   focusAreas: string[];

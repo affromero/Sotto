@@ -158,6 +158,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Auto-assign episode type tag from discovery depth
   const depthToTypeSlug: Record<string, string> = {
+    eli5: 'type-eli5',
     quick_overview: 'type-quick-overview',
     standard: 'type-explainer',
     deep_dive: 'type-deep-dive',
