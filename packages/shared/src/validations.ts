@@ -28,7 +28,7 @@ export const feedQuerySchema = z.object({
   tag: z.string().optional(),
   sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).default('recent'),
   tags: z.string().optional(),
-  depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
+  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
   audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
   tone: z.enum(['casual', 'professional', 'socratic']).optional(),
   durationMin: z.coerce.number().int().min(0).optional(),

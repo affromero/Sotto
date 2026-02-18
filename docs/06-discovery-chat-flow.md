@@ -230,7 +230,7 @@ When the agent has gathered enough information (typically 3-5 exchanges), it pro
 | Field             | Type     | Values                                                            | Description                                              |
 | ----------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------------- |
 | `topic`           | string   | Free text                                                         | The primary topic for the podcast                        |
-| `depth`           | string   | `quick_overview`, `standard`, `deep_dive`                         | How detailed the coverage should be                      |
+| `depth`           | string   | `eli5`, `quick_overview`, `standard`, `deep_dive`                 | How detailed the coverage should be                      |
 | `audience`        | string   | `kids`, `teens`, `family`, `general`, `nerds`, `mature`           | Content rating / target audience                         |
 | `audience_level`  | string   | `beginner`, `intermediate`, `expert`                              | The listener's background knowledge                      |
 | `focus_areas`     | string[] | Free text array                                                   | Specific angles or subtopics to emphasize                |

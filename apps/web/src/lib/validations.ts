@@ -81,7 +81,7 @@ export const feedQuerySchema = z.object({
   language: z.string().max(5).optional(),
   sort: z.enum(['recent', 'popular', 'trending', 'most_forked']).default('recent'),
   tags: z.string().optional(), // comma-separated tag slugs
-  depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
+  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
   audience: z.enum(['beginner', 'intermediate', 'expert']).optional(),
   tone: z.enum(['casual', 'professional', 'socratic']).optional(),
   durationMin: z.coerce.number().int().min(0).optional(),
@@ -280,7 +280,7 @@ export const forkBodySchema = z.object({
   topic: z.string().min(1).max(5000).optional(),
   remixNote: z.string().max(2000).optional(),
   focusAreas: z.array(z.string()).max(10).optional(),
-  depth: z.enum(['quick_overview', 'standard', 'deep_dive']).optional(),
+  depth: z.enum(['eli5', 'quick_overview', 'standard', 'deep_dive']).optional(),
   tone: z.enum(['casual', 'professional', 'socratic']).optional(),
 });
 
@@ -452,6 +452,7 @@ export const manualTweetSchema = z.object({
  */
 export const threadToPodcastSchema = z.object({
   tweetUrl: z.string().url().regex(/(?:twitter\.com|x\.com)\/\w+\/status\/\d+/),
+  message: z.string().max(1000).optional(),
 });
 
 /**

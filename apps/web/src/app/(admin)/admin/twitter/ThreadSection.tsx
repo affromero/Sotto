@@ -13,6 +13,7 @@ interface ThreadPodcast {
 
 export function ThreadSection() {
   const [url, setUrl] = useState('');
+  const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -57,7 +58,10 @@ export function ThreadSection() {
       const res = await fetch('/api/admin/twitter/thread-to-podcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tweetUrl: url.trim() }),
+        body: JSON.stringify({
+          tweetUrl: url.trim(),
+          ...(message.trim() && { message: message.trim() }),
+        }),
       });
 
       if (!res.ok) {
@@ -68,6 +72,7 @@ export function ThreadSection() {
       const data = await res.json();
       setSuccess(`Job queued (ID: ${data.jobId}). Podcast will appear below once processing completes.`);
       setUrl('');
+      setMessage('');
       // Refresh the list after a short delay
       setTimeout(loadRecentThreadPodcasts, 2000);
     } catch (err) {
@@ -108,6 +113,24 @@ export function ThreadSection() {
             {submitting ? 'Submitting...' : 'Generate Podcast'}
           </button>
         </div>
+
+        <div>
+          <label className={styles.label} htmlFor="adminMessage">
+            Your message (as if tagging @sotto)
+          </label>
+          <span className={styles.hint}>
+            Optional — controls duration, depth, audience. Leave blank to infer from the tweet.
+          </span>
+        </div>
+        <textarea
+          id="adminMessage"
+          className={styles.messageTextarea}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="@sotto make a 5min eli5 about this for nerds"
+          rows={3}
+          maxLength={1000}
+        />
 
         {error && <div className={styles.error}>{error}</div>}
         {success && <div className={styles.success}>{success}</div>}

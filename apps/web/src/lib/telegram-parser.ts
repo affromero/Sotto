@@ -9,7 +9,7 @@ Users send messages to the @SottoFMBot on Telegram to request podcast generation
 Rules:
 - Extract the core topic they want a podcast about
 - Generate a concise, engaging title (max 80 chars)
-- Infer depth from cues: short messages → quick_overview, detailed requests → deep_dive, default → standard
+- Infer depth from cues: "eli5" or "explain like I'm 5" → eli5, short messages → quick_overview, detailed requests → deep_dive, default → standard
 - Infer audience from language complexity: jargon-heavy → expert, plain language → beginner, default → intermediate
 - Infer tone from message style: emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
 - Extract focus areas if the user mentions specific subtopics
@@ -21,7 +21,7 @@ Respond with ONLY valid JSON matching this shape:
 {
   "topic": "string — the core topic",
   "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "quick_overview" | "standard" | "deep_dive",
+  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
   "audienceLevel": "beginner" | "intermediate" | "expert",
   "tone": "casual" | "professional" | "socratic",
   "focusAreas": ["string array of specific subtopics"],
