@@ -37,6 +37,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'beginner',
         tone: 'professional',
         focusAreas: ['qubits', 'superposition'],
+        audience: 'general',
+        durationTarget: 10,
         sourceUrl: undefined,
       };
 
@@ -61,6 +63,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'expert',
         tone: 'professional',
         focusAreas: ['bias', 'privacy'],
+        audience: 'general',
+        durationTarget: 15,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -87,6 +91,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'beginner',
         tone: 'casual',
         focusAreas: ['cryptocurrency', 'smart contracts'],
+        audience: 'general',
+        durationTarget: 5,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -108,6 +114,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'intermediate',
         tone: 'professional',
         focusAreas: ['neural networks'],
+        audience: 'general',
+        durationTarget: 10,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -129,6 +137,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'expert',
         tone: 'professional',
         focusAreas: ['propulsion', 'life support'],
+        audience: 'general',
+        durationTarget: 15,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -225,6 +235,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'intermediate',
         tone: 'professional',
         focusAreas: ['solar panels', 'efficiency'],
+        audience: 'general',
+        durationTarget: 10,
         sourceUrl: 'https://example.com/solar-power',
       };
 
@@ -249,6 +261,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'beginner',
         tone: 'casual',
         focusAreas: ['knife skills', 'seasoning'],
+        audience: 'general',
+        durationTarget: 5,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -272,6 +286,8 @@ describe('parseTweetIntent', () => {
         audienceLevel: 'expert',
         tone: 'professional',
         focusAreas: ['renormalization', 'gauge theory', 'symmetry breaking'],
+        audience: 'mature',
+        durationTarget: 15,
       };
 
       mockGenerateResponse.mockResolvedValue({
@@ -368,6 +384,8 @@ describe('parseThreadIntent', () => {
       audienceLevel: 'intermediate',
       tone: 'socratic',
       focusAreas: ['automation', 'augmentation', 'labor market'],
+      audience: 'general',
+      durationTarget: 15,
       sourceUrl: 'https://example.com/ai-jobs',
       sourceUrls: ['https://example.com/ai-jobs'],
       isDebate: true,
@@ -401,6 +419,8 @@ describe('parseThreadIntent', () => {
       audienceLevel: 'intermediate',
       tone: 'professional',
       focusAreas: ['streaming', 'data fetching'],
+      audience: 'general',
+      durationTarget: 15,
       isDebate: false,
       viewpoints: [],
     };

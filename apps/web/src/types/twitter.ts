@@ -7,6 +7,8 @@ export interface TweetParseResult {
   audienceLevel: 'beginner' | 'intermediate' | 'expert';
   tone: 'casual' | 'professional' | 'socratic';
   focusAreas: string[];
+  audience?: 'general' | 'kids' | 'mature';
+  durationTarget?: number;
   sourceUrl?: string;
   sourceUrls?: string[];
   isDebate?: boolean;
