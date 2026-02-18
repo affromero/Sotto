@@ -10,7 +10,7 @@ This guide walks you through deploying Sotto to production for beta testing with
 4. [Storage & CDN](#storage--cdn)
 5. [API Keys & Integrations](#api-keys--integrations)
 6. [Authentication](#authentication)
-7. [Payments](#payments)
+7. [BYOK & Voice Marketplace](#byok--voice-marketplace)
 8. [Deployment](#deployment)
 9. [Post-Deployment Configuration](#post-deployment-configuration)
 10. [Cost Breakdown](#cost-breakdown)
@@ -28,34 +28,23 @@ Before starting, ensure you have:
 ### Required Accounts
 
 - **Domain name**: `sotto.fm`, `trysotto.com`, or similar
-- **Vercel account**: Free hobby tier works for web frontend
-- **Railway account**: For worker processes ($5/mo starter plan)
+- **Hetzner account**: For VPS hosting (CPX31 ~$11/mo runs everything)
 - **GitHub account**: For repo hosting and CI/CD
 - **Cloudflare account**: For R2 storage (10GB free)
-- **Stripe account**: For billing (test mode is free)
+- **Stripe account**: For voice marketplace payments (Stripe Connect)
 
 ### Required API Keys
 
 - **Anthropic API key**: Sign up at console.anthropic.com ($5 minimum credit)
 - **ElevenLabs API key**: Sign up at elevenlabs.io (Starter $5/mo or Creator $22/mo)
 
-### Required Database Services
-
-Choose one option for PostgreSQL:
-
-- **Neon** (recommended): Free tier, 0.5GB storage, serverless
-- **Supabase**: Free tier, 500MB storage, includes Redis alternative
-- **Railway**: $5/mo, includes PostgreSQL + Redis together
-
-Choose one option for Redis:
-
-- **Upstash** (recommended): Free tier, 10K commands/day, serverless
-- **Railway**: $5/mo, bundled with PostgreSQL
+**Note**: Sotto uses a BYOK (Bring Your Own Key) model — users provide their own AI and TTS API keys. Platform keys are only needed as fallback for the free tier.
 
 ### Local Tools
 
 - Node.js 18+ and npm
 - Git
+- Docker + Docker Compose
 - Prisma CLI: `npm install -g prisma`
 
 ---
@@ -82,48 +71,61 @@ cp .env.example .env.production
 
 ## Database & Cache
 
-### PostgreSQL Setup (Neon)
+Sotto runs PostgreSQL and Redis as Docker containers on the same VPS. No external database services needed.
 
-1. Go to [console.neon.tech](https://console.neon.tech)
-2. Click "Create Project"
-3. Choose region closest to your users
-4. Copy the connection string (looks like `postgresql://user:pass@host/db?sslmode=require`)
-5. Add to `.env.production`:
+### PostgreSQL Setup (Docker)
+
+PostgreSQL 16 with pgvector runs as a Docker Compose service:
+
+```yaml
+# In docker-compose.prod.yml
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: sotto
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: sotto
+    volumes:
+      - sotto_postgres_data:/var/lib/postgresql/data
+```
+
+The `DATABASE_URL` is configured automatically inside the Docker network:
 
 ```env
-DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+DATABASE_URL="postgresql://sotto:${POSTGRES_PASSWORD}@postgres:5432/sotto?schema=public"
 ```
 
-6. Push schema to database:
+Push schema to database:
 
 ```bash
-npx prisma db push --schema prisma/schema.prisma
+npx prisma db push --schema=apps/web/prisma/schema.prisma
 ```
 
-7. Verify connection:
+Verify connection:
 
 ```bash
 npx prisma studio
 ```
 
-### Redis Setup (Upstash)
+### Redis Setup (Docker)
 
-1. Go to [console.upstash.com](https://console.upstash.com)
-2. Create Redis database
-3. Choose region closest to your PostgreSQL instance
-4. Copy the connection URL (looks like `rediss://default:xxx@us1-xxx.upstash.io:6379`)
-5. Add to `.env.production`:
+Redis 7 runs as a Docker Compose service with AOF persistence:
 
-```env
-REDIS_URL="rediss://default:xxx@us1-xxx.upstash.io:6379"
+```yaml
+# In docker-compose.prod.yml
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - sotto_redis_data:/data
 ```
 
-6. Test connection:
+The `REDIS_URL` is configured automatically:
 
-```bash
-# Install redis-cli or use Upstash web console
-redis-cli -u "rediss://default:xxx@us1-xxx.upstash.io:6379" PING
-# Should return: PONG
+```env
+REDIS_URL="redis://redis:6379"
 ```
 
 ---
@@ -182,7 +184,7 @@ R2_PUBLIC_URL="https://pub-xxxxx.r2.dev"
 
 ## API Keys & Integrations
 
-### Anthropic Claude
+### Anthropic Claude (Platform Fallback)
 
 1. Go to [console.anthropic.com](https://console.anthropic.com)
 2. Add credit ($5 minimum)
@@ -194,9 +196,9 @@ R2_PUBLIC_URL="https://pub-xxxxx.r2.dev"
 ANTHROPIC_API_KEY="sk-ant-xxxxx"
 ```
 
-**Cost estimation**: Each podcast generation uses ~10K-30K tokens ($0.03-0.09). Budget $10-30/month for 50 beta users.
+**Note**: This key serves as the platform fallback for free-tier users. Most users will provide their own keys via BYOK.
 
-### ElevenLabs
+### ElevenLabs (Platform Fallback)
 
 1. Go to [elevenlabs.io](https://elevenlabs.io)
 2. Sign up for Starter ($5/mo, 30K characters) or Creator ($22/mo, 100K characters)
@@ -207,31 +209,28 @@ ANTHROPIC_API_KEY="sk-ant-xxxxx"
 ELEVENLABS_API_KEY="your-elevenlabs-key"
 ```
 
-**Cost estimation**: 10-minute podcast = ~1500 words = ~9K characters. ElevenLabs Scale tier ($99/mo) provides sufficient character allocation for Studio-tier users. For beta, recommend Scale tier.
+### BYOK Encryption Key
+
+Generate the encryption key used to store user API keys (AES-256-GCM):
+
+```bash
+openssl rand -hex 32
+```
+
+Add to `.env.production`:
+
+```env
+BYOK_ENCRYPTION_KEY="your-generated-hex-key"
+```
 
 ### Voice Selection
 
-ElevenLabs provides multiple voices. For Sotto's 2-speaker format:
-
-- **Host voice** (warm, conversational): Try `Rachel`, `Bella`, `Elli`
-- **Expert voice** (authoritative, clear): Try `Adam`, `Antoni`, `Josh`
-
-The `src/lib/elevenlabs.ts` file includes a voice pool system. Update the voice IDs based on your ElevenLabs account:
+ElevenLabs provides multiple voices. Sotto uses a voice pool system with 16 curated voices across 5 TTS providers. The `src/lib/voice-pool.ts` file handles deterministic voice pair selection per podcast:
 
 ```typescript
-// In apps/web/src/lib/elevenlabs.ts
-const VOICE_POOL = {
-  hosts: [
-    { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella' },
-    { id: 'MF3mGyEYCl7XYWbV9V6O', name: 'Elli' },
-    { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
-  ],
-  experts: [
-    { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam' },
-    { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni' },
-    { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh' },
-  ],
-};
+// In apps/web/src/lib/voice-pool.ts
+// selectVoicePair(podcastId) hashes the podcast ID to pick a unique HOST + EXPERT pair
+// resolveVoiceId() maps logical voice IDs to provider-specific IDs
 ```
 
 ---
@@ -287,6 +286,20 @@ GITHUB_CLIENT_ID="your-client-id"
 GITHUB_CLIENT_SECRET="your-client-secret"
 ```
 
+#### Twitter OAuth
+
+1. Go to [developer.twitter.com](https://developer.twitter.com)
+2. Create a project and app
+3. Enable OAuth 2.0 (User authentication settings)
+4. Callback URL: `https://yourdomain.com/api/auth/callback/twitter`
+5. Copy Client ID and Client Secret
+6. Add to `.env.production`:
+
+```env
+TWITTER_CLIENT_ID="your-client-id"
+TWITTER_CLIENT_SECRET="your-client-secret"
+```
+
 #### Apple Sign In (Optional for MVP)
 
 1. Go to [developer.apple.com](https://developer.apple.com)
@@ -302,19 +315,37 @@ APPLE_TEAM_ID="your-team-id"
 APPLE_KEY_ID="your-key-id"
 ```
 
-**Note**: Apple Sign In requires a paid Apple Developer account ($99/year). Skip for initial MVP if budget-constrained.
+**Note**: Apple Sign In requires a paid Apple Developer account ($99/year). Required for the iOS app, optional for web-only MVP.
 
 ---
 
-## Payments
+## BYOK & Voice Marketplace
 
-### Stripe Setup
+### BYOK (Bring Your Own Key)
+
+Sotto uses a BYOK model — all generation features are free when users provide their own API keys. No subscription tiers or credits.
+
+**User-provided keys** (encrypted with AES-256-GCM via `BYOK_ENCRYPTION_KEY`):
+
+| Key Type | Supported Providers | Stored In |
+|----------|-------------------|-----------|
+| AI key | Anthropic, OpenAI | `UserAiKey` model |
+| TTS key | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume | `UserTtsKey` model |
+
+**Free tier fallback**: The `FreeTierConfig` singleton controls platform-provided AI/TTS for users without their own keys. Admin-configurable at `/admin`.
+
+**Rate limits** (abuse prevention): 20 generations/hour, 100/day per user. 60 interactions/hour.
+
+### Voice Marketplace (Stripe Connect)
+
+Voice owners can sell their custom voice clones on a per-podcast basis via Stripe Connect.
 
 1. Go to [dashboard.stripe.com](https://dashboard.stripe.com)
-2. Activate your account (provides business details, tax info)
-3. Go to "Developers" → "API keys"
-4. Copy "Publishable key" and "Secret key" (use live mode for production)
-5. Add to `.env.production`:
+2. Activate your account
+3. Enable **Stripe Connect** (for voice marketplace payouts)
+4. Go to "Developers" → "API keys"
+5. Copy "Publishable key" and "Secret key"
+6. Add to `.env.production`:
 
 ```env
 STRIPE_PUBLISHABLE_KEY="pk_live_xxxxx"
@@ -322,71 +353,22 @@ STRIPE_SECRET_KEY="sk_live_xxxxx"
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_xxxxx"
 ```
 
-### Create Products
+**How it works**:
 
-1. Go to "Products" → "Add product"
-2. Create six products:
-
-**Subscription Tiers**:
-
-**Starter Tier**:
-
-- Name: "Sotto Starter"
-- Pricing: Recurring, $9/month
-- Billing period: Monthly
-
-**Pro Tier**:
-
-- Name: "Sotto Pro"
-- Pricing: Recurring, $24/month
-- Billing period: Monthly
-
-**Studio Tier**:
-
-- Name: "Sotto Studio"
-- Pricing: Recurring, $49/month
-- Billing period: Monthly
-
-**One-Time Credit Packs**:
-
-**3 Credits Pack**:
-
-- Name: "Sotto 3 Credits"
-- Pricing: One-time, $5
-
-**10 Credits Pack**:
-
-- Name: "Sotto 10 Credits"
-- Pricing: One-time, $15
-
-**25 Credits Pack**:
-
-- Name: "Sotto 25 Credits"
-- Pricing: One-time, $30
-
-3. Copy Price IDs (e.g., `price_xxxxx`)
-4. Add to `.env.production`:
-
-```env
-STRIPE_PRICE_ID_STARTER="price_xxxxx"
-STRIPE_PRICE_ID_PRO="price_xxxxx"
-STRIPE_PRICE_ID_STUDIO="price_xxxxx"
-STRIPE_PRICE_ID_CREDITS_3="price_xxxxx"
-STRIPE_PRICE_ID_CREDITS_10="price_xxxxx"
-STRIPE_PRICE_ID_CREDITS_25="price_xxxxx"
-```
+- Voice owners connect their Stripe account and set a per-podcast price (or free)
+- Buyers pay once per podcast using that voice
+- Payment is authorized upfront, captured when podcast reaches READY, cancelled on FAILED
+- Platform takes 10% via `application_fee_amount`
+- Free access paths: owner, allowlisted user, approved VoiceRequest, or existing purchase
 
 ### Webhook Setup
 
 1. Go to "Developers" → "Webhooks" → "Add endpoint"
 2. Endpoint URL: `https://yourdomain.com/api/webhooks/stripe`
 3. Listen to events:
-   - `checkout.session.completed`
-   - `customer.subscription.created`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.payment_succeeded`
-   - `invoice.payment_failed`
+   - `account.updated` (Connect account status)
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
 4. Copy "Signing secret" (looks like `whsec_xxxxx`)
 5. Add to `.env.production`:
 
@@ -398,75 +380,112 @@ STRIPE_WEBHOOK_SECRET="whsec_xxxxx"
 
 ## Deployment
 
-### Deploy Web Frontend (Vercel)
+### Provision Hetzner VPS
 
-1. Go to [vercel.com](https://vercel.com)
-2. "Import Project" → Connect GitHub repo
-3. Project settings:
-   - Framework: Next.js
-   - Root directory: `./`
-   - Build command: `npm run build`
-   - Output directory: `.next`
-4. Environment variables: Paste all `.env.production` values
-   - **Important**: Include `NEXT_PUBLIC_*` variables for client-side access
-5. Deploy
-6. Vercel will assign a URL: `https://sotto-xxxxx.vercel.app`
+1. Go to [console.hetzner.cloud](https://console.hetzner.cloud)
+2. Create a new project: "Sotto"
+3. Add a server:
+   - Location: Choose closest to your users (e.g., Falkenstein, Ashburn)
+   - Image: Ubuntu 22.04
+   - Type: **CPX31** (4 vCPU, 8GB RAM, 160GB SSD) — €10/mo (~$11)
+   - Add your SSH key
+4. Note the server IP address
 
-### Custom Domain (Vercel)
+### Server Setup
 
-1. Go to project settings → "Domains"
-2. Add your domain: `yourdomain.com`
-3. Follow DNS instructions:
-   - Add A record: `76.76.21.21`
-   - Add CNAME for www: `cname.vercel-dns.com`
-4. Wait for DNS propagation (5-60 minutes)
-5. Vercel automatically provisions SSL certificate
+SSH into your server and install dependencies:
 
-### Deploy Workers (Railway)
+```bash
+ssh root@your-server-ip
 
-1. Go to [railway.app](https://railway.app)
-2. "New Project" → "Deploy from GitHub repo"
-3. Connect Sotto repository
-4. Create new service: "Sotto Workers"
-5. Settings:
-   - Build command: `npm install && npm run build`
-   - Start command: `npm run dev:workers`
-   - Dockerfile: Use `Dockerfile.workers`
+# Install Docker + Docker Compose
+curl -fsSL https://get.docker.com | sh
 
-Railway Dockerfile (`Dockerfile.workers`):
-
-```dockerfile
-FROM node:18-alpine
-
-WORKDIR /app
-
-# Install FFmpeg for audio stitching
-RUN apk add --no-cache ffmpeg
-
-# Copy package files
-COPY package*.json ./
-RUN npm ci --only=production
-
-# Copy source
-COPY . .
-
-# Build TypeScript
-RUN npm run build
-
-# Start workers
-CMD ["node", "dist/workers/index.js"]
+# Install Caddy
+apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+apt update && apt install caddy
 ```
 
-6. Environment variables: Paste all `.env.production` values
-7. Deploy
+### Deploy with Docker Compose
 
-**Important**: Workers need separate Redis connections. Railway automatically handles this via environment variables.
+1. Clone the repo on the server:
+
+```bash
+git clone https://github.com/yourusername/sotto.git /opt/sotto
+cd /opt/sotto
+```
+
+2. Copy `.env.production` to `.env`:
+
+```bash
+# Upload your .env.production file, then:
+cp .env.production .env
+```
+
+3. Start all services:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+This starts 4 containers:
+- **postgres**: PostgreSQL 16 with pgvector
+- **redis**: Redis 7 with AOF persistence
+- **web**: Next.js app on port 3000 (internal)
+- **workers**: 23 BullMQ workers
+
+4. Run database migration:
+
+```bash
+docker compose -f docker-compose.prod.yml --profile migration run --rm migrate \
+  npx prisma db push --schema=apps/web/prisma/schema.prisma
+```
+
+### Configure Caddy (Reverse Proxy + SSL)
+
+1. Copy the Caddyfile:
+
+```bash
+cp /opt/sotto/Caddyfile /etc/caddy/Caddyfile
+```
+
+2. Edit to use your domain:
+
+```bash
+# Replace sotto.fm with your domain
+nano /etc/caddy/Caddyfile
+```
+
+3. Point your domain DNS to the server IP (A record)
+4. Reload Caddy:
+
+```bash
+sudo systemctl reload caddy
+```
+
+Caddy automatically provisions and renews Let's Encrypt SSL certificates.
 
 ### Verify Deployment
 
 1. Web: Visit `https://yourdomain.com`
-2. Workers: Check Railway logs for "Worker started" messages
+2. Workers: Check logs for "23 workers started":
+   ```bash
+   docker compose -f docker-compose.prod.yml logs workers --tail=50
+   ```
 3. Health check: `curl https://yourdomain.com/api/health`
+
+### CI/CD (GitHub Actions)
+
+Sotto deploys via GitHub Actions SSH. On push to `main`:
+
+1. SSH into the Hetzner VPS
+2. Pull latest code
+3. Rebuild Docker images
+4. Restart containers with zero downtime
+
+See `.github/workflows/` for the deployment workflow.
 
 ---
 
@@ -497,7 +516,7 @@ Create 3-5 example podcasts on diverse topics to showcase the platform:
 npx prisma db seed
 ```
 
-Edit `prisma/seed.ts` to create real example podcasts:
+Edit `apps/web/prisma/seed.ts` to create real example podcasts:
 
 ```typescript
 // Example topics:
@@ -509,35 +528,19 @@ Edit `prisma/seed.ts` to create real example podcasts:
 
 ### Configure Rate Limiting
 
-Update `src/middleware.ts` to add production rate limits:
+Rate limits are enforced via Redis-backed sliding window counters in `src/middleware.ts`:
 
-```typescript
-// Per user: 10 podcast generations per hour
-// Per IP: 50 requests per minute
-```
+- 20 podcast generations/hour per user
+- 100 generations/day per user
+- 60 interactions/hour per user
 
-### Enable Analytics (Optional)
+### Configure Free Tier
 
-For MVP, use Vercel Analytics (free):
+Set platform defaults at `/admin` → Free Tier Config:
 
-1. Go to Vercel project → "Analytics"
-2. Enable "Vercel Analytics"
-3. Add to `src/app/layout.tsx`:
-
-```typescript
-import { Analytics } from '@vercel/analytics/react';
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        {children}
-        <Analytics />
-      </body>
-    </html>
-  );
-}
-```
+- AI provider + model for free-tier users
+- TTS provider for free-tier users
+- Generation limit for users without BYOK keys
 
 ---
 
@@ -545,39 +548,41 @@ export default function RootLayout({ children }) {
 
 Monthly costs for MVP with 50 beta users (estimated):
 
-| Service              | Tier          | Cost          | Notes                                |
-| -------------------- | ------------- | ------------- | ------------------------------------ |
-| **Vercel**           | Hobby         | $0            | Up to 100GB bandwidth                |
-| **Railway**          | Starter       | $5            | Workers + 512MB RAM                  |
-| **Neon PostgreSQL**  | Free          | $0            | 0.5GB storage, 1GB data transfer     |
-| **Upstash Redis**    | Free          | $0            | 10K commands/day                     |
-| **Cloudflare R2**    | Free          | $0            | 10GB storage, 10M Class A requests   |
-| **Anthropic Claude** | Pay-as-you-go | $15-30        | ~100-300 podcast generations         |
-| **ElevenLabs**       | Creator       | $22           | 100K characters/month (~11 podcasts) |
-| **Stripe**           | Pay-as-you-go | $0-10         | 2.9% + $0.30 per transaction         |
-| **Domain**           | Annual        | $1-2/mo       | `.com` domain                        |
-| **Total**            |               | **$43-69/mo** | Scales with usage                    |
+| Service | Tier | Cost | Notes |
+|---------|------|------|-------|
+| **Hetzner VPS** | CPX31 (4 vCPU, 8GB) | $11 | Web + workers + PostgreSQL + Redis |
+| **Cloudflare R2** | Free | $0 | 10GB storage, 10M Class A requests |
+| **Anthropic Claude** | Pay-as-you-go | $15-30 | Platform fallback only (most users BYOK) |
+| **ElevenLabs** | Creator | $22 | Platform fallback only (most users BYOK) |
+| **Stripe** | Pay-as-you-go | $0-5 | 2.9% + $0.30 per voice marketplace transaction |
+| **Domain** | Annual | $1-2/mo | `.com` or `.fm` domain |
+| **Total** | | **$49-70/mo** | Drops to ~$13/mo when most users BYOK |
 
 ### Cost Scaling
 
-**At 100 users**:
+**At 100 users** (most providing own keys):
 
-- Railway: $10 (1GB RAM)
-- Neon: $20 (3GB storage)
-- Upstash: $10 (100K commands/day)
-- Claude: $50-100
-- ElevenLabs: $99 (Indie tier, 500K characters)
-- **Total: ~$200/mo**
+- Hetzner: $11 (CPX31 still sufficient)
+- Claude: $10-20 (free tier fallback only)
+- ElevenLabs: $22 (free tier fallback only)
+- **Total: ~$45/mo**
 
 **At 500 users**:
 
-- Vercel: $20 (Pro tier)
-- Railway: $50 (4GB RAM)
-- Neon: $50 (10GB storage)
-- Upstash: $50 (1M commands/day)
-- Claude: $200-500
-- ElevenLabs: $330 (Growth tier, 2M characters)
-- **Total: ~$700-1000/mo**
+- Hetzner: $21 (upgrade to CPX41, 8 vCPU, 16GB RAM)
+- Claude: $20-50 (free tier fallback)
+- ElevenLabs: $22-99 (depends on free tier usage)
+- R2: $0.23 (15GB storage)
+- **Total: ~$65-195/mo**
+
+**At 2,000+ users**:
+
+- Hetzner: $50 (CCX33 dedicated CPU, separate DB)
+- Claude: $50-100
+- ElevenLabs: $99-330
+- **Total: ~$200-500/mo**
+
+**Key insight**: The BYOK model means platform AI/TTS costs stay low regardless of user count. Most costs scale with free-tier usage, not total users.
 
 ---
 
@@ -587,12 +592,23 @@ Before sharing with beta users, test every core flow:
 
 ### Authentication
 
-- [ ] Sign up with email works
-- [ ] Email verification link works
 - [ ] Sign in with Google works
 - [ ] Sign in with GitHub works
+- [ ] Sign in with Twitter works
 - [ ] Logout works
 - [ ] Session persists across page reloads
+
+### BYOK Key Management
+
+- [ ] Can add Anthropic API key in settings
+- [ ] Can add OpenAI API key in settings
+- [ ] Can add ElevenLabs API key in settings
+- [ ] Can add PlayHT / Cartesia / Hume API key
+- [ ] Keys are encrypted (verify in DB — no plaintext)
+- [ ] Key validation worker runs (24h cycle)
+- [ ] Generation works with user's own keys
+- [ ] Generation works with free tier (platform keys)
+- [ ] Rate limits enforced (20/hour, 100/day)
 
 ### Podcast Creation
 
@@ -602,6 +618,10 @@ Before sharing with beta users, test every core flow:
 - [ ] Can paste URL for source material
 - [ ] Shows recommendations before generating
 - [ ] "Create mine" starts generation
+- [ ] Script verification runs (claim check + sourcing)
+- [ ] Reference validation runs (4-layer verification)
+- [ ] Script review pause works (SCRIPT_READY)
+- [ ] User can edit, approve, or regenerate script
 - [ ] Progress bar updates in real-time
 - [ ] Push notification arrives when ready
 - [ ] Generated podcast appears in "My Podcasts"
@@ -639,31 +659,30 @@ Before sharing with beta users, test every core flow:
 - [ ] Follow button works
 - [ ] Fork button creates a copy
 
-### Billing
+### Voice Marketplace
 
-- [ ] Pricing page loads with correct tiers
-- [ ] "Upgrade" button redirects to Stripe Checkout
-- [ ] Can complete test payment (use `4242 4242 4242 4242`)
-- [ ] Redirects back to dashboard after payment
-- [ ] Subscription shows as "Pro" in billing page
-- [ ] "Manage subscription" opens Stripe portal
-- [ ] Can cancel subscription in portal
+- [ ] Voice owner can connect Stripe account
+- [ ] Voice owner can set per-podcast price
+- [ ] Buyer can purchase voice access
+- [ ] Payment authorized on generation start
+- [ ] Payment captured on READY
+- [ ] Payment cancelled on FAILED
+- [ ] Free access paths work (owner, allowlist, purchase)
 
-### Mobile (PWA)
+### Mobile App (React Native + Expo)
 
-- [ ] "Add to Home Screen" prompt appears
-- [ ] Installs as standalone app
-- [ ] App icon shows on home screen
-- [ ] Opens without browser chrome
-- [ ] Offline fallback page works
-- [ ] Push notifications work on Android
+- [ ] iOS app builds and runs on TestFlight
+- [ ] Login works (API token auth via SecureStore)
+- [ ] Podcast playback works (react-native-track-player)
+- [ ] Background audio continues when app is backgrounded
+- [ ] Push notifications work on iOS
 
 ### Performance
 
-- [ ] Lighthouse score > 90 for Performance
 - [ ] First Contentful Paint < 1.5s
 - [ ] Time to Interactive < 3s
 - [ ] No console errors on production
+- [ ] Docker containers healthy (`docker compose ps`)
 
 ---
 
@@ -694,6 +713,8 @@ I built Sotto — podcasts that listen back.
 
 Chat with AI to describe what you want to learn, and it generates a 2-voice conversational podcast. While listening, you can interrupt to ask questions, and the AI answers in context.
 
+Bring your own API keys — all features are free.
+
 Try it: https://yourdomain.com
 
 It's in beta, so I'd love your feedback!
@@ -709,7 +730,7 @@ Record a 3-5 minute podcast explaining Sotto:
 - How to create your first podcast (1 min)
 - How to interrupt and ask questions (1 min)
 - Social features: feed, follow, fork (1 min)
-- Pricing and limits (30s)
+- Setting up your API keys (BYOK) (30s)
 - How to give feedback (30s)
 
 Pin this podcast to the top of the feed so every new user sees it.
@@ -724,7 +745,7 @@ Create a simple feedback form at `/feedback`:
 // - What did you like?
 // - What was confusing?
 // - What features are missing?
-// - Would you pay for this? (Yes / No / Maybe)
+// - Would you use this regularly? (Yes / No / Maybe)
 // - Email (optional, for follow-up)
 ```
 
@@ -747,22 +768,25 @@ model Feedback {
 
 ## Monitoring & Debugging
 
-### Vercel Logs
+### Docker Logs
 
-1. Go to Vercel project → "Logs"
-2. Filter by:
-   - Error logs: `level:error`
-   - Slow requests: `duration:>5000`
-   - API routes: `path:/api/*`
+Monitor all services:
 
-### Railway Logs
+```bash
+# All containers
+docker compose -f docker-compose.prod.yml logs -f
 
-1. Go to Railway project → "Sotto Workers" → "Logs"
-2. Filter by worker type:
-   - `[script-generation]`
-   - `[audio-generation]`
-   - `[audio-stitching]`
-3. Watch for errors: `level:error`
+# Web app only
+docker compose -f docker-compose.prod.yml logs -f web
+
+# Workers only
+docker compose -f docker-compose.prod.yml logs -f workers
+
+# Filter by worker type
+docker compose -f docker-compose.prod.yml logs workers | grep "\[script-generation\]"
+docker compose -f docker-compose.prod.yml logs workers | grep "\[audio-generation\]"
+docker compose -f docker-compose.prod.yml logs workers | grep "ERROR"
+```
 
 ### BullMQ Dashboard (Optional)
 
@@ -795,22 +819,10 @@ createBullBoard({
 
 ### Error Tracking (Sentry, Optional)
 
-For MVP, use console.error logs. For production, add Sentry:
+For MVP, use structured logging via `src/lib/logger.ts`. For production, add Sentry:
 
 ```bash
 npm install @sentry/nextjs
-```
-
-```typescript
-// apps/web/src/lib/logger.ts
-import * as Sentry from '@sentry/nextjs';
-
-export function logError(error: Error, context?: any) {
-  console.error(error, context);
-  if (process.env.NODE_ENV === 'production') {
-    Sentry.captureException(error, { extra: context });
-  }
-}
 ```
 
 ### Key Metrics to Watch
@@ -818,25 +830,26 @@ export function logError(error: Error, context?: any) {
 1. **Podcast generation success rate**: Should be > 95%
 2. **Audio generation time**: Should be < 5 minutes for 10-minute podcast
 3. **API error rate**: Should be < 1%
-4. **Database connection pool**: Should not exceed 80%
-5. **Redis memory usage**: Should stay under free tier limit
-6. **R2 storage usage**: Monitor approaching 10GB limit
+4. **Docker container health**: All containers should be "healthy"
+5. **Redis memory usage**: Should stay under 512MB limit
+6. **VPS resource usage**: CPU < 80%, Memory < 80%
+7. **R2 storage usage**: Monitor approaching 10GB free limit
 
 ### Set Up Alerts
 
-**Vercel**:
+**Hetzner**:
 
-- Deploy failure notifications (email)
-- Error rate > 5% (email)
+- Server monitoring (CPU, memory, disk) via Hetzner Cloud Console
+- Set alerts for CPU > 90% or disk > 80%
 
-**Railway**:
+**Docker**:
 
-- Worker crash notifications (email)
-- Memory usage > 90% (email)
+- Container restart alerts (configure `restart: unless-stopped`)
+- Use `docker compose ps` to check container health
 
-**Upstash**:
+**Application**:
 
-- Commands approaching daily limit (email)
+- Monitor `/api/health` endpoint with an uptime service (e.g., UptimeRobot, free tier)
 
 ---
 
@@ -846,23 +859,24 @@ export function logError(error: Error, context?: any) {
 
 #### "Database connection failed"
 
-**Cause**: Invalid `DATABASE_URL` or database not accepting connections
+**Cause**: PostgreSQL container not running or not healthy
 
 **Fix**:
 
-1. Verify connection string in Neon dashboard
-2. Check IP allowlist (Neon allows all by default)
-3. Test connection: `npx prisma studio`
+1. Check container status: `docker compose -f docker-compose.prod.yml ps postgres`
+2. Check logs: `docker compose -f docker-compose.prod.yml logs postgres`
+3. Verify `POSTGRES_PASSWORD` is set in `.env`
+4. Test connection: `docker compose -f docker-compose.prod.yml exec postgres psql -U sotto -d sotto -c "SELECT 1"`
 
 #### "Redis connection timeout"
 
-**Cause**: Invalid `REDIS_URL` or free tier commands exceeded
+**Cause**: Redis container not running or memory limit exceeded
 
 **Fix**:
 
-1. Check Upstash dashboard for daily command usage
-2. Upgrade to paid tier if exceeded
-3. Optimize Redis usage (reduce cache TTL, use batch operations)
+1. Check container status: `docker compose -f docker-compose.prod.yml ps redis`
+2. Check memory usage: `docker compose -f docker-compose.prod.yml exec redis redis-cli INFO memory`
+3. If maxmemory exceeded, increase limit in `docker-compose.prod.yml` (default: 512mb)
 
 #### "Audio generation stuck at 50%"
 
@@ -871,8 +885,8 @@ export function logError(error: Error, context?: any) {
 **Fix**:
 
 1. Check ElevenLabs dashboard for quota usage
-2. Check Railway logs for worker errors
-3. Retry failed jobs: Go to BullMQ dashboard, select job, click "Retry"
+2. Check worker logs: `docker compose -f docker-compose.prod.yml logs workers | grep audio-generation`
+3. Retry failed jobs via BullMQ dashboard or admin panel
 
 #### "Stripe webhook not receiving events"
 
@@ -881,8 +895,9 @@ export function logError(error: Error, context?: any) {
 **Fix**:
 
 1. Test webhook: Stripe dashboard → Webhooks → Send test event
-2. Check Vercel logs for incoming webhook requests
+2. Check web logs: `docker compose -f docker-compose.prod.yml logs web | grep webhook`
 3. Verify `STRIPE_WEBHOOK_SECRET` matches dashboard value
+4. Verify Caddy is proxying correctly to port 3000
 
 #### "Push notifications not working"
 
@@ -900,8 +915,8 @@ export function logError(error: Error, context?: any) {
 
 **Fix**:
 
-1. Check Railway logs for FFmpeg errors
-2. Re-run stitching job
+1. Check worker logs: `docker compose -f docker-compose.prod.yml logs workers | grep audio-stitching`
+2. Re-run stitching job via admin panel
 3. Verify R2 file integrity: Download and play locally
 
 #### "Feed page loads slowly"
@@ -918,6 +933,19 @@ export function logError(error: Error, context?: any) {
 2. Implement pagination: Limit to 20 podcasts per page
 3. Add Redis caching for trending podcasts
 
+#### "Container keeps restarting"
+
+**Cause**: Out of memory, missing env var, or application crash
+
+**Fix**:
+
+1. Check logs before crash: `docker compose -f docker-compose.prod.yml logs --tail=100 <service>`
+2. Check memory: `docker stats`
+3. If OOM, upgrade VPS or increase swap:
+   ```bash
+   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+   ```
+
 ---
 
 ## Next Steps After MVP
@@ -925,14 +953,13 @@ export function logError(error: Error, context?: any) {
 Once you have 50+ beta users and stable performance:
 
 1. **Gather feedback**: Analyze feedback form responses, identify top feature requests
-2. **Optimize costs**: Monitor usage, upgrade/downgrade tiers as needed
+2. **Optimize costs**: Monitor BYOK adoption — higher adoption = lower platform costs
 3. **Improve onboarding**: Add tutorial overlay for first-time users
-4. **Add mobile apps**: React Native or PWA enhancement
-5. **Expand OAuth**: Add LinkedIn, Twitter/X
-6. **Studio features**: Voice marketplace, analytics dashboard
-7. **Analytics dashboard**: Show creators their podcast stats
-8. **Public API**: Let developers build on Sotto
-9. **Monetization**: Enable Starter/Pro/Studio tier conversions with in-app prompts
+4. **Scale VPS**: Upgrade to CPX41 ($21/mo) when CPU consistently > 70%
+5. **Voice marketplace growth**: Onboard voice creators, promote voice clones
+6. **Analytics dashboard**: Show creators their podcast stats (already built at `/analytics`)
+7. **Twitter bot**: Enable @sottofm mention-to-podcast pipeline (`docs/25-twitter-integration.md`)
+8. **Telegram bot**: Enable Telegram podcast creation (`docs/26-telegram-integration.md`)
 
 ---
 
@@ -940,22 +967,24 @@ Once you have 50+ beta users and stable performance:
 
 Before considering MVP "launched":
 
-- [ ] All services are deployed and healthy
+- [ ] All Docker containers are healthy (`docker compose ps`)
 - [ ] All environment variables are set correctly
 - [ ] Database schema is pushed and seeded
-- [ ] Custom domain is configured with SSL
-- [ ] OAuth providers are working (Google, GitHub)
-- [ ] Stripe products and webhook are configured
+- [ ] Custom domain is configured with SSL (Caddy auto-provisions)
+- [ ] OAuth providers are working (Google, GitHub, Twitter)
+- [ ] BYOK key management is working (add, validate, encrypt)
+- [ ] Voice marketplace Stripe Connect is configured
 - [ ] 3-5 example podcasts are seeded
 - [ ] All critical user flows tested end-to-end
-- [ ] Error tracking is set up (logs at minimum)
+- [ ] Error tracking is set up (structured logging at minimum)
 - [ ] Feedback form is live
-- [ ] Push notifications are working on Android
-- [ ] Monitoring dashboards are accessible
-- [ ] Cost alerts are configured
+- [ ] Push notifications are working
+- [ ] Docker health checks are passing
+- [ ] Uptime monitoring is configured
 - [ ] Beta user invite list is ready
 - [ ] "Welcome to Sotto" podcast is created
 - [ ] Social sharing links are tested
+- [ ] iOS TestFlight build is available (see `docs/24-ios-testflight-appstore-guide.md`)
 
 ---
 
@@ -964,8 +993,8 @@ Before considering MVP "launched":
 For questions or support, refer to:
 
 - `CLAUDE.md` — Codebase overview
-- `docs/00-plan.md` — Full product plan
-- `docs/03-technical-architecture.md` — System design
-- `docs/06-authentication-setup.md` — Auth deep dive
-- `docs/07-stripe-billing.md` — Billing deep dive
-- `docs/13-hosting-infrastructure.md` — Infrastructure details
+- `docs/05-plan.md` — Full product plan
+- `docs/16-technical-architecture.md` — System design
+- `docs/17-authentication-setup.md` — Auth deep dive
+- `docs/18-hosting-infrastructure.md` — Infrastructure details
+- `docs/19-deploy-sotto-fm.md` — Hetzner VPS deployment guide

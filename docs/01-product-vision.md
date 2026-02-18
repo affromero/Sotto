@@ -36,7 +36,7 @@ Sotto addresses all three problems through a single product with three core capa
 
 ### 2.1 AI-Powered Podcast Generation
 
-Users describe what they want to learn through a natural chat conversation with Sotto's AI agent. The agent asks targeted questions with tappable chip suggestions (depth, audience level, focus area, tone, duration) and extracts structured metadata. This metadata feeds into a Claude-powered script generator that produces a two-voice conversational podcast script. ElevenLabs TTS converts each segment to audio with distinct, expressive voices (one Host, one Expert), and FFmpeg stitches them into a normalized final episode.
+Users describe what they want to learn through a natural chat conversation with Sotto's AI agent. The agent asks targeted questions with tappable chip suggestions (depth, audience level, focus area, tone, duration) and extracts structured metadata. This metadata feeds into a Claude-powered script generator that produces a two-voice conversational podcast script. Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) converts each segment to audio with distinct, expressive voices (one Host, one Expert), and FFmpeg stitches them into a normalized final episode.
 
 The result: a personalized 5-30 minute podcast on any topic, tailored to the listener's exact background and interests, ready in 2-3 minutes.
 
@@ -66,7 +66,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: They already listen to educational podcasts (Lex Fridman, Huberman Lab, Radiolab) and wish they could ask follow-up questions. They value the intimacy and clarity of conversational explanation over reading.
 
-**Conversion path**: Free tier (2 credits/month to explore) -> Starter ($9/month for 5 credits/month, 5 interactions/podcast) -> Pro ($24/month for 15 credits/month, unlimited interactions, private podcasts, and downloads).
+**Onboarding flow**: Sign up → add BYOK API keys (AI + TTS provider) → start creating. All features are free — users bring their own LLM and TTS keys.
 
 ### 3.2 Busy Professionals
 
@@ -76,7 +76,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Their screen time is maxed out. Audio is the only content format that fits into the gaps of a busy day without competing for visual attention. The conversational format makes complex topics feel approachable rather than intimidating.
 
-**Conversion path**: Free tier (try it once during a commute) -> Starter ($9/month for 5 credits/month, basic features) -> Pro ($24/month for 15 credits/month, unlimited interactions, private podcasts, downloadable MP3s for offline listening).
+**Onboarding flow**: Sign up → add BYOK API keys (AI + TTS provider) → start creating. All features are free — users bring their own LLM and TTS keys. Private podcasts, downloads, and unlimited interactions are available to everyone.
 
 ### 3.3 Content Creators and Educators
 
@@ -86,7 +86,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Why podcasts**: Audio content has higher engagement and completion rates than text. A blog post gets skimmed; a podcast gets listened to from start to finish. Creators want to reach the growing audience that prefers audio. The social feed gives them distribution they do not have to build themselves.
 
-**Conversion path**: Free tier (test with one piece of content) -> Starter ($9/month — 5 credits/month, basic features) -> Pro ($24/month — 15 credits/month, unlimited interactions, voice library, PDF transcripts) -> Studio ($49/month — 50 credits/month, premium SFX, marketplace, analytics).
+**Onboarding flow**: Sign up → add BYOK API keys (AI + TTS provider) → start creating. All features are free — users bring their own LLM and TTS keys. Voice clones, analytics, PDF transcripts, and the voice marketplace are available to everyone.
 
 ---
 
@@ -122,7 +122,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Monday morning, Priya gets in her car and opens Sotto. She types "I want to understand how design systems scale at large companies." Sotto asks about her background (she selects "working designer"), her focus ("organizational challenges, not just component libraries"), and tone ("casual, with real examples"). Two minutes later, she is listening to a tailored 15-minute episode. At minute 8, the Expert mentions "design tokens" in a way she finds confusing. She taps "Ask a Question," types "Can you explain what design tokens are with a concrete example?", gets a clear answer, taps "Update podcast," and resumes. The next time she shares this episode with her team, the improved version plays.
 
-**Tier**: Pro ($24/month) — she generates 15+ podcasts per month and uses the Q&A feature constantly with unlimited interactions.
+**Tier**: Free with BYOK keys — she brings her own Anthropic and ElevenLabs API keys, generates 15+ podcasts per month, and uses the Q&A feature constantly with unlimited interactions.
 
 ---
 
@@ -156,7 +156,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Marcus has a board meeting Thursday about AI strategy. On his Tuesday morning run, he opens Sotto and says "Explain the current state of AI in fintech payments, including fraud detection, compliance automation, and personalization. I'm a technical executive — skip the basics." Sotto generates a 25-minute deep dive. During his run, he pauses twice to ask questions: "What's the ROI timeline for implementing this?" and "Which vendors are leading in this space?" He marks the podcast as Private, downloads the MP3, and listens again on his Wednesday flight to prepare.
 
-**Tier**: Pro ($24/month) — private podcasts, unlimited interactions, and offline downloads are essential for his use case.
+**Tier**: Free with BYOK keys — he brings his own OpenAI keys for both AI and TTS, and uses private podcasts, unlimited interactions, and offline downloads at no platform cost.
 
 ---
 
@@ -189,7 +189,7 @@ Sotto serves three primary user segments, each with distinct motivations but ove
 
 **Sotto scenario**: Before her Monday lecture on CRISPR delivery mechanisms, Amara creates a Sotto podcast by pasting the URL to her course notes. She specifies: "My students are junior-level biology majors. Focus on the lipid nanoparticle delivery pathway. Keep it at 15 minutes. Professional tone." She shares the podcast link in Canvas. Over the weekend, 40 students listen. Twelve use the Q&A feature: "Why can't we use viral vectors for this?", "What's the size limit for the cargo?", "How does this compare to electroporation?" Amara reviews the questions before class and uses them to shape her lecture. Three of the best Q&A pairs get baked into the episode for next semester's students.
 
-**Tier**: Studio ($49/month) — she generates high volumes of content across two courses (50+ credits/month), wants the analytics dashboard to track which topics generate the most questions, and uses the marketplace to share her voice profiles with colleagues.
+**Tier**: Free with BYOK keys — she brings her own Anthropic and ElevenLabs API keys, generates high volumes of content across two courses, uses the analytics dashboard to track which topics generate the most questions, and shares her voice clones with colleagues via the voice marketplace.
 
 ---
 
@@ -222,7 +222,7 @@ Unlike reading (which requires dedicated visual attention), watching (which requ
 | **NotebookLM**               | Interactive Q&A during playback. Social feed for discovery. Conversational discovery (not just document upload). Voice diversity (not the same two voices every time). |
 | **Traditional podcasts**     | On-demand generation of any topic. Personalized depth. Interactive Q&A. Updatable content.                                                                             |
 | **Online courses**           | 15 minutes vs. 15 hours. Free to start. No commitment. Just-in-time learning, not just-in-case.                                                                        |
-| **Audiobooks**               | Focused on a single topic, not a full book. Interactive. Free tier available. Updated with community Q&A.                                                              |
+| **Audiobooks**               | Focused on a single topic, not a full book. Interactive. Free with BYOK keys. Updated with community Q&A.                                                              |
 
 ---
 
@@ -260,7 +260,7 @@ Sotto's two-voice format (Host + Expert) is deliberately designed to exploit the
 
 Voice carries information that text cannot: warmth, enthusiasm, hesitation, emphasis, humor, gravity. When an Expert says "and this is where it gets really interesting..." with genuine excitement in their voice, the listener leans in. When a Host says "wait, hold on, I'm not sure I follow..." with authentic confusion, the listener feels validated in their own confusion.
 
-ElevenLabs' TTS technology is now advanced enough to convey these emotional nuances. Sotto's script generator includes delivery directions (laughing, excited, thoughtful, leaning in) that translate into TTS parameters, producing audio that feels like a real conversation rather than a text-to-speech readout.
+Modern TTS technology (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) is now advanced enough to convey these emotional nuances. Sotto's script generator includes delivery directions (laughing, excited, thoughtful, leaning in) that translate into TTS parameters, producing audio that feels like a real conversation rather than a text-to-speech readout.
 
 This emotional dimension is why podcasts have higher completion rates than articles, why podcast advertising commands premium CPMs, and why podcast listeners report stronger parasocial relationships with hosts than with any other content creator type.
 
@@ -309,8 +309,8 @@ Sotto does not demand a screen, a desk, or dedicated study time. It fits into th
 | **Completion Rate**        | % of episodes listened to >80%                                    | >60%           | >70%            |
 | **Interaction Rate**       | % of listening sessions where Q&A is used                         | >15%           | >25%            |
 | **Update Acceptance**      | % of Q&A interactions where user accepts podcast update           | >30%           | >40%            |
-| **Free-to-Pro Conversion** | % of Free users upgrading to Pro within 30 days                   | >5%            | >8%             |
-| **Monthly Churn (Pro)**    | % of Pro subscribers canceling per month                          | <12%           | <8%             |
+| **Key Setup Rate**         | % of signups who configure at least one BYOK key within 7 days   | >40%           | >60%            |
+| **7-Day Retention**        | % of key-configured users active 7 days after first podcast      | >30%           | >45%            |
 | **NPS**                    | Net Promoter Score from in-app survey                             | >40            | >50             |
 | **Social Engagement**      | Avg likes + saves + forks per public podcast                      | 3              | 8               |
 | **Feed Discovery Rate**    | % of listening sessions initiated from the feed (vs. own content) | >20%           | >35%            |
