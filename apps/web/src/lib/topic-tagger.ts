@@ -317,6 +317,17 @@ interface MatchTopicTagsInput {
 }
 
 /**
+ * Check if a keyword appears in text as a whole word/phrase.
+ * Uses word boundary matching to avoid false positives (e.g. "foss" in "fossil").
+ * Allows optional trailing "s" to handle plurals (e.g. "neural network" matches "neural networks").
+ */
+function keywordMatches(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`\\b${escaped}s?\\b`, 'i');
+  return re.test(text);
+}
+
+/**
  * Match podcast topic + focus areas to tag slugs using keyword matching.
  * Returns tag slugs sorted by relevance (best match first), including parent categories.
  */
@@ -329,7 +340,7 @@ export function matchTopicTags({ topic, focusAreas, maxTags = 5 }: MatchTopicTag
   for (const [slug, keywords] of Object.entries(TAG_KEYWORDS)) {
     let score = 0;
     for (const keyword of keywords) {
-      if (text.includes(keyword.toLowerCase())) {
+      if (keywordMatches(text, keyword)) {
         // Longer keyword matches are more specific and score higher
         score += keyword.length;
       }
