@@ -159,6 +159,16 @@ async function computeUserFeatures(userId: string): Promise<void> {
     const interactionRate =
       totalPodcastsListened > 0 ? interactionCount / totalPodcastsListened : 0;
 
+    // Peak listening hours
+    const hourBuckets = new Map<number, number>();
+    for (const s of sessions) {
+      const hour = s.startedAt.getUTCHours();
+      hourBuckets.set(hour, (hourBuckets.get(hour) || 0) + s.totalListenSeconds / 60);
+    }
+    const peakListeningHours = Array.from(hourBuckets.entries())
+      .map(([hour, listenMinutes]) => ({ hour, listenMinutes: Math.round(listenMinutes * 10) / 10 }))
+      .sort((a, b) => a.hour - b.hour);
+
     // Recency
     const lastSession = sessions.sort(
       (a: SessionType, b: SessionType) => b.startedAt.getTime() - a.startedAt.getTime()
@@ -193,9 +203,10 @@ async function computeUserFeatures(userId: string): Promise<void> {
       forkRate,
       interactionRate,
       daysSinceLastListen,
-      speakerPreference: 0, // Requires segment-level abandon data
-      noveltyResponseRate: 0, // Requires topic diversity analysis
-      creatorLoyalty: 0, // Requires follow + listen cross-reference
+      peakListeningHours,
+      speakerPreference: 0,
+      noveltyResponseRate: 0,
+      creatorLoyalty: 0,
       listenFrequency:
         totalPodcastsListened > 0 ? totalPodcastsListened / Math.max(daysSinceLastListen, 1) : 0,
       computedAt: new Date(),
@@ -207,12 +218,14 @@ async function computeUserFeatures(userId: string): Promise<void> {
         INSERT INTO "UserFeature" (id, "userId", "totalListenMinutes", "totalPodcastsListened",
           "avgCompletionRate", "avgListenSpeed", "avgAbandonPercent", "optimalDuration",
           "topicAffinity", archetype, "followingCount", "followerCount", "likeRate",
-          "forkRate", "interactionRate", "daysSinceLastListen", "speakerPreference",
-          "noveltyResponseRate", "creatorLoyalty", "listenFrequency", embedding, "computedAt", "updatedAt")
+          "forkRate", "interactionRate", "daysSinceLastListen", "peakListeningHours",
+          "speakerPreference", "noveltyResponseRate", "creatorLoyalty", "listenFrequency",
+          embedding, "computedAt", "updatedAt")
         VALUES (gen_random_uuid(), ${userId}, ${data.totalListenMinutes}, ${data.totalPodcastsListened},
           ${data.avgCompletionRate}, ${data.avgListenSpeed}, ${data.avgAbandonPercent}, ${data.optimalDuration},
           ${JSON.stringify(data.topicAffinity)}::jsonb, ${data.archetype}, ${data.followingCount}, ${data.followerCount},
           ${data.likeRate}, ${data.forkRate}, ${data.interactionRate}, ${data.daysSinceLastListen},
+          ${JSON.stringify(data.peakListeningHours)}::jsonb,
           ${data.speakerPreference}, ${data.noveltyResponseRate}, ${data.creatorLoyalty},
           ${data.listenFrequency}, ${`[${embedding.join(',')}]`}::vector, NOW(), NOW())
         ON CONFLICT ("userId") DO UPDATE SET
@@ -230,6 +243,7 @@ async function computeUserFeatures(userId: string): Promise<void> {
           "forkRate" = EXCLUDED."forkRate",
           "interactionRate" = EXCLUDED."interactionRate",
           "daysSinceLastListen" = EXCLUDED."daysSinceLastListen",
+          "peakListeningHours" = EXCLUDED."peakListeningHours",
           "speakerPreference" = EXCLUDED."speakerPreference",
           "noveltyResponseRate" = EXCLUDED."noveltyResponseRate",
           "creatorLoyalty" = EXCLUDED."creatorLoyalty",
@@ -368,6 +382,95 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       speedDistribution[key] = count / sessions.length;
     }
 
+    // Dropoff points: bucket maxPosition by 10% of duration
+    const podcastDuration = podcast.duration || 1;
+    const dropoffPoints: Array<{ position: number; dropoffRate: number }> = [];
+    for (let pct = 0; pct <= 90; pct += 10) {
+      const posLow = (pct / 100) * podcastDuration;
+      const posHigh = ((pct + 10) / 100) * podcastDuration;
+      const droppedHere = sessions.filter(
+        (s: PodcastSessionType) => s.maxPosition >= posLow && s.maxPosition < posHigh && s.completionPercent < 95
+      ).length;
+      dropoffPoints.push({
+        position: pct,
+        dropoffRate: sessions.length > 0 ? droppedHere / sessions.length : 0,
+      });
+    }
+
+    // Seek hotspots: query BehavioralEvent for playback.seek
+    const seekEvents = await prisma.$queryRaw<Array<{ bucket: number; seekCount: bigint }>>`
+      SELECT
+        FLOOR(("eventData"->>'toPosition')::float / ${podcastDuration} * 20) * 5 AS bucket,
+        COUNT(*)::bigint AS "seekCount"
+      FROM "BehavioralEvent"
+      WHERE "podcastId" = ${podcastId}
+        AND "eventType" = 'playback.seek'
+        AND "eventData"->>'toPosition' IS NOT NULL
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+    const seekHotspots = seekEvents.map((s) => ({
+      position: Number(s.bucket),
+      seekCount: Number(s.seekCount),
+    }));
+
+    // Completion by source: join PlaybackSession with RecommendationLog
+    const sourceCompletion = await prisma.$queryRaw<
+      Array<{ source: string; avgCompletion: number }>
+    >`
+      SELECT
+        CASE
+          WHEN rl.id IS NOT NULL THEN 'recommendation'
+          ELSE 'direct'
+        END AS source,
+        AVG(ps."completionPercent")::float AS "avgCompletion"
+      FROM "PlaybackSession" ps
+      LEFT JOIN "RecommendationLog" rl
+        ON rl."userId" = ps."userId" AND rl."podcastId" = ps."podcastId" AND rl."clicked" = true
+      WHERE ps."podcastId" = ${podcastId}
+      GROUP BY source
+    `;
+    const completionBySource: Record<string, number> = {};
+    for (const row of sourceCompletion) {
+      completionBySource[row.source] = Math.round(row.avgCompletion * 10) / 10;
+    }
+
+    // Question density by position: bucket Interaction.timestamp into 5% increments
+    const interactions = await prisma.interaction.findMany({
+      where: { podcastId },
+      select: { timestamp: true },
+    });
+    const questionDensityByPosition: Array<{ percentBucket: number; questionsPerListener: number }> = [];
+    for (let bucket = 0; bucket <= 95; bucket += 5) {
+      const posLow = (bucket / 100) * podcastDuration;
+      const posHigh = ((bucket + 5) / 100) * podcastDuration;
+      const questionsInBucket = interactions.filter(
+        (i) => i.timestamp >= posLow && i.timestamp < posHigh
+      ).length;
+      questionDensityByPosition.push({
+        percentBucket: bucket,
+        questionsPerListener: uniqueListeners > 0 ? questionsInBucket / uniqueListeners : 0,
+      });
+    }
+
+    // Segment abandon rates: cross-reference maxPosition with segment positions
+    const sortedSegments = [...podcast.segments].sort((a, b) => a.order - b.order);
+    let cumulativeTime = 0;
+    const segmentAbandonRates: Array<{ segmentOrder: number; speaker: string; abandonRate: number }> = [];
+    for (const seg of sortedSegments) {
+      const segStart = cumulativeTime;
+      const segEnd = cumulativeTime + (seg.duration || 0);
+      const abandonedInSegment = sessions.filter(
+        (s: PodcastSessionType) => s.maxPosition >= segStart && s.maxPosition < segEnd && s.completionPercent < 95
+      ).length;
+      segmentAbandonRates.push({
+        segmentOrder: seg.order,
+        speaker: seg.speaker,
+        abandonRate: sessions.length > 0 ? abandonedInSegment / sessions.length : 0,
+      });
+      cumulativeTime = segEnd;
+    }
+
     // Generate embedding from podcast topic + title + tags
     const tags = await prisma.podcastTag.findMany({
       where: { podcastId },
@@ -396,6 +499,11 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
       abandonmentCurve,
       avgListenSpeed,
       speedDistribution,
+      dropoffPoints,
+      seekHotspots: seekHotspots.length > 0 ? seekHotspots : undefined,
+      completionBySource: Object.keys(completionBySource).length > 0 ? completionBySource : undefined,
+      questionDensityByPosition,
+      segmentAbandonRates: segmentAbandonRates.length > 0 ? segmentAbandonRates : undefined,
       relistenRate,
       segmentCount: podcast.segments.length,
       durationSeconds: podcast.duration || 0,
@@ -413,13 +521,21 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
         INSERT INTO "PodcastFeature" (id, "podcastId", "avgCompletionRate", "medianCompletionRate",
           "totalUniqueListeners", "totalListenMinutes", "likeToListenRatio", "saveToListenRatio",
           "forkToListenRatio", "interactionRate", "abandonmentCurve", "avgListenSpeed",
-          "speedDistribution", "relistenRate", "segmentCount", "durationSeconds",
-          "referenceCount", "verifiedReferenceRate", embedding, "computedAt", "updatedAt")
+          "speedDistribution", "dropoffPoints", "seekHotspots", "completionBySource",
+          "questionDensityByPosition", "segmentAbandonRates", "relistenRate",
+          "segmentCount", "durationSeconds", "referenceCount", "verifiedReferenceRate",
+          embedding, "computedAt", "updatedAt")
         VALUES (gen_random_uuid(), ${podcastId}, ${data.avgCompletionRate}, ${data.medianCompletionRate},
           ${data.totalUniqueListeners}, ${data.totalListenMinutes}, ${data.likeToListenRatio},
           ${data.saveToListenRatio}, ${data.forkToListenRatio}, ${data.interactionRate},
           ${JSON.stringify(data.abandonmentCurve)}::jsonb, ${data.avgListenSpeed},
-          ${JSON.stringify(data.speedDistribution)}::jsonb, ${data.relistenRate},
+          ${JSON.stringify(data.speedDistribution)}::jsonb,
+          ${JSON.stringify(data.dropoffPoints)}::jsonb,
+          ${data.seekHotspots ? JSON.stringify(data.seekHotspots) : null}::jsonb,
+          ${data.completionBySource ? JSON.stringify(data.completionBySource) : null}::jsonb,
+          ${JSON.stringify(data.questionDensityByPosition)}::jsonb,
+          ${data.segmentAbandonRates ? JSON.stringify(data.segmentAbandonRates) : null}::jsonb,
+          ${data.relistenRate},
           ${data.segmentCount}, ${data.durationSeconds}, ${data.referenceCount},
           ${data.verifiedReferenceRate}, ${`[${embedding.join(',')}]`}::vector, NOW(), NOW())
         ON CONFLICT ("podcastId") DO UPDATE SET
@@ -434,6 +550,11 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
           "abandonmentCurve" = EXCLUDED."abandonmentCurve",
           "avgListenSpeed" = EXCLUDED."avgListenSpeed",
           "speedDistribution" = EXCLUDED."speedDistribution",
+          "dropoffPoints" = EXCLUDED."dropoffPoints",
+          "seekHotspots" = EXCLUDED."seekHotspots",
+          "completionBySource" = EXCLUDED."completionBySource",
+          "questionDensityByPosition" = EXCLUDED."questionDensityByPosition",
+          "segmentAbandonRates" = EXCLUDED."segmentAbandonRates",
           "relistenRate" = EXCLUDED."relistenRate",
           "segmentCount" = EXCLUDED."segmentCount",
           "durationSeconds" = EXCLUDED."durationSeconds",
