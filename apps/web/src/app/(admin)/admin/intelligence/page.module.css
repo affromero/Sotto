@@ -1,0 +1,280 @@
+/* Admin Platform Intelligence */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+}
+
+.subtitle {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+}
+
+.rangeNav {
+  display: flex;
+  gap: var(--spacing-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 4px;
+}
+
+.rangeLink {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+
+.rangeLink:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
+
+.rangeLinkActive {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.rangeLinkActive:hover {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+/* Summary cards */
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover {
+  border-color: var(--color-border-hover);
+}
+
+.cardLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.cardValue {
+  font: var(--text-h2);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.cardSub {
+  font: var(--text-body-sm);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+/* Sections */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.sectionTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+}
+
+.empty {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  padding: var(--spacing-xl);
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+/* Heatmap */
+
+.heatmapWrapper {
+  overflow-x: auto;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: 40px repeat(24, 1fr);
+  gap: 2px;
+  min-width: 600px;
+}
+
+.heatmapCorner {
+  /* Empty top-left corner */
+}
+
+.heatmapHourLabel {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding-bottom: var(--spacing-xs);
+}
+
+.heatmapDayLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--spacing-xs);
+}
+
+.heatmapCell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  min-height: 20px;
+  transition: opacity var(--transition-fast);
+}
+
+.heatmapCell:hover {
+  opacity: 0.8;
+  outline: 1px solid var(--color-text-primary);
+}
+
+/* Table */
+
+.tableWrapper {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  font: var(--text-body-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.table td {
+  color: var(--color-text-primary);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Horizontal bar chart */
+
+.hBarContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.hBarRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.hBarLabel {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 100px;
+  text-align: right;
+  text-transform: capitalize;
+}
+
+.hBarTrack {
+  flex: 1;
+  height: 24px;
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.hBarFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+}
+
+.hBarValue {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  min-width: 50px;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
