@@ -165,6 +165,22 @@ export const HUME_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Qwen3-TTS voices — shared by Fal and Replicate (same model, same voices)
+// ---------------------------------------------------------------------------
+
+export const FAL_VOICE_POOL: ProviderVoice[] = [
+  { id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm narrator' },
+  { id: 'Serena', name: 'Serena', gender: 'female', character: 'polished professional' },
+  { id: 'Dylan', name: 'Dylan', gender: 'male', character: 'confident presenter' },
+  { id: 'Eric', name: 'Eric', gender: 'male', character: 'authoritative expert' },
+  { id: 'Ryan', name: 'Ryan', gender: 'male', character: 'friendly conversationalist' },
+  { id: 'Aiden', name: 'Aiden', gender: 'male', character: 'casual and curious' },
+  { id: 'Ono_Anna', name: 'Ono Anna', gender: 'female', character: 'enthusiastic explainer' },
+  { id: 'Sohee', name: 'Sohee', gender: 'female', character: 'engaging storyteller' },
+  { id: 'Uncle_Fu', name: 'Uncle Fu', gender: 'male', character: 'wise mentor' },
+];
+
+// ---------------------------------------------------------------------------
 // Provider voice scoring (tone-character only, no ageRange/accent)
 // ---------------------------------------------------------------------------
 
