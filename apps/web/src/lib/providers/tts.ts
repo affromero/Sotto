@@ -5,6 +5,7 @@ import {
   resolveVoiceId,
   findByVoiceId,
   type VoicePoolEntry,
+  type VoiceMatchMetadata,
 } from '../voice-pool';
 import type { TtsProviderId } from './tts-registry';
 import { getProviderMeta, compareQuality } from './tts-registry';
@@ -29,7 +30,7 @@ export interface SfxParams {
 export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string;
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string;
   getModelId(): string;
   readonly providerId: TtsProviderId;
 }
@@ -113,8 +114,8 @@ class FallbackTtsProvider implements TtsProvider {
     throw new Error('No SFX provider available');
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
-    return this.primary.getVoiceId(speaker, podcastId);
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
+    return this.primary.getVoiceId(speaker, podcastId, metadata);
   }
 
   getModelId(): string {
@@ -322,4 +323,4 @@ export async function canResolveTts(userId: string): Promise<boolean> {
 
 // Re-export voice pool utilities for convenience
 export { VOICE_POOL, selectVoicePair, resolveVoiceId, findByVoiceId };
-export type { VoicePoolEntry };
+export type { VoicePoolEntry, VoiceMatchMetadata };

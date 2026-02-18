@@ -6,6 +6,7 @@ import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import type { VoiceMatchMetadata } from '@/lib/voice-pool';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -40,6 +41,20 @@ export async function processSegmentRegeneration(
     },
   });
 
+  // Fetch discovery metadata for topic-aware voice selection
+  const discovery = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { tone: true, audienceLevel: true, audience: true },
+  });
+
+  const voiceMetadata: VoiceMatchMetadata | undefined = discovery
+    ? {
+        tone: discovery.tone as VoiceMatchMetadata['tone'],
+        audienceLevel: discovery.audienceLevel as VoiceMatchMetadata['audienceLevel'],
+        audience: discovery.audience as VoiceMatchMetadata['audience'],
+      }
+    : undefined;
+
   // Resolve provider using multi-provider system (matches audio-generation worker)
   const { provider, source, providerId } = await resolveTtsProvider({
     userId: podcast.userId,
@@ -48,7 +63,7 @@ export async function processSegmentRegeneration(
   });
 
   const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
-  const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId);
+  const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
   logger.info('Segment regen: using TTS provider', {
     speaker,
