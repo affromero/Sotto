@@ -77,16 +77,67 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async session({ session, token }) {
       if (session.user && token.sub) {
-        session.user.id = token.sub;
-        session.user.role = token.role ?? 'USER';
+        if (token.impersonateUserId) {
+          session.user.id = token.impersonateUserId;
+          session.user.name = token.impersonateName ?? null;
+          session.user.email = token.impersonateEmail ?? null;
+          session.user.image = token.impersonateImage ?? null;
+          session.user.role = token.role ?? 'ADMIN';
+          session.user.isImpersonating = true;
+          session.user.impersonatedRole = token.impersonateRole;
+          session.user.originalUser = {
+            id: token.originalUserId!,
+            name: token.originalUserName ?? null,
+            image: token.originalUserImage ?? null,
+          };
+        } else {
+          session.user.id = token.sub;
+          session.user.role = token.role ?? 'USER';
+        }
         session.user.bannedAt = token.bannedAt ?? null;
         session.user.suspendedUntil = token.suspendedUntil ?? null;
       }
       return session;
     },
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.sub = user.id;
+      }
+
+      // Handle impersonation triggers from session.update()
+      if (trigger === 'update' && session) {
+        const updateData = session as { impersonateUserId?: string; stopImpersonating?: boolean };
+
+        if (updateData.impersonateUserId && token.role === 'ADMIN') {
+          const target = await prisma.user.findUnique({
+            where: { id: updateData.impersonateUserId },
+            select: { id: true, name: true, email: true, image: true, role: true },
+          });
+          if (target) {
+            if (!token.impersonateUserId) {
+              token.originalUserId = token.sub;
+              token.originalUserName = token.name as string | null;
+              token.originalUserImage = token.picture as string | null;
+            }
+            token.impersonateUserId = target.id;
+            token.impersonateName = target.name;
+            token.impersonateEmail = target.email;
+            token.impersonateImage = target.image;
+            token.impersonateRole = target.role;
+          }
+          return token;
+        }
+
+        if (updateData.stopImpersonating && token.impersonateUserId) {
+          delete token.impersonateUserId;
+          delete token.impersonateName;
+          delete token.impersonateEmail;
+          delete token.impersonateImage;
+          delete token.impersonateRole;
+          delete token.originalUserId;
+          delete token.originalUserName;
+          delete token.originalUserImage;
+        }
       }
 
       // On sign-in or session update, fetch role from DB
