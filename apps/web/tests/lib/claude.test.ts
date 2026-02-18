@@ -25,6 +25,17 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+const mockApiUsageLogCreate = vi.fn().mockResolvedValue({});
+
+vi.mock('@/lib/prisma', () => {
+  const _mockPrisma = {
+    apiUsageLog: {
+      create: (...args: unknown[]) => mockApiUsageLogCreate(...args),
+    },
+  };
+  return { prisma: _mockPrisma };
+});
+
 // Prevent claude-code-client from spawning a real CLI process
 // (e.g. when AI_PROVIDER=claude-code leaks from .env into tests)
 vi.mock('@/lib/claude-code-client', () => ({
@@ -491,9 +502,12 @@ describe('claude', () => {
   });
 
   describe('logApiUsage', () => {
-    it('logs API usage with cost calculation', async () => {
+    beforeEach(() => {
+      mockApiUsageLogCreate.mockClear();
+    });
+
+    it('persists API usage to database with cost calculation', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         category: 'script-generation',
@@ -501,17 +515,19 @@ describe('claude', () => {
         outputTokens: 2000,
       });
 
-      expect(logger.info).toHaveBeenCalledWith('AI API usage', {
-        category: 'script-generation',
-        inputTokens: '1000',
-        outputTokens: '2000',
-        totalCost: '0.033',
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          service: 'anthropic',
+          category: 'script-generation',
+          inputTokens: 1000,
+          outputTokens: 2000,
+          totalCost: expect.closeTo(0.033, 6),
+        }),
       });
     });
 
     it('includes podcastId when provided', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         podcastId: 'podcast-123',
@@ -520,17 +536,16 @@ describe('claude', () => {
         outputTokens: 1000,
       });
 
-      expect(logger.info).toHaveBeenCalledWith('AI API usage', {
-        category: 'discovery',
-        inputTokens: '500',
-        outputTokens: '1000',
-        totalCost: '0.0165',
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          podcastId: 'podcast-123',
+          category: 'discovery',
+        }),
       });
     });
 
     it('includes userId when provided', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         userId: 'user-456',
@@ -539,17 +554,19 @@ describe('claude', () => {
         outputTokens: 300,
       });
 
-      const callArgs = (logger.info as any).mock.calls[0];
-      expect(callArgs[0]).toBe('AI API usage');
-      expect(callArgs[1].category).toBe('interaction');
-      expect(callArgs[1].inputTokens).toBe('200');
-      expect(callArgs[1].outputTokens).toBe('300');
-      expect(parseFloat(callArgs[1].totalCost)).toBeCloseTo(0.0051, 6);
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          userId: 'user-456',
+          category: 'interaction',
+          inputTokens: 200,
+          outputTokens: 300,
+          totalCost: expect.closeTo(0.0051, 6),
+        }),
+      });
     });
 
     it('calculates cost correctly for Claude Sonnet 4.5 pricing', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       // Input: $3.00 per million tokens
       // Output: $15.00 per million tokens
@@ -559,17 +576,15 @@ describe('claude', () => {
         outputTokens: 1_000_000, // Should cost $15.00
       });
 
-      expect(logger.info).toHaveBeenCalledWith('AI API usage', {
-        category: 'test',
-        inputTokens: '1000000',
-        outputTokens: '1000000',
-        totalCost: '18',
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          totalCost: 18,
+        }),
       });
     });
 
     it('handles zero tokens', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         category: 'test',
@@ -577,17 +592,15 @@ describe('claude', () => {
         outputTokens: 0,
       });
 
-      expect(logger.info).toHaveBeenCalledWith('AI API usage', {
-        category: 'test',
-        inputTokens: '0',
-        outputTokens: '0',
-        totalCost: '0',
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          totalCost: 0,
+        }),
       });
     });
 
     it('includes durationMs when provided', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         category: 'performance-test',
@@ -596,17 +609,16 @@ describe('claude', () => {
         durationMs: 1500,
       });
 
-      expect(logger.info).toHaveBeenCalledWith('AI API usage', {
-        category: 'performance-test',
-        inputTokens: '100',
-        outputTokens: '200',
-        totalCost: '0.0033',
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          durationMs: 1500,
+          totalCost: expect.closeTo(0.0033, 6),
+        }),
       });
     });
 
     it('handles fractional costs correctly', async () => {
       const { logApiUsage } = await import('@/lib/claude');
-      const { logger } = await import('@/lib/logger');
 
       await logApiUsage({
         category: 'small-request',
@@ -614,13 +626,12 @@ describe('claude', () => {
         outputTokens: 20,
       });
 
-      const callArgs = (logger.info as any).mock.calls[0];
-      expect(callArgs[0]).toBe('AI API usage');
-      expect(callArgs[1].category).toBe('small-request');
-      expect(callArgs[1].inputTokens).toBe('10');
-      expect(callArgs[1].outputTokens).toBe('20');
       // 10 / 1_000_000 * 3.0 + 20 / 1_000_000 * 15.0 = 0.00003 + 0.0003 = 0.00033
-      expect(parseFloat(callArgs[1].totalCost)).toBeCloseTo(0.00033, 6);
+      expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          totalCost: expect.closeTo(0.00033, 6),
+        }),
+      });
     });
   });
 });
