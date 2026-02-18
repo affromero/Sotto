@@ -20,6 +20,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput                                                                          |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
+| `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramSession, TelegramMessageData, Telegram API payload types                                                            |
 | `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 
@@ -38,6 +39,7 @@ This means `@/types/*` imports throughout the web app don't change.
 - `podcast.ts` — uses `PodcastStatus`, `PodcastVisibility`, `PodcastSource`, `Speaker`
 - `reference.ts` — uses `ReferenceType`, `VerificationStatus`
 - `twitter.ts` — uses `TweetMentionStatus`
+- `telegram.ts` — uses `TelegramMessageStatus`
 - `next-auth.d.ts` — uses `UserRole` (NextAuth module augmentation)
 
 ## Rules
