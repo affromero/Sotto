@@ -10,8 +10,8 @@ const mockPoolVoices = [
 ];
 
 const mockVoiceClones = [
-  { id: 'clone-1', name: 'My Voice', elevenLabsVoiceId: 'clone-voice-1' },
-  { id: 'clone-2', name: 'Custom Voice', elevenLabsVoiceId: 'clone-voice-2' },
+  { id: 'clone-1', name: 'My Voice', externalVoiceId: 'clone-voice-1' },
+  { id: 'clone-2', name: 'Custom Voice', externalVoiceId: 'clone-voice-2' },
 ];
 
 describe('VoicePreferenceSelector', () => {

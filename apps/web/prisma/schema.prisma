@@ -1157,22 +1157,24 @@ model ApiKey {
 // ============ VOICE CLONES ============
 
 model VoiceClone {
-  id                String           @id @default(cuid())
-  userId            String
-  name              String
-  elevenLabsVoiceId String           @unique
-  sourceType        VoiceCloneSource
-  sampleUrl         String?
-  description       String?          @db.VarChar(200)
-  requestable       Boolean          @default(false)
-  priceInCents      Int?             // null = free, 0+ = paid per-podcast
-  createdAt         DateTime         @default(now())
+  id              String           @id @default(cuid())
+  userId          String
+  name            String
+  provider        String           @default("elevenlabs")
+  externalVoiceId String
+  sourceType      VoiceCloneSource
+  sampleUrl       String?
+  description     String?          @db.VarChar(200)
+  requestable     Boolean          @default(false)
+  priceInCents    Int?             // null = free, 0+ = paid per-podcast
+  createdAt       DateTime         @default(now())
 
   user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   voiceRequests  VoiceRequest[]
   allowlist      VoiceAllowlist[]
   voicePurchases VoicePurchase[]
 
+  @@unique([provider, externalVoiceId])
   @@index([userId])
 }
 

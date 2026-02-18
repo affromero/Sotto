@@ -530,7 +530,7 @@ User ──< Podcast ──< Segment
 | **Interaction**      | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, helpful, segmentOrder, visibility (PUBLIC/PRIVATE), upvoteCount       | podcastId, userId, status                                   |
 | **UserAiKey**        | `id` (cuid) | userId, provider (ANTHROPIC/OPENAI), encryptedKey, isValid — `@@unique([userId, provider])`                                   | userId                                                      |
 | **UserTtsKey**       | `id` (cuid) | userId, provider (ELEVENLABS/OPENAI/PLAYHT/CARTESIA/HUME), encryptedKey, isValid — `@@unique([userId, provider])`             | userId                                                      |
-| **VoiceClone**       | `id` (cuid) | userId, name, elevenLabsVoiceId, priceInCents                                                                                 | userId                                                      |
+| **VoiceClone**       | `id` (cuid) | userId, name, provider, externalVoiceId, priceInCents                                                                         | userId                                                      |
 | **VoicePurchase**    | `id` (cuid) | buyerId, voiceCloneId, podcastId, amountCents, platformFeeCents, status (authorized/captured/cancelled/refunded)              | buyerId, voiceCloneId                                       |
 | **FreeTierConfig**   | `id` (cuid) | aiProvider, aiModel, ttsProvider, generationLimit — singleton row                                                              |                                                             |
 

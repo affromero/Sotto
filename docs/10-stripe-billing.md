@@ -193,7 +193,7 @@ Before charging, `checkFreeAccess(userId, voiceCloneId)` checks these paths (in 
 ### Database Models
 
 ```
-VoiceClone     — id, name, userId, elevenLabsVoiceId, priceInCents, sourceType
+VoiceClone     — id, name, userId, provider, externalVoiceId, priceInCents, sourceType
 VoicePurchase  — buyerId, voiceCloneId, podcastId, amountCents, platformFeeCents,
                  stripePaymentIntent, status (authorized/captured/cancelled/refunded)
 VoiceAllowlist — voiceCloneId, allowedUserId (unique per pair)

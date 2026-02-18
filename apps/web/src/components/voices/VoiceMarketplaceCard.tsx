@@ -12,7 +12,7 @@ export interface BrowseVoice {
   sourceType: string;
   priceInCents: number | null;
   createdAt: string;
-  elevenLabsVoiceId: string;
+  externalVoiceId: string;
   owner: {
     id: string;
     name: string | null;
@@ -68,7 +68,7 @@ export function VoiceMarketplaceCard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          voiceId: voice.elevenLabsVoiceId,
+          voiceId: voice.externalVoiceId,
           text: 'Welcome to Sotto. Let me tell you something fascinating today.',
         }),
       });

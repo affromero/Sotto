@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
+import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
+import { getByokKey } from '@/lib/byok';
 import { cloneVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
 
@@ -25,6 +27,7 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const name = formData.get('name') as string;
   const sourceType = formData.get('sourceType') as string;
+  const provider = (formData.get('provider') as string) || 'elevenlabs';
   const audioFile = formData.get('audio') as File | null;
 
   const parsed = cloneVoiceSchema.safeParse({ name, sourceType });
@@ -39,13 +42,29 @@ export async function POST(request: NextRequest) {
   const arrayBuffer = await audioFile.arrayBuffer();
   const audioBuffer = Buffer.from(arrayBuffer);
 
-  const { voiceId } = await cloneVoice(parsed.data.name, [audioBuffer]);
+  let externalVoiceId: string;
+
+  if (provider === 'fal') {
+    const falKey = await getByokKey(session.user.id, 'fal');
+    if (!falKey) {
+      return NextResponse.json(
+        { error: 'Fal API key required for voice cloning. Add it in Settings.' },
+        { status: 400 }
+      );
+    }
+    const { embeddingUrl } = await cloneVoiceViaFal(falKey, audioBuffer);
+    externalVoiceId = embeddingUrl;
+  } else {
+    const { voiceId } = await cloneVoice(parsed.data.name, [audioBuffer]);
+    externalVoiceId = voiceId;
+  }
 
   const voiceClone = await prisma.voiceClone.create({
     data: {
       userId: session.user.id,
       name: parsed.data.name,
-      elevenLabsVoiceId: voiceId,
+      provider,
+      externalVoiceId,
       sourceType: parsed.data.sourceType,
     },
   });
@@ -158,7 +177,10 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  await deleteClonedVoice(voiceClone.elevenLabsVoiceId);
+  // Only call ElevenLabs delete API for ElevenLabs voices
+  if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
+    await deleteClonedVoice(voiceClone.externalVoiceId);
+  }
 
   // Clean up voice requests for this clone
   await prisma.voiceRequest.deleteMany({
