@@ -5,7 +5,7 @@ import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
 import Apple from 'next-auth/providers/apple';
 import { prisma } from './prisma';
-import { generateUniqueHandle, isHandleAvailable } from './handles';
+import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -115,16 +115,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           // Auto-generate handle if missing
           if (!dbUser.handle) {
             try {
-              const preferredHandles: Record<string, string> = {
-                'andres2912@gmail.com': 'andres',
-              };
-              const preferred = dbUser.email
-                ? preferredHandles[dbUser.email.toLowerCase()]
-                : undefined;
-              const handle =
-                preferred && (await isHandleAvailable(preferred)).available
-                  ? preferred
-                  : await generateUniqueHandle(dbUser.name);
+              const handle = await generateUniqueHandle(
+                dbUser.email ? dbUser.email.split('@')[0] : dbUser.name
+              );
               await prisma.user.update({
                 where: { id: token.sub },
                 data: { handle },
