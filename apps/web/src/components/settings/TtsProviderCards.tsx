@@ -45,6 +45,20 @@ const PROVIDERS = [
     fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
     getKeyUrl: 'https://platform.hume.ai/settings/keys',
   },
+  {
+    id: 'fal' as const,
+    name: 'Fal (Qwen3-TTS)',
+    quality: 'Premium',
+    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
+    getKeyUrl: 'https://fal.ai/dashboard/keys',
+  },
+  {
+    id: 'replicate' as const,
+    name: 'Replicate (Qwen3-TTS)',
+    quality: 'Premium',
+    fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
+    getKeyUrl: 'https://replicate.com/account/api-tokens',
+  },
 ];
 
 interface ProviderStatus {

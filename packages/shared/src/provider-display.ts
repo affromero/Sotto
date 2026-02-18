@@ -10,6 +10,8 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   playht: { label: 'PlayHT', shortLabel: 'PlayHT' },
   cartesia: { label: 'Cartesia', shortLabel: 'Cartesia' },
   hume: { label: 'Hume AI', shortLabel: 'Hume' },
+  fal: { label: 'Fal (Qwen3-TTS)', shortLabel: 'Fal' },
+  replicate: { label: 'Replicate (Qwen3-TTS)', shortLabel: 'Replicate' },
 };
 
 export const LANGUAGE_DISPLAY: Record<string, string> = {
@@ -55,6 +57,9 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   'sonic-2': 'Sonic 2',
   premium: 'Premium',
   octave: 'Octave',
+  'qwen3-tts-1.7b': 'Qwen3 1.7B',
+  'qwen3-tts-0.6b': 'Qwen3 0.6B',
+  'qwen3-tts': 'Qwen3',
 };
 
 export function getAiProviderLabel(id: string | null | undefined): string | null {

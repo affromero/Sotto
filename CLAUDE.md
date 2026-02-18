@@ -22,10 +22,10 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | Auth      | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                                           |
 | Queue     | Redis 7 + BullMQ (24 worker types)                                                                       |
 | AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                  |
-| Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume (multi-provider TTS) — resolved via resolveTtsProvider()      |
+| Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate (multi-provider TTS) — resolved via resolveTtsProvider() |
 | Stitching | FFmpeg (segment concatenation + normalization)                                                           |
 | Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                         |
-| BYOK      | Users bring own LLM keys (Anthropic/OpenAI) + TTS keys (5 providers) — all features free                |
+| BYOK      | Users bring own LLM keys (Anthropic/OpenAI) + TTS keys (7 providers) — all features free                |
 | PDF       | pdfmake (server-side transcript PDF generation)                                                          |
 | Hosting   | Hetzner VPS (Docker Compose + Caddy), deployed via GitHub Actions SSH                                    |
 
@@ -183,7 +183,7 @@ User opens "Create Podcast" → chats with AI agent → AI asks conversational q
     ↓
 [SCRIPT_READY pause] → User reviews/edits script (WEB/IMPORT only; auto-approve for TWITTER/TELEGRAM/API)
     ↓
-[audio-generation] × N → TTS per segment (multi-provider: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) (parallel, 5 concurrent)
+[audio-generation] × N → TTS per segment (multi-provider: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate) (parallel, 5 concurrent)
     ↓
 [audio-stitching] → FFmpeg concat + normalize + duration hard check → final.mp3
     ↓

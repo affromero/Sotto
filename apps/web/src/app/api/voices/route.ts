@@ -20,7 +20,7 @@ export async function GET() {
       select: {
         id: true,
         name: true,
-        elevenLabsVoiceId: true,
+        externalVoiceId: true,
         sourceType: true,
         description: true,
         requestable: true,
@@ -43,7 +43,7 @@ export async function GET() {
           select: {
             id: true,
             name: true,
-            elevenLabsVoiceId: true,
+            externalVoiceId: true,
             sourceType: true,
             createdAt: true,
             user: { select: { id: true, name: true } },
@@ -60,7 +60,7 @@ export async function GET() {
           select: {
             id: true,
             name: true,
-            elevenLabsVoiceId: true,
+            externalVoiceId: true,
             sourceType: true,
             createdAt: true,
             user: { select: { id: true, name: true } },
@@ -79,7 +79,7 @@ export async function GET() {
     return {
       id: clone.id,
       name: clone.name,
-      elevenLabsVoiceId: clone.elevenLabsVoiceId,
+      externalVoiceId: clone.externalVoiceId,
       sourceType: clone.sourceType,
       description: clone.description,
       requestable: clone.requestable,
@@ -90,24 +90,24 @@ export async function GET() {
     };
   });
 
-  // Merge approved-request voices + allowlisted voices, dedup by elevenLabsVoiceId
+  // Merge approved-request voices + allowlisted voices, dedup by externalVoiceId
   const seenVoiceIds = new Set<string>();
   const sharedVoices: Array<{
     id: string;
     name: string;
-    elevenLabsVoiceId: string;
+    externalVoiceId: string;
     sourceType: string;
     createdAt: Date;
     owner: { id: string; name: string | null };
   }> = [];
 
   for (const r of approvedRequests) {
-    if (!seenVoiceIds.has(r.voiceClone.elevenLabsVoiceId)) {
-      seenVoiceIds.add(r.voiceClone.elevenLabsVoiceId);
+    if (!seenVoiceIds.has(r.voiceClone.externalVoiceId)) {
+      seenVoiceIds.add(r.voiceClone.externalVoiceId);
       sharedVoices.push({
         id: r.voiceClone.id,
         name: r.voiceClone.name,
-        elevenLabsVoiceId: r.voiceClone.elevenLabsVoiceId,
+        externalVoiceId: r.voiceClone.externalVoiceId,
         sourceType: r.voiceClone.sourceType,
         createdAt: r.voiceClone.createdAt,
         owner: r.voiceClone.user,
@@ -116,12 +116,12 @@ export async function GET() {
   }
 
   for (const a of allowlistEntries) {
-    if (!seenVoiceIds.has(a.voiceClone.elevenLabsVoiceId)) {
-      seenVoiceIds.add(a.voiceClone.elevenLabsVoiceId);
+    if (!seenVoiceIds.has(a.voiceClone.externalVoiceId)) {
+      seenVoiceIds.add(a.voiceClone.externalVoiceId);
       sharedVoices.push({
         id: a.voiceClone.id,
         name: a.voiceClone.name,
-        elevenLabsVoiceId: a.voiceClone.elevenLabsVoiceId,
+        externalVoiceId: a.voiceClone.externalVoiceId,
         sourceType: a.voiceClone.sourceType,
         createdAt: a.voiceClone.createdAt,
         owner: a.voiceClone.user,
