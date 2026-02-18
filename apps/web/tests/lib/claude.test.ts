@@ -25,6 +25,14 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+// Prevent claude-code-client from spawning a real CLI process
+// (e.g. when AI_PROVIDER=claude-code leaks from .env into tests)
+vi.mock('@/lib/claude-code-client', () => ({
+  executeClaudeCode: vi.fn().mockResolvedValue({ content: '', inputTokens: 0, outputTokens: 0 }),
+  serializeMessages: vi.fn().mockReturnValue(''),
+  streamClaudeCode: vi.fn(),
+}));
+
 // ---- Tests ----
 
 describe('claude', () => {
@@ -35,9 +43,9 @@ describe('claude', () => {
     vi.clearAllMocks();
     originalApiKey = process.env.ANTHROPIC_API_KEY;
     originalAiProvider = process.env.AI_PROVIDER;
-    // Set API key before importing module
+    // Set API key and force Anthropic SDK path (not claude-code)
     process.env.ANTHROPIC_API_KEY = 'test-api-key-123';
-    delete process.env.AI_PROVIDER;
+    process.env.AI_PROVIDER = 'anthropic';
     // Clear module cache to force re-import
     vi.resetModules();
   });
