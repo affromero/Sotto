@@ -271,6 +271,18 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       cumulativeTime += seg.duration ?? 0;
     }
 
+    // 9b. Clean up segment audio files from R2 (no longer needed after stitching)
+    for (const seg of segments) {
+      if (seg.audioUrl) {
+        await deleteFile(seg.audioUrl).catch((err) => {
+          logger.warn('Failed to delete segment audio from R2', {
+            segmentId: seg.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
+    }
+
     await job.updateProgress(95);
 
     // 10. Send notification

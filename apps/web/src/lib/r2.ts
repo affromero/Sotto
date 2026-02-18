@@ -116,10 +116,15 @@ export async function downloadFile(urlOrKey: string): Promise<Buffer> {
 /**
  * Delete a file from R2
  */
-export async function deleteFile(key: string): Promise<void> {
+export async function deleteFile(urlOrKey: string): Promise<void> {
   if (!s3Client) {
     throw new Error('R2 storage not configured');
   }
+
+  const key =
+    R2_PUBLIC_URL && urlOrKey.startsWith(R2_PUBLIC_URL)
+      ? urlOrKey.slice(R2_PUBLIC_URL.length + 1)
+      : urlOrKey;
 
   await s3Client.send(
     new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })
