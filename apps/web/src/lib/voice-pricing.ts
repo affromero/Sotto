@@ -55,7 +55,7 @@ export async function getVoicePricing(voiceCloneId: string): Promise<VoicePricin
  * Look up a VoiceClone by its external voice ID.
  */
 export async function findVoiceCloneByExternalId(externalVoiceId: string) {
-  return prisma.voiceClone.findUnique({
+  return prisma.voiceClone.findFirst({
     where: { externalVoiceId },
     select: {
       id: true,
