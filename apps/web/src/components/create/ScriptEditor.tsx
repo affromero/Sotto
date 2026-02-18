@@ -15,6 +15,7 @@ import {
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
+import { wordsToMinutes } from '@/lib/duration';
 import styles from './ScriptEditor.module.css';
 
 interface ScriptEditorProps {
@@ -119,7 +120,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       (sum, t) => sum + t.text.split(/\s+/).filter(Boolean).length,
       0
     );
-    const estimatedMinutes = Math.round(wordCount / 150);
+    const estimatedMinutes = Math.round(wordsToMinutes(wordCount));
     return { wordCount, estimatedMinutes, turnCount: turns.length, refCount: references.length };
   }, [turns, references]);
 
