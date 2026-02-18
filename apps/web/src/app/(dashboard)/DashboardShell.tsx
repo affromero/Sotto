@@ -15,10 +15,11 @@ interface DashboardShellProps {
     image: string | null;
     role?: string;
   };
+  hasPodcasts?: boolean;
   children: React.ReactNode;
 }
 
-export function DashboardShell({ user, children }: DashboardShellProps) {
+export function DashboardShell({ user, hasPodcasts = false, children }: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const player = usePlayer();
@@ -30,6 +31,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         currentPath={pathname}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        hasPodcasts={hasPodcasts}
         user={user}
       />
 
