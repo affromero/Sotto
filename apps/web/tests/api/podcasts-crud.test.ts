@@ -340,6 +340,7 @@ describe('POST /api/podcasts', () => {
         hostVoiceId: 'voice-host-custom',
         expertVoiceId: 'voice-expert-custom',
         ttsProvider: null,
+        ttsModel: null,
         aiModel: null,
       },
     });

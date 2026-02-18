@@ -104,6 +104,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     userId: podcast.userId,
     podcastId,
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+    requestedModel: podcast.ttsModel,
   });
 
   const ttsModelId = provider.getModelId();
