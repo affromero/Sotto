@@ -21,6 +21,7 @@ import {
   Heart,
   Headphones,
   Activity,
+  TrendingUp,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ const navItems: NavItem[] = [
   { href: '/admin/engagement', label: 'Engagement', icon: Heart },
   { href: '/admin/playback', label: 'Playback', icon: Headphones },
   { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
+  { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
   { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/handles', label: 'Handles', icon: AtSign },
