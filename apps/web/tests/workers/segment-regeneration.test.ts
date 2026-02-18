@@ -15,6 +15,8 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   ttsProvider: null,
 });
 
+const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
+
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
   const tx = {
     segment: {
@@ -39,6 +41,9 @@ vi.mock('@/lib/prisma', () => {
     },
     interaction: {
       update: (...args: unknown[]) => mockPrismaInteractionUpdate(...args),
+    },
+    discovery: {
+      findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockPrismaTransaction(fn),
   };
@@ -200,21 +205,21 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
     });
 
     it('passes HOST speaker to getVoiceId when speaker is HOST', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
     });
 
     it('passes EXPERT speaker to getVoiceId when speaker is EXPERT', async () => {
       const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
       await processSegmentRegeneration(job);
 
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
     });
 
     it('uses custom hostVoiceId when set', async () => {
@@ -302,7 +307,7 @@ describe('processSegmentRegeneration', () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001');
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith(
         expect.objectContaining({ voiceId: 'openai-voice-xyz' })
       );
@@ -531,7 +536,7 @@ describe('processSegmentRegeneration', () => {
       expect(mockPrismaPodcastFindUniqueOrThrow).toHaveBeenCalled();
 
       // Voice selected via provider
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001');
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
 
       // Audio generated via premium provider
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith({
@@ -615,7 +620,7 @@ describe('processSegmentRegeneration', () => {
       await processSegmentRegeneration(job);
 
       // Voice selected for EXPERT via standard provider
-      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-002');
+      expect(mockStandardGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-002', undefined);
 
       // Audio generated via standard provider
       expect(mockStandardGenerateSpeech).toHaveBeenCalledWith({
