@@ -14,6 +14,7 @@ vi.mock('@/lib/prisma', () => {
     tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
     userInterest: { findMany: (...args: unknown[]) => mockUserInterestFindMany(...args) },
     tasteQuizAnswer: { findMany: (...args: unknown[]) => mockTasteQuizAnswerFindMany(...args) },
+    apiUsageLog: { create: () => Promise.resolve({}) },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
