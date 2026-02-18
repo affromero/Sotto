@@ -67,3 +67,7 @@
 2026-02-17 * "Anthropic" "API credits (2 months prepaid)"
   Assets:Prepaid:APICredits                    60.00 USD
   Assets:Current:Cash:Bank                    -60.00 USD
+
+2026-02-18 * "Twitter" "Developer Console — February 2026"
+  Expenses:Software:DevTools                   50.00 USD
+  Assets:Current:Cash:Bank                    -50.00 USD
