@@ -48,13 +48,27 @@ export async function GET() {
     healthy = false;
   }
 
-  // Unauthenticated requests get minimal response (sufficient for Docker healthcheck)
+  // --- OAuth providers (not sensitive — just reports which are configured) ---
+  const oauth: Record<string, boolean> = {
+    google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
+    twitter: !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET),
+    apple: !!(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET),
+  };
+
+  // --- VAPID (Web Push) ---
+  const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+
+  // Unauthenticated requests get minimal response (sufficient for Docker healthcheck + deploy notifications)
   const session = await auth();
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
     return NextResponse.json(
       {
         status: healthy ? 'healthy' : 'degraded',
+        version: process.env.COMMIT_SHA || 'dev',
         timestamp: new Date().toISOString(),
+        oauth,
+        vapid,
       },
       { status: healthy ? 200 : 503 }
     );
@@ -219,17 +233,6 @@ export async function GET() {
   for (const key of envKeys) {
     env[key] = !!process.env[key];
   }
-
-  // --- OAuth providers ---
-  const oauth: Record<string, boolean> = {
-    google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
-    twitter: !!(process.env.TWITTER_CLIENT_ID && process.env.TWITTER_CLIENT_SECRET),
-    apple: !!(process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET),
-  };
-
-  // --- VAPID (Web Push) ---
-  const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
   return NextResponse.json(
     {
