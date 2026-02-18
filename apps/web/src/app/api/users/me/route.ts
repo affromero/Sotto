@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { isHandleAvailable } from '@/lib/handles';
 import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
-import { notificationQueue, addJob, JobType } from '@/lib/queue';
+import { deleteFile, listFiles } from '@/lib/r2';
+import { logger } from '@/lib/logger';
 import { z } from 'zod';
 
 const updateUserSchema = z
@@ -222,10 +223,10 @@ export async function DELETE(request: NextRequest) {
 
     const userId = session.user.id;
 
-    // Collect storage keys for R2 cleanup before deleting
+    // Collect podcast IDs and storage keys before deleting
     const podcasts = await prisma.podcast.findMany({
       where: { userId },
-      select: { audioUrl: true, pdfUrl: true, importedAudioKey: true },
+      select: { id: true, audioUrl: true, pdfUrl: true, importedAudioKey: true },
     });
 
     const user = await prisma.user.findUnique({
@@ -233,25 +234,52 @@ export async function DELETE(request: NextRequest) {
       select: { image: true },
     });
 
-    const storageKeys: string[] = [];
-    for (const p of podcasts) {
-      if (p.audioUrl) storageKeys.push(p.audioUrl);
-      if (p.pdfUrl) storageKeys.push(p.pdfUrl);
-      if (p.importedAudioKey) storageKeys.push(p.importedAudioKey);
-    }
-    if (user?.image) storageKeys.push(user.image);
+    // Delete orphaned models (no User FK, won't cascade)
+    await Promise.all([
+      prisma.behavioralEvent.deleteMany({ where: { userId } }),
+      prisma.userSession.deleteMany({ where: { userId } }),
+      prisma.playbackSession.deleteMany({ where: { userId } }),
+      prisma.recommendationLog.deleteMany({ where: { userId } }),
+      prisma.userFeature.deleteMany({ where: { userId } }),
+      prisma.contentFlag.deleteMany({ where: { userId } }),
+      prisma.feedback.deleteMany({ where: { userId } }),
+      prisma.listeningQueue.deleteMany({ where: { userId } }),
+    ]);
 
-    // Delete user — cascades handle all related records
+    // Delete user — cascades handle all FK-linked records
     await prisma.user.delete({ where: { id: userId } });
 
-    // Queue R2 storage cleanup for collected keys
-    if (storageKeys.length > 0) {
-      await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-        userId: 'system',
-        type: 'STORAGE_CLEANUP',
-        title: 'Account Deletion Cleanup',
-        message: `Clean up ${storageKeys.length} storage objects for deleted user`,
-        data: { storageKeys: JSON.stringify(storageKeys) },
+    // R2 storage cleanup — best-effort, doesn't fail the request
+    try {
+      const deletePromises: Promise<void>[] = [];
+
+      // Delete all files under each podcast prefix (segments, audio, PDFs, versions)
+      for (const p of podcasts) {
+        const keys = await listFiles(`podcasts/${p.id}/`);
+        for (const key of keys) {
+          deletePromises.push(deleteFile(key));
+        }
+        if (p.importedAudioKey) {
+          deletePromises.push(deleteFile(p.importedAudioKey));
+        }
+      }
+
+      // Delete user avatar
+      if (user?.image) {
+        deletePromises.push(deleteFile(user.image));
+      }
+
+      if (deletePromises.length > 0) {
+        await Promise.allSettled(deletePromises);
+        logger.info('Account deletion R2 cleanup completed', {
+          userId,
+          filesAttempted: String(deletePromises.length),
+        });
+      }
+    } catch (storageError) {
+      logger.error('Account deletion R2 cleanup failed', {
+        userId,
+        error: storageError instanceof Error ? storageError.message : 'Unknown error',
       });
     }
 
