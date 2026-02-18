@@ -11,9 +11,11 @@ export class ClaudeCodeProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
-    return executeClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
+    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const result = await executeClaudeCode(system, serializeMessages(messages), {
+      model: ccModel,
     });
+    return { ...result, model: ccModel };
   }
 
   async *streamResponse(

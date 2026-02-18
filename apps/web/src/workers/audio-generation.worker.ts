@@ -213,7 +213,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
 
   logUsage({
-    service: providerId,
+    service,
     category: 'audio_generation',
     inputTokens: charCount,
     totalCost,

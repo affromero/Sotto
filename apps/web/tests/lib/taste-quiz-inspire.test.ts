@@ -179,6 +179,7 @@ describe('generateNewsQuestions', () => {
           { text: 'Latest Mars discovery this week', tagSlugs: ['science'], category: 'science' },
         ])},
       ],
+      usage: { input_tokens: 100, output_tokens: 50 },
     });
 
     vi.doMock('@anthropic-ai/sdk', () => ({
