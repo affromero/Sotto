@@ -71,6 +71,12 @@ export type {
   UsageDataPoint,
   AnalyticsSummary,
   AnalyticsResponse,
+  CreatorOverview,
+  CreatorTopPodcast,
+  CreatorDailyPlays,
+  CreatorEngagement,
+  CreatorAudienceInsights,
+  CreatorAnalyticsResponse,
 } from './types/analytics';
 
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
