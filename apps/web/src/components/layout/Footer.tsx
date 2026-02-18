@@ -15,8 +15,13 @@ export function Footer() {
             <a href="/create">Create</a>
           </div>
           <div>
-            <h4>Company</h4>
+            <h4>Community</h4>
+            <a href="https://discord.gg/ufrTRR48pV" target="_blank" rel="noopener noreferrer">Discord</a>
+            <a href="https://x.com/SottoFM" target="_blank" rel="noopener noreferrer">Twitter</a>
             <a href="/feedback">Feedback</a>
+          </div>
+          <div>
+            <h4>Company</h4>
             <a href="/support">Support</a>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>

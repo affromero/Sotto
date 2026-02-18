@@ -70,6 +70,7 @@ const mockUploadPodcastAudio = vi.fn().mockResolvedValue('https://r2.example.com
 vi.mock('@/lib/r2', () => ({
   downloadFile: (...args: unknown[]) => mockDownloadFile(...args),
   uploadPodcastAudio: (...args: unknown[]) => mockUploadPodcastAudio(...args),
+  deleteFile: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'notification-job-1' });

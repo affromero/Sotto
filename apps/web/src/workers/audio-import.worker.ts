@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { ImportAudioPayload, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { downloadFile, uploadPodcastAudio } from '@/lib/r2';
+import { downloadFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
 import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
@@ -353,6 +353,15 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         currentVersion: podcastVersion.version,
         language: detectedLanguage ?? undefined,
       },
+    });
+
+    // Clean up the original imported audio file from R2
+    deleteFile(audioKey).catch((err) => {
+      logger.warn('Failed to delete imported audio from R2', {
+        podcastId,
+        audioKey,
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
 
     const cumulativeTime = segments.reduce<number[]>((acc, seg, i) => {

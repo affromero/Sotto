@@ -34,6 +34,18 @@ export default function SupportPage() {
             <div className={styles.contactItem}>
               <span className={styles.contactIcon} aria-hidden="true">&#128172;</span>
               <div>
+                <strong>Discord Community</strong>
+                <p>
+                  Join our{' '}
+                  <a href="https://discord.gg/ufrTRR48pV" target="_blank" rel="noopener noreferrer">Discord server</a>{' '}
+                  to chat with other creators, share podcasts, and get help
+                  from the community.
+                </p>
+              </div>
+            </div>
+            <div className={styles.contactItem}>
+              <span className={styles.contactIcon} aria-hidden="true">&#128161;</span>
+              <div>
                 <strong>Product Feedback</strong>
                 <p>
                   Have ideas or found a bug? Visit our{' '}
