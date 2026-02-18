@@ -17,7 +17,7 @@ export const createPodcastSchema = z.object({
   discoveryId: z.string().optional(),
   hostVoiceId: z.string().optional(),
   expertVoiceId: z.string().optional(),
-  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']).optional(),
+  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   aiModel: z.string().optional(),
   metadata: z.object({
     topic: z.string(),
@@ -256,7 +256,7 @@ export const userSearchSchema = z.object({
  * BYOK API key validation (multi-provider)
  */
 export const byokSchema = z.object({
-  provider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume']),
+  provider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']),
   apiKey: z.string().min(10).max(500),
   userId: z.string().optional(), // PlayHT requires this
 });

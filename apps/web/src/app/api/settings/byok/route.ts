@@ -56,12 +56,12 @@ export async function DELETE(request: NextRequest) {
     // No body — legacy behavior removes elevenlabs
   }
 
-  const validProviders = ['elevenlabs', 'openai', 'playht', 'cartesia', 'hume'];
+  const validProviders = ['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate'];
   const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
 
   await removeByokKey(
     authed.userId,
-    targetProvider as 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+    targetProvider as 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate'
   );
   return NextResponse.json({ success: true });
 }

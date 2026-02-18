@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import styles from './TtsProviderSelector.module.css';
 
-type ProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume';
+type ProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate';
 
 const QUALITY_LABELS: Record<string, string> = {
   elevenlabs: 'Premium',
@@ -12,6 +12,8 @@ const QUALITY_LABELS: Record<string, string> = {
   playht: 'Premium',
   cartesia: 'Premium',
   hume: 'Ultra',
+  fal: 'Premium',
+  replicate: 'Premium',
 };
 
 interface TtsProviderSelectorProps {

@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -197,6 +197,63 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
           });
           // Hume returns 200 on success or 400 for bad params but not 401/403
           return res.status !== 401 && res.status !== 403;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  fal: {
+    id: 'fal',
+    displayName: 'Fal (Qwen3-TTS)',
+    supportsSfx: false,
+    supportsVoiceCloning: true,
+    supportsStreaming: false,
+    maxSegmentChars: 5000,
+    defaultModel: 'qwen3-tts-1.7b',
+    models: [
+      { id: 'qwen3-tts-1.7b', displayName: 'Qwen3 TTS 1.7B', tier: 'premium' },
+      { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard' },
+    ],
+    supportsAudioTags: false,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://rest.fal.ai/keys/', {
+            headers: { Authorization: `Key ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  replicate: {
+    id: 'replicate',
+    displayName: 'Replicate (Qwen3-TTS)',
+    supportsSfx: false,
+    supportsVoiceCloning: false,
+    supportsStreaming: false,
+    maxSegmentChars: 5000,
+    defaultModel: 'qwen3-tts',
+    models: [{ id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'premium' }],
+    supportsAudioTags: false,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.replicate.com/v1/account', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
         } catch {
           return false;
         }
