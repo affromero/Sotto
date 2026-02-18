@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
+import { validateUrl, UrlValidationError } from '@/lib/url-validator';
 import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
@@ -15,6 +16,15 @@ export async function POST(request: NextRequest) {
 
   if (!url || typeof url !== 'string') {
     return NextResponse.json({ error: 'url is required' }, { status: 400 });
+  }
+
+  try {
+    await validateUrl(url);
+  } catch (err) {
+    if (err instanceof UrlValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
   }
 
   const { allowed } = await checkRateLimit(`url-extract:${session.user.id}`, 10, 60);

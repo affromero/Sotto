@@ -2,6 +2,7 @@ import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import * as cheerio from 'cheerio';
 import { logger } from '../logger';
+import { validateUrl } from '../url-validator';
 import type { ExtractedContent } from './types';
 
 const MAX_CONTENT_LENGTH = 50000;
@@ -88,6 +89,8 @@ export async function extractHtmlContent(url: string): Promise<ExtractedContent>
 }
 
 async function fetchHtml(url: string): Promise<string> {
+  await validateUrl(url);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 

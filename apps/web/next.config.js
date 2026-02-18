@@ -4,6 +4,7 @@ const path = require('path');
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '150mb',
   },
