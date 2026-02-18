@@ -1,7 +1,8 @@
 import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generateResponse, logApiUsage } from '@/lib/claude';
+import { generateResponse } from '@/lib/claude';
+import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey } from '@/lib/byok';
@@ -119,12 +120,14 @@ Answer concisely and helpfully, using the podcast context. Keep answers under 20
     },
   });
 
-  await logApiUsage({
-    podcastId,
-    userId,
+  await logUsage({
+    service: 'anthropic',
+    model: response.model,
     category: 'interaction',
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
+    podcastId,
+    userId,
   });
 
   await job.updateProgress(100);

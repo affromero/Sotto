@@ -107,7 +107,7 @@ export async function getDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string,
   model?: string
-): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
   return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,
     apiKeyOverride,
@@ -123,7 +123,7 @@ export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string,
   model?: string,
-  onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void
+  onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void
 ): AsyncGenerator<string> {
   return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,

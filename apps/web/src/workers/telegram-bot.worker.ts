@@ -13,6 +13,7 @@ import { parseTelegramIntent } from '@/lib/telegram-parser';
 import { getDiscoveryResponse, parseChips, parseMetadata } from '@/lib/discovery-agent';
 import { getAiKey } from '@/lib/byok';
 import { canResolveAi } from '@/lib/providers/ai';
+import { logUsage } from '@/lib/usage-logger';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
 import type {
@@ -243,6 +244,16 @@ async function startDiscoverySession(
 
   const aiKey = await getAiKey(userId);
   const response = await getDiscoveryResponse(messages, aiKey?.apiKey);
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'telegram_discovery',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId,
+  });
+
   const { text: responseText, chips } = parseChips(response.content);
   const metadata = parseMetadata(response.content);
 
@@ -290,6 +301,16 @@ export async function handleDiscoveryMessage(
 
   const aiKey = await getAiKey(userId);
   const response = await getDiscoveryResponse(session.messages, aiKey?.apiKey);
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'telegram_discovery',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    userId,
+  });
+
   const { text: responseText, chips } = parseChips(response.content);
   const metadata = parseMetadata(response.content);
 

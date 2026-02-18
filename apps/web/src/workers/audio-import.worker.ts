@@ -10,6 +10,8 @@ import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metada
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
 import { detectLanguage } from '@/lib/language-detect';
+import { getSttProviderMeta } from '@/lib/providers/stt-registry';
+import { logUsage } from '@/lib/usage-logger';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import * as path from 'path';
 import * as os from 'os';
@@ -141,6 +143,20 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         fs.readFile(normalizedPath)
       );
       const transcription = await provider.transcribe(normalizedBuffer);
+
+      const sttId = sttProvider ?? 'openai';
+      const sttMeta = getSttProviderMeta(sttId);
+      const durationMin = duration / 60;
+      logUsage({
+        service: sttId,
+        model: sttMeta.defaultModel,
+        category: 'stt_transcription',
+        totalCost: durationMin * sttMeta.platformCostPerMinute,
+        podcastId,
+        userId,
+        metadata: { durationSeconds: Math.round(duration) },
+      });
+
       await job.updateProgress(70);
 
       logger.info('Running speaker diarization');

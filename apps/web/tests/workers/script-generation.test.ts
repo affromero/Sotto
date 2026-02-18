@@ -76,16 +76,17 @@ const mockGenerateScript = vi.fn().mockResolvedValue({
   markdown: '**HOST:** Welcome to the show!\n\n**EXPERT:** Thanks for having me!',
   inputTokens: 1000,
   outputTokens: 500,
+  model: 'claude-haiku-4-5-20251001',
 });
 
 vi.mock('@/lib/script-generator', () => ({
   generateScript: (...args: unknown[]) => mockGenerateScript(...args),
 }));
 
-const mockLogApiUsage = vi.fn().mockResolvedValue({});
+const mockLogUsage = vi.fn();
 
-vi.mock('@/lib/claude', () => ({
-  logApiUsage: (...args: unknown[]) => mockLogApiUsage(...args),
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: (...args: unknown[]) => mockLogUsage(...args),
 }));
 
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
@@ -693,20 +694,23 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalledWith({
-        podcastId: 'podcast-001',
-        userId: 'user-001',
-        category: 'script_generation',
-        inputTokens: 2500,
-        outputTokens: 1800,
-      });
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'anthropic',
+          category: 'script_generation',
+          inputTokens: 2500,
+          outputTokens: 1800,
+          podcastId: 'podcast-001',
+          userId: 'user-001',
+        })
+      );
     });
 
     it('logs usage even when no references', async () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalled();
+      expect(mockLogUsage).toHaveBeenCalled();
     });
 
     it('logs usage even when references exist', async () => {
@@ -733,7 +737,7 @@ describe('processScriptGeneration', () => {
       const job = createMockJob(defaultPayload);
       await processScriptGeneration(job);
 
-      expect(mockLogApiUsage).toHaveBeenCalled();
+      expect(mockLogUsage).toHaveBeenCalled();
     });
   });
 
@@ -916,7 +920,7 @@ describe('processScriptGeneration', () => {
       );
 
       // Usage logged
-      expect(mockLogApiUsage).toHaveBeenCalledWith(
+      expect(mockLogUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           category: 'script_generation',
           inputTokens: 1800,
@@ -970,7 +974,7 @@ describe('processScriptGeneration', () => {
       });
 
       // Usage logged
-      expect(mockLogApiUsage).toHaveBeenCalled();
+      expect(mockLogUsage).toHaveBeenCalled();
 
       // Progress tracked
       expect(job.updateProgress).toHaveBeenCalledWith(100);

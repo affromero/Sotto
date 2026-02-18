@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { cache } from './redis';
 import { prisma } from './prisma';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
 const OPENAI_MODERATION_KEY = process.env.OPENAI_MODERATION_KEY;
@@ -121,6 +122,14 @@ export async function moderateContent(text: string): Promise<ModerationResult> {
       scores: result.category_scores,
       blockedCategories,
     };
+
+    logUsage({
+      service: 'openai',
+      model: MODERATION_MODEL,
+      category: 'moderation',
+      totalCost: 0,
+      metadata: { inputChars: truncated.length },
+    });
 
     // Cache result
     await cache.set(key, moderationResult, CACHE_TTL_SECONDS).catch(() => {});

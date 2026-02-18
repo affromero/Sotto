@@ -11,6 +11,7 @@ import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
 import { estimateDurationFromText } from '@/lib/duration';
 import type { VoiceMatchMetadata } from '@/lib/voice-pool';
+import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
@@ -211,17 +212,15 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   const meta = getProviderMeta(providerId);
   const totalCost = (charCount / 1000) * meta.platformCostPerKChar;
 
-  await prisma.apiUsageLog.create({
-    data: {
-      podcastId,
-      userId: podcast.userId,
-      service,
-      category: 'audio_generation',
-      inputTokens: charCount,
-      totalCost,
-      durationMs,
-      metadata: { voiceId, speaker, providerId, source },
-    },
+  logUsage({
+    service,
+    category: 'audio_generation',
+    inputTokens: charCount,
+    totalCost,
+    durationMs,
+    podcastId,
+    userId: podcast.userId,
+    metadata: { voiceId, speaker, source },
   });
 
   await job.updateProgress(90);

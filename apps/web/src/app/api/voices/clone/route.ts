@@ -6,6 +6,7 @@ import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
 import { getByokKey } from '@/lib/byok';
 import { cloneVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
+import { logUsage } from '@/lib/usage-logger';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -58,6 +59,14 @@ export async function POST(request: NextRequest) {
     const { voiceId } = await cloneVoice(parsed.data.name, [audioBuffer]);
     externalVoiceId = voiceId;
   }
+
+  logUsage({
+    service: provider,
+    category: 'voice_clone',
+    totalCost: 0,
+    userId: session.user.id,
+    metadata: { audioSizeBytes: audioBuffer.length },
+  });
 
   const voiceClone = await prisma.voiceClone.create({
     data: {

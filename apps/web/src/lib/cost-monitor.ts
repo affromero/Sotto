@@ -10,6 +10,7 @@ import { logger } from './logger';
 
 export interface ProviderCostBreakdown {
   service: string;
+  modelId: string | null;
   totalCost: number;
   callCount: number;
   avgCostPerCall: number;
@@ -42,16 +43,19 @@ export async function getCostBreakdown(period: '24h' | '7d' | '30d' | '90d'): Pr
   const from = new Date(now.getTime() - periodMs[period]);
 
   const logs = await prisma.apiUsageLog.groupBy({
-    by: ['service', 'category'],
+    by: ['service', 'modelId', 'category'],
     where: { createdAt: { gte: from } },
     _sum: { totalCost: true },
     _count: { id: true },
   });
 
-  // Group by service
+  // Group by service+modelId
+  const groupKey = (svc: string, model: string | null) => `${svc}::${model ?? ''}`;
   const serviceMap = new Map<
     string,
     {
+      service: string;
+      modelId: string | null;
       totalCost: number;
       callCount: number;
       categories: Map<string, { totalCost: number; callCount: number }>;
@@ -59,11 +63,17 @@ export async function getCostBreakdown(period: '24h' | '7d' | '30d' | '90d'): Pr
   >();
 
   for (const row of logs) {
-    const svc = row.service;
-    if (!serviceMap.has(svc)) {
-      serviceMap.set(svc, { totalCost: 0, callCount: 0, categories: new Map() });
+    const key = groupKey(row.service, row.modelId);
+    if (!serviceMap.has(key)) {
+      serviceMap.set(key, {
+        service: row.service,
+        modelId: row.modelId,
+        totalCost: 0,
+        callCount: 0,
+        categories: new Map(),
+      });
     }
-    const entry = serviceMap.get(svc)!;
+    const entry = serviceMap.get(key)!;
     const cost = row._sum.totalCost ?? 0;
     const count = row._count.id;
     entry.totalCost += cost;
@@ -73,10 +83,11 @@ export async function getCostBreakdown(period: '24h' | '7d' | '30d' | '90d'): Pr
 
   let totalCost = 0;
   const providers: ProviderCostBreakdown[] = [];
-  for (const [service, data] of serviceMap) {
+  for (const [, data] of serviceMap) {
     totalCost += data.totalCost;
     providers.push({
-      service,
+      service: data.service,
+      modelId: data.modelId,
       totalCost: data.totalCost,
       callCount: data.callCount,
       avgCostPerCall: data.callCount > 0 ? data.totalCost / data.callCount : 0,

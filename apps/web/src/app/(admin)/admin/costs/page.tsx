@@ -41,11 +41,14 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
     getCostPerPodcast(since),
   ]);
 
+  const AI_SERVICES = new Set(['anthropic', 'openai']);
+  const SYSTEM_SERVICES = new Set(['ffmpeg']);
+
   const aiCost = breakdown.providers
-    .filter((p) => p.service === 'anthropic' || p.service === 'openai')
+    .filter((p) => AI_SERVICES.has(p.service))
     .reduce((sum, p) => sum + p.totalCost, 0);
   const ttsCost = breakdown.providers
-    .filter((p) => p.service !== 'anthropic' && p.service !== 'openai' && p.service !== 'ffmpeg')
+    .filter((p) => !AI_SERVICES.has(p.service) && !SYSTEM_SERVICES.has(p.service))
     .reduce((sum, p) => sum + p.totalCost, 0);
 
   const maxDailyCost = Math.max(...dailyTrend.map((d) => d.totalCost), 0.01);
@@ -100,7 +103,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
           <div className={styles.chartContainer} role="img" aria-label="Daily cost trend bar chart">
             {dailyTrend.map((d) => {
               const aiDayCost = Object.entries(d.services)
-                .filter(([svc]) => svc === 'anthropic' || svc === 'openai')
+                .filter(([svc]) => AI_SERVICES.has(svc))
                 .reduce((sum, [, cost]) => sum + cost, 0);
               const ttsDayCost = d.totalCost - aiDayCost;
               const aiPct = (aiDayCost / maxDailyCost) * 100;
@@ -141,6 +144,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
             <thead>
               <tr>
                 <th>Service</th>
+                <th>Model</th>
                 <th>Total Cost</th>
                 <th>Calls</th>
                 <th>Avg Cost/Call</th>
@@ -148,8 +152,9 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
             </thead>
             <tbody>
               {breakdown.providers.map((p) => (
-                <tr key={p.service}>
+                <tr key={`${p.service}-${p.modelId ?? 'none'}`}>
                   <td>{p.service}</td>
+                  <td>{p.modelId ?? '—'}</td>
                   <td>${p.totalCost.toFixed(4)}</td>
                   <td>{p.callCount.toLocaleString()}</td>
                   <td>${p.avgCostPerCall.toFixed(4)}</td>

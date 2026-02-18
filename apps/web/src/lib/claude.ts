@@ -1,6 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { moderateOrThrow, moderateContent } from './moderation';
-import { prisma } from './prisma';
 import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -35,7 +34,7 @@ export async function generateResponse(
     tools?: Anthropic.MessageCreateParams['tools'];
     skipModeration?: boolean;
   }
-): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
   // Screen user input before sending to LLM
   if (!options?.skipModeration) {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
@@ -46,9 +45,11 @@ export async function generateResponse(
 
   if (isClaudeCodeMode() && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
-    return executeClaudeCode(systemPrompt, serializeMessages(messages), {
-      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
+    const ccModel = options?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), {
+      model: ccModel,
     });
+    return { ...result, model: ccModel };
   }
 
   const activeClient = options?.apiKeyOverride
@@ -59,8 +60,10 @@ export async function generateResponse(
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
+  const resolvedModel = options?.model || 'claude-sonnet-4-5-20250929';
+
   const response = await activeClient.messages.create({
-    model: options?.model || 'claude-sonnet-4-5-20250929',
+    model: resolvedModel,
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,
     messages,
@@ -87,6 +90,7 @@ export async function generateResponse(
     content,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
+    model: resolvedModel,
   };
 }
 
@@ -103,7 +107,7 @@ export async function* streamResponse(
     apiKeyOverride?: string;
     tools?: Anthropic.MessageCreateParams['tools'];
     skipModeration?: boolean;
-    onComplete?: (usage: { inputTokens: number; outputTokens: number }) => void;
+    onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void;
   }
 ): AsyncGenerator<string> {
   // Screen user input before starting stream
@@ -130,8 +134,10 @@ export async function* streamResponse(
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
+  const streamModel = options?.model || 'claude-sonnet-4-5-20250929';
+
   const stream = activeClient.messages.stream({
-    model: options?.model || 'claude-sonnet-4-5-20250929',
+    model: streamModel,
     max_tokens: options?.maxTokens || 4096,
     system: systemPrompt,
     messages,
@@ -149,36 +155,8 @@ export async function* streamResponse(
     options.onComplete({
       inputTokens: finalMessage.usage.input_tokens,
       outputTokens: finalMessage.usage.output_tokens,
+      model: streamModel,
     });
   }
 }
 
-/**
- * Log AI API usage for cost tracking — persists to ApiUsageLog table.
- */
-export async function logApiUsage(params: {
-  podcastId?: string;
-  userId?: string;
-  category: string;
-  inputTokens: number;
-  outputTokens: number;
-  durationMs?: number;
-}): Promise<void> {
-  // Cost calculation (Claude Sonnet 4.5 pricing)
-  const inputCost = (params.inputTokens / 1_000_000) * 3.0;
-  const outputCost = (params.outputTokens / 1_000_000) * 15.0;
-  const totalCost = inputCost + outputCost;
-
-  prisma.apiUsageLog.create({
-    data: {
-      service: 'anthropic',
-      category: params.category,
-      inputTokens: params.inputTokens,
-      outputTokens: params.outputTokens,
-      totalCost,
-      durationMs: params.durationMs ?? null,
-      podcastId: params.podcastId ?? null,
-      userId: params.userId ?? null,
-    },
-  }).catch(() => {});
-}
