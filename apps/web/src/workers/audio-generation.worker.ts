@@ -9,21 +9,12 @@ import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import { estimateDurationFromText } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
-
-/**
- * Estimate audio duration from text length as a fallback.
- * Average speech rate: ~150 words/min, average word length ~5 chars.
- * So ~750 chars/min → ~12.5 chars/sec.
- */
-function estimateDurationFromText(text: string): number {
-  const charsPerSecond = 12.5;
-  return text.length / charsPerSecond;
-}
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
   const { podcastId, segmentId, speaker, text } = job.data;

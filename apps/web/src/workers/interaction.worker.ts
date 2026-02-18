@@ -6,6 +6,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey } from '@/lib/byok';
 import { getLanguageLabel } from '@sotto/shared';
+import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 
 export async function processInteraction(job: Job<ProcessInteractionPayload>): Promise<void> {
@@ -49,7 +50,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     // Average ~12.5 chars/sec speech rate
     let elapsed = 0;
     for (let i = 0; i < turns.length; i++) {
-      elapsed += turns[i].text.length / 12.5;
+      elapsed += turns[i].text.length / CHARS_PER_SECOND;
       if (elapsed >= timestamp) {
         turnIndex = i + 1;
         break;

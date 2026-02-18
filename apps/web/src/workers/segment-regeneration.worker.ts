@@ -6,20 +6,12 @@ import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
+import { estimateDurationFromText } from '@/lib/duration';
 import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
-
-/**
- * Estimate audio duration from text length as a fallback.
- * Average speech rate: ~150 words/min, average word length ~5 chars.
- * So ~750 chars/min → ~12.5 chars/sec.
- */
-function estimateDurationFromText(text: string): number {
-  return text.length / 12.5;
-}
 
 export async function processSegmentRegeneration(
   job: Job<RegenerateSegmentPayload>
