@@ -15,6 +15,7 @@ All shared business logic and external service integrations live here.
 | `claude.ts` | Anthropic Claude client (streaming + non-streaming), provider-aware (`AI_PROVIDER`) | Anthropic API / Claude CLI |
 | `claude-code-client.ts` | Claude Code CLI wrapper (`claude -p`): serialize messages, execute, stream | Claude CLI (`claude`) |
 | `elevenlabs.ts` | ElevenLabs TTS client, voice ID mapping | ElevenLabs API |
+| `fal-voice-clone.ts` | Fal.ai voice cloning via Qwen3-TTS: upload audio to R2, call clone-voice endpoint, return speaker embedding URL | Fal API + R2 |
 | `stripe.ts` | Stripe SDK client, `PLATFORM_FEE_PERCENT` (10%), flat feature limits | Stripe API |
 | `voice-pricing.ts` | Voice marketplace pricing: `computeVoiceCharges()`, `createVoicePayment()`, `captureVoicePayment()`, `cancelVoicePayment()`, `capturePodcastPayments()`, `cancelPodcastPayments()`, `checkFreeAccess()` | Uses `prisma.ts`, `stripe.ts` |
 | `r2.ts` | Cloudflare R2 file storage (upload, download, presign) | AWS S3 SDK → R2 |
@@ -100,10 +101,10 @@ Modular provider architecture — swap external services via env vars.
 | `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` + `resolveAiProvider()`, `canResolveAi()` | `AI_PROVIDER` |
 | `ai-registry.ts` | `AiProviderMeta` | Declarative AI provider metadata: validation functions for Anthropic + OpenAI keys | — |
 | `claude-code.ts` | `AIProvider` | `ClaudeCodeProvider` (standalone) | `AI_PROVIDER` |
-| `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `PlayHTProvider`, `CartesiaProvider`, `HumeProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
+| `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `PlayHTProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
 | `tts-registry.ts` | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities, models | — |
-| `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (PlayHT, Cartesia, Hume) with curated voices + deterministic hash selection | — |
-| `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `playht`, `cartesia`, `hume` | Various TTS APIs |
+| `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (PlayHT, Cartesia, Hume, Fal/Replicate) with curated voices + deterministic hash selection | — |
+| `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `playht`, `cartesia`, `hume`, `fal`, `replicate` | Various TTS APIs |
 | `stt.ts` | `SttProvider` | OpenAI Whisper (`WhisperProvider`), Groq, ElevenLabs STT + `resolveSttProvider()` | `STT_PROVIDER` |
 | `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, Groq, ElevenLabs | — |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
