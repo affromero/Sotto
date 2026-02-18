@@ -215,6 +215,24 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       },
     });
 
+    // Compute duration deviation from target
+    const discovery = await prisma.discovery.findUnique({
+      where: { podcastId },
+      select: { durationTarget: true },
+    });
+    const durationDeviation = discovery?.durationTarget
+      ? Math.round(duration) - discovery.durationTarget * 60
+      : null;
+
+    if (durationDeviation !== null) {
+      logger.info('Duration deviation from target', {
+        podcastId,
+        actualSeconds: String(Math.round(duration)),
+        targetSeconds: String(discovery!.durationTarget! * 60),
+        deviationSeconds: String(durationDeviation),
+      });
+    }
+
     // Update podcast record
     await prisma.podcast.update({
       where: { id: podcastId },
@@ -222,6 +240,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         status: 'READY',
         audioUrl,
         duration: Math.round(duration),
+        durationDeviation,
         fileSize: finalAudio.length,
         currentVersion: newVersion,
       },
