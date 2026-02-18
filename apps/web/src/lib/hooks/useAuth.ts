@@ -2,6 +2,7 @@
 
 import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
 import { useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface AuthUser {
   id: string;
@@ -9,6 +10,9 @@ interface AuthUser {
   email: string | null;
   image: string | null;
   role: string;
+  isImpersonating?: boolean;
+  impersonatedRole?: string;
+  originalUser?: { id: string; name: string | null; image: string | null };
 }
 
 interface UseAuthReturn {
@@ -17,21 +21,28 @@ interface UseAuthReturn {
   isLoading: boolean;
   signIn: () => void;
   signOut: () => void;
+  impersonate: (userId: string) => Promise<void>;
+  stopImpersonating: () => Promise<void>;
 }
 
 export function useAuth(): UseAuthReturn {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
+  const router = useRouter();
 
   const isLoading = status === 'loading';
   const isAuthenticated = status === 'authenticated';
 
-  const user: AuthUser | null = session?.user
+  const sessionUser = session?.user as Record<string, unknown> | undefined;
+  const user: AuthUser | null = sessionUser
     ? {
-        id: session.user.id as string,
-        name: session.user.name ?? null,
-        email: session.user.email ?? null,
-        image: session.user.image ?? null,
-        role: ((session.user as Record<string, unknown>).role as string) ?? 'USER',
+        id: sessionUser.id as string,
+        name: (sessionUser.name as string) ?? null,
+        email: (sessionUser.email as string) ?? null,
+        image: (sessionUser.image as string) ?? null,
+        role: (sessionUser.role as string) ?? 'USER',
+        isImpersonating: (sessionUser.isImpersonating as boolean) ?? false,
+        impersonatedRole: (sessionUser.impersonatedRole as string) ?? undefined,
+        originalUser: sessionUser.originalUser as AuthUser['originalUser'],
       }
     : null;
 
@@ -43,5 +54,15 @@ export function useAuth(): UseAuthReturn {
     nextAuthSignOut({ callbackUrl: '/' });
   }, []);
 
-  return { user, isAuthenticated, isLoading, signIn, signOut };
+  const impersonate = useCallback(async (userId: string) => {
+    await update({ impersonateUserId: userId });
+    router.refresh();
+  }, [update, router]);
+
+  const stopImpersonating = useCallback(async () => {
+    await update({ stopImpersonating: true });
+    router.refresh();
+  }, [update, router]);
+
+  return { user, isAuthenticated, isLoading, signIn, signOut, impersonate, stopImpersonating };
 }

@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
-const mockUserFindUnique = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
 const mockSetFreeTierConfig = vi.fn();
 
@@ -10,11 +9,12 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-vi.mock('@/lib/prisma', () => ({
-  prisma: {
-    user: {
-      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
-    },
+vi.mock('@/lib/auth-guards', () => ({
+  requireAdmin: async () => {
+    const session = await mockAuth();
+    if (!session?.user?.id) return null;
+    if (session.user.role !== 'ADMIN') return null;
+    return session.user.id;
   },
 }));
 
@@ -49,8 +49,7 @@ describe('GET /api/admin/config', () => {
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const response = await GET();
     const body = await response.json();
@@ -60,8 +59,7 @@ describe('GET /api/admin/config', () => {
   });
 
   it('returns config when user is admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     const mockConfig = {
       aiProvider: 'anthropic',
       aiModel: 'claude-sonnet-4-5-20250929',
@@ -95,8 +93,7 @@ describe('PATCH /api/admin/config', () => {
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const request = createPatchRequest({ aiProvider: 'openai' });
     const response = await PATCH(request);
@@ -107,8 +104,7 @@ describe('PATCH /api/admin/config', () => {
   });
 
   it('returns 400 for invalid body', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const request = createPatchRequest({ aiProvider: 'invalid-provider' });
     const response = await PATCH(request);
@@ -117,8 +113,7 @@ describe('PATCH /api/admin/config', () => {
   });
 
   it('updates config and returns updated values', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockSetFreeTierConfig.mockResolvedValue(undefined);
     const updatedConfig = {
       aiProvider: 'openai',

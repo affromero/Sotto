@@ -13,6 +13,15 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/auth-guards', () => ({
+  requireAdmin: async () => {
+    const session = await mockAuth();
+    if (!session?.user?.id) return null;
+    if (session.user.role !== 'ADMIN') return null;
+    return session.user.id;
+  },
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
@@ -62,20 +71,19 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     vi.clearAllMocks();
   });
 
-  it('returns 401 when unauthenticated', async () => {
+  it('returns 403 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
     const request = createPostRequest({ title: 'Test', topic: 'Test' });
     const response = await POST(request);
     const body = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(response.status).toBe(403);
+    expect(body).toEqual({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const request = createPostRequest({ title: 'Test', topic: 'Test' });
     const response = await POST(request);
@@ -86,11 +94,8 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
   });
 
   it('returns 404 when @sotto account not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    // First call: admin role check, second call: sotto user lookup
-    mockUserFindUnique
-      .mockResolvedValueOnce({ role: 'ADMIN' })
-      .mockResolvedValueOnce(null);
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockUserFindUnique.mockResolvedValueOnce(null);
 
     const request = createPostRequest({ title: 'Test', topic: 'Test' });
     const response = await POST(request);
@@ -101,10 +106,8 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
   });
 
   it('returns 400 when title or topic missing', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    mockUserFindUnique
-      .mockResolvedValueOnce({ role: 'ADMIN' })
-      .mockResolvedValueOnce({ id: 'sotto-id' });
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
 
     const request = createPostRequest({ title: 'Test' });
     const response = await POST(request);
@@ -115,10 +118,8 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
   });
 
   it('creates podcast owned by @sotto successfully', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-    mockUserFindUnique
-      .mockResolvedValueOnce({ role: 'ADMIN' })
-      .mockResolvedValueOnce({ id: 'sotto-id' });
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockUserFindUnique.mockResolvedValueOnce({ id: 'sotto-id' });
     const created = {
       id: 'pod-1',
       userId: 'sotto-id',

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
@@ -27,14 +26,10 @@ import {
   ArrowLeft,
   Menu,
 } from 'lucide-react';
+import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import styles from './AdminShell.module.css';
 
 interface AdminShellProps {
-  user: {
-    name: string | null;
-    email: string | null;
-    image: string | null;
-  };
   pendingReportCount?: number;
   children: React.ReactNode;
 }
@@ -67,11 +62,9 @@ const navItems: NavItem[] = [
   { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
 ];
 
-export function AdminShell({ user, pendingReportCount, children }: AdminShellProps) {
+export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const displayName = user.name || user.email || 'Admin';
-  const initials = displayName.charAt(0).toUpperCase();
 
   return (
     <div className={styles.layout}>
@@ -128,19 +121,7 @@ export function AdminShell({ user, pendingReportCount, children }: AdminShellPro
           </Link>
         </div>
 
-        <div className={styles.userSection}>
-          <div className={styles.avatar}>
-            {user.image ? (
-              <Image src={user.image} alt={`${displayName}'s avatar`} width={32} height={32} />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className={styles.userInfo}>
-            <span className={styles.userName}>{displayName}</span>
-            <span className={styles.userRole}>Administrator</span>
-          </div>
-        </div>
+        <AccountSwitcher variant="admin" />
       </aside>
 
       <div className={styles.main}>

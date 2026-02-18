@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Verify current user is ADMIN
-  const currentUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  if (currentUser?.role !== 'ADMIN') {
+  const adminId = await requireAdmin();
+  if (!adminId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

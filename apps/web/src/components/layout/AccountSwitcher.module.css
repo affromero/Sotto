@@ -1,0 +1,293 @@
+.userSection {
+  position: relative;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.admin {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.withPlayer {
+  padding-bottom: var(--mini-player-height);
+}
+
+/* Trigger button */
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.trigger:hover {
+  background: var(--color-surface-hover);
+}
+
+.admin .trigger:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Avatar */
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin .avatar {
+  background: var(--color-primary);
+  color: #0f1a2e;
+}
+
+/* User info */
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.userNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.userName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin .userName {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.roleLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.admin .roleLabel {
+  color: #6b8aae;
+}
+
+.signOut {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.signOut:hover {
+  color: var(--color-error);
+}
+
+/* Chevron */
+
+.chevron {
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+  transition: transform var(--transition-fast);
+}
+
+.admin .chevron {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* Popover */
+
+.popover {
+  position: absolute;
+  bottom: 100%;
+  left: var(--spacing-sm);
+  right: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--spacing-xs);
+  animation: slideUp 150ms ease;
+  z-index: var(--z-dropdown);
+}
+
+.popoverAdmin {
+  background: #1a2a44;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Account option */
+
+.accountOption {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.accountOption:hover {
+  background: var(--color-surface-hover);
+}
+
+.popoverAdmin .accountOption:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.optionAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--font-size-xs);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.optionAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.popoverAdmin .optionAvatar {
+  background: var(--color-primary);
+  color: #0f1a2e;
+}
+
+.optionInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.optionName {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popoverAdmin .optionName {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.optionRole {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.popoverAdmin .optionRole {
+  color: #6b8aae;
+}
+
+.check {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* Divider + sign out */
+
+.popoverDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--spacing-xs) 0;
+}
+
+.popoverAdmin .popoverDivider {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.signOutOption {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+}
+
+.signOutOption:hover {
+  background: var(--color-error-lighter);
+  color: var(--color-error);
+}
+
+.popoverAdmin .signOutOption {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.popoverAdmin .signOutOption:hover {
+  background: rgba(220, 38, 38, 0.15);
+  color: #f87171;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
