@@ -16,21 +16,25 @@ export default async function AnalyticsPage() {
     redirect('/auth/login');
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { role: true },
-  });
+  const [dbUser, podcastCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    }),
+    prisma.podcast.count({ where: { userId, deletedAt: null } }),
+  ]);
 
   const role = dbUser?.role || 'USER';
+  const hasAccess = podcastCount > 0 || role === 'ADMIN';
 
-  if (role !== 'CREATOR' && role !== 'ADMIN') {
+  if (!hasAccess) {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Analytics</h1>
           <p className={styles.upgradeText}>
-            Analytics is available for creators. Start creating podcasts to unlock usage analytics,
-            cost breakdowns, and generation statistics.
+            Analytics is available for podcast creators. Start creating podcasts to unlock
+            performance analytics, audience insights, and engagement data.
           </p>
           <Link href="/create" className={styles.upgradeLink}>
             Create a Podcast
@@ -42,7 +46,7 @@ export default async function AnalyticsPage() {
 
   return (
     <main className={styles.main}>
-      <AnalyticsClient />
+      <AnalyticsClient hasPodcasts={podcastCount > 0} />
     </main>
   );
 }

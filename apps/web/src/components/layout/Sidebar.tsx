@@ -21,6 +21,7 @@ interface SidebarProps {
   currentPath: string;
   isOpen?: boolean;
   onClose?: () => void;
+  hasPodcasts?: boolean;
   user?: {
     name?: string | null;
     image?: string | null;
@@ -35,15 +36,15 @@ interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
-function getNavItems(role: string): NavItem[] {
+function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
   const items: NavItem[] = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/feed', label: 'Discover', icon: Radio },
     { href: '/create', label: 'Create', icon: PlusCircle },
   ];
 
-  // Analytics - CREATOR and ADMIN
-  if (role === 'CREATOR' || role === 'ADMIN') {
+  // Analytics - users with podcasts or ADMIN
+  if (hasPodcasts || role === 'ADMIN') {
     items.push({ href: '/analytics', label: 'Analytics', icon: BarChart2 });
   }
 
@@ -59,11 +60,11 @@ function getNavItems(role: string): NavItem[] {
   return items;
 }
 
-export function Sidebar({ currentPath, isOpen = false, onClose, user }: SidebarProps) {
+export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = false, user }: SidebarProps) {
   const displayName = user?.name || user?.email || 'User';
   const initials = displayName.charAt(0).toUpperCase();
   const role = user?.role || 'USER';
-  const navItems = getNavItems(role);
+  const navItems = getNavItems(role, hasPodcasts);
 
   return (
     <div className={isOpen ? styles.sidebarOpen : undefined}>
