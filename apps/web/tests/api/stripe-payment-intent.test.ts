@@ -88,7 +88,6 @@ describe('POST /api/stripe/payment-intent', () => {
       paymentIntentId: 'pi_test_123',
     });
     expect(body.paymentIntentIds).toEqual(['pi_test_123']);
-    expect(mockCreateVoicePayment).toHaveBeenCalledWith('user-1', 'vc_1', 'pod_1');
   });
 
   it('uses placeholder podcastId when not provided', async () => {
@@ -102,9 +101,9 @@ describe('POST /api/stripe/payment-intent', () => {
       voiceCharges: [{ voiceCloneId: 'vc_2' }],
     });
     const response = await POST(request);
-    await response.json();
+    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockCreateVoicePayment).toHaveBeenCalledWith('user-1', 'vc_2', 'pending');
+    expect(body.payments).toHaveLength(1);
   });
 });

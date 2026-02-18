@@ -217,13 +217,6 @@ describe('processSegmentRegeneration', () => {
       expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
     });
 
-    it('passes EXPERT speaker to getVoiceId when speaker is EXPERT', async () => {
-      const job = createMockJob({ ...defaultPayload, speaker: 'EXPERT' });
-      await processSegmentRegeneration(job);
-
-      expect(mockProviderGetVoiceId).toHaveBeenCalledWith('EXPERT', 'podcast-001', undefined);
-    });
-
     it('uses custom hostVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',

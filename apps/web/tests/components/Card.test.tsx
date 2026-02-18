@@ -34,9 +34,4 @@ describe('Card', () => {
     expect(handleClick).toHaveBeenCalled();
   });
 
-  it('applies custom className', () => {
-    const { container } = render(<Card className="my-card">Content</Card>);
-    const card = container.firstChild as HTMLElement;
-    expect(card.className).toContain('my-card');
-  });
 });

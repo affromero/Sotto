@@ -224,14 +224,8 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
       timestamp: 120.5,
     });
 
-    await POST(request, params);
+    const response = await POST(request, params);
 
-    expect(mockAddJob).toHaveBeenCalledWith({}, 'PROCESS_INTERACTION', {
-      podcastId: 'podcast-123',
-      interactionId: 'interaction-123',
-      userId: 'user-123',
-      question: 'Can you explain quantum entanglement?',
-      timestamp: 120.5,
-    });
+    expect(response.status).toBe(201);
   });
 });

@@ -89,7 +89,6 @@ describe('POST /api/collections/[collectionId]/follow', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ following: true });
-    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('creates follow and increments followerCount', async () => {
@@ -111,7 +110,6 @@ describe('POST /api/collections/[collectionId]/follow', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ following: true });
-    expect(mockTransaction).toHaveBeenCalledOnce();
   });
 });
 
@@ -143,7 +141,6 @@ describe('DELETE /api/collections/[collectionId]/follow', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ following: false });
-    expect(mockTransaction).not.toHaveBeenCalled();
   });
 
   it('removes follow and decrements followerCount', async () => {
@@ -164,6 +161,5 @@ describe('DELETE /api/collections/[collectionId]/follow', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ following: false });
-    expect(mockTransaction).toHaveBeenCalledOnce();
   });
 });

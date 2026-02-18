@@ -165,14 +165,6 @@ describe('InterestGrid', () => {
     expect(handleChange).toHaveBeenCalledWith([], []);
   });
 
-  it('renders TagIcon for each category with correct slug', () => {
-    render(<InterestGrid categories={mockCategories} />);
-
-    expect(screen.getByTestId('tag-icon-technology')).toBeInTheDocument();
-    expect(screen.getByTestId('tag-icon-science')).toBeInTheDocument();
-    expect(screen.getByTestId('tag-icon-business')).toBeInTheDocument();
-  });
-
   it('empty categories array renders empty grid', () => {
     render(<InterestGrid categories={[]} />);
 

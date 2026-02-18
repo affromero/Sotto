@@ -145,6 +145,7 @@ describe('MiniPlayer', () => {
       duration: 180,
     });
     const { container } = render(<MiniPlayer />);
+    // Progress line has no accessible role — CSS class query is the only option
     const progressLine = container.querySelector('[class*="progressLine"]');
     expect(progressLine).toHaveStyle({ width: '50%' });
   });
@@ -156,6 +157,7 @@ describe('MiniPlayer', () => {
       duration: 0,
     });
     const { container } = render(<MiniPlayer />);
+    // Progress line has no accessible role — CSS class query is the only option
     const progressLine = container.querySelector('[class*="progressLine"]');
     expect(progressLine).toHaveStyle({ width: '0%' });
   });

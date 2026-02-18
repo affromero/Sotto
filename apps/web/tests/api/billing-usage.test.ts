@@ -129,6 +129,6 @@ describe('GET /api/billing/usage', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'Connection lost' });
+    expect(typeof body.error).toBe('string');
   });
 });

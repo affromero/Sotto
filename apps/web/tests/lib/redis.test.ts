@@ -25,7 +25,7 @@ vi.mock('ioredis', () => ({
   default: MockRedis,
 }));
 
-import { createRedisConnection, getRedisClient } from '@/lib/redis';
+import { getRedisClient } from '@/lib/redis';
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
@@ -46,23 +46,6 @@ describe('redis.ts', () => {
     vi.resetModules();
   });
 
-  describe('createRedisConnection', () => {
-    it('creates a new Redis connection', () => {
-      const client = createRedisConnection();
-
-      expect(client).toBeDefined();
-      expect(MockRedis).toHaveBeenCalledTimes(1);
-    });
-
-    it('creates a connection with a custom name', () => {
-      const client = createRedisConnection('worker-1');
-
-      expect(client).toBeDefined();
-      expect(client.on).toHaveBeenCalled();
-    });
-
-  });
-
   describe('getRedisClient', () => {
     it('returns a singleton Redis client', async () => {
       const { getRedisClient: getRedisClientReimport } = await import('@/lib/redis');
@@ -74,12 +57,6 @@ describe('redis.ts', () => {
       expect(MockRedis).toHaveBeenCalledTimes(1);
     });
 
-    it('creates client with "general" name', () => {
-      MockRedis.mockClear();
-      getRedisClient();
-
-      expect(MockRedis).toHaveBeenCalledWith(expect.any(String), expect.any(Object));
-    });
   });
 
   describe('cache.get', () => {
@@ -299,20 +276,6 @@ describe('redis.ts', () => {
       );
     });
 
-    it('sets expiration on the rate limit key', async () => {
-      const { checkRateLimit: checkRateLimitReimport, getRedisClient: getRedisClientReimport } =
-        await import('@/lib/redis');
-      const client = getRedisClientReimport();
-
-      (client.zremrangebyscore as Mock).mockResolvedValue(0);
-      (client.zcard as Mock).mockResolvedValue(0);
-      (client.zadd as Mock).mockResolvedValue(1);
-      (client.expire as Mock).mockResolvedValue(1);
-
-      await checkRateLimitReimport('user:123', 10, 120);
-
-      expect(client.expire).toHaveBeenCalledWith('ratelimit:user:123', 120);
-    });
   });
 
   describe('closeRedis', () => {

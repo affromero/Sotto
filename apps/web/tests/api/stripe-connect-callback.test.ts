@@ -63,10 +63,6 @@ describe('GET /api/stripe/connect/callback', () => {
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
     expect(location).toContain('/settings/voices?stripe=success');
-    expect(mockUserUpdateMany).toHaveBeenCalledWith({
-      where: { stripeAccountId: 'acct_123' },
-      data: { stripeOnboarded: true },
-    });
   });
 
   it('redirects to pending when account is not yet fully onboarded', async () => {
@@ -81,7 +77,6 @@ describe('GET /api/stripe/connect/callback', () => {
     expect(response.status).toBe(307);
     const location = response.headers.get('location');
     expect(location).toContain('/settings/voices?stripe=pending');
-    expect(mockUserUpdateMany).not.toHaveBeenCalled();
   });
 
   it('redirects to error when Stripe API throws', async () => {

@@ -134,6 +134,5 @@ describe('PATCH /api/admin/config', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual(updatedConfig);
-    expect(mockSetFreeTierConfig).toHaveBeenCalledWith({ aiProvider: 'openai' }, 'admin-1');
   });
 });

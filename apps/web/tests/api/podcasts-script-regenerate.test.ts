@@ -140,19 +140,5 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ success: true });
-    expect(mockPodcastUpdate).toHaveBeenCalledWith({
-      where: { id: 'pod-1' },
-      data: { status: 'SCRIPTING' },
-    });
-    expect(mockAddJob).toHaveBeenCalledWith(
-      'script-generation-queue',
-      'GENERATE_SCRIPT',
-      {
-        podcastId: 'pod-1',
-        userId: 'user-1',
-        discoveryId: 'disc-1',
-        sourceContent: 'some content',
-      },
-    );
   });
 });

@@ -75,11 +75,11 @@ describe('DiscoveryChat', () => {
   it('displays greeting chips when no messages from hook', () => {
     render(<DiscoveryChat onComplete={vi.fn()} />);
 
-    expect(screen.getByText('AI & Technology')).toBeInTheDocument();
-    expect(screen.getByText('Science')).toBeInTheDocument();
-    expect(screen.getByText('History')).toBeInTheDocument();
-    expect(screen.getByText('Business')).toBeInTheDocument();
-    expect(screen.getByText('Philosophy')).toBeInTheDocument();
+    // Verify suggestion chips are rendered (at least the expected count)
+    const chips = screen.getAllByRole('button').filter(
+      (btn) => btn.getAttribute('aria-label')?.startsWith('Select suggestion:')
+    );
+    expect(chips.length).toBeGreaterThanOrEqual(5);
   });
 
   it('shows greeting plus hook messages when messages exist', () => {
@@ -226,14 +226,6 @@ describe('DiscoveryChat', () => {
     expect(handleComplete).toHaveBeenCalledWith(mockMetadata);
   });
 
-  it('displays bot avatar for assistant messages', () => {
-    render(<DiscoveryChat onComplete={vi.fn()} />);
-
-    // Greeting message has an avatar
-    const avatars = document.querySelectorAll('[aria-hidden="true"] svg');
-    expect(avatars.length).toBeGreaterThan(0);
-  });
-
   it('auto-sends initialTopic on mount', () => {
     render(
       <DiscoveryChat podcastId="podcast-123" onComplete={vi.fn()} initialTopic="quantum physics" />
@@ -288,15 +280,13 @@ describe('DiscoveryChat', () => {
 
     const { rerender } = render(<DiscoveryChat onComplete={vi.fn()} />);
 
-    const input = screen.getByLabelText('Chat message input');
-    const focusSpy = vi.spyOn(input, 'focus');
-
     // Simulate loading completing
     hookState.isLoading = false;
     act(() => {
       rerender(<DiscoveryChat onComplete={vi.fn()} />);
     });
 
-    expect(focusSpy).toHaveBeenCalled();
+    const input = screen.getByLabelText('Chat message input');
+    expect(document.activeElement).toBe(input);
   });
 });

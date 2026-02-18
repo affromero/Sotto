@@ -101,6 +101,8 @@ vi.mock('date-fns', () => ({
   startOfDay: vi.fn((date: Date) => date),
 }));
 
+const realValidations = await vi.importActual<typeof import('@/lib/validations')>('@/lib/validations');
+
 import { GET as getConfig, PATCH as patchConfig } from '@/app/api/admin/twitter/config/route';
 import { POST as postThreadToPodcast } from '@/app/api/admin/twitter/thread-to-podcast/route';
 import { GET as getAutoTweet, POST as postAutoTweet } from '@/app/api/admin/twitter/auto-tweet/route';
@@ -170,12 +172,11 @@ describe('PATCH /api/admin/twitter/config', () => {
 
   it('returns 400 for invalid body', async () => {
     mockAdmin();
-    mockTwitterConfigUpdateSafeParse.mockReturnValue({
-      success: false,
-      error: { flatten: () => ({ fieldErrors: { enabled: ['Invalid'] } }) },
-    });
+    mockTwitterConfigUpdateSafeParse.mockImplementation(
+      (data: unknown) => realValidations.twitterConfigUpdateSchema.safeParse(data)
+    );
 
-    const request = createRequest('/api/admin/twitter/config', { bad: 'data' });
+    const request = createRequest('/api/admin/twitter/config', { minLikes: -999, bad: 'data' });
     const response = await patchConfig(request);
     expect(response.status).toBe(400);
   });
@@ -218,12 +219,11 @@ describe('POST /api/admin/twitter/thread-to-podcast', () => {
 
   it('returns 400 for invalid body', async () => {
     mockAdmin();
-    mockThreadToPodcastSafeParse.mockReturnValue({
-      success: false,
-      error: { flatten: () => ({ fieldErrors: {} }) },
-    });
+    mockThreadToPodcastSafeParse.mockImplementation(
+      (data: unknown) => realValidations.threadToPodcastSchema.safeParse(data)
+    );
 
-    const request = createRequest('/api/admin/twitter/thread-to-podcast', {});
+    const request = createRequest('/api/admin/twitter/thread-to-podcast', { tweetUrl: 'not-a-url' });
     const response = await postThreadToPodcast(request);
     expect(response.status).toBe(400);
   });
@@ -282,10 +282,9 @@ describe('POST /api/admin/twitter/auto-tweet', () => {
 
   it('returns 400 for invalid body', async () => {
     mockAdmin();
-    mockManualTweetSchemaSafeParse.mockReturnValue({
-      success: false,
-      error: { flatten: () => ({ fieldErrors: {} }) },
-    });
+    mockManualTweetSchemaSafeParse.mockImplementation(
+      (data: unknown) => realValidations.manualTweetSchema.safeParse(data)
+    );
 
     const request = createRequest('/api/admin/twitter/auto-tweet', {});
     const response = await postAutoTweet(request);
@@ -421,10 +420,9 @@ describe('POST /api/admin/twitter/trends', () => {
 
   it('returns 400 for invalid body', async () => {
     mockAdmin();
-    mockTrendGenerateSafeParse.mockReturnValue({
-      success: false,
-      error: { flatten: () => ({ fieldErrors: {} }) },
-    });
+    mockTrendGenerateSafeParse.mockImplementation(
+      (data: unknown) => realValidations.trendGenerateSchema.safeParse(data)
+    );
 
     const request = createRequest('/api/admin/twitter/trends', {});
     const response = await postTrends(request);

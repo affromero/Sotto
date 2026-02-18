@@ -21,17 +21,16 @@ describe('Button', () => {
   it('shows spinner element when loading', () => {
     render(<Button loading>Loading</Button>);
     const button = screen.getByRole('button');
-    // The spinner is a <span> child rendered only when loading is true
-    const spans = button.querySelectorAll('span');
-    expect(spans.length).toBeGreaterThanOrEqual(1);
+    // No accessible role/label on spinner — query by CSS class (component lacks aria-busy)
+    const spinner = button.querySelector('[class*="spinner"]');
+    expect(spinner).toBeInTheDocument();
   });
 
   it('does not show spinner when not loading', () => {
     render(<Button>Not Loading</Button>);
     const button = screen.getByRole('button');
-    // No extra span elements should be present when not loading
-    const spans = button.querySelectorAll('span');
-    expect(spans.length).toBe(0);
+    const spinner = button.querySelector('[class*="spinner"]');
+    expect(spinner).not.toBeInTheDocument();
   });
 
   it('is disabled when loading', () => {
