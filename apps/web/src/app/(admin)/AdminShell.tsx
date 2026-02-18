@@ -16,6 +16,7 @@ import {
   MessageSquareShare,
   Star,
   Sparkles,
+  DollarSign,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { href: '/admin', label: 'Overview', icon: LayoutDashboard },
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
+  { href: '/admin/costs', label: 'Costs', icon: DollarSign },
   { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/handles', label: 'Handles', icon: AtSign },
