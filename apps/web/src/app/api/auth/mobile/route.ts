@@ -217,7 +217,7 @@ async function handleOAuthLogin(body: unknown) {
 
   // Step 3: No Account, no User — create both (full mobile sign-up)
   const name = userName || profile.name || null;
-  const handle = await generateUniqueHandle(name);
+  const handle = await generateUniqueHandle(email.split('@')[0]);
 
   try {
     const newUser = await prisma.user.create({
