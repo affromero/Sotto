@@ -71,7 +71,9 @@ describe('GET /api/health', () => {
     expect(body.timestamp).toBeDefined();
     expect(body.checks).toBeUndefined();
     expect(body.env).toBeUndefined();
-    expect(body.oauth).toBeUndefined();
+    expect(body.version).toBeDefined();
+    expect(body.oauth).toBeDefined();
+    expect(body.vapid).toBeDefined();
   });
 
   it('returns minimal response for non-admin users', async () => {
@@ -83,6 +85,7 @@ describe('GET /api/health', () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe('healthy');
     expect(body.checks).toBeUndefined();
+    expect(body.oauth).toBeDefined();
   });
 
   it('returns 200 healthy when DB and Redis pass', async () => {
