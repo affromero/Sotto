@@ -20,6 +20,7 @@ const mockPrismaTweetMentionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTelegramMessageFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
+const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -36,6 +37,9 @@ vi.mock('@/lib/prisma', () => {
     },
     podcastVersion: {
       create: (...args: unknown[]) => mockPrismaPodcastVersionCreate(...args),
+    },
+    discovery: {
+      findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
     },
     tweetMention: {
       findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
@@ -785,6 +789,7 @@ describe('processAudioStitching', () => {
           status: 'READY',
           audioUrl: 'https://cdn.sotto.fm/final.mp3',
           duration: 306, // rounded
+          durationDeviation: 6, // 306 - 5*60 = 6
           fileSize: 1024 * 256,
           currentVersion: 0,
         },

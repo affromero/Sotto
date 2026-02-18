@@ -51,7 +51,7 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   quick_overview: 0.7,
 };
 
-import { WORDS_PER_MINUTE, wordCountBounds } from './duration';
+import { wordCountBounds } from './duration';
 
 /**
  * Verify a podcast script by extracting factual claims and evaluating sourcing.
