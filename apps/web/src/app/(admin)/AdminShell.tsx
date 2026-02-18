@@ -18,6 +18,7 @@ import {
   Sparkles,
   DollarSign,
   Wallet,
+  Heart,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -45,6 +46,7 @@ const navItems: NavItem[] = [
   { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
   { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
   { href: '/admin/costs', label: 'Costs', icon: DollarSign },
+  { href: '/admin/engagement', label: 'Engagement', icon: Heart },
   { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/admin/handles', label: 'Handles', icon: AtSign },
