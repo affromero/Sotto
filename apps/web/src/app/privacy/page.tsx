@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           <h3>Account Information</h3>
           <p>
             When you sign up, we collect your email address, name, and profile
-            information from your OAuth provider (Google, GitHub, Twitter, or Apple).
+            information from your OAuth provider (Google, GitHub, or Apple).
           </p>
 
           <h3>Content You Create</h3>
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
             <li><strong>AI Providers</strong> (Anthropic, OpenAI) — podcast script generation, Q&amp;A</li>
             <li><strong>TTS Providers</strong> (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) — audio generation</li>
             <li><strong>Cloudflare R2</strong> — audio and PDF file storage</li>
-            <li><strong>OAuth Providers</strong> (Google, GitHub, Twitter, Apple) — authentication</li>
+            <li><strong>OAuth Providers</strong> (Google, GitHub, Apple) — authentication and account linking (Twitter)</li>
           </ul>
           <p>
             Each third-party service has its own privacy policy. Your BYOK keys are
