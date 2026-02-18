@@ -254,8 +254,9 @@ export async function resolveTtsProvider(context: {
   userId: string;
   podcastId: string;
   requestedProvider?: TtsProviderId | 'auto' | null;
+  requestedModel?: string | null;
 }): Promise<ResolvedProvider> {
-  const { userId, requestedProvider } = context;
+  const { userId, requestedProvider, requestedModel } = context;
 
   // Case 1+2: Specific provider requested
   if (requestedProvider && requestedProvider !== 'auto') {
@@ -265,16 +266,17 @@ export async function resolveTtsProvider(context: {
       const provider = await createTtsProviderAsync(
         requestedProvider,
         byokKey,
-        extraData ?? undefined
+        extraData ?? undefined,
+        requestedModel ?? undefined
       );
       return { provider, source: 'byok', providerId: requestedProvider };
     }
 
     // Platform fallback for elevenlabs/openai (we have platform keys)
-    // Use admin-configured model when falling back to platform keys
+    // Prefer user's requested model, fall back to admin-configured model
     if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
       const config = await getFreeTierConfig();
-      const model = config.ttsProvider === 'elevenlabs' ? config.ttsModel : undefined;
+      const model = requestedModel ?? (config.ttsProvider === 'elevenlabs' ? config.ttsModel : undefined);
       return {
         provider: createPremiumTtsProvider(undefined, model),
         source: 'platform',
@@ -283,7 +285,7 @@ export async function resolveTtsProvider(context: {
     }
     if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
       const config = await getFreeTierConfig();
-      const model = config.ttsProvider === 'openai' ? config.ttsModel : undefined;
+      const model = requestedModel ?? (config.ttsProvider === 'openai' ? config.ttsModel : undefined);
       return {
         provider: createTtsProvider('openai', undefined, model),
         source: 'platform',
