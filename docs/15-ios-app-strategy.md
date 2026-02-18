@@ -6,7 +6,7 @@
 
 Sotto's iOS strategy prioritizes speed-to-market with a PWA foundation, then progressively enhances the experience with native features critical for podcast listening: background audio, push notifications, and offline playback.
 
-**Timeline**: Phase 1 (complete), Phase 2 (Months 2-3), Phase 3 (Month 4+)
+**Timeline**: Phase 1 (complete), Phase 2 (complete — shipped), Phase 3 (planned)
 
 **Recommendation**: React Native + Expo over Flutter or SwiftUI for maximum code sharing with web experience and faster iteration cycles.
 
@@ -86,7 +86,7 @@ The existing web app is already PWA-ready:
 
 ---
 
-## Phase 2: React Native + Expo (Months 2-3)
+## Phase 2: React Native + Expo (Shipped)
 
 ### Why React Native + Expo?
 
@@ -167,7 +167,7 @@ The existing web app is already PWA-ready:
 
 ### Screen Breakdown
 
-#### 1. Feed Screen (`app/(tabs)/feed.tsx`)
+#### 1. Feed Screen (`app/(tabs)/index.tsx`)
 
 **UI Components**:
 
@@ -263,7 +263,7 @@ useEffect(() => {
 5. Show answer in chat bubble
 6. "Was this helpful?" → "Update podcast with this?"
 
-#### 3. Create Screen (`app/create/index.tsx`)
+#### 3. Create Screen (`app/(tabs)/create.tsx`)
 
 **UI Components**:
 
@@ -306,7 +306,7 @@ eventSource.addEventListener('message', (event) => {
 - `expo-av` audio recording
 - Send audio file to `/api/discovery` (backend handles transcription via Claude)
 
-#### 4. Profile Screen (`app/profile/[userId].tsx`)
+#### 4. Profile Screen (`app/(tabs)/profile.tsx`)
 
 **UI Components**:
 
@@ -325,17 +325,21 @@ eventSource.addEventListener('message', (event) => {
 
 ```
 app/
-├── (auth)/
-│   ├── login.tsx
-│   └── signup.tsx
+├── _layout.tsx              # Root layout
+├── auth/
+│   └── login.tsx            # Login screen
 ├── (tabs)/
 │   ├── _layout.tsx          # Tab navigator
-│   ├── feed.tsx             # Home feed
+│   ├── index.tsx            # Home feed
 │   ├── create.tsx           # Create podcast
 │   ├── notifications.tsx    # Notification list
 │   └── profile.tsx          # Own profile
 ├── podcast/
 │   └── [id].tsx             # Player screen (full screen, not in tabs)
+├── ideas.tsx                # Ideas / Inspire Me
+├── settings.tsx             # App settings
+├── settings/
+│   └── api-keys.tsx         # BYOK API key management
 └── user/
     └── [userId].tsx         # Public profile
 ```
@@ -587,62 +591,13 @@ eas submit --platform ios
 - Month 3: Public TestFlight (100+ users)
 - Month 3 end: App Store v1.0 release
 
-### Monetization: In-App Purchase vs Web Billing
+### Monetization
 
-**Apple's 30% Cut**:
-
-- In-app subscriptions via Apple: Apple takes 30% (15% after year 1)
-- Web subscriptions: Apple takes 0%
-
-**Legal Options**:
-
-| Approach                | Legality                                | Implementation                                       |
-| ----------------------- | --------------------------------------- | ---------------------------------------------------- |
-| **Link to web billing** | Allowed since 2022 (after Epic lawsuit) | Show link "Manage subscription at sotto.app/billing" |
-| **In-app purchases**    | Always allowed                          | Use `expo-in-app-purchases` or `react-native-iap`    |
-| **Hybrid**              | Recommended                             | Allow both, default to web for existing users        |
-
-**Recommended Strategy**:
-
-1. New iOS users see "Subscribe" button → opens in-app browser to `sotto.app/pricing`
-2. Stripe Checkout in WebView → subscription managed on web
-3. App checks subscription status via existing `/api/billing` endpoint
-4. Apple gets 0%, Stripe takes 2.9% + 30¢
-
-**Alternative**: Implement IAP for iOS-only users, sync with backend:
-
-```typescript
-// lib/iap.native.ts
-import * as InAppPurchases from 'expo-in-app-purchases';
-
-export async function purchaseProPlan() {
-  await InAppPurchases.connectAsync();
-
-  const products = await InAppPurchases.getProductsAsync(['sotto_pro_monthly']);
-  const purchase = await InAppPurchases.purchaseItemAsync('sotto_pro_monthly');
-
-  // Validate receipt with Apple
-  const receipt = purchase.transactionReceipt;
-
-  // Send to backend for validation + subscription creation
-  await axios.post('https://sotto.app/api/billing/apple-iap', {
-    receipt,
-    productId: 'sotto_pro_monthly',
-  });
-}
-```
-
-**Backend Changes Required**:
-
-- Add `/api/billing/apple-iap` route
-- Validate Apple receipts via `app-store-server-api`
-- Create subscription in Prisma with `provider: 'APPLE'`
-
-**Decision**: Start with web billing (0% to Apple), add IAP in Phase 3 if conversion is low.
+Sotto uses BYOK (Bring Your Own Key) — all features are free. No subscriptions or IAP. Voice marketplace payments are handled via Stripe Connect (web-based), bypassing Apple's 30% cut. The app manages BYOK API keys via the `settings/api-keys.tsx` screen.
 
 ---
 
-## Phase 3: Native Enhancements (Month 4+)
+## Phase 3: Native Enhancements (Planned)
 
 ### 1. Offline Download Management
 
@@ -767,115 +722,6 @@ INVoiceShortcutCenter.shared.setShortcutSuggestions([
 **Development Effort**: 3-5 days
 
 ---
-
-## Development Timeline
-
-### Month 2: Core App Development
-
-**Week 1-2: Foundation**
-
-- Set up Expo project
-- Configure expo-router navigation
-- Implement authentication (login, signup, token storage)
-- Build shared API client
-- Design system setup (colors, fonts, spacing)
-
-**Week 3-4: Core Screens**
-
-- Feed screen (grid, filters, search)
-- Player screen (audio, transcript, controls)
-- Create screen (chat UI, streaming responses)
-- Profile screen
-
-**Week 5-6: Background Features**
-
-- react-native-track-player integration
-- Background audio playback
-- Lock screen controls
-- Push notification setup
-
-**Week 7-8: Polish**
-
-- Animations (page transitions, loading states)
-- Error handling
-- Offline support (AsyncStorage caching)
-- TestFlight internal beta
-
-**Deliverable**: Internal beta on TestFlight (10-20 users)
-
-### Month 3: Public Beta & Launch
-
-**Week 9-10: Public Beta**
-
-- Expand TestFlight to 100+ users
-- Collect feedback
-- Fix critical bugs
-- Performance optimization
-
-**Week 11-12: App Store Submission**
-
-- Prepare marketing materials (screenshots, preview video)
-- Write app description
-- Submit for review
-- Address App Review feedback
-
-**Week 13-14: Launch**
-
-- App Store release (v1.0.0)
-- Marketing push (Product Hunt, social media)
-- Monitor crash reports (Sentry)
-- Gather user reviews
-
-**Deliverable**: Sotto iOS app live on App Store
-
-### Month 4+: Phase 3 Enhancements
-
-**Week 15-16**: Offline download management
-**Week 17-18**: Apple Watch companion
-**Week 19-20**: CarPlay integration
-**Week 21**: Siri Shortcuts
-**Week 22**: Home screen widget
-**Week 23**: Live Activities
-
----
-
-## Team Structure
-
-### Recommended Team
-
-**For Phase 2 (Months 2-3)**:
-
-- 1x React Native Developer (senior, full-time)
-- 1x Backend Developer (existing team, 25% time for mobile API support)
-- 1x Designer (part-time, mobile UI/UX)
-- 1x QA Tester (part-time, TestFlight testing)
-
-**For Phase 3 (Month 4+)**:
-
-- 1x iOS Native Developer (contract, for WatchOS/CarPlay/Widgets)
-- Same React Native developer (maintenance + new features)
-
-**External**:
-
-- App Store asset designer (screenshots, preview video): 1-2 days
-- Legal review (privacy policy, terms): 1-2 days
-
-### Skills Required
-
-**React Native Developer Must Have**:
-
-- 2+ years React Native experience
-- Expo experience (managed workflow)
-- Background audio implementation (track-player or similar)
-- App Store submission experience
-- TypeScript proficiency
-
-**Nice to Have**:
-
-- Podcast app development experience
-- WebSocket/SSE streaming experience
-- Animation libraries (Reanimated, Lottie)
-- Native module development (bridging)
 
 ---
 
@@ -1342,21 +1188,15 @@ Data Not Linked to You:
 
 ## Summary
 
-**Phase 1 (Now)**: PWA works on iOS Safari, limited by browser capabilities.
+**Phase 1 (Complete)**: PWA works on iOS Safari, limited by browser capabilities.
 
-**Phase 2 (Months 2-3)**: React Native + Expo app with background audio, push notifications, native UI. Launch on App Store.
+**Phase 2 (Shipped)**: React Native + Expo iOS app with background audio, push notifications, native UI, BYOK key management. Available on TestFlight.
 
-**Phase 3 (Month 4+)**: Apple Watch, CarPlay, Siri Shortcuts, offline downloads, widgets.
+**Phase 3 (Planned)**: Apple Watch, CarPlay, Siri Shortcuts, offline downloads, widgets.
 
 **Key Decisions**:
 
 - React Native + Expo (not Flutter or native)
-- Web billing (not IAP) to avoid 30% Apple fee
+- BYOK model — no IAP needed
 - Same API backend (no rewrites)
 - Managed workflow (not bare) for faster iteration
-
-**Timeline**: MVP on App Store in 3 months, full feature set in 6 months.
-
-**Team**: 1 senior React Native dev, 1 backend dev (part-time), 1 designer (part-time).
-
-**Cost**: $99/year (Apple Developer), $299/month (EAS Build), $0 (Expo SDK is free).

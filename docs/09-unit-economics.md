@@ -37,11 +37,10 @@ Two-tenths of a cent. At 1,000 podcasts/day, variable cost is $2/day ($60/month)
 
 | Provider | Cost per Podcast | Quality | Free Tier |
 |---|---|---|---|
-| Google Cloud TTS (WaveNet) | $0.24 | Good | 1M chars/mo (~66 podcasts FREE) |
-| Amazon Polly (Neural) | $0.24 | Good | 1M chars/mo for 12 months |
-| Azure Speech (Neural) | $0.24 | Good | 5M chars/mo (~333 podcasts FREE) |
 | OpenAI TTS-1 | $0.23 | Good | None |
 | OpenAI TTS-1-HD | $0.45 | Better | None |
+| PlayHT | $0.30 | Good | Limited |
+| Hume | $0.40 | Good | Limited |
 | Cartesia Sonic | $0.75 | Good | Limited |
 | ElevenLabs (Scale) | $2.55 | Best | 10K chars/mo |
 
@@ -49,12 +48,27 @@ Two-tenths of a cent. At 1,000 podcasts/day, variable cost is $2/day ($60/month)
 
 | Scenario | LLM | TTS | User Total |
 |---|---|---|---|
-| Budget (Gemini Flash + Google WaveNet free tier) | $0.004 | $0.00 | **$0.004** |
+| Budget (GPT-4o-mini + OpenAI TTS-1) | $0.005 | $0.23 | **$0.24** |
 | Balanced (Claude Haiku + OpenAI TTS-1) | $0.076 | $0.23 | **$0.31** |
 | Premium (Claude Sonnet + ElevenLabs) | $0.108 | $2.55 | **$2.66** |
 | One-key (OpenAI GPT-4o-mini + OpenAI TTS-1-HD) | $0.005 | $0.45 | **$0.46** |
 
 **Lowest friction path**: One OpenAI API key covers both LLM and TTS. ~$0.46/podcast.
+
+---
+
+## Voice Marketplace Economics
+
+Voice owners connect Stripe and set a per-podcast price (or keep voices free). Buyers pay once per podcast.
+
+| Parameter | Value |
+|---|---|
+| Platform fee | 10% via Stripe Connect `application_fee_amount` |
+| Payment flow | Authorize upfront → capture on READY → cancel on FAILED |
+| Free access paths | Owner, allowlisted user, approved VoiceRequest, existing purchase |
+| Payout | Direct to voice owner's Stripe Connect account (minus 10% platform fee) |
+
+Voice marketplace is the only revenue stream. All other features (generation, Q&A, discovery, collections, etc.) are free with BYOK keys.
 
 ---
 
