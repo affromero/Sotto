@@ -6,6 +6,8 @@
  * voice pool in voice-pool.ts, ensuring consistent voice selection.
  */
 
+import { scoreToneMatch, type VoiceMatchMetadata } from '../voice-pool';
+
 export interface ProviderVoice {
   id: string;
   name: string;
@@ -163,29 +165,63 @@ export const HUME_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Provider voice scoring (tone-character only, no ageRange/accent)
+// ---------------------------------------------------------------------------
+
+function scoreProviderVoice(voice: ProviderVoice, metadata: VoiceMatchMetadata): number {
+  if (!metadata.tone) return 0;
+  return scoreToneMatch(voice.character, metadata.tone);
+}
+
+// ---------------------------------------------------------------------------
 // Generic voice pair selection (works with any provider voice pool)
 // ---------------------------------------------------------------------------
 
+function hashString(s: string): number {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) - hash + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+}
+
 /**
  * Select a diverse voice pair from a provider-specific voice pool.
- * Uses the same deterministic hash algorithm as voice-pool.ts.
+ * When metadata is provided, voices are scored by tone-character match
+ * and filtered to a preferred tier before hash-selecting.
  */
 export function selectVoicePairFromPool(
   pool: ProviderVoice[],
-  podcastId: string
+  podcastId: string,
+  metadata?: VoiceMatchMetadata
 ): { host: ProviderVoice; expert: ProviderVoice } {
-  let hash = 0;
-  for (let i = 0; i < podcastId.length; i++) {
-    hash = ((hash << 5) - hash + podcastId.charCodeAt(i)) | 0;
+  const index = hashString(podcastId);
+
+  const hasMetadata = metadata && metadata.tone;
+
+  if (!hasMetadata) {
+    const hostIndex = index % pool.length;
+    const host = pool[hostIndex];
+    const candidates = pool.filter((v) => v.id !== host.id);
+    const contrastCandidates = candidates.filter((v) => v.gender !== host.gender);
+    const expertPool = contrastCandidates.length > 0 ? contrastCandidates : candidates;
+    const expertIndex = (index >>> 8) % expertPool.length;
+    const expert = expertPool[expertIndex];
+    return { host, expert };
   }
-  const index = Math.abs(hash);
 
-  const hostIndex = index % pool.length;
-  const host = pool[hostIndex];
+  const scored = pool.map((v) => ({ voice: v, score: scoreProviderVoice(v, metadata!) }));
+  const maxScore = Math.max(...scored.map((s) => s.score));
+  const tier = scored.filter((s) => s.score >= maxScore - 3).map((s) => s.voice);
 
-  const candidates = pool.filter((v) => v.id !== host.id);
-  const contrastCandidates = candidates.filter((v) => v.gender !== host.gender);
-  const expertPool = contrastCandidates.length > 0 ? contrastCandidates : candidates;
+  const hostIndex = index % tier.length;
+  const host = tier[hostIndex];
+
+  const expertCandidates = tier.filter((v) => v.id !== host.id && v.gender !== host.gender);
+  const expertPool =
+    expertCandidates.length > 0
+      ? expertCandidates
+      : pool.filter((v) => v.id !== host.id && v.gender !== host.gender);
   const expertIndex = (index >>> 8) % expertPool.length;
   const expert = expertPool[expertIndex];
 

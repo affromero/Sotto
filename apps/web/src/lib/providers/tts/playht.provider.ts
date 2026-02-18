@@ -5,6 +5,7 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { PLAYHT_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+import type { VoiceMatchMetadata } from '../../voice-pool';
 
 export class PlayHTProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'playht';
@@ -46,11 +47,11 @@ export class PlayHTProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
     if (!podcastId) {
       return speaker === 'HOST' ? PLAYHT_VOICE_POOL[0].id : PLAYHT_VOICE_POOL[1].id;
     }
-    const pair = selectVoicePairFromPool(PLAYHT_VOICE_POOL, podcastId);
+    const pair = selectVoicePairFromPool(PLAYHT_VOICE_POOL, podcastId, metadata);
     return speaker === 'HOST' ? pair.host.id : pair.expert.id;
   }
 
