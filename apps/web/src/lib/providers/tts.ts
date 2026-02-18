@@ -64,6 +64,16 @@ async function importHume() {
   return HumeProvider;
 }
 
+async function importFal() {
+  const { FalProvider } = await import('./tts/fal.provider');
+  return FalProvider;
+}
+
+async function importReplicate() {
+  const { ReplicateProvider } = await import('./tts/replicate.provider');
+  return ReplicateProvider;
+}
+
 // ---------------------------------------------------------------------------
 // Fallback TTS provider — tries primary, then falls back on failure
 // ---------------------------------------------------------------------------
@@ -184,6 +194,16 @@ export async function createTtsProviderAsync(
     case 'hume': {
       if (!apiKey) throw new Error('Hume AI requires an API key');
       const Cls = await importHume();
+      return new Cls(apiKey, model);
+    }
+    case 'fal': {
+      if (!apiKey) throw new Error('Fal requires an API key');
+      const Cls = await importFal();
+      return new Cls(apiKey, model);
+    }
+    case 'replicate': {
+      if (!apiKey) throw new Error('Replicate requires an API key');
+      const Cls = await importReplicate();
       return new Cls(apiKey, model);
     }
     default:
