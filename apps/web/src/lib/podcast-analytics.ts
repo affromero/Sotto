@@ -89,7 +89,7 @@ export async function getPodcastRetentionCurve(podcastId: string): Promise<Reten
 
   if (!feature?.abandonmentCurve) return null;
 
-  return feature.abandonmentCurve as RetentionBucket[];
+  return feature.abandonmentCurve as unknown as RetentionBucket[];
 }
 
 export interface PodcastEngagementData {
@@ -182,6 +182,6 @@ export async function getPodcastTrafficSources(podcastId: string): Promise<Traff
 
   if (!feature?.completionBySource) return null;
 
-  const sources = feature.completionBySource as Record<string, number>;
+  const sources = feature.completionBySource as unknown as Record<string, number>;
   return Object.entries(sources).map(([source, percentage]) => ({ source, percentage }));
 }
