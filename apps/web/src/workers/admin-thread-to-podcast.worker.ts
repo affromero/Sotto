@@ -12,7 +12,7 @@ const TWEET_URL_REGEX = /(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/;
 export async function processAdminThreadToPodcast(
   job: Job<AdminThreadToPodcastPayload>
 ): Promise<void> {
-  const { tweetUrl } = job.data;
+  const { tweetUrl, message } = job.data;
 
   // 1. Parse tweet URL to extract tweet ID
   const match = tweetUrl.match(TWEET_URL_REGEX);
@@ -37,9 +37,11 @@ export async function processAdminThreadToPodcast(
 
   await job.updateProgress(40);
 
-  // 4. Parse intent from thread or single tweet
+  // 4. Parse intent from admin message (if provided) or tweet/thread text
   let parsed;
-  if (threadData && threadData.replies.length >= 2) {
+  if (message) {
+    parsed = await parseTweetIntent(message);
+  } else if (threadData && threadData.replies.length >= 2) {
     const mentionAsThreadTweet = {
       id: tweet.id,
       text: tweet.text,

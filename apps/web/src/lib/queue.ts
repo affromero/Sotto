@@ -181,6 +181,7 @@ export interface PollTwitterTrendsPayload {}
 export interface AdminThreadToPodcastPayload {
   tweetUrl: string;
   adminUserId: string;
+  message?: string;
 }
 
 export interface ModerateContentPayload {
