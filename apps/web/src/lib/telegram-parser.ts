@@ -1,5 +1,6 @@
 import { generateResponse } from './claude';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { TelegramParseResult } from '@/types/telegram';
 
@@ -43,6 +44,14 @@ export async function parseTelegramIntent(
     [{ role: 'user', content: `Message: "${messageText}"` }],
     { maxTokens: 512, apiKeyOverride }
   );
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'telegram_parse',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+  });
 
   logger.info('Telegram intent parsed', {
     inputTokens: String(response.inputTokens),

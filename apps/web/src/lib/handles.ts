@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { generateResponse } from './claude';
 import { cache } from './redis';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/;
@@ -88,7 +89,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
     const cached = await cache.get<HandleCheckResult>(cacheKey);
     if (cached !== null) return cached;
 
-    const { content } = await generateResponse(
+    const handleResponse = await generateResponse(
       'Classify the word into exactly one category. Answer with a single word: NAME, OFFENSIVE, or OK. Nothing else.',
       [
         {
@@ -98,6 +99,16 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
       ],
       { maxTokens: 3, model: 'claude-haiku-4-5-20251001', apiKeyOverride, skipModeration: true }
     );
+
+    logUsage({
+      service: 'anthropic',
+      model: handleResponse.model,
+      category: 'handle_screening',
+      inputTokens: handleResponse.inputTokens,
+      outputTokens: handleResponse.outputTokens,
+    });
+
+    const { content } = handleResponse;
 
     const answer = content.trim().toUpperCase();
     const result: HandleCheckResult = answer.startsWith('NAME')

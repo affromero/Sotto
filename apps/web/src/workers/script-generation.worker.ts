@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, type SourceMetadata } from '@/lib/script-generator';
-import { logApiUsage } from '@/lib/claude';
+import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
@@ -221,12 +221,14 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   });
 
   // Log API usage
-  await logApiUsage({
-    podcastId,
-    userId,
+  await logUsage({
+    service: resolvedAiProvider === 'openai' ? 'openai' : 'anthropic',
+    model: model ?? result.model,
     category: 'script_generation',
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
+    podcastId,
+    userId,
   });
 
   await job.updateProgress(100);

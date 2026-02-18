@@ -1,4 +1,5 @@
 import { generateResponse } from './claude';
+import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { TranscriptionResult } from './providers/stt';
 
@@ -208,6 +209,15 @@ Rules:
   const response = await generateResponse(systemPrompt, [{ role: 'user', content: userPrompt }], {
     maxTokens: 4096,
     apiKeyOverride,
+  });
+
+  logUsage({
+    service: 'anthropic',
+    model: response.model,
+    category: 'diarization',
+    inputTokens: response.inputTokens,
+    outputTokens: response.outputTokens,
+    metadata: { segmentCount: segments.length },
   });
 
   const jsonMatch = response.content.match(/\[[\s\S]*\]/);
