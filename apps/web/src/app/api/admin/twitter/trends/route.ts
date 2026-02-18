@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { searchPopularTweets } from '@/lib/twitter';
 import { parseTweetIntent } from '@/lib/tweet-parser';
@@ -8,17 +8,6 @@ import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTwitterConfig } from '@/lib/twitter-config';
 import { trendGenerateSchema } from '@/lib/validations';
 import type { TwitterTweet, TrendTopic } from '@/types/twitter';
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-  if (user?.role !== 'ADMIN') return null;
-  return session.user.id;
-}
 
 function engagementScore(tweet: TwitterTweet): number {
   const m = tweet.public_metrics;
