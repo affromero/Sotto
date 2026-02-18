@@ -17,6 +17,10 @@ export async function GET(): Promise<NextResponse> {
       twitterEnabled: true,
       preferredHostVoiceId: true,
       preferredExpertVoiceId: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      preferredAiProvider: true,
+      preferredAiModel: true,
     },
   });
 
@@ -30,6 +34,10 @@ export async function GET(): Promise<NextResponse> {
     twitterEnabled: user.twitterEnabled,
     preferredHostVoiceId: user.preferredHostVoiceId,
     preferredExpertVoiceId: user.preferredExpertVoiceId,
+    preferredTtsProvider: user.preferredTtsProvider,
+    preferredTtsModel: user.preferredTtsModel,
+    preferredAiProvider: user.preferredAiProvider,
+    preferredAiModel: user.preferredAiModel,
   };
 
   return NextResponse.json({
@@ -53,7 +61,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { twitterEnabled, preferredHostVoiceId, preferredExpertVoiceId } = parsed.data;
+  const {
+    twitterEnabled, preferredHostVoiceId, preferredExpertVoiceId,
+    preferredTtsProvider, preferredTtsModel, preferredAiProvider, preferredAiModel,
+  } = parsed.data;
 
   const updateData: Record<string, unknown> = {};
   if (twitterEnabled !== undefined) {
@@ -65,6 +76,18 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   if (preferredExpertVoiceId !== undefined) {
     updateData.preferredExpertVoiceId = preferredExpertVoiceId;
   }
+  if (preferredTtsProvider !== undefined) {
+    updateData.preferredTtsProvider = preferredTtsProvider;
+  }
+  if (preferredTtsModel !== undefined) {
+    updateData.preferredTtsModel = preferredTtsModel;
+  }
+  if (preferredAiProvider !== undefined) {
+    updateData.preferredAiProvider = preferredAiProvider;
+  }
+  if (preferredAiModel !== undefined) {
+    updateData.preferredAiModel = preferredAiModel;
+  }
 
   const user = await prisma.user.update({
     where: { id: session.user.id },
@@ -74,6 +97,10 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
       twitterEnabled: true,
       preferredHostVoiceId: true,
       preferredExpertVoiceId: true,
+      preferredTtsProvider: true,
+      preferredTtsModel: true,
+      preferredAiProvider: true,
+      preferredAiModel: true,
     },
   });
 

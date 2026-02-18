@@ -162,6 +162,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
@@ -199,6 +203,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
@@ -235,6 +243,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       const mockParseResult: TweetParseResult = {
@@ -270,6 +282,9 @@ describe('processTwitterMentions', () => {
           sourceTweetId: tweet.id,
           hostVoiceId: 'voice-host-1',
           expertVoiceId: 'voice-expert-1',
+          ttsProvider: undefined,
+          ttsModel: undefined,
+          aiModel: undefined,
           visibility: 'PUBLIC',
           discovery: {
             create: {
@@ -301,6 +316,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: false,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
@@ -329,6 +348,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
@@ -415,6 +438,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockGetTweet.mockResolvedValue(parentTweet);
@@ -453,6 +480,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: 'user-host-voice',
         preferredExpertVoiceId: 'user-expert-voice',
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
@@ -494,6 +525,10 @@ describe('processTwitterMentions', () => {
         twitterEnabled: true,
         preferredHostVoiceId: null,
         preferredExpertVoiceId: null,
+        preferredTtsProvider: null,
+        preferredTtsModel: null,
+        preferredAiProvider: null,
+        preferredAiModel: null,
       });
       mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
       mockSelectVoicePair.mockReturnValue({

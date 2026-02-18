@@ -41,6 +41,10 @@ model User {
   preferredHostVoiceId   String?
   preferredExpertVoiceId String?
   preferredLanguage      String?
+  preferredTtsProvider   String?
+  preferredTtsModel      String?
+  preferredAiProvider    String?
+  preferredAiModel       String?
 
   // Telegram integration
   telegramEnabled Boolean @default(false)

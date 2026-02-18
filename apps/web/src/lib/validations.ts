@@ -161,6 +161,10 @@ export const twitterSettingsSchema = z.object({
   twitterEnabled: z.boolean().optional(),
   preferredHostVoiceId: z.string().nullable().optional(),
   preferredExpertVoiceId: z.string().nullable().optional(),
+  preferredTtsProvider: z.string().nullable().optional(),
+  preferredTtsModel: z.string().nullable().optional(),
+  preferredAiProvider: z.string().nullable().optional(),
+  preferredAiModel: z.string().nullable().optional(),
 });
 
 /**
