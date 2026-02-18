@@ -12,6 +12,9 @@ declare module 'next-auth' {
       role: UserRole;
       bannedAt?: string | null;
       suspendedUntil?: string | null;
+      isImpersonating?: boolean;
+      impersonatedRole?: UserRole;
+      originalUser?: { id: string; name: string | null; image: string | null };
     };
   }
 
@@ -25,5 +28,20 @@ declare module 'next-auth/jwt' {
     role?: UserRole;
     bannedAt?: string | null;
     suspendedUntil?: string | null;
+    impersonateUserId?: string;
+    impersonateName?: string | null;
+    impersonateEmail?: string | null;
+    impersonateImage?: string | null;
+    impersonateRole?: UserRole;
+    originalUserId?: string;
+    originalUserName?: string | null;
+    originalUserImage?: string | null;
+  }
+}
+
+declare module 'next-auth/react' {
+  interface UpdateSession {
+    impersonateUserId?: string;
+    stopImpersonating?: boolean;
   }
 }

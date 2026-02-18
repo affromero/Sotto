@@ -10,6 +10,14 @@ vi.mock('next-auth/react', () => ({
   signOut: vi.fn(),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    refresh: vi.fn(),
+    push: vi.fn(),
+    replace: vi.fn(),
+  }),
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -102,7 +110,7 @@ describe('useAuth', () => {
 
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.user).toEqual({
+      expect(result.current.user).toMatchObject({
         id: 'user-123',
         name: 'John Doe',
         email: 'john@example.com',
@@ -221,6 +229,114 @@ describe('useAuth', () => {
 
   });
 
+  describe('impersonation', () => {
+    it('exposes impersonate and stopImpersonating methods', () => {
+      vi.mocked(nextAuthReact.useSession).mockReturnValue({
+        data: {
+          user: {
+            id: 'admin-1',
+            name: 'Admin',
+            email: 'admin@example.com',
+            image: null,
+            role: 'ADMIN' as UserRole,
+          },
+          expires: '2025-01-01',
+        },
+        status: 'authenticated',
+        update: vi.fn(),
+      });
+
+      const { result } = renderHook(() => useAuth());
+
+      expect(typeof result.current.impersonate).toBe('function');
+      expect(typeof result.current.stopImpersonating).toBe('function');
+    });
+
+    it('calls session update with impersonateUserId', async () => {
+      const mockUpdate = vi.fn().mockResolvedValue({});
+      vi.mocked(nextAuthReact.useSession).mockReturnValue({
+        data: {
+          user: {
+            id: 'admin-1',
+            name: 'Admin',
+            email: 'admin@example.com',
+            image: null,
+            role: 'ADMIN' as UserRole,
+          },
+          expires: '2025-01-01',
+        },
+        status: 'authenticated',
+        update: mockUpdate,
+      });
+
+      const { result } = renderHook(() => useAuth());
+
+      await act(async () => {
+        await result.current.impersonate('sotto-id');
+      });
+
+      expect(mockUpdate).toHaveBeenCalledWith({ impersonateUserId: 'sotto-id' });
+    });
+
+    it('calls session update with stopImpersonating', async () => {
+      const mockUpdate = vi.fn().mockResolvedValue({});
+      vi.mocked(nextAuthReact.useSession).mockReturnValue({
+        data: {
+          user: {
+            id: 'sotto-id',
+            name: 'Sotto',
+            email: 'sotto@sotto.fm',
+            image: null,
+            role: 'ADMIN' as UserRole,
+            isImpersonating: true,
+            originalUser: { id: 'admin-1', name: 'Admin', image: null },
+          },
+          expires: '2025-01-01',
+        },
+        status: 'authenticated',
+        update: mockUpdate,
+      });
+
+      const { result } = renderHook(() => useAuth());
+
+      await act(async () => {
+        await result.current.stopImpersonating();
+      });
+
+      expect(mockUpdate).toHaveBeenCalledWith({ stopImpersonating: true });
+    });
+
+    it('includes impersonation fields in user object', () => {
+      vi.mocked(nextAuthReact.useSession).mockReturnValue({
+        data: {
+          user: {
+            id: 'sotto-id',
+            name: 'Sotto',
+            email: 'sotto@sotto.fm',
+            image: null,
+            role: 'ADMIN' as UserRole,
+            isImpersonating: true,
+            impersonatedRole: 'USER' as UserRole,
+            originalUser: { id: 'admin-1', name: 'Admin', image: null },
+          },
+          expires: '2025-01-01',
+        },
+        status: 'authenticated',
+        update: vi.fn(),
+      });
+
+      const { result } = renderHook(() => useAuth());
+
+      expect(result.current.user?.isImpersonating).toBe(true);
+      expect(result.current.user?.impersonatedRole).toBe('USER');
+      expect(result.current.user?.originalUser).toEqual({
+        id: 'admin-1',
+        name: 'Admin',
+        image: null,
+      });
+    });
+  });
+
   describe('session updates', () => {
     it('updates when session changes from unauthenticated to authenticated', () => {
       const { rerender } = renderHook(() => useAuth());
@@ -328,7 +444,7 @@ describe('useAuth', () => {
 
       const { result } = renderHook(() => useAuth());
 
-      expect(result.current.user).toEqual({
+      expect(result.current.user).toMatchObject({
         id: 'user-minimal',
         name: null,
         email: null,

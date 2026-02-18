@@ -13,6 +13,15 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+vi.mock('@/lib/auth-guards', () => ({
+  requireAdmin: async () => {
+    const session = await mockAuth();
+    if (!session?.user?.id) return null;
+    if (session.user.role !== 'ADMIN') return null;
+    return session.user.id;
+  },
+}));
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
@@ -45,8 +54,7 @@ function createRequest(body?: Record<string, unknown>): NextRequest {
 }
 
 function mockAdmin() {
-  mockAuth.mockResolvedValue({ user: { id: 'admin-1' } });
-  mockUserFindUnique.mockResolvedValue({ role: 'ADMIN' });
+  mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 }
 
 describe('GET /api/admin/handles', () => {
@@ -65,8 +73,7 @@ describe('GET /api/admin/handles', () => {
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const response = await GET();
     const body = await response.json();
@@ -108,8 +115,7 @@ describe('POST /api/admin/handles', () => {
   });
 
   it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUnique.mockResolvedValue({ role: 'USER' });
+    mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const request = createRequest({ handle: 'test' });
     const response = await POST(request);

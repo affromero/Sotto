@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { isValidHandleFormat } from '@/lib/handles';
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user?.id) return null;
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-  if (user?.role !== 'ADMIN') return null;
-  return session.user.id;
-}
 
 export async function GET() {
   const adminId = await requireAdmin();
