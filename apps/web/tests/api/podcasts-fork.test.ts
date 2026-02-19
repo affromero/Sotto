@@ -7,12 +7,18 @@ const mockPodcastCreate = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockPodcastTagCreateMany = vi.fn();
 const mockDiscoveryCreate = vi.fn();
+const mockUserFindUnique = vi.fn();
 const mockTransaction = vi.fn();
 
-// Mock auth
-const mockAuth = vi.fn();
+// Mock authenticateRequest (replaces direct auth() usage)
+const mockAuthenticateRequest = vi.fn();
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
+}));
+
+// Mock auth (used for dynamic import suspension check on session-based auth)
 vi.mock('@/lib/auth', () => ({
-  auth: () => mockAuth(),
+  auth: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock prisma
@@ -28,6 +34,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
@@ -114,7 +123,8 @@ const mockSourcePodcast = {
 };
 
 function setupSuccessMocks(userId = 'user-1') {
-  mockAuth.mockResolvedValue({ user: { id: userId, name: 'Alice' } });
+  mockAuthenticateRequest.mockResolvedValue({ userId });
+  mockUserFindUnique.mockResolvedValue({ name: 'Alice' });
   mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
   mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
   mockAddJob.mockResolvedValue(undefined);
@@ -153,7 +163,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest();
     const response = await POST(request, {
@@ -166,7 +176,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 404 when source podcast does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue(null);
 
@@ -181,7 +191,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 403 when source podcast is not PUBLIC', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
@@ -199,7 +209,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 403 when source podcast is UNLISTED', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
@@ -217,7 +227,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 400 when source podcast status is not READY', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
@@ -235,7 +245,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
   });
 
   it('returns 400 when source podcast is GENERATING_AUDIO', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
