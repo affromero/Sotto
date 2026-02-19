@@ -171,6 +171,7 @@
 | `/api/access`                                                    | GET/POST         | No         | Site password gate (GET: check cookie, POST: validate password)             |
 | `/api/auth/mobile`                                               | POST             | No         | Mobile OAuth login (Apple, Google, GitHub, Twitter) — issues API key token  |
 | `/api/connect/telegram`                                          | GET/POST         | Yes        | Telegram account linking (GET: verify code, POST: confirm link)             |
+| `/api/telegram/webhook`                                          | POST             | No         | Telegram webhook receiver (secret token verified, always returns 200)       |
 | `/api/events`                                                    | POST             | No (opt)   | Batch behavioral event ingestion (queued for async processing)              |
 | `/api/export`                                                    | POST             | ADMIN      | Trigger data export job (playback, events, features, training pairs)        |
 | `/api/ideas`                                                     | GET/POST         | Yes        | List/save podcast ideas from taste quiz                                     |
