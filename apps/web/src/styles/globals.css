@@ -361,3 +361,8 @@ a:hover {
     --mini-player-height: 64px;
   }
 }
+
+/* Offset all page content when the MiniPlayer is visible */
+body[data-mini-player] {
+  padding-bottom: var(--mini-player-height);
+}

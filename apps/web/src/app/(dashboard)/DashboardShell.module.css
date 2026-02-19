@@ -56,10 +56,6 @@
   margin: 0 auto;
 }
 
-.contentWithPlayer {
-  padding-bottom: calc(var(--spacing-lg) + 64px + var(--mini-player-height));
-}
-
 /* Desktop: sidebar visible, hide menu button */
 @media (min-width: 769px) {
   .main {
