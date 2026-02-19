@@ -257,20 +257,17 @@
 }
 
 .pageInfo {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
+  composes: pageInfo from '../admin.module.css';
 }
 
 /* Empty */
 
 .empty {
+  composes: empty from '../admin.module.css';
   padding: var(--spacing-xl);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  text-align: center;
-  color: var(--color-text-secondary);
-  font: var(--text-body);
 }
 
 /* Loading */
