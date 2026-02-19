@@ -212,6 +212,7 @@ describe('processScriptGeneration', () => {
       aiModel: 'claude-haiku-4-5-20251001',
       ttsProvider: 'openai',
       generationLimit: 3,
+      aiAllocations: [],
     });
     mockGetAiProviderMeta.mockReturnValue({
       id: 'anthropic',
