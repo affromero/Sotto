@@ -28,6 +28,15 @@ vi.mock('@/lib/segment-creator', () => ({
   createSegmentsAndQueueAudio: (...args: unknown[]) => mockCreateSegmentsAndQueueAudio(...args),
 }));
 
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  getRedisClient: vi.fn(),
+}));
+
+vi.mock('@/lib/generation-gate', () => ({
+  checkGenerationGate: vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, prismaUnfiltered } from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
@@ -86,6 +86,18 @@ export async function POST(request: NextRequest) {
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+  }
+
+  // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
+    if (!ok) {
+      return NextResponse.json(
+        { error: 'Free generations used.', code: 'free_tier_exhausted' },
+        { status: 403 }
+      );
+    }
   }
 
   // Duration validation — free tier users capped at 5 min, BYOK at 40 min
@@ -196,19 +208,6 @@ export async function POST(request: NextRequest) {
     sourceText: sourceText ?? undefined,
   };
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
-
-  // Increment free tier counter for non-BYOK users
-  if (!gate.isByokUser) {
-    const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
-    if (!ok) {
-      await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
-      return NextResponse.json(
-        { error: 'Free generations used.', code: 'free_tier_exhausted' },
-        { status: 403 }
-      );
-    }
-  }
 
   // Fire-and-forget activity record
   prisma.activity.create({
