@@ -52,6 +52,7 @@ model User {
 
   // Telegram integration
   telegramEnabled Boolean @default(false)
+  telegramChatId  String?
 
   // Relations
   accounts           Account[]
@@ -118,6 +119,9 @@ model User {
 
   // Saved ideas
   savedIdeas SavedIdea[]
+
+  // Podcast ideas (from Telegram bot)
+  podcastIdeas PodcastIdea[]
 
   // Free tier
   freeGenerationsUsed Int @default(0)
@@ -922,6 +926,21 @@ enum TelegramMessageStatus {
   REPLIED
   FAILED
   IGNORED
+}
+
+// ============ PODCAST IDEAS (Telegram Save-for-Later) ============
+
+model PodcastIdea {
+  id        String   @id @default(cuid())
+  userId    String
+  text      String   @db.Text
+  sourceUrl String?
+  source    String   @default("telegram")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 // ============ RECOMMENDATION ENGINE ============

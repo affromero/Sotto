@@ -960,8 +960,7 @@ export default function LandingPage() {
             <h2 className={styles.h2Light}>Tweet it. Message it. Done.</h2>
             <p className={styles.bodyLgLight}>
               Tag <strong>@sottofm</strong> on X or message <strong>@SottoFMBot</strong> on
-              Telegram — your podcast generates automatically and you get a link when it&apos;s
-              ready.
+              Telegram to save a topic or URL as a podcast idea — then open Sotto to generate.
             </p>
           </div>
 
@@ -1218,45 +1217,27 @@ export default function LandingPage() {
               </span>
 
               <div className={styles.tgMock}>
-                <div className={styles.tgMsgRow}>
-                  <div className={styles.tgBotName}>SottoFM</div>
-                  <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                    What aspect of quantum computing interests you?
-                  </div>
-                </div>
-
-                <div className={styles.tgKeyboard}>
-                  <span className={styles.tgKey}>Quantum Basics</span>
-                  <span className={`${styles.tgKey} ${styles.tgKeySelected}`}>
-                    Quantum Computing
-                  </span>
-                  <span className={styles.tgKey}>Cryptography</span>
-                </div>
-
                 <div className={`${styles.tgMsgRow} ${styles.tgMsgRowUser}`}>
                   <div className={`${styles.tgBubble} ${styles.tgBubbleUser}`}>
-                    Quantum Computing
+                    https://nature.com/articles/quantum-computing-2026
                   </div>
                 </div>
 
                 <div className={styles.tgMsgRow}>
                   <div className={styles.tgBotName}>SottoFM</div>
                   <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                    {'Ready to generate your podcast!\n\nTopic: Quantum Computing\nDepth: standard · Tone: casual'}
+                    Saved as a podcast idea! Open Sotto to generate your podcast.
                   </div>
                 </div>
 
                 <div className={styles.tgKeyboard}>
-                  <span className={`${styles.tgKey} ${styles.tgKeyAccent}`}>
-                    ▶ Generate Podcast
-                  </span>
-                  <span className={styles.tgKey}>Edit Settings</span>
+                  <span className={styles.tgKeyUrl}>Open Sotto ↗</span>
                 </div>
 
                 <div className={styles.tgMsgRow}>
                   <div className={styles.tgBotName}>SottoFM</div>
                   <div className={`${styles.tgBubble} ${styles.tgBubbleBot}`}>
-                    Your podcast is ready! &quot;Quantum Computing Explained&quot; (12 min)
+                    Your podcast is ready! &quot;Quantum Computing in 2026&quot; (10 min)
                   </div>
                 </div>
 
@@ -1278,7 +1259,7 @@ export default function LandingPage() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Multi-turn discovery conversation
+                  Save any topic or URL on the go
                 </div>
                 <div className={styles.tgFeature}>
                   <svg
@@ -1292,7 +1273,7 @@ export default function LandingPage() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Tap chips or type free text
+                  Get notified when your podcast is ready
                 </div>
                 <div className={styles.tgFeature}>
                   <svg
@@ -1306,7 +1287,7 @@ export default function LandingPage() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Sends a Listen Now button when ready
+                  Open Sotto to generate from your saved ideas
                 </div>
               </div>
             </div>

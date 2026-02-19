@@ -20,7 +20,7 @@ Shared types used across the application. These mirror Prisma models but are sha
 | `events.ts`       | EventPayload (discriminated union of 23 event types), EventContext, BehavioralEventInput                                                                          |
 | `version.ts`      | PodcastVersionData, PodcastVersionSegmentData                                                                                                                     |
 | `import.ts`       | ImportPodcastRequest, ImportProgress, ImportStatus                                                                                                                |
-| `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramSession, TelegramMessageData, Telegram API payload types                                                            |
+| `telegram.ts`     | TelegramParseResult, TelegramUpdate, TelegramMessageData, Telegram API payload types                                                            |
 | `pitch.ts`        | PitchVersion, PitchAsset types                                                                                                                                    |
 | `next-auth.d.ts`  | NextAuth module augmentation: adds `role: UserRole` to Session.user, User, JWT                                                                                    |
 

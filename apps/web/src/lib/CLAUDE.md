@@ -46,7 +46,7 @@ All shared business logic and external service integrations live here.
 | `twitter-utils.ts` | Thread source text formatting (engagement-aware, credential-aware) | Pure utility |
 | `credential-lookup.ts` | Verified participant credential lookup via Claude + web search | Uses `claude.ts` |
 | `telegram.ts` | Telegram Bot API client (send messages, get updates, inline keyboards, webhook management) | Telegram Bot API |
-| `telegram-handler.ts` | Shared Telegram update router: commands, discovery chat, generation, callback queries. Used by both webhook route and polling worker | Uses `prisma.ts`, `telegram.ts`, `discovery-agent.ts`, `byok.ts` |
+| `telegram-handler.ts` | Telegram update router: /start (account linking), /help, save-for-later (any text/URL → PodcastIdea), legacy callback query fallback | Uses `prisma.ts`, `telegram.ts`, `discovery-agent.ts`, `byok.ts` |
 | `telegram-parser.ts` | Claude-based Telegram message intent extraction (topic, title, depth, tone, sourceUrl) | Uses `claude.ts` |
 | `voice-pool.ts` | Unified voice pool: 16 curated voices with per-provider IDs, deterministic `selectVoicePair(podcastId)` hash, `resolveVoiceId()`, `findByVoiceId()` | Pure utility |
 | `pipeline-resume.ts` | Smart resume: `markPodcastFailed(podcastId)` records `failedAtStatus`, `determineResumePoint(podcastId)` inspects existing data (Script, Segments, References) and returns the optimal pipeline restart step | Uses `prisma.ts` |

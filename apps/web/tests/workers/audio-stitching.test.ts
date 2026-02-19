@@ -12,7 +12,9 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   sourceTweetId: null,
   currentVersion: 0,
   audioUrl: null,
+  user: { telegramEnabled: false, telegramChatId: null },
 });
+const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastVersionCreate = vi.fn().mockResolvedValue({});
 const mockPrismaTweetMentionFindFirst = vi.fn().mockResolvedValue(null);
@@ -33,6 +35,7 @@ vi.mock('@/lib/prisma', () => {
     },
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
+      findUnique: (...args: unknown[]) => mockPrismaPodcastFindUnique(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
     },
     podcastVersion: {
@@ -191,6 +194,7 @@ describe('processAudioStitching', () => {
       sourceTweetId: null,
       currentVersion: 0,
       audioUrl: null,
+      user: { telegramEnabled: false, telegramChatId: null },
     });
 
     // Default script data (no sound cues)
@@ -565,6 +569,7 @@ describe('processAudioStitching', () => {
         sourceTweetId: null,
         currentVersion: 0,
         audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
       });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -588,6 +593,7 @@ describe('processAudioStitching', () => {
         sourceTweetId: 'tweet-123',
         currentVersion: 0,
         audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-1',
@@ -625,6 +631,7 @@ describe('processAudioStitching', () => {
         sourceTweetId: null,
         currentVersion: 0,
         audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
       });
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
@@ -723,6 +730,7 @@ describe('processAudioStitching', () => {
         sourceTweetId: 'tweet-123',
         currentVersion: 0,
         audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-1',
@@ -855,6 +863,7 @@ describe('processAudioStitching', () => {
         sourceTweetId: 'tweet-789',
         currentVersion: 0,
         audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
       });
       mockPrismaTweetMentionFindFirst.mockResolvedValue({
         id: 'mention-2',

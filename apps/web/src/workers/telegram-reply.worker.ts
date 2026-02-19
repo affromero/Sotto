@@ -20,10 +20,12 @@ export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Prom
       await sendMessage(chatId,
         `Sorry, we couldn't generate your podcast. Try again or visit ${SOTTO_APP_URL} to create one manually.`
       );
-      await prisma.telegramMessage.update({
-        where: { id: telegramMessageId },
-        data: { status: 'FAILED' },
-      });
+      if (telegramMessageId) {
+        await prisma.telegramMessage.update({
+          where: { id: telegramMessageId },
+          data: { status: 'FAILED' },
+        });
+      }
     } catch (err) {
       logger.error('Failed to send Telegram failure message', {
         telegramMessageId,
@@ -50,10 +52,12 @@ export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Prom
 
   await job.updateProgress(80);
 
-  await prisma.telegramMessage.update({
-    where: { id: telegramMessageId },
-    data: { status: 'REPLIED' },
-  });
+  if (telegramMessageId) {
+    await prisma.telegramMessage.update({
+      where: { id: telegramMessageId },
+      data: { status: 'REPLIED' },
+    });
+  }
 
   await job.updateProgress(100);
   logger.info('Telegram reply sent', { podcastId, chatId });

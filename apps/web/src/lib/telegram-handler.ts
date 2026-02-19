@@ -1,32 +1,15 @@
 import { randomBytes } from 'crypto';
-import {
-  addJob,
-  JobType,
-  contentExtractionQueue,
-} from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
-import { sendMessage, answerCallbackQuery, editMessageText } from '@/lib/telegram';
-import { parseTelegramIntent } from '@/lib/telegram-parser';
-import { getDiscoveryResponse, parseChips, parseMetadata } from '@/lib/discovery-agent';
-import { getAiKey } from '@/lib/byok';
-import { canResolveAi } from '@/lib/providers/ai';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
-import { logUsage } from '@/lib/usage-logger';
-import { selectVoicePair } from '@/lib/elevenlabs';
+import { sendMessage, answerCallbackQuery } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import type {
   TelegramUpdate,
   TelegramMessagePayload,
   TelegramCallbackQuery,
-  TelegramSession,
-  TelegramInlineKeyboardButton,
 } from '@/types/telegram';
 
-const REDIS_SESSION_PREFIX = 'telegram:session:';
 const REDIS_LINK_PREFIX = 'telegram:link:';
-const SESSION_TTL = 3600; // 1 hour
 const LINK_CODE_TTL = 600; // 10 minutes
 const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
 
@@ -51,10 +34,6 @@ async function handleTextMessage(msg: TelegramMessagePayload): Promise<void> {
   // Commands
   if (text.startsWith('/start')) {
     await handleStart(msg);
-    return;
-  }
-  if (text === '/cancel') {
-    await handleCancel(chatId);
     return;
   }
   if (text === '/help') {
@@ -88,27 +67,7 @@ async function handleTextMessage(msg: TelegramMessagePayload): Promise<void> {
     return;
   }
 
-  // Check BYOK keys
-  const hasAi = await canResolveAi(userId);
-  if (!hasAi) {
-    await sendMessage(chatId,
-      `You need to add an AI API key (Anthropic or OpenAI) in your Sotto settings first.\n\n${SOTTO_APP_URL}/settings`
-    );
-    return;
-  }
-
-  const redis = getRedisClient();
-  const sessionKey = `${REDIS_SESSION_PREFIX}${chatId}`;
-  const sessionRaw = await redis.get(sessionKey);
-
-  if (sessionRaw) {
-    // Continue active discovery session
-    const session = JSON.parse(sessionRaw) as TelegramSession;
-    await handleDiscoveryMessage(chatId, userId, text, session);
-  } else {
-    // New message — parse intent
-    await handleNewMessage(chatId, userId, telegramUserId, text);
-  }
+  await handleSaveIdea(chatId, userId, text);
 }
 
 // ─── Commands ───────────────────────────────────────────────────────────
@@ -125,7 +84,7 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
 
   if (existing) {
     await sendMessage(chatId,
-      'Your Telegram account is already connected to Sotto! Send me a topic to generate a podcast.'
+      'Your Telegram account is already connected!\nSend me any topic or URL to save it as a podcast idea.'
     );
     return;
   }
@@ -152,542 +111,49 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
   );
 }
 
-async function handleCancel(chatId: string): Promise<void> {
-  const redis = getRedisClient();
-  const sessionKey = `${REDIS_SESSION_PREFIX}${chatId}`;
-  const deleted = await redis.del(sessionKey);
-
-  if (deleted) {
-    await sendMessage(chatId, 'Session cancelled. Send me a new topic whenever you\'re ready.');
-  } else {
-    await sendMessage(chatId, 'No active session to cancel.');
-  }
-}
-
 async function handleHelp(chatId: string): Promise<void> {
   await sendMessage(chatId,
-    `*Sotto Bot* — Generate AI podcasts from Telegram\n\n` +
-    `Just send me a topic and I'll create a 2-voice podcast for you!\n\n` +
+    `*Sotto Bot* — Your podcast companion\n\n` +
+    `Send me any topic or URL and I'll save it as a podcast idea.\n` +
+    `Open Sotto to generate your podcast whenever you're ready!\n\n` +
     `*Commands:*\n` +
     `/start — Link your Sotto account\n` +
-    `/cancel — Cancel the current session\n` +
     `/help — Show this message\n\n` +
-    `*Tips:*\n` +
-    `• Be specific: "The history of the Silk Road trade routes" works better than "history"\n` +
-    `• Include a URL to base the podcast on an article\n` +
-    `• If I ask follow-up questions, tap the chip buttons or type your answer`,
+    `*Notifications:*\n` +
+    `I'll send you a message when your podcasts are ready.`,
     { parse_mode: 'Markdown' }
   );
 }
 
-// ─── New Message (Intent Parsing) ───────────────────────────────────────
+// ─── Save Idea ──────────────────────────────────────────────────────────
 
-async function handleNewMessage(
-  chatId: string,
-  userId: string,
-  telegramUserId: string,
-  text: string
-): Promise<void> {
-  const aiKey = await getAiKey(userId);
-  const parsed = await parseTelegramIntent(text, aiKey?.apiKey);
+async function handleSaveIdea(chatId: string, userId: string, text: string): Promise<void> {
+  const isUrl = text.startsWith('http://') || text.startsWith('https://');
+  const sourceUrl = isUrl ? text : undefined;
+  const ideaText = isUrl ? `Podcast from: ${text}` : text;
 
-  if (parsed.isComplete) {
-    await showConfirmation(chatId, userId, telegramUserId, parsed);
-  } else {
-    await startDiscoverySession(chatId, userId, telegramUserId, text);
-  }
-}
-
-// ─── Discovery Session ──────────────────────────────────────────────────
-
-async function startDiscoverySession(
-  chatId: string,
-  userId: string,
-  telegramUserId: string,
-  initialMessage: string
-): Promise<void> {
-  const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
-    { role: 'user', content: initialMessage },
-  ];
-
-  const aiKey = await getAiKey(userId);
-  const response = await getDiscoveryResponse(messages, aiKey?.apiKey);
-
-  logUsage({
-    service: 'anthropic',
-    model: response.model,
-    category: 'telegram_discovery',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId,
+  await prisma.podcastIdea.create({
+    data: { userId, text: ideaText, sourceUrl, source: 'telegram' },
   });
 
-  const { text: responseText, chips } = parseChips(response.content);
-  const metadata = parseMetadata(response.content);
+  logger.info('Telegram podcast idea saved', { chatId, userId, isUrl });
 
-  messages.push({ role: 'assistant', content: response.content });
-
-  const session: TelegramSession = {
-    userId,
-    telegramUserId,
-    chatId,
-    state: metadata?.ready ? 'confirming' : 'discovery',
-    messages,
-    metadata: metadata ? {
-      topic: metadata.topic,
-      depth: metadata.depth,
-      audienceLevel: metadata.audience_level,
-      audience: metadata.audience,
-      focusAreas: metadata.focus_areas,
-      tone: metadata.tone,
-      durationTarget: metadata.duration_target,
-    } : {},
-  };
-
-  const redis = getRedisClient();
-  await redis.set(
-    `${REDIS_SESSION_PREFIX}${chatId}`,
-    JSON.stringify(session),
-    'EX',
-    SESSION_TTL
+  await sendMessage(chatId,
+    'Saved! Open Sotto to create your podcast.',
+    {
+      reply_markup: {
+        inline_keyboard: [[{ text: 'Open Sotto', url: `${SOTTO_APP_URL}/ideas` }]],
+      },
+    }
   );
-
-  if (metadata?.ready) {
-    await showConfirmationFromSession(chatId, session);
-  } else {
-    await sendMessageWithChips(chatId, responseText, chips);
-  }
-}
-
-async function handleDiscoveryMessage(
-  chatId: string,
-  userId: string,
-  userInput: string,
-  session: TelegramSession
-): Promise<void> {
-  session.messages.push({ role: 'user', content: userInput });
-
-  const aiKey = await getAiKey(userId);
-  const response = await getDiscoveryResponse(session.messages, aiKey?.apiKey);
-
-  logUsage({
-    service: 'anthropic',
-    model: response.model,
-    category: 'telegram_discovery',
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    userId,
-  });
-
-  const { text: responseText, chips } = parseChips(response.content);
-  const metadata = parseMetadata(response.content);
-
-  session.messages.push({ role: 'assistant', content: response.content });
-
-  if (metadata) {
-    session.metadata = {
-      topic: metadata.topic,
-      depth: metadata.depth,
-      audienceLevel: metadata.audience_level,
-      audience: metadata.audience,
-      focusAreas: metadata.focus_areas,
-      tone: metadata.tone,
-      durationTarget: metadata.duration_target,
-    };
-  }
-
-  if (metadata?.ready) {
-    session.state = 'confirming';
-  }
-
-  const redis = getRedisClient();
-  await redis.set(
-    `${REDIS_SESSION_PREFIX}${chatId}`,
-    JSON.stringify(session),
-    'EX',
-    SESSION_TTL
-  );
-
-  if (metadata?.ready) {
-    await showConfirmationFromSession(chatId, session);
-  } else {
-    await sendMessageWithChips(chatId, responseText, chips);
-  }
-}
-
-// ─── Confirmation UI ────────────────────────────────────────────────────
-
-async function showConfirmation(
-  chatId: string,
-  userId: string,
-  telegramUserId: string,
-  parsed: {
-    topic: string;
-    title: string;
-    depth: string;
-    audienceLevel: string;
-    tone: string;
-    focusAreas: string[];
-    sourceUrl?: string;
-  }
-): Promise<void> {
-  const session: TelegramSession = {
-    userId,
-    telegramUserId,
-    chatId,
-    state: 'confirming',
-    messages: [],
-    metadata: {
-      topic: parsed.topic,
-      depth: parsed.depth,
-      audienceLevel: parsed.audienceLevel,
-      tone: parsed.tone,
-      focusAreas: parsed.focusAreas,
-      sourceUrl: parsed.sourceUrl,
-    },
-  };
-
-  const redis = getRedisClient();
-  await redis.set(
-    `${REDIS_SESSION_PREFIX}${chatId}`,
-    JSON.stringify(session),
-    'EX',
-    SESSION_TTL
-  );
-
-  const text =
-    `Ready to generate your podcast!\n\n` +
-    `*Topic:* ${parsed.topic}\n` +
-    `*Depth:* ${parsed.depth.replace('_', ' ')}\n` +
-    `*Audience:* ${parsed.audienceLevel}\n` +
-    `*Tone:* ${parsed.tone}`;
-
-  await sendMessage(chatId, text, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'Generate Podcast', callback_data: 'generate' },
-          { text: 'Edit Settings', callback_data: 'edit' },
-        ],
-      ],
-    },
-  });
-}
-
-async function showConfirmationFromSession(chatId: string, session: TelegramSession): Promise<void> {
-  const m = session.metadata;
-  const text =
-    `Ready to generate your podcast!\n\n` +
-    `*Topic:* ${m.topic || 'Not set'}\n` +
-    `*Depth:* ${(m.depth || 'standard').replace('_', ' ')}\n` +
-    `*Audience:* ${m.audienceLevel || 'intermediate'}\n` +
-    `*Tone:* ${m.tone || 'casual'}`;
-
-  await sendMessage(chatId, text, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: 'Generate Podcast', callback_data: 'generate' },
-          { text: 'Edit Settings', callback_data: 'edit' },
-        ],
-      ],
-    },
-  });
 }
 
 // ─── Callback Queries ───────────────────────────────────────────────────
 
 async function handleCallbackQuery(query: TelegramCallbackQuery): Promise<void> {
-  const data = query.data;
-  const chatId = query.message?.chat ? String(query.message.chat.id) : null;
-
-  if (!data || !chatId) {
-    await answerCallbackQuery(query.id);
-    return;
-  }
-
-  // Chip selection
-  if (data.startsWith('chip:')) {
-    const chipText = data.substring(5);
-    await answerCallbackQuery(query.id);
-    await handleChipSelection(chatId, chipText);
-    return;
-  }
-
-  // Edit setting selection (e.g., edit:depth:deep_dive)
-  if (data.startsWith('edit:')) {
-    await answerCallbackQuery(query.id);
-    await handleEditSelection(chatId, data);
-    return;
-  }
-
-  switch (data) {
-    case 'generate':
-      await answerCallbackQuery(query.id, 'Generating...');
-      await handleGenerate(chatId, query.message?.message_id);
-      break;
-    case 'edit':
-      await answerCallbackQuery(query.id);
-      await handleEditSettings(chatId);
-      break;
-    case 'back_confirm':
-      await answerCallbackQuery(query.id);
-      await handleBackToConfirm(chatId);
-      break;
-    default:
-      await answerCallbackQuery(query.id);
-  }
-}
-
-async function handleChipSelection(chatId: string, chipText: string): Promise<void> {
-  const redis = getRedisClient();
-  const sessionRaw = await redis.get(`${REDIS_SESSION_PREFIX}${chatId}`);
-  if (!sessionRaw) {
-    await sendMessage(chatId, 'Session expired. Send me a new topic to start over.');
-    return;
-  }
-
-  const session = JSON.parse(sessionRaw) as TelegramSession;
-  await handleDiscoveryMessage(chatId, session.userId, chipText, session);
-}
-
-async function handleGenerate(chatId: string, messageId?: number): Promise<void> {
-  const redis = getRedisClient();
-  const sessionKey = `${REDIS_SESSION_PREFIX}${chatId}`;
-  const sessionRaw = await redis.get(sessionKey);
-
-  if (!sessionRaw) {
-    await sendMessage(chatId, 'Session expired. Send me a new topic to start over.');
-    return;
-  }
-
-  const session = JSON.parse(sessionRaw) as TelegramSession;
-  const m = session.metadata;
-
-  if (!m.topic) {
-    await sendMessage(chatId, 'Something went wrong — no topic found. Please try again.');
-    return;
-  }
-
-  // Generation gate: BYOK or free tier
-  const gate = await checkGenerationGate(session.userId);
-  if (!gate.allowed) {
-    const msg =
-      gate.reason === 'free_tier_exhausted'
-        ? 'Free generations used. Add your own API keys in Settings to continue.'
-        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    await sendMessage(chatId, msg);
-    return;
-  }
-
-  // Atomically increment free tier counter before creating anything
-  if (!gate.isByokUser) {
-    const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(session.userId, config.generationLimit);
-    if (!ok) {
-      await sendMessage(chatId, 'Free generations used. Add your own API keys in Settings to continue.');
-      return;
-    }
-  }
-
-  // Update the inline message to show "Generating..."
-  if (messageId) {
-    await editMessageText(chatId, messageId, 'Generating your podcast... This may take a few minutes.').catch(() => {});
-  }
-
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: session.userId },
-    select: {
-      preferredHostVoiceId: true,
-      preferredExpertVoiceId: true,
-      preferredTtsProvider: true,
-      preferredTtsModel: true,
-      preferredAiProvider: true,
-      preferredAiModel: true,
-    },
-  });
-
-  // Generate a title from the topic
-  const title = m.topic.length > 80 ? m.topic.substring(0, 77) + '...' : m.topic;
-
-  // Voice selection
-  const tempId = `tg-${chatId}-${Date.now()}`;
-  const voicePair = selectVoicePair(tempId);
-  const hostVoiceId = user.preferredHostVoiceId ?? voicePair.host.id;
-  const expertVoiceId = user.preferredExpertVoiceId ?? voicePair.expert.id;
-
-  // Create TelegramMessage record
-  const telegramMsg = await prisma.telegramMessage.create({
-    data: {
-      telegramUserId: session.telegramUserId,
-      chatId,
-      text: m.topic,
-      parsedTopic: m.topic,
-      status: 'GENERATING',
-      userId: session.userId,
-    },
-  });
-
-  // Create Podcast + Discovery
-  const podcast = await prisma.podcast.create({
-    data: {
-      userId: session.userId,
-      title,
-      topic: m.topic,
-      status: 'EXTRACTING',
-      source: 'TELEGRAM',
-      hostVoiceId,
-      expertVoiceId,
-      ttsProvider: user.preferredTtsProvider ?? undefined,
-      ttsModel: user.preferredTtsModel ?? undefined,
-      aiModel: user.preferredAiModel ?? undefined,
-      visibility: 'PUBLIC',
-      discovery: {
-        create: {
-          userId: session.userId,
-          topic: m.topic,
-          depth: m.depth || 'standard',
-          audienceLevel: m.audienceLevel || 'intermediate',
-          audience: m.audience,
-          tone: m.tone || 'casual',
-          focusAreas: m.focusAreas || [],
-          durationTarget: m.durationTarget || 10,
-          sourceUrl: m.sourceUrl,
-        },
-      },
-    },
-    include: { discovery: true },
-  });
-
-  // Link TelegramMessage to Podcast
-  await prisma.telegramMessage.update({
-    where: { id: telegramMsg.id },
-    data: { podcastId: podcast.id },
-  });
-
-  // Kick off the pipeline
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
-    podcastId: podcast.id,
-    userId: session.userId,
-    sourceUrl: m.sourceUrl,
-  });
-
-  // Clear the session
-  await redis.del(sessionKey);
-
-  logger.info('Telegram podcast generation started', {
-    chatId,
-    podcastId: podcast.id,
-    topic: m.topic,
-  });
-}
-
-async function handleEditSettings(chatId: string): Promise<void> {
-  const redis = getRedisClient();
-  const sessionRaw = await redis.get(`${REDIS_SESSION_PREFIX}${chatId}`);
-
-  if (!sessionRaw) {
-    await sendMessage(chatId, 'Session expired. Send me a new topic to start over.');
-    return;
-  }
-
-  const session = JSON.parse(sessionRaw) as TelegramSession;
-  const m = session.metadata;
-
-  const text =
-    `Current settings:\n\n` +
-    `*Depth:* ${(m.depth || 'standard').replace('_', ' ')}\n` +
-    `*Audience:* ${m.audienceLevel || 'intermediate'}\n` +
-    `*Tone:* ${m.tone || 'casual'}\n\n` +
-    `Tap to change:`;
-
-  const depthButtons: TelegramInlineKeyboardButton[] = [
-    { text: 'Quick Overview', callback_data: 'edit:depth:quick_overview' },
-    { text: 'Standard', callback_data: 'edit:depth:standard' },
-    { text: 'Deep Dive', callback_data: 'edit:depth:deep_dive' },
-  ];
-  const toneButtons: TelegramInlineKeyboardButton[] = [
-    { text: 'Casual', callback_data: 'edit:tone:casual' },
-    { text: 'Professional', callback_data: 'edit:tone:professional' },
-    { text: 'Socratic', callback_data: 'edit:tone:socratic' },
-  ];
-
-  await sendMessage(chatId, text, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        depthButtons,
-        toneButtons,
-        [{ text: 'Back to Confirmation', callback_data: 'back_confirm' }],
-      ],
-    },
-  });
-}
-
-async function handleBackToConfirm(chatId: string): Promise<void> {
-  const redis = getRedisClient();
-  const sessionRaw = await redis.get(`${REDIS_SESSION_PREFIX}${chatId}`);
-
-  if (!sessionRaw) {
-    await sendMessage(chatId, 'Session expired. Send me a new topic to start over.');
-    return;
-  }
-
-  const session = JSON.parse(sessionRaw) as TelegramSession;
-  await showConfirmationFromSession(chatId, session);
-}
-
-async function handleEditSelection(chatId: string, data: string): Promise<void> {
-  const redis = getRedisClient();
-  const sessionKey = `${REDIS_SESSION_PREFIX}${chatId}`;
-  const sessionRaw = await redis.get(sessionKey);
-
-  if (!sessionRaw) {
-    await sendMessage(chatId, 'Session expired. Send me a new topic to start over.');
-    return;
-  }
-
-  const session = JSON.parse(sessionRaw) as TelegramSession;
-  // data format: edit:<field>:<value>
-  const parts = data.split(':');
-  if (parts.length !== 3) return;
-
-  const [, field, value] = parts;
-  if (field === 'depth') session.metadata.depth = value;
-  if (field === 'tone') session.metadata.tone = value;
-  if (field === 'audienceLevel') session.metadata.audienceLevel = value;
-
-  await redis.set(sessionKey, JSON.stringify(session), 'EX', SESSION_TTL);
-  await showConfirmationFromSession(chatId, session);
-}
-
-// ─── Helpers ────────────────────────────────────────────────────────────
-
-async function sendMessageWithChips(chatId: string, text: string, chips: string[]): Promise<void> {
-  if (chips.length === 0) {
-    await sendMessage(chatId, text);
-    return;
-  }
-
-  // Build inline keyboard from chips (max 64 bytes per callback_data)
-  const buttons: TelegramInlineKeyboardButton[][] = [];
-  const row: TelegramInlineKeyboardButton[] = [];
-
-  for (const chip of chips) {
-    const callbackData = `chip:${chip.substring(0, 58)}`; // 5 prefix + 58 content < 64 bytes
-    row.push({ text: chip, callback_data: callbackData });
-    if (row.length === 2) {
-      buttons.push([...row]);
-      row.length = 0;
-    }
-  }
-  if (row.length > 0) {
-    buttons.push([...row]);
-  }
-
-  await sendMessage(chatId, text, {
-    reply_markup: { inline_keyboard: buttons },
-  });
+  await answerCallbackQuery(
+    query.id,
+    'This button is no longer active. Send me a topic to save it as a podcast idea.',
+    true
+  );
 }

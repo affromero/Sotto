@@ -14,7 +14,7 @@
 | `/analytics`                 | `(dashboard)/analytics/page.tsx`           | Yes                         | Usage analytics dashboard                                |
 | `/settings/api`              | `(dashboard)/settings/api/page.tsx`        | Yes                         | API key management                                       |
 | `/settings/voices`           | `(dashboard)/settings/voices/page.tsx`     | Yes                         | Voice clone management                                   |
-| `/ideas`                     | `(dashboard)/ideas/page.tsx`               | Yes                         | Saved podcast ideas from taste quiz                      |
+| `/ideas`                     | `(dashboard)/ideas/page.tsx`               | Yes                         | Saved podcast ideas from taste quiz and Telegram bot     |
 | `/onboarding`                | `onboarding/page.tsx`                      | Yes                         | Post-signup interest selection + BYOK key setup           |
 | `/create`                    | `create/page.tsx`                          | Yes                         | Chat-based creation + Import tab (requires BYOK keys)    |
 | `/podcast/[podcastId]`       | `podcast/[podcastId]/page.tsx`             | No (public) / Yes (private) | Podcast player                                           |
@@ -176,6 +176,7 @@
 | `/api/export`                                                    | POST             | ADMIN      | Trigger data export job (playback, events, features, training pairs)        |
 | `/api/ideas`                                                     | GET/POST         | Yes        | List/save podcast ideas from taste quiz                                     |
 | `/api/ideas/[ideaId]`                                            | DELETE           | Yes        | Delete a saved idea (owner only)                                            |
+| `/api/podcast-ideas/[ideaId]`                                    | DELETE           | Yes        | Delete a Telegram-saved podcast idea (owner only)                           |
 | `/api/picks`                                                     | GET/POST         | Yes        | Daily personalized podcast picks (GET: fetch, POST: refresh batch)          |
 | `/api/pitch/[...path]`                                           | GET              | Pitch cookie | Serve pitch deck manifest + HTML documents from .pitch/ directory          |
 | `/api/pitch/auth`                                                | POST             | No         | Pitch deck password authentication (issues signed cookie)                   |
