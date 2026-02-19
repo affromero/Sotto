@@ -9,6 +9,7 @@ export interface ClaimAnalysis {
   existingCitations: number[];
   needsMoreCitations: boolean;
   hasUnreliableSource: boolean;
+  hasMisattribution: boolean;
   verificationNote: string;
 }
 
@@ -21,6 +22,7 @@ export interface VerificationVerdict {
   unsupportedClaims: ClaimAnalysis[];
   underSourcedClaims: ClaimAnalysis[];
   unreliableSourceClaims: ClaimAnalysis[];
+  misattributedClaims: ClaimAnalysis[];
   durationFeedback: string | null;
   feedback: string;
   inputTokens: number;
@@ -143,6 +145,17 @@ this is a HIGH-RISK factual claim. You must:
    web search, flag it as UNSUPPORTED and request removal or correction
 5. Never allow a credential claim to pass as COMMON_KNOWLEDGE
 
+## Reference Attribution Accuracy
+
+For each citation [N], check that the surrounding text accurately describes the referenced source.
+Cross-check against the reference metadata provided above.
+
+Set hasMisattribution to true if:
+- The script names an institution/lab not found in the reference's authors or publisher
+- The script names a publisher/venue that doesn't match the reference's publisher
+- The script states a year that doesn't match the reference's year
+- The script names specific authors not listed in the reference's authors array
+
 ## This is attempt ${attemptNumber} of 3.
 ${previousFeedback ? `\n## Previous Feedback (that the script was revised to address):\n${previousFeedback}` : ''}
 
@@ -158,6 +171,7 @@ Return a JSON object:
       "existingCitations": [1, 3],
       "needsMoreCitations": true,
       "hasUnreliableSource": false,
+      "hasMisattribution": false,
       "verificationNote": "brief explanation"
     }
   ],
@@ -196,6 +210,7 @@ Analyze every factual claim. Return JSON only.`;
       existingCitations: number[];
       needsMoreCitations: boolean;
       hasUnreliableSource: boolean;
+      hasMisattribution: boolean;
       verificationNote: string;
     }>;
     overallScore: number;
@@ -218,6 +233,7 @@ Analyze every factual claim. Return JSON only.`;
       unsupportedClaims: [],
       underSourcedClaims: [],
       unreliableSourceClaims: [],
+      misattributedClaims: [],
       durationFeedback: null,
       feedback: 'Script verification failed: could not parse AI response. Will retry.',
       inputTokens: response.inputTokens,
@@ -234,6 +250,7 @@ Analyze every factual claim. Return JSON only.`;
     existingCitations: c.existingCitations || [],
     needsMoreCitations: c.needsMoreCitations,
     hasUnreliableSource: c.hasUnreliableSource,
+    hasMisattribution: c.hasMisattribution ?? false,
     verificationNote: c.verificationNote,
   }));
 
@@ -244,8 +261,9 @@ Analyze every factual claim. Return JSON only.`;
     (c) => c.needsMoreCitations && c.existingCitations.length > 0
   );
   const unreliableSourceClaims = sourcingRequired.filter((c) => c.hasUnreliableSource);
+  const misattributedClaims = sourcingRequired.filter((c) => c.hasMisattribution);
   const adequatelySourcedClaims = sourcingRequired.filter(
-    (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource
+    (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource && !c.hasMisattribution
   );
 
   // Duration check — bidirectional (too long OR too short), only when target is set
@@ -272,14 +290,19 @@ Analyze every factual claim. Return JSON only.`;
   const score =
     sourcingRequired.length === 0
       ? 1
-      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length) /
+      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length - misattributedClaims.length) /
         sourcingRequired.length;
   const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
 
   const passed =
-    score >= threshold && unreliableSourceClaims.length === 0 && !tooLong && !tooShort;
+    score >= threshold && unreliableSourceClaims.length === 0 && misattributedClaims.length === 0 && !tooLong && !tooShort;
 
   let feedback = parsed.feedback || '';
+  if (misattributedClaims.length > 0) {
+    const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
+      misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
+    feedback = feedback ? `${feedback}\n\n${misattrFeedback}` : misattrFeedback;
+  }
   if (durationFeedback) {
     feedback = feedback ? `${feedback}\n\nDURATION: ${durationFeedback}` : durationFeedback;
   }
@@ -293,6 +316,7 @@ Analyze every factual claim. Return JSON only.`;
     unsupportedClaims,
     underSourcedClaims,
     unreliableSourceClaims,
+    misattributedClaims,
     durationFeedback,
     feedback,
     inputTokens: response.inputTokens,
