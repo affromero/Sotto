@@ -49,6 +49,12 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
+// Mock redis (rate limiting)
+vi.mock('@/lib/redis', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  getRedisClient: vi.fn(),
+}));
+
 // Mock generation gate
 const mockCheckGenerationGate = vi.fn();
 const mockTryIncrementFreeGeneration = vi.fn();

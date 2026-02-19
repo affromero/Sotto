@@ -9,6 +9,7 @@ import { getAiKey } from '@/lib/byok';
 import { getLanguageLabel } from '@sotto/shared';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { checkRateLimit } from '@/lib/redis';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
@@ -19,6 +20,24 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const userId = session.user.id;
+
+  // Rate limit: 20/hour, 100/day
+  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
+  if (!hourly.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 20 generations per hour.' },
+      { status: 429 }
+    );
+  }
+  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
+  if (!daily.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 100 generations per day.' },
+      { status: 429 }
+    );
   }
 
   // Fetch the interaction with podcast ownership check
@@ -34,18 +53,30 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   }
 
   // Only the podcast owner can incorporate
-  if (interaction.podcast.userId !== session.user.id) {
+  if (interaction.podcast.userId !== userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   // Generation gate
-  const gate = await checkGenerationGate(session.user.id);
+  const gate = await checkGenerationGate(userId);
   if (!gate.allowed) {
     const msg =
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+  }
+
+  // Atomically increment free tier counter before any state mutations
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit);
+    if (!ok) {
+      return NextResponse.json(
+        { error: 'Free generations used.', code: 'free_tier_exhausted' },
+        { status: 403 }
+      );
+    }
   }
 
   if (interaction.podcast.source === 'IMPORT') {
@@ -107,7 +138,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     .join('\n');
 
   // Resolve user's AI key for BYOK passthrough
-  const aiKey = await getAiKey(session.user.id);
+  const aiKey = await getAiKey(userId);
 
   // Generate the explanation segment text via Claude
   // Always use podcast language for incorporation (segment becomes part of the audio)
@@ -130,7 +161,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     podcastId,
-    userId: session.user.id,
+    userId,
   });
 
   // Queue segment regeneration
@@ -143,12 +174,6 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   };
 
   await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload);
-
-  // Increment free tier counter for non-BYOK users
-  if (!gate.isByokUser) {
-    const config = await getFreeTierConfig();
-    await tryIncrementFreeGeneration(session.user.id, config.generationLimit);
-  }
 
   return NextResponse.json(
     {
