@@ -61,6 +61,41 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
   };
 }
 
+export function buildWelcomeEmail(name: string): { subject: string; html: string } {
+  const simpleFooter = `
+      <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
+        <p style="font-size:12px; color:#9ca3af; margin:0;">
+          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+        </p>
+      </div>
+    </div>
+  </div>
+  `;
+
+  return {
+    subject: 'Welcome to Sotto',
+    html: `${HEADER}
+      <div style="padding:16px 32px 32px;">
+        <h2 style="font-family:'DM Serif Display',Georgia,serif; font-size:20px; color:#1A1A1A; margin:0 0 12px;">
+          Welcome, ${name}!
+        </h2>
+        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
+          You&apos;re all set. Sotto is the open podcast network where you can generate
+          AI podcasts from any topic, interrupt to ask questions, fork &amp; remix, and
+          share knowledge with the world.
+        </p>
+        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
+          Create your first podcast in minutes &mdash; just describe what you want to learn
+          and we&apos;ll handle the rest.
+        </p>
+        <a href="${APP_URL}/create" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
+          Create Your First Podcast
+        </a>
+      </div>
+    ${simpleFooter}`,
+  };
+}
+
 interface DigestPodcast {
   id: string;
   title: string;

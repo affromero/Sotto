@@ -22,6 +22,8 @@ const updateUserSchema = z
     preferredHostVoiceId: z.string().nullable().optional(),
     preferredExpertVoiceId: z.string().nullable().optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
+    emailNotifications: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
     customTags: z.array(customTagSchema).max(10).optional(),
   })
