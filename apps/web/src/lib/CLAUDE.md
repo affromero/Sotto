@@ -43,6 +43,8 @@ All shared business logic and external service integrations live here.
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |
 | `twitter.ts` | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a) | Twitter API v2 |
 | `tweet-parser.ts` | Claude-based tweet intent extraction (topic, title, depth, tone) | Uses `claude.ts` |
+| `twitter-utils.ts` | Thread source text formatting (engagement-aware, credential-aware) | Pure utility |
+| `credential-lookup.ts` | Verified participant credential lookup via Claude + web search | Uses `claude.ts` |
 | `telegram.ts` | Telegram Bot API client (send messages, get updates, inline keyboards, webhook management) | Telegram Bot API |
 | `telegram-handler.ts` | Shared Telegram update router: commands, discovery chat, generation, callback queries. Used by both webhook route and polling worker | Uses `prisma.ts`, `telegram.ts`, `discovery-agent.ts`, `byok.ts` |
 | `telegram-parser.ts` | Claude-based Telegram message intent extraction (topic, title, depth, tone, sourceUrl) | Uses `claude.ts` |
