@@ -7,10 +7,11 @@ export async function GET(request: Request) {
   const variant = searchParams.get('v');
 
   const colors: Record<string, { bg: string; fg: string; glow: string }> = {
-    amber: { bg: '#D97706', fg: '#FFFFFF', glow: 'rgba(255,255,255,0.1)' },
-    white: { bg: '#FFFFFF', fg: '#D97706', glow: 'rgba(217,119,6,0.06)' },
+    amber: { bg: '#D97706', fg: '#FFFFFF', glow: 'rgba(255,255,255,0.15)' },
+    white: { bg: '#FFFFFF', fg: '#D97706', glow: 'rgba(217,119,6,0.08)' },
   };
-  const { bg, fg, glow } = colors[variant ?? ''] ?? { bg: '#FEFCF8', fg: '#1A1A1A', glow: 'rgba(217,119,6,0.06)' };
+  const { bg, fg, glow } =
+    colors[variant ?? ''] ?? { bg: '#FEFCF8', fg: '#1A1A1A', glow: 'rgba(217,119,6,0.06)' };
 
   return new ImageResponse(
     <div
@@ -38,15 +39,16 @@ export async function GET(request: Request) {
 
       <span
         style={{
-          fontSize: 160,
+          fontSize: 420,
           fontWeight: 700,
           color: fg,
           letterSpacing: '-0.03em',
+          lineHeight: 1,
         }}
       >
-        Sotto
+        S
       </span>
     </div>,
-    { width: 800, height: 800 }
+    { width: 512, height: 512 }
   );
 }
