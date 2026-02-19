@@ -8,8 +8,11 @@ import { getAiKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectVoicePair } from '@/lib/elevenlabs';
+import { lookupParticipantCredentials } from '@/lib/credential-lookup';
+import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet, TweetParseResult, ThreadData } from '@/types/twitter';
+import type { ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
 const REDIS_CTA_PREFIX = 'twitter:cta_sent:';
@@ -139,15 +142,22 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     const aiKey = await getAiKey(userId);
 
     // 7. Detect thread and parse intent accordingly
-    const isThread = tweet.conversation_id && tweet.conversation_id !== tweet.id;
+    const conversationId = tweet.conversation_id || tweet.id;
+    const isRootMention = conversationId === tweet.id;
+    const hasReplies = tweet.public_metrics?.reply_count && tweet.public_metrics.reply_count > 0;
     let parsed: TweetParseResult;
     let threadData: ThreadData | null = null;
 
-    if (isThread) {
-      threadData = await getThread(tweet.conversation_id!);
+    if (!isRootMention || hasReplies) {
+      threadData = await getThread(conversationId);
     }
 
-    if (threadData && threadData.replies.length >= 3) {
+    const isThreadPodcast = threadData !== null && (
+      (threadData.isSelfAuthored && threadData.replies.length >= 1) ||
+      (!threadData.isSelfAuthored && threadData.replies.length >= 3)
+    );
+
+    if (isThreadPodcast && threadData) {
       // Thread path: parse full conversation
       const mentionAsThreadTweet = {
         id: tweet.id,
@@ -172,6 +182,18 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
     }
 
+    // 7b. Look up credentials for verified thread participants
+    let participantCredentials: ParticipantCredential[] = [];
+    if (isThreadPodcast && threadData) {
+      const verifiedParticipants = getVerifiedParticipants(threadData);
+      if (verifiedParticipants.length > 0) {
+        participantCredentials = await lookupParticipantCredentials(
+          verifiedParticipants,
+          aiKey?.apiKey
+        );
+      }
+    }
+
     await prisma.tweetMention.update({
       where: { id: mention.id },
       data: { parsedTopic: parsed.topic, status: 'GENERATING' },
@@ -184,14 +206,13 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     const expertVoiceId = user.preferredExpertVoiceId ?? voicePair.expert.id;
 
     // 9. Build podcast metadata — adjust for threads
-    const isThreadPodcast = threadData && threadData.replies.length >= 3;
     const tone = parsed.isDebate ? 'socratic' : parsed.tone;
     const focusAreas = isThreadPodcast && parsed.viewpoints
       ? [...parsed.focusAreas, ...parsed.viewpoints]
       : parsed.focusAreas;
     const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
     const sourceText = isThreadPodcast && threadData
-      ? formatThreadAsSourceText(threadData, parsed)
+      ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
       : undefined;
 
     // 10. Create Podcast + Discovery records
@@ -301,26 +322,3 @@ function getParentTweetId(tweet: TwitterTweet): string | undefined {
   return repliedTo?.id;
 }
 
-function formatThreadAsSourceText(thread: ThreadData, parsed: TweetParseResult): string {
-  const sections: string[] = [];
-
-  sections.push('## Twitter/X Thread Discussion');
-  sections.push('');
-
-  if (parsed.viewpoints && parsed.viewpoints.length > 0) {
-    sections.push('### Viewpoints Identified:');
-    for (const viewpoint of parsed.viewpoints) {
-      sections.push(`- ${viewpoint}`);
-    }
-    sections.push('');
-  }
-
-  sections.push('### Thread Conversation:');
-  sections.push(`**Original post by @${thread.rootTweet.authorUsername}:** ${thread.rootTweet.text}`);
-
-  for (const reply of thread.replies) {
-    sections.push(`**@${reply.authorUsername}:** ${reply.text}`);
-  }
-
-  return sections.join('\n');
-}

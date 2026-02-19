@@ -137,7 +137,7 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics',
     max_results: '100',
   });
 
@@ -182,7 +182,7 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics',
   });
 
   const url = `${TWITTER_API_BASE}/tweets/${tweetId}?${params}`;
@@ -222,9 +222,9 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
 
   // Fetch root tweet separately (search results exclude it)
   const rootParams = new URLSearchParams({
-    'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities',
+    'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities,public_metrics',
     expansions: 'author_id',
-    'user.fields': 'username,name',
+    'user.fields': 'username,name,verified,verified_type,description',
   });
 
   const rootUrl = `${TWITTER_API_BASE}/tweets/${conversationId}?${rootParams}`;
@@ -244,12 +244,12 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
   if (!rootData.data) return null;
 
   const rawRootTweet = rootData.data as TwitterTweet;
-  const userMap = new Map<string, { username: string; name: string }>();
+  const userMap = new Map<string, { username: string; name: string; verified?: boolean; verifiedType?: string; description?: string }>();
 
   // Collect user info from root tweet includes
   if (rootData.includes?.users) {
     for (const user of rootData.includes.users) {
-      userMap.set(user.id, { username: user.username, name: user.name });
+      userMap.set(user.id, { username: user.username, name: user.name, verified: user.verified, verifiedType: user.verified_type, description: user.description });
     }
   }
 
@@ -262,9 +262,9 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
 
     const searchParams = new URLSearchParams({
       query: `conversation_id:${conversationId}`,
-      'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities',
+      'tweet.fields': 'author_id,conversation_id,created_at,in_reply_to_user_id,referenced_tweets,entities,public_metrics',
       expansions: 'author_id',
-      'user.fields': 'username,name',
+      'user.fields': 'username,name,verified,verified_type,description',
       max_results: '100',
     });
 
@@ -291,7 +291,7 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
     // Accumulate user info across pages
     if (searchData.includes?.users) {
       for (const user of searchData.includes.users) {
-        userMap.set(user.id, { username: user.username, name: user.name });
+        userMap.set(user.id, { username: user.username, name: user.name, verified: user.verified, verifiedType: user.verified_type, description: user.description });
       }
     }
 
@@ -333,6 +333,7 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
   const toThreadTweet = (tweet: TwitterTweet): ThreadTweet => {
     const author = userMap.get(tweet.author_id);
     const repliedTo = tweet.referenced_tweets?.find((r) => r.type === 'replied_to');
+    const pm = tweet.public_metrics;
     return {
       id: tweet.id,
       text: tweet.text,
@@ -342,6 +343,17 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
       urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
       createdAt: tweet.created_at,
       inReplyToTweetId: repliedTo?.id,
+      ...(pm && {
+        publicMetrics: {
+          likeCount: pm.like_count,
+          retweetCount: pm.retweet_count,
+          replyCount: pm.reply_count,
+          quoteCount: pm.quote_count,
+        },
+      }),
+      ...(author?.verified !== undefined && { authorVerified: author.verified }),
+      ...(author?.verifiedType && { authorVerifiedType: author.verifiedType }),
+      ...(author?.description && { authorBio: author.description }),
     };
   };
 
@@ -355,10 +367,16 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
   // Count unique participants
   const participantIds = new Set([rootThreadTweet.authorId, ...replyThreadTweets.map((r) => r.authorId)]);
 
+  // Determine if thread is self-authored (all replies, or all but 1, are from root author)
+  const rootAuthorId = rootThreadTweet.authorId;
+  const otherAuthorReplies = replyThreadTweets.filter((r) => r.authorId !== rootAuthorId);
+  const isSelfAuthored = otherAuthorReplies.length <= 1;
+
   logger.info('Fetched thread', {
     conversationId,
     tweetCount: String(1 + replyThreadTweets.length),
     participantCount: String(participantIds.size),
+    isSelfAuthored: String(isSelfAuthored),
   });
 
   return {
@@ -366,6 +384,7 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
     replies: replyThreadTweets,
     participantCount: participantIds.size,
     tweetCount: 1 + replyThreadTweets.length,
+    isSelfAuthored,
   };
 }
 

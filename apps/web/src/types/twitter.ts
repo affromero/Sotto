@@ -13,6 +13,7 @@ export interface TweetParseResult {
   sourceUrls?: string[];
   isDebate?: boolean;
   viewpoints?: string[];
+  isSelfAuthored?: boolean;
 }
 
 export interface TwitterTweet {
@@ -53,6 +54,15 @@ export interface ThreadTweet {
   urls: string[];
   createdAt: string;
   inReplyToTweetId?: string;
+  publicMetrics?: {
+    likeCount: number;
+    retweetCount: number;
+    replyCount: number;
+    quoteCount: number;
+  };
+  authorVerified?: boolean;
+  authorVerifiedType?: string;
+  authorBio?: string;
 }
 
 export interface ThreadData {
@@ -60,6 +70,7 @@ export interface ThreadData {
   replies: ThreadTweet[];
   participantCount: number;
   tweetCount: number;
+  isSelfAuthored: boolean;
 }
 
 export interface TwitterMention {

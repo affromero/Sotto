@@ -100,7 +100,7 @@ Note: The script may contain inline audio tags like [laughs], [sighs], [whispers
 1. Extract every factual claim from the dialogue. Ignore: greetings, transitions, opinions, rhetorical questions, conversational filler, and audio tags.
 2. Classify each claim as COMMON_KNOWLEDGE or REQUIRES_SOURCING.
    - COMMON_KNOWLEDGE: universally known facts (e.g., "water boils at 100C", "the earth orbits the sun")
-   - REQUIRES_SOURCING: specific statistics, study results, historical claims, technical details, quotes, dates
+   - REQUIRES_SOURCING: specific statistics, study results, historical claims, technical details, quotes, dates, biographical claims (a person's title, affiliation, institution, credentials, professional role). Any statement of the form "X is a professor/CEO/researcher/expert at Y" is a factual claim that REQUIRES_SOURCING — not common knowledge.
 3. For each REQUIRES_SOURCING claim:
    - Check if it has citation markers [N] in the text
    - Check if the cited references are from reliable sources (NOT Wikipedia, personal blogs, social media, content farms)
@@ -131,6 +131,17 @@ You have access to web search. Use it to:
 - Cross-check specific factual claims against current, authoritative sources
 - Find real sources to suggest as replacements for unverifiable citations
 Do NOT rely solely on your training data — actively search to confirm or refute each non-obvious claim.
+
+## Credential Claims — Extra Scrutiny:
+When the script attributes credentials to a named person (e.g., "Dr. Smith, a physicist at MIT"),
+this is a HIGH-RISK factual claim. You must:
+1. Flag it as REQUIRES_SOURCING regardless of context
+2. Use web search to verify: does this person exist? Do they hold this title at this institution?
+3. If the source material includes [VERIFIED] credential markers, cross-check that the script
+   faithfully reproduces them without embellishment
+4. If a credential claim appears that is NOT in the source material and cannot be verified via
+   web search, flag it as UNSUPPORTED and request removal or correction
+5. Never allow a credential claim to pass as COMMON_KNOWLEDGE
 
 ## This is attempt ${attemptNumber} of 3.
 ${previousFeedback ? `\n## Previous Feedback (that the script was revised to address):\n${previousFeedback}` : ''}
