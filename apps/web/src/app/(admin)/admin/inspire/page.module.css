@@ -1,79 +1,21 @@
 /* Admin Inspire Metrics Page */
 
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
-
-.headerRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-}
-
-.subtitle {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-}
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
 
 /* Range Nav */
 
-.rangeNav {
-  display: flex;
-  gap: var(--spacing-xs);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 4px;
-}
+.rangeNav { composes: rangeNav from '../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../admin.module.css'; }
 
-.rangeLink {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-full);
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-
-.rangeLink:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-hover);
-}
-
-.rangeLinkActive {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-.rangeLinkActive:hover {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-/* Stats Grid — 6 cards, 3 columns */
+/* Stats Grid — 6 cards, 3 columns (overrides shared 2-col) */
 
 .grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-md);
+  composes: grid from '../admin.module.css';
 }
 
 @media (min-width: 640px) {
@@ -82,129 +24,27 @@
   }
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
-}
-
-.card:hover {
-  border-color: var(--color-border-hover);
-}
-
-.cardLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.cardValue {
-  font: var(--text-h2);
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
+.card { composes: card from '../admin.module.css'; }
+.cardLabel { composes: cardLabel from '../admin.module.css'; }
+.cardValue { composes: cardValue from '../admin.module.css'; }
 
 /* Sections */
 
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.sectionTitle {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
-}
-
-.empty {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-  padding: var(--spacing-xl);
-  text-align: center;
-}
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
+.empty { composes: empty from '../admin.module.css'; }
 
 /* Two-column layout */
 
-.columns {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-xl);
-}
-
-@media (min-width: 1024px) {
-  .columns {
-    grid-template-columns: 1fr 1fr;
-  }
-}
+.columns { composes: columns from '../admin.module.css'; }
 
 /* Bar Chart */
 
-.chartContainer {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 200px;
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-}
-
-.chartBar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  min-width: 28px;
-  height: 100%;
-  justify-content: flex-end;
-  gap: var(--spacing-xs);
-}
-
-.chartBarFill {
-  width: 100%;
-  max-width: 32px;
-  background: var(--color-primary);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  min-height: 2px;
-  transition: height 0.3s ease;
-}
-
-.chartBarFillAccent {
-  width: 100%;
-  max-width: 32px;
-  background: var(--color-accent);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  min-height: 2px;
-  transition: height 0.3s ease;
-}
-
-.chartLabel {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  writing-mode: vertical-lr;
-  transform: rotate(180deg);
-  max-height: 50px;
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .chartLabel {
-    writing-mode: horizontal-tb;
-    transform: none;
-    font-size: 11px;
-  }
-}
+.chartContainer { composes: chartContainer from '../admin.module.css'; }
+.chartBar { composes: chartBar from '../admin.module.css'; }
+.chartBarFill { composes: chartBarFill from '../admin.module.css'; }
+.chartBarFillAccent { composes: chartBarFillAccent from '../admin.module.css'; }
+.chartLabel { composes: chartLabel from '../admin.module.css'; }
 
 /* Cache Hit Rate Cards */
 

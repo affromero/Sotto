@@ -1,126 +1,32 @@
 /* Admin Recommendation Analytics */
 
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
 
-.headerRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-}
+.rangeNav { composes: rangeNav from '../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../admin.module.css'; }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-}
-
-.subtitle {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-}
-
-.rangeNav {
-  display: flex;
-  gap: var(--spacing-xs);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 4px;
-}
-
-.rangeLink {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-full);
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-
-.rangeLink:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-hover);
-}
-
-.rangeLinkActive {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-.rangeLinkActive:hover {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-/* Summary cards */
+/* Summary cards — 2 col at 640px, 5 col at 1024px */
 
 .grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-md);
+  composes: grid from '../admin.module.css';
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
-}
-
-.card:hover {
-  border-color: var(--color-border-hover);
-}
-
-.cardLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.cardValue {
-  font: var(--text-h2);
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
+.card { composes: card from '../admin.module.css'; }
+.cardLabel { composes: cardLabel from '../admin.module.css'; }
+.cardValue { composes: cardValue from '../admin.module.css'; }
 
 /* Sections */
 
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.sectionTitle {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
-}
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
 
 .empty {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-  padding: var(--spacing-xl);
-  text-align: center;
+  composes: empty from '../admin.module.css';
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -128,17 +34,7 @@
 
 /* Side-by-side bar chart */
 
-.chartContainer {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 200px;
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-}
+.chartContainer { composes: chartContainer from '../admin.module.css'; }
 
 .chartBarGroup {
   display: flex;
@@ -209,14 +105,9 @@
   border-radius: 2px;
 }
 
-/* Table */
+/* Table — alias tableWrapper to shared tableContainer */
 
-.tableWrapper {
-  overflow-x: auto;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
+.tableWrapper { composes: tableContainer from '../admin.module.css'; }
 
 .table {
   width: 100%;
@@ -258,56 +149,23 @@
 
 /* Horizontal bar chart */
 
-.hBarContainer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.hBarRow {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
+.hBarContainer { composes: hBarContainer from '../admin.module.css'; }
+.hBarRow { composes: hBarRow from '../admin.module.css'; }
 
 .hBarLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
+  composes: hBarLabel from '../admin.module.css';
   min-width: 40px;
-  text-align: right;
 }
 
-.hBarTrack {
-  flex: 1;
-  height: 24px;
-  background: var(--color-surface-hover);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.hBarFill {
-  height: 100%;
-  background: var(--color-primary);
-  border-radius: var(--radius-sm);
-  transition: width 0.3s ease;
-}
+.hBarTrack { composes: hBarTrack from '../admin.module.css'; }
+.hBarFill { composes: hBarFill from '../admin.module.css'; }
 
 .hBarValue {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
+  composes: hBarValue from '../admin.module.css';
   min-width: 70px;
 }
 
 @media (min-width: 640px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
   .chartLabel {
     writing-mode: horizontal-tb;
     transform: none;

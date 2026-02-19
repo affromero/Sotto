@@ -1,93 +1,29 @@
 /* Admin Overview Page */
 
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
+.container { composes: container from './admin.module.css'; }
+.header { composes: header from './admin.module.css'; }
+.title { composes: title from './admin.module.css'; }
+.subtitle { composes: subtitle from './admin.module.css'; }
+.grid { composes: grid from './admin.module.css'; }
+.card { composes: card from './admin.module.css'; gap: var(--spacing-md); }
+.cardLabel { composes: cardLabel from './admin.module.css'; }
+.cardValue { composes: cardValue from './admin.module.css'; }
+.section { composes: section from './admin.module.css'; }
+.sectionTitle { composes: sectionTitle from './admin.module.css'; }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-}
-
-.subtitle {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-}
-
-/* Stats Grid */
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-md);
-}
-
-@media (min-width: 640px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
+/* Grid: 3 columns on desktop */
 @media (min-width: 1024px) {
   .grid {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
-}
-
-.card:hover {
-  border-color: var(--color-border-hover);
-}
+/* Page-specific */
 
 .cardHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.cardLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.cardValue {
-  font: var(--text-h2);
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-/* Sections */
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.sectionTitle {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
 }
 
 .statsGrid {
