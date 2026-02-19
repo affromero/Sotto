@@ -8,7 +8,7 @@ import {
   JobType,
 } from '@/lib/queue';
 import { isTwitterConfigured } from '@/lib/twitter';
-import { isTelegramBotConfigured } from '@/lib/telegram';
+import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
 import { processContentExtraction } from './content-extraction.worker';
 import { processScriptGeneration } from './script-generation.worker';
@@ -56,7 +56,7 @@ const workers = [
   createWorker('data-export', processDataExport, { concurrency: 1 }),
   createWorker('audio-import', processAudioImport, { concurrency: 2 }),
   createWorker('key-validation', processKeyValidation, { concurrency: 1 }),
-  createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 35000 }),
+  createWorker('telegram-bot', processTelegramUpdates, { concurrency: 1, lockDuration: 10000 }),
   createWorker('telegram-reply', processTelegramReply, { concurrency: 2 }),
   createWorker('twitter-auto-tweet', processAutoTweet, { concurrency: 1 }),
   createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
@@ -78,17 +78,29 @@ if (isTwitterConfigured()) {
   logger.info('Twitter integration not configured — polling disabled');
 }
 
-// Set up Telegram bot polling if configured
+// Set up Telegram bot: webhook (production) or polling (dev)
 if (isTelegramBotConfigured()) {
-  const pollInterval = parseInt(process.env.TELEGRAM_POLL_INTERVAL_MS || '35000', 10);
-  telegramBotQueue
-    .add(JobType.POLL_TELEGRAM_UPDATES, {}, { repeat: { every: pollInterval } })
-    .then(() =>
-      logger.info('Telegram bot polling scheduled', { intervalMs: String(pollInterval) })
-    )
-    .catch((err) => logger.error('Failed to schedule Telegram polling', { error: err.message }));
+  const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+
+  if (webhookUrl && webhookSecret) {
+    // Production: register webhook, no polling needed
+    setWebhook(webhookUrl, webhookSecret)
+      .then(() => logger.info('Telegram webhook registered', { url: webhookUrl }))
+      .catch((err) => logger.error('Failed to register Telegram webhook', { error: err.message }));
+  } else {
+    // Dev: clear any stale webhook, then start fast polling
+    deleteWebhook()
+      .then(() => telegramBotQueue.obliterate({ force: true }))
+      .then(() => {
+        const pollInterval = parseInt(process.env.TELEGRAM_POLL_INTERVAL_MS || '5000', 10);
+        return telegramBotQueue.add(JobType.POLL_TELEGRAM_UPDATES, {}, { repeat: { every: pollInterval } });
+      })
+      .then(() => logger.info('Telegram bot polling scheduled (dev mode)'))
+      .catch((err) => logger.error('Failed to set up Telegram polling', { error: err.message }));
+  }
 } else {
-  logger.info('Telegram bot not configured — polling disabled');
+  logger.info('Telegram bot not configured — disabled');
 }
 
 // Set up Twitter trend polling if credentials are configured
