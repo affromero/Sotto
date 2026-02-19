@@ -1,0 +1,116 @@
+.main {
+  min-height: 100vh;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background: var(--color-background);
+}
+
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* Hero */
+
+.hero {
+  text-align: center;
+  margin-bottom: var(--spacing-3xl);
+}
+
+.heroTitle {
+  font: var(--text-display);
+  margin-bottom: var(--spacing-md);
+}
+
+.heroSubtitle {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Features */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-3xl);
+}
+
+.feature {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.featureIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-md);
+}
+
+.featureTitle {
+  font: var(--text-h3);
+  margin-bottom: var(--spacing-sm);
+}
+
+.featureDescription {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+/* Sections */
+
+.section {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.sectionTitle {
+  font: var(--text-h2);
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText:last-child {
+  margin-bottom: 0;
+}
+
+.sectionText a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+/* Contact */
+
+.contact {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-2xl);
+}
+
+/* Mobile */
+
+@media (max-width: 700px) {
+  .features {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .heroTitle {
+    font: var(--text-h1);
+  }
+}

@@ -38,6 +38,8 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'en_US',
     siteName: 'Sotto',
+    url: 'https://sotto.fm',
+    images: [{ url: 'https://sotto.fm/icon-512.png', width: 512, height: 512, alt: 'Sotto' }],
   },
   twitter: {
     card: 'summary_large_image',
@@ -53,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${dmSerifDisplay.variable} ${inter.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body>
         <SessionProvider>
