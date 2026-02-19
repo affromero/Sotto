@@ -23,6 +23,7 @@ export interface VerificationVerdict {
   underSourcedClaims: ClaimAnalysis[];
   unreliableSourceClaims: ClaimAnalysis[];
   misattributedClaims: ClaimAnalysis[];
+  referenceQuality: ReferenceQualityAssessment;
   durationFeedback: string | null;
   feedback: string;
   inputTokens: number;
@@ -54,6 +55,88 @@ const DEPTH_THRESHOLDS: Record<string, number> = {
   quick_overview: 0.7,
   eli5: 0.6,
 };
+
+export const MIN_REFERENCE_COUNTS: Record<string, number> = {
+  deep_dive: 10,
+  standard: 5,
+  quick_overview: 3,
+  eli5: 3,
+};
+
+export const SERIOUS_REFERENCE_TYPES: Set<string> = new Set(['PAPER', 'BOOK', 'REPORT']);
+
+export const MIN_SERIOUS_RATIO: Record<string, number> = {
+  deep_dive: 0.6,
+  standard: 0.4,
+  quick_overview: 0.2,
+  eli5: 0,
+};
+
+export const REFERENCE_TYPE_WEIGHTS: Record<string, number> = {
+  PAPER: 1.0,
+  BOOK: 0.9,
+  REPORT: 0.85,
+  ARTICLE: 0.6,
+  VIDEO: 0.5,
+  WEB: 0.4,
+};
+
+export interface ReferenceQualityAssessment {
+  totalCount: number;
+  requiredCount: number;
+  countPassed: boolean;
+  seriousCount: number;
+  seriousRatio: number;
+  requiredSeriousRatio: number;
+  ratioPassed: boolean;
+  qualityScore: number;
+  feedback: string | null;
+}
+
+export function assessReferenceQuality(
+  references: GeneratedReference[],
+  depth: string
+): ReferenceQualityAssessment {
+  const totalCount = references.length;
+  const requiredCount = MIN_REFERENCE_COUNTS[depth] ?? 5;
+  const countPassed = totalCount >= requiredCount;
+
+  const seriousCount = references.filter((r) => SERIOUS_REFERENCE_TYPES.has(r.type)).length;
+  const seriousRatio = totalCount > 0 ? seriousCount / totalCount : 0;
+  const requiredSeriousRatio = MIN_SERIOUS_RATIO[depth] ?? 0.4;
+  const ratioPassed = seriousRatio >= requiredSeriousRatio;
+
+  const qualityScore =
+    totalCount > 0
+      ? references.reduce((sum, r) => sum + (REFERENCE_TYPE_WEIGHTS[r.type] ?? 0.4), 0) / totalCount
+      : 0;
+
+  const problems: string[] = [];
+  if (!countPassed) {
+    problems.push(
+      `Only ${totalCount} reference(s) provided, but ${depth} depth requires at least ${requiredCount}. Add more references — prefer peer-reviewed papers (PAPER), books (BOOK), and official reports (REPORT).`
+    );
+  }
+  if (!ratioPassed) {
+    const pct = Math.round(seriousRatio * 100);
+    const reqPct = Math.round(requiredSeriousRatio * 100);
+    problems.push(
+      `Only ${pct}% of references are serious sources (PAPER/BOOK/REPORT), but ${depth} depth requires at least ${reqPct}%. Replace WEB/ARTICLE references with peer-reviewed papers, books, or official reports where possible.`
+    );
+  }
+
+  return {
+    totalCount,
+    requiredCount,
+    countPassed,
+    seriousCount,
+    seriousRatio,
+    requiredSeriousRatio,
+    ratioPassed,
+    qualityScore,
+    feedback: problems.length > 0 ? problems.join(' ') : null,
+  };
+}
 
 import { wordCountBounds } from './duration';
 
@@ -234,6 +317,17 @@ Analyze every factual claim. Return JSON only.`;
       underSourcedClaims: [],
       unreliableSourceClaims: [],
       misattributedClaims: [],
+      referenceQuality: {
+        totalCount: 0,
+        requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+        countPassed: false,
+        seriousCount: 0,
+        seriousRatio: 0,
+        requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+        ratioPassed: false,
+        qualityScore: 0,
+        feedback: null,
+      },
       durationFeedback: null,
       feedback: 'Script verification failed: could not parse AI response. Will retry.',
       inputTokens: response.inputTokens,
@@ -294,8 +388,16 @@ Analyze every factual claim. Return JSON only.`;
         sourcingRequired.length;
   const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
 
+  const refQuality = assessReferenceQuality(references, depth);
+
   const passed =
-    score >= threshold && unreliableSourceClaims.length === 0 && misattributedClaims.length === 0 && !tooLong && !tooShort;
+    score >= threshold &&
+    unreliableSourceClaims.length === 0 &&
+    misattributedClaims.length === 0 &&
+    !tooLong &&
+    !tooShort &&
+    refQuality.countPassed &&
+    refQuality.ratioPassed;
 
   let feedback = parsed.feedback || '';
   if (misattributedClaims.length > 0) {
@@ -305,6 +407,9 @@ Analyze every factual claim. Return JSON only.`;
   }
   if (durationFeedback) {
     feedback = feedback ? `${feedback}\n\nDURATION: ${durationFeedback}` : durationFeedback;
+  }
+  if (refQuality.feedback) {
+    feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
   }
 
   return {
@@ -317,6 +422,7 @@ Analyze every factual claim. Return JSON only.`;
     underSourcedClaims,
     unreliableSourceClaims,
     misattributedClaims,
+    referenceQuality: refQuality,
     durationFeedback,
     feedback,
     inputTokens: response.inputTokens,

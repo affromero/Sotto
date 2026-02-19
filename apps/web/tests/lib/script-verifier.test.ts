@@ -10,7 +10,25 @@ vi.mock('@/lib/claude', () => ({
 }));
 
 // ---- Import under test ----
-import { verifyScript } from '@/lib/script-verifier';
+import { verifyScript, assessReferenceQuality } from '@/lib/script-verifier';
+import type { GeneratedReference } from '@/lib/script-generator';
+
+function makeRef(num: number, type: GeneratedReference['type']): GeneratedReference {
+  return {
+    number: num,
+    title: `Reference ${num}`,
+    authors: [`Author ${num}`],
+    year: 2023,
+    url: `https://example.com/ref${num}`,
+    type,
+    publisher: null,
+    doi: type === 'PAPER' ? `10.1234/ref${num}` : null,
+  };
+}
+
+function makePaperRefs(count: number, startNum = 1): GeneratedReference[] {
+  return Array.from({ length: count }, (_, i) => makeRef(startNum + i, 'PAPER'));
+}
 
 // ---- Tests ----
 
@@ -109,7 +127,7 @@ describe('verifyScript', () => {
     const result = await verifyScript({
       topic: 'Astronomy Basics',
       turns: [{ speaker: 'HOST', text: 'The earth orbits the sun.' }],
-      references: [],
+      references: makePaperRefs(5),
       depth: 'standard',
       audienceLevel: 'beginner',
       attemptNumber: 1,
@@ -274,7 +292,7 @@ describe('verifyScript', () => {
     const result = await verifyScript({
       topic: 'Good Script',
       turns: [{ speaker: 'HOST', text: okText }],
-      references: [],
+      references: makePaperRefs(5),
       depth: 'standard',
       audienceLevel: 'beginner',
       attemptNumber: 1,
@@ -404,6 +422,7 @@ describe('verifyScript', () => {
           publisher: null,
           doi: null,
         },
+        ...makePaperRefs(4, 2),
       ],
       depth: 'standard',
       audienceLevel: 'intermediate',
@@ -517,5 +536,139 @@ describe('verifyScript', () => {
       expect.any(Array),
       expect.objectContaining({ apiKeyOverride: 'user-key-456' })
     );
+  });
+});
+
+describe('reference quality enforcement', () => {
+  it('assessReferenceQuality passes for deep_dive with >= 10 refs and >= 60% serious', () => {
+    const refs: GeneratedReference[] = [
+      ...makePaperRefs(4),
+      makeRef(5, 'BOOK'),
+      makeRef(6, 'REPORT'),
+      makeRef(7, 'PAPER'),
+      makeRef(8, 'ARTICLE'),
+      makeRef(9, 'WEB'),
+      makeRef(10, 'PAPER'),
+    ];
+    const result = assessReferenceQuality(refs, 'deep_dive');
+    expect(result.countPassed).toBe(true);
+    expect(result.ratioPassed).toBe(true);
+    expect(result.totalCount).toBe(10);
+    expect(result.seriousCount).toBe(8);
+    expect(result.feedback).toBeNull();
+  });
+
+  it('fails when reference count below minimum', () => {
+    const refs = makePaperRefs(3);
+    const result = assessReferenceQuality(refs, 'standard');
+    expect(result.countPassed).toBe(false);
+    expect(result.feedback).toContain('at least 5');
+  });
+
+  it('fails when serious ratio below minimum', () => {
+    const refs: GeneratedReference[] = [
+      ...Array.from({ length: 7 }, (_, i) => makeRef(i + 1, 'WEB')),
+      ...makePaperRefs(3, 8),
+    ];
+    const result = assessReferenceQuality(refs, 'deep_dive');
+    expect(result.ratioPassed).toBe(false);
+    expect(result.seriousRatio).toBe(0.3);
+    expect(result.feedback).toContain('60%');
+  });
+
+  it('eli5 passes with all WEB refs', () => {
+    const refs = Array.from({ length: 3 }, (_, i) => makeRef(i + 1, 'WEB'));
+    const result = assessReferenceQuality(refs, 'eli5');
+    expect(result.countPassed).toBe(true);
+    expect(result.ratioPassed).toBe(true);
+    expect(result.feedback).toBeNull();
+  });
+
+  it('quality score is higher for PAPER-heavy sets', () => {
+    const paperRefs = makePaperRefs(5);
+    const webRefs = Array.from({ length: 5 }, (_, i) => makeRef(i + 1, 'WEB'));
+    const paperResult = assessReferenceQuality(paperRefs, 'standard');
+    const webResult = assessReferenceQuality(webRefs, 'standard');
+    expect(paperResult.qualityScore).toBe(1.0);
+    expect(webResult.qualityScore).toBe(0.4);
+    expect(paperResult.qualityScore).toBeGreaterThan(webResult.qualityScore);
+  });
+
+  it('integration: verifyScript fails when reference count insufficient', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Quantum computing uses qubits',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Adequately sourced',
+          },
+        ],
+        overallScore: 0.95,
+        feedback: '',
+      }),
+      inputTokens: 600,
+      outputTokens: 300,
+    });
+
+    const result = await verifyScript({
+      topic: 'Quantum Computing',
+      turns: [{ speaker: 'EXPERT', text: 'Quantum computing uses qubits [1].' }],
+      references: [makeRef(1, 'PAPER')],
+      depth: 'deep_dive',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.referenceQuality.countPassed).toBe(false);
+    expect(result.feedback).toContain('REFERENCES');
+  });
+
+  it('integration: verifyScript passes when references meet thresholds', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Studies show exercise improves mood',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1, 2],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Well sourced',
+          },
+        ],
+        overallScore: 0.95,
+        feedback: '',
+      }),
+      inputTokens: 600,
+      outputTokens: 300,
+    });
+
+    const refs: GeneratedReference[] = [
+      ...makePaperRefs(4),
+      makeRef(5, 'ARTICLE'),
+    ];
+
+    const result = await verifyScript({
+      topic: 'Exercise Benefits',
+      turns: [{ speaker: 'EXPERT', text: 'Studies show exercise improves mood [1,2].' }],
+      references: refs,
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.referenceQuality.countPassed).toBe(true);
+    expect(result.referenceQuality.ratioPassed).toBe(true);
+    expect(result.referenceQuality.qualityScore).toBeGreaterThan(0.8);
   });
 });
