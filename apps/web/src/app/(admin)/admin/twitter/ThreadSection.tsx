@@ -36,6 +36,8 @@ export function ThreadSection() {
   const [activePodcastId, setActivePodcastId] = useState<string | null>(null);
   const [podcastStatus, setPodcastStatus] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
+  const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
+  const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const pollRef = useRef(false);
 
   const loadRecentThreadPodcasts = useCallback(async () => {
@@ -145,6 +147,8 @@ export function ThreadSection() {
       }
 
       const data = await res.json();
+      setSubmittedUrl(url.trim());
+      setSubmittedMessage(message.trim() || null);
       setUrl('');
       setMessage('');
       setActiveJobId(data.jobId);
@@ -213,6 +217,16 @@ export function ThreadSection() {
 
         {error && !activeJobId && <div className={styles.error}>{error}</div>}
 
+        {/* Submitted context — visible during processing */}
+        {activeJobId && submittedUrl && (
+          <div className={styles.submittedContext}>
+            <span className={styles.submittedUrl}>{submittedUrl}</span>
+            {submittedMessage && (
+              <span className={styles.submittedMessage}>{submittedMessage}</span>
+            )}
+          </div>
+        )}
+
         {/* Worker phase: fetching tweet / parsing intent */}
         {activeJobId && !activePodcastId && !jobError && (
           <div className={styles.progressSection}>
@@ -248,6 +262,8 @@ export function ThreadSection() {
                 setActiveJobId(null);
                 setActivePodcastId(null);
                 setPodcastStatus(null);
+                setSubmittedUrl(null);
+                setSubmittedMessage(null);
               }}
               aria-label="Dismiss"
             >
@@ -267,6 +283,8 @@ export function ThreadSection() {
                 setActiveJobId(null);
                 setJobError(null);
                 setActivePodcastId(null);
+                setSubmittedUrl(null);
+                setSubmittedMessage(null);
               }}
               aria-label="Dismiss error"
             >
