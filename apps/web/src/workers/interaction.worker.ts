@@ -31,7 +31,9 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   }
   if (!model) {
     const config = await getFreeTierConfig();
-    model = config.aiModel;
+    model = config.aiAllocations.length > 0
+      ? config.aiAllocations[0].model
+      : config.aiModel;
   }
 
   // Get podcast script context

@@ -9,6 +9,7 @@ import { importPodcastSchema } from '@/lib/validations';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import type { SttProviderId } from '@sotto/shared';
@@ -279,7 +280,11 @@ export async function POST(request: NextRequest) {
     // Increment free tier counter for non-BYOK users
     if (!gate.isByokUser) {
       const config = await getFreeTierConfig();
-      const ok = await tryIncrementFreeGeneration(userId, config.generationLimit);
+      const selected = await selectFreeTierProviders(userId);
+      const ok = await tryIncrementFreeGeneration(userId, config.generationLimit, {
+        ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+        tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+      });
       if (!ok) {
         await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
         return NextResponse.json(

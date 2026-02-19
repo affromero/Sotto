@@ -5,6 +5,7 @@ import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import { checkRateLimit } from '@/lib/redis';
@@ -76,15 +77,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
+  let freeTierTtsProvider: string | undefined;
+  let freeTierTtsModel: string | undefined;
+  let freeTierAiModel: string | undefined;
   if (!gate.isByokUser) {
     const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit);
+    const selected = await selectFreeTierProviders(userId);
+    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit, {
+      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+    });
     if (!ok) {
       return NextResponse.json(
         { error: 'Free generations used.', code: 'free_tier_exhausted' },
         { status: 403 }
       );
     }
+    freeTierTtsProvider = selected.ttsProvider;
+    freeTierTtsModel = selected.ttsModel;
+    freeTierAiModel = selected.aiModel;
   }
 
   const body = await request.json().catch(() => ({}));
@@ -184,6 +195,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         forkedFromId: podcastId,
         hostVoiceId: forkHostVoiceId,
         expertVoiceId: forkExpertVoiceId,
+        ttsProvider: freeTierTtsProvider ?? undefined,
+        ttsModel: freeTierTtsModel ?? undefined,
+        aiModel: freeTierAiModel ?? undefined,
       },
     });
 

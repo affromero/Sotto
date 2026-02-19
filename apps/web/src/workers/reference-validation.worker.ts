@@ -82,7 +82,9 @@ export async function processReferenceValidation(
   }
   if (!model) {
     const config = await getFreeTierConfig();
-    model = config.aiModel;
+    model = config.aiAllocations.length > 0
+      ? config.aiAllocations[0].model
+      : config.aiModel;
   }
 
   if (!script) {
