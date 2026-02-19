@@ -20,12 +20,13 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 | Frontend  | Next.js 14+ (App Router), TypeScript, CSS Modules (NO Tailwind)                                          |
 | Database  | PostgreSQL 16 + Prisma ORM                                                                               |
 | Auth      | NextAuth.js v5 (Google, GitHub, Apple Sign In; Twitter for account linking only)                         |
-| Queue     | Redis 7 + BullMQ (24 worker types)                                                                       |
+| Queue     | Redis 7 + BullMQ (25 worker types)                                                                       |
 | AI        | Anthropic Claude (discovery chat, script generation, Q&A) — swappable via `AI_PROVIDER`                  |
 | Audio     | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate (multi-provider TTS) — resolved via resolveTtsProvider() |
 | Stitching | FFmpeg (segment concatenation + normalization)                                                           |
 | Storage   | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                                         |
 | BYOK      | Users bring own LLM keys (Anthropic/OpenAI) + TTS keys (7 providers) — all features free                |
+| Email     | Resend (transactional email: waitlist welcome, weekly digest)                                             |
 | PDF       | pdfmake (server-side transcript PDF generation)                                                          |
 | Hosting   | Hetzner VPS (Docker Compose + Caddy), deployed via GitHub Actions SSH                                    |
 
@@ -139,7 +140,7 @@ Each subdirectory has its own `CLAUDE.md` with full file listings:
 | `app/` | `src/app/CLAUDE.md` | All pages + 38 API route groups |
 | `components/` | `src/components/CLAUDE.md` | 15 component directories |
 | `lib/` | `src/lib/CLAUDE.md` | 40+ lib files, 7 hooks, providers |
-| `workers/` | `src/workers/CLAUDE.md` | 24 workers, pipeline flow |
+| `workers/` | `src/workers/CLAUDE.md` | 25 workers, pipeline flow |
 | `types/` | `src/types/CLAUDE.md` | Type re-exports from @sotto/shared |
 | `styles/` | `src/styles/CLAUDE.md` | Design system tokens |
 | `prisma/` | `prisma/CLAUDE.md` | 58 Prisma models |
