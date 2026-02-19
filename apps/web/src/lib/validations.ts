@@ -469,3 +469,30 @@ export const trendGenerateSchema = z.object({
   tweetText: z.string().min(1).max(5000),
   tweetId: z.string().optional(),
 });
+
+/**
+ * AI-generated script validation — applied after JSON parse in script-generator
+ */
+export const generatedScriptSchema = z.object({
+  turns: z.array(z.object({
+    speaker: z.enum(['HOST', 'EXPERT']),
+    text: z.string().min(1),
+    direction: z.string().optional(),
+  })).min(2),
+  soundCues: z.array(z.object({
+    type: z.enum(['intro', 'transition', 'outro', 'ambient']),
+    prompt: z.string().min(1),
+    durationSeconds: z.number().positive(),
+    insertAfterTurn: z.number().int(),
+  })).optional().default([]),
+  references: z.array(z.object({
+    number: z.number().int().positive(),
+    title: z.string().min(1),
+    authors: z.union([z.array(z.string()), z.string()]),
+    year: z.number().nullable(),
+    url: z.string().nullable(),
+    type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
+    publisher: z.string().nullable(),
+    doi: z.string().nullable(),
+  })).optional().default([]),
+});

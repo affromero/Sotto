@@ -59,7 +59,7 @@ describe('generateScript', () => {
 
     it('generates valid output for minimal params', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Hello' }],
+        turns: [{ speaker: 'HOST', text: 'Hello' }, { speaker: 'EXPERT', text: 'Hi there.' }],
         soundCues: [],
         references: [],
       };
@@ -79,14 +79,14 @@ describe('generateScript', () => {
         durationTarget: 5,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Hello');
       expect(result.markdown).toBeDefined();
     });
 
     it('succeeds when source content is provided', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Today we discuss...' }],
+        turns: [{ speaker: 'HOST', text: 'Today we discuss...' }, { speaker: 'EXPERT', text: 'Great topic.' }],
         soundCues: [],
         references: [],
       };
@@ -109,13 +109,13 @@ describe('generateScript', () => {
         sourceContent,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Today we discuss...');
     });
 
     it('succeeds with casual tone', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Hey there!' }],
+        turns: [{ speaker: 'HOST', text: 'Hey there!' }, { speaker: 'EXPERT', text: 'Hey!' }],
         soundCues: [],
         references: [],
       };
@@ -135,13 +135,13 @@ describe('generateScript', () => {
         durationTarget: 7,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Hey there!');
     });
 
     it('succeeds with professional tone', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'EXPERT', text: 'Good morning.' }],
+        turns: [{ speaker: 'HOST', text: 'Welcome.' }, { speaker: 'EXPERT', text: 'Good morning.' }],
         soundCues: [],
         references: [],
       };
@@ -161,13 +161,13 @@ describe('generateScript', () => {
         durationTarget: 12,
       });
 
-      expect(result.turns).toHaveLength(1);
-      expect(result.turns[0].text).toBe('Good morning.');
+      expect(result.turns).toHaveLength(2);
+      expect(result.turns[1].text).toBe('Good morning.');
     });
 
     it('succeeds with socratic tone', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'What if we consider...' }],
+        turns: [{ speaker: 'HOST', text: 'What if we consider...' }, { speaker: 'EXPERT', text: 'Interesting point.' }],
         soundCues: [],
         references: [],
       };
@@ -187,13 +187,13 @@ describe('generateScript', () => {
         durationTarget: 20,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('What if we consider...');
     });
 
     it('succeeds with storytelling tone', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'EXPERT', text: 'Once upon a time...' }],
+        turns: [{ speaker: 'HOST', text: 'Tell us a story.' }, { speaker: 'EXPERT', text: 'Once upon a time...' }],
         soundCues: [],
         references: [],
       };
@@ -213,13 +213,13 @@ describe('generateScript', () => {
         durationTarget: 15,
       });
 
-      expect(result.turns).toHaveLength(1);
-      expect(result.turns[0].text).toBe('Once upon a time...');
+      expect(result.turns).toHaveLength(2);
+      expect(result.turns[1].text).toBe('Once upon a time...');
     });
 
     it('succeeds with focus areas', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: "Let's dive in!" }],
+        turns: [{ speaker: 'HOST', text: "Let's dive in!" }, { speaker: 'EXPERT', text: 'Absolutely.' }],
         soundCues: [],
         references: [],
       };
@@ -239,13 +239,13 @@ describe('generateScript', () => {
         durationTarget: 10,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe("Let's dive in!");
     });
 
     it('succeeds with duration target', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Welcome!' }],
+        turns: [{ speaker: 'HOST', text: 'Welcome!' }, { speaker: 'EXPERT', text: 'Thanks.' }],
         soundCues: [],
         references: [],
       };
@@ -265,7 +265,7 @@ describe('generateScript', () => {
         durationTarget: 5,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Welcome!');
     });
   });
@@ -443,7 +443,7 @@ describe('generateScript', () => {
   describe('segment structure', () => {
     it('returns structured script with turns, soundCues, references, markdown', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Welcome!', direction: 'warm' }],
+        turns: [{ speaker: 'HOST', text: 'Welcome!', direction: 'warm' }, { speaker: 'EXPERT', text: 'Great to be here.' }],
         soundCues: [
           { type: 'intro', prompt: 'upbeat jingle', durationSeconds: 3, insertAfterTurn: -1 },
         ],
@@ -509,7 +509,7 @@ describe('generateScript', () => {
 
     it('adds default sound cues if none provided by Claude', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Welcome!' }],
+        turns: [{ speaker: 'HOST', text: 'Welcome!' }, { speaker: 'EXPERT', text: 'Thanks.' }],
         soundCues: [],
         references: [],
       };
@@ -538,7 +538,7 @@ describe('generateScript', () => {
       expect(result.soundCues[1]).toMatchObject({
         type: 'outro',
         durationSeconds: 4,
-        insertAfterTurn: 0, // after the single turn
+        insertAfterTurn: 1, // after the last turn
       });
     });
 
@@ -581,7 +581,7 @@ describe('generateScript', () => {
   describe('error handling and edge cases', () => {
     it('handles empty topic gracefully', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Default content.' }],
+        turns: [{ speaker: 'HOST', text: 'Default content.' }, { speaker: 'EXPERT', text: 'Indeed.' }],
         soundCues: [],
         references: [],
       };
@@ -601,13 +601,13 @@ describe('generateScript', () => {
         durationTarget: 5,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Default content.');
     });
 
     it('extracts JSON from Claude response wrapped in text', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Hello!' }],
+        turns: [{ speaker: 'HOST', text: 'Hello!' }, { speaker: 'EXPERT', text: 'Hi!' }],
         soundCues: [],
         references: [],
       };
@@ -627,7 +627,7 @@ describe('generateScript', () => {
         durationTarget: 10,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Hello!');
     });
 
@@ -659,7 +659,7 @@ describe('generateScript', () => {
 
     it('succeeds with source content exceeding 20000 chars', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Summary time.' }],
+        turns: [{ speaker: 'HOST', text: 'Summary time.' }, { speaker: 'EXPERT', text: 'Agreed.' }],
         soundCues: [],
         references: [],
       };
@@ -682,13 +682,13 @@ describe('generateScript', () => {
         sourceContent: longContent,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Summary time.');
     });
 
     it('succeeds with audience parameter', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Hey kids!' }],
+        turns: [{ speaker: 'HOST', text: 'Hey kids!' }, { speaker: 'EXPERT', text: 'Hello!' }],
         soundCues: [],
         references: [],
       };
@@ -709,13 +709,13 @@ describe('generateScript', () => {
         durationTarget: 5,
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Hey kids!');
     });
 
     it('passes web search tool to generateResponse', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Current events.' }],
+        turns: [{ speaker: 'HOST', text: 'Current events.' }, { speaker: 'EXPERT', text: 'Indeed.' }],
         soundCues: [],
         references: [],
       };
@@ -746,7 +746,7 @@ describe('generateScript', () => {
 
     it('passes apiKeyOverride to generateResponse', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'BYOK test.' }],
+        turns: [{ speaker: 'HOST', text: 'BYOK test.' }, { speaker: 'EXPERT', text: 'Working.' }],
         soundCues: [],
         references: [],
       };
@@ -776,7 +776,7 @@ describe('generateScript', () => {
 
     it('succeeds with sourceMetadata provided', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'From the article...' }],
+        turns: [{ speaker: 'HOST', text: 'From the article...' }, { speaker: 'EXPERT', text: 'Fascinating.' }],
         soundCues: [],
         references: [],
       };
@@ -803,13 +803,13 @@ describe('generateScript', () => {
         },
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('From the article...');
     });
 
     it('succeeds without sourceMetadata', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'From the source...' }],
+        turns: [{ speaker: 'HOST', text: 'From the source...' }, { speaker: 'EXPERT', text: 'Right.' }],
         soundCues: [],
         references: [],
       };
@@ -830,13 +830,13 @@ describe('generateScript', () => {
         sourceContent: 'Plain source text',
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('From the source...');
     });
 
     it('succeeds with partial sourceMetadata', async () => {
       const mockResponse = {
-        turns: [{ speaker: 'HOST', text: 'Partial meta...' }],
+        turns: [{ speaker: 'HOST', text: 'Partial meta...' }, { speaker: 'EXPERT', text: 'Noted.' }],
         soundCues: [],
         references: [],
       };
@@ -860,8 +860,57 @@ describe('generateScript', () => {
         },
       });
 
-      expect(result.turns).toHaveLength(1);
+      expect(result.turns).toHaveLength(2);
       expect(result.turns[0].text).toBe('Partial meta...');
+    });
+
+    it('throws ZodError when AI returns malformed script', async () => {
+      const malformed = {
+        turns: [{ speaker: 'INVALID_SPEAKER', text: '' }],
+        soundCues: 'not-an-array',
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(malformed),
+        inputTokens: 400,
+        outputTokens: 300,
+      });
+
+      await expect(
+        generateScript({
+          topic: 'Malformed Output',
+          depth: 'standard',
+          audienceLevel: 'intermediate',
+          focusAreas: [],
+          tone: 'professional',
+          durationTarget: 10,
+        })
+      ).rejects.toThrow();
+    });
+
+    it('throws when AI returns only one turn', async () => {
+      const singleTurn = {
+        turns: [{ speaker: 'HOST', text: 'Only one turn.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(singleTurn),
+        inputTokens: 400,
+        outputTokens: 300,
+      });
+
+      await expect(
+        generateScript({
+          topic: 'Too Short',
+          depth: 'standard',
+          audienceLevel: 'intermediate',
+          focusAreas: [],
+          tone: 'professional',
+          durationTarget: 10,
+        })
+      ).rejects.toThrow();
     });
   });
 });
@@ -873,7 +922,7 @@ describe('generateScriptWithFeedback', () => {
 
   it('truncates sourceContent at 20000 chars', async () => {
     const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised content.' }],
+      turns: [{ speaker: 'HOST', text: 'Revised content.' }, { speaker: 'EXPERT', text: 'Noted.' }],
       soundCues: [],
       references: [],
     };
@@ -910,7 +959,7 @@ describe('generateScriptWithFeedback', () => {
 
   it('includes sourceMetadata in user message when provided', async () => {
     const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised with metadata.' }],
+      turns: [{ speaker: 'HOST', text: 'Revised with metadata.' }, { speaker: 'EXPERT', text: 'Updated.' }],
       soundCues: [],
       references: [],
     };
@@ -950,7 +999,7 @@ describe('generateScriptWithFeedback', () => {
 
   it('passes web search tool to generateResponse', async () => {
     const mockResponse = {
-      turns: [{ speaker: 'HOST', text: 'Revised.' }],
+      turns: [{ speaker: 'HOST', text: 'Revised.' }, { speaker: 'EXPERT', text: 'Confirmed.' }],
       soundCues: [],
       references: [],
     };

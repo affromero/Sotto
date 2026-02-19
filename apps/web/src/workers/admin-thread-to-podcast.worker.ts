@@ -45,23 +45,34 @@ export async function processAdminThreadToPodcast(
     (!threadData.isSelfAuthored && threadData.replies.length >= 2)
   );
 
-  // 5. Parse intent from admin message (if provided) or tweet/thread text
+  // 5. Always parse thread/tweet for content first, then merge admin overrides
   let parsed;
+  const mentionAsThreadTweet = {
+    id: tweet.id,
+    text: tweet.text,
+    authorId: tweet.author_id,
+    authorUsername: 'unknown',
+    authorName: 'Unknown',
+    urls: tweet.entities?.urls?.map((u: { expanded_url: string }) => u.expanded_url) ?? [],
+    createdAt: tweet.created_at,
+  };
+
+  const contentParsed = isThreadPodcast && threadData
+    ? await parseThreadIntent(mentionAsThreadTweet, threadData)
+    : await parseTweetIntent(tweet.text);
+
   if (message) {
-    parsed = await parseTweetIntent(message);
-  } else if (isThreadPodcast && threadData) {
-    const mentionAsThreadTweet = {
-      id: tweet.id,
-      text: tweet.text,
-      authorId: tweet.author_id,
-      authorUsername: 'unknown',
-      authorName: 'Unknown',
-      urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
-      createdAt: tweet.created_at,
+    const overrides = await parseTweetIntent(message);
+    parsed = {
+      ...contentParsed,
+      depth: overrides.depth,
+      audienceLevel: overrides.audienceLevel,
+      tone: overrides.tone,
+      audience: overrides.audience ?? contentParsed.audience,
+      durationTarget: overrides.durationTarget ?? contentParsed.durationTarget,
     };
-    parsed = await parseThreadIntent(mentionAsThreadTweet, threadData);
   } else {
-    parsed = await parseTweetIntent(tweet.text);
+    parsed = contentParsed;
   }
 
   await job.updateProgress(50);
