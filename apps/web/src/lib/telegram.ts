@@ -123,6 +123,38 @@ export async function editMessageText(
   await callApi<unknown>('editMessageText', body);
 }
 
+/**
+ * Register a webhook URL with Telegram. Once set, Telegram POSTs updates
+ * to this URL instead of holding them for getUpdates polling.
+ */
+export async function setWebhook(url: string, secretToken: string): Promise<boolean> {
+  return callApi<boolean>('setWebhook', {
+    url,
+    secret_token: secretToken,
+    allowed_updates: ['message', 'callback_query'],
+  });
+}
+
+/**
+ * Remove the active webhook so getUpdates polling works again.
+ */
+export async function deleteWebhook(): Promise<boolean> {
+  return callApi<boolean>('deleteWebhook', { drop_pending_updates: false });
+}
+
+/**
+ * Get current webhook status (useful for debugging).
+ */
+export async function getWebhookInfo(): Promise<{
+  url: string;
+  has_custom_certificate: boolean;
+  pending_update_count: number;
+  last_error_date?: number;
+  last_error_message?: string;
+}> {
+  return callApi('getWebhookInfo');
+}
+
 export function isTelegramBotConfigured(): boolean {
   return !!process.env.TELEGRAM_BOT_TOKEN;
 }

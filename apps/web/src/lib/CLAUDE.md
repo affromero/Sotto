@@ -43,7 +43,8 @@ All shared business logic and external service integrations live here.
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |
 | `twitter.ts` | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a) | Twitter API v2 |
 | `tweet-parser.ts` | Claude-based tweet intent extraction (topic, title, depth, tone) | Uses `claude.ts` |
-| `telegram.ts` | Telegram Bot API client (send messages, get updates, inline keyboards) | Telegram Bot API |
+| `telegram.ts` | Telegram Bot API client (send messages, get updates, inline keyboards, webhook management) | Telegram Bot API |
+| `telegram-handler.ts` | Shared Telegram update router: commands, discovery chat, generation, callback queries. Used by both webhook route and polling worker | Uses `prisma.ts`, `telegram.ts`, `discovery-agent.ts`, `byok.ts` |
 | `telegram-parser.ts` | Claude-based Telegram message intent extraction (topic, title, depth, tone, sourceUrl) | Uses `claude.ts` |
 | `voice-pool.ts` | Unified voice pool: 16 curated voices with per-provider IDs, deterministic `selectVoicePair(podcastId)` hash, `resolveVoiceId()`, `findByVoiceId()` | Pure utility |
 | `pipeline-resume.ts` | Smart resume: `markPodcastFailed(podcastId)` records `failedAtStatus`, `determineResumePoint(podcastId)` inspects existing data (Script, Segments, References) and returns the optimal pipeline restart step | Uses `prisma.ts` |
