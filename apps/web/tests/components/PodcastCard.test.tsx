@@ -182,13 +182,13 @@ describe('PodcastCard', () => {
     expect(anonymousElements.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('uses question mark fallback for anonymous user avatar', () => {
+  it('uses U fallback for anonymous user avatar', () => {
     const podcastAnon = {
       ...mockPodcast,
-      user: { ...mockPodcast.user, name: null, image: null },
+      user: { ...mockPodcast.user, name: null, handle: null, image: null },
     };
     render(<PodcastCard podcast={podcastAnon} />);
-    const fallbacks = screen.getAllByText('?');
+    const fallbacks = screen.getAllByText('U');
     expect(fallbacks.length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -59,23 +59,6 @@ export async function GET() {
   // --- VAPID (Web Push) ---
   const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
-  // Unauthenticated requests get minimal response (sufficient for Docker healthcheck + deploy notifications)
-  const session = await auth();
-  if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json(
-      {
-        status: healthy ? 'healthy' : 'degraded',
-        version: process.env.COMMIT_SHA || 'dev',
-        timestamp: new Date().toISOString(),
-        oauth,
-        vapid,
-      },
-      { status: healthy ? 200 : 503 }
-    );
-  }
-
-  // --- Admin-only detailed checks below ---
-
   // --- R2 Storage (non-critical) ---
   const r2Start = Date.now();
   try {
@@ -212,7 +195,23 @@ export async function GET() {
     checks.queues = { status: 'error' };
   }
 
-  // --- Env vars ---
+  // Public response — includes all checks (ok/error + latency only, no secrets)
+  const session = await auth();
+  if (!session?.user?.id || session.user.role !== 'ADMIN') {
+    return NextResponse.json(
+      {
+        status: healthy ? 'healthy' : 'degraded',
+        version: process.env.COMMIT_SHA || 'dev',
+        timestamp: new Date().toISOString(),
+        checks,
+        oauth,
+        vapid,
+      },
+      { status: healthy ? 200 : 503 }
+    );
+  }
+
+  // --- Admin-only: env var configuration ---
   const envKeys = [
     'DATABASE_URL',
     'REDIS_URL',

@@ -137,7 +137,7 @@ export function CollectionDetail({
                   />
                 ) : (
                   <span className={styles.creatorAvatarFallback}>
-                    {(user.name || '?')[0].toUpperCase()}
+                    {(user.name || user.handle || 'U')[0].toUpperCase()}
                   </span>
                 )}
               </div>

@@ -161,7 +161,7 @@ export function PodcastCard({
                 />
               ) : (
                 <span className={styles.avatarFallback}>
-                  {(podcast.user.name || '?')[0].toUpperCase()}
+                  {(podcast.user.name || podcast.user.handle || 'U')[0].toUpperCase()}
                 </span>
               )}
             </div>

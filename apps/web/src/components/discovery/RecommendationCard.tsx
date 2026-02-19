@@ -10,6 +10,7 @@ interface RecommendationCardProps {
     likeCount: number;
     user: {
       name: string | null;
+      handle?: string | null;
       image: string | null;
     };
   };
@@ -114,7 +115,7 @@ export function RecommendationCard({ podcast, onListen, onFollow }: Recommendati
               />
             ) : (
               <span className={styles.creatorAvatarFallback}>
-                {podcast.user.name ? podcast.user.name.charAt(0).toUpperCase() : '?'}
+                {(podcast.user.name || podcast.user.handle || 'U')[0].toUpperCase()}
               </span>
             )}
           </div>

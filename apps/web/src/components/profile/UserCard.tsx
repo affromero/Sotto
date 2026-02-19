@@ -20,15 +20,18 @@ interface UserCardProps {
   isAuthenticated: boolean;
 }
 
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((word) => word[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+function getInitials(name: string | null, handle?: string | null): string {
+  if (name) {
+    return name
+      .split(' ')
+      .map((word) => word[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  }
+  if (handle) return handle.charAt(0).toUpperCase();
+  return 'U';
 }
 
 export function UserCard({ user, isFollowing: initialIsFollowing, isOwnProfile, isAuthenticated }: UserCardProps) {
@@ -66,7 +69,7 @@ export function UserCard({ user, isFollowing: initialIsFollowing, isOwnProfile, 
           />
         ) : (
           <div className={styles.avatarFallback} role="img" aria-label={`${user.name || 'User'}'s avatar`}>
-            <span className={styles.initials}>{getInitials(user.name)}</span>
+            <span className={styles.initials}>{getInitials(user.name, user.handle)}</span>
           </div>
         )}
         <div className={styles.info}>

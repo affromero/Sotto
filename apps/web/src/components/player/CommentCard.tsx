@@ -124,7 +124,7 @@ export function CommentCard({
             />
           ) : (
             <span className={styles.avatarFallback}>
-              {(comment.user.name || '?')[0].toUpperCase()}
+              {(comment.user.name || comment.user.handle || 'U')[0].toUpperCase()}
             </span>
           )}
         </Link>
@@ -220,7 +220,7 @@ export function CommentCard({
                     />
                   ) : (
                     <span className={styles.avatarFallback} data-size="small">
-                      {(reply.user.name || '?')[0].toUpperCase()}
+                      {(reply.user.name || reply.user.handle || 'U')[0].toUpperCase()}
                     </span>
                   )}
                 </Link>

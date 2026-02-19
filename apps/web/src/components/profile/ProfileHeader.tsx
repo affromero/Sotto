@@ -29,9 +29,10 @@ interface ProfileHeaderProps {
   onFollowingClick?: () => void;
 }
 
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name
+function getInitials(name: string | null, handle?: string | null): string {
+  if (!name && !handle) return 'U';
+  const source = name || handle || '';
+  return source
     .split(' ')
     .map((word) => word[0])
     .filter(Boolean)
@@ -78,7 +79,7 @@ export function ProfileHeader({
             role="img"
             aria-label={`${user.name || 'User'}'s avatar`}
           >
-            <span className={styles.initials}>{getInitials(user.name)}</span>
+            <span className={styles.initials}>{getInitials(user.name, user.handle)}</span>
           </div>
         )}
       </div>
