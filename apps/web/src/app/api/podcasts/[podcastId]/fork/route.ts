@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
@@ -16,16 +16,38 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const suspended = checkSuspension(session);
-  if (suspended) return suspended;
+  // Detect API key auth (Bearer token) vs browser session
+  const authHeader = request.headers.get('authorization');
+  const isApiKeyAuth = authHeader?.startsWith('Bearer ');
 
-  const userId = session.user.id;
+  // Session-based suspension check (skip for API key auth — those have separate controls)
+  if (!isApiKeyAuth) {
+    const { auth } = await import('@/lib/auth');
+    const session = await auth();
+    if (session) {
+      const suspended = checkSuspension(session);
+      if (suspended) return suspended;
+    }
+  }
+
+  // Rate limit API key requests (60 requests per minute)
+  if (isApiKeyAuth) {
+    const rateLimit = await checkRateLimit(`api:fork:${authResult.userId}`, 60, 60);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', resetAt: rateLimit.resetAt },
+        { status: 429 }
+      );
+    }
+  }
+
+  const userId = authResult.userId;
 
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
@@ -226,7 +248,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Notify source podcast owner about the fork
   if (sourcePodcast.userId !== userId) {
-    const forkerName = session.user.name || 'Someone';
+    const forker = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+    const forkerName = forker?.name || 'Someone';
     const notifPayload: SendNotificationPayload = {
       userId: sourcePodcast.userId,
       type: 'PODCAST_FORKED',
