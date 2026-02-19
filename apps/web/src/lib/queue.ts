@@ -35,6 +35,7 @@ export enum JobType {
   POLL_TWITTER_TRENDS = 'poll_twitter_trends',
   ADMIN_THREAD_TO_PODCAST = 'admin_thread_to_podcast',
   MODERATE_CONTENT = 'moderate_content',
+  SEND_EMAIL_DIGEST = 'send_email_digest',
 }
 
 /**
@@ -444,3 +445,4 @@ export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempt
 export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1 });
 export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2 });
 export const contentModerationQueue = createQueue('content-moderation', { attempts: 2 });
+export const emailDigestQueue = createQueue('email-digest', { attempts: 2 });

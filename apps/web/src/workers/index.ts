@@ -4,6 +4,7 @@ import {
   telegramBotQueue,
   keyValidationQueue,
   twitterTrendPollQueue,
+  emailDigestQueue,
   JobType,
 } from '@/lib/queue';
 import { isTwitterConfigured } from '@/lib/twitter';
@@ -32,6 +33,7 @@ import { processAutoTweet } from './twitter-auto-tweet.worker';
 import { processTrendPoll } from './twitter-trend-poll.worker';
 import { processAdminThreadToPodcast } from './admin-thread-to-podcast.worker';
 import { processContentModeration } from './content-moderation.worker';
+import { processEmailDigest } from './email-digest.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -60,6 +62,7 @@ const workers = [
   createWorker('twitter-trend-poll', processTrendPoll, { concurrency: 1 }),
   createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
   createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
+  createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -100,6 +103,12 @@ if (isTwitterConfigured()) {
 } else {
   logger.info('Twitter integration not configured — trend polling disabled');
 }
+
+// Schedule weekly email digest (Sunday 10:00 UTC)
+emailDigestQueue
+  .add(JobType.SEND_EMAIL_DIGEST, {}, { repeat: { pattern: '0 10 * * 0' } })
+  .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
+  .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
 
 // Schedule BYOK key re-validation every 24 hours
 keyValidationQueue

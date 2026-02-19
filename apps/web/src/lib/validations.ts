@@ -456,6 +456,13 @@ export const threadToPodcastSchema = z.object({
 });
 
 /**
+ * Referral attribution validation
+ */
+export const referralSchema = z.object({
+  handle: z.string().min(3).max(30),
+});
+
+/**
  * Trend generate validation (admin)
  */
 export const trendGenerateSchema = z.object({

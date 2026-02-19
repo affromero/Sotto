@@ -367,6 +367,24 @@
   color: var(--color-primary);
 }
 
+/* Referrals */
+
+.sectionDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.referralRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.referralRow input {
+  flex: 1;
+}
+
 /* Danger Zone */
 
 .dangerSection {

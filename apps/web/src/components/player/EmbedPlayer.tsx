@@ -126,7 +126,7 @@ export function EmbedPlayer({
 
       <div className={styles.footer}>
         <a
-          href={`${appUrl}/podcast/${podcastId}`}
+          href={`${appUrl}/podcast/${podcastId}?utm_source=embed&utm_medium=player&utm_campaign=listen`}
           target="_blank"
           rel="noopener noreferrer"
           className={styles.poweredBy}

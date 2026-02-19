@@ -32,6 +32,8 @@
 | `/pitch`                     | `pitch/page.tsx`                           | No (password-gated)         | Investor pitch deck viewer                               |
 | `/privacy`                   | `privacy/page.tsx`                         | No                          | Privacy policy                                           |
 | `/terms`                     | `terms/page.tsx`                           | No                          | Terms of service                                         |
+| `/changelog`                 | `changelog/page.tsx`                       | No                          | Public changelog page                                    |
+| `/developers`                | `developers/page.tsx`                      | No                          | Public API docs page                                     |
 | `/support`                   | `support/page.tsx`                         | No                          | Support page — FAQ, contact, feedback                    |
 | `/admin`                     | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                                 |
 | `/admin/users`               | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment                        |
@@ -55,6 +57,7 @@
 
 | Endpoint                                                         | Method           | Auth       | Description                                                                 |
 | ---------------------------------------------------------------- | ---------------- | ---------- | --------------------------------------------------------------------------- |
+| `/ref/[handle]`                                                  | GET              | No         | Referral redirect (sets cookie, redirects to signup)                        |
 | `/api/auth/[...nextauth]`                                        | GET/POST         | —          | NextAuth handlers                                                           |
 | `/api/discovery`                                                 | POST             | Yes        | Streaming discovery chat                                                    |
 | `/api/podcasts`                                                  | GET/POST         | Yes        | List/create podcasts                                                        |
@@ -111,6 +114,7 @@
 | `/api/teams/[teamId]`                                            | GET/PATCH/DELETE | Yes        | Team CRUD                                                                   |
 | `/api/teams/invite`                                              | POST             | Yes        | Send team invite                                                            |
 | `/api/users/me`                                                  | GET/PATCH        | Yes        | Current user profile                                                        |
+| `/api/users/me/referral`                                         | POST             | Yes        | Referral attribution                                                        |
 | `/api/users/me/twitter`                                          | GET/PATCH/DELETE | Yes        | Twitter settings (handle, enabled, voice prefs, disconnect)                 |
 | `/api/users/discover`                                            | GET              | No (opt)   | Search users by name/handle/bio/interests (enriches isFollowing if authed)  |
 | `/api/users/suggested`                                           | GET              | Yes        | Suggested follows via tag overlap + embedding + collaborative listening     |
@@ -124,6 +128,7 @@
 | `/api/voices/allowlist`                                          | GET/POST         | Yes        | List/add voice allowlist entries                                            |
 | `/api/voices/allowlist/[entryId]`                                | DELETE           | Yes        | Remove voice allowlist entry                                                |
 | `/api/waitlist`                                                  | POST             | No         | Waitlist signup                                                             |
+| `/api/waitlist/unsubscribe`                                      | GET              | No         | HMAC-signed unsubscribe                                                     |
 | `/api/health`                                                    | GET              | No         | Health check                                                                |
 | `/api/feedback`                                                  | POST/GET         | No         | Submit/list feedback                                                        |
 | `/api/settings/ai-keys`                                          | GET/POST/DELETE  | Yes        | AI provider BYOK key management (Anthropic/OpenAI)                          |
