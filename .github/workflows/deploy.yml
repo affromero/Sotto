@@ -132,7 +132,7 @@ jobs:
 
       - name: Notify via Telegram
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CI_STATUS: ${{ needs.ci.result }}
           DEPLOY_STATUS: ${{ needs.deploy.outputs.deploy_status || needs.deploy.result }}
