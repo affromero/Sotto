@@ -51,6 +51,20 @@ vi.mock('@/lib/queue', () => ({
   },
 }));
 
+const mockLookupParticipantCredentials = vi.fn();
+
+vi.mock('@/lib/credential-lookup', () => ({
+  lookupParticipantCredentials: (...args: unknown[]) => mockLookupParticipantCredentials(...args),
+}));
+
+const mockFormatThreadAsSourceText = vi.fn();
+const mockGetVerifiedParticipants = vi.fn();
+
+vi.mock('@/lib/twitter-utils', () => ({
+  formatThreadAsSourceText: (...args: unknown[]) => mockFormatThreadAsSourceText(...args),
+  getVerifiedParticipants: (...args: unknown[]) => mockGetVerifiedParticipants(...args),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -94,6 +108,9 @@ describe('processAdminThreadToPodcast', () => {
     mockParseTweetIntent.mockResolvedValue(DEFAULT_PARSED);
     mockParseThreadIntent.mockResolvedValue(DEFAULT_PARSED);
     mockPrismaPodcastCreate.mockResolvedValue({ id: 'podcast-001' });
+    mockGetVerifiedParticipants.mockReturnValue([]);
+    mockLookupParticipantCredentials.mockResolvedValue([]);
+    mockFormatThreadAsSourceText.mockReturnValue('## Thread source text');
   });
 
   describe('URL parsing', () => {
@@ -151,7 +168,7 @@ describe('processAdminThreadToPodcast', () => {
         author_id: 'author-1',
         conversation_id: '111',
       });
-      mockGetThread.mockResolvedValue({ rootTweet: {}, replies: [] });
+      mockGetThread.mockResolvedValue({ rootTweet: {}, replies: [], isSelfAuthored: false });
 
       const job = createMockJob({
         tweetUrl: 'https://x.com/user/status/111',
@@ -188,6 +205,7 @@ describe('processAdminThreadToPodcast', () => {
           { text: 'Reply 1', authorUsername: 'user2' },
           { text: 'Reply 2', authorUsername: 'user3' },
         ],
+        isSelfAuthored: false,
       });
 
       const job = createMockJob({
@@ -214,6 +232,7 @@ describe('processAdminThreadToPodcast', () => {
           { text: 'Reply 1', authorUsername: 'user2' },
           { text: 'Reply 2', authorUsername: 'user3' },
         ],
+        isSelfAuthored: false,
       });
 
       const job = createMockJob({

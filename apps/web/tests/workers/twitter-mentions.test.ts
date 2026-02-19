@@ -106,6 +106,18 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+const mockLookupParticipantCredentials = vi.fn().mockResolvedValue([]);
+vi.mock('@/lib/credential-lookup', () => ({
+  lookupParticipantCredentials: (...args: unknown[]) => mockLookupParticipantCredentials(...args),
+}));
+
+const mockFormatThreadAsSourceText = vi.fn().mockReturnValue('## Twitter/X Thread Discussion\n\n### Thread Conversation:\n**Original post by @alice:** Root post');
+const mockGetVerifiedParticipants = vi.fn().mockReturnValue([]);
+vi.mock('@/lib/twitter-utils', () => ({
+  formatThreadAsSourceText: (...args: unknown[]) => mockFormatThreadAsSourceText(...args),
+  getVerifiedParticipants: (...args: unknown[]) => mockGetVerifiedParticipants(...args),
+}));
+
 // ---- Import under test ----
 import { processTwitterMentions } from '@/workers/twitter-mentions.worker';
 import type { PollTwitterMentionsPayload } from '@/lib/queue';
@@ -141,6 +153,8 @@ describe('processTwitterMentions', () => {
     mockGetMentions.mockResolvedValue([]);
     mockGetThread.mockResolvedValue(null);
     mockPrismaTweetMentionFindUnique.mockResolvedValue(null);
+    mockLookupParticipantCredentials.mockResolvedValue([]);
+    mockGetVerifiedParticipants.mockReturnValue([]);
   });
 
   describe('mention polling', () => {
@@ -609,6 +623,7 @@ describe('processTwitterMentions', () => {
         ],
         participantCount: 4,
         tweetCount: 4,
+        isSelfAuthored: false,
       });
       mockParseThreadIntent.mockResolvedValue({
         topic: 'Thread Topic',
@@ -676,6 +691,7 @@ describe('processTwitterMentions', () => {
         ],
         participantCount: 2,
         tweetCount: 2,
+        isSelfAuthored: false,
       });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
@@ -717,6 +733,7 @@ describe('processTwitterMentions', () => {
         ],
         participantCount: 4,
         tweetCount: 4,
+        isSelfAuthored: false,
       });
       mockParseThreadIntent.mockResolvedValue({
         topic: 'Climate Change',
@@ -779,6 +796,7 @@ describe('processTwitterMentions', () => {
         ],
         participantCount: 4,
         tweetCount: 4,
+        isSelfAuthored: false,
       });
       mockParseThreadIntent.mockResolvedValue({
         topic: 'Debate Topic',
@@ -806,6 +824,127 @@ describe('processTwitterMentions', () => {
           }),
         })
       );
+    });
+
+    it('root mention with replies fetches thread', async () => {
+      const tweet = createMockTweet({
+        conversation_id: '1234567890', // same as tweet id = root mention
+        public_metrics: { retweet_count: 0, reply_count: 5, like_count: 10, quote_count: 0 },
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: { id: '1234567890', text: 'My thread', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        replies: [
+          { id: 'r1', text: 'Part 2', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:01:00Z' },
+          { id: 'r2', text: 'Part 3', authorId: 'twitter-user-123', authorUsername: 'me', authorName: 'Me', urls: [], createdAt: '2026-02-10T10:02:00Z' },
+        ],
+        participantCount: 1,
+        tweetCount: 3,
+        isSelfAuthored: true,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'My Thread Topic',
+        title: 'My Thread',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).toHaveBeenCalledWith('1234567890');
+      expect(mockParseThreadIntent).toHaveBeenCalled();
+    });
+
+    it('root mention with zero replies skips thread', async () => {
+      const tweet = createMockTweet({
+        conversation_id: '1234567890',
+        public_metrics: { retweet_count: 5, reply_count: 0, like_count: 10, quote_count: 0 },
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockGetThread).not.toHaveBeenCalled();
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+    });
+
+    it('self-authored thread with 1 reply takes thread path', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: { id: 'thread-root-id', text: 'My thoughts on AI', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        replies: [
+          { id: 'r1', text: 'Continued...', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:01:00Z' },
+        ],
+        participantCount: 1,
+        tweetCount: 2,
+        isSelfAuthored: true,
+      });
+      mockParseThreadIntent.mockResolvedValue({
+        topic: 'AI Thoughts',
+        title: 'My AI Thread',
+        depth: 'deep_dive',
+        audienceLevel: 'intermediate',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockParseThreadIntent).toHaveBeenCalled();
+      expect(mockParseTweetIntent).not.toHaveBeenCalled();
+    });
+
+    it('multi-participant thread still needs 3 replies', async () => {
+      const tweet = createMockTweet({
+        id: 'reply-in-thread',
+        conversation_id: 'thread-root-id',
+      });
+      mockGetMentions.mockResolvedValue([tweet]);
+      setupLinkedUser();
+      mockGetThread.mockResolvedValue({
+        rootTweet: { id: 'thread-root-id', text: 'Discussion', authorId: 'a1', authorUsername: 'alice', authorName: 'Alice', urls: [], createdAt: '2026-02-10T10:00:00Z' },
+        replies: [
+          { id: 'r1', text: 'Reply 1', authorId: 'a2', authorUsername: 'bob', authorName: 'Bob', urls: [], createdAt: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Reply 2', authorId: 'a3', authorUsername: 'carol', authorName: 'Carol', urls: [], createdAt: '2026-02-10T10:10:00Z' },
+        ],
+        participantCount: 3,
+        tweetCount: 3,
+        isSelfAuthored: false,
+      });
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockParseTweetIntent).toHaveBeenCalled();
+      expect(mockParseThreadIntent).not.toHaveBeenCalled();
     });
   });
 });
