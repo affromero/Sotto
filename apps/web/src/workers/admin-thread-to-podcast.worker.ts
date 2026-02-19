@@ -123,6 +123,7 @@ export async function processAdminThreadToPodcast(
     },
   });
 
+  await job.updateData({ ...job.data, podcastId: podcast.id });
   await job.updateProgress(80);
 
   // 7. Kick off generation pipeline

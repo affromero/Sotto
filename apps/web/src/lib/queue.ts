@@ -183,6 +183,7 @@ export interface AdminThreadToPodcastPayload {
   tweetUrl: string;
   adminUserId: string;
   message?: string;
+  podcastId?: string;
 }
 
 export interface ModerateContentPayload {

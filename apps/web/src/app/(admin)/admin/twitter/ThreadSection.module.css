@@ -197,3 +197,98 @@
 .link:hover {
   text-decoration: underline;
 }
+
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-width: 640px;
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progressTitle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.progressPercent {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.progressTrack {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.progressLabel {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.successBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 10px 14px;
+  background: #ecfdf5;
+  color: #059669;
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  max-width: 640px;
+}
+
+.errorWithDismiss {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 10px 14px;
+  background: var(--color-error-subtle, #fef2f2);
+  color: var(--color-error, #dc2626);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+}
+
+.dismissButton {
+  appearance: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: var(--text-caption);
+  color: inherit;
+  opacity: 0.7;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.dismissButton:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
+    transition: none;
+  }
+}
