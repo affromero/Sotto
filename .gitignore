@@ -75,6 +75,9 @@ accounting/imports/*.ofx
 accounting/imports/*.csv
 .fava-cache/
 
+# MCP server build output
+packages/mcp/dist/
+
 # MCP config (contains API tokens)
 .mcp.json
 
