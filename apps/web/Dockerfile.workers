@@ -28,8 +28,9 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 sotto
 RUN adduser --system --uid 1001 sotto
 
-# Copy dependencies with Prisma client
+# Copy dependencies with Prisma client (root + workspace-specific node_modules)
 COPY --from=deps --chown=sotto:sotto /app/node_modules ./node_modules
+COPY --from=deps --chown=sotto:sotto /app/apps/web/node_modules ./apps/web/node_modules
 
 # Copy workspace structure (workers need full src/ for tsx runtime compilation)
 COPY --chown=sotto:sotto apps/web/package.json ./apps/web/
