@@ -24,10 +24,19 @@ type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating
 type TabMode = 'create' | 'import';
 type ImportStep = 'upload' | 'importing';
 
+interface ProviderQuota {
+  provider: string;
+  model: string;
+  quota: number;
+  used: number;
+  remaining: number;
+}
+
 interface FreeTierInfo {
   used: number;
   limit: number;
   remaining: number;
+  ttsQuotas?: ProviderQuota[];
 }
 
 interface CreatePageClientProps {
@@ -315,7 +324,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
           <div className={styles.headerText}>
             <div className={styles.titleRow}>
               <h1 className={styles.title}>{getTitle()}</h1>
-              {freeTier && <FreeTierCounter used={freeTier.used} limit={freeTier.limit} />}
+              {freeTier && <FreeTierCounter used={freeTier.used} limit={freeTier.limit} ttsQuotas={freeTier.ttsQuotas} />}
             </div>
             <p className={styles.subtitle}>{getSubtitle()}</p>
           </div>

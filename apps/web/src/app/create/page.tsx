@@ -28,6 +28,7 @@ export default async function CreatePage() {
         used: gate.freeGenerationsUsed,
         limit: gate.freeGenerationsLimit,
         remaining: gate.freeGenerationsLimit - gate.freeGenerationsUsed,
+        ttsQuotas: gate.ttsQuotas,
       };
 
   return <CreatePageClient freeTier={freeTier} isByokUser={gate.isByokUser} />;
