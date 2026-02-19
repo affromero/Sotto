@@ -12,7 +12,7 @@
 
 Sotto is an AI-powered podcast platform where users describe a topic through natural conversation, and the platform generates a personalized two-voice podcast they can listen to anywhere. The core innovation: listeners can **interrupt mid-playback** to ask questions, get contextual answers, and optionally update the podcast with those clarifications for all future listeners.
 
-Think of it as "podcasts that listen back."
+Think of it as "the open podcast network."
 
 ### 1.2 Name Etymology
 
@@ -82,13 +82,13 @@ Four distinct creative directions follow. Each is viable. A designer may pursue 
 
 ### Direction B: "The Listening Ear"
 
-**Concept**: A stylized ear combined with a speech bubble or sound wave element, representing the product's unique quality — podcasts that "listen back." The ear is rendered in a warm, organic line style (not medical or anatomical).
+**Concept**: A stylized ear combined with a speech bubble or sound wave element, representing the product's unique quality — interactive podcasts you can interrupt and question. The ear is rendered in a warm, organic line style (not medical or anatomical).
 
 **Visual description**: A single continuous line drawing of a human ear, where the inner spiral transitions into a small speech bubble or sound wave. The line is warm and slightly imperfect (not ruler-straight), suggesting human touch. The overall feel is editorial illustration, not technical diagram.
 
 **Why it works**:
 
-- Encodes the product's tagline ("podcasts that listen back") directly into the mark
+- Encodes the product's interactive nature directly into the mark
 - An ear is distinctive in the podcast/audio space — most competitors use microphones, headphones, or play buttons
 - The continuous-line style aligns with the brand's warmth and intimacy
 - Memorable and recognizable at small sizes
@@ -159,7 +159,7 @@ Logo mark for a podcast app called "Sotto" (meaning "soft voice" in Italian). Tw
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo: a stylized human ear drawn in a single continuous golden amber (#D97706) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical — organic and inviting. White background. The concept is "podcasts that listen back." Suitable as an app icon. --ar 1:1 --style raw --v 6.1
+Minimalist logo: a stylized human ear drawn in a single continuous golden amber (#D97706) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical — organic and inviting. White background. The concept is "the open podcast network." Suitable as an app icon. --ar 1:1 --style raw --v 6.1
 ```
 
 ```
@@ -239,7 +239,7 @@ Minimalist logo design for "Sotto," a podcast platform. Abstract audio waveform 
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous golden amber #D97706 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is podcasts that listen back.
+Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous golden amber #D97706 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is the open podcast network.
 ```
 
 **Direction C — Intimate Conversation**:
@@ -571,7 +571,7 @@ When reviewing logo concepts, score each on these dimensions:
 | Item                   | Value                                             |
 | ---------------------- | ------------------------------------------------- |
 | **Brand name**         | Sotto                                             |
-| **Tagline**            | Podcasts that listen back                         |
+| **Tagline**            | The Open Podcast Network                          |
 | **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
 | **Product**            | AI-generated interactive podcasts with Q&A        |
 | **Primary color**      | Golden Amber `#D97706`                            |

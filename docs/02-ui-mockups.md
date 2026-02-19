@@ -19,7 +19,7 @@ Convert visitors into signups by demonstrating Sotto's core value: personalized,
 |  [Logo: Sotto]                             [Feed] [Login]   |
 +============================================================+
 |                                                              |
-|            "Podcasts that listen back."                       |
+|            "The Open Podcast Network."                       |
 |                                                              |
 |     Generate AI podcasts from any topic, interrupt to         |
 |     ask questions, and share knowledge with the world.        |

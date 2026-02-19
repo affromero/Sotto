@@ -464,7 +464,7 @@ Examples:
 | Item                   | Value                                             |
 | ---------------------- | ------------------------------------------------- |
 | **Brand name**         | Sotto                                             |
-| **Tagline**            | Podcasts that listen back                         |
+| **Tagline**            | The Open Podcast Network                          |
 | **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
 | **Product**            | AI-generated interactive podcasts with Q&A        |
 | **Design philosophy**  | "Warm Intimacy" — podcast studio + reading nook   |

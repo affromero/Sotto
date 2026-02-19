@@ -28,7 +28,7 @@ The web app manifest is at `public/manifest.json`:
 
 ```json
 {
-  "name": "Sotto — Podcasts That Listen Back",
+  "name": "Sotto — The Open Podcast Network",
   "short_name": "Sotto",
   "description": "Generate AI podcasts, interrupt to ask questions, share knowledge.",
   "start_url": "/",
