@@ -63,7 +63,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 3. Load podcast metadata
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { userId: true, title: true, source: true, sourceTweetId: true },
+      select: { userId: true, title: true, source: true, sourceTweetId: true,
+                user: { select: { telegramEnabled: true, telegramChatId: true } } },
     });
     const usePremiumSfx = LIMITS.hasPremiumSfx;
 
@@ -330,18 +331,20 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       }
     }
 
-    // 12. If generated from Telegram, queue a reply message
-    if (podcast.source === 'TELEGRAM') {
-      const telegramMsg = await prisma.telegramMessage.findFirst({
-        where: { podcastId, status: { in: ['GENERATING'] } },
-        select: { id: true, chatId: true },
+    // 12. If user has Telegram enabled, send a notification
+    if (!skipSfx && podcast.user.telegramEnabled && podcast.user.telegramChatId) {
+      const telegramMsg = podcast.source === 'TELEGRAM'
+        ? await prisma.telegramMessage.findFirst({
+            where: { podcastId, status: { in: ['GENERATING'] } },
+            select: { id: true, chatId: true },
+          })
+        : null;
+      await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
+        podcastId,
+        telegramMessageId: telegramMsg?.id,
+        chatId: telegramMsg?.chatId ?? podcast.user.telegramChatId,
       });
       if (telegramMsg) {
-        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
-          podcastId,
-          telegramMessageId: telegramMsg.id,
-          chatId: telegramMsg.chatId,
-        });
         await prisma.telegramMessage.update({
           where: { id: telegramMsg.id },
           data: { status: 'READY' },
@@ -378,19 +381,25 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       }
     }
 
-    // If Telegram-sourced, queue failure reply
+    // If user has Telegram enabled, queue failure notification
     if (job.data.podcastId) {
-      const telegramMsg = await prisma.telegramMessage
-        .findFirst({
-          where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, chatId: true },
+      const failedPodcast = await prisma.podcast
+        .findUnique({
+          where: { id: job.data.podcastId },
+          select: { user: { select: { telegramEnabled: true, telegramChatId: true } } },
         })
         .catch(() => null);
-      if (telegramMsg) {
+      if (failedPodcast?.user.telegramEnabled && failedPodcast.user.telegramChatId) {
+        const telegramMsg = await prisma.telegramMessage
+          .findFirst({
+            where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
+            select: { id: true, chatId: true },
+          })
+          .catch(() => null);
         await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
           podcastId: job.data.podcastId,
-          telegramMessageId: telegramMsg.id,
-          chatId: telegramMsg.chatId,
+          telegramMessageId: telegramMsg?.id,
+          chatId: telegramMsg?.chatId ?? failedPodcast.user.telegramChatId,
         }).catch(() => {});
       }
     }
