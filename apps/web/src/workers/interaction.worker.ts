@@ -6,6 +6,8 @@ import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey } from '@/lib/byok';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
@@ -18,9 +20,19 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
 
   const [aiKey, podcast, user] = await Promise.all([
     getAiKey(userId),
-    prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true } }),
+    prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
   ]);
+
+  // Model priority: user's choice > provider default > free tier admin config
+  let model = podcast?.aiModel ?? undefined;
+  if (!model && aiKey) {
+    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
+  }
+  if (!model) {
+    const config = await getFreeTierConfig();
+    model = config.aiModel;
+  }
 
   // Get podcast script context
   const script = await prisma.script.findUnique({ where: { podcastId } });
@@ -79,7 +91,7 @@ Answer concisely and helpfully, using the podcast context. Keep answers under 20
         role: 'user',
         content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,
       },
-    ], { apiKeyOverride: aiKey?.apiKey });
+    ], { apiKeyOverride: aiKey?.apiKey, model });
   } catch (err) {
     if (err instanceof ContentModerationError) {
       // Content policy violation — mark interaction failed, don't retry

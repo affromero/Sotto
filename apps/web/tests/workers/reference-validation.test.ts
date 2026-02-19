@@ -107,6 +107,10 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001' }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -368,7 +372,8 @@ describe('processReferenceValidation', () => {
         ]),
         expect.any(Map),
         'Quantum Computing Basics',
-        undefined
+        undefined,
+        expect.any(String)
       );
     });
 
@@ -396,7 +401,8 @@ describe('processReferenceValidation', () => {
         expect.anything(),
         expect.any(Map),
         expect.anything(),
-        undefined
+        undefined,
+        expect.any(String)
       );
     });
 

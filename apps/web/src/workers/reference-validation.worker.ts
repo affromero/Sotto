@@ -25,6 +25,8 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { getAiKey } from '@/lib/byok';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 
 const MAX_CONCURRENT = 5;
@@ -69,9 +71,19 @@ export async function processReferenceValidation(
     }),
     prisma.podcast.findUnique({
       where: { id: podcastId },
-      select: { topic: true },
+      select: { topic: true, aiModel: true },
     }),
   ]);
+
+  // Model priority: user's choice > provider default > free tier admin config
+  let model = podcast?.aiModel ?? undefined;
+  if (!model && aiKey) {
+    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
+  }
+  if (!model) {
+    const config = await getFreeTierConfig();
+    model = config.aiModel;
+  }
 
   if (!script) {
     throw new Error(`Script not found for podcast ${podcastId}`);
@@ -154,7 +166,7 @@ export async function processReferenceValidation(
     aiResults = new Map();
   } else {
     try {
-      aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey);
+      aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey, model);
     } catch (error) {
       logger.warn('AI evaluation failed, using external checks only', {
         error: error instanceof Error ? error.message : 'Unknown',

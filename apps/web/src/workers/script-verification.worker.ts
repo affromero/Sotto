@@ -19,6 +19,8 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { LIMITS } from '@/lib/stripe';
 import { logger } from '@/lib/logger';
 
@@ -32,7 +34,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   const aiKey = await getAiKey(userId);
 
-  const [script, discovery, references] = await Promise.all([
+  const [script, discovery, references, podcastRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
       where: { podcastId },
     }),
@@ -43,7 +45,21 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       where: { podcastId },
       orderBy: { number: 'asc' },
     }),
+    prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { aiModel: true },
+    }),
   ]);
+
+  // Model priority: user's choice > provider default > free tier admin config
+  let model = podcastRecord.aiModel ?? undefined;
+  if (!model && aiKey) {
+    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
+  }
+  if (!model) {
+    const config = await getFreeTierConfig();
+    model = config.aiModel;
+  }
 
   const maxDurationMinutes = discovery.durationTarget || LIMITS.maxDurationMinutes;
 
@@ -73,6 +89,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     maxDurationMinutes,
     previousFeedback: script.verificationFeedback || undefined,
     apiKeyOverride: aiKey?.apiKey,
+    model,
   });
 
   await job.updateProgress(50);
@@ -225,6 +242,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
     apiKeyOverride: aiKey?.apiKey,
+    model,
   });
 
   await job.updateProgress(80);
