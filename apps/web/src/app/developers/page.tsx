@@ -1,3 +1,5 @@
+import { PublicNav } from '@/components/layout/PublicNav';
+import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -142,7 +144,9 @@ const sections: Section[] = [
 
 export default function DevelopersPage() {
   return (
-    <main className={styles.main}>
+    <>
+      <PublicNav />
+      <main className={styles.main}>
       <div className={styles.container}>
         <header className={styles.header}>
           <h1 className={styles.title}>API Documentation</h1>
@@ -242,5 +246,7 @@ export default function DevelopersPage() {
         </section>
       </div>
     </main>
+      <Footer />
+    </>
   );
 }

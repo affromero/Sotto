@@ -1,0 +1,128 @@
+.main {
+  min-height: 100vh;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  background: var(--color-background);
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Hero */
+
+.hero {
+  text-align: center;
+  margin-bottom: var(--spacing-3xl);
+}
+
+.heroTitle {
+  font: var(--text-display);
+  margin-bottom: var(--spacing-md);
+}
+
+.heroSubtitle {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+/* Sections */
+
+.section {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.sectionTitle {
+  font: var(--text-h2);
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+  margin-bottom: var(--spacing-md);
+}
+
+.sectionText:last-child {
+  margin-bottom: 0;
+}
+
+/* Values */
+
+.values {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.value {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-lg);
+}
+
+.valueTitle {
+  font: var(--text-h4);
+  margin-bottom: var(--spacing-xs);
+}
+
+.valueDescription {
+  font: var(--text-body);
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+}
+
+/* CTA */
+
+.cta {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-2xl);
+  text-align: center;
+}
+
+.ctaTitle {
+  font: var(--text-h2);
+  margin-bottom: var(--spacing-md);
+}
+
+.ctaText {
+  font: var(--text-body-lg);
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+  margin-bottom: var(--spacing-xl);
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ctaButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: var(--spacing-sm) var(--spacing-xl);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font: var(--text-body);
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  transition: background var(--transition-fast);
+}
+
+.ctaButton:hover {
+  background: var(--color-primary-hover);
+  color: var(--color-text-inverse);
+}
+
+/* Mobile */
+
+@media (max-width: 600px) {
+  .heroTitle {
+    font: var(--text-h1);
+  }
+}
