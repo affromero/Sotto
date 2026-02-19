@@ -284,6 +284,119 @@ describe('processAdminThreadToPodcast', () => {
     });
   });
 
+  describe('admin message merges overrides, not content', () => {
+    it('uses tweet content for title/topic even when admin provides a message', async () => {
+      const tweetParsed = {
+        ...DEFAULT_PARSED,
+        title: 'AI Safety Discussion',
+        topic: 'AI safety and alignment',
+      };
+      const adminOverrides = {
+        ...DEFAULT_PARSED,
+        title: 'make it 5 min for nerds',
+        topic: 'make it 5 min for nerds',
+        depth: 'deep_dive',
+        audienceLevel: 'expert',
+        tone: 'professional',
+        durationTarget: 5,
+      };
+
+      mockGetTweet.mockResolvedValue({
+        id: '700',
+        text: 'AI safety and alignment discussion',
+        author_id: 'author-1',
+        conversation_id: '700',
+      });
+      mockGetThread.mockResolvedValue(null);
+      // First call: parseTweetIntent(tweet.text) → content
+      // Second call: parseTweetIntent(message) → overrides
+      mockParseTweetIntent
+        .mockResolvedValueOnce(tweetParsed)
+        .mockResolvedValueOnce(adminOverrides);
+
+      const job = createMockJob({
+        tweetUrl: 'https://x.com/user/status/700',
+        message: 'make it 5 min for nerds',
+        adminUserId: 'admin-1',
+      });
+      await processAdminThreadToPodcast(job);
+
+      // Title and topic should come from tweet, not admin message
+      expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: 'AI Safety Discussion',
+          topic: 'AI safety and alignment',
+          discovery: {
+            create: expect.objectContaining({
+              depth: 'deep_dive',
+              audienceLevel: 'expert',
+              tone: 'professional',
+              durationTarget: 5,
+            }),
+          },
+        }),
+      });
+    });
+
+    it('merges admin overrides onto thread content for thread podcasts', async () => {
+      const threadParsed = {
+        ...DEFAULT_PARSED,
+        title: 'Thread: Quantum Computing Debate',
+        topic: 'quantum computing advances',
+      };
+      const adminOverrides = {
+        ...DEFAULT_PARSED,
+        depth: 'eli5',
+        audienceLevel: 'beginner',
+        tone: 'casual',
+      };
+
+      mockGetTweet.mockResolvedValue({
+        id: '800',
+        text: 'Thread starter about quantum',
+        author_id: 'author-1',
+        conversation_id: '800',
+        created_at: '2025-01-01T00:00:00Z',
+      });
+      mockGetThread.mockResolvedValue({
+        rootTweet: { text: 'Thread starter about quantum', authorUsername: 'user1' },
+        replies: [
+          { text: 'Reply 1', authorUsername: 'user2' },
+          { text: 'Reply 2', authorUsername: 'user3' },
+        ],
+        isSelfAuthored: false,
+      });
+      mockParseThreadIntent.mockResolvedValue(threadParsed);
+      mockParseTweetIntent.mockResolvedValue(adminOverrides);
+
+      const job = createMockJob({
+        tweetUrl: 'https://x.com/user/status/800',
+        message: 'eli5 for beginners',
+        adminUserId: 'admin-1',
+      });
+      await processAdminThreadToPodcast(job);
+
+      // parseThreadIntent should be called for content (thread qualifies)
+      expect(mockParseThreadIntent).toHaveBeenCalled();
+      // parseTweetIntent called for admin overrides
+      expect(mockParseTweetIntent).toHaveBeenCalledWith('eli5 for beginners');
+
+      expect(mockPrismaPodcastCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          title: 'Thread: Quantum Computing Debate',
+          topic: 'quantum computing advances',
+          discovery: {
+            create: expect.objectContaining({
+              depth: 'eli5',
+              audienceLevel: 'beginner',
+              tone: 'casual',
+            }),
+          },
+        }),
+      });
+    });
+  });
+
   describe('pipeline kick-off', () => {
     it('enqueues content extraction job after podcast creation', async () => {
       mockGetTweet.mockResolvedValue({
