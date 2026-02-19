@@ -51,6 +51,7 @@
     "prisma": "^6.19.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "resend": "^6.9.2",
     "stripe": "^20.3.1",
     "styled-jsx": "^5.1.6",
     "typescript": "^5.9.3",

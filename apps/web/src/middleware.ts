@@ -18,13 +18,14 @@ const PUBLIC_ROUTES = new Set([
   '/romero',
   '/api/access',
   '/api/health',
-  '/api/waitlist',
   '/feedback',
   '/api/feedback',
   '/pitch',
   '/connect/telegram',
+  '/changelog',
+  '/developers',
 ]);
-const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed'];
+const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed', '/api/waitlist', '/ref'];
 
 async function constantTimeEqual(a: string, b: string): Promise<boolean> {
   const encoder = new TextEncoder();

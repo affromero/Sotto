@@ -29,6 +29,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `telegram-reply`       | `telegram-reply`       | 2           | Podcast ready/failed → send Telegram message with "Listen Now" link                                              | Updates TelegramMessage.status to REPLIED/FAILED                                       |
 | `content-moderation`   | `content-moderation`   | 3           | Content text → OpenAI Moderation API scan                                                                        | Creates ContentFlag records for flagged content                                        |
 | `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as @sotto                                               | Creates Podcast, kicks off pipeline                                                    |
+| `email-digest`            | `email-digest`            | 1      | Sunday 10:00 UTC cron → query new podcasts + stats → send weekly digest to subscribed waitlist emails            | Sends digest emails via Resend                                                         |
 
 ## Pipeline Flow
 
@@ -45,6 +46,7 @@ admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as @s
 twitter-auto-tweet (on-demand) → interpolates template → posts tweet → updates TwitterAutoTweet record
 telegram-bot (repeatable, every 35s) → polls Telegram updates → discovery chat → creates Podcast → kicks off pipeline above
 telegram-reply (on completion) → sends "Listen Now" link to Telegram chat (if TELEGRAM)
+email-digest (cron, Sunday 10:00 UTC) → queries new podcasts + stats → sends weekly digest to subscribed waitlist emails
 
 Script review (at SCRIPT_READY):
   User edits script → PATCH /api/podcasts/[id]/script (save edits)

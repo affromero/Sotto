@@ -38,6 +38,7 @@ const defaultProps = {
   configuredAiProviders: [],
   isTwitterProviderAvailable: false,
   quizAnswerCount: 0,
+  referralCount: 0,
 };
 
 describe('SettingsForm', () => {

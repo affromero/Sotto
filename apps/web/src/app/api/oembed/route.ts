@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       title: true,
       status: true,
       visibility: true,
-      user: { select: { name: true } },
+      user: { select: { id: true, name: true, handle: true } },
     },
   });
 
@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
     provider_url: appUrl,
     title: podcast.title,
     author_name: podcast.user.name || 'Anonymous',
-    author_url: `${appUrl}/profile/${podcast.user.name}`,
+    author_url: `${appUrl}/profile/${podcast.user.id}`,
+    thumbnail_url: `${appUrl}/podcast/${podcastId}/opengraph-image`,
     html: `<iframe src="${embedUrl}" width="100%" height="160" frameborder="0" allow="autoplay" loading="lazy" style="border-radius:12px;max-width:600px"></iframe>`,
     width: 600,
     height: 160,

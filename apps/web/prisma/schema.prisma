@@ -130,6 +130,11 @@ model User {
   moderationPerformed ModerationAction[] @relation("Moderator")
   reports             Report[]           @relation("Reporter")
 
+  // Referrals
+  referredById String?
+  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id])
+  referrals    User[]  @relation("Referrals")
+
   // Stripe Connect (voice monetization)
   stripeAccountId  String?
   stripeOnboarded  Boolean @default(false)
@@ -139,6 +144,7 @@ model User {
 
   @@index([role])
   @@index([handle])
+  @@index([referredById])
 }
 
 model Account {
@@ -1130,10 +1136,11 @@ model PlaybackSession {
 // ============ WAITLIST ============
 
 model Waitlist {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  source    String?  // "hero", "footer", "cta" — where they signed up
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  source       String?  // "hero", "footer", "cta" — where they signed up
+  unsubscribed Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   @@index([createdAt])
 }
