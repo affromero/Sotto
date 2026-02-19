@@ -7,7 +7,9 @@ import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
 import { getAiKey, getByokKey } from '@/lib/byok';
-import { getFreeTierStatus } from '@/lib/generation-gate';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { checkRateLimit } from '@/lib/redis';
 import { logger } from '@/lib/logger';
 import type { SttProviderId } from '@sotto/shared';
 
@@ -129,6 +131,34 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const userId = authResult.userId;
+
+  // Rate limit: 20/hour, 100/day
+  const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
+  if (!hourly.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 20 generations per hour.' },
+      { status: 429 }
+    );
+  }
+  const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
+  if (!daily.allowed) {
+    return NextResponse.json(
+      { error: 'Rate limit exceeded: max 100 generations per day.' },
+      { status: 429 }
+    );
+  }
+
+  // Generation gate: BYOK or free tier
+  const gate = await checkGenerationGate(userId);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys to continue.'
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+  }
+
   try {
     const { fields, files } = await parseMultipart(request);
 
@@ -190,18 +220,16 @@ export async function POST(request: NextRequest) {
     const validatedTopic = validation.data.topic || '';
     const generateMetadata = !validation.data.title;
 
-    const freeTier = await getFreeTierStatus(authResult.userId);
-
     const podcast = await prisma.podcast.create({
       data: {
-        userId: authResult.userId,
+        userId,
         title: validatedTitle,
         topic: validatedTopic,
         status: 'IMPORTING',
         source: 'IMPORT',
         isHumanContent,
         sourcePlatform: validatedSourcePlatform ?? null,
-        visibility: freeTier.isByokUser ? 'PRIVATE' : 'PUBLIC',
+        visibility: gate.isByokUser ? 'PRIVATE' : 'PUBLIC',
       },
     });
 
@@ -224,7 +252,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const sttApiKey = await resolveSttApiKey(authResult.userId, validatedSttProvider);
+    const sttApiKey = await resolveSttApiKey(userId, validatedSttProvider);
 
     if (!sttApiKey && !transcriptText) {
       await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
@@ -239,7 +267,7 @@ export async function POST(request: NextRequest) {
 
     await addJob(audioImportQueue, JobType.IMPORT_AUDIO, {
       podcastId: podcast.id,
-      userId: authResult.userId,
+      userId,
       audioKey,
       transcriptText,
       isHumanContent,
@@ -248,9 +276,22 @@ export async function POST(request: NextRequest) {
       sttApiKey,
     });
 
+    // Increment free tier counter for non-BYOK users
+    if (!gate.isByokUser) {
+      const config = await getFreeTierConfig();
+      const ok = await tryIncrementFreeGeneration(userId, config.generationLimit);
+      if (!ok) {
+        await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
+        return NextResponse.json(
+          { error: 'Free generations used.', code: 'free_tier_exhausted' },
+          { status: 403 }
+        );
+      }
+    }
+
     logger.info('Audio import queued', {
       podcastId: podcast.id,
-      userId: authResult.userId,
+      userId,
       audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
       sttProvider: validatedSttProvider ?? 'openai',
