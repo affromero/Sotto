@@ -303,6 +303,7 @@ async function main() {
       role: 'SYSTEM',
       name: 'Sotto',
       bio: 'The official Sotto account. Curated podcasts and platform highlights.',
+      image: '/brand/profile?v=amber',
     },
     create: {
       email: 'system@sotto.fm',
@@ -310,6 +311,7 @@ async function main() {
       role: 'SYSTEM',
       name: 'Sotto',
       bio: 'The official Sotto account. Curated podcasts and platform highlights.',
+      image: '/brand/profile?v=amber',
     },
   });
 
