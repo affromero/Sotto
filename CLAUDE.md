@@ -301,7 +301,7 @@ Every commit **must** pass this checklist. Do not commit until every item is ver
 
 - [ ] `npm run lint` — no errors (warnings OK)
 - [ ] `npm run type-check` — clean pass
-- [ ] `npm run test` — all tests pass (no new failures; pre-existing failures in unrelated files are acceptable but must not increase)
+- [ ] `npm run test` — **ALL tests pass, zero failures.** Pre-existing failures must be fixed before committing — no exceptions. If a test is broken, fix it or delete it.
 - [ ] `npm run build` — successful production build
 - [ ] No `console.log` or debug statements in staged files
 - [ ] No secrets or `.env` values in staged files
