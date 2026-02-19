@@ -35,7 +35,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   anthropic: {
     id: 'anthropic',
     displayName: 'Anthropic (Claude)',
-    defaultModel: 'claude-sonnet-4-5-20250929',
+    defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
       { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast' },
