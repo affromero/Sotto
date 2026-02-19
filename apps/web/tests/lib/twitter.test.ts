@@ -436,7 +436,7 @@ describe('twitter', () => {
   describe('getThread', () => {
     function createSearchResponse(
       tweets: Partial<TwitterTweet>[],
-      users: Array<{ id: string; username: string; name: string }> = [],
+      users: Array<{ id: string; username: string; name: string; verified?: boolean; verified_type?: string; description?: string }> = [],
       nextToken?: string
     ) {
       return {
@@ -717,6 +717,129 @@ describe('twitter', () => {
       expect(result).not.toBeNull();
       expect(result!.replies[0].id).toBe('r-early');
       expect(result!.replies[1].id).toBe('r-late');
+    });
+
+    it('maps public_metrics to ThreadTweet.publicMetrics', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: {
+            id: 'conv-metrics',
+            text: 'Root post',
+            author_id: 'a1',
+            created_at: '2026-02-10T10:00:00Z',
+            public_metrics: { retweet_count: 5, reply_count: 3, like_count: 42, quote_count: 2, impression_count: 1000 },
+          },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+      mockFetch.mockResolvedValueOnce(createSearchResponse([], []));
+
+      const result = await getThread('conv-metrics');
+
+      expect(result).not.toBeNull();
+      expect(result!.rootTweet.publicMetrics).toEqual({
+        likeCount: 42,
+        retweetCount: 5,
+        replyCount: 3,
+        quoteCount: 2,
+      });
+    });
+
+    it('returns isSelfAuthored true for single-author threads', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: { id: 'conv-self', text: 'Part 1', author_id: 'a1', created_at: '2026-02-10T10:00:00Z' },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+      mockFetch.mockResolvedValueOnce(createSearchResponse(
+        [
+          { id: 'r1', text: 'Part 2', author_id: 'a1', created_at: '2026-02-10T10:01:00Z' },
+          { id: 'r2', text: 'Part 3', author_id: 'a1', created_at: '2026-02-10T10:02:00Z' },
+        ],
+        [{ id: 'a1', username: 'alice', name: 'Alice' }]
+      ));
+
+      const result = await getThread('conv-self');
+
+      expect(result).not.toBeNull();
+      expect(result!.isSelfAuthored).toBe(true);
+    });
+
+    it('returns isSelfAuthored false for multi-author threads', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: { id: 'conv-multi', text: 'Root', author_id: 'a1', created_at: '2026-02-10T10:00:00Z' },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+      mockFetch.mockResolvedValueOnce(createSearchResponse(
+        [
+          { id: 'r1', text: 'Reply 1', author_id: 'a2', created_at: '2026-02-10T10:05:00Z' },
+          { id: 'r2', text: 'Reply 2', author_id: 'a3', created_at: '2026-02-10T10:10:00Z' },
+        ],
+        [
+          { id: 'a2', username: 'bob', name: 'Bob' },
+          { id: 'a3', username: 'carol', name: 'Carol' },
+        ]
+      ));
+
+      const result = await getThread('conv-multi');
+
+      expect(result).not.toBeNull();
+      expect(result!.isSelfAuthored).toBe(false);
+    });
+
+    it('returns isSelfAuthored true with 1 stray reply', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: { id: 'conv-stray', text: 'Part 1', author_id: 'a1', created_at: '2026-02-10T10:00:00Z' },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice' }] },
+        }),
+      });
+      mockFetch.mockResolvedValueOnce(createSearchResponse(
+        [
+          { id: 'r1', text: 'Part 2', author_id: 'a1', created_at: '2026-02-10T10:01:00Z' },
+          { id: 'r2', text: 'Part 3', author_id: 'a1', created_at: '2026-02-10T10:02:00Z' },
+          { id: 'r3', text: 'Nice thread!', author_id: 'a2', created_at: '2026-02-10T10:03:00Z' },
+        ],
+        [
+          { id: 'a1', username: 'alice', name: 'Alice' },
+          { id: 'a2', username: 'bob', name: 'Bob' },
+        ]
+      ));
+
+      const result = await getThread('conv-stray');
+
+      expect(result).not.toBeNull();
+      expect(result!.isSelfAuthored).toBe(true);
+    });
+
+    it('maps verified user fields to ThreadTweet', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: createMockHeaders(),
+        json: async () => ({
+          data: { id: 'conv-verified', text: 'Root', author_id: 'a1', created_at: '2026-02-10T10:00:00Z' },
+          includes: { users: [{ id: 'a1', username: 'alice', name: 'Alice', verified: true, verified_type: 'blue', description: 'Physicist at MIT' }] },
+        }),
+      });
+      mockFetch.mockResolvedValueOnce(createSearchResponse([], []));
+
+      const result = await getThread('conv-verified');
+
+      expect(result).not.toBeNull();
+      expect(result!.rootTweet.authorVerified).toBe(true);
+      expect(result!.rootTweet.authorVerifiedType).toBe('blue');
+      expect(result!.rootTweet.authorBio).toBe('Physicist at MIT');
     });
   });
 
