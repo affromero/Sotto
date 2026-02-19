@@ -709,7 +709,7 @@ Before sharing with beta users, test every core flow:
 ### Share Message Template
 
 ```
-I built Sotto — podcasts that listen back.
+I built Sotto — the open podcast network.
 
 Chat with AI to describe what you want to learn, and it generates a 2-voice conversational podcast. While listening, you can interrupt to ask questions, and the AI answers in context.
 

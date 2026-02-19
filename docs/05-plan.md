@@ -49,7 +49,7 @@ After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmp
 
 ### Positioning Statement
 
-> **Sotto** — Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.
+> **Sotto** — The Open Podcast Network. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.
 
 ---
 

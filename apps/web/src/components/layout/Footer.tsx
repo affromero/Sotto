@@ -6,7 +6,7 @@ export function Footer() {
       <div className={styles.inner}>
         <div className={styles.brand}>
           <span className={styles.logo}>Sotto</span>
-          <p>Podcasts that listen back.</p>
+          <p>The Open Podcast Network.</p>
         </div>
         <div className={styles.links}>
           <div>

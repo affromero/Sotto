@@ -2,7 +2,7 @@
 
 # Sotto
 
-### Podcasts that listen back.
+### The Open Podcast Network.
 
 Generate AI podcasts from any topic. Interrupt to ask questions. Share knowledge with the world.
 

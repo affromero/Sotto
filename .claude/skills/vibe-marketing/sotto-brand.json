@@ -1,7 +1,7 @@
 {
   "brand": {
     "name": "Sotto",
-    "tagline": "Podcasts that listen back.",
+    "tagline": "The Open Podcast Network.",
     "origin": "From 'sotto voce' — soft voice in Italian",
     "elevator_pitch": "Generate AI podcasts from any topic, interrupt to ask questions mid-playback, and share knowledge with the world. Think NotebookLM meets social media.",
     "url": "https://sotto.fm",
@@ -46,7 +46,7 @@
       "Don't use 'users' — say 'listeners', 'creators', 'people', or 'you'"
     ],
     "signature_phrases": [
-      "Podcasts that listen back",
+      "The Open Podcast Network",
       "What if your podcast could answer questions?",
       "Turn any idea into a conversation worth hearing",
       "Knowledge you can interrupt",
@@ -285,7 +285,7 @@
   },
 
   "hashtags": {
-    "primary": ["#Sotto", "#SottoFM", "#PodcastsThatListenBack"],
+    "primary": ["#Sotto", "#SottoFM", "#OpenPodcastNetwork"],
     "topic": ["#AIPodcast", "#InteractivePodcast", "#AIAudio", "#VoiceAI", "#PodcastAI"],
     "community": ["#BuildInPublic", "#IndieHackers", "#AITools", "#CreatorEconomy"],
     "discovery": ["#LearnAnything", "#CuriousMinds", "#KnowledgeSharing"]

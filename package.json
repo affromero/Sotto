@@ -6,7 +6,7 @@
     "apps/*",
     "packages/*"
   ],
-  "description": "Podcasts that listen back. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
+  "description": "The Open Podcast Network. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
