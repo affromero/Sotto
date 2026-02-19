@@ -1448,15 +1448,17 @@ export default function LandingPage() {
               <h4>Product</h4>
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
+              <a href="/pricing">Pricing</a>
             </div>
             <div>
               <h4>Company</h4>
               <a href="/feedback" className={styles.footerFeedback}>
                 Share Feedback
               </a>
-              <a href="#">About</a>
-              <a href="#">Privacy</a>
-              <a href="#">Terms</a>
+              <a href="/about">About</a>
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+              <a href="/join">Join Us</a>
             </div>
           </div>
         </div>

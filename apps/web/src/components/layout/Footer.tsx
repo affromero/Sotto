@@ -15,6 +15,7 @@ export function Footer() {
             <a href="/create">Create</a>
             <a href="/changelog">Changelog</a>
             <a href="/developers">Developers</a>
+            <a href="/pricing">Pricing</a>
           </div>
           <div>
             <h4>Community</h4>
@@ -27,6 +28,8 @@ export function Footer() {
             <a href="/support">Support</a>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
+            <a href="/about">About</a>
+            <a href="/join">Join Us</a>
           </div>
         </div>
       </div>

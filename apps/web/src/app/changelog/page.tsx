@@ -1,3 +1,5 @@
+import { PublicNav } from '@/components/layout/PublicNav';
+import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -152,7 +154,9 @@ function formatDate(dateStr: string): string {
 
 export default function ChangelogPage() {
   return (
-    <main className={styles.main}>
+    <>
+      <PublicNav />
+      <main className={styles.main}>
       <div className={styles.container}>
         <header className={styles.header}>
           <h1 className={styles.title}>Changelog</h1>
@@ -188,5 +192,7 @@ export default function ChangelogPage() {
         </div>
       </div>
     </main>
+      <Footer />
+    </>
   );
 }

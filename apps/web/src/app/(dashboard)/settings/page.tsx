@@ -31,6 +31,8 @@ export default async function SettingsPage() {
         preferredHostVoiceId: true,
         preferredExpertVoiceId: true,
         preferredLanguage: true,
+        emailNotifications: true,
+        pushNotifications: true,
       },
     }),
     prisma.account.findMany({
@@ -105,6 +107,8 @@ export default async function SettingsPage() {
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
         isTwitterProviderAvailable={isTwitterProviderAvailable}
+        initialEmailNotifications={user.emailNotifications}
+        initialPushNotifications={user.pushNotifications}
         quizAnswerCount={quizAnswerCount}
         referralCount={referralCount}
       />

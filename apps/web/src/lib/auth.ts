@@ -58,6 +58,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     newUser: '/onboarding',
   },
   events: {
+    async createUser({ user }) {
+      if (user.email && user.name) {
+        const { buildWelcomeEmail } = await import('./email-templates');
+        const { sendEmail } = await import('./email');
+        const { subject, html } = buildWelcomeEmail(user.name);
+        await sendEmail({ to: user.email, subject, html });
+      }
+    },
     async linkAccount({ user, account, profile }) {
       if (account.provider === 'twitter' && user.id) {
         const twitterHandle =
