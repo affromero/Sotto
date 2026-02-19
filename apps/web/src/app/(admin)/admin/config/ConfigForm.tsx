@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AllocationEditor, type Allocation } from './AllocationEditor';
 import styles from './ConfigForm.module.css';
 
 interface ModelOption {
@@ -9,19 +10,7 @@ interface ModelOption {
   tier: string;
 }
 
-interface AiProvider {
-  id: string;
-  displayName: string;
-  models: ModelOption[];
-}
-
-interface TtsProvider {
-  id: string;
-  displayName: string;
-  models: ModelOption[];
-}
-
-interface SttProvider {
+interface ProviderOption {
   id: string;
   displayName: string;
   models: ModelOption[];
@@ -36,10 +25,12 @@ interface ConfigFormProps {
     sttProvider: string;
     sttModel: string;
     generationLimit: number;
+    aiAllocations: Allocation[];
+    ttsAllocations: Allocation[];
   };
-  aiProviders: AiProvider[];
-  ttsProviders: TtsProvider[];
-  sttProviders: SttProvider[];
+  aiProviders: ProviderOption[];
+  ttsProviders: ProviderOption[];
+  sttProviders: ProviderOption[];
 }
 
 export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProviders }: ConfigFormProps) {
@@ -50,6 +41,10 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
   const [sttProvider, setSttProvider] = useState(initialConfig.sttProvider);
   const [sttModel, setSttModel] = useState(initialConfig.sttModel);
   const [generationLimit, setGenerationLimit] = useState(initialConfig.generationLimit);
+  const [useAiAllocations, setUseAiAllocations] = useState(initialConfig.aiAllocations.length > 0);
+  const [aiAllocations, setAiAllocations] = useState<Allocation[]>(initialConfig.aiAllocations);
+  const [useTtsAllocations, setUseTtsAllocations] = useState(initialConfig.ttsAllocations.length > 0);
+  const [ttsAllocations, setTtsAllocations] = useState<Allocation[]>(initialConfig.ttsAllocations);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +91,8 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           ttsProvider, ttsModel,
           sttProvider, sttModel,
           generationLimit,
+          aiAllocations: useAiAllocations ? aiAllocations : [],
+          ttsAllocations: useTtsAllocations ? ttsAllocations : [],
         }),
       });
 
@@ -244,6 +241,60 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
         />
         <span className={styles.hint}>Max free podcasts per user before requiring BYOK keys</span>
       </div>
+
+      <div className={styles.field}>
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={useAiAllocations}
+            onChange={(e) => {
+              setUseAiAllocations(e.target.checked);
+              if (!e.target.checked) setAiAllocations([]);
+            }}
+          />
+          <span className={styles.label}>Per-provider AI quotas</span>
+        </label>
+        <span className={styles.hint}>
+          Distribute AI generations across multiple providers instead of using a single default
+        </span>
+      </div>
+
+      {useAiAllocations && (
+        <AllocationEditor
+          label="AI"
+          providers={aiProviders}
+          allocations={aiAllocations}
+          onChange={setAiAllocations}
+          generationLimit={generationLimit}
+        />
+      )}
+
+      <div className={styles.field}>
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={useTtsAllocations}
+            onChange={(e) => {
+              setUseTtsAllocations(e.target.checked);
+              if (!e.target.checked) setTtsAllocations([]);
+            }}
+          />
+          <span className={styles.label}>Per-provider TTS quotas</span>
+        </label>
+        <span className={styles.hint}>
+          Distribute TTS generations across multiple providers instead of using a single default
+        </span>
+      </div>
+
+      {useTtsAllocations && (
+        <AllocationEditor
+          label="TTS"
+          providers={ttsProviders}
+          allocations={ttsAllocations}
+          onChange={setTtsAllocations}
+          generationLimit={generationLimit}
+        />
+      )}
 
       {error && (
         <div className={styles.error} role="alert">
