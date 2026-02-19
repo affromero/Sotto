@@ -188,6 +188,7 @@ export default async function DashboardPage() {
         used={freeTier.freeGenerationsUsed}
         limit={freeTier.freeGenerationsLimit}
         isByokUser={freeTier.isByokUser}
+        ttsQuotas={freeTier.ttsQuotas}
       />
 
       <section className={styles.header}>
