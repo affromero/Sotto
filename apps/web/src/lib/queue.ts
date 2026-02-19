@@ -168,7 +168,7 @@ export interface PollTelegramUpdatesPayload {}
 
 export interface ReplyTelegramPayload {
   podcastId: string;
-  telegramMessageId: string;
+  telegramMessageId?: string;
   chatId: string;
 }
 

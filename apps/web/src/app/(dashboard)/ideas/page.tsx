@@ -13,23 +13,41 @@ export default async function IdeasPage() {
     return null;
   }
 
-  const ideas = await prisma.savedIdea.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      questionId: true,
-      question: true,
-      tagSlugs: true,
-      category: true,
-      createdAt: true,
-    },
-  });
+  const [ideas, podcastIdeas] = await Promise.all([
+    prisma.savedIdea.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        questionId: true,
+        question: true,
+        tagSlugs: true,
+        category: true,
+        createdAt: true,
+      },
+    }),
+    prisma.podcastIdea.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        text: true,
+        sourceUrl: true,
+        source: true,
+        createdAt: true,
+      },
+    }),
+  ]);
 
-  const serialized = ideas.map((idea) => ({
+  const serializedIdeas = ideas.map((idea) => ({
     ...idea,
     createdAt: idea.createdAt.toISOString(),
   }));
 
-  return <IdeasList ideas={serialized} />;
+  const serializedPodcastIdeas = podcastIdeas.map((idea) => ({
+    ...idea,
+    createdAt: idea.createdAt.toISOString(),
+  }));
+
+  return <IdeasList ideas={serializedIdeas} podcastIdeas={serializedPodcastIdeas} />;
 }
