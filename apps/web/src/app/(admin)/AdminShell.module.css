@@ -155,6 +155,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-top: var(--impersonation-banner-height, 0px);
 }
 
 .topBar {
