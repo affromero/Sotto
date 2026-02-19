@@ -1,25 +1,19 @@
 /* Admin Moderation Page */
 
 .container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
+  composes: container from '../admin.module.css';
 }
 
 .header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
+  composes: header from '../admin.module.css';
 }
 
 .title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
+  composes: title from '../admin.module.css';
 }
 
 .subtitle {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
+  composes: subtitle from '../admin.module.css';
 }
 
 /* Tabs */
@@ -79,73 +73,42 @@
 /* Sections */
 
 .section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  composes: section from '../admin.module.css';
 }
 
 .sectionTitle {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
+  composes: sectionTitle from '../admin.module.css';
 }
 
 .empty {
+  composes: empty from '../admin.module.css';
   padding: var(--spacing-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  text-align: center;
-  color: var(--color-text-secondary);
-  font: var(--text-body);
 }
 
 /* Table */
 
 .tableContainer {
-  overflow-x: auto;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  composes: tableContainer from '../admin.module.css';
 }
 
 .table {
-  width: 100%;
-  border-collapse: collapse;
+  composes: table from '../admin.module.css';
 }
 
-.table thead {
-  background: var(--color-background);
-  border-bottom: 1px solid var(--color-border);
+.table th,
+.table td {
+  padding: var(--spacing-md);
 }
 
 .table th {
-  padding: var(--spacing-md);
-  text-align: left;
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
   white-space: nowrap;
 }
 
-.table tbody tr {
-  border-bottom: 1px solid var(--color-border);
-  transition: background var(--transition-fast);
-}
-
-.table tbody tr:last-child {
-  border-bottom: none;
-}
-
-.table tbody tr:hover {
-  background: var(--color-surface-hover);
-}
-
 .table td {
-  padding: var(--spacing-md);
   font: var(--text-body);
-  color: var(--color-text-primary);
 }
 
 .link {
