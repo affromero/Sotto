@@ -46,6 +46,10 @@ model User {
   preferredAiProvider    String?
   preferredAiModel       String?
 
+  // Notification preferences
+  emailNotifications Boolean @default(true)
+  pushNotifications  Boolean @default(true)
+
   // Telegram integration
   telegramEnabled Boolean @default(false)
 

@@ -39,6 +39,8 @@ const defaultProps = {
   isTwitterProviderAvailable: false,
   quizAnswerCount: 0,
   referralCount: 0,
+  initialEmailNotifications: true,
+  initialPushNotifications: true,
 };
 
 describe('SettingsForm', () => {
