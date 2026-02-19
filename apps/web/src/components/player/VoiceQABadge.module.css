@@ -1,0 +1,12 @@
+.root {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+}
+
+.label {
+  font-weight: 500;
+}

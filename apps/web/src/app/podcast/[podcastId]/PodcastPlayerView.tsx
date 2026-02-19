@@ -25,6 +25,7 @@ import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import { ReferenceList } from '@/components/player/ReferenceList';
 import { InterruptButton } from '@/components/player/InterruptButton';
+import { VoiceQABadge } from '@/components/player/VoiceQABadge';
 import { InterruptChatPanel } from '@/components/player/InterruptChatPanel';
 import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
@@ -705,6 +706,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {isReady && isAuthenticated && (
         <div className={styles.interruptSection}>
           <InterruptButton onInterrupt={handleInterrupt} />
+          <VoiceQABadge />
         </div>
       )}
 
