@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
   const podcastUrl = `${appUrl}/podcast/${podcastId}`;
+  const creatorName = podcast.user.name || 'Anonymous';
 
   return {
     title: podcast.title,
@@ -30,12 +31,14 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       description: podcast.topic,
       type: 'article',
       url: podcastUrl,
+      siteName: 'Sotto',
       ...(podcast.audioUrl ? { audio: podcast.audioUrl } : {}),
     },
     twitter: {
       card: 'summary_large_image',
-      title: podcast.title,
+      title: `${podcast.title} — by ${creatorName}`,
       description: podcast.topic,
+      site: '@SottoFM',
     },
     alternates: {
       canonical: podcastUrl,
