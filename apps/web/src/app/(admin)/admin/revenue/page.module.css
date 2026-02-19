@@ -1,245 +1,35 @@
 /* Admin Revenue Dashboard */
 
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
+.rangeNav { composes: rangeNav from '../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../admin.module.css'; }
+.grid { composes: grid from '../admin.module.css'; }
+.card { composes: card from '../admin.module.css'; }
+.cardLabel { composes: cardLabel from '../admin.module.css'; }
+.cardValue { composes: cardValue from '../admin.module.css'; }
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
+.empty { composes: empty from '../admin.module.css'; }
+.columns { composes: columns from '../admin.module.css'; }
+.chartContainer { composes: chartContainer from '../admin.module.css'; }
+.chartBar { composes: chartBar from '../admin.module.css'; }
+.chartBarFill { composes: chartBarFill from '../admin.module.css'; }
+.chartLabel { composes: chartLabel from '../admin.module.css'; }
+.table { composes: tableCompact from '../admin.module.css'; }
 
-.headerRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-}
-
-.subtitle {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-}
-
-/* Range Nav */
-
-.rangeNav {
-  display: flex;
-  gap: var(--spacing-xs);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 4px;
-}
-
-.rangeLink {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--spacing-xs) var(--spacing-md);
-  border-radius: var(--radius-full);
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-
-.rangeLink:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-hover);
-}
-
-.rangeLinkActive {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-.rangeLinkActive:hover {
-  background: var(--color-accent);
-  color: #fff;
-}
-
-/* Stats Grid */
-
-.grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-md);
-}
-
-@media (min-width: 640px) {
-  .grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
+/* Grid: 5 columns on wide screens */
 @media (min-width: 1200px) {
   .grid {
     grid-template-columns: repeat(5, 1fr);
   }
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  transition: border-color var(--transition-fast);
-}
-
-.card:hover {
-  border-color: var(--color-border-hover);
-}
-
-.cardLabel {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.cardValue {
-  font: var(--text-h2);
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-/* Sections */
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.sectionTitle {
-  font: var(--text-h3);
-  color: var(--color-text-primary);
-}
-
-.empty {
-  font: var(--text-body);
-  color: var(--color-text-secondary);
-  padding: var(--spacing-xl);
-  text-align: center;
-}
-
-/* Two-column layout */
-
-.columns {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--spacing-xl);
-}
-
-@media (min-width: 1024px) {
-  .columns {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* Bar Chart */
-
-.chartContainer {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 200px;
-  padding: var(--spacing-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow-x: auto;
-}
-
-.chartBar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex: 1;
-  min-width: 28px;
-  height: 100%;
-  justify-content: flex-end;
-  gap: var(--spacing-xs);
-}
-
-.chartBarFill {
-  width: 100%;
-  max-width: 32px;
-  background: var(--color-primary);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  min-height: 2px;
-  transition: height 0.3s ease;
-}
-
-.chartLabel {
-  font-size: 10px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  writing-mode: vertical-lr;
-  transform: rotate(180deg);
-  max-height: 50px;
-  overflow: hidden;
-}
-
-@media (min-width: 768px) {
-  .chartLabel {
-    writing-mode: horizontal-tb;
-    transform: none;
-    font-size: 11px;
-  }
-}
-
-/* Table */
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.table th,
-.table td {
-  padding: var(--spacing-sm) var(--spacing-md);
-  text-align: left;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.table th {
-  font: var(--text-body-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-  background: var(--color-surface-hover);
-}
-
-.table td {
-  font: var(--text-body);
-  color: var(--color-text-primary);
-}
-
-.table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Status badge */
+/* Page-specific: Status badges */
 
 .statusBadge {
   display: inline-flex;
@@ -269,7 +59,7 @@
   color: #92400e;
 }
 
-/* Marketplace stats */
+/* Page-specific: Marketplace stats */
 
 .statsGrid {
   display: grid;
