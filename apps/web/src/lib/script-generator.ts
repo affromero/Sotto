@@ -45,6 +45,75 @@ function normalizeReferences(
 }
 
 /**
+ * Deduplicate references by content identity (DOI, URL, or normalized title).
+ * Returns deduplicated references renumbered from 1, and a map from old → new
+ * numbers so callers can remap `[N]` citation markers in the script text.
+ */
+function deduplicateReferences(refs: GeneratedReference[]): {
+  references: GeneratedReference[];
+  numberMap: Map<number, number>;
+} {
+  if (refs.length === 0) return { references: [], numberMap: new Map() };
+
+  // Build a content key for each reference
+  function contentKey(ref: GeneratedReference): string {
+    if (ref.doi) return `doi:${ref.doi.toLowerCase().trim()}`;
+    if (ref.url) return `url:${ref.url.toLowerCase().trim()}`;
+    return `title:${ref.title.toLowerCase().trim()}`;
+  }
+
+  const seen = new Map<string, number>(); // content key → kept reference's NEW number
+  const kept: GeneratedReference[] = [];
+  const numberMap = new Map<number, number>(); // old number → new number
+
+  for (const ref of refs) {
+    const key = contentKey(ref);
+    const existingNewNumber = seen.get(key);
+
+    if (existingNewNumber !== undefined) {
+      // Duplicate — map old number to the kept reference's new number
+      numberMap.set(ref.number, existingNewNumber);
+    } else {
+      const newNumber = kept.length + 1;
+      seen.set(key, newNumber);
+      numberMap.set(ref.number, newNumber);
+      kept.push({ ...ref, number: newNumber });
+    }
+  }
+
+  return { references: kept, numberMap };
+}
+
+/**
+ * Remap `[N]` citation markers in script turns using a number map.
+ * Handles single `[1]` and comma-separated `[1,3]` patterns.
+ */
+function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): ScriptTurn[] {
+  // Check if any numbers actually changed
+  let hasChanges = false;
+  for (const [old, nu] of numberMap) {
+    if (old !== nu) { hasChanges = true; break; }
+  }
+  if (!hasChanges) return turns;
+
+  return turns.map((turn) => ({
+    ...turn,
+    text: turn.text.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_match, inner: string) => {
+      const remapped = inner
+        .split(',')
+        .map((s) => {
+          const n = parseInt(s.trim(), 10);
+          return numberMap.get(n) ?? n;
+        })
+        // Deduplicate numbers that now map to the same reference
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .sort((a, b) => a - b);
+      return `[${remapped.join(',')}]`;
+    }),
+  }));
+}
+
+/**
  * Generate a 2-voice podcast script from discovery metadata.
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
@@ -239,12 +308,14 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     ];
   }
 
-  const references = normalizeReferences(
+  const normalized = normalizeReferences(
     (validated.references as Array<Record<string, unknown>>) || []
   );
+  const { references, numberMap } = deduplicateReferences(normalized);
+  const turns = remapCitations(validated.turns, numberMap);
 
   // Generate markdown version with delivery directions
-  const markdown = validated.turns
+  const markdown = turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -252,7 +323,7 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     .join('\n\n');
 
   return {
-    turns: validated.turns,
+    turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
     markdown,
@@ -419,11 +490,13 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     ];
   }
 
-  const references = normalizeReferences(
+  const normalized = normalizeReferences(
     (validated.references as Array<Record<string, unknown>>) || []
   );
+  const { references, numberMap } = deduplicateReferences(normalized);
+  const turns = remapCitations(validated.turns, numberMap);
 
-  const markdown = validated.turns
+  const markdown = turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -431,7 +504,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     .join('\n\n');
 
   return {
-    turns: validated.turns,
+    turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
     markdown,
