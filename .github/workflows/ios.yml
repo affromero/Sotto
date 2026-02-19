@@ -12,7 +12,7 @@ jobs:
     name: Build & Submit to TestFlight
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +58,7 @@ jobs:
 
       - name: Notify via Telegram
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BUILD_STATUS: ${{ needs.build-and-submit.result }}
         run: |
