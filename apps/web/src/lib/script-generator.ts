@@ -45,6 +45,75 @@ function normalizeReferences(
 }
 
 /**
+ * Deduplicate references by content identity (DOI, URL, or normalized title).
+ * Returns deduplicated references renumbered from 1, and a map from old → new
+ * numbers so callers can remap `[N]` citation markers in the script text.
+ */
+function deduplicateReferences(refs: GeneratedReference[]): {
+  references: GeneratedReference[];
+  numberMap: Map<number, number>;
+} {
+  if (refs.length === 0) return { references: [], numberMap: new Map() };
+
+  // Build a content key for each reference
+  function contentKey(ref: GeneratedReference): string {
+    if (ref.doi) return `doi:${ref.doi.toLowerCase().trim()}`;
+    if (ref.url) return `url:${ref.url.toLowerCase().trim()}`;
+    return `title:${ref.title.toLowerCase().trim()}`;
+  }
+
+  const seen = new Map<string, number>(); // content key → kept reference's NEW number
+  const kept: GeneratedReference[] = [];
+  const numberMap = new Map<number, number>(); // old number → new number
+
+  for (const ref of refs) {
+    const key = contentKey(ref);
+    const existingNewNumber = seen.get(key);
+
+    if (existingNewNumber !== undefined) {
+      // Duplicate — map old number to the kept reference's new number
+      numberMap.set(ref.number, existingNewNumber);
+    } else {
+      const newNumber = kept.length + 1;
+      seen.set(key, newNumber);
+      numberMap.set(ref.number, newNumber);
+      kept.push({ ...ref, number: newNumber });
+    }
+  }
+
+  return { references: kept, numberMap };
+}
+
+/**
+ * Remap `[N]` citation markers in script turns using a number map.
+ * Handles single `[1]` and comma-separated `[1,3]` patterns.
+ */
+function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): ScriptTurn[] {
+  // Check if any numbers actually changed
+  let hasChanges = false;
+  for (const [old, nu] of numberMap) {
+    if (old !== nu) { hasChanges = true; break; }
+  }
+  if (!hasChanges) return turns;
+
+  return turns.map((turn) => ({
+    ...turn,
+    text: turn.text.replace(/\[(\d+(?:\s*,\s*\d+)*)\]/g, (_match, inner: string) => {
+      const remapped = inner
+        .split(',')
+        .map((s) => {
+          const n = parseInt(s.trim(), 10);
+          return numberMap.get(n) ?? n;
+        })
+        // Deduplicate numbers that now map to the same reference
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .sort((a, b) => a - b);
+      return `[${remapped.join(',')}]`;
+    }),
+  }));
+}
+
+/**
  * Generate a 2-voice podcast script from discovery metadata.
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
@@ -137,14 +206,38 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 - Audience level: ${params.audienceLevel}
 - Focus areas: ${params.focusAreas.join(', ')}
 
-## Inline Citations:
-You MUST include inline citations in the dialogue using [N] notation (e.g. [1], [2]):
-- Only cite REAL, verifiable sources — published papers, books, reputable news outlets, official reports
-- Use 3-15 citations depending on depth level (deep_dive: 10-15, standard: 5-10, quick_overview: 3-8, eli5: 3-8)
+## Inline Citations — STRICT REQUIREMENTS:
+You MUST include inline citations in the dialogue using [N] notation (e.g. [1], [2]).
+
+### Hard Minimum Reference Counts (scripts below these thresholds WILL be rejected):
+- deep_dive: minimum 10 references
+- standard: minimum 5 references
+- quick_overview: minimum 3 references
+- eli5: minimum 3 references
+
+### Reference Type Hierarchy (prefer types at the top):
+1. PAPER — peer-reviewed journal articles (highest quality). Include DOI when available (e.g. doi: "10.1038/s41586-023-06185-3")
+2. BOOK — published books from academic or major publishers
+3. REPORT — government reports (.gov), official organization reports (WHO, UNESCO, IPCC)
+4. ARTICLE — established news outlets (Reuters, AP, BBC, NYT, etc.)
+5. WEB — other reputable web sources (use sparingly, only when better types aren't available)
+6. VIDEO — use only when the video itself is the primary source
+
+### Serious Source Ratio Requirements (PAPER + BOOK + REPORT must make up at least):
+- deep_dive: 60% of all references
+- standard: 40% of all references
+- quick_overview: 20% of all references
+- eli5: no minimum ratio
+
+### Citation Rules:
+- Only cite REAL, verifiable sources — search the web to find actual papers, books, and reports
+- Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)
+- For journal papers, always include the DOI in the "doi" field
 - HOST introduces citations conversationally: "I read that researchers at MIT found..." [3]
 - EXPERT cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim
-- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source. Do NOT cite Wikipedia, personal blogs, social media, or content farms. Only cite: peer-reviewed journals, published books, government reports (.gov), academic institutions (.edu), and established news outlets (Reuters, AP, BBC, NYT, etc). Each non-obvious factual claim should be supported by at least 3 independent sources
+- Do NOT invent fake citations. Do NOT cite Wikipedia, personal blogs, social media, or content farms
+- Each non-obvious factual claim should be supported by at least 3 independent sources
 
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
@@ -239,12 +332,14 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     ];
   }
 
-  const references = normalizeReferences(
+  const normalized = normalizeReferences(
     (validated.references as Array<Record<string, unknown>>) || []
   );
+  const { references, numberMap } = deduplicateReferences(normalized);
+  const turns = remapCitations(validated.turns, numberMap);
 
   // Generate markdown version with delivery directions
-  const markdown = validated.turns
+  const markdown = turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -252,7 +347,7 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     .join('\n\n');
 
   return {
-    turns: validated.turns,
+    turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
     markdown,
@@ -332,12 +427,36 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 - Audience level: ${params.audienceLevel}
 - Focus areas: ${params.focusAreas.join(', ')}
 
-## Citation Requirements:
-- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source.
-- Do NOT cite Wikipedia, personal blogs, social media, or content farms.
-- Only cite: peer-reviewed journals, published books, government reports (.gov), academic institutions (.edu), and established news outlets (Reuters, AP, BBC, NYT, etc).
-- Each non-obvious factual claim should be supported by at least 3 independent sources.
-- Use [N] notation for inline citations.
+## Citation Requirements — STRICT (scripts that fail these thresholds will be rejected again):
+
+### Hard Minimum Reference Counts:
+- deep_dive: minimum 10 references
+- standard: minimum 5 references
+- quick_overview: minimum 3 references
+- eli5: minimum 3 references
+
+### Reference Type Hierarchy (prefer types at the top):
+1. PAPER — peer-reviewed journal articles. Include DOI when available
+2. BOOK — published books from academic or major publishers
+3. REPORT — government reports (.gov), official organization reports (WHO, UNESCO, IPCC)
+4. ARTICLE — established news outlets (Reuters, AP, BBC, NYT, etc.)
+5. WEB — other reputable web sources (use sparingly)
+6. VIDEO — use only when the video itself is the primary source
+
+### Serious Source Ratio (PAPER + BOOK + REPORT must make up at least):
+- deep_dive: 60% of all references
+- standard: 40% of all references
+- quick_overview: 20% of all references
+- eli5: no minimum ratio
+
+### Rules:
+- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source
+- Do NOT cite Wikipedia, personal blogs, social media, or content farms
+- Set the correct "type" field for each reference
+- For journal papers, always include the DOI in the "doi" field
+- Use [N] notation for inline citations
+- Each non-obvious factual claim should be supported by at least 3 independent sources
+- If the previous feedback flagged REFERENCES quality issues, use web search to find REAL peer-reviewed papers, books, and official reports to replace weak WEB/ARTICLE sources
 
 ## Sound Effect Cues:
 Include [SFX: description] markers at natural transition points (3-5 per episode max).
@@ -419,11 +538,13 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     ];
   }
 
-  const references = normalizeReferences(
+  const normalized = normalizeReferences(
     (validated.references as Array<Record<string, unknown>>) || []
   );
+  const { references, numberMap } = deduplicateReferences(normalized);
+  const turns = remapCitations(validated.turns, numberMap);
 
-  const markdown = validated.turns
+  const markdown = turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -431,7 +552,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     .join('\n\n');
 
   return {
-    turns: validated.turns,
+    turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
     markdown,

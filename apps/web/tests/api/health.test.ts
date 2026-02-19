@@ -53,6 +53,8 @@ describe('GET /api/health', () => {
     mockS3Send.mockResolvedValue({});
     // Default: admin session for detailed checks
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    // Default: mock fetch so tests are isolated from real external API calls
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
   });
 
   afterEach(() => {

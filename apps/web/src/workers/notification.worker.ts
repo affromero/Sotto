@@ -10,6 +10,11 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
 
   logger.info('Sending notification', { userId, type });
 
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { pushNotifications: true },
+  });
+
   // Create in-app notification
   await prisma.notification.create({
     data: {
@@ -21,11 +26,13 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
     },
   });
 
-  // Send push notifications (web + mobile) in parallel
-  await Promise.all([
-    sendPushNotification({ userId, title, body: message, data }),
-    sendExpoPushNotification({ userId, title, body: message, data }),
-  ]);
+  // Send push notifications (web + mobile) only if user has opted in
+  if (user?.pushNotifications) {
+    await Promise.all([
+      sendPushNotification({ userId, title, body: message, data }),
+      sendExpoPushNotification({ userId, title, body: message, data }),
+    ]);
+  }
 
   logger.info('Notification sent', { userId, type });
 }
