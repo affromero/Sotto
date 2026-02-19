@@ -7,6 +7,7 @@ import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
@@ -92,15 +93,25 @@ export async function POST(request: NextRequest) {
   }
 
   // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
+  let freeTierTtsProvider: string | undefined;
+  let freeTierTtsModel: string | undefined;
+  let freeTierAiModel: string | undefined;
   if (!gate.isByokUser) {
     const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
+    const selected = await selectFreeTierProviders(authResult.userId);
+    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit, {
+      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+    });
     if (!ok) {
       return NextResponse.json(
         { error: 'Free generations used.', code: 'free_tier_exhausted' },
         { status: 403 }
       );
     }
+    freeTierTtsProvider = selected.ttsProvider;
+    freeTierTtsModel = selected.ttsModel;
+    freeTierAiModel = selected.aiModel;
   }
 
   // Duration validation — free tier users capped at 5 min, BYOK at 40 min
@@ -156,9 +167,9 @@ export async function POST(request: NextRequest) {
       status: 'EXTRACTING',
       hostVoiceId: parsed.data.hostVoiceId,
       expertVoiceId: parsed.data.expertVoiceId,
-      ttsProvider: parsed.data.ttsProvider ?? null,
-      ttsModel: parsed.data.ttsModel ?? null,
-      aiModel: parsed.data.aiModel ?? null,
+      ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
+      ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
+      aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
       ...(isApiKeyAuth && { source: 'API' }),
     },
   });

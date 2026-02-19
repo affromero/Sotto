@@ -3,6 +3,12 @@ import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
 import type { SttProviderId } from '@sotto/shared';
 
+export interface ProviderAllocation {
+  provider: string;
+  model: string;
+  quota: number;
+}
+
 export interface FreeTierConfig {
   aiProvider: AiProviderId;
   aiModel: string;
@@ -11,9 +17,11 @@ export interface FreeTierConfig {
   sttProvider: SttProviderId;
   sttModel: string;
   generationLimit: number;
+  aiAllocations: ProviderAllocation[];
+  ttsAllocations: ProviderAllocation[];
 }
 
-const DEFAULTS: FreeTierConfig = {
+const DEFAULTS: Omit<FreeTierConfig, 'aiAllocations' | 'ttsAllocations'> = {
   aiProvider: 'anthropic',
   aiModel: 'claude-haiku-4-5-20251001',
   ttsProvider: 'openai',
@@ -22,6 +30,18 @@ const DEFAULTS: FreeTierConfig = {
   sttModel: 'whisper-large-v3-turbo',
   generationLimit: 3,
 };
+
+function parseAllocations(json: unknown): ProviderAllocation[] {
+  if (!Array.isArray(json)) return [];
+  return json.filter(
+    (item): item is ProviderAllocation =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof item.provider === 'string' &&
+      typeof item.model === 'string' &&
+      typeof item.quota === 'number'
+  );
+}
 
 /**
  * Get the current free tier configuration.
@@ -51,6 +71,8 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
     sttProvider: row.sttProvider as SttProviderId,
     sttModel: row.sttModel,
     generationLimit: row.generationLimit,
+    aiAllocations: parseAllocations(row.aiAllocations),
+    ttsAllocations: parseAllocations(row.ttsAllocations),
   };
 }
 
@@ -71,6 +93,8 @@ export async function setFreeTierConfig(
       ...(data.sttProvider !== undefined && { sttProvider: data.sttProvider }),
       ...(data.sttModel !== undefined && { sttModel: data.sttModel }),
       ...(data.generationLimit !== undefined && { generationLimit: data.generationLimit }),
+      ...(data.aiAllocations !== undefined && { aiAllocations: data.aiAllocations }),
+      ...(data.ttsAllocations !== undefined && { ttsAllocations: data.ttsAllocations }),
       updatedBy: adminId,
     },
     create: {
@@ -82,6 +106,8 @@ export async function setFreeTierConfig(
       sttProvider: data.sttProvider ?? DEFAULTS.sttProvider,
       sttModel: data.sttModel ?? DEFAULTS.sttModel,
       generationLimit: data.generationLimit ?? DEFAULTS.generationLimit,
+      aiAllocations: data.aiAllocations ?? [],
+      ttsAllocations: data.ttsAllocations ?? [],
       updatedBy: adminId,
     },
   });

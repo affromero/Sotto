@@ -29,6 +29,8 @@ export async function GET(_request: NextRequest) {
         limit: freeTier.freeGenerationsLimit,
         remaining: freeTier.freeGenerationsRemaining,
         isByokUser: freeTier.isByokUser,
+        aiQuotas: freeTier.aiQuotas,
+        ttsQuotas: freeTier.ttsQuotas,
       },
       limits: LIMITS,
     });

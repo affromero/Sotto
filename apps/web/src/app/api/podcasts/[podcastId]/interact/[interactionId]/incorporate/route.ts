@@ -9,6 +9,7 @@ import { getAiKey } from '@/lib/byok';
 import { getLanguageLabel } from '@sotto/shared';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
@@ -70,7 +71,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Atomically increment free tier counter before any state mutations
   if (!gate.isByokUser) {
     const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit);
+    const selected = await selectFreeTierProviders(userId);
+    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit, {
+      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+    });
     if (!ok) {
       return NextResponse.json(
         { error: 'Free generations used.', code: 'free_tier_exhausted' },

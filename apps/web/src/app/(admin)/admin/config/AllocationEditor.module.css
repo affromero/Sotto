@@ -1,0 +1,131 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.sectionTitle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.toggleLabel {
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+}
+
+.row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.rowField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.rowFieldSmall {
+  composes: rowField;
+  max-width: 80px;
+  flex: 0 0 80px;
+}
+
+.rowLabel {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.rowSelect,
+.rowInput {
+  appearance: none;
+  padding: 8px 10px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  font: var(--text-caption);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.rowSelect:focus,
+.rowInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.removeButton {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-md);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.removeButton:hover {
+  color: var(--color-error, #dc2626);
+  background: var(--color-error-subtle, #fef2f2);
+}
+
+.addButton {
+  appearance: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xxs);
+  padding: 6px 12px;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: none;
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.addButton:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.quotaSummary {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.quotaOver {
+  color: var(--color-error, #dc2626);
+  font-weight: 600;
+}

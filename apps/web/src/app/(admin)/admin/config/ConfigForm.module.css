@@ -44,6 +44,13 @@
   color: var(--color-text-tertiary);
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  cursor: pointer;
+}
+
 .error {
   padding: 10px 14px;
   background: var(--color-error-subtle, #fef2f2);
