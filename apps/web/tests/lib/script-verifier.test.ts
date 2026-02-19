@@ -414,6 +414,83 @@ describe('verifyScript', () => {
     expect(result.adequatelySourcedClaims).toBe(1);
   });
 
+  it('includes reference attribution accuracy instructions in system prompt', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'Test',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).toContain('Reference Attribution Accuracy');
+    expect(systemPrompt).toContain('hasMisattribution');
+  });
+
+  it('fails when claims have misattributed references', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'A paper from Google DeepMind shows transformers scale linearly',
+            turnIndex: 2,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            hasMisattribution: true,
+            verificationNote: 'Reference [1] is by OpenAI researchers, not Google DeepMind',
+          },
+        ],
+        overallScore: 0.0,
+        feedback: 'Fix misattribution: reference [1] is not from Google DeepMind.',
+      }),
+      inputTokens: 800,
+      outputTokens: 500,
+    });
+
+    const result = await verifyScript({
+      topic: 'Transformer Scaling',
+      turns: [
+        { speaker: 'HOST', text: 'So what does the research say?' },
+        { speaker: 'EXPERT', text: 'Well, a paper from Google DeepMind [1] shows transformers scale linearly.' },
+      ],
+      references: [
+        {
+          number: 1,
+          title: 'Scaling Laws for Neural Language Models',
+          authors: ['Jared Kaplan', 'Sam McCandlish'],
+          year: 2020,
+          url: 'https://arxiv.org/abs/2001.08361',
+          type: 'PAPER',
+          publisher: 'OpenAI',
+          doi: null,
+        },
+      ],
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.misattributedClaims).toHaveLength(1);
+    expect(result.misattributedClaims[0].hasMisattribution).toBe(true);
+    expect(result.feedback).toContain('MISATTRIBUTION');
+  });
+
   it('passes apiKeyOverride to generateResponse', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
