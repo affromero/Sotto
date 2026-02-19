@@ -34,9 +34,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Session-based suspension check (skip for API key auth — those have separate controls)
+  // Detect API key auth (Bearer token) vs browser session
   const authHeader = request.headers.get('authorization');
-  if (!authHeader?.startsWith('Bearer ')) {
+  const isApiKeyAuth = authHeader?.startsWith('Bearer ');
+
+  // Session-based suspension check (skip for API key auth — those have separate controls)
+  if (!isApiKeyAuth) {
     const { auth } = await import('@/lib/auth');
     const session = await auth();
     if (session) {
@@ -46,7 +49,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Rate limit API key requests (60 requests per minute)
-  if (authHeader?.startsWith('Bearer ')) {
+  if (isApiKeyAuth) {
     const rateLimit = await checkRateLimit(`api:create:${authResult.userId}`, 60, 60);
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -156,6 +159,7 @@ export async function POST(request: NextRequest) {
       ttsProvider: parsed.data.ttsProvider ?? null,
       ttsModel: parsed.data.ttsModel ?? null,
       aiModel: parsed.data.aiModel ?? null,
+      ...(isApiKeyAuth && { source: 'API' }),
     },
   });
 
