@@ -2,6 +2,41 @@ import crypto from 'crypto';
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
 
+export function generateUserUnsubscribeUrl(userId: string): string {
+  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
+  const signature = crypto.createHmac('sha256', secret).update(userId).digest('hex');
+  return `${APP_URL}/api/users/unsubscribe?userId=${encodeURIComponent(userId)}&sig=${signature}`;
+}
+
+export function buildAnnouncementEmail(
+  subject: string,
+  body: string,
+  unsubscribeUrl: string
+): { subject: string; html: string } {
+  const announcementFooter = `
+      <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
+        <p style="font-size:12px; color:#9ca3af; margin:0;">
+          <a href="${unsubscribeUrl}" style="color:#9ca3af; text-decoration:underline;">Unsubscribe from announcements</a>
+          &nbsp;·&nbsp;
+          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+        </p>
+      </div>
+    </div>
+  </div>
+  `;
+
+  return {
+    subject,
+    html: `${HEADER}
+      <div style="padding:16px 32px 32px;">
+        <p style="font-size:15px; line-height:1.7; color:#1A1A1A; margin:0;">
+          ${body.replace(/\n/g, '<br />')}
+        </p>
+      </div>
+    ${announcementFooter}`,
+  };
+}
+
 function generateUnsubscribeUrl(email: string): string {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
   const signature = crypto

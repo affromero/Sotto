@@ -715,6 +715,7 @@ enum NotificationType {
   ACCOUNT_SUSPENDED
   ACCOUNT_BANNED
   CONTENT_REMOVED
+  PLATFORM_ANNOUNCEMENT
 }
 
 // ============ MODERATION ============
