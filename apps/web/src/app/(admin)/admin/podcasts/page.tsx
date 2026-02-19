@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { CreateAsSottoButton } from './CreateAsSottoButton';
+import { RetryButton } from './RetryButton';
 import styles from './page.module.css';
 
 interface PageProps {
@@ -33,6 +34,8 @@ async function getPodcasts(search: string | undefined, status: string | undefine
         id: true,
         title: true,
         status: true,
+        failedAtStatus: true,
+        failureReason: true,
         playCount: true,
         visibility: true,
         createdAt: true,
@@ -114,6 +117,7 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
               <th>Plays</th>
               <th>Visibility</th>
               <th>Created</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -129,7 +133,10 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
                   </td>
                   <td className={styles.creatorCell}>{creatorName}</td>
                   <td>
-                    <span className={`${styles.badge} ${styles[`badge${podcast.status}`]}`}>
+                    <span
+                      className={`${styles.badge} ${styles[`badge${podcast.status}`]}`}
+                      title={podcast.status === 'FAILED' && podcast.failureReason ? podcast.failureReason : undefined}
+                    >
                       {podcast.status.replace(/_/g, ' ')}
                     </span>
                   </td>
@@ -145,6 +152,11 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
                       month: 'short',
                       day: 'numeric',
                     })}
+                  </td>
+                  <td>
+                    {podcast.status === 'FAILED' && (
+                      <RetryButton podcastId={podcast.id} />
+                    )}
                   </td>
                 </tr>
               );
