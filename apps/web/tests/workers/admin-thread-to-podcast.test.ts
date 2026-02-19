@@ -65,6 +65,7 @@ function createMockJob(data: AdminThreadToPodcastPayload): Job<AdminThreadToPodc
   return {
     data,
     updateProgress: vi.fn().mockResolvedValue(undefined),
+    updateData: vi.fn().mockResolvedValue(undefined),
   } as unknown as Job<AdminThreadToPodcastPayload>;
 }
 
