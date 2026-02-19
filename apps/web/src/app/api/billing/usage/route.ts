@@ -31,6 +31,8 @@ export async function GET(_request: NextRequest) {
         limit: freeTier.freeGenerationsLimit,
         remaining: freeTier.freeGenerationsRemaining,
         isByokUser: freeTier.isByokUser,
+        aiQuotas: freeTier.aiQuotas,
+        ttsQuotas: freeTier.ttsQuotas,
       },
       limits: {
         maxDurationMinutes: freeTier.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES,

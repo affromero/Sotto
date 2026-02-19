@@ -59,7 +59,7 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001' }),
+  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] }),
 }));
 
 vi.mock('@/lib/logger', () => ({

@@ -150,6 +150,9 @@ model User {
   // Voice purchases
   voicePurchases VoicePurchase[] @relation("VoiceBuyer")
 
+  // Per-provider free tier usage tracking
+  freeProviderUsage FreeProviderUsage[]
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -1425,8 +1428,22 @@ model FreeTierConfig {
   sttProvider     String   @default("groq")
   sttModel        String   @default("whisper-large-v3-turbo")
   generationLimit Int      @default(3)
+  aiAllocations   Json?
+  ttsAllocations  Json?
   updatedAt       DateTime @updatedAt
   updatedBy       String?
+}
+
+model FreeProviderUsage {
+  id       String @id @default(cuid())
+  userId   String
+  category String // 'ai' | 'tts'
+  provider String
+  used     Int    @default(0)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category, provider])
+  @@index([userId])
 }
 
 // ============ VOICE PURCHASES (Stripe) ============

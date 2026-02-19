@@ -324,11 +324,18 @@ export async function resolveTtsProvider(context: {
   }
 
   // Default: use admin-configured free tier TTS provider + model
+  // Check allocations first, then fall back to legacy single-provider
   const config = await getFreeTierConfig();
+  const fallbackProvider = config.ttsAllocations.length > 0
+    ? (config.ttsAllocations[0].provider as TtsProviderId)
+    : config.ttsProvider;
+  const fallbackModel = config.ttsAllocations.length > 0
+    ? config.ttsAllocations[0].model
+    : config.ttsModel;
   return {
-    provider: createTtsProvider(config.ttsProvider, undefined, config.ttsModel),
+    provider: createTtsProvider(fallbackProvider, undefined, fallbackModel),
     source: 'platform',
-    providerId: config.ttsProvider,
+    providerId: fallbackProvider,
   };
 }
 

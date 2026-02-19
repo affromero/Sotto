@@ -130,4 +130,97 @@ describe('PATCH /api/admin/config', () => {
     expect(response.status).toBe(200);
     expect(body).toEqual(updatedConfig);
   });
+
+  it('accepts valid allocations', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockSetFreeTierConfig.mockResolvedValue(undefined);
+    mockGetFreeTierConfig.mockResolvedValue({ generationLimit: 5 });
+
+    const request = createPatchRequest({
+      generationLimit: 5,
+      ttsAllocations: [
+        { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
+        { provider: 'openai', model: 'tts-1-hd', quota: 3 },
+      ],
+    });
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(200);
+    expect(mockSetFreeTierConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ttsAllocations: [
+          { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
+          { provider: 'openai', model: 'tts-1-hd', quota: 3 },
+        ],
+      }),
+      'admin-1'
+    );
+  });
+
+  it('rejects TTS allocations exceeding generation limit', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const request = createPatchRequest({
+      generationLimit: 3,
+      ttsAllocations: [
+        { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
+        { provider: 'openai', model: 'tts-1-hd', quota: 3 },
+      ],
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('TTS allocation quotas (5) exceed generation limit (3)');
+  });
+
+  it('rejects AI allocations exceeding generation limit', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const request = createPatchRequest({
+      generationLimit: 2,
+      aiAllocations: [
+        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', quota: 3 },
+      ],
+    });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain('AI allocation quotas (3) exceed generation limit (2)');
+  });
+
+  it('rejects allocation with missing fields', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const request = createPatchRequest({
+      generationLimit: 5,
+      ttsAllocations: [{ provider: 'elevenlabs' }],
+    });
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('clears allocations when empty arrays are sent', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+    mockSetFreeTierConfig.mockResolvedValue(undefined);
+    mockGetFreeTierConfig.mockResolvedValue({ generationLimit: 5 });
+
+    const request = createPatchRequest({
+      generationLimit: 5,
+      aiAllocations: [],
+      ttsAllocations: [],
+    });
+    const response = await PATCH(request);
+
+    expect(response.status).toBe(200);
+    expect(mockSetFreeTierConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aiAllocations: [],
+        ttsAllocations: [],
+      }),
+      'admin-1'
+    );
+  });
 });
