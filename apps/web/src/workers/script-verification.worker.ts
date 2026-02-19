@@ -114,6 +114,11 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     totalClaims: String(verdict.totalClaims),
     unsupported: String(verdict.unsupportedClaims.length),
     unreliable: String(verdict.unreliableSourceClaims.length),
+    refCount: String(verdict.referenceQuality.totalCount),
+    refRequired: String(verdict.referenceQuality.requiredCount),
+    refCountPassed: String(verdict.referenceQuality.countPassed),
+    refSeriousRatio: String(verdict.referenceQuality.seriousRatio.toFixed(2)),
+    refQualityScore: String(verdict.referenceQuality.qualityScore.toFixed(2)),
   });
 
   if (verdict.passed) {

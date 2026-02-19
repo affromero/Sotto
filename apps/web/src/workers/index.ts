@@ -7,6 +7,7 @@ import {
   emailDigestQueue,
   JobType,
 } from '@/lib/queue';
+import { processAnnouncement } from './announcement.worker';
 import { isTwitterConfigured } from '@/lib/twitter';
 import { isTelegramBotConfigured, setWebhook, deleteWebhook } from '@/lib/telegram';
 import { logger } from '@/lib/logger';
@@ -63,6 +64,7 @@ const workers = [
   createWorker('admin-thread-to-podcast', processAdminThreadToPodcast, { concurrency: 1 }),
   createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
   createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
+  createWorker('announcements', processAnnouncement, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

@@ -58,6 +58,7 @@
 | `/admin/twitter`             | `(admin)/admin/twitter/page.tsx`           | Yes (ADMIN only)            | Twitter dashboard (analytics, auto-tweet, trends, thread→podcast) |
 | `/admin/inspire`             | `(admin)/admin/inspire/page.tsx`           | Yes (ADMIN only)            | Inspire Me analytics (forYou, trending, news stats)      |
 | `/admin/ratings`             | `(admin)/admin/ratings/page.tsx`           | Yes (ADMIN only)            | TTS quality ratings by provider (creator feedback)       |
+| `/admin/announcements`       | `(admin)/admin/announcements/page.tsx`     | Yes (ADMIN only)            | Compose + send platform announcements to all users        |
 
 ## API Route Index
 
@@ -135,6 +136,7 @@
 | `/api/voices/allowlist/[entryId]`                                | DELETE           | Yes        | Remove voice allowlist entry                                                |
 | `/api/waitlist`                                                  | POST             | No         | Waitlist signup                                                             |
 | `/api/waitlist/unsubscribe`                                      | GET              | No         | HMAC-signed unsubscribe                                                     |
+| `/api/users/unsubscribe`                                         | GET              | No         | HMAC-signed email unsubscribe for registered users — sets emailNotifications=false |
 | `/api/health`                                                    | GET              | No         | Health check                                                                |
 | `/api/feedback`                                                  | POST/GET         | No         | Submit/list feedback                                                        |
 | `/api/settings/ai-keys`                                          | GET/POST/DELETE  | Yes        | AI provider BYOK key management (Anthropic/OpenAI)                          |
@@ -158,6 +160,7 @@
 | `/api/tts-models`                                                | GET              | Yes        | List available TTS models for user's BYOK provider (by ?provider= param)    |
 | `/api/settings/byok`                                             | GET/POST/DELETE  | Yes        | Multi-provider TTS BYOK key management (5 providers)                        |
 | `/api/admin/config`                                              | GET/PATCH        | ADMIN      | Free tier configuration (AI/TTS provider, model, generation limit)          |
+| `/api/admin/announcements`                                       | POST             | ADMIN      | Queue platform announcement to all users (in-app + push + email fan-out)    |
 | `/api/admin/twitter/config`                                      | GET/PATCH        | ADMIN      | Twitter admin config (auto-tweet thresholds, trend polling, template)        |
 | `/api/admin/twitter/auto-tweet`                                  | GET/POST         | ADMIN      | List recent auto-tweets / manual "Tweet this"                               |
 | `/api/admin/twitter/trends`                                      | GET/POST         | ADMIN      | Live trending topics / generate podcast from topic                          |

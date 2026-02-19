@@ -23,6 +23,7 @@ import {
   TrendingUp,
   Brain,
   Target,
+  Megaphone,
   ArrowLeft,
   Menu,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ const navItems: NavItem[] = [
   { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
   { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
   { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
+  { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
 ];
 
 export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
