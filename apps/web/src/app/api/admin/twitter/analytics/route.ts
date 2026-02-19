@@ -62,6 +62,7 @@ export async function GET() {
         status: true,
         createdAt: true,
         source: true,
+        failureReason: true,
       },
     }),
   ]);
