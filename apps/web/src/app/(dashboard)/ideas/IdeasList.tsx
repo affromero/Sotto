@@ -16,8 +16,17 @@ interface SavedIdea {
   createdAt: string;
 }
 
+interface PodcastIdea {
+  id: string;
+  text: string;
+  sourceUrl: string | null;
+  source: string;
+  createdAt: string;
+}
+
 interface IdeasListProps {
   ideas: SavedIdea[];
+  podcastIdeas: PodcastIdea[];
 }
 
 function formatDate(dateStr: string): string {
@@ -28,9 +37,10 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function IdeasList({ ideas: initialIdeas }: IdeasListProps) {
+export function IdeasList({ ideas: initialIdeas, podcastIdeas: initialPodcastIdeas }: IdeasListProps) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
+  const [podcastIdeas, setPodcastIdeas] = useState(initialPodcastIdeas);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
@@ -52,11 +62,31 @@ export function IdeasList({ ideas: initialIdeas }: IdeasListProps) {
     }
   };
 
+  const handleDeletePodcastIdea = async (ideaId: string) => {
+    if (confirmId !== ideaId) {
+      setConfirmId(ideaId);
+      return;
+    }
+
+    setDeletingId(ideaId);
+    try {
+      const res = await fetch(`/api/podcast-ideas/${ideaId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setPodcastIdeas((prev) => prev.filter((i) => i.id !== ideaId));
+      }
+    } finally {
+      setDeletingId(null);
+      setConfirmId(null);
+    }
+  };
+
   const handleCancelConfirm = () => {
     setConfirmId(null);
   };
 
-  if (ideas.length === 0) {
+  const totalCount = ideas.length + podcastIdeas.length;
+
+  if (totalCount === 0) {
     return (
       <main className={styles.main}>
         <header className={styles.header}>
@@ -65,7 +95,7 @@ export function IdeasList({ ideas: initialIdeas }: IdeasListProps) {
         <div className={styles.emptyState}>
           <p className={styles.emptyText}>
             No saved ideas yet. Tap the bookmark icon on quiz questions or browse Inspire Me to save
-            podcast ideas for later.
+            podcast ideas. You can also send any topic or URL to @SottoFMBot on Telegram.
           </p>
           <Link href="/create" className={styles.emptyLink}>
             <Sparkles size={16} aria-hidden="true" />
@@ -81,59 +111,113 @@ export function IdeasList({ ideas: initialIdeas }: IdeasListProps) {
       <header className={styles.header}>
         <h1 className={styles.title}>Saved Ideas</h1>
         <p className={styles.subtitle}>
-          {ideas.length} idea{ideas.length !== 1 ? 's' : ''} saved
+          {totalCount} idea{totalCount !== 1 ? 's' : ''} saved
         </p>
       </header>
 
-      <div className={styles.grid} role="list" aria-label="Saved ideas">
-        {ideas.map((idea) => (
-          <div key={idea.id} className={styles.card} role="listitem">
-            <div className={styles.cardContent}>
-              {idea.category && <span className={styles.categoryBadge}>{idea.category}</span>}
-              <p className={styles.question}>{idea.question}</p>
-              <span className={styles.date}>{formatDate(idea.createdAt)}</span>
-            </div>
-            <div className={styles.cardActions}>
-              <Button
-                size="small"
-                onClick={() => router.push(`/create?topic=${encodeURIComponent(idea.question)}`)}
-              >
-                Create
-              </Button>
-              {confirmId === idea.id ? (
-                <div className={styles.confirmActions}>
-                  <button
-                    type="button"
-                    className={styles.confirmBtn}
-                    onClick={() => handleDelete(idea.id)}
-                    disabled={deletingId === idea.id}
-                    aria-label="Confirm delete"
-                  >
-                    {deletingId === idea.id ? 'Deleting...' : 'Confirm'}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.cancelBtn}
-                    onClick={handleCancelConfirm}
-                    aria-label="Cancel delete"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.deleteBtn}
-                  onClick={() => handleDelete(idea.id)}
-                  aria-label={`Delete idea: ${idea.question}`}
+      {ideas.length > 0 && (
+        <div className={styles.grid} role="list" aria-label="Saved ideas">
+          {ideas.map((idea) => (
+            <div key={idea.id} className={styles.card} role="listitem">
+              <div className={styles.cardContent}>
+                {idea.category && <span className={styles.categoryBadge}>{idea.category}</span>}
+                <p className={styles.question}>{idea.question}</p>
+                <span className={styles.date}>{formatDate(idea.createdAt)}</span>
+              </div>
+              <div className={styles.cardActions}>
+                <Button
+                  size="small"
+                  onClick={() => router.push(`/create?topic=${encodeURIComponent(idea.question)}`)}
                 >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
-              )}
+                  Create
+                </Button>
+                {confirmId === idea.id ? (
+                  <div className={styles.confirmActions}>
+                    <button
+                      type="button"
+                      className={styles.confirmBtn}
+                      onClick={() => handleDelete(idea.id)}
+                      disabled={deletingId === idea.id}
+                      aria-label="Confirm delete"
+                    >
+                      {deletingId === idea.id ? 'Deleting...' : 'Confirm'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.cancelBtn}
+                      onClick={handleCancelConfirm}
+                      aria-label="Cancel delete"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    onClick={() => handleDelete(idea.id)}
+                    aria-label={`Delete idea: ${idea.question}`}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {podcastIdeas.length > 0 && (
+        <div className={styles.grid} role="list" aria-label="Telegram ideas">
+          {podcastIdeas.map((idea) => (
+            <div key={idea.id} className={styles.card} role="listitem">
+              <div className={styles.cardContent}>
+                <span className={styles.categoryBadge}>Telegram</span>
+                <p className={styles.question}>{idea.text}</p>
+                <span className={styles.date}>{formatDate(idea.createdAt)}</span>
+              </div>
+              <div className={styles.cardActions}>
+                <Button
+                  size="small"
+                  onClick={() => router.push(`/create?topic=${encodeURIComponent(idea.text)}`)}
+                >
+                  Create
+                </Button>
+                {confirmId === idea.id ? (
+                  <div className={styles.confirmActions}>
+                    <button
+                      type="button"
+                      className={styles.confirmBtn}
+                      onClick={() => handleDeletePodcastIdea(idea.id)}
+                      disabled={deletingId === idea.id}
+                      aria-label="Confirm delete"
+                    >
+                      {deletingId === idea.id ? 'Deleting...' : 'Confirm'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.cancelBtn}
+                      onClick={handleCancelConfirm}
+                      aria-label="Cancel delete"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.deleteBtn}
+                    onClick={() => handleDeletePodcastIdea(idea.id)}
+                    aria-label={`Delete idea: ${idea.text}`}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

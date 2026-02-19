@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     }),
     prisma.user.update({
       where: { id: userId },
-      data: { telegramEnabled: true },
+      data: { telegramEnabled: true, telegramChatId: linkData.chatId },
     }),
   ]);
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
   try {
     await sendMessage(
       linkData.chatId,
-      'Account connected! Send me a topic to generate a podcast, or just start chatting about what you want to learn.'
+      'Account connected! Send me any topic or URL to save it as a podcast idea.'
     );
   } catch (err) {
     logger.error('Failed to send Telegram confirmation', {

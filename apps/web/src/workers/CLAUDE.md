@@ -25,8 +25,8 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `feature-computation`  | `feature-computation`  | 2           | Scope (user/podcast/all) → aggregate sessions + engagement into feature vectors                                  | Upserts UserFeature / PodcastFeature with embeddings, runs hourly or on-demand         |
 | `data-export`          | `data-export`          | 1           | Export type + date range + format → stream large result sets to JSONL/CSV                                        | Uploads export file to R2, returns fileUrl                                             |
 | `key-validation`       | `key-validation`       | 1           | Scheduled (every 24h) → re-validate all BYOK TTS + AI keys against provider APIs                                | Marks invalid keys `isValid=false`, sends KEY_INVALID notification to affected users   |
-| `telegram-bot`         | `telegram-bot`         | 1           | Dual-mode: webhook (prod) or 5s polling (dev). Handler logic in `lib/telegram-handler.ts` | Creates TelegramMessage + Podcast, kicks off pipeline (source: TELEGRAM)               |
-| `telegram-reply`       | `telegram-reply`       | 2           | Podcast ready/failed → send Telegram message with "Listen Now" link                                              | Updates TelegramMessage.status to REPLIED/FAILED                                       |
+| `telegram-bot`         | `telegram-bot`         | 1           | Dual-mode: webhook (prod) or 5s polling (dev). Handler logic in `lib/telegram-handler.ts` | Saves topic/URL as PodcastIdea, sends confirmation reply; notifies user when podcast is ready |
+| `telegram-reply`       | `telegram-reply`       | 2           | Podcast ready/failed → send Telegram message with "Listen Now" link                                              | Sends 'Listen Now' notification to any user with telegramEnabled + telegramChatId (not just TELEGRAM-source podcasts) |
 | `content-moderation`   | `content-moderation`   | 3           | Content text → OpenAI Moderation API scan                                                                        | Creates ContentFlag records for flagged content                                        |
 | `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as @sotto                                               | Creates Podcast, kicks off pipeline                                                    |
 | `email-digest`            | `email-digest`            | 1      | Sunday 10:00 UTC cron → query new podcasts + stats → send weekly digest to subscribed waitlist emails            | Sends digest emails via Resend                                                         |
@@ -44,8 +44,8 @@ twitter-mentions (repeatable, every 60s) → polls @sottofm → creates Podcast 
 twitter-trend-poll (repeatable, every 2hrs) → searches trending tweets → creates Podcast as @sotto → kicks off pipeline above
 admin-thread-to-podcast (on-demand) → fetches thread → creates Podcast as @sotto → kicks off pipeline above
 twitter-auto-tweet (on-demand) → interpolates template → posts tweet → updates TwitterAutoTweet record
-telegram-bot (webhook in prod, 5s polling in dev) → routes Telegram updates → discovery chat → creates Podcast → kicks off pipeline above
-telegram-reply (on completion) → sends "Listen Now" link to Telegram chat (if TELEGRAM)
+telegram-bot (webhook in prod, 5s polling in dev) → routes Telegram updates → saves topic/URL as PodcastIdea → sends confirmation reply
+telegram-reply (on completion) → sends "Listen Now" notification to any user with telegramEnabled + telegramChatId
 email-digest (cron, Sunday 10:00 UTC) → queries new podcasts + stats → sends weekly digest to subscribed waitlist emails
 
 Script review (at SCRIPT_READY):

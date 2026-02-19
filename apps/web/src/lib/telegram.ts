@@ -89,13 +89,17 @@ export async function sendMessage(
  */
 export async function answerCallbackQuery(
   callbackQueryId: string,
-  text?: string
+  text?: string,
+  showAlert?: boolean
 ): Promise<boolean> {
   const body: Record<string, unknown> = {
     callback_query_id: callbackQueryId,
   };
   if (text) {
     body.text = text;
+  }
+  if (showAlert) {
+    body.show_alert = true;
   }
   return callApi<boolean>('answerCallbackQuery', body);
 }

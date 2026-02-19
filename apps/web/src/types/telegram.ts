@@ -71,20 +71,3 @@ export interface TelegramMessageData {
   createdAt: string;
 }
 
-export interface TelegramSession {
-  userId: string;
-  telegramUserId: string;
-  chatId: string;
-  state: 'discovery' | 'confirming';
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-  metadata: {
-    topic?: string;
-    depth?: string;
-    audienceLevel?: string;
-    audience?: string;
-    focusAreas?: string[];
-    tone?: string;
-    durationTarget?: number;
-    sourceUrl?: string;
-  };
-}
