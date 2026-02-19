@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { GenerationProgress } from '@/components/create/GenerationProgress';
 import styles from './ThreadSection.module.css';
 
 interface ThreadPodcast {
@@ -11,22 +12,37 @@ interface ThreadPodcast {
   source: string;
 }
 
+function getWorkerStepLabel(state: string | null, progress: number): string {
+  if (state === 'waiting' || state === 'delayed') return 'Queued...';
+  if (progress < 10) return 'Starting...';
+  if (progress < 20) return 'Fetching tweet';
+  if (progress < 40) return 'Fetching tweet data';
+  if (progress < 60) return 'Fetching full thread';
+  if (progress < 80) return 'Parsing intent';
+  if (progress < 100) return 'Creating podcast';
+  return 'Starting pipeline';
+}
+
 export function ThreadSection() {
   const [url, setUrl] = useState('');
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [podcasts, setPodcasts] = useState<ThreadPodcast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [jobProgress, setJobProgress] = useState(0);
+  const [jobState, setJobState] = useState<string | null>(null);
+  const [activePodcastId, setActivePodcastId] = useState<string | null>(null);
+  const [podcastStatus, setPodcastStatus] = useState<string | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
+  const pollRef = useRef(false);
 
   const loadRecentThreadPodcasts = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/twitter/analytics');
       if (!res.ok) return;
       const data = await res.json();
-      // Filter from recent twitter-sourced podcasts (source=TWITTER gives us both mentions and threads)
-      // We show all twitter-sourced podcasts as a simple reference list
       if (data.recentThreadPodcasts) {
         setPodcasts(data.recentThreadPodcasts);
       }
@@ -41,6 +57,66 @@ export function ThreadSection() {
     loadRecentThreadPodcasts();
   }, [loadRecentThreadPodcasts]);
 
+  // Worker phase polling: fetching tweet → parsing intent → creating podcast
+  useEffect(() => {
+    if (!activeJobId || activePodcastId) return;
+
+    pollRef.current = true;
+
+    const interval = setInterval(async () => {
+      if (!pollRef.current) return;
+      try {
+        const res = await fetch(`/api/admin/twitter/job-status/${activeJobId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setJobProgress(typeof data.progress === 'number' ? data.progress : 0);
+        setJobState(data.state);
+        if (data.podcastId) {
+          clearInterval(interval);
+          pollRef.current = false;
+          setActivePodcastId(data.podcastId);
+          setPodcastStatus('EXTRACTING');
+        } else if (data.state === 'failed') {
+          clearInterval(interval);
+          pollRef.current = false;
+          setJobError(data.failedReason ?? 'Worker failed');
+        }
+      } catch {
+        // Transient error — keep polling
+      }
+    }, 2000);
+
+    return () => {
+      clearInterval(interval);
+      pollRef.current = false;
+    };
+  }, [activeJobId, activePodcastId]);
+
+  // Pipeline phase polling: EXTRACTING → ... → READY
+  useEffect(() => {
+    if (!activePodcastId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/podcasts/${activePodcastId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setPodcastStatus(data.status);
+        if (data.status === 'READY') {
+          clearInterval(interval);
+          loadRecentThreadPodcasts();
+        } else if (data.status === 'FAILED') {
+          clearInterval(interval);
+          setJobError('Podcast generation failed');
+        }
+      } catch {
+        // Transient error — keep polling
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [activePodcastId, loadRecentThreadPodcasts]);
+
   const handleSubmit = async () => {
     if (!url.trim()) return;
 
@@ -52,7 +128,6 @@ export function ThreadSection() {
 
     setSubmitting(true);
     setError(null);
-    setSuccess(null);
 
     try {
       const res = await fetch('/api/admin/twitter/thread-to-podcast', {
@@ -70,11 +145,15 @@ export function ThreadSection() {
       }
 
       const data = await res.json();
-      setSuccess(`Job queued (ID: ${data.jobId}). Podcast will appear below once processing completes.`);
       setUrl('');
       setMessage('');
-      // Refresh the list after a short delay
-      setTimeout(loadRecentThreadPodcasts, 2000);
+      setActiveJobId(data.jobId);
+      setJobProgress(0);
+      setJobState('active');
+      setActivePodcastId(null);
+      setPodcastStatus(null);
+      setJobError(null);
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
@@ -108,7 +187,7 @@ export function ThreadSection() {
             type="button"
             className={styles.generateButton}
             onClick={handleSubmit}
-            disabled={submitting || !url.trim()}
+            disabled={submitting || !url.trim() || !!activeJobId}
           >
             {submitting ? 'Submitting...' : 'Generate Podcast'}
           </button>
@@ -132,8 +211,69 @@ export function ThreadSection() {
           maxLength={1000}
         />
 
-        {error && <div className={styles.error}>{error}</div>}
-        {success && <div className={styles.success}>{success}</div>}
+        {error && !activeJobId && <div className={styles.error}>{error}</div>}
+
+        {/* Worker phase: fetching tweet / parsing intent */}
+        {activeJobId && !activePodcastId && !jobError && (
+          <div className={styles.progressSection}>
+            <div className={styles.progressHeader}>
+              <span className={styles.progressTitle}>Processing Thread</span>
+              <span className={styles.progressPercent}>{jobProgress}%</span>
+            </div>
+            <div className={styles.progressTrack}>
+              <div className={styles.progressFill} style={{ width: `${jobProgress}%` }} />
+            </div>
+            <span className={styles.progressLabel}>{getWorkerStepLabel(jobState, jobProgress)}</span>
+          </div>
+        )}
+
+        {/* Pipeline phase: GenerationProgress */}
+        {activePodcastId && podcastStatus && podcastStatus !== 'READY' && !jobError && (
+          <div className={styles.progressSection}>
+            <GenerationProgress status={podcastStatus} />
+          </div>
+        )}
+
+        {/* Done */}
+        {activePodcastId && podcastStatus === 'READY' && (
+          <div className={styles.successBanner}>
+            <span>Podcast ready!</span>
+            <a href={`/podcast/${activePodcastId}`} className={styles.link}>
+              View Podcast
+            </a>
+            <button
+              type="button"
+              className={styles.dismissButton}
+              onClick={() => {
+                setActiveJobId(null);
+                setActivePodcastId(null);
+                setPodcastStatus(null);
+              }}
+              aria-label="Dismiss"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Error */}
+        {jobError && (
+          <div className={styles.errorWithDismiss}>
+            {jobError}
+            <button
+              type="button"
+              className={styles.dismissButton}
+              onClick={() => {
+                setActiveJobId(null);
+                setJobError(null);
+                setActivePodcastId(null);
+              }}
+              aria-label="Dismiss error"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       <div className={styles.tableWrapper}>

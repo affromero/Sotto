@@ -162,6 +162,7 @@
 | `/api/admin/twitter/auto-tweet`                                  | GET/POST         | ADMIN      | List recent auto-tweets / manual "Tweet this"                               |
 | `/api/admin/twitter/trends`                                      | GET/POST         | ADMIN      | Live trending topics / generate podcast from topic                          |
 | `/api/admin/twitter/thread-to-podcast`                           | POST             | ADMIN      | Queue thread-to-podcast conversion job                                      |
+| `/api/admin/twitter/job-status/[jobId]`                          | GET              | ADMIN      | BullMQ job state + progress + podcastId for thread-to-podcast jobs          |
 | `/api/admin/twitter/analytics`                                   | GET              | ADMIN      | 30-day Twitter engagement analytics                                         |
 | `/api/admin/moderation-log`                                      | GET              | ADMIN      | Paginated moderation action history                                         |
 | `/api/admin/reports`                                             | GET              | ADMIN      | List user reports (filter by status, targetType, reason)                    |
