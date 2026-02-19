@@ -214,13 +214,13 @@ export async function listByokProviders(userId: string): Promise<ByokKeyInfo[]> 
 export async function hasByokKey(userId: string, provider?: TtsProviderId): Promise<boolean> {
   if (provider) {
     const count = await prisma.userTtsKey.count({
-      where: { userId, provider },
+      where: { userId, provider, isValid: true },
     });
     return count > 0;
   }
 
   // Any provider
-  const count = await prisma.userTtsKey.count({ where: { userId } });
+  const count = await prisma.userTtsKey.count({ where: { userId, isValid: true } });
   return count > 0;
 }
 
