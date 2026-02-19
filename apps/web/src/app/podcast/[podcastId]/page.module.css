@@ -445,6 +445,14 @@
   margin-top: var(--spacing-lg);
 }
 
+.badgeSection {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+}
+
 /* Mobile fixes — ensure no overflow on 320px */
 
 @media (max-width: 599px) {
