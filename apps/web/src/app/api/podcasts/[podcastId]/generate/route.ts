@@ -16,6 +16,7 @@ import {
 import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
@@ -180,7 +181,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Increment free tier counter (skip for FAILED retries — already counted)
   if (!gate.isByokUser) {
     const config = await getFreeTierConfig();
-    await tryIncrementFreeGeneration(authResult.userId, config.generationLimit);
+    const selected = await selectFreeTierProviders(authResult.userId);
+    await tryIncrementFreeGeneration(authResult.userId, config.generationLimit, {
+      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+    });
+    // Write selected providers onto the podcast
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: {
+        ttsProvider: selected.ttsProvider,
+        ttsModel: selected.ttsModel,
+        aiModel: selected.aiModel,
+      },
+    });
   }
 
   return NextResponse.json({ success: true, message: 'Generation started' });

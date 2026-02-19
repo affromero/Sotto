@@ -13,6 +13,7 @@ import { getAiKey } from '@/lib/byok';
 import { canResolveAi } from '@/lib/providers/ai';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { logUsage } from '@/lib/usage-logger';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
@@ -483,13 +484,23 @@ async function handleGenerate(chatId: string, messageId?: number): Promise<void>
   }
 
   // Atomically increment free tier counter before creating anything
+  let freeTierTtsProvider: string | undefined;
+  let freeTierTtsModel: string | undefined;
+  let freeTierAiModel: string | undefined;
   if (!gate.isByokUser) {
     const config = await getFreeTierConfig();
-    const ok = await tryIncrementFreeGeneration(session.userId, config.generationLimit);
+    const selected = await selectFreeTierProviders(session.userId);
+    const ok = await tryIncrementFreeGeneration(session.userId, config.generationLimit, {
+      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+    });
     if (!ok) {
       await sendMessage(chatId, 'Free generations used. Add your own API keys in Settings to continue.');
       return;
     }
+    freeTierTtsProvider = selected.ttsProvider;
+    freeTierTtsModel = selected.ttsModel;
+    freeTierAiModel = selected.aiModel;
   }
 
   // Update the inline message to show "Generating..."
@@ -540,9 +551,9 @@ async function handleGenerate(chatId: string, messageId?: number): Promise<void>
       source: 'TELEGRAM',
       hostVoiceId,
       expertVoiceId,
-      ttsProvider: user.preferredTtsProvider ?? undefined,
-      ttsModel: user.preferredTtsModel ?? undefined,
-      aiModel: user.preferredAiModel ?? undefined,
+      ttsProvider: user.preferredTtsProvider ?? freeTierTtsProvider ?? undefined,
+      ttsModel: user.preferredTtsModel ?? freeTierTtsModel ?? undefined,
+      aiModel: user.preferredAiModel ?? freeTierAiModel ?? undefined,
       visibility: 'PUBLIC',
       discovery: {
         create: {

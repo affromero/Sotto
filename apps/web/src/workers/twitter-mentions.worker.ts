@@ -7,6 +7,7 @@ import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
 import { getAiKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
@@ -264,7 +265,20 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     // Increment free tier counter for non-BYOK users
     if (!gate.isByokUser) {
       const config = await getFreeTierConfig();
-      await tryIncrementFreeGeneration(userId, config.generationLimit);
+      const selected = await selectFreeTierProviders(userId);
+      await tryIncrementFreeGeneration(userId, config.generationLimit, {
+        ai: { provider: selected.aiProvider, quota: selected.aiQuota },
+        tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
+      });
+      // Write selected providers onto the podcast
+      await prisma.podcast.update({
+        where: { id: podcast.id },
+        data: {
+          ttsProvider: selected.ttsProvider,
+          ttsModel: selected.ttsModel,
+          aiModel: selected.aiModel,
+        },
+      });
     }
 
     logger.info('Twitter mention processed — podcast created', {
