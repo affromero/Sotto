@@ -1031,3 +1031,183 @@ describe('generateScriptWithFeedback', () => {
     );
   });
 });
+
+describe('reference deduplication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('deduplicates references with the same DOI and remaps citations', async () => {
+    const mockResponse = {
+      turns: [
+        { speaker: 'HOST', text: 'Study A found X [1] and study B confirmed it [2].' },
+        { speaker: 'EXPERT', text: 'Indeed, both studies agree [1,2].' },
+      ],
+      soundCues: [],
+      references: [
+        { number: 1, title: 'Original Study', authors: ['Smith'], year: 2023, url: 'https://example.com/a', type: 'PAPER', publisher: 'Nature', doi: '10.1234/abc' },
+        { number: 2, title: 'Same study different title', authors: ['Smith J'], year: 2023, url: 'https://example.com/b', type: 'PAPER', publisher: 'Nature', doi: '10.1234/abc' },
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 500,
+      outputTokens: 800,
+    });
+
+    const result = await generateScript({
+      topic: 'Dedup DOI',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+    });
+
+    expect(result.references).toHaveLength(1);
+    expect(result.references[0].number).toBe(1);
+    expect(result.references[0].doi).toBe('10.1234/abc');
+    // Both [1] and [2] should now be [1]
+    expect(result.turns[0].text).toBe('Study A found X [1] and study B confirmed it [1].');
+    expect(result.turns[1].text).toBe('Indeed, both studies agree [1].');
+  });
+
+  it('deduplicates references with the same URL when no DOI', async () => {
+    const mockResponse = {
+      turns: [
+        { speaker: 'HOST', text: 'Source one [1] and source two [2] and unique [3].' },
+        { speaker: 'EXPERT', text: 'Right, per [1,3].' },
+      ],
+      soundCues: [],
+      references: [
+        { number: 1, title: 'Article A', authors: ['Author A'], year: 2023, url: 'https://example.com/same', type: 'WEB', publisher: null, doi: null },
+        { number: 2, title: 'Article B', authors: ['Author B'], year: 2023, url: 'https://example.com/same', type: 'WEB', publisher: null, doi: null },
+        { number: 3, title: 'Unique', authors: ['Author C'], year: 2024, url: 'https://other.com', type: 'ARTICLE', publisher: null, doi: null },
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 500,
+      outputTokens: 800,
+    });
+
+    const result = await generateScript({
+      topic: 'Dedup URL',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+    });
+
+    expect(result.references).toHaveLength(2);
+    expect(result.references[0].title).toBe('Article A');
+    expect(result.references[1].title).toBe('Unique');
+    // [2] → [1], [3] → [2]
+    expect(result.turns[0].text).toBe('Source one [1] and source two [1] and unique [2].');
+    expect(result.turns[1].text).toBe('Right, per [1,2].');
+  });
+
+  it('deduplicates references with the same title when no DOI or URL', async () => {
+    const mockResponse = {
+      turns: [
+        { speaker: 'HOST', text: 'The book [1] is great.' },
+        { speaker: 'EXPERT', text: 'Same book cited again [2].' },
+      ],
+      soundCues: [],
+      references: [
+        { number: 1, title: 'Machine Learning Fundamentals', authors: ['Goodfellow'], year: 2016, url: null, type: 'BOOK', publisher: 'MIT Press', doi: null },
+        { number: 2, title: 'machine learning fundamentals', authors: ['Goodfellow I'], year: 2016, url: null, type: 'BOOK', publisher: 'MIT Press', doi: null },
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 500,
+      outputTokens: 800,
+    });
+
+    const result = await generateScript({
+      topic: 'Dedup Title',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+    });
+
+    expect(result.references).toHaveLength(1);
+    expect(result.turns[1].text).toBe('Same book cited again [1].');
+  });
+
+  it('does not alter references or citations when there are no duplicates', async () => {
+    const mockResponse = {
+      turns: [
+        { speaker: 'HOST', text: 'First source [1].' },
+        { speaker: 'EXPERT', text: 'Second source [2].' },
+      ],
+      soundCues: [],
+      references: [
+        { number: 1, title: 'Unique A', authors: ['A'], year: 2023, url: 'https://a.com', type: 'PAPER', publisher: null, doi: '10.1/a' },
+        { number: 2, title: 'Unique B', authors: ['B'], year: 2024, url: 'https://b.com', type: 'PAPER', publisher: null, doi: '10.1/b' },
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 500,
+      outputTokens: 800,
+    });
+
+    const result = await generateScript({
+      topic: 'No Dupes',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+    });
+
+    expect(result.references).toHaveLength(2);
+    expect(result.turns[0].text).toBe('First source [1].');
+    expect(result.turns[1].text).toBe('Second source [2].');
+  });
+
+  it('deduplicates references in generateScriptWithFeedback too', async () => {
+    const mockResponse = {
+      turns: [
+        { speaker: 'HOST', text: 'Revised with [1] and [2].' },
+        { speaker: 'EXPERT', text: 'Confirmed [2].' },
+      ],
+      soundCues: [],
+      references: [
+        { number: 1, title: 'Study X', authors: ['X'], year: 2023, url: null, type: 'PAPER', publisher: null, doi: '10.1/same' },
+        { number: 2, title: 'Study Y', authors: ['Y'], year: 2023, url: null, type: 'PAPER', publisher: null, doi: '10.1/same' },
+      ],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResponse),
+      inputTokens: 1000,
+      outputTokens: 500,
+    });
+
+    const result = await generateScriptWithFeedback({
+      topic: 'Dedup Feedback',
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      focusAreas: [],
+      tone: 'professional',
+      durationTarget: 10,
+      previousScript: [{ speaker: 'HOST', text: 'Old.' }],
+      previousReferences: [],
+      verificationFeedback: 'Fix sources.',
+    });
+
+    expect(result.references).toHaveLength(1);
+    expect(result.turns[0].text).toBe('Revised with [1] and [1].');
+    expect(result.turns[1].text).toBe('Confirmed [1].');
+  });
+});
