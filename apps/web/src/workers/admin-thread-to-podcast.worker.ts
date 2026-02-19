@@ -4,6 +4,8 @@ import { getTweet, getThread } from '@/lib/twitter';
 import { parseThreadIntent, parseTweetIntent } from '@/lib/tweet-parser';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
+import { lookupParticipantCredentials } from '@/lib/credential-lookup';
+import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { logger } from '@/lib/logger';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 
@@ -37,11 +39,17 @@ export async function processAdminThreadToPodcast(
 
   await job.updateProgress(40);
 
-  // 4. Parse intent from admin message (if provided) or tweet/thread text
+  // 4. Determine if this qualifies as a thread podcast
+  const isThreadPodcast = threadData !== null && (
+    (threadData.isSelfAuthored && threadData.replies.length >= 1) ||
+    (!threadData.isSelfAuthored && threadData.replies.length >= 2)
+  );
+
+  // 5. Parse intent from admin message (if provided) or tweet/thread text
   let parsed;
   if (message) {
     parsed = await parseTweetIntent(message);
-  } else if (threadData && threadData.replies.length >= 2) {
+  } else if (isThreadPodcast && threadData) {
     const mentionAsThreadTweet = {
       id: tweet.id,
       text: tweet.text,
@@ -56,9 +64,20 @@ export async function processAdminThreadToPodcast(
     parsed = await parseTweetIntent(tweet.text);
   }
 
+  await job.updateProgress(50);
+
+  // 5b. Look up credentials for verified thread participants
+  let participantCredentials: import('@/lib/credential-lookup').ParticipantCredential[] = [];
+  if (isThreadPodcast && threadData) {
+    const verifiedParticipants = getVerifiedParticipants(threadData);
+    if (verifiedParticipants.length > 0) {
+      participantCredentials = await lookupParticipantCredentials(verifiedParticipants);
+    }
+  }
+
   await job.updateProgress(60);
 
-  // 5. Resolve @sotto system user
+  // 6. Resolve @sotto system user
   const sottoUser = await prisma.user.findUnique({
     where: { handle: 'sotto' },
     select: { id: true },
@@ -68,33 +87,16 @@ export async function processAdminThreadToPodcast(
     throw new Error('@sotto system account not found. Run prisma db seed.');
   }
 
-  // 6. Create podcast as @sotto
+  // 7. Create podcast as @sotto
   const voicePair = selectVoicePair(tweetId);
 
-  const isThreadPodcast = threadData && threadData.replies.length >= 2;
   const tone = parsed.isDebate ? 'socratic' : parsed.tone;
   const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
 
   // Build source text for threads
-  let sourceText: string | undefined;
-  if (isThreadPodcast && threadData) {
-    const sections: string[] = ['## Twitter/X Thread Discussion', ''];
-    if (parsed.viewpoints && parsed.viewpoints.length > 0) {
-      sections.push('### Viewpoints Identified:');
-      for (const v of parsed.viewpoints) {
-        sections.push(`- ${v}`);
-      }
-      sections.push('');
-    }
-    sections.push('### Thread Conversation:');
-    sections.push(
-      `**Original post by @${threadData.rootTweet.authorUsername}:** ${threadData.rootTweet.text}`
-    );
-    for (const reply of threadData.replies) {
-      sections.push(`**@${reply.authorUsername}:** ${reply.text}`);
-    }
-    sourceText = sections.join('\n');
-  }
+  const sourceText = isThreadPodcast && threadData
+    ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
+    : undefined;
 
   const podcast = await prisma.podcast.create({
     data: {
@@ -126,7 +128,7 @@ export async function processAdminThreadToPodcast(
   await job.updateData({ ...job.data, podcastId: podcast.id });
   await job.updateProgress(80);
 
-  // 7. Kick off generation pipeline
+  // 8. Kick off generation pipeline
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, {
     podcastId: podcast.id,
     userId: sottoUser.id,
