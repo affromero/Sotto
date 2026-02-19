@@ -13,6 +13,8 @@ import { parseTelegramIntent } from '@/lib/telegram-parser';
 import { getDiscoveryResponse, parseChips, parseMetadata } from '@/lib/discovery-agent';
 import { getAiKey } from '@/lib/byok';
 import { canResolveAi } from '@/lib/providers/ai';
+import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { logUsage } from '@/lib/usage-logger';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { logger } from '@/lib/logger';
@@ -501,6 +503,27 @@ async function handleGenerate(chatId: string, messageId?: number): Promise<void>
   if (!m.topic) {
     await sendMessage(chatId, 'Something went wrong — no topic found. Please try again.');
     return;
+  }
+
+  // Generation gate: BYOK or free tier
+  const gate = await checkGenerationGate(session.userId);
+  if (!gate.allowed) {
+    const msg =
+      gate.reason === 'free_tier_exhausted'
+        ? 'Free generations used. Add your own API keys in Settings to continue.'
+        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    await sendMessage(chatId, msg);
+    return;
+  }
+
+  // Atomically increment free tier counter before creating anything
+  if (!gate.isByokUser) {
+    const config = await getFreeTierConfig();
+    const ok = await tryIncrementFreeGeneration(session.userId, config.generationLimit);
+    if (!ok) {
+      await sendMessage(chatId, 'Free generations used. Add your own API keys in Settings to continue.');
+      return;
+    }
   }
 
   // Update the inline message to show "Generating..."
