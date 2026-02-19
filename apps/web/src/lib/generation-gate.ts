@@ -26,10 +26,10 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     select: { freeGenerationsUsed: true, role: true },
   });
 
-  const isAdmin = user.role === 'ADMIN';
+  const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
-  // Admin and BYOK users are always allowed, no counting
-  if (isAdmin || isByokUser) {
+  // Admin, system, and BYOK users are always allowed, no counting
+  if (isPrivileged || isByokUser) {
     return {
       allowed: true,
       reason: 'ok',
@@ -106,12 +106,12 @@ export async function getFreeTierStatus(userId: string): Promise<{
     select: { freeGenerationsUsed: true, role: true },
   });
 
-  const isAdmin = user.role === 'ADMIN';
+  const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
   return {
     freeGenerationsUsed: user.freeGenerationsUsed,
     freeGenerationsLimit: config.generationLimit,
     freeGenerationsRemaining: Math.max(0, config.generationLimit - user.freeGenerationsUsed),
-    isByokUser: isByokUser || isAdmin,
+    isByokUser: isByokUser || isPrivileged,
   };
 }

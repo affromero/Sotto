@@ -90,7 +90,7 @@ function UserResultCard({
               />
             ) : (
               <div className={styles.avatarFallback}>
-                {(user.name ?? '?')[0].toUpperCase()}
+                {(user.name ?? user.handle ?? 'U')[0].toUpperCase()}
               </div>
             )}
           </div>

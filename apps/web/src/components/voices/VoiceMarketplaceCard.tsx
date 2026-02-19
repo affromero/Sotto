@@ -129,9 +129,10 @@ export function VoiceMarketplaceCard({
     }
   }
 
-  function getInitial(name: string | null): string {
-    if (!name) return '?';
-    return name.charAt(0).toUpperCase();
+  function getInitial(name: string | null, handle?: string | null): string {
+    if (name) return name.charAt(0).toUpperCase();
+    if (handle) return handle.charAt(0).toUpperCase();
+    return 'U';
   }
 
   return (
@@ -148,7 +149,7 @@ export function VoiceMarketplaceCard({
             />
           ) : (
             <span className={styles.avatarFallback}>
-              {getInitial(voice.owner.name)}
+              {getInitial(voice.owner.name, voice.owner.handle)}
             </span>
           )}
           <div className={styles.ownerInfo}>

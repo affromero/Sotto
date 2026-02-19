@@ -4,6 +4,7 @@ import styles from './TopBar.module.css';
 
 interface TopBarUser {
   name?: string | null;
+  email?: string | null;
   image?: string | null;
   id?: string;
 }
@@ -12,9 +13,10 @@ interface TopBarProps {
   user?: TopBarUser | null;
 }
 
-function getInitial(name?: string | null): string {
-  if (!name) return '?';
-  return name.charAt(0).toUpperCase();
+function getInitial(name?: string | null, email?: string | null): string {
+  if (name) return name.charAt(0).toUpperCase();
+  if (email) return email.charAt(0).toUpperCase();
+  return 'U';
 }
 
 export function TopBar({ user }: TopBarProps) {
@@ -44,7 +46,7 @@ export function TopBar({ user }: TopBarProps) {
                 className={styles.avatar}
               />
             ) : (
-              <span className={styles.avatarFallback}>{getInitial(user.name)}</span>
+              <span className={styles.avatarFallback}>{getInitial(user.name, user.email)}</span>
             )}
           </Link>
         ) : (

@@ -135,7 +135,7 @@ export function QuestionCard({ question, podcastId }: QuestionCardProps) {
                 />
               ) : (
                 <span className={styles.avatarFallback}>
-                  {(question.user.name || '?')[0].toUpperCase()}
+                  {(question.user.name || question.user.handle || 'U')[0].toUpperCase()}
                 </span>
               )}
             </div>

@@ -28,15 +28,18 @@ interface ActivityItemProps {
   activity: ActivityData;
 }
 
-function getInitials(name: string | null): string {
-  if (!name) return '?';
-  return name
-    .split(' ')
-    .map((word) => word[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
+function getInitials(name: string | null, handle?: string | null): string {
+  if (name) {
+    return name
+      .split(' ')
+      .map((word) => word[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  }
+  if (handle) return handle.charAt(0).toUpperCase();
+  return 'U';
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -176,7 +179,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
           />
         ) : (
           <div className={styles.avatarFallback} role="img" aria-label={`${activity.user.name || 'User'}'s avatar`}>
-            <span className={styles.initials}>{getInitials(activity.user.name)}</span>
+            <span className={styles.initials}>{getInitials(activity.user.name, activity.user.handle)}</span>
           </div>
         )}
         {icon && <span className={styles.iconBadge}>{icon}</span>}

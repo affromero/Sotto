@@ -105,7 +105,7 @@ export default async function FeedPage() {
   const gridPodcasts = serializedAll.filter((p) => !heroIds.has(p.id));
 
   const topBarUser = session?.user
-    ? { name: session.user.name, image: session.user.image, id: session.user.id }
+    ? { name: session.user.name, email: session.user.email, image: session.user.image, id: session.user.id }
     : null;
 
   return (

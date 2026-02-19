@@ -307,7 +307,7 @@ export function SettingsForm({
     }
   };
 
-  const initials = (name || email || '?').charAt(0).toUpperCase();
+  const initials = (name || email || 'U').charAt(0).toUpperCase();
 
   return (
     <div className={styles.sections}>
