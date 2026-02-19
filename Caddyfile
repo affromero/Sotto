@@ -35,5 +35,13 @@ sotto.fm {
 }
 
 www.sotto.fm {
-	redir https://sotto.fm{uri} permanent
+	# Telegram webhook — proxy directly (Telegram can't resolve apex .fm domains)
+	handle /api/telegram/webhook {
+		reverse_proxy localhost:3000
+	}
+
+	# Everything else redirects to apex
+	handle {
+		redir https://sotto.fm{uri} permanent
+	}
 }

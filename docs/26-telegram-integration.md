@@ -105,28 +105,45 @@ Create a second bot for local development:
 
 ## Step 2: Configure Environment Variables
 
+### Local development (polling mode)
+
 Add the **dev bot** token to your local `.env`:
 
 ```env
 # ── Telegram @SottoFMDevBot (local dev) ──
 TELEGRAM_BOT_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# ── Optional: polling interval (default 35s — 30s long poll + 5s buffer) ──
-# TELEGRAM_POLL_INTERVAL_MS=35000
+# ── Optional: polling interval (default 5s) ──
+# TELEGRAM_POLL_INTERVAL_MS=5000
 ```
 
-On the production server, set the **production bot** token instead.
+When `TELEGRAM_WEBHOOK_URL` is **not set**, the worker deletes any stale webhook and starts fast polling (5s interval by default).
 
-That's it — only one variable is required. Compare this to Twitter's 8 variables.
+### Production (webhook mode)
+
+On production, set all three variables (managed via Doppler):
+
+```env
+TELEGRAM_BOT_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_WEBHOOK_URL=https://www.sotto.fm/api/telegram/webhook
+TELEGRAM_WEBHOOK_SECRET=<random-hex-string>
+```
+
+When both `TELEGRAM_WEBHOOK_URL` and `TELEGRAM_WEBHOOK_SECRET` are set, the worker registers the webhook with Telegram at startup. Telegram POSTs updates to the webhook route, which verifies the secret via the `x-telegram-bot-api-secret-token` header.
+
+**Why `www.sotto.fm`?** Telegram's DNS resolvers cannot resolve the apex `sotto.fm` domain (a `.fm` TLD issue). The Caddyfile handles this by proxying `/api/telegram/webhook` on `www.sotto.fm` directly instead of redirecting.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `TELEGRAM_BOT_TOKEN` | Yes | — | Authenticates all Bot API calls |
-| `TELEGRAM_POLL_INTERVAL_MS` | No | `35000` | Interval between polling jobs (ms) |
+| `TELEGRAM_WEBHOOK_URL` | Production | — | Webhook URL registered with Telegram (enables webhook mode) |
+| `TELEGRAM_WEBHOOK_SECRET` | Production | — | Secret token verified on incoming webhook POSTs |
+| `TELEGRAM_POLL_INTERVAL_MS` | No | `5000` | Polling interval in dev mode (ms) |
+| `TELEGRAM_POLL_TIMEOUT` | No | `2` | Long poll timeout in dev mode (seconds) |
 
 ---
 
-## Step 3: Start Workers and Verify Polling
+## Step 3: Start Workers and Verify Bot
 
 ```bash
 # Start everything (web + workers)
@@ -136,13 +153,23 @@ npm run dev
 npm run dev:workers
 ```
 
-On startup, the worker orchestrator calls `isTelegramBotConfigured()` (checks `TELEGRAM_BOT_TOKEN`). If configured, it schedules a repeatable BullMQ job on the `telegram-bot` queue. Look for these lines in worker logs:
+On startup, the worker orchestrator calls `isTelegramBotConfigured()` (checks `TELEGRAM_BOT_TOKEN`). Depending on the mode:
+
+**Webhook mode** (production): If `TELEGRAM_WEBHOOK_URL` and `TELEGRAM_WEBHOOK_SECRET` are set, it calls `setWebhook()` to register the URL with Telegram. Look for:
 
 ```
-Telegram bot polling scheduled (intervalMs: 35000)
+Telegram webhook registered (url: https://www.sotto.fm/api/telegram/webhook)
 ```
 
-The polling worker uses Telegram's long polling: each request blocks for up to 30 seconds waiting for new messages, then returns. The 35-second BullMQ interval (30s poll + 5s buffer) prevents job queue buildup.
+Updates arrive via `POST /api/telegram/webhook`. The webhook route verifies the secret header and calls `routeUpdate()` directly — no BullMQ queue involved.
+
+**Polling mode** (dev): If webhook vars are not set, it deletes any stale webhook, then schedules a repeatable BullMQ job on the `telegram-bot` queue. Look for:
+
+```
+Telegram bot polling scheduled (dev mode)
+```
+
+The polling worker calls `getUpdates()` with a 2-second long poll timeout on a 5-second interval.
 
 ---
 
@@ -257,10 +284,14 @@ Tap a setting button to change it, then "Back to Confirmation" to return and gen
 ```
 1. User messages @SottoFMBot: "Make a podcast about quantum computing"
 
-2. telegram-bot worker polls Telegram Bot API
-   POST /getUpdates (long poll, timeout=30s)
-   ↓
-3. Cursor check: offset = last_update_id + 1 (stored in Redis)
+2a. [Webhook mode] Telegram POSTs to /api/telegram/webhook
+    Route verifies secret header → calls routeUpdate()
+    ↓
+2b. [Polling mode] telegram-bot worker polls Telegram Bot API
+    POST /getUpdates (long poll, timeout=2s, every 5s)
+    Cursor check: offset = last_update_id + 1 (stored in Redis)
+    ↓
+3. routeUpdate() dispatches to handleTextMessage()
    ↓
 4. Account lookup: find Sotto user by Telegram user ID
    - Not found → "Link your account first. Send /start"
@@ -307,7 +338,7 @@ PENDING ──→ DISCOVERING ──→ GENERATING ──→ READY ──→ REP
 
 | Key | TTL | Purpose |
 |---|---|---|
-| `telegram:last_update_id` | None | Cursor for getUpdates polling (highest processed update_id) |
+| `telegram:last_update_id` | None | Cursor for getUpdates polling — dev mode only (highest processed update_id) |
 | `telegram:session:<chatId>` | 1 hour | Active discovery session (messages, metadata, state) |
 | `telegram:link:<code>` | 10 min | Account linking code → `{ telegramUserId, chatId, firstName }` |
 
@@ -356,7 +387,8 @@ In Prisma Studio, check:
 | `src/lib/telegram.ts` | Telegram Bot API client: `getUpdates()`, `sendMessage()`, `answerCallbackQuery()`, `editMessageText()`, `isTelegramBotConfigured()` |
 | `src/lib/telegram-parser.ts` | Claude-powered intent extraction: topic, title, depth, tone, `isComplete` flag |
 | `src/types/telegram.ts` | TypeScript types for Telegram API payloads, sessions, parse results |
-| `src/workers/telegram-bot.worker.ts` | Polls updates, routes messages, manages discovery sessions, creates podcasts |
+| `src/app/api/telegram/webhook/route.ts` | Webhook receiver: verifies secret header, calls `routeUpdate()`, always returns 200 |
+| `src/workers/telegram-bot.worker.ts` | Polls updates (dev mode), routes messages, manages discovery sessions, creates podcasts |
 | `src/workers/telegram-reply.worker.ts` | Sends "Listen Now" reply (or failure message) when pipeline completes |
 | `src/workers/audio-stitching.worker.ts` | Queues `REPLY_TELEGRAM` job after successful stitching (lines 274-290) |
 | `src/workers/index.ts` | Registers telegram-bot + telegram-reply workers, schedules polling |
@@ -379,7 +411,7 @@ All paths are relative to `apps/web/`.
 | **Account linking** | OAuth 2.0 redirect (NextAuth) | Custom link-code flow via Redis |
 | **Interaction** | Single tweet, no follow-up | Multi-turn discovery with chip buttons |
 | **Message format** | Plain text (280 chars) | Markdown + inline keyboards |
-| **Polling** | 60s interval, mentions endpoint | 35s interval, long polling (30s blocks) |
+| **Message delivery** | Polling (60s interval, mentions endpoint) | Webhook (prod) or polling (dev, 5s interval) |
 | **Discovery** | Parse only — no conversational flow | Full multi-turn with `getDiscoveryResponse()` |
 | **Duration** | Fixed 10 min | Configurable via discovery (default 10 min) |
 | **Settings edit** | Not possible (tweet is fire-and-forget) | Inline keyboard for depth/tone before generating |
@@ -402,10 +434,13 @@ All paths are relative to `apps/web/`.
 
 | Check | Action |
 |---|---|
-| Workers running? | `npm run dev:workers` — look for "Telegram bot polling scheduled" in logs |
-| Token correct? | Verify `TELEGRAM_BOT_TOKEN` in `.env.local` matches BotFather's output |
+| Workers running? | `npm run dev:workers` — look for "Telegram bot polling scheduled" or "Telegram webhook registered" |
+| Token correct? | Verify `TELEGRAM_BOT_TOKEN` matches BotFather's output |
+| Webhook registered? | `curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo` — check `url` is set and `last_error_message` is empty |
+| Webhook secret match? | Verify `TELEGRAM_WEBHOOK_SECRET` in Doppler matches what was passed to `setWebhook` |
 | Redis running? | `docker-compose up -d` — polling uses Redis for cursor tracking |
 | Bot exists? | Message @SottoFMBot in Telegram — if it doesn't exist, create it via BotFather |
+| DNS issue? | Telegram can't resolve apex `.fm` domains — use `www.sotto.fm` for webhook URL |
 
 ### Bot responds but doesn't generate
 
