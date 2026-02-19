@@ -8,7 +8,7 @@ All shared business logic and external service integrations live here.
 | --- | --- | --- |
 | `prisma.ts` | Database client (PostgreSQL) | Prisma ORM |
 | `redis.ts` | Redis connections, cache helpers, rate limiting | Redis / ioredis |
-| `queue.ts` | BullMQ job queues (23 types), worker creation | BullMQ + Redis |
+| `queue.ts` | BullMQ job queues (24 types), worker creation | BullMQ + Redis |
 | `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/CREATOR/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
 | `admin-emails.ts` | Admin email list loader from `config/admins.json`, `isAdminEmail()` check | Filesystem |
 | `auth-guards.ts` | Suspension check for write-path API routes (`checkSuspension()`) | Pure utility |
@@ -78,6 +78,8 @@ All shared business logic and external service integrations live here.
 | `theme-script.ts` | Inline dark mode init script (`THEME_INIT_SCRIPT`) — prevents flash on page load | Pure utility |
 | `topic-tagger.ts` | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI) | Pure utility |
 | `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `claude.ts` |
+| `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
+| `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
 | `tts-text-cleaner.ts` | TTS text preprocessor: strips `[SFX:]`, citations, delivery directions; preserves audio tags for ElevenLabs | Pure utility |
 
 ## Hooks (`src/lib/hooks/`)
