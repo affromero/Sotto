@@ -354,6 +354,7 @@ function createMockThread(overrides?: Partial<ThreadData>): ThreadData {
     ],
     participantCount: 4,
     tweetCount: 4,
+    isSelfAuthored: false,
     ...overrides,
   };
 }

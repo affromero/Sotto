@@ -305,6 +305,115 @@ describe('verifyScript', () => {
     expect(result.feedback).toContain('could not parse');
   });
 
+  it('includes credential claim scrutiny in system prompt', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'Test',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).toContain('biographical claims');
+    expect(systemPrompt).toContain('Credential Claims');
+    expect(systemPrompt).toContain('REQUIRES_SOURCING');
+    expect(systemPrompt).toContain('[VERIFIED]');
+  });
+
+  it('flags unverified credential claims as unsupported', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Dr. Smith is a professor of physics at MIT',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: false,
+            existingCitations: [],
+            needsMoreCitations: true,
+            hasUnreliableSource: false,
+            verificationNote: 'Credential claim with no citation — cannot verify',
+          },
+        ],
+        overallScore: 0.0,
+        feedback: 'Remove or cite the credential claim about Dr. Smith.',
+      }),
+      inputTokens: 600,
+      outputTokens: 400,
+    });
+
+    const result = await verifyScript({
+      topic: 'Physics Discussion',
+      turns: [{ speaker: 'HOST', text: 'Dr. Smith, a professor of physics at MIT, explains.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.unsupportedClaims).toHaveLength(1);
+    expect(result.unsupportedClaims[0].claimText).toContain('professor');
+  });
+
+  it('passes when verified credential claim has citations', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Dr. Smith is a professor of physics at MIT',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Matches [VERIFIED] source in script — confirmed via MIT faculty page',
+          },
+        ],
+        overallScore: 0.95,
+        feedback: '',
+      }),
+      inputTokens: 700,
+      outputTokens: 400,
+    });
+
+    const result = await verifyScript({
+      topic: 'Physics Discussion',
+      turns: [{ speaker: 'HOST', text: 'Dr. Smith, a professor of physics at MIT [1], explains.' }],
+      references: [
+        {
+          number: 1,
+          title: 'MIT Faculty Page - Dr. Smith',
+          authors: [],
+          year: 2025,
+          url: 'https://mit.edu/physics/faculty/smith',
+          type: 'WEB',
+          publisher: null,
+          doi: null,
+        },
+      ],
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.adequatelySourcedClaims).toBe(1);
+  });
+
   it('passes apiKeyOverride to generateResponse', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
