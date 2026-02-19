@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
@@ -23,6 +24,28 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
   const userId = session.user.id;
   const params = await searchParams;
   const step = params.step;
+
+  // Attribute referral from cookie (fire-and-forget)
+  const cookieStore = await cookies();
+  const refHandle = cookieStore.get('sotto_ref')?.value;
+  if (refHandle) {
+    prisma.user.findUnique({ where: { id: userId }, select: { referredById: true } })
+      .then(async (u) => {
+        if (u && !u.referredById) {
+          const referrer = await prisma.user.findFirst({
+            where: { handle: refHandle },
+            select: { id: true },
+          });
+          if (referrer && referrer.id !== userId) {
+            await prisma.user.update({
+              where: { id: userId },
+              data: { referredById: referrer.id },
+            });
+          }
+        }
+      })
+      .catch(() => {});
+  }
 
   // Check if already onboarded — skip to keys step or create
   const user = await prisma.user.findUnique({

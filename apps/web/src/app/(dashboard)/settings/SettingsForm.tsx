@@ -56,6 +56,7 @@ interface SettingsFormProps {
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   isTwitterProviderAvailable: boolean;
   quizAnswerCount: number;
+  referralCount: number;
 }
 
 const providerLabels: Record<string, string> = {
@@ -85,6 +86,7 @@ export function SettingsForm({
   configuredAiProviders,
   isTwitterProviderAvailable,
   quizAnswerCount,
+  referralCount,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -778,6 +780,31 @@ export function SettingsForm({
           </Button>
         </div>
       </section>
+
+      {/* Referrals */}
+      {handle && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Referrals</h2>
+          <p className={styles.sectionDescription}>
+            Share your referral link to invite friends. You&apos;ve referred{' '}
+            <strong>{referralCount}</strong> {referralCount === 1 ? 'person' : 'people'} so far.
+          </p>
+          <div className={styles.referralRow}>
+            <Input
+              value={`sotto.fm/ref/${handle}`}
+              readOnly
+            />
+            <Button
+              variant="secondary"
+              onClick={() => {
+                navigator.clipboard.writeText(`https://sotto.fm/ref/${handle}`);
+              }}
+            >
+              Copy
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Danger Zone */}
       <section className={`${styles.section} ${styles.dangerSection}`}>
