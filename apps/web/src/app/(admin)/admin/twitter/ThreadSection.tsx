@@ -10,6 +10,7 @@ interface ThreadPodcast {
   status: string;
   createdAt: string;
   source: string;
+  failureReason?: string | null;
 }
 
 function getWorkerStepLabel(state: string | null, progress: number): string {
@@ -39,6 +40,7 @@ export function ThreadSection() {
   const [workerCount, setWorkerCount] = useState<number | null>(null);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+  const [retryingIds, setRetryingIds] = useState<Set<string>>(new Set());
   const pollRef = useRef(false);
 
   const loadRecentThreadPodcasts = useCallback(async () => {
@@ -164,6 +166,27 @@ export function ThreadSection() {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRetry = async (podcastId: string) => {
+    setRetryingIds((prev) => new Set(prev).add(podcastId));
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/generate`, { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Retry failed');
+        return;
+      }
+      await loadRecentThreadPodcasts();
+    } catch {
+      setError('Retry failed');
+    } finally {
+      setRetryingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(podcastId);
+        return next;
+      });
     }
   };
 
@@ -322,7 +345,10 @@ export function ThreadSection() {
                 <tr key={p.id}>
                   <td className={styles.truncate}>{p.title}</td>
                   <td>
-                    <span className={`${styles.badge} ${styles[`badge${p.status}`] || ''}`}>
+                    <span
+                      className={`${styles.badge} ${styles[`badge${p.status}`] || ''}`}
+                      title={p.status === 'FAILED' && p.failureReason ? p.failureReason : undefined}
+                    >
                       {p.status}
                     </span>
                   </td>
@@ -332,6 +358,16 @@ export function ThreadSection() {
                       <a href={`/podcast/${p.id}`} className={styles.link}>
                         View
                       </a>
+                    )}
+                    {p.status === 'FAILED' && (
+                      <button
+                        type="button"
+                        className={styles.retryButton}
+                        onClick={() => handleRetry(p.id)}
+                        disabled={retryingIds.has(p.id)}
+                      >
+                        {retryingIds.has(p.id) ? 'Retrying...' : 'Retry'}
+                      </button>
                     )}
                   </td>
                 </tr>

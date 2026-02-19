@@ -1,6 +1,7 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
 import { minutesToWords, wordCountBounds } from './duration';
+import { generatedScriptSchema } from './validations';
 
 export type ScriptTurn = {
   speaker: 'HOST' | 'EXPERT';
@@ -217,9 +218,12 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     }
   }
 
+  // Validate structure before proceeding
+  const validated = generatedScriptSchema.parse(parsed);
+
   // Ensure defaults
-  if (!parsed.soundCues || parsed.soundCues.length === 0) {
-    parsed.soundCues = [
+  if (!validated.soundCues || validated.soundCues.length === 0) {
+    validated.soundCues = [
       {
         type: 'intro',
         prompt: 'warm podcast intro jingle with soft chimes',
@@ -230,17 +234,17 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
         type: 'outro',
         prompt: 'gentle melodic podcast outro with fade out',
         durationSeconds: 4,
-        insertAfterTurn: parsed.turns.length - 1,
+        insertAfterTurn: validated.turns.length - 1,
       },
     ];
   }
 
-  parsed.references = normalizeReferences(
-    (parsed.references as Array<Record<string, unknown>>) || []
+  const references = normalizeReferences(
+    (validated.references as Array<Record<string, unknown>>) || []
   );
 
   // Generate markdown version with delivery directions
-  const markdown = parsed.turns
+  const markdown = validated.turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -248,9 +252,9 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     .join('\n\n');
 
   return {
-    turns: parsed.turns,
-    soundCues: parsed.soundCues,
-    references: parsed.references,
+    turns: validated.turns,
+    soundCues: validated.soundCues as SoundCue[],
+    references,
     markdown,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
@@ -395,8 +399,11 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     }
   }
 
-  if (!parsed.soundCues || parsed.soundCues.length === 0) {
-    parsed.soundCues = [
+  // Validate structure before proceeding
+  const validated = generatedScriptSchema.parse(parsed);
+
+  if (!validated.soundCues || validated.soundCues.length === 0) {
+    validated.soundCues = [
       {
         type: 'intro',
         prompt: 'warm podcast intro jingle with soft chimes',
@@ -407,16 +414,16 @@ Revise the script addressing ALL feedback. Return JSON only.`;
         type: 'outro',
         prompt: 'gentle melodic podcast outro with fade out',
         durationSeconds: 4,
-        insertAfterTurn: parsed.turns.length - 1,
+        insertAfterTurn: validated.turns.length - 1,
       },
     ];
   }
 
-  parsed.references = normalizeReferences(
-    (parsed.references as Array<Record<string, unknown>>) || []
+  const references = normalizeReferences(
+    (validated.references as Array<Record<string, unknown>>) || []
   );
 
-  const markdown = parsed.turns
+  const markdown = validated.turns
     .map((turn) => {
       const direction = turn.direction ? ` _(${turn.direction})_` : '';
       return `**${turn.speaker}:**${direction} ${turn.text}`;
@@ -424,9 +431,9 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     .join('\n\n');
 
   return {
-    turns: parsed.turns,
-    soundCues: parsed.soundCues,
-    references: parsed.references,
+    turns: validated.turns,
+    soundCues: validated.soundCues as SoundCue[],
+    references,
     markdown,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
