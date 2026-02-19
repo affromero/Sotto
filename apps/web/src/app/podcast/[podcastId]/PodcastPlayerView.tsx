@@ -40,6 +40,7 @@ import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
 import { PostListenRating } from '@/components/player/PostListenRating';
 import { Badge } from '@/components/ui/Badge';
+import { SottoBadge } from '@/components/ui/SottoBadge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
@@ -817,6 +818,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             />
           )}
         </section>
+      )}
+
+      {/* Made with Sotto */}
+      {!isOwner && podcast.visibility === 'PUBLIC' && (
+        <div className={styles.badgeSection}>
+          <SottoBadge />
+        </div>
       )}
 
       {/* Fork & Remix Modal */}
