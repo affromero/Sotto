@@ -49,7 +49,7 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
           <span className={styles.logo}>Sotto</span>
         </header>
 
-        <div className={`${styles.content} ${hasActivePlayer ? styles.contentWithPlayer : ''}`}>
+        <div className={styles.content}>
           {children}
         </div>
       </div>
