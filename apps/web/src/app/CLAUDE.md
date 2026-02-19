@@ -35,6 +35,12 @@
 | `/changelog`                 | `changelog/page.tsx`                       | No                          | Public changelog page                                    |
 | `/developers`                | `developers/page.tsx`                      | No                          | Public API docs page                                     |
 | `/support`                   | `support/page.tsx`                         | No                          | Support page — FAQ, contact, feedback                    |
+| `/about`                     | `about/page.tsx`                           | No                          | About page — mission, features, BYOK philosophy          |
+| `/join`                      | `join/page.tsx`                            | No                          | Join Us page — careers, mission pitch                    |
+| `/pricing`                   | `pricing/page.tsx`                         | No                          | Pricing page — free + BYOK model, provider comparison    |
+| `not-found`                  | `not-found.tsx`                            | No                          | Custom branded 404 page                                  |
+| `error`                      | `error.tsx`                                | No                          | Custom error boundary (`'use client'`)                   |
+| `sitemap.xml`                | `sitemap.ts`                               | No                          | Dynamic sitemap (static pages + public podcasts + profiles) |
 | `/admin`                     | `(admin)/admin/page.tsx`                   | Yes (ADMIN only)            | Admin overview dashboard                                 |
 | `/admin/users`               | `(admin)/admin/users/page.tsx`             | Yes (ADMIN only)            | User management + role assignment                        |
 | `/admin/podcasts`            | `(admin)/admin/podcasts/page.tsx`          | Yes (ADMIN only)            | Podcast management                                       |

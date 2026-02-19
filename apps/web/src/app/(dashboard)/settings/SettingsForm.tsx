@@ -55,6 +55,8 @@ interface SettingsFormProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   isTwitterProviderAvailable: boolean;
+  initialEmailNotifications: boolean;
+  initialPushNotifications: boolean;
   quizAnswerCount: number;
   referralCount: number;
 }
@@ -84,6 +86,8 @@ export function SettingsForm({
   selectedInterestTagIds,
   configuredTtsProviders,
   configuredAiProviders,
+  initialEmailNotifications,
+  initialPushNotifications,
   isTwitterProviderAvailable,
   quizAnswerCount,
   referralCount,
@@ -131,8 +135,8 @@ export function SettingsForm({
     };
   }, []);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
+  const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
 
   const [avatarUrl, setAvatarUrl] = useState(image);
   const [uploading, setUploading] = useState(false);
@@ -612,7 +616,15 @@ export function SettingsForm({
               type="checkbox"
               className={styles.toggle}
               checked={emailNotifications}
-              onChange={(e) => setEmailNotifications(e.target.checked)}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setEmailNotifications(checked);
+                await fetch('/api/users/me', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ emailNotifications: checked }),
+                });
+              }}
               aria-label="Toggle email notifications"
             />
           </label>
@@ -627,7 +639,15 @@ export function SettingsForm({
               type="checkbox"
               className={styles.toggle}
               checked={pushNotifications}
-              onChange={(e) => setPushNotifications(e.target.checked)}
+              onChange={async (e) => {
+                const checked = e.target.checked;
+                setPushNotifications(checked);
+                await fetch('/api/users/me', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ pushNotifications: checked }),
+                });
+              }}
               aria-label="Toggle push notifications"
             />
           </label>

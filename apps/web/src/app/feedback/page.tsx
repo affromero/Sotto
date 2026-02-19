@@ -1,3 +1,5 @@
+import { PublicNav } from '@/components/layout/PublicNav';
+import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 import { FeedbackForm } from './FeedbackForm';
 
@@ -8,7 +10,9 @@ export const metadata = {
 
 export default function FeedbackPage() {
   return (
-    <main className={styles.main}>
+    <>
+      <PublicNav />
+      <main className={styles.main}>
       <div className={styles.container}>
         <header className={styles.header}>
           <span className={styles.badge}>Early Access</span>
@@ -53,5 +57,7 @@ export default function FeedbackPage() {
         </footer>
       </div>
     </main>
+      <Footer />
+    </>
   );
 }
