@@ -13,10 +13,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   if (!job) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const state = await job.getState();
+  const workerCount = await adminThreadToPodcastQueue.getWorkersCount();
+
   return NextResponse.json({
     state,
     progress: typeof job.progress === 'number' ? job.progress : 0,
     podcastId: (job.data as Record<string, unknown>).podcastId ?? null,
     failedReason: state === 'failed' ? job.failedReason : null,
+    workerCount,
   });
 }

@@ -203,7 +203,7 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 14px;
-  background: #f8fafc;
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   max-width: 640px;
@@ -212,7 +212,7 @@
 .submittedUrl {
   font: var(--text-caption);
   font-weight: 500;
-  color: var(--color-text-primary);
+  color: var(--color-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -220,7 +220,7 @@
 
 .submittedMessage {
   font: var(--text-caption);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   font-style: italic;
 }
 
@@ -270,6 +270,12 @@
 .progressLabel {
   font: var(--text-caption);
   color: var(--color-text-secondary);
+}
+
+.workerWarning {
+  font: var(--text-caption);
+  color: var(--color-error, #dc2626);
+  font-weight: 500;
 }
 
 .successBanner {

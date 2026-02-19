@@ -36,6 +36,7 @@ export function ThreadSection() {
   const [activePodcastId, setActivePodcastId] = useState<string | null>(null);
   const [podcastStatus, setPodcastStatus] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
+  const [workerCount, setWorkerCount] = useState<number | null>(null);
   const [submittedUrl, setSubmittedUrl] = useState<string | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
   const pollRef = useRef(false);
@@ -73,6 +74,7 @@ export function ThreadSection() {
         const data = await res.json();
         setJobProgress(typeof data.progress === 'number' ? data.progress : 0);
         setJobState(data.state);
+        if (typeof data.workerCount === 'number') setWorkerCount(data.workerCount);
         if (data.podcastId) {
           clearInterval(interval);
           pollRef.current = false;
@@ -238,6 +240,11 @@ export function ThreadSection() {
               <div className={styles.progressFill} style={{ width: `${jobProgress}%` }} />
             </div>
             <span className={styles.progressLabel}>{getWorkerStepLabel(jobState, jobProgress)}</span>
+            {workerCount === 0 && (
+              <span className={styles.workerWarning}>
+                No workers connected — the workers container needs to be rebuilt and restarted.
+              </span>
+            )}
           </div>
         )}
 
