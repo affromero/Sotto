@@ -111,6 +111,12 @@ vi.mock('@/lib/byok', () => ({
   getByokKey: vi.fn().mockResolvedValue(null),
 }));
 
+const mockRequireAdmin = vi.fn();
+
+vi.mock('@/lib/auth-guards', () => ({
+  requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
+}));
+
 // ---- Import under test ----
 import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
 
@@ -138,6 +144,7 @@ async function createMockParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRequireAdmin.mockResolvedValue(null); // non-admin by default
     mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
     mockPrismaPodcastUpdate.mockResolvedValue({});
@@ -405,6 +412,69 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
       expect(response.status).toBe(200);
       expect(data.message).toBe('Generation started');
+    });
+  });
+
+  describe('admin bypass', () => {
+    it('admin can generate podcast owned by another user', async () => {
+      mockRequireAdmin.mockResolvedValue('admin-user-id');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-other',
+        userId: 'some-other-user',
+        status: 'PENDING',
+        discovery: { id: 'disc-other', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-other');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ success: true, message: 'Generation started' });
+    });
+
+    it('admin skips rate limit', async () => {
+      mockRequireAdmin.mockResolvedValue('admin-user-id');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
+      mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-rl-admin',
+        userId: 'admin-user-id',
+        status: 'PENDING',
+        discovery: { id: 'disc-rl', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-rl-admin');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ success: true, message: 'Generation started' });
+      expect(mockCheckRateLimit).not.toHaveBeenCalled();
+    });
+
+    it('admin skips generation gate', async () => {
+      mockRequireAdmin.mockResolvedValue('admin-user-id');
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false, freeGenerationsUsed: 0, freeGenerationsLimit: 0 });
+      mockPrismaPodcastFindUnique.mockResolvedValue({
+        id: 'podcast-gate-admin',
+        userId: 'admin-user-id',
+        status: 'PENDING',
+        discovery: { id: 'disc-gate', sourceUrl: null, sourceContent: null, durationTarget: null },
+      });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-gate-admin');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ success: true, message: 'Generation started' });
+      expect(mockCheckGenerationGate).not.toHaveBeenCalled();
     });
   });
 });

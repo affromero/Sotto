@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
+import { requireAdmin } from '@/lib/auth-guards';
 import {
   contentExtractionQueue,
   scriptGenerationQueue,
@@ -39,24 +40,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Rate limit: 20/hour, 100/day
-  const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 20 generations per hour.' },
-      { status: 429 }
-    );
-  }
-  const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 100 generations per day.' },
-      { status: 429 }
-    );
+  // Admin bypass: skip rate limit, generation gate, and ownership checks
+  const adminId = await requireAdmin();
+  const isAdmin = adminId !== null;
+
+  // Rate limit: 20/hour, 100/day (skip for admins)
+  if (!isAdmin) {
+    const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
+    if (!hourly.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded: max 20 generations per hour.' },
+        { status: 429 }
+      );
+    }
+    const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
+    if (!daily.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded: max 100 generations per day.' },
+        { status: 429 }
+      );
+    }
   }
 
-  // Generation gate: BYOK or free tier
-  const gate = await checkGenerationGate(authResult.userId);
+  // Generation gate: BYOK or free tier (skip for admins)
+  const gate = isAdmin
+    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0 }
+    : await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
     const msg =
       gate.reason === 'free_tier_exhausted'
@@ -86,7 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
   }
 
-  if (podcast.userId !== authResult.userId) {
+  if (podcast.userId !== authResult.userId && !isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
