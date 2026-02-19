@@ -3,11 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks ----
 
 const mockPrismaNotificationCreate = vi.fn().mockResolvedValue({ id: 'notif-001' });
+const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ pushNotifications: true });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     notification: {
       create: (...args: unknown[]) => mockPrismaNotificationCreate(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -57,6 +61,7 @@ describe('processNotification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrismaNotificationCreate.mockResolvedValue({ id: 'notif-001' });
+    mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: true });
     mockSendPushNotification.mockResolvedValue(undefined);
     mockSendExpoPushNotification.mockResolvedValue(undefined);
   });
@@ -158,11 +163,30 @@ describe('processNotification', () => {
   });
 
   describe('push notification delivery', () => {
-    it('sends a push notification to the user', async () => {
+    it('sends push notifications when user has pushNotifications enabled', async () => {
+      mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: true });
       const job = createMockJob(defaultPayload);
       await processNotification(job);
 
       expect(mockSendPushNotification).toHaveBeenCalled();
+      expect(mockSendExpoPushNotification).toHaveBeenCalled();
+    });
+
+    it('skips push notifications when user has pushNotifications disabled', async () => {
+      mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: false });
+      const job = createMockJob(defaultPayload);
+      await processNotification(job);
+
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendExpoPushNotification).not.toHaveBeenCalled();
+    });
+
+    it('still creates in-app notification even when pushNotifications is disabled', async () => {
+      mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: false });
+      const job = createMockJob(defaultPayload);
+      await processNotification(job);
+
+      expect(mockPrismaNotificationCreate).toHaveBeenCalled();
     });
 
     it('sends push notification with correct userId', async () => {
