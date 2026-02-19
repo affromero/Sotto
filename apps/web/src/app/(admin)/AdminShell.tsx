@@ -23,8 +23,10 @@ import {
   TrendingUp,
   Brain,
   Target,
+  Megaphone,
   ArrowLeft,
   Menu,
+  ChevronDown,
 } from 'lucide-react';
 import { AccountSwitcher } from '@/components/layout/AccountSwitcher';
 import styles from './AdminShell.module.css';
@@ -40,31 +42,87 @@ interface NavItem {
   icon: typeof LayoutDashboard;
 }
 
-const navItems: NavItem[] = [
-  { href: '/admin', label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
-  { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
-  { href: '/admin/costs', label: 'Costs', icon: DollarSign },
-  { href: '/admin/engagement', label: 'Engagement', icon: Heart },
-  { href: '/admin/playback', label: 'Playback', icon: Headphones },
-  { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
-  { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
-  { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
-  { href: '/admin/handles', label: 'Handles', icon: AtSign },
-  { href: '/admin/moderation', label: 'Moderation', icon: Shield },
-  { href: '/admin/config', label: 'Config', icon: Settings },
-  { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
-  { href: '/admin/ratings', label: 'TTS Ratings', icon: Star },
-  { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
-  { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
-  { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
+interface NavGroup {
+  label: string | null;
+  items: NavItem[];
+  defaultOpen?: boolean;
+}
+
+const navGroups: NavGroup[] = [
+  {
+    label: null,
+    items: [{ href: '/admin', label: 'Overview', icon: LayoutDashboard }],
+  },
+  {
+    label: 'Content',
+    defaultOpen: true,
+    items: [
+      { href: '/admin/users', label: 'Users', icon: Users },
+      { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
+      { href: '/admin/moderation', label: 'Moderation', icon: Shield },
+    ],
+  },
+  {
+    label: 'Business',
+    items: [
+      { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
+      { href: '/admin/costs', label: 'Costs', icon: DollarSign },
+    ],
+  },
+  {
+    label: 'Metrics',
+    items: [
+      { href: '/admin/engagement', label: 'Engagement', icon: Heart },
+      { href: '/admin/playback', label: 'Playback', icon: Headphones },
+      { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
+      { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
+      { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
+      { href: '/admin/handles', label: 'Handles', icon: AtSign },
+      { href: '/admin/config', label: 'Config', icon: Settings },
+      { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+    ],
+  },
+  {
+    label: 'Integrations',
+    items: [
+      { href: '/admin/twitter', label: 'Twitter', icon: MessageSquareShare },
+    ],
+  },
+  {
+    label: 'AI / ML',
+    items: [
+      { href: '/admin/ratings', label: 'TTS Ratings', icon: Star },
+      { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
+      { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
+      { href: '/admin/recommendations', label: 'Recommendations', icon: Target },
+    ],
+  },
 ];
+
+function getInitialExpanded(pathname: string): Record<string, boolean> {
+  const expanded: Record<string, boolean> = {};
+  for (const group of navGroups) {
+    if (!group.label) continue;
+    const containsActive = group.items.some(({ href }) => pathname === href);
+    expanded[group.label] = containsActive || !!group.defaultOpen;
+  }
+  return expanded;
+}
 
 export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
+
+  function toggleGroup(label: string) {
+    setExpanded((prev) => ({ ...prev, [label]: !prev[label] }));
+  }
 
   return (
     <div className={styles.layout}>
@@ -84,28 +142,70 @@ export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
         </div>
 
         <nav className={styles.nav} aria-label="Admin sections">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname === href;
-            const showBadge =
-              href === '/admin/moderation' &&
-              pendingReportCount !== undefined &&
-              pendingReportCount > 0;
+          {navGroups.map((group, gi) => {
+            if (!group.label) {
+              return group.items.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href;
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Icon className={styles.navIcon} aria-hidden="true" />
+                    {label}
+                  </Link>
+                );
+              });
+            }
+
+            const isOpen = expanded[group.label] ?? false;
+
             return (
-              <Link
-                key={href}
-                href={href}
-                className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
-                aria-current={isActive ? 'page' : undefined}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Icon className={styles.navIcon} aria-hidden="true" />
-                {label}
-                {showBadge && (
-                  <span className={styles.navBadge} aria-label={`${pendingReportCount} pending reports`}>
-                    {pendingReportCount}
-                  </span>
+              <div key={group.label} className={gi > 0 ? styles.navGroup : undefined}>
+                <button
+                  type="button"
+                  className={styles.navGroupLabel}
+                  onClick={() => toggleGroup(group.label!)}
+                  aria-expanded={isOpen}
+                >
+                  {group.label}
+                  <ChevronDown
+                    className={`${styles.navGroupChevron} ${isOpen ? styles.navGroupChevronOpen : ''}`}
+                    aria-hidden="true"
+                  />
+                </button>
+                {isOpen && (
+                  <div className={styles.navGroupItems}>
+                    {group.items.map(({ href, label, icon: Icon }) => {
+                      const isActive = pathname === href;
+                      const showBadge =
+                        href === '/admin/moderation' &&
+                        pendingReportCount !== undefined &&
+                        pendingReportCount > 0;
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`${styles.navLink} ${isActive ? styles.navLinkActive : ''}`}
+                          aria-current={isActive ? 'page' : undefined}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <Icon className={styles.navIcon} aria-hidden="true" />
+                          {label}
+                          {showBadge && (
+                            <span className={styles.navBadge} aria-label={`${pendingReportCount} pending reports`}>
+                              {pendingReportCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>
