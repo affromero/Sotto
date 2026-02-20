@@ -40,7 +40,18 @@ export async function POST(request: NextRequest) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sotto.fm';
-  const returnUrl = body.returnUrl ?? `${appUrl}/billing`;
+
+  function isSameOrigin(url: string): boolean {
+    try {
+      return new URL(url).origin === new URL(appUrl).origin;
+    } catch {
+      return false;
+    }
+  }
+
+  const returnUrl = body.returnUrl && isSameOrigin(body.returnUrl)
+    ? body.returnUrl
+    : `${appUrl}/billing`;
 
   try {
     const portalSession = await stripe.billingPortal.sessions.create({
