@@ -661,6 +661,63 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== VOICE PROTECTION ====== */}
+      <section className={styles.section} aria-label="Voice protection">
+        <div className={styles.inner}>
+          <div className={styles.centered}>
+            <span className={styles.overline}>Voice Protection</span>
+            <h2 className={styles.h2}>Your voice is yours. We make sure it stays that way.</h2>
+            <p className={styles.bodyLg}>
+              Every voice on Sotto goes through verification. No exceptions.
+            </p>
+          </div>
+          <div className={styles.pillars}>
+            <div className={styles.pillar}>
+              <div className={styles.pIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <path d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <h3>Verified Ownership</h3>
+              <p>
+                Every voice clone requires a live verification challenge. You record a phrase,
+                we match it to your upload. Only you can put your voice on Sotto.
+              </p>
+            </div>
+            <div className={styles.pillar}>
+              <div className={styles.pIcon}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 2a10 10 0 1 0 10 10" />
+                  <path d="M12 12l7-7" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </div>
+              <h3>Impersonation Detection</h3>
+              <p>
+                Every upload is compared against our voiceprint database. If someone tries
+                to clone a verified voice, we auto-block it and notify the owner instantly.
+              </p>
+            </div>
+            <div className={styles.pillar}>
+              <div className={`${styles.pIcon} ${styles.pIconNavy}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </div>
+              <h3>Creator Protection</h3>
+              <p>
+                Verified creators get a badge, priority in the marketplace, and full control
+                over who uses their voice. Approve, deny, or monetize — on your terms.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ====== FORK & REMIX ====== */}
       <section className={styles.section} aria-label="Fork and remix">
         <div className={styles.inner}>

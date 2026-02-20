@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import styles from './VoiceManager.module.css';
+import { VoiceVerificationChallenge } from '@/components/settings/VoiceVerificationChallenge';
 
 interface VoiceClone {
   id: string;
@@ -11,6 +12,7 @@ interface VoiceClone {
   sourceType: 'UPLOAD' | 'RECORD';
   requestable: boolean;
   priceInCents: number | null;
+  verificationStatus: string;
   salesCount: number;
   totalEarningsCents: number;
   createdAt: string;
@@ -47,6 +49,7 @@ export function VoiceManager() {
   const [cloneFile, setCloneFile] = useState<File | null>(null);
   const [cloning, setCloning] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [verifyingVoice, setVerifyingVoice] = useState<VoiceClone | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [togglingRequestable, setTogglingRequestable] = useState<string | null>(null);
   const [voiceRequests, setVoiceRequests] = useState<{
@@ -464,11 +467,57 @@ export function VoiceManager() {
           </p>
         ) : (
           <div className={styles.voiceList}>
-            {userClones.map((voice) => (
+            {userClones.map((voice) => {
+              const isVoiceVerified = voice.verificationStatus === 'VERIFIED' || voice.verificationStatus === 'ADMIN_VERIFIED';
+              return (
               <div key={voice.id} className={styles.voiceItemWrap}>
                 <div className={styles.voiceItem}>
                   <div>
-                    <div className={styles.voiceName}>{voice.name}</div>
+                    <div className={styles.voiceNameRow}>
+                      <div className={styles.voiceName}>{voice.name}</div>
+                      {(voice.verificationStatus === 'VERIFIED' || voice.verificationStatus === 'ADMIN_VERIFIED') && (
+                        <span className={styles.verifiedBadge} title="Verified">
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                            <circle cx="7" cy="7" r="7" fill="#16a34a" />
+                            <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Verified
+                        </span>
+                      )}
+                      {voice.verificationStatus === 'PROTECTED' && (
+                        <span className={styles.protectedBadge} title="Protected">
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                            <path d="M7 1L2 3.5v4C2 10.5 4 12.5 7 13c3-.5 5-2.5 5-5.5v-4L7 1z" fill="#1E3A5F" />
+                            <path d="M5 7l1.5 1.5L9.5 5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Protected
+                        </span>
+                      )}
+                      {(voice.verificationStatus === 'PENDING_VERIFICATION' || voice.verificationStatus === 'CHALLENGE_SUBMITTED') && (
+                        <span className={styles.pendingBadge}>
+                          <span className={styles.spinnerTiny} /> Processing...
+                        </span>
+                      )}
+                      {voice.verificationStatus === 'AWAITING_CHALLENGE' && (
+                        <button
+                          type="button"
+                          className={styles.verifyBtn}
+                          onClick={() => setVerifyingVoice(voice)}
+                        >
+                          Verify Now
+                        </button>
+                      )}
+                      {voice.verificationStatus === 'BLOCKED' && (
+                        <span className={styles.blockedBadge} title="Blocked — matches an existing verified voice">
+                          Blocked
+                        </span>
+                      )}
+                      {voice.verificationStatus === 'REJECTED' && (
+                        <span className={styles.rejectedBadge} title="Failed verification">
+                          Rejected
+                        </span>
+                      )}
+                    </div>
                     {voice.requestable && (
                       editingDescription === voice.id ? (
                         <div className={styles.descriptionEdit}>
@@ -562,6 +611,7 @@ export function VoiceManager() {
                     </div>
                   </div>
                   <div className={styles.voiceActions}>
+                    {isVoiceVerified && (
                     <label
                       className={styles.requestableToggle}
                       title={
@@ -579,6 +629,7 @@ export function VoiceManager() {
                         {voice.requestable ? 'Shared' : 'Private'}
                       </span>
                     </label>
+                    )}
                     <button
                       type="button"
                       className={`${styles.playButton} ${activeVoiceId === voice.id ? styles.allowlistActive : ''}`}
@@ -726,7 +777,8 @@ export function VoiceManager() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -878,6 +930,18 @@ export function VoiceManager() {
           </button>
         </form>
       </section>
+
+      {verifyingVoice && (
+        <VoiceVerificationChallenge
+          voiceCloneId={verifyingVoice.id}
+          voiceName={verifyingVoice.name}
+          onVerified={() => {
+            setVerifyingVoice(null);
+            fetchVoices();
+          }}
+          onClose={() => setVerifyingVoice(null)}
+        />
+      )}
     </div>
   );
 }

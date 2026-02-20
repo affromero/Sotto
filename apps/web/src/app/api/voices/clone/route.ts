@@ -7,6 +7,8 @@ import { getByokKey } from '@/lib/byok';
 import { cloneVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
 import { logUsage } from '@/lib/usage-logger';
+import { uploadFile } from '@/lib/r2';
+import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -68,6 +70,10 @@ export async function POST(request: NextRequest) {
     metadata: { audioSizeBytes: audioBuffer.length },
   });
 
+  // Upload sample audio to R2 for voiceprint extraction
+  const sampleKey = `voice-clones/samples/${session.user.id}/${Date.now()}.mp3`;
+  const sampleUrl = await uploadFile(sampleKey, audioBuffer, 'audio/mpeg');
+
   const voiceClone = await prisma.voiceClone.create({
     data: {
       userId: session.user.id,
@@ -75,7 +81,16 @@ export async function POST(request: NextRequest) {
       provider,
       externalVoiceId,
       sourceType: parsed.data.sourceType,
+      sampleUrl,
+      verificationStatus: 'PENDING_VERIFICATION',
     },
+  });
+
+  // Queue voice verification
+  await addJob(voiceVerificationQueue, JobType.VERIFY_VOICE, {
+    voiceCloneId: voiceClone.id,
+    userId: session.user.id,
+    action: 'extract_fingerprint',
   });
 
   return NextResponse.json(voiceClone, { status: 201 });

@@ -13,6 +13,7 @@ export interface BrowseVoice {
   priceInCents: number | null;
   createdAt: string;
   externalVoiceId: string;
+  isVerified?: boolean;
   owner: {
     id: string;
     name: string | null;
@@ -162,7 +163,18 @@ export function VoiceMarketplaceCard({
       </div>
 
       <div className={styles.cardBody}>
-        <h3 className={styles.voiceName}>{voice.name}</h3>
+        <h3 className={styles.voiceName}>
+          {voice.name}
+          {voice.isVerified && (
+            <span className={styles.verifiedBadge} title="Verified Voice">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="7" fill="#16a34a" />
+                <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Verified
+            </span>
+          )}
+        </h3>
         {voice.description && (
           <p className={styles.voiceDescription}>{voice.description}</p>
         )}

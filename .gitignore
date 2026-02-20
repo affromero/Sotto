@@ -30,6 +30,9 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
+# ML Models
+apps/web/models/
+
 # Misc
 .DS_Store
 *.pem

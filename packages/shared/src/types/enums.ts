@@ -75,7 +75,13 @@ export type NotificationType =
   | 'ACCOUNT_WARNING'
   | 'ACCOUNT_SUSPENDED'
   | 'ACCOUNT_BANNED'
-  | 'CONTENT_REMOVED';
+  | 'CONTENT_REMOVED'
+  | 'PLATFORM_ANNOUNCEMENT'
+  | 'VOICE_VERIFICATION_REQUIRED'
+  | 'VOICE_VERIFICATION_PASSED'
+  | 'VOICE_VERIFICATION_FAILED'
+  | 'VOICE_BLOCKED_DUPLICATE'
+  | 'VOICE_OWNERSHIP_ALERT';
 
 export type ReportReason =
   | 'HARASSMENT'
@@ -86,6 +92,7 @@ export type ReportReason =
   | 'SPAM'
   | 'IMPERSONATION'
   | 'COPYRIGHT'
+  | 'VOICE_THEFT'
   | 'OTHER';
 
 export type ReportStatus =
@@ -95,6 +102,17 @@ export type ReportStatus =
   | 'RESOLVED_DISMISSED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
+
+export type VoiceVerificationStatus =
+  | 'PENDING_VERIFICATION'
+  | 'AWAITING_CHALLENGE'
+  | 'CHALLENGE_SUBMITTED'
+  | 'VERIFIED'
+  | 'BLOCKED'
+  | 'REJECTED'
+  | 'ADMIN_VERIFIED'
+  | 'ADMIN_BLOCKED'
+  | 'PROTECTED';
 
 export type VoiceRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'REVOKED';
 
