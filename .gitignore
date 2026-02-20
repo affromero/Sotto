@@ -30,8 +30,9 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
-# ML Models
-apps/web/models/
+# ML Models (weights ignored, but directory must exist for Docker COPY)
+apps/web/models/*
+!apps/web/models/.gitkeep
 
 # Misc
 .DS_Store
