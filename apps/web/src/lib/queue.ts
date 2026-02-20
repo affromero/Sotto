@@ -60,7 +60,7 @@ export interface GenerateScriptPayload {
 export interface GenerateAudioPayload {
   podcastId: string;
   segmentId: string;
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
 }
 
@@ -83,7 +83,7 @@ export interface RegenerateSegmentPayload {
   interactionId: string;
   insertAfterOrder: number;
   newText: string;
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
 }
 
 export interface SendNotificationPayload {

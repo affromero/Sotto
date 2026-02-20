@@ -25,47 +25,19 @@ describe('twitterSettingsSchema', () => {
       }
     });
 
-    it('accepts nullable preferredHostVoiceId', () => {
+    it('accepts voicePreferences array', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: null,
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'voice-abc-123' },
+          { speaker: 'EXPERT', voiceId: 'voice-xyz-789' },
+        ],
       });
 
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBeNull();
-      }
-    });
-
-    it('accepts string preferredHostVoiceId', () => {
-      const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: 'voice-abc-123',
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBe('voice-abc-123');
-      }
-    });
-
-    it('accepts nullable preferredExpertVoiceId', () => {
-      const result = twitterSettingsSchema.safeParse({
-        preferredExpertVoiceId: null,
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredExpertVoiceId).toBeNull();
-      }
-    });
-
-    it('accepts string preferredExpertVoiceId', () => {
-      const result = twitterSettingsSchema.safeParse({
-        preferredExpertVoiceId: 'voice-xyz-789',
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredExpertVoiceId).toBe('voice-xyz-789');
+        expect(result.data.voicePreferences).toHaveLength(2);
+        expect(result.data.voicePreferences![0].speaker).toBe('HOST');
+        expect(result.data.voicePreferences![0].voiceId).toBe('voice-abc-123');
       }
     });
 
@@ -75,51 +47,45 @@ describe('twitterSettingsSchema', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.twitterEnabled).toBeUndefined();
-        expect(result.data.preferredHostVoiceId).toBeUndefined();
-        expect(result.data.preferredExpertVoiceId).toBeUndefined();
+        expect(result.data.voicePreferences).toBeUndefined();
       }
     });
 
     it('accepts all fields together', () => {
       const result = twitterSettingsSchema.safeParse({
         twitterEnabled: true,
-        preferredHostVoiceId: 'host-voice-1',
-        preferredExpertVoiceId: 'expert-voice-1',
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'host-voice-1' },
+          { speaker: 'EXPERT', voiceId: 'expert-voice-1' },
+        ],
+        preferredTtsProvider: 'elevenlabs',
+        preferredAiProvider: 'anthropic',
       });
 
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data.twitterEnabled).toBe(true);
-        expect(result.data.preferredHostVoiceId).toBe('host-voice-1');
-        expect(result.data.preferredExpertVoiceId).toBe('expert-voice-1');
+        expect(result.data.voicePreferences).toHaveLength(2);
       }
     });
 
-    it('accepts partial fields', () => {
+    it('accepts empty voicePreferences array', () => {
       const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: false,
-        preferredHostVoiceId: 'voice-1',
+        voicePreferences: [],
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.twitterEnabled).toBe(false);
-        expect(result.data.preferredHostVoiceId).toBe('voice-1');
-        expect(result.data.preferredExpertVoiceId).toBeUndefined();
-      }
     });
 
-    it('accepts only voice preferences without twitterEnabled', () => {
+    it('accepts custom speaker names', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: 'voice-a',
-        preferredExpertVoiceId: 'voice-b',
+        voicePreferences: [
+          { speaker: 'Skeptic', voiceId: 'voice-1' },
+          { speaker: 'Narrator', voiceId: 'voice-2' },
+        ],
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBe('voice-a');
-        expect(result.data.preferredExpertVoiceId).toBe('voice-b');
-      }
     });
   });
 
@@ -140,98 +106,72 @@ describe('twitterSettingsSchema', () => {
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid preferredHostVoiceId (number)', () => {
+    it('rejects voicePreferences with missing speaker', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: 123,
+        voicePreferences: [
+          { voiceId: 'voice-1' },
+        ],
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid preferredHostVoiceId (boolean)', () => {
+    it('rejects voicePreferences with empty speaker', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: true,
+        voicePreferences: [
+          { speaker: '', voiceId: 'voice-1' },
+        ],
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid preferredExpertVoiceId (array)', () => {
+    it('rejects voicePreferences with missing voiceId', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredExpertVoiceId: ['voice-1'],
+        voicePreferences: [
+          { speaker: 'HOST' },
+        ],
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('rejects invalid preferredExpertVoiceId (object)', () => {
+    it('rejects non-array voicePreferences', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredExpertVoiceId: { id: 'voice-1' },
+        voicePreferences: 'invalid',
       });
 
       expect(result.success).toBe(false);
     });
 
-    it('rejects multiple invalid fields', () => {
+    it('rejects voicePreferences with non-object items', () => {
       const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: 'invalid',
-        preferredHostVoiceId: 999,
-        preferredExpertVoiceId: false,
+        voicePreferences: ['voice-1', 'voice-2'],
       });
 
       expect(result.success).toBe(false);
     });
-
   });
 
   describe('edge cases', () => {
-    it('handles undefined voice IDs', () => {
+    it('accepts voicePreferences with special characters in voiceId', () => {
       const result = twitterSettingsSchema.safeParse({
-        twitterEnabled: true,
-        preferredHostVoiceId: undefined,
-        preferredExpertVoiceId: undefined,
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'voice-with-special-chars_!@#$' },
+        ],
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBeUndefined();
-        expect(result.data.preferredExpertVoiceId).toBeUndefined();
-      }
     });
 
-    it('handles empty string voice IDs', () => {
+    it('accepts long speaker names up to 50 chars', () => {
       const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: '',
-        preferredExpertVoiceId: '',
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBe('');
-        expect(result.data.preferredExpertVoiceId).toBe('');
-      }
-    });
-
-    it('handles very long voice ID strings', () => {
-      const longVoiceId = 'v'.repeat(1000);
-      const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: longVoiceId,
-      });
-
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.preferredHostVoiceId).toBe(longVoiceId);
-      }
-    });
-
-    it('handles special characters in voice IDs', () => {
-      const result = twitterSettingsSchema.safeParse({
-        preferredHostVoiceId: 'voice-with-special-chars_!@#$',
-        preferredExpertVoiceId: 'voice_123-abc_XYZ',
+        voicePreferences: [
+          { speaker: 'A'.repeat(50), voiceId: 'voice-1' },
+        ],
       });
 
       expect(result.success).toBe(true);
     });
   });
-
 });

@@ -4,7 +4,7 @@ import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 
 export type ScriptTurn = {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   direction?: string; // delivery direction: "laughing", "whispering", "excited"
 };

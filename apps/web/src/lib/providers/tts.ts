@@ -30,7 +30,7 @@ export interface SfxParams {
 export interface TtsProvider {
   generateSpeech(params: SpeechParams): Promise<Buffer>;
   generateSoundEffect?(params: SfxParams): Promise<Buffer>;
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string;
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string;
   getModelId(): string;
   readonly providerId: TtsProviderId;
 }
@@ -129,7 +129,7 @@ class FallbackTtsProvider implements TtsProvider {
     throw new Error('No SFX provider available');
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
     return this.primary.getVoiceId(speaker, podcastId, metadata);
   }
 

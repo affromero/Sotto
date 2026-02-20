@@ -81,8 +81,7 @@ export interface TwitterMention {
 export interface TwitterSettingsData {
   twitterHandle: string | null;
   twitterEnabled: boolean;
-  preferredHostVoiceId: string | null;
-  preferredExpertVoiceId: string | null;
+  voicePreferences: Array<{ speaker: string; voiceId: string }>;
   preferredTtsProvider: string | null;
   preferredTtsModel: string | null;
   preferredAiProvider: string | null;
