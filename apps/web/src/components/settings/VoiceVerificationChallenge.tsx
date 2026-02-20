@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styles from './VoiceVerificationChallenge.module.css';
 
 interface VoiceVerificationChallengeProps {
@@ -36,28 +36,30 @@ export function VoiceVerificationChallenge({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchChallenge = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/voices/verify?voiceCloneId=${voiceCloneId}`);
-      const data = await res.json();
-      if (data.challenge) {
-        setChallenge(data.challenge);
-        setStatus('ready');
-      } else {
-        setError('No active challenge found');
-      }
-    } catch {
-      setError('Failed to load challenge');
-    }
-  }, [voiceCloneId]);
-
   useEffect(() => {
-    fetchChallenge();
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/voices/verify?voiceCloneId=${voiceCloneId}`);
+        if (cancelled) return;
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.challenge) {
+          setChallenge(data.challenge);
+          setStatus('ready');
+        } else {
+          setError('No active challenge found');
+        }
+      } catch {
+        if (!cancelled) setError('Failed to load challenge');
+      }
+    })();
     return () => {
+      cancelled = true;
       if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [fetchChallenge]);
+  }, [voiceCloneId]);
 
   async function startRecording() {
     try {

@@ -30,7 +30,6 @@ function getExtractor(): SpeakerEmbeddingExtractor {
     throw new Error('SHERPA_ONNX_MODEL_PATH not configured');
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const sherpa_onnx = require('sherpa-onnx');
   extractor = new sherpa_onnx.SpeakerEmbeddingExtractor({
     model: modelPath,
@@ -76,7 +75,6 @@ export async function extractVoiceprint(audioBuffer: Buffer): Promise<number[]> 
   const wavPath = await audioBufferToWav(audioBuffer);
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const sherpa_onnx = require('sherpa-onnx');
     const wave: SherpaReadWaveResult = sherpa_onnx.readWave(wavPath);
 

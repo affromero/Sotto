@@ -159,8 +159,7 @@ export async function PATCH(request: NextRequest) {
         moderatorId: adminId,
         action: `voice_${action}`,
         reason: `Admin ${action} on voice clone`,
-        targetType: 'voice_clone',
-        targetId: voiceCloneId,
+        metadata: { targetType: 'voice_clone', targetId: voiceCloneId },
       },
     }),
   ]);
