@@ -3,17 +3,19 @@
 import { useState } from 'react';
 import { ReportQueue } from './ReportQueue';
 import { ModerationLog } from './ModerationLog';
+import { VoiceModeration } from './VoiceModeration';
 import styles from './page.module.css';
 
 interface ModerationTabsProps {
   pendingReportCount: number;
   failedPodcastCount: number;
   feedbackCount: number;
+  pendingVoiceCount: number;
   failedPodcastsContent: React.ReactNode;
   feedbackContent: React.ReactNode;
 }
 
-type TabId = 'reports' | 'log' | 'failed' | 'feedback';
+type TabId = 'reports' | 'log' | 'failed' | 'feedback' | 'voices';
 
 interface Tab {
   id: TabId;
@@ -25,6 +27,7 @@ export function ModerationTabs({
   pendingReportCount,
   failedPodcastCount,
   feedbackCount,
+  pendingVoiceCount,
   failedPodcastsContent,
   feedbackContent,
 }: ModerationTabsProps) {
@@ -35,6 +38,7 @@ export function ModerationTabs({
     { id: 'log', label: 'Moderation Log' },
     { id: 'failed', label: 'Failed Podcasts', count: failedPodcastCount },
     { id: 'feedback', label: 'Feedback', count: feedbackCount },
+    { id: 'voices', label: 'Voices', count: pendingVoiceCount },
   ];
 
   return (
@@ -68,6 +72,7 @@ export function ModerationTabs({
         {activeTab === 'log' && <ModerationLog />}
         {activeTab === 'failed' && failedPodcastsContent}
         {activeTab === 'feedback' && feedbackContent}
+        {activeTab === 'voices' && <VoiceModeration />}
       </div>
     </>
   );

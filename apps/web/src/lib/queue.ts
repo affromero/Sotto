@@ -37,6 +37,7 @@ export enum JobType {
   MODERATE_CONTENT = 'moderate_content',
   SEND_EMAIL_DIGEST = 'send_email_digest',
   SEND_ANNOUNCEMENT = 'send_announcement',
+  VERIFY_VOICE = 'verify_voice',
 }
 
 /**
@@ -96,6 +97,13 @@ export interface SendNotificationPayload {
 export interface ValidateReferencesPayload {
   podcastId: string;
   userId: string;
+}
+
+export interface VerifyVoicePayload {
+  voiceCloneId: string;
+  userId: string;
+  action: 'extract_fingerprint' | 'check_duplicates' | 'verify_challenge';
+  challengeId?: string;
 }
 
 export interface VerifyScriptPayload {
@@ -454,3 +462,4 @@ export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', 
 export const contentModerationQueue = createQueue('content-moderation', { attempts: 2 });
 export const emailDigestQueue = createQueue('email-digest', { attempts: 2 });
 export const announcementQueue = createQueue('announcements', { attempts: 2 });
+export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2 });

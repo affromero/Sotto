@@ -25,6 +25,7 @@ export async function GET() {
         description: true,
         requestable: true,
         priceInCents: true,
+        verificationStatus: true,
         createdAt: true,
         voicePurchases: {
           where: { status: 'captured' },
@@ -37,6 +38,9 @@ export async function GET() {
       where: {
         requesterId: session.user.id,
         status: 'APPROVED',
+        voiceClone: {
+          verificationStatus: { in: ['VERIFIED', 'ADMIN_VERIFIED'] },
+        },
       },
       select: {
         voiceClone: {
@@ -54,6 +58,9 @@ export async function GET() {
     prisma.voiceAllowlist.findMany({
       where: {
         allowedUserId: session.user.id,
+        voiceClone: {
+          verificationStatus: { in: ['VERIFIED', 'ADMIN_VERIFIED'] },
+        },
       },
       select: {
         voiceClone: {
@@ -84,6 +91,7 @@ export async function GET() {
       description: clone.description,
       requestable: clone.requestable,
       priceInCents: clone.priceInCents,
+      verificationStatus: clone.verificationStatus,
       createdAt: clone.createdAt,
       salesCount: clone.voicePurchases.length,
       totalEarningsCents,

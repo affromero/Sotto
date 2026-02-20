@@ -55,13 +55,14 @@ export async function getVoicePricing(voiceCloneId: string): Promise<VoicePricin
  * Look up a VoiceClone by its external voice ID.
  */
 export async function findVoiceCloneByExternalId(externalVoiceId: string) {
-  return prisma.voiceClone.findFirst({
+  const clone = await prisma.voiceClone.findFirst({
     where: { externalVoiceId },
     select: {
       id: true,
       name: true,
       userId: true,
       priceInCents: true,
+      verificationStatus: true,
       user: {
         select: {
           name: true,
@@ -71,6 +72,12 @@ export async function findVoiceCloneByExternalId(externalVoiceId: string) {
       },
     },
   });
+
+  if (clone && clone.verificationStatus !== 'VERIFIED' && clone.verificationStatus !== 'ADMIN_VERIFIED') {
+    throw new Error('Voice clone is not verified');
+  }
+
+  return clone;
 }
 
 /**
