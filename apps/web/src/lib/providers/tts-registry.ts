@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'kittentts';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -258,6 +258,26 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
           return false;
         }
       },
+    },
+  },
+
+  kittentts: {
+    id: 'kittentts',
+    displayName: 'KittenTTS (Platform)',
+    supportsSfx: false,
+    supportsVoiceCloning: false,
+    supportsStreaming: false,
+    maxSegmentChars: 5000,
+    defaultModel: 'kitten-tts-mini-0.8',
+    models: [
+      { id: 'kitten-tts-mini-0.8', displayName: 'KittenTTS Mini 0.8', tier: 'standard' },
+    ],
+    supportsAudioTags: false,
+    qualityTier: 'standard',
+    platformCostPerKChar: 0,
+    auth: {
+      fields: [],
+      validate: async () => false,
     },
   },
 };

@@ -130,6 +130,75 @@ class OpenAIProvider implements AIProvider {
 }
 
 /**
+ * Groq provider — fast hosted inference for open-source LLMs.
+ * Uses OpenAI-compatible API at api.groq.com.
+ */
+class GroqProvider implements AIProvider {
+  private async getClient() {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) throw new Error('GROQ_API_KEY is not set');
+    const { default: OpenAI } = await import('openai');
+    return new OpenAI({ baseURL: 'https://api.groq.com/openai/v1', apiKey });
+  }
+
+  async generateResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): Promise<AIResponse> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+    }
+
+    const client = await this.getClient();
+    const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+
+    const response = await client.chat.completions.create({
+      model,
+      max_tokens: opts?.maxTokens || 4096,
+      temperature: opts?.temperature,
+      messages: [{ role: 'system', content: system }, ...messages],
+    });
+
+    const content = response.choices[0]?.message?.content || '';
+    return {
+      content,
+      inputTokens: response.usage?.prompt_tokens || 0,
+      outputTokens: response.usage?.completion_tokens || 0,
+      model,
+    };
+  }
+
+  async *streamResponse(
+    system: string,
+    messages: ChatMessage[],
+    opts?: AIOptions
+  ): AsyncGenerator<string> {
+    if (!opts?.skipModeration) {
+      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
+      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+    }
+
+    const client = await this.getClient();
+    const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+
+    const stream = await client.chat.completions.create({
+      model,
+      max_tokens: opts?.maxTokens || 4096,
+      temperature: opts?.temperature,
+      messages: [{ role: 'system', content: system }, ...messages],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+}
+
+/**
  * Claude Code CLI provider — uses `claude -p` for free local testing.
  */
 class ClaudeCodeLazyProvider implements AIProvider {
@@ -169,6 +238,8 @@ export function createAIProvider(type?: string): AIProvider {
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
+    case 'groq':
+      return new GroqProvider();
     case 'claude-code':
       return new ClaudeCodeLazyProvider();
     default:
@@ -181,20 +252,38 @@ export interface ResolvedAiProvider {
   provider: AiProviderId;
   source: 'byok' | 'platform' | 'claude-code';
   apiKey?: string;
+  model?: string;
 }
 
 /**
  * Resolve which AI provider + key to use for a given user.
- * Priority: user BYOK key → platform env var → claude-code dev mode → error.
+ *
+ * Priority:
+ * 1. User BYOK key → their chosen provider
+ * 2. Platform Groq key + user plan:
+ *    - PRO → llama-3.3-70b-versatile
+ *    - FREE → llama-3.1-8b-instant
+ * 3. Platform Anthropic / OpenAI keys (legacy fallback)
+ * 4. Dev mode: claude-code
  */
-export async function resolveAiProvider(userId: string): Promise<ResolvedAiProvider> {
+export async function resolveAiProvider(
+  userId: string,
+  plan?: 'FREE' | 'PRO'
+): Promise<ResolvedAiProvider> {
   // 1. Check user BYOK key
   const userKey = await getAiKey(userId);
   if (userKey) {
     return { provider: userKey.provider, source: 'byok', apiKey: userKey.apiKey };
   }
 
-  // 2. Check platform env vars
+  // 2. Groq platform key (primary platform LLM)
+  if (process.env.GROQ_API_KEY) {
+    const model =
+      plan === 'PRO' ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
+    return { provider: 'groq', source: 'platform', model };
+  }
+
+  // 3. Legacy platform keys
   if (process.env.ANTHROPIC_API_KEY) {
     return { provider: 'anthropic', source: 'platform' };
   }
@@ -202,7 +291,7 @@ export async function resolveAiProvider(userId: string): Promise<ResolvedAiProvi
     return { provider: 'openai', source: 'platform' };
   }
 
-  // 3. Dev mode: claude-code provider
+  // 4. Dev mode: claude-code
   if (process.env.AI_PROVIDER === 'claude-code') {
     return { provider: 'anthropic', source: 'claude-code' };
   }
@@ -212,10 +301,10 @@ export async function resolveAiProvider(userId: string): Promise<ResolvedAiProvi
 
 /**
  * Check if AI can be resolved for a user without throwing.
- * Returns true if user has BYOK key, platform has env key, or AI_PROVIDER=claude-code.
  */
 export async function canResolveAi(userId: string): Promise<boolean> {
   if (await hasAiKey(userId)) return true;
+  if (process.env.GROQ_API_KEY) return true;
   if (process.env.ANTHROPIC_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.AI_PROVIDER === 'claude-code') return true;
