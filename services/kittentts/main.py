@@ -1,3 +1,4 @@
+import asyncio
 import io
 import logging
 import os
@@ -7,7 +8,7 @@ from typing import Annotated
 import numpy as np
 import soundfile as sf
 from fastapi import FastAPI, Form, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +48,8 @@ app = FastAPI(title="KittenTTS", version="0.8.0", lifespan=lifespan)
 
 @app.get("/health")
 async def health() -> dict:
+    if model is None:
+        return JSONResponse({"status": "loading"}, status_code=503)
     return {"status": "ok", "model": MODEL_ID}
 
 
@@ -71,7 +74,7 @@ async def synthesize(
         )
 
     try:
-        audio = model.generate(text, voice=voice_lower)
+        audio = await asyncio.to_thread(model.generate, text, voice=voice_lower)
     except Exception as exc:
         logger.error("Synthesis failed for voice=%s: %s", voice_lower, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc

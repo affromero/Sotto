@@ -277,7 +277,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     platformCostPerKChar: 0,
     auth: {
       fields: [],
-      validate: async () => false,
+      validate: async () => true,
     },
   },
 };
