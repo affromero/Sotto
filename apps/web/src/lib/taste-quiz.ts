@@ -368,7 +368,8 @@ Respond with a JSON array only, no markdown. Each item:
 
   try {
     // Use user's BYOK key if available (faster than platform claude-code CLI)
-    const resolved = await resolveAiProvider(userId).catch(() => null);
+    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
@@ -490,7 +491,8 @@ Respond with a JSON array only, no markdown. Each item:
 {"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
-    const resolved = await resolveAiProvider(userId);
+    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO');
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;

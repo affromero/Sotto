@@ -64,6 +64,15 @@ fi
 echo "[5/7] Installing utilities..."
 apt install -y git curl unzip htop
 
+echo "[5b/7] Installing Doppler CLI..."
+if ! command -v doppler &>/dev/null; then
+  curl -Ls --tlsv1.2 --proto "=https" --retry 3 \
+    https://cli.doppler.com/install.sh | sh
+  echo "  Doppler CLI installed ($(doppler --version))"
+else
+  echo "  Doppler CLI already installed ($(doppler --version)), skipping"
+fi
+
 echo "[6/7] Configuring firewall..."
 ufw --force reset
 ufw default deny incoming
@@ -94,11 +103,13 @@ echo ""
 echo "=== Setup Complete ==="
 echo ""
 echo "Next steps:"
-echo "  1. Log in as sotto:  ssh sotto@$(hostname -I | awk '{print $1}')"
-echo "  2. Clone the repo:   git clone <repo-url> ~/sotto"
-echo "  3. Create .env:      cp ~/sotto/.env.example ~/sotto/.env && nano ~/sotto/.env"
-echo "  4. Deploy:           cd ~/sotto && docker compose -f docker-compose.prod.yml up -d --build"
-echo "  5. Push schema:      docker compose -f docker-compose.prod.yml run --rm web npx prisma db push"
-echo "  6. Set up Caddy:     sudo cp ~/sotto/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy"
-echo "  7. Set up backups:   (crontab -l 2>/dev/null; echo \"0 3 * * * ~/sotto/scripts/backup.sh\") | crontab -"
+echo "  1. Log in as sotto:    ssh sotto@$(hostname -I | awk '{print $1}')"
+echo "  2. Clone the repo:     git clone <repo-url> ~/sotto"
+echo "  3. Authenticate Doppler (service token from dashboard.doppler.com):"
+echo "     doppler configure set token <SERVICE_TOKEN> --scope ~/sotto"
+echo "  4. Verify secrets:     cd ~/sotto && doppler secrets"
+echo "  5. First deploy:       cd ~/sotto && doppler run -- docker compose -f docker-compose.prod.yml up -d --build"
+echo "  6. Push schema:        docker compose -f docker-compose.prod.yml run --rm web npx prisma db push"
+echo "  7. Set up Caddy:       sudo cp ~/sotto/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy"
+echo "  8. Set up backups:     (crontab -l 2>/dev/null; echo \"0 3 * * * ~/sotto/scripts/backup.sh\") | crontab -"
 echo ""

@@ -4,10 +4,10 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
@@ -91,48 +91,75 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Generation gate: BYOK or free tier
+  // Generation gate: BYOK, PRO, or free tier daily limit
   const gate = await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
+    if (gate.reason === 'daily_limit_reached') {
+      const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
+      return NextResponse.json(
+        {
+          error: `Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`,
+          code: gate.reason,
+          resetInSeconds: gate.resetInSeconds,
+        },
+        { status: 403 }
+      );
+    }
     const msg =
       gate.reason === 'free_tier_exhausted'
-        ? 'Free generations used. Add your own API keys to continue.'
-        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+        ? 'Generation limit reached. Add your own API keys or upgrade to Pro.'
+        : 'No voice provider available. Add a TTS key or upgrade to Pro.';
     return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
   }
 
-  // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
+  // Get tier features for this user
+  const tierFeatures = getTierFeatures(
+    gate.isProUser ? 'PRO' : 'FREE',
+    gate.isByokUser
+  );
+
+  // Gate private podcast creation
+  if (parsed.data.visibility === 'PRIVATE' && !tierFeatures.privateAllowed) {
+    return NextResponse.json(
+      { error: 'Private podcasts require Pro or BYOK. Upgrade to Pro to create private content.' },
+      { status: 403 }
+    );
+  }
+
+  // Duration validation — enforce tier cap (before incrementing counter)
+  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
+    ? tierFeatures.maxDurationMinutes
+    : 9999;
+  const durationTarget = parsed.data.metadata?.durationTarget;
+  if (durationTarget && durationTarget > effectiveMaxDuration) {
+    return NextResponse.json(
+      {
+        error: `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
+      },
+      { status: 400 }
+    );
+  }
+
+  // Atomically increment daily free-tier counter BEFORE creating anything (avoids TOCTOU race)
   let freeTierTtsProvider: string | undefined;
   let freeTierTtsModel: string | undefined;
   let freeTierAiModel: string | undefined;
-  if (!gate.isByokUser) {
+  if (!gate.isByokUser && !gate.isProUser) {
     const config = await getFreeTierConfig();
     const selected = await selectFreeTierProviders(authResult.userId);
-    const ok = await tryIncrementFreeGeneration(authResult.userId, config.generationLimit, {
+    const ok = await tryIncrementFreeGeneration(authResult.userId, config.dailyGenerationLimit, {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
     if (!ok) {
       return NextResponse.json(
-        { error: 'Free generations used.', code: 'free_tier_exhausted' },
+        { error: 'Daily podcast limit reached.', code: 'daily_limit_reached' },
         { status: 403 }
       );
     }
     freeTierTtsProvider = selected.ttsProvider;
     freeTierTtsModel = selected.ttsModel;
     freeTierAiModel = selected.aiModel;
-  }
-
-  // Duration validation — free tier users capped at 5 min, BYOK at 40 min
-  const effectiveMaxDuration = gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
-  const durationTarget = parsed.data.metadata?.durationTarget;
-  if (durationTarget && durationTarget > effectiveMaxDuration) {
-    return NextResponse.json(
-      {
-        error: `Requested duration (${durationTarget} min) exceeds the maximum of ${effectiveMaxDuration} minutes.`,
-      },
-      { status: 400 }
-    );
   }
 
   // Check if selected voices require payment (skip if paymentIntentIds provided)
@@ -231,7 +258,8 @@ export async function POST(request: NextRequest) {
     sourceUrl: sourceUrl ?? undefined,
     sourceText: sourceText ?? undefined,
   };
-  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
+  const jobPriority = getJobPriority(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+  await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload, { priority: jobPriority });
 
   // Fire-and-forget activity record
   prisma.activity.create({

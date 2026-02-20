@@ -5,8 +5,9 @@ import { generateResponse } from '@/lib/claude';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { ContentModerationError } from '@/lib/moderation';
-import { getAiKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getTierFeatures } from '@/lib/tier-features';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
@@ -18,11 +19,34 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   logger.info('Processing interaction', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  const [aiKey, podcast, user] = await Promise.all([
+  const [aiKey, hasTts, podcast, user, userPlan] = await Promise.all([
     getAiKey(userId),
+    hasByokKey(userId),
     prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
+
+  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts);
+
+  // Enforce Q&A interaction limit for free users
+  if (isFinite(tierFeatures.maxQaInteractions)) {
+    const existingCount = await prisma.interaction.count({
+      where: { podcastId, userId, answer: { not: null } },
+    });
+    if (existingCount >= tierFeatures.maxQaInteractions) {
+      await prisma.interaction.update({
+        where: { id: interactionId },
+        data: {
+          answer: `You've reached the Q&A limit for free podcasts (${tierFeatures.maxQaInteractions} questions). Upgrade to Pro for unlimited Q&A.`,
+          status: 'ANSWERED',
+        },
+      });
+      logger.info('Q&A limit reached', { userId, podcastId, limit: tierFeatures.maxQaInteractions });
+      await job.updateProgress(100);
+      return;
+    }
+  }
 
   // Model priority: user's choice > provider default > free tier admin config
   let model = podcast?.aiModel ?? undefined;

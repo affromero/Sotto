@@ -25,6 +25,9 @@ vi.mock('@/lib/prisma', () => {
       deleteMany: (...args: unknown[]) => mockPrismaReferenceDeleteMany(...args),
       createMany: (...args: unknown[]) => mockPrismaReferenceCreateMany(...args),
     },
+    user: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+    },
     podcast: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
@@ -75,6 +78,18 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 40,
+    maxQaInteractions: Infinity,
+    webSearchEnabled: true,
+    autoApproveScript: false,
+    privateAllowed: true,
+    analyticsEnabled: true,
+  }),
 }));
 
 const mockGetFreeTierConfig = vi.fn();

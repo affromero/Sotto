@@ -12,6 +12,7 @@ export interface VoicePoolEntry {
   ids: {
     elevenlabs: string;
     openai?: string;
+    kittentts?: string;
   };
   gender: 'male' | 'female';
   accent: 'american' | 'british' | 'australian' | 'indian' | 'african';
@@ -27,7 +28,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   // --- Male voices ---
   {
     name: 'Adam',
-    ids: { elevenlabs: 'pNInz6obpgDQGcFmaJgB', openai: 'onyx' },
+    ids: { elevenlabs: 'pNInz6obpgDQGcFmaJgB', openai: 'onyx', kittentts: 'hugo' },
     gender: 'male',
     accent: 'american',
     ageRange: 'middle',
@@ -35,7 +36,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Antoni',
-    ids: { elevenlabs: 'ErXwobaYiN019PkySvjV', openai: 'echo' },
+    ids: { elevenlabs: 'ErXwobaYiN019PkySvjV', openai: 'echo', kittentts: 'bruno' },
     gender: 'male',
     accent: 'american',
     ageRange: 'young',
@@ -43,7 +44,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Arnold',
-    ids: { elevenlabs: 'VR6AewLTigWG4xSOukaG', openai: 'onyx' },
+    ids: { elevenlabs: 'VR6AewLTigWG4xSOukaG', openai: 'onyx', kittentts: 'jasper' },
     gender: 'male',
     accent: 'american',
     ageRange: 'mature',
@@ -51,7 +52,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Sam',
-    ids: { elevenlabs: 'yoZ06aMxZJJ28mfd3POQ', openai: 'fable' },
+    ids: { elevenlabs: 'yoZ06aMxZJJ28mfd3POQ', openai: 'fable', kittentts: 'leo' },
     gender: 'male',
     accent: 'american',
     ageRange: 'young',
@@ -59,7 +60,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Josh',
-    ids: { elevenlabs: 'TxGEqnHWrfWFTfGW9XjX', openai: 'echo' },
+    ids: { elevenlabs: 'TxGEqnHWrfWFTfGW9XjX', openai: 'echo', kittentts: 'jasper' },
     gender: 'male',
     accent: 'american',
     ageRange: 'middle',
@@ -67,7 +68,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Charlie',
-    ids: { elevenlabs: 'IKne3meq5aSn9XLyUdCD', openai: 'fable' },
+    ids: { elevenlabs: 'IKne3meq5aSn9XLyUdCD', openai: 'fable', kittentts: 'bruno' },
     gender: 'male',
     accent: 'australian',
     ageRange: 'young',
@@ -75,7 +76,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'George',
-    ids: { elevenlabs: 'JBFqnCBsd6RMkjVDRZzb', openai: 'onyx' },
+    ids: { elevenlabs: 'JBFqnCBsd6RMkjVDRZzb', openai: 'onyx', kittentts: 'hugo' },
     gender: 'male',
     accent: 'british',
     ageRange: 'mature',
@@ -83,7 +84,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Callum',
-    ids: { elevenlabs: 'N2lVS1w4EtoT3dr4eOWO', openai: 'echo' },
+    ids: { elevenlabs: 'N2lVS1w4EtoT3dr4eOWO', openai: 'echo', kittentts: 'leo' },
     gender: 'male',
     accent: 'british',
     ageRange: 'middle',
@@ -92,7 +93,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   // --- Female voices ---
   {
     name: 'Bella',
-    ids: { elevenlabs: 'EXAVITQu4vr4xnSDxMaL', openai: 'nova' },
+    ids: { elevenlabs: 'EXAVITQu4vr4xnSDxMaL', openai: 'nova', kittentts: 'bella' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -100,7 +101,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Rachel',
-    ids: { elevenlabs: '21m00Tcm4TlvDq8ikWAM', openai: 'shimmer' },
+    ids: { elevenlabs: '21m00Tcm4TlvDq8ikWAM', openai: 'shimmer', kittentts: 'rosie' },
     gender: 'female',
     accent: 'american',
     ageRange: 'middle',
@@ -108,7 +109,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Elli',
-    ids: { elevenlabs: 'MF3mGyEYCl7XYWbV9V6O', openai: 'alloy' },
+    ids: { elevenlabs: 'MF3mGyEYCl7XYWbV9V6O', openai: 'alloy', kittentts: 'kiki' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -116,7 +117,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Domi',
-    ids: { elevenlabs: 'AZnzlk1XvdvUeBnXmlld', openai: 'nova' },
+    ids: { elevenlabs: 'AZnzlk1XvdvUeBnXmlld', openai: 'nova', kittentts: 'luna' },
     gender: 'female',
     accent: 'american',
     ageRange: 'young',
@@ -124,7 +125,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Glinda',
-    ids: { elevenlabs: 'z9fAnlkpzviPz146aGWa', openai: 'shimmer' },
+    ids: { elevenlabs: 'z9fAnlkpzviPz146aGWa', openai: 'shimmer', kittentts: 'rosie' },
     gender: 'female',
     accent: 'american',
     ageRange: 'mature',
@@ -132,7 +133,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Freya',
-    ids: { elevenlabs: 'jsCqWAovK2LkecY7zXl4', openai: 'alloy' },
+    ids: { elevenlabs: 'jsCqWAovK2LkecY7zXl4', openai: 'alloy', kittentts: 'kiki' },
     gender: 'female',
     accent: 'british',
     ageRange: 'young',
@@ -140,7 +141,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Charlotte',
-    ids: { elevenlabs: 'XB0fDUnXU5powFXDhCwa', openai: 'shimmer' },
+    ids: { elevenlabs: 'XB0fDUnXU5powFXDhCwa', openai: 'shimmer', kittentts: 'luna' },
     gender: 'female',
     accent: 'british',
     ageRange: 'middle',
@@ -148,7 +149,7 @@ export const VOICE_POOL: VoicePoolEntry[] = [
   },
   {
     name: 'Grace',
-    ids: { elevenlabs: 'oWAxZDx7w5VEj9dCyTzz', openai: 'nova' },
+    ids: { elevenlabs: 'oWAxZDx7w5VEj9dCyTzz', openai: 'nova', kittentts: 'bella' },
     gender: 'female',
     accent: 'australian',
     ageRange: 'middle',
@@ -302,7 +303,10 @@ export function selectVoicePair(
 /**
  * Resolve a provider-specific voice ID from a voice pool entry.
  */
-export function resolveVoiceId(entry: VoicePoolEntry, provider: 'elevenlabs' | 'openai'): string {
+export function resolveVoiceId(
+  entry: VoicePoolEntry,
+  provider: 'elevenlabs' | 'openai' | 'kittentts'
+): string {
   return entry.ids[provider] ?? entry.ids.elevenlabs;
 }
 
@@ -310,5 +314,44 @@ export function resolveVoiceId(entry: VoicePoolEntry, provider: 'elevenlabs' | '
  * Look up a voice pool entry by any provider ID.
  */
 export function findByVoiceId(voiceId: string): VoicePoolEntry | undefined {
-  return VOICE_POOL.find((v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId);
+  return VOICE_POOL.find(
+    (v) => v.ids.elevenlabs === voiceId || v.ids.openai === voiceId || v.ids.kittentts === voiceId
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KittenTTS-specific voice pool
+// KittenTTS mini ships with 8 named voices — 4 host (warm/conversational),
+// 4 expert (authoritative). Deterministic pairing via podcast ID hash.
+// ---------------------------------------------------------------------------
+
+export interface KittenVoicePoolEntry {
+  id: string;
+  role: 'host' | 'expert';
+  gender: 'male' | 'female';
+}
+
+export const KITTENTTS_VOICE_POOL: KittenVoicePoolEntry[] = [
+  { id: 'bella', role: 'host', gender: 'female' },
+  { id: 'rosie', role: 'host', gender: 'female' },
+  { id: 'kiki', role: 'host', gender: 'female' },
+  { id: 'luna', role: 'host', gender: 'female' },
+  { id: 'jasper', role: 'expert', gender: 'male' },
+  { id: 'bruno', role: 'expert', gender: 'male' },
+  { id: 'hugo', role: 'expert', gender: 'male' },
+  { id: 'leo', role: 'expert', gender: 'male' },
+];
+
+const HOST_VOICES = KITTENTTS_VOICE_POOL.filter((v) => v.role === 'host');
+const EXPERT_VOICES = KITTENTTS_VOICE_POOL.filter((v) => v.role === 'expert');
+
+/**
+ * Select a deterministic KittenTTS host/expert voice pair for a podcast.
+ * Each podcast always gets the same pair, but different podcasts get different pairs.
+ */
+export function selectKittenVoicePair(podcastId: string): { host: string; expert: string } {
+  const index = hashString(podcastId);
+  const host = HOST_VOICES[index % HOST_VOICES.length];
+  const expert = EXPERT_VOICES[(index >>> 4) % EXPERT_VOICES.length];
+  return { host: host.id, expert: expert.id };
 }

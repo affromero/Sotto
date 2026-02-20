@@ -149,6 +149,7 @@ export async function generateScript(params: {
   sourceMetadata?: SourceMetadata;
   apiKeyOverride?: string;
   model?: string;
+  webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -286,7 +287,7 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    tools: [WEB_SEARCH_TOOL],
+    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };

@@ -74,6 +74,11 @@ async function importReplicate() {
   return ReplicateProvider;
 }
 
+async function importKittenTts() {
+  const { KittenTtsProvider } = await import('./tts/kittentts.provider');
+  return KittenTtsProvider;
+}
+
 // ---------------------------------------------------------------------------
 // Fallback TTS provider — tries primary, then falls back on failure
 // ---------------------------------------------------------------------------
@@ -101,7 +106,7 @@ class FallbackTtsProvider implements TtsProvider {
 
       const entry = findByVoiceId(params.voiceId);
       const fallbackVoiceId = entry
-        ? resolveVoiceId(entry, this.fallbackName as 'elevenlabs' | 'openai')
+        ? resolveVoiceId(entry, this.fallbackName as 'elevenlabs' | 'openai' | 'kittentts')
         : params.voiceId;
 
       return this.fallback.generateSpeech({ ...params, voiceId: fallbackVoiceId });
@@ -147,13 +152,16 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
   // ElevenLabs and OpenAI as synchronous constructors.
   switch (providerType) {
     case 'elevenlabs': {
-      // Inline sync version using the same lazy-loading pattern
       const { ElevenLabsProvider } = require('./tts/elevenlabs.provider');
       return new ElevenLabsProvider(byokApiKey, model);
     }
     case 'openai': {
       const { OpenAITtsProvider } = require('./tts/openai.provider');
       return new OpenAITtsProvider(byokApiKey, model);
+    }
+    case 'kittentts': {
+      const { KittenTtsProvider } = require('./tts/kittentts.provider');
+      return new KittenTtsProvider();
     }
     default:
       logger.warn(`Unknown TTS_PROVIDER "${providerType}", falling back to openai`);
@@ -205,6 +213,10 @@ export async function createTtsProviderAsync(
       if (!apiKey) throw new Error('Replicate requires an API key');
       const Cls = await importReplicate();
       return new Cls(apiKey, model);
+    }
+    case 'kittentts': {
+      const Cls = await importKittenTts();
+      return new Cls();
     }
     default:
       throw new Error(`Unknown TTS provider: ${providerId}`);
@@ -323,8 +335,17 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Default: use admin-configured free tier TTS provider + model
-  // Check allocations first, then fall back to legacy single-provider
+  // Platform path: prefer KittenTTS (zero-cost CPU sidecar) for all non-BYOK users
+  if (process.env.KITTENTTS_URL) {
+    const { KittenTtsProvider } = require('./tts/kittentts.provider');
+    return {
+      provider: new KittenTtsProvider(),
+      source: 'platform',
+      providerId: 'kittentts' as TtsProviderId,
+    };
+  }
+
+  // Fallback: admin-configured free tier TTS provider + model
   const config = await getFreeTierConfig();
   const fallbackProvider = config.ttsAllocations.length > 0
     ? (config.ttsAllocations[0].provider as TtsProviderId)
@@ -341,10 +362,11 @@ export async function resolveTtsProvider(context: {
 
 /**
  * Check if TTS can be resolved for a user without throwing.
- * Returns true if user has BYOK TTS key or platform has a TTS key.
+ * KittenTTS (platform sidecar) is always available when KITTENTTS_URL is set.
  */
 export async function canResolveTts(userId: string): Promise<boolean> {
   if (await hasByokKey(userId)) return true;
+  if (process.env.KITTENTTS_URL) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   return false;

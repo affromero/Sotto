@@ -3178,3 +3178,53 @@
     font-size: 14px;
   }
 }
+
+/* ==========================================================================
+   LANDING PRO CTA
+   ========================================================================== */
+
+.landingProCta {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: var(--spacing-lg);
+}
+
+.landingProCtaPrimary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.75rem;
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity var(--transition-fast);
+}
+
+.landingProCtaPrimary:hover {
+  opacity: 0.9;
+}
+
+.landingProCtaSecondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.75rem 1.75rem;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.landingProCtaSecondary:hover {
+  color: white;
+  border-color: rgba(255, 255, 255, 0.6);
+}
