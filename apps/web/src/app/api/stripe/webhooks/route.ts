@@ -86,8 +86,9 @@ export async function POST(request: NextRequest) {
       const customerId =
         typeof sub.customer === 'string' ? sub.customer : (sub.customer as { id: string }).id;
 
-      const currentPeriodEnd = sub.current_period_end
-        ? new Date(sub.current_period_end * 1000)
+      const itemPeriodEnd = sub.items.data[0]?.current_period_end;
+      const currentPeriodEnd = itemPeriodEnd
+        ? new Date(itemPeriodEnd * 1000)
         : new Date();
       const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
 
