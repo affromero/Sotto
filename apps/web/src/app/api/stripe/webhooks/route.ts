@@ -5,7 +5,10 @@ import { logger } from '@/lib/logger';
 
 /**
  * Stripe webhook handler.
- * Handles account.updated (Connect onboarding) and payment_intent.payment_failed events.
+ * Handles:
+ * - account.updated (Connect onboarding)
+ * - payment_intent.payment_failed (voice purchases)
+ * - customer.subscription.created / updated / deleted (Pro tier)
  */
 export async function POST(request: NextRequest) {
   if (!stripe) {
@@ -64,6 +67,85 @@ export async function POST(request: NextRequest) {
         });
         logger.info('Voice payment failed', { paymentIntentId: paymentIntent.id });
       }
+      break;
+    }
+
+    case 'customer.subscription.created':
+    case 'customer.subscription.updated': {
+      const sub = event.data.object;
+      const userId = sub.metadata?.userId;
+
+      if (!userId) {
+        logger.warn('Subscription event missing userId metadata', { subscriptionId: sub.id });
+        break;
+      }
+
+      const isActive = sub.status === 'active' || sub.status === 'trialing';
+      const plan = isActive ? ('PRO' as const) : ('FREE' as const);
+
+      const customerId =
+        typeof sub.customer === 'string' ? sub.customer : (sub.customer as { id: string }).id;
+
+      const itemPeriodEnd = sub.items.data[0]?.current_period_end;
+      const currentPeriodEnd = itemPeriodEnd
+        ? new Date(itemPeriodEnd * 1000)
+        : new Date();
+      const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
+
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: userId },
+          data: { plan },
+        }),
+        prisma.subscription.upsert({
+          where: { userId },
+          create: {
+            userId,
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: sub.id,
+            stripePriceId: sub.items.data[0]?.price?.id ?? '',
+            status: sub.status,
+            currentPeriodEnd,
+            cancelAtPeriodEnd,
+          },
+          update: {
+            stripeCustomerId: customerId,
+            stripeSubscriptionId: sub.id,
+            stripePriceId: sub.items.data[0]?.price?.id ?? '',
+            status: sub.status,
+            currentPeriodEnd,
+            cancelAtPeriodEnd,
+          },
+        }),
+      ]);
+
+      logger.info('Subscription synced', { userId, subscriptionId: sub.id, plan });
+      break;
+    }
+
+    case 'customer.subscription.deleted': {
+      const sub = event.data.object;
+      const userId = sub.metadata?.userId;
+
+      if (!userId) {
+        logger.warn('Subscription deleted event missing userId metadata', {
+          subscriptionId: sub.id,
+        });
+        break;
+      }
+
+      await prisma.$transaction([
+        prisma.user.update({
+          where: { id: userId },
+          data: { plan: 'FREE' },
+        }),
+        prisma.subscription.update({
+          where: { userId },
+          data: { status: 'canceled' },
+        }),
+      ]);
+
+      logger.info('Subscription cancelled', { userId, subscriptionId: sub.id });
       break;
     }
   }

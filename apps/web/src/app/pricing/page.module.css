@@ -32,9 +32,10 @@
 
 .plans {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--spacing-xl);
   margin-bottom: var(--spacing-3xl);
+  align-items: start;
 }
 
 .plan {
@@ -49,6 +50,21 @@
 .planFeatured {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
+  position: relative;
+}
+
+.planBadge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 12px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
 }
 
 .planHeader {
@@ -275,11 +291,13 @@
 
 /* Mobile */
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .plans {
     grid-template-columns: 1fr;
   }
+}
 
+@media (max-width: 700px) {
   .providerGrid {
     grid-template-columns: 1fr;
   }

@@ -24,6 +24,7 @@ vi.mock('@/lib/prisma', () => {
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
     },
     segment: {
       findMany: (...args: unknown[]) => mockPrismaSegmentFindMany(...args),
@@ -56,6 +57,18 @@ vi.mock('@/lib/usage-logger', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 40,
+    maxQaInteractions: Infinity,
+    webSearchEnabled: true,
+    autoApproveScript: false,
+    privateAllowed: true,
+    analyticsEnabled: true,
+  }),
 }));
 
 vi.mock('@/lib/free-tier-config', () => ({

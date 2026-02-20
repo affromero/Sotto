@@ -3,11 +3,12 @@ import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from 
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, type SourceMetadata } from '@/lib/script-generator';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
+import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
@@ -40,7 +41,13 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     return;
   }
 
-  const aiKey = await getAiKey(userId);
+  const [aiKey, hasTts, user] = await Promise.all([
+    getAiKey(userId),
+    hasByokKey(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+  ]);
+
+  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
 
   // Read podcast's aiModel preference
   const podcast = await prisma.podcast.findUniqueOrThrow({
@@ -67,6 +74,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
 
+  // Apply tier caps to duration target
+  const requestedDuration = discovery.durationTarget || 10;
+  const cappedDuration = isFinite(tierFeatures.maxDurationMinutes)
+    ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
+    : requestedDuration;
+
   const result = await generateScript({
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
@@ -74,11 +87,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     audience: discovery.audience || 'general',
     focusAreas: discovery.focusAreas,
     tone: discovery.tone || 'casual',
-    durationTarget: discovery.durationTarget || 10,
+    durationTarget: cappedDuration,
     sourceContent: discovery.sourceContent || undefined,
     sourceMetadata: sourceMetadata || undefined,
     apiKeyOverride: aiKey?.apiKey,
     model,
+    webSearchEnabled: tierFeatures.webSearchEnabled,
   });
 
   await job.updateProgress(50);

@@ -34,23 +34,27 @@ interface FreeTierInfo {
   used: number;
   limit: number;
   remaining: number;
+  dailyUsed: number;
+  dailyLimit: number;
+  dailyRemaining: number;
   ttsQuotas?: ProviderQuota[];
 }
 
 interface CreatePageClientProps {
   freeTier?: FreeTierInfo | null;
   isByokUser?: boolean;
+  isProUser?: boolean;
 }
 
-export function CreatePageClient({ freeTier, isByokUser }: CreatePageClientProps) {
+export function CreatePageClient({ freeTier, isByokUser, isProUser }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} />
     </Suspense>
   );
 }
 
-function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
+function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
@@ -64,7 +68,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
   const [ttsModel, setTtsModel] = useState<string | undefined>();
-  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
+  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : isProUser ? 30 : FREE_TIER_MAX_DURATION_MINUTES;
   const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
@@ -94,7 +98,7 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
       setDurationTarget(clamped);
     }
     setStep('voice');
-  }, []);
+  }, [maxDuration]);
 
   const handleVoiceSelectionChange = useCallback((selection: VoiceSelection) => {
     setVoiceSelection(selection);
@@ -322,7 +326,16 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
           <div className={styles.headerText}>
             <div className={styles.titleRow}>
               <h1 className={styles.title}>{getTitle()}</h1>
-              {freeTier && <FreeTierCounter used={freeTier.used} limit={freeTier.limit} ttsQuotas={freeTier.ttsQuotas} />}
+              {(freeTier || isProUser) && (
+                <FreeTierCounter
+                  used={freeTier?.used ?? 0}
+                  limit={freeTier?.limit ?? 1}
+                  dailyUsed={freeTier?.dailyUsed ?? 0}
+                  dailyLimit={freeTier?.dailyLimit ?? 1}
+                  isByokUser={isByokUser ?? false}
+                  isProUser={isProUser ?? false}
+                />
+              )}
             </div>
             <p className={styles.subtitle}>{getSubtitle()}</p>
           </div>

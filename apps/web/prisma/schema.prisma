@@ -21,6 +21,11 @@ enum UserRole {
   SYSTEM
 }
 
+enum UserPlan {
+  FREE
+  PRO
+}
+
 // ============ USERS & AUTH ============
 
 model User {
@@ -126,6 +131,10 @@ model User {
   // Free tier
   freeGenerationsUsed Int @default(0)
 
+  // Subscription plan
+  plan         UserPlan     @default(FREE)
+  subscription Subscription?
+
   // Moderation
   bannedAt        DateTime?
   bannedReason    String?    @db.Text
@@ -156,6 +165,23 @@ model User {
   @@index([role])
   @@index([handle])
   @@index([referredById])
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String   @unique
+  stripeSubscriptionId String   @unique
+  stripePriceId        String
+  status               String   // active | canceled | past_due | trialing
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
 }
 
 model Account {
@@ -1421,18 +1447,19 @@ model Activity {
 // ============ FREE TIER CONFIG ============
 
 model FreeTierConfig {
-  id              String   @id @default("singleton")
-  aiProvider      String   @default("anthropic")
-  aiModel         String   @default("claude-haiku-4-5-20251001")
-  ttsProvider     String   @default("openai")
-  ttsModel        String   @default("tts-1-hd")
-  sttProvider     String   @default("groq")
-  sttModel        String   @default("whisper-large-v3-turbo")
-  generationLimit Int      @default(3)
-  aiAllocations   Json?
-  ttsAllocations  Json?
-  updatedAt       DateTime @updatedAt
-  updatedBy       String?
+  id                    String   @id @default("singleton")
+  aiProvider            String   @default("groq")
+  aiModel               String   @default("llama-3.1-8b-instant")
+  ttsProvider           String   @default("kittentts")
+  ttsModel              String   @default("kitten-tts-mini-0.8")
+  sttProvider           String   @default("groq")
+  sttModel              String   @default("whisper-large-v3-turbo")
+  generationLimit       Int      @default(3)
+  dailyGenerationLimit  Int      @default(1)
+  aiAllocations         Json?
+  ttsAllocations        Json?
+  updatedAt             DateTime @updatedAt
+  updatedBy             String?
 }
 
 model FreeProviderUsage {

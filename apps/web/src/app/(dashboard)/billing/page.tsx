@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { Badge } from '@/components/ui/Badge';
+import { ManageSubscriptionButton } from './ManageSubscriptionButton';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'API Keys & Usage' };
+export const metadata = { title: 'Billing & API Keys' };
 
 export default async function BillingPage() {
   const session = await auth();
@@ -17,18 +18,67 @@ export default async function BillingPage() {
     return null;
   }
 
-  const [ttsKeys, aiKeys, podcastCount, freeTier] = await Promise.all([
+  const [ttsKeys, aiKeys, podcastCount, freeTier, user, subscription] = await Promise.all([
     listByokProviders(userId),
     listAiProviders(userId),
     prisma.podcast.count({ where: { userId } }),
     getFreeTierStatus(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    prisma.subscription.findUnique({
+      where: { userId },
+      select: { status: true, currentPeriodEnd: true, cancelAtPeriodEnd: true, stripePriceId: true },
+    }),
   ]);
 
   const hasAnyKey = ttsKeys.length > 0 || aiKeys.length > 0;
+  const isPro = user.plan === 'PRO';
+  const isActiveSub =
+    subscription?.status === 'active' || subscription?.status === 'trialing';
+  const periodEndDate = subscription?.currentPeriodEnd
+    ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
 
   return (
     <main className={styles.main}>
-      <h1 className={styles.pageTitle}>API Keys & Usage</h1>
+      <h1 className={styles.pageTitle}>Billing &amp; API Keys</h1>
+
+      {/* Subscription status card */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Subscription</h2>
+        <div className={styles.creditCard}>
+          <div className={styles.creditBalance}>
+            {isPro ? 'Pro' : 'Free'}
+            {isPro && (
+              <Badge variant="success">Active</Badge>
+            )}
+          </div>
+          <div className={styles.creditMeta}>
+            {isPro && isActiveSub && periodEndDate && (
+              <span>
+                {subscription?.cancelAtPeriodEnd
+                  ? `Cancels on ${periodEndDate}`
+                  : `Renews on ${periodEndDate}`}
+              </span>
+            )}
+            {!isPro && <span>1 podcast per day · No API keys required</span>}
+          </div>
+        </div>
+        {isPro ? (
+          <div className={styles.manageActions}>
+            <ManageSubscriptionButton className={styles.manageButton} />
+          </div>
+        ) : (
+          <div className={styles.manageActions}>
+            <Link href="/pricing" className={styles.upgradeButton}>
+              Upgrade to Pro — $12/month
+            </Link>
+          </div>
+        )}
+      </section>
 
       {/* AI Provider Keys */}
       <section className={styles.section}>

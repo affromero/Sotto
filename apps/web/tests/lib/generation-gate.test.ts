@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // ---- Mocks ----
 
 const mockUser = vi.fn();
+const mockUserUpdate = vi.fn().mockResolvedValue({});
 const mockFreeProviderUsageFindMany = vi.fn();
 const mockExecuteRaw = vi.fn();
 
@@ -10,6 +11,7 @@ vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockUser(...args),
+      update: (...args: unknown[]) => mockUserUpdate(...args),
     },
     freeProviderUsage: {
       findMany: (...args: unknown[]) => mockFreeProviderUsageFindMany(...args),
@@ -29,6 +31,18 @@ vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
 }));
 
+const mockRedisGet = vi.fn();
+const mockRedisTtl = vi.fn();
+const mockRedisEval = vi.fn();
+
+vi.mock('@/lib/redis', () => ({
+  getRedisClient: () => ({
+    get: (...args: unknown[]) => mockRedisGet(...args),
+    ttl: (...args: unknown[]) => mockRedisTtl(...args),
+    eval: (...args: unknown[]) => mockRedisEval(...args),
+  }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -46,6 +60,7 @@ const baseConfig = {
   sttProvider: 'openai',
   sttModel: 'whisper-1',
   generationLimit: 5,
+  dailyGenerationLimit: 1,
   aiAllocations: [],
   ttsAllocations: [],
 };
@@ -58,145 +73,137 @@ describe('checkGenerationGate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
+    mockRedisGet.mockResolvedValue('0');
+    mockRedisTtl.mockResolvedValue(-1);
   });
 
   afterEach(() => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('allows BYOK users without checking quotas', async () => {
+  it('allows BYOK users without checking the daily counter', async () => {
     mockHasByokKey.mockResolvedValue(true);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER', plan: 'FREE' });
 
     const result = await checkGenerationGate('user-1');
 
     expect(result.allowed).toBe(true);
     expect(result.isByokUser).toBe(true);
+    expect(mockRedisGet).not.toHaveBeenCalled();
   });
 
-  it('blocks free-tier users when total limit exhausted', async () => {
+  it('allows PRO users without checking the daily counter', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 5, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 100, role: 'USER', plan: 'PRO' });
 
     const result = await checkGenerationGate('user-1');
 
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toBe('free_tier_exhausted');
+    expect(result.allowed).toBe(true);
+    expect(result.isProUser).toBe(true);
+    expect(mockRedisGet).not.toHaveBeenCalled();
   });
 
-  it('allows free-tier users with remaining quota', async () => {
+  it('allows admin users regardless of daily counter', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 999, role: 'ADMIN', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('999');
 
-    const result = await checkGenerationGate('user-1');
+    const result = await checkGenerationGate('admin-1');
 
     expect(result.allowed).toBe(true);
     expect(result.reason).toBe('ok');
   });
 
-  it('blocks when all TTS allocations are exhausted', async () => {
-    const config = {
-      ...baseConfig,
-      ttsAllocations: [
-        { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
-        { provider: 'openai', model: 'tts-1-hd', quota: 3 },
-      ],
-    };
+  it('blocks free-tier users when Redis daily counter equals the limit', async () => {
     mockHasByokKey.mockResolvedValue(false);
-    mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 3, role: 'USER' });
-    mockFreeProviderUsageFindMany.mockResolvedValue([
-      { category: 'tts', provider: 'elevenlabs', used: 2 },
-      { category: 'tts', provider: 'openai', used: 3 },
-    ]);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 5, role: 'USER', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('1'); // dailyUsed === dailyLimit (1)
+    mockRedisTtl.mockResolvedValue(3600);
 
     const result = await checkGenerationGate('user-1');
 
     expect(result.allowed).toBe(false);
-    expect(result.reason).toBe('free_tier_exhausted');
-    expect(result.ttsQuotas).toEqual([
-      { provider: 'elevenlabs', model: 'eleven_v3', quota: 2, used: 2, remaining: 0 },
-      { provider: 'openai', model: 'tts-1-hd', quota: 3, used: 3, remaining: 0 },
-    ]);
+    expect(result.reason).toBe('daily_limit_reached');
+    expect(result.dailyUsed).toBe(1);
+    expect(result.resetInSeconds).toBe(3600);
   });
 
-  it('allows when at least one TTS allocation has remaining quota', async () => {
-    const config = {
-      ...baseConfig,
-      ttsAllocations: [
-        { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
-        { provider: 'openai', model: 'tts-1-hd', quota: 3 },
-      ],
-    };
+  it('allows free-tier users when daily counter is below the limit', async () => {
     mockHasByokKey.mockResolvedValue(false);
-    mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 3, role: 'USER' });
-    mockFreeProviderUsageFindMany.mockResolvedValue([
-      { category: 'tts', provider: 'elevenlabs', used: 2 },
-      { category: 'tts', provider: 'openai', used: 1 },
-    ]);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('0'); // dailyUsed = 0 < dailyLimit (1)
+    mockRedisTtl.mockResolvedValue(-1);
 
     const result = await checkGenerationGate('user-1');
 
     expect(result.allowed).toBe(true);
-    expect(result.ttsQuotas).toEqual([
-      { provider: 'elevenlabs', model: 'eleven_v3', quota: 2, used: 2, remaining: 0 },
-      { provider: 'openai', model: 'tts-1-hd', quota: 3, used: 1, remaining: 2 },
-    ]);
+    expect(result.reason).toBe('ok');
+    expect(result.dailyUsed).toBe(0);
   });
 
-  it('returns AI quota breakdowns when allocations exist', async () => {
-    const config = {
-      ...baseConfig,
-      aiAllocations: [
-        { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', quota: 3 },
-        { provider: 'openai', model: 'gpt-4o-mini', quota: 2 },
-      ],
-    };
+  it('blocks when no platform TTS provider is configured', async () => {
+    process.env = { ...ORIGINAL_ENV };
+    delete process.env.ELEVENLABS_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.KITTENTTS_URL;
+
     mockHasByokKey.mockResolvedValue(false);
-    mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER' });
-    mockFreeProviderUsageFindMany.mockResolvedValue([
-      { category: 'ai', provider: 'anthropic', used: 1 },
-    ]);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE' });
 
     const result = await checkGenerationGate('user-1');
 
-    expect(result.allowed).toBe(true);
-    expect(result.aiQuotas).toEqual([
-      { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', quota: 3, used: 1, remaining: 2 },
-      { provider: 'openai', model: 'gpt-4o-mini', quota: 2, used: 0, remaining: 2 },
-    ]);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('no_provider');
+  });
+
+  it('uses 86400 as resetInSeconds when Redis key has no TTL', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('1');
+    mockRedisTtl.mockResolvedValue(-1); // no TTL set yet
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('daily_limit_reached');
+    expect(result.resetInSeconds).toBe(86400);
   });
 });
 
 describe('tryIncrementFreeGeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserUpdate.mockResolvedValue({});
+    mockExecuteRaw.mockResolvedValue(1);
   });
 
-  it('returns false when total counter already at limit', async () => {
-    mockExecuteRaw.mockResolvedValue(0);
+  it('returns false when Redis Lua returns -1 (counter at limit)', async () => {
+    mockRedisEval.mockResolvedValue(-1);
 
-    const result = await tryIncrementFreeGeneration('user-1', 5);
+    const result = await tryIncrementFreeGeneration('user-1', 1);
 
     expect(result).toBe(false);
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
   });
 
-  it('returns true and increments total counter', async () => {
-    mockExecuteRaw.mockResolvedValue(1);
+  it('returns true when Redis Lua returns the new count', async () => {
+    mockRedisEval.mockResolvedValue(1);
 
-    const result = await tryIncrementFreeGeneration('user-1', 5);
+    const result = await tryIncrementFreeGeneration('user-1', 1);
 
     expect(result).toBe(true);
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(mockRedisEval).toHaveBeenCalledTimes(1);
   });
 
-  it('increments per-provider counters when providerUsage provided', async () => {
-    mockExecuteRaw.mockResolvedValue(1);
+  it('increments per-provider SQL counters when providerUsage is given', async () => {
+    mockRedisEval.mockResolvedValue(1);
 
     const result = await tryIncrementFreeGeneration('user-1', 5, {
       ai: { provider: 'anthropic', quota: 3 },
@@ -204,20 +211,19 @@ describe('tryIncrementFreeGeneration', () => {
     });
 
     expect(result).toBe(true);
-    // Total + TTS + AI = 3 calls
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(3);
+    // One $executeRaw per provider (TTS + AI)
+    expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
   });
 
-  it('skips per-provider increment when total fails', async () => {
-    mockExecuteRaw.mockResolvedValue(0);
+  it('skips per-provider increment when Redis returns -1', async () => {
+    mockRedisEval.mockResolvedValue(-1);
 
     const result = await tryIncrementFreeGeneration('user-1', 5, {
       tts: { provider: 'elevenlabs', quota: 2 },
     });
 
     expect(result).toBe(false);
-    // Only total counter was attempted
-    expect(mockExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
   });
 });
 
@@ -227,37 +233,42 @@ describe('getFreeTierStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
+    mockRedisGet.mockResolvedValue('0');
+    mockRedisTtl.mockResolvedValue(-1);
   });
 
   afterEach(() => {
     process.env = ORIGINAL_ENV;
   });
 
-  it('returns basic status without quotas when no allocations', async () => {
+  it('returns basic status including daily Redis fields', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('0');
 
     const result = await getFreeTierStatus('user-1');
 
     expect(result.freeGenerationsUsed).toBe(2);
     expect(result.freeGenerationsLimit).toBe(5);
     expect(result.freeGenerationsRemaining).toBe(3);
+    expect(result.dailyUsed).toBe(0);
+    expect(result.dailyLimit).toBe(1);
+    expect(result.dailyRemaining).toBe(1);
     expect(result.isByokUser).toBe(false);
+    expect(result.isProUser).toBe(false);
     expect(result.aiQuotas).toBeUndefined();
     expect(result.ttsQuotas).toBeUndefined();
   });
 
-  it('includes quota breakdowns when allocations exist', async () => {
+  it('includes ttsQuotas when TTS allocations are configured', async () => {
     const config = {
       ...baseConfig,
-      ttsAllocations: [
-        { provider: 'elevenlabs', model: 'eleven_v3', quota: 3 },
-      ],
+      ttsAllocations: [{ provider: 'elevenlabs', model: 'eleven_v3', quota: 3 }],
     };
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE' });
     mockFreeProviderUsageFindMany.mockResolvedValue([
       { category: 'tts', provider: 'elevenlabs', used: 1 },
     ]);
@@ -272,18 +283,46 @@ describe('getFreeTierStatus', () => {
   it('skips quota fetch for BYOK users', async () => {
     const config = {
       ...baseConfig,
-      ttsAllocations: [
-        { provider: 'elevenlabs', model: 'eleven_v3', quota: 3 },
-      ],
+      ttsAllocations: [{ provider: 'elevenlabs', model: 'eleven_v3', quota: 3 }],
     };
     mockHasByokKey.mockResolvedValue(true);
     mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER' });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE' });
 
     const result = await getFreeTierStatus('user-1');
 
     expect(result.isByokUser).toBe(true);
     expect(result.ttsQuotas).toBeUndefined();
     expect(mockFreeProviderUsageFindMany).not.toHaveBeenCalled();
+  });
+
+  it('returns isProUser true for PRO plan users and skips quota fetch', async () => {
+    const config = {
+      ...baseConfig,
+      ttsAllocations: [{ provider: 'elevenlabs', model: 'eleven_v3', quota: 3 }],
+    };
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(config);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'PRO' });
+
+    const result = await getFreeTierStatus('user-1');
+
+    expect(result.isProUser).toBe(true);
+    expect(result.ttsQuotas).toBeUndefined();
+    expect(mockFreeProviderUsageFindMany).not.toHaveBeenCalled();
+  });
+
+  it('includes resetInSeconds when Redis TTL is set', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE' });
+    mockRedisGet.mockResolvedValue('1');
+    mockRedisTtl.mockResolvedValue(7200);
+
+    const result = await getFreeTierStatus('user-1');
+
+    expect(result.resetInSeconds).toBe(7200);
+    expect(result.dailyUsed).toBe(1);
+    expect(result.dailyRemaining).toBe(0);
   });
 });

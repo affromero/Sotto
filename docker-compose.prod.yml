@@ -95,10 +95,13 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      KITTENTTS_URL: http://kittentts:8000
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kittentts:
         condition: service_healthy
     networks:
       - sotto-network
@@ -107,6 +110,28 @@ services:
       options:
         max-size: '50m'
         max-file: '5'
+
+  kittentts:
+    build:
+      context: ./services/kittentts
+      dockerfile: Dockerfile
+    container_name: sotto-prod-kittentts
+    restart: unless-stopped
+    environment:
+      KITTENTTS_MODEL: ${KITTENTTS_MODEL:-KittenML/kitten-tts-mini-0.8}
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '3'
 
   migrate:
     build:

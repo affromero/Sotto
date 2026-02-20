@@ -14,22 +14,31 @@ export default async function CreatePage() {
 
   const gate = await checkGenerationGate(session.user.id);
 
-  if (!gate.allowed && gate.reason === 'free_tier_exhausted') {
-    redirect('/onboarding?step=keys');
-  }
-
   if (!gate.allowed && gate.reason === 'no_provider') {
     redirect('/onboarding?step=keys');
   }
 
-  const freeTier = gate.isByokUser
-    ? null
-    : {
-        used: gate.freeGenerationsUsed,
-        limit: gate.freeGenerationsLimit,
-        remaining: gate.freeGenerationsLimit - gate.freeGenerationsUsed,
-        ttsQuotas: gate.ttsQuotas,
-      };
+  // Daily limit reached — stay on create page with upgrade prompt (don't redirect)
+  // The UI shows the banner with countdown and Pro CTA.
 
-  return <CreatePageClient freeTier={freeTier} isByokUser={gate.isByokUser} />;
+  const freeTier =
+    gate.isByokUser || gate.isProUser
+      ? null
+      : {
+          used: gate.freeGenerationsUsed,
+          limit: gate.freeGenerationsLimit,
+          remaining: Math.max(0, gate.freeGenerationsLimit - gate.freeGenerationsUsed),
+          dailyUsed: gate.dailyUsed,
+          dailyLimit: gate.dailyLimit,
+          dailyRemaining: Math.max(0, gate.dailyLimit - gate.dailyUsed),
+          ttsQuotas: gate.ttsQuotas,
+        };
+
+  return (
+    <CreatePageClient
+      freeTier={freeTier}
+      isByokUser={gate.isByokUser}
+      isProUser={gate.isProUser}
+    />
+  );
 }

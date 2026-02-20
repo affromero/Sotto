@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import { subDays, startOfDay } from 'date-fns';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { hasByokKey } from '@/lib/byok';
+import { getTierFeatures } from '@/lib/tier-features';
 import {
   getPodcastOverview,
   getPodcastDailyPlays,
@@ -47,6 +49,19 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
   const role = ((session.user as Record<string, unknown>).role as string) ?? 'USER';
   if (podcast.userId !== userId && role !== 'ADMIN') {
     notFound();
+  }
+
+  // Gate: Pro or BYOK only
+  const [user, hasTts] = await Promise.all([
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    hasByokKey(userId),
+  ]);
+
+  const isPrivileged = role === 'ADMIN' || role === 'SYSTEM';
+  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
+
+  if (!features.analyticsEnabled && !isPrivileged) {
+    redirect(`/podcast/${podcast.id}?upgrade=analytics`);
   }
 
   const days = [7, 30, 90].includes(Number(sp.range)) ? Number(sp.range) : 30;

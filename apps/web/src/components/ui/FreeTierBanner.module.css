@@ -67,6 +67,26 @@
   transform: translateX(2px);
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-xs);
+}
+
+.linkSecondary {
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.linkSecondary:hover {
+  color: var(--color-text-primary);
+}
+
 .dismissButton {
   appearance: none;
   border: none;
