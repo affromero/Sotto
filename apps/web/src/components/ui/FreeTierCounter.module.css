@@ -22,3 +22,8 @@
   background: var(--color-error-subtle, #fef2f2);
   color: var(--color-error, #dc2626);
 }
+
+.pro {
+  background: var(--color-primary);
+  color: #fff;
+}

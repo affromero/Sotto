@@ -187,8 +187,11 @@ export default async function DashboardPage() {
       <FreeTierBanner
         used={freeTier.freeGenerationsUsed}
         limit={freeTier.freeGenerationsLimit}
+        dailyUsed={freeTier.dailyUsed}
+        dailyLimit={freeTier.dailyLimit}
         isByokUser={freeTier.isByokUser}
-        ttsQuotas={freeTier.ttsQuotas}
+        isProUser={freeTier.isProUser}
+        resetInSeconds={freeTier.resetInSeconds}
       />
 
       <section className={styles.header}>
@@ -304,7 +307,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className={styles.miniGradientBody}>
                       <p className={styles.miniGradientTopic}>{podcast.topic}</p>
-                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={freeTier.isByokUser} />
+                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={freeTier.isByokUser || freeTier.isProUser} />
                       <div className={styles.miniGradientMeta}>
                         <span>{formatDuration(podcast.duration)}</span>
                         <span>{formatDate(podcast.createdAt)}</span>

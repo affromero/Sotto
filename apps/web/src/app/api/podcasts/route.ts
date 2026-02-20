@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   );
 
   // Gate private podcast creation
-  if (parsed.data.isPrivate && !tierFeatures.privateAllowed) {
+  if (parsed.data.visibility === 'PRIVATE' && !tierFeatures.privateAllowed) {
     return NextResponse.json(
       { error: 'Private podcasts require Pro or BYOK. Upgrade to Pro to create private content.' },
       { status: 403 }

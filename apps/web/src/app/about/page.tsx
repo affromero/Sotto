@@ -76,18 +76,17 @@ export default function AboutPage() {
           </section>
 
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Free by Design</h2>
+            <h2 className={styles.sectionTitle}>Accessible by Design</h2>
             <p className={styles.sectionText}>
-              Sotto is free because you bring your own API keys. We call it
-              BYOK — Bring Your Own Key. Connect your Anthropic or OpenAI key
-              for AI, pick from seven TTS providers for audio, and you have
-              unlimited access to every feature. No subscriptions, no tiers,
-              no limits.
+              Sotto gives you one podcast every day for free — no credit card, no API keys.
+              Platform AI (Groq) and voices (KittenTTS) are included. Upgrade to Pro ($12/month)
+              for unlimited generation, better AI models, and creator analytics. Or bring your own
+              API keys (BYOK) for unlimited access at cost price — connect Anthropic, OpenAI, or
+              any of seven TTS providers.
             </p>
             <p className={styles.sectionText}>
-              Your keys are encrypted with AES-256-GCM and never leave our
-              servers unencrypted. You stay in full control of your usage and
-              costs with your own provider accounts.
+              Your keys are encrypted with AES-256-GCM and never leave our servers unencrypted.
+              You stay in full control of your usage and costs with your own provider accounts.
             </p>
           </section>
 

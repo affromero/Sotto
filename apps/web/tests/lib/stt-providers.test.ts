@@ -137,7 +137,7 @@ describe('AI Registry — Groq provider', () => {
     const meta = getAiProviderMeta('groq');
     expect(meta.id).toBe('groq');
     expect(meta.displayName).toBe('Groq');
-    expect(meta.defaultModel).toBe('whisper-large-v3-turbo');
+    expect(meta.defaultModel).toBe('llama-3.3-70b-versatile');
     expect(meta.getApiKeyUrl).toBe('https://console.groq.com/keys');
     expect(meta.auth.fields[0].placeholder).toBe('gsk_...');
   });

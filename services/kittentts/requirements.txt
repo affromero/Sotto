@@ -1,5 +1,0 @@
-kittentts==0.8.0
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-soundfile==0.13.1
-numpy==2.2.2
