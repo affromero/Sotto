@@ -192,27 +192,6 @@ export default function ProfileScreen() {
     [],
   );
 
-  if (isLoading && !profile) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (isProfileError) {
-    return (
-      <ErrorState
-        message={
-          profileError instanceof Error
-            ? profileError.message
-            : 'Failed to load profile'
-        }
-        onRetry={() => refetchProfile()}
-      />
-    );
-  }
-
   const profileHeader = (
     <View style={styles.profileSection}>
       <View style={styles.profileTopRow}>
@@ -294,7 +273,20 @@ export default function ProfileScreen() {
           />
         }
         ListEmptyComponent={
-          isPodcastsError ? (
+          isLoading && !profile ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : isProfileError ? (
+            <ErrorState
+              message={
+                profileError instanceof Error
+                  ? profileError.message
+                  : 'Failed to load profile'
+              }
+              onRetry={() => refetchProfile()}
+            />
+          ) : isPodcastsError ? (
             <EmptyState
               title="Error"
               subtitle="Failed to load your podcasts"

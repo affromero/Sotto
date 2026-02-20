@@ -172,47 +172,47 @@ export default function NotificationsScreen() {
         </View>
       ) : null}
 
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : isError ? (
-        <ErrorState
-          message={
-            error instanceof Error
-              ? error.message
-              : 'Failed to load notifications'
-          }
-          onRetry={() => refetch()}
-        />
-      ) : (
-        <FlatList
-          data={notifications}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={
-            notifications?.length === 0
-              ? styles.emptyListContainer
-              : styles.listContent
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => refetch()}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+      <FlatList
+        data={notifications}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={
+          !notifications || notifications.length === 0
+            ? styles.emptyListContainer
+            : styles.listContent
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => refetch()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : isError ? (
+            <ErrorState
+              message={
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to load notifications'
+              }
+              onRetry={() => refetch()}
             />
-          }
-          ListEmptyComponent={
+          ) : (
             <EmptyState
               icon={'\u{1F514}'}
               title="No notifications yet"
               subtitle="When someone likes your podcast, follows you, or your podcast finishes generating, you will see it here."
             />
-          }
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
+          )
+        }
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
     </View>
   );
 }

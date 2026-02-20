@@ -49,7 +49,7 @@ export default function PodcastScreen() {
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
 
-  const { position, duration: trackDuration } = useProgress(250);
+  const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
   const isPlaying = playbackState.state === State.Playing;
 
