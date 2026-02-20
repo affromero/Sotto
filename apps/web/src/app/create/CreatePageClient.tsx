@@ -5,9 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
-import { TtsProviderSelector } from '@/components/create/TtsProviderSelector';
-import { AiModelSelector } from '@/components/create/AiModelSelector';
-import { TtsModelSelector } from '@/components/create/TtsModelSelector';
+import { TtsModelDropdown } from '@/components/create/TtsModelDropdown';
 import { DurationSelector } from '@/components/create/DurationSelector';
 import { FreeTierCounter } from '@/components/ui/FreeTierCounter';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
@@ -401,7 +399,13 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
                 Inspire Me
               </button>
             </div>
-            <DiscoveryChat onComplete={handleDiscoveryComplete} initialTopic={initialTopic} />
+            <DiscoveryChat
+              onComplete={handleDiscoveryComplete}
+              initialTopic={initialTopic}
+              aiModel={aiModel}
+              onAiModelChange={setAiModel}
+              isByokUser={isByokUser}
+            />
           </div>
         )}
 
@@ -423,9 +427,14 @@ function CreatePageContent({ freeTier, isByokUser }: CreatePageClientProps) {
         {step === 'voice' && tabMode === 'create' && (
           <div className={styles.chatArea}>
             <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
-            {isByokUser && <AiModelSelector value={aiModel} onChange={setAiModel} />}
-            <TtsProviderSelector value={ttsProvider} onChange={setTtsProvider} />
-            {isByokUser && <TtsModelSelector provider={ttsProvider} value={ttsModel} onChange={setTtsModel} />}
+            <TtsModelDropdown
+              ttsProvider={ttsProvider}
+              ttsModel={ttsModel}
+              onChange={(provider, model) => {
+                setTtsProvider(provider);
+                setTtsModel(model);
+              }}
+            />
             <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
             <div className={styles.voiceActions}>
               <button
