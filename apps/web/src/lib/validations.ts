@@ -140,6 +140,10 @@ export const cloneVoiceSchema = z.object({
   sourceType: z.enum(['UPLOAD', 'RECORD']),
 });
 
+export const voiceVerifyChallengeSchema = z.object({
+  voiceCloneId: z.string().min(1),
+});
+
 /**
  * Voice preview validation
  */
