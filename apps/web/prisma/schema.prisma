@@ -384,6 +384,7 @@ model Discovery {
   focusAreas     String[] // array of focus topics
   tone           String?  // casual, professional, socratic
   durationTarget Int?     // minutes
+  speakers       Json?    // [{name: "Host", description: "..."}] for multi-voice
   priorKnowledge String?  @db.Text
   sourceUrl      String?
   sourceContent  String?  @db.Text
