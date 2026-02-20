@@ -29,24 +29,28 @@ const STT_PROVIDERS: SttProviderInfo[] = [
 export async function GET() {
   const session = await auth();
 
-  let configuredProviders: string[] = [];
+  const configuredProviders: string[] = [];
 
   if (session?.user?.id) {
     const userId = session.user.id;
+    const isAdmin = session.user.role === 'ADMIN';
 
-    // OpenAI Whisper: check BYOK OpenAI key or platform key
+    // OpenAI Whisper: BYOK key, or platform key (admin only)
     const hasOpenAi =
-      (await getAiKey(userId, 'openai')) !== null || !!process.env.OPENAI_API_KEY;
+      (await getAiKey(userId, 'openai')) !== null ||
+      (isAdmin && !!process.env.OPENAI_API_KEY);
     if (hasOpenAi) configuredProviders.push('openai');
 
-    // ElevenLabs Scribe: check BYOK ElevenLabs key or platform key
+    // ElevenLabs Scribe: BYOK key, or platform key (admin only)
     const hasElevenLabs =
-      (await getByokKey(userId, 'elevenlabs')) !== null || !!process.env.ELEVENLABS_API_KEY;
+      (await getByokKey(userId, 'elevenlabs')) !== null ||
+      (isAdmin && !!process.env.ELEVENLABS_API_KEY);
     if (hasElevenLabs) configuredProviders.push('elevenlabs');
 
-    // Groq Whisper: check BYOK Groq key or platform key
+    // Groq Whisper: BYOK key, or platform key (admin only)
     const hasGroq =
-      (await getAiKey(userId, 'groq')) !== null || !!process.env.GROQ_API_KEY;
+      (await getAiKey(userId, 'groq')) !== null ||
+      (isAdmin && !!process.env.GROQ_API_KEY);
     if (hasGroq) configuredProviders.push('groq');
   }
 
