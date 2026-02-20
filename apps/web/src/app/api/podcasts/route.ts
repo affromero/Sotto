@@ -66,6 +66,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  // Block non-admins from using claude-code models
+  if (parsed.data.aiModel?.startsWith('claude-code:')) {
+    const { auth } = await import('@/lib/auth');
+    const sess = await auth();
+    if (sess?.user?.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
+
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
   if (!hourly.allowed) {

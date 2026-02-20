@@ -199,7 +199,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Route to script verification (handles both with and without references)
   // Resolve the actual AI provider used
-  const resolvedAiProvider = aiKey?.provider ?? (await getFreeTierConfig()).aiProvider;
+  const resolvedAiProvider = model?.startsWith('claude-code:')
+    ? 'claude-code'
+    : aiKey?.provider ?? (await getFreeTierConfig()).aiProvider;
 
   await prisma.podcast.update({
     where: { id: podcastId },
