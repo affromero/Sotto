@@ -18,10 +18,10 @@ import {
 } from '@/lib/script-generator';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
-import { LIMITS } from '@/lib/stripe';
+import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 
 const MAX_VERIFICATION_ATTEMPTS = 3;
@@ -32,7 +32,13 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
 
-  const aiKey = await getAiKey(userId);
+  const [aiKey, hasTts, userPlan] = await Promise.all([
+    getAiKey(userId),
+    hasByokKey(userId),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+  ]);
+
+  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts);
 
   const [script, discovery, references, podcastRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
@@ -146,8 +152,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         select: { source: true },
       });
 
-      if (podcast.source === 'WEB' || podcast.source === 'IMPORT') {
-        // Pause for user review
+      // Free users auto-approve (no script review pause)
+      const shouldAutoApprove = tierFeatures.autoApproveScript ||
+        (podcast.source !== 'WEB' && podcast.source !== 'IMPORT');
+
+      if (!shouldAutoApprove) {
+        // Pause for user review (Pro/BYOK users on WEB/IMPORT)
         await prisma.podcast.update({
           where: { id: podcastId },
           data: { status: 'SCRIPT_READY' },
