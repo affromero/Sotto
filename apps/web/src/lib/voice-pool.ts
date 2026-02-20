@@ -254,6 +254,48 @@ function hashString(s: string): number {
 }
 
 /**
+ * Select N diverse voices for a podcast using a deterministic seed.
+ * Alternates genders and avoids duplicate voices.
+ */
+export function selectVoiceSet(
+  podcastId: string,
+  speakerCount: number,
+  metadata?: VoiceMatchMetadata
+): VoicePoolEntry[] {
+  const count = Math.max(1, Math.min(speakerCount, VOICE_POOL.length));
+  const index = hashString(podcastId);
+
+  const hasMetadata =
+    metadata && (metadata.tone || metadata.audienceLevel || metadata.audience);
+
+  const pool = hasMetadata
+    ? (() => {
+        const scored = VOICE_POOL.map((v) => ({ voice: v, score: scoreVoice(v, metadata!) }));
+        const maxScore = Math.max(...scored.map((s) => s.score));
+        return scored.filter((s) => s.score >= maxScore - 3).map((s) => s.voice);
+      })()
+    : VOICE_POOL;
+
+  const selected: VoicePoolEntry[] = [];
+  const usedNames = new Set<string>();
+
+  for (let i = 0; i < count; i++) {
+    const wantGender = i % 2 === 0 ? 'female' : 'male';
+    const candidates = pool.filter(
+      (v) => !usedNames.has(v.name) && v.gender === wantGender
+    );
+    const fallback = pool.filter((v) => !usedNames.has(v.name));
+    const pickFrom = candidates.length > 0 ? candidates : fallback;
+    if (pickFrom.length === 0) break;
+    const pick = pickFrom[(index >>> (i * 4)) % pickFrom.length];
+    selected.push(pick);
+    usedNames.add(pick.name);
+  }
+
+  return selected;
+}
+
+/**
  * Select a diverse voice pair for a podcast using a deterministic seed.
  * When metadata is provided, voices are scored and filtered to a "preferred tier"
  * (within 3 points of the best score) before hash-selecting within that tier.
@@ -327,31 +369,51 @@ export function findByVoiceId(voiceId: string): VoicePoolEntry | undefined {
 
 export interface KittenVoicePoolEntry {
   id: string;
-  role: 'host' | 'expert';
   gender: 'male' | 'female';
 }
 
 export const KITTENTTS_VOICE_POOL: KittenVoicePoolEntry[] = [
-  { id: 'bella', role: 'host', gender: 'female' },
-  { id: 'rosie', role: 'host', gender: 'female' },
-  { id: 'kiki', role: 'host', gender: 'female' },
-  { id: 'luna', role: 'host', gender: 'female' },
-  { id: 'jasper', role: 'expert', gender: 'male' },
-  { id: 'bruno', role: 'expert', gender: 'male' },
-  { id: 'hugo', role: 'expert', gender: 'male' },
-  { id: 'leo', role: 'expert', gender: 'male' },
+  { id: 'bella', gender: 'female' },
+  { id: 'rosie', gender: 'female' },
+  { id: 'kiki', gender: 'female' },
+  { id: 'luna', gender: 'female' },
+  { id: 'jasper', gender: 'male' },
+  { id: 'bruno', gender: 'male' },
+  { id: 'hugo', gender: 'male' },
+  { id: 'leo', gender: 'male' },
 ];
 
-const HOST_VOICES = KITTENTTS_VOICE_POOL.filter((v) => v.role === 'host');
-const EXPERT_VOICES = KITTENTTS_VOICE_POOL.filter((v) => v.role === 'expert');
+/**
+ * Select N diverse KittenTTS voices for a podcast using a deterministic seed.
+ * Alternates genders and avoids duplicate voices.
+ */
+export function selectKittenVoiceSet(podcastId: string, speakerCount: number): string[] {
+  const count = Math.max(1, Math.min(speakerCount, KITTENTTS_VOICE_POOL.length));
+  const index = hashString(podcastId);
+  const selected: string[] = [];
+  const usedIds = new Set<string>();
+
+  for (let i = 0; i < count; i++) {
+    const wantGender = i % 2 === 0 ? 'female' : 'male';
+    const candidates = KITTENTTS_VOICE_POOL.filter(
+      (v) => !usedIds.has(v.id) && v.gender === wantGender
+    );
+    const fallback = KITTENTTS_VOICE_POOL.filter((v) => !usedIds.has(v.id));
+    const pickFrom = candidates.length > 0 ? candidates : fallback;
+    if (pickFrom.length === 0) break;
+    const pick = pickFrom[(index >>> (i * 4)) % pickFrom.length];
+    selected.push(pick.id);
+    usedIds.add(pick.id);
+  }
+
+  return selected;
+}
 
 /**
  * Select a deterministic KittenTTS host/expert voice pair for a podcast.
- * Each podcast always gets the same pair, but different podcasts get different pairs.
+ * Wrapper around selectKittenVoiceSet for backward compatibility.
  */
 export function selectKittenVoicePair(podcastId: string): { host: string; expert: string } {
-  const index = hashString(podcastId);
-  const host = HOST_VOICES[index % HOST_VOICES.length];
-  const expert = EXPERT_VOICES[(index >>> 4) % EXPERT_VOICES.length];
-  return { host: host.id, expert: expert.id };
+  const voices = selectKittenVoiceSet(podcastId, 2);
+  return { host: voices[0], expert: voices[1] };
 }

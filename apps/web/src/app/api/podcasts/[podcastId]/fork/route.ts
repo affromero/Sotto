@@ -143,14 +143,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
   const skipPaidVoices = body.skipPaidVoices === true;
   let forkVoices = sourcePodcast.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId }));
-  const forkHostVoiceId = forkVoices.find(v => v.speaker === 'HOST')?.voiceId;
-  const forkExpertVoiceId = forkVoices.find(v => v.speaker === 'EXPERT')?.voiceId;
+  const forkVoicesWithIds = forkVoices.filter(
+    (v): v is { speaker: string; voiceId: string } => !!v.voiceId
+  );
 
-  if (!skipPaidVoices && !paymentIntentIds && (forkHostVoiceId || forkExpertVoiceId)) {
+  if (!skipPaidVoices && !paymentIntentIds && forkVoicesWithIds.length > 0) {
     const voiceCharges = await computeVoiceCharges(
       userId,
-      forkHostVoiceId ?? undefined,
-      forkExpertVoiceId ?? undefined
+      forkVoicesWithIds
     );
 
     if (voiceCharges.length > 0) {
