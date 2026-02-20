@@ -5,12 +5,16 @@ import type { DiscoveryMessage } from '@/types/discovery';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import { useDiscovery } from '@/lib/hooks/useDiscovery';
 import { SuggestionChips } from './SuggestionChips';
+import { LlmModelDropdown } from '@/components/create/LlmModelDropdown';
 import styles from './DiscoveryChat.module.css';
 
 interface DiscoveryChatProps {
   podcastId?: string;
   onComplete: (metadata: DiscoveryMetadata) => void;
   initialTopic?: string;
+  aiModel?: string;
+  onAiModelChange?: (model: string | undefined) => void;
+  isByokUser?: boolean;
 }
 
 const GREETING: DiscoveryMessage = {
@@ -22,7 +26,7 @@ const GREETING: DiscoveryMessage = {
   createdAt: new Date(0).toISOString(),
 };
 
-export function DiscoveryChat({ podcastId, onComplete, initialTopic }: DiscoveryChatProps) {
+export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, onAiModelChange }: DiscoveryChatProps) {
   const { messages, metadata, isLoading, sendMessage } = useDiscovery();
   const [inputValue, setInputValue] = useState('');
   const initialTopicSentRef = useRef(false);
@@ -53,17 +57,17 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic }: Discovery
   useEffect(() => {
     if (initialTopic && !initialTopicSentRef.current) {
       initialTopicSentRef.current = true;
-      sendMessage(initialTopic, podcastId, false);
+      sendMessage(initialTopic, podcastId, false, aiModel);
     }
-  }, [initialTopic, sendMessage, podcastId]);
+  }, [initialTopic, sendMessage, podcastId, aiModel]);
 
   const handleSend = useCallback(
     (content: string, isChipBased = false) => {
       if (!content.trim() || isLoading) return;
       setInputValue('');
-      sendMessage(content, podcastId, isChipBased);
+      sendMessage(content, podcastId, isChipBased, aiModel);
     },
-    [isLoading, sendMessage, podcastId]
+    [isLoading, sendMessage, podcastId, aiModel]
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -213,6 +217,9 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic }: Discovery
 
       {/* Input area */}
       <form className={styles.inputBar} onSubmit={handleSubmit}>
+        {onAiModelChange && (
+          <LlmModelDropdown value={aiModel} onChange={onAiModelChange} />
+        )}
         <input
           ref={inputRef}
           type="text"

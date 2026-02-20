@@ -19,7 +19,7 @@ interface UseDiscoveryReturn {
   isLoading: boolean;
   isComplete: boolean;
   linkPreview: LinkPreviewData | null;
-  sendMessage: (content: string, podcastId?: string, isChipBased?: boolean) => Promise<void>;
+  sendMessage: (content: string, podcastId?: string, isChipBased?: boolean, model?: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -40,7 +40,7 @@ export function useDiscovery(): UseDiscoveryReturn {
   messagesRef.current = state.messages;
 
   const sendMessage = useCallback(
-    async (content: string, podcastId?: string, isChipBased: boolean = false) => {
+    async (content: string, podcastId?: string, isChipBased: boolean = false, model?: string) => {
       const currentMessageIndex = messageIndexRef.current;
       messageIndexRef.current++;
 
@@ -124,6 +124,9 @@ export function useDiscovery(): UseDiscoveryReturn {
         const body: Record<string, unknown> = { content, history };
         if (podcastId) {
           body.podcastId = podcastId;
+        }
+        if (model) {
+          body.model = model;
         }
 
         const response = await fetch('/api/discovery', {
