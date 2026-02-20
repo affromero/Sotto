@@ -24,10 +24,10 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     hasByokKey(userId),
     prisma.podcast.findUnique({ where: { id: podcastId }, select: { language: true, aiModel: true } }),
     prisma.user.findUnique({ where: { id: userId }, select: { preferredLanguage: true } }),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
 
-  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts);
+  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts, userPlan.role);
 
   // Enforce Q&A interaction limit for free users
   if (isFinite(tierFeatures.maxQaInteractions)) {

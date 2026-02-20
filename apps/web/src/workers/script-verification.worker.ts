@@ -35,10 +35,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const [aiKey, hasTts, userPlan] = await Promise.all([
     getAiKey(userId),
     hasByokKey(userId),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
 
-  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts);
+  const tierFeatures = getTierFeatures(userPlan.plan as 'FREE' | 'PRO', hasTts, userPlan.role);
 
   const [script, discovery, references, podcastRecord] = await Promise.all([
     prisma.script.findUniqueOrThrow({
