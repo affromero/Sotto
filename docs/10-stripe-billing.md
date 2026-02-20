@@ -188,7 +188,7 @@ is set by `FreeTierConfig.dailyGenerationLimit` (default: 1, configurable in `/a
 
 | Feature | Free | Pro | BYOK |
 |---|---|---|---|
-| Max duration | 15 min | 40 min | 40 min |
+| Max duration | 5 min | 30 min | Unlimited |
 | Q&A interactions | 3/podcast | Unlimited | Unlimited |
 | Web search in scripts | No | Yes | Yes |
 | Auto-approve script | Yes (no pause) | No (user reviews) | No (user reviews) |
@@ -216,7 +216,7 @@ Admin-configurable singleton (`FreeTierConfig`) at `/admin/free-tier`:
 
 Users connect their own LLM (Anthropic, OpenAI, Groq) and TTS keys (7 providers).
 Keys are AES-256-GCM encrypted at rest. All features unlock immediately — no daily limit,
-full 40-minute duration, analytics, private podcasts.
+unlimited duration, analytics, private podcasts.
 
 See `lib/byok.ts` for encryption details and key management functions.
 
