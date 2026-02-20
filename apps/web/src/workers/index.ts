@@ -35,6 +35,7 @@ import { processTrendPoll } from './twitter-trend-poll.worker';
 import { processAdminThreadToPodcast } from './admin-thread-to-podcast.worker';
 import { processContentModeration } from './content-moderation.worker';
 import { processEmailDigest } from './email-digest.worker';
+import { processVoiceVerification } from './voice-verification.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -65,6 +66,7 @@ const workers = [
   createWorker('content-moderation', processContentModeration, { concurrency: 3 }),
   createWorker('email-digest', processEmailDigest, { concurrency: 1 }),
   createWorker('announcements', processAnnouncement, { concurrency: 1 }),
+  createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
