@@ -9,9 +9,7 @@ const mockPrismaInteractionUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
-  usePremiumVoice: true,
-  hostVoiceId: null,
-  expertVoiceId: null,
+  voices: [],
   ttsProvider: null,
   ttsModel: null,
 });
@@ -173,12 +171,10 @@ function setupStandardProvider() {
 describe('processSegmentRegeneration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: premium voice, no custom voice IDs
+    // Default: no custom voice IDs
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
-      usePremiumVoice: true,
-      hostVoiceId: null,
-      expertVoiceId: null,
+      voices: [],
       ttsProvider: null,
       ttsModel: null,
     });
@@ -220,9 +216,9 @@ describe('processSegmentRegeneration', () => {
     it('uses custom hostVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: true,
-        hostVoiceId: 'custom-host-voice',
-        expertVoiceId: null,
+        voices: [
+          { speaker: 'HOST', voiceId: 'custom-host-voice' },
+        ],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -237,9 +233,9 @@ describe('processSegmentRegeneration', () => {
     it('uses custom expertVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: true,
-        hostVoiceId: null,
-        expertVoiceId: 'custom-expert-voice',
+        voices: [
+          { speaker: 'EXPERT', voiceId: 'custom-expert-voice' },
+        ],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -283,16 +279,14 @@ describe('processSegmentRegeneration', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: false,
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: null,
         ttsModel: null,
       });
       setupStandardProvider();
     });
 
-    it('uses standard TTS provider when usePremiumVoice is false', async () => {
+    it('uses standard TTS provider when no custom provider is set', async () => {
       const job = createMockJob(defaultPayload);
       await processSegmentRegeneration(job);
 
@@ -587,9 +581,7 @@ describe('processSegmentRegeneration', () => {
     it('executes the full regeneration pipeline for EXPERT segment (standard voice)', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: false,
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -677,9 +669,7 @@ describe('processSegmentRegeneration', () => {
     it('propagates errors from standard generateSpeech', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        usePremiumVoice: false,
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: null,
         ttsModel: null,
       });

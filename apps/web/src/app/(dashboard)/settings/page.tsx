@@ -28,8 +28,7 @@ export default async function SettingsPage() {
         role: true,
         twitterHandle: true,
         twitterEnabled: true,
-        preferredHostVoiceId: true,
-        preferredExpertVoiceId: true,
+        voicePreferences: { select: { speaker: true, voiceId: true } },
         preferredLanguage: true,
         emailNotifications: true,
         pushNotifications: true,
@@ -98,8 +97,8 @@ export default async function SettingsPage() {
         connectedProviders={connectedProviders}
         twitterHandle={user.twitterHandle}
         twitterEnabled={user.twitterEnabled}
-        preferredHostVoiceId={user.preferredHostVoiceId}
-        preferredExpertVoiceId={user.preferredExpertVoiceId}
+        preferredHostVoiceId={user.voicePreferences.find(v => v.speaker === 'HOST')?.voiceId ?? null}
+        preferredExpertVoiceId={user.voicePreferences.find(v => v.speaker === 'EXPERT')?.voiceId ?? null}
         preferredLanguage={user.preferredLanguage}
         voiceClones={voiceClones}
         interestCategories={categories}

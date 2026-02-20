@@ -168,11 +168,14 @@ export async function POST(request: NextRequest) {
 
   // Check if selected voices require payment (skip if paymentIntentIds provided)
   const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
+  const voiceEntries = parsed.data.voices ?? [];
+  const hostVoiceId = voiceEntries.find(v => v.speaker === 'HOST')?.voiceId;
+  const expertVoiceId = voiceEntries.find(v => v.speaker === 'EXPERT')?.voiceId;
   if (!paymentIntentIds) {
     const voiceCharges = await computeVoiceCharges(
       authResult.userId,
-      parsed.data.hostVoiceId,
-      parsed.data.expertVoiceId
+      hostVoiceId,
+      expertVoiceId
     );
 
     if (voiceCharges.length > 0) {
@@ -205,14 +208,23 @@ export async function POST(request: NextRequest) {
       title: parsed.data.title,
       topic: parsed.data.topic,
       status: 'EXTRACTING',
-      hostVoiceId: parsed.data.hostVoiceId,
-      expertVoiceId: parsed.data.expertVoiceId,
       ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
       ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
       aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
       ...(isApiKeyAuth && { source: 'API' }),
     },
   });
+
+  // Create PodcastVoice records from the voices array
+  if (voiceEntries.length > 0) {
+    await prisma.podcastVoice.createMany({
+      data: voiceEntries.map(v => ({
+        podcastId: podcast.id,
+        speaker: v.speaker,
+        voiceId: v.voiceId ?? null,
+      })),
+    });
+  }
 
   // Link existing VoicePurchase records to this podcast
   if (paymentIntentIds) {

@@ -22,6 +22,10 @@ vi.mock('@/lib/auth', () => ({
 }));
 
 // Mock prisma
+const mockPodcastVoiceCreateMany = vi.fn();
+const mockVoicePurchaseFindUnique = vi.fn();
+const mockVoicePurchaseUpdateMany = vi.fn();
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
@@ -32,11 +36,18 @@ vi.mock('@/lib/prisma', () => {
     podcastTag: {
       createMany: (...args: unknown[]) => mockPodcastTagCreateMany(...args),
     },
+    podcastVoice: {
+      createMany: (...args: unknown[]) => mockPodcastVoiceCreateMany(...args),
+    },
     discovery: {
       create: (...args: unknown[]) => mockDiscoveryCreate(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+    },
+    voicePurchase: {
+      findUnique: (...args: unknown[]) => mockVoicePurchaseFindUnique(...args),
+      updateMany: (...args: unknown[]) => mockVoicePurchaseUpdateMany(...args),
     },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
@@ -62,6 +73,39 @@ vi.mock('@/lib/queue', () => ({
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
   getRedisClient: vi.fn(),
+}));
+
+// Mock voice pricing
+vi.mock('@/lib/voice-pricing', () => ({
+  computeVoiceCharges: vi.fn().mockResolvedValue([]),
+}));
+
+// Mock twitter auto-tweet
+vi.mock('@/lib/twitter-auto-tweet', () => ({
+  checkAutoTweetThreshold: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock free-tier-provider-selector
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    aiQuota: 'platform',
+    ttsProvider: 'openai',
+    ttsModel: 'tts-1',
+    ttsQuota: 'platform',
+  }),
+}));
+
+// Mock auth-guards
+vi.mock('@/lib/auth-guards', () => ({
+  checkSuspension: vi.fn().mockReturnValue(null),
+}));
+
+// Mock stripe
+vi.mock('@/lib/stripe', () => ({
+  LIMITS: { maxDurationMinutes: 30 },
+  FREE_TIER_MAX_DURATION_MINUTES: 10,
 }));
 
 // Mock generation gate
@@ -106,6 +150,10 @@ const mockSourcePodcast = {
   forkCount: 5,
   forkedFromId: null,
   tags: [{ tagId: 'tag-science' }, { tagId: 'tag-tech' }],
+  voices: [
+    { speaker: 'HOST', voiceId: 'voice-host-1' },
+    { speaker: 'EXPERT', voiceId: 'voice-expert-1' },
+  ],
   discovery: {
     durationTarget: 10,
     audienceLevel: 'intermediate',
@@ -135,6 +183,9 @@ function setupSuccessMocks(userId = 'user-1') {
       podcast: {
         create: mockPodcastCreate,
         update: mockPodcastUpdate,
+      },
+      podcastVoice: {
+        createMany: mockPodcastVoiceCreateMany,
       },
       discovery: {
         create: mockDiscoveryCreate,

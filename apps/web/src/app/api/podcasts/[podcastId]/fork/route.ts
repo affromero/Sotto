@@ -108,6 +108,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     include: {
       tags: { select: { tagId: true } },
+      voices: { select: { speaker: true, voiceId: true } },
       discovery: {
         select: {
           durationTarget: true,
@@ -141,8 +142,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Check if the source podcast's voices are paid and forker needs to pay
   const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
   const skipPaidVoices = body.skipPaidVoices === true;
-  let forkHostVoiceId = sourcePodcast.hostVoiceId;
-  let forkExpertVoiceId = sourcePodcast.expertVoiceId;
+  let forkVoices = sourcePodcast.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId }));
+  const forkHostVoiceId = forkVoices.find(v => v.speaker === 'HOST')?.voiceId;
+  const forkExpertVoiceId = forkVoices.find(v => v.speaker === 'EXPERT')?.voiceId;
 
   if (!skipPaidVoices && !paymentIntentIds && (forkHostVoiceId || forkExpertVoiceId)) {
     const voiceCharges = await computeVoiceCharges(
@@ -165,8 +167,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // If skipping paid voices, clear the voice IDs so the pool will be used instead
   if (skipPaidVoices) {
-    forkHostVoiceId = null;
-    forkExpertVoiceId = null;
+    forkVoices = forkVoices.map(v => ({ ...v, voiceId: null }));
   }
 
   // Verify provided payment intents
@@ -191,13 +192,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         remixNote: remixNote || null,
         status: 'PENDING',
         forkedFromId: podcastId,
-        hostVoiceId: forkHostVoiceId,
-        expertVoiceId: forkExpertVoiceId,
         ttsProvider: freeTierTtsProvider ?? undefined,
         ttsModel: freeTierTtsModel ?? undefined,
         aiModel: freeTierAiModel ?? undefined,
       },
     });
+
+    // Copy voice records to the forked podcast
+    if (forkVoices.length > 0) {
+      await tx.podcastVoice.createMany({
+        data: forkVoices.map(v => ({
+          podcastId: newPodcast.id,
+          speaker: v.speaker,
+          voiceId: v.voiceId,
+        })),
+      });
+    }
 
     // Create synthetic Discovery so the pipeline works
     await tx.discovery.create({

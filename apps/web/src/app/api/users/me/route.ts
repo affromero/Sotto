@@ -19,8 +19,10 @@ const updateUserSchema = z
     bio: z.string().max(500).optional(),
     image: z.string().url().optional(),
     handle: handleSchema.optional(),
-    preferredHostVoiceId: z.string().nullable().optional(),
-    preferredExpertVoiceId: z.string().nullable().optional(),
+    voicePreferences: z.array(z.object({
+      speaker: z.string().min(1).max(50),
+      voiceId: z.string().min(1),
+    })).optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
@@ -38,6 +40,9 @@ export async function GET(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: authResult.userId },
+      include: {
+        voicePreferences: { select: { speaker: true, voiceId: true, sortOrder: true } },
+      },
     });
 
     if (!user) {
@@ -63,8 +68,7 @@ export async function GET(request: NextRequest) {
       createdAt: user.createdAt.toISOString(),
       twitterHandle: user.twitterHandle,
       twitterEnabled: user.twitterEnabled,
-      preferredHostVoiceId: user.preferredHostVoiceId,
-      preferredExpertVoiceId: user.preferredExpertVoiceId,
+      voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
     });
   } catch (error: unknown) {
@@ -87,7 +91,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
     }
 
-    const { interests, customTags, handle, ...data } = validation.data;
+    const { interests, customTags, handle, voicePreferences, ...data } = validation.data;
 
     // Validate handle availability if changing it
     if (handle !== undefined) {
@@ -112,7 +116,25 @@ export async function PATCH(request: NextRequest) {
       const user = await tx.user.update({
         where: { id: authResult.userId },
         data: updateData,
+        include: {
+          voicePreferences: { select: { speaker: true, voiceId: true, sortOrder: true } },
+        },
       });
+
+      // Update voice preferences if provided
+      if (voicePreferences !== undefined) {
+        await tx.userVoicePreference.deleteMany({ where: { userId: authResult.userId } });
+        if (voicePreferences.length > 0) {
+          await tx.userVoicePreference.createMany({
+            data: voicePreferences.map((vp, i) => ({
+              userId: authResult.userId,
+              speaker: vp.speaker,
+              voiceId: vp.voiceId,
+              sortOrder: i,
+            })),
+          });
+        }
+      }
 
       // Update interests if provided
       if (interests !== undefined) {
@@ -197,8 +219,7 @@ export async function PATCH(request: NextRequest) {
       createdAt: updatedUser.createdAt.toISOString(),
       twitterHandle: updatedUser.twitterHandle,
       twitterEnabled: updatedUser.twitterEnabled,
-      preferredHostVoiceId: updatedUser.preferredHostVoiceId,
-      preferredExpertVoiceId: updatedUser.preferredExpertVoiceId,
+      voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
     });
   } catch (error: unknown) {

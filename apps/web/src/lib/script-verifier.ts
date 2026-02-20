@@ -4,7 +4,7 @@ import type { ScriptTurn, GeneratedReference } from './script-generator';
 export interface ClaimAnalysis {
   claimText: string;
   turnIndex: number;
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   isCommonKnowledge: boolean;
   existingCitations: number[];
   needsMoreCitations: boolean;
@@ -288,7 +288,7 @@ Analyze every factual claim. Return JSON only.`;
     claims: Array<{
       claimText: string;
       turnIndex: number;
-      speaker: 'HOST' | 'EXPERT';
+      speaker: string;
       isCommonKnowledge: boolean;
       existingCitations: number[];
       needsMoreCitations: boolean;

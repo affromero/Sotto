@@ -4,7 +4,7 @@
  */
 
 type ScriptTurn = {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   direction?: string;
 };

@@ -81,9 +81,15 @@ export async function POST(request: NextRequest) {
       status: 'EXTRACTING',
       source: 'TWITTER',
       sourceTweetId: parsed.data.tweetId,
-      hostVoiceId: voicePair.host.id,
-      expertVoiceId: voicePair.expert.id,
       visibility: 'PUBLIC',
+      voices: {
+        createMany: {
+          data: [
+            { speaker: 'HOST', voiceId: voicePair.host.id },
+            { speaker: 'EXPERT', voiceId: voicePair.expert.id },
+          ],
+        },
+      },
       discovery: {
         create: {
           userId: sottoUser.id,
