@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
   const { search, sort, pricing, page, limit } = parsed.data;
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = { requestable: true };
+  const where: Record<string, unknown> = {
+    requestable: true,
+    verificationStatus: { in: ['VERIFIED', 'ADMIN_VERIFIED'] },
+  };
 
   if (search) {
     where.OR = [
@@ -61,6 +64,7 @@ export async function GET(request: NextRequest) {
         priceInCents: true,
         createdAt: true,
         externalVoiceId: true,
+        verificationStatus: true,
         user: {
           select: {
             id: true,
@@ -136,6 +140,7 @@ export async function GET(request: NextRequest) {
         image: v.user.image,
       },
       ownerStripeOnboarded: v.user.stripeOnboarded,
+      isVerified: v.verificationStatus === 'VERIFIED' || v.verificationStatus === 'ADMIN_VERIFIED',
       approvedCount: v._count.voiceRequests,
       requestStatus: requestStatusMap[v.id] ?? null,
       hasAccess,
