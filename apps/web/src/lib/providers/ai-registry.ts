@@ -39,7 +39,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
       { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast' },
-      { id: 'claude-sonnet-4-5-20250929', displayName: 'Claude Sonnet 4.5', tier: 'balanced' },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', tier: 'balanced' },
       { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', tier: 'best' },
     ],
     auth: {
@@ -70,11 +70,12 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   openai: {
     id: 'openai',
     displayName: 'OpenAI',
-    defaultModel: 'gpt-4o',
+    defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-4o-mini', displayName: 'GPT-4o Mini', tier: 'fast' },
-      { id: 'gpt-4o', displayName: 'GPT-4o', tier: 'balanced' },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', tier: 'fast' },
+      { id: 'gpt-5', displayName: 'GPT-5', tier: 'balanced' },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', tier: 'best' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],

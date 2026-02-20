@@ -36,24 +36,26 @@ export const LANGUAGE_DISPLAY: Record<string, string> = {
 
 export const AI_MODEL_DISPLAY: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'Claude Haiku 4.5',
-  'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5',
+  'claude-sonnet-4-6': 'Claude Sonnet 4.6',
   'claude-opus-4-6': 'Claude Opus 4.6',
-  'gpt-4o-mini': 'GPT-4o Mini',
-  'gpt-4o': 'GPT-4o',
+  'gpt-5-mini': 'GPT-5 Mini',
+  'gpt-5': 'GPT-5',
+  'gpt-5.2': 'GPT-5.2',
   'claude-code:haiku': 'Claude Haiku 4.5 (Local)',
-  'claude-code:sonnet': 'Claude Sonnet 4.5 (Local)',
+  'claude-code:sonnet': 'Claude Sonnet 4.6 (Local)',
   'claude-code:opus': 'Claude Opus 4.6 (Local)',
 };
 
 /** Short model names without the provider prefix (for "Provider · Model" badges) */
 export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
-  'claude-sonnet-4-5-20250929': 'Sonnet 4.5',
+  'claude-sonnet-4-6': 'Sonnet 4.6',
   'claude-opus-4-6': 'Opus 4.6',
-  'gpt-4o-mini': '4o Mini',
-  'gpt-4o': '4o',
+  'gpt-5-mini': '5 Mini',
+  'gpt-5': '5',
+  'gpt-5.2': '5.2',
   'claude-code:haiku': 'Haiku 4.5',
-  'claude-code:sonnet': 'Sonnet 4.5',
+  'claude-code:sonnet': 'Sonnet 4.6',
   'claude-code:opus': 'Opus 4.6',
 };
 

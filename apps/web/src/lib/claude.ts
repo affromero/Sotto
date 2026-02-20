@@ -68,7 +68,7 @@ export async function generateResponse(
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const resolvedModel = options?.model || 'claude-sonnet-4-5-20250929';
+  const resolvedModel = options?.model || 'claude-sonnet-4-6';
 
   const response = await activeClient.messages.create({
     model: resolvedModel,
@@ -151,7 +151,7 @@ export async function* streamResponse(
     throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const streamModel = options?.model || 'claude-sonnet-4-5-20250929';
+  const streamModel = options?.model || 'claude-sonnet-4-6';
 
   const stream = activeClient.messages.stream({
     model: streamModel,
