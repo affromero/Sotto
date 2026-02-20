@@ -117,8 +117,6 @@ services:
       dockerfile: Dockerfile
     container_name: sotto-prod-kittentts
     restart: unless-stopped
-    environment:
-      KITTENTTS_MODEL: ${KITTENTTS_MODEL:-KittenML/kitten-tts-mini-0.8}
     healthcheck:
       test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
       interval: 30s
