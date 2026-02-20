@@ -73,13 +73,6 @@ jobs:
             export COMMIT_SHA=$(git rev-parse --short HEAD)
             docker compose -f docker-compose.prod.yml build
 
-            echo "Running manual SQL migrations..."
-            for sql in apps/web/prisma/manual-migrations/*.sql; do
-              [ -f "$sql" ] || continue
-              echo "  Applying $(basename $sql)..."
-              docker compose -f docker-compose.prod.yml --profile migration run --rm migrate npx prisma db execute --schema=prisma/schema.prisma --file="prisma/manual-migrations/$(basename $sql)"
-            done
-
             echo "Running database migrations..."
             docker compose -f docker-compose.prod.yml --profile migration run --build --rm migrate npx prisma db push --schema=prisma/schema.prisma
 
