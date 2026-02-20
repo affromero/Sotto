@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       title: title || undefined,
       topic: topic || undefined,
       isHumanContent: isHumanContentStr === 'true',
-      sourcePlatform: sourcePlatform || undefined,
+      sourcePlatform: sourcePlatform ?? undefined,
       sttProvider: sttProviderField || undefined,
     });
 
@@ -228,7 +228,7 @@ export async function POST(request: NextRequest) {
         status: 'IMPORTING',
         source: 'IMPORT',
         isHumanContent,
-        sourcePlatform: validatedSourcePlatform ?? null,
+        sourcePlatform: validatedSourcePlatform,
         visibility: gate.isByokUser ? 'PRIVATE' : 'PUBLIC',
       },
     });

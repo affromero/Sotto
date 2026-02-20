@@ -22,6 +22,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
   const [sourcePlatform, setSourcePlatform] = useState('');
+  const [customPlatform, setCustomPlatform] = useState('');
   const [isHumanContent, setIsHumanContent] = useState(false);
   const [sttProvider, setSttProvider] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
@@ -96,6 +97,12 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
         return;
       }
 
+      const resolvedPlatform = sourcePlatform === 'other' ? customPlatform.trim() : sourcePlatform;
+      if (!resolvedPlatform) {
+        setError('Please select a source platform');
+        return;
+      }
+
       setLoading(true);
       setUploadProgress(0);
       setError(null);
@@ -110,9 +117,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       if (topic.trim()) {
         formData.append('topic', topic.trim());
       }
-      if (sourcePlatform) {
-        formData.append('sourcePlatform', sourcePlatform);
-      }
+      formData.append('sourcePlatform', resolvedPlatform);
       if (sttProvider) {
         formData.append('sttProvider', sttProvider);
       }
@@ -163,7 +168,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       xhr.open('POST', '/api/podcasts/import');
       xhr.send(formData);
     },
-    [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, sttProvider, onImportStarted]
+    [title, topic, audioFile, transcriptFile, isHumanContent, sourcePlatform, customPlatform, sttProvider, onImportStarted]
   );
 
   const handleCancel = useCallback(() => {
@@ -302,7 +307,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
 
       <div className={styles.field}>
         <label htmlFor="sourcePlatform" className={styles.label}>
-          Source Platform
+          Source Platform <span className={styles.required}>*</span>
         </label>
         <div className={styles.selectWrapper}>
           <select
@@ -312,14 +317,18 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
             onChange={(e) => {
               const value = e.target.value;
               setSourcePlatform(value);
+              if (value !== 'other') {
+                setCustomPlatform('');
+              }
               const platform = SOURCE_PLATFORMS.find((p) => p.value === value);
               if (platform?.isAiGenerated) {
                 setIsHumanContent(false);
               }
             }}
             disabled={loading}
+            required
           >
-            <option value="">Select a platform (optional)</option>
+            <option value="">Select a platform</option>
             {SOURCE_PLATFORMS.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label}
@@ -328,7 +337,21 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
           </select>
           <ChevronDown size={16} className={styles.selectIcon} aria-hidden="true" />
         </div>
+        {sourcePlatform === 'other' && (
+          <input
+            id="customPlatform"
+            type="text"
+            className={styles.input}
+            value={customPlatform}
+            onChange={(e) => setCustomPlatform(e.target.value)}
+            placeholder="Enter platform name"
+            disabled={loading}
+            required
+            autoFocus
+          />
+        )}
         {sourcePlatform &&
+          sourcePlatform !== 'other' &&
           SOURCE_PLATFORM_HELP[sourcePlatform as SourcePlatformValue] && (
             <div className={styles.platformHelp}>
               <Info size={16} aria-hidden="true" />
@@ -437,7 +460,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
             variant="primary"
             size="large"
             fullWidth
-            disabled={!audioFile}
+            disabled={!audioFile || !sourcePlatform || (sourcePlatform === 'other' && !customPlatform.trim())}
           >
             Import Podcast
           </Button>
