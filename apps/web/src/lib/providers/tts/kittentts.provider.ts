@@ -4,7 +4,7 @@
  * WAV response is converted to MP3 via FFmpeg (already available in workers).
  */
 import { spawn } from 'child_process';
-import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
+import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { selectKittenVoicePair } from '../../voice-pool';
 import { logger } from '../../logger';
@@ -71,10 +71,6 @@ export class KittenTtsProvider implements TtsProvider {
       });
       return wavBuffer;
     }
-  }
-
-  generateSoundEffect(_params: SfxParams): Promise<Buffer> {
-    throw new Error('KittenTTS does not support sound effects');
   }
 
   getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
