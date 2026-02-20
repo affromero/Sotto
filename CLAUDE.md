@@ -299,15 +299,12 @@ Before declaring any UI work done, verify:
 
 Every commit **must** pass this checklist. Do not commit until every item is verified.
 
-- [ ] `npm run lint` — no errors (warnings OK)
-- [ ] `npm run type-check` — clean pass
-- [ ] `npm run test` — **ALL tests pass, zero failures.** Pre-existing failures must be fixed before committing — no exceptions. If a test is broken, fix it or delete it.
-- [ ] `npm run build` — successful production build
+**Run `npm run ci` first** — this executes lint, type-check, test, and build in one shot. Do not run individual checks in isolation and call it done; the full pipeline must pass. Running only the affected test file is fine for fast feedback during development, but `npm run ci` is the required gate before every commit.
+
+- [ ] `npm run ci` — full pipeline passes (lint + type-check + test + build)
 - [ ] No `console.log` or debug statements in staged files
 - [ ] No secrets or `.env` values in staged files
 - [ ] `git diff --cached` reviewed — only intended changes are staged
-
-Run `npm run ci` to execute lint, type-check, test, and build in sequence.
 
 ### Additional rules
 
