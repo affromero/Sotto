@@ -39,6 +39,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
         where: { id: interactionId },
         data: {
           answer: `You've reached the Q&A limit for free podcasts (${tierFeatures.maxQaInteractions} questions). Upgrade to Pro for unlimited Q&A.`,
+          status: 'ANSWERED',
         },
       });
       logger.info('Q&A limit reached', { userId, podcastId, limit: tierFeatures.maxQaInteractions });

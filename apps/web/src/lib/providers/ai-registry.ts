@@ -99,7 +99,6 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     models: [
       { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', tier: 'fast' },
       { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', tier: 'best' },
-      { id: 'whisper-large-v3-turbo', displayName: 'Whisper Large v3 Turbo', tier: 'fast' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
