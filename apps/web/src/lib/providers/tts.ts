@@ -335,8 +335,17 @@ export async function resolveTtsProvider(context: {
     }
   }
 
-  // Default: use admin-configured free tier TTS provider + model
-  // Check allocations first, then fall back to legacy single-provider
+  // Platform path: prefer KittenTTS (zero-cost CPU sidecar) for all non-BYOK users
+  if (process.env.KITTENTTS_URL) {
+    const { KittenTtsProvider } = require('./tts/kittentts.provider');
+    return {
+      provider: new KittenTtsProvider(),
+      source: 'platform',
+      providerId: 'kittentts' as TtsProviderId,
+    };
+  }
+
+  // Fallback: admin-configured free tier TTS provider + model
   const config = await getFreeTierConfig();
   const fallbackProvider = config.ttsAllocations.length > 0
     ? (config.ttsAllocations[0].provider as TtsProviderId)

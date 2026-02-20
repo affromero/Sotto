@@ -149,6 +149,7 @@ export async function generateScript(params: {
   sourceMetadata?: SourceMetadata;
   apiKeyOverride?: string;
   model?: string;
+  webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
