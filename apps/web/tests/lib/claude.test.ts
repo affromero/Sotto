@@ -97,7 +97,7 @@ describe('claude', () => {
         content: 'This is a test response from Claude.',
         inputTokens: 150,
         outputTokens: 75,
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-6',
       });
     });
 
@@ -428,7 +428,7 @@ describe('claude', () => {
 
       await logUsage({
         service: 'anthropic',
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-6',
         category: 'script_generation',
         inputTokens: 1000,
         outputTokens: 2000,
@@ -437,7 +437,7 @@ describe('claude', () => {
       expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
           service: 'anthropic',
-          modelId: 'claude-sonnet-4-5-20250929',
+          modelId: 'claude-sonnet-4-6',
           category: 'script_generation',
           inputTokens: 1000,
           outputTokens: 2000,

@@ -98,7 +98,7 @@ vi.mock('@/lib/free-tier-config', () => ({
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  getAiProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'claude-sonnet-4-5-20250929' }),
+  getAiProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'claude-sonnet-4-6' }),
 }));
 
 vi.mock('@/lib/logger', () => ({

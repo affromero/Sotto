@@ -62,7 +62,7 @@ describe('GET /api/admin/config', () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     const mockConfig = {
       aiProvider: 'anthropic',
-      aiModel: 'claude-sonnet-4-5-20250929',
+      aiModel: 'claude-sonnet-4-6',
       ttsProvider: 'elevenlabs',
       generationLimit: 10,
     };

@@ -136,7 +136,7 @@ vi.mock('@/lib/free-tier-config', () => ({
 const mockGetAiProviderMeta = vi.fn().mockReturnValue({
   id: 'anthropic',
   displayName: 'Anthropic (Claude)',
-  defaultModel: 'claude-sonnet-4-5-20250929',
+  defaultModel: 'claude-sonnet-4-6',
 });
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -232,7 +232,7 @@ describe('processScriptGeneration', () => {
     mockGetAiProviderMeta.mockReturnValue({
       id: 'anthropic',
       displayName: 'Anthropic (Claude)',
-      defaultModel: 'claude-sonnet-4-5-20250929',
+      defaultModel: 'claude-sonnet-4-6',
     });
   });
 
