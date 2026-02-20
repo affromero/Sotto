@@ -21,9 +21,9 @@ ENV UV_SYSTEM_PYTHON=1 \
     UV_COMPILE_BYTECODE=1
 
 # Copy dependency manifests first — Docker caches this layer until they change
-COPY pyproject.toml .python-version ./
+COPY pyproject.toml uv.lock .python-version ./
 
-# Install all dependencies; --no-dev skips any dev extras if added later
+# Install from lock file for reproducible builds
 RUN uv pip install -r pyproject.toml
 
 COPY main.py .
