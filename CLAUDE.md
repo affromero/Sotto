@@ -315,6 +315,7 @@ Run `npm run ci` to execute lint, type-check, test, and build in sequence.
 - If pre-commit hooks fail on files unrelated to your change, use `git commit --no-verify` on the second attempt
 - After any Prisma schema change, run `npx prisma generate --schema=apps/web/prisma/schema.prisma` before type-checking
 - When CI fails, read the full log — don't guess which test broke
+- **Gate user interactions on visible UI state, not on mock signals** — in React Testing Library tests, before calling `user.type()` or `user.click()`, always `waitFor` a user-visible outcome (e.g., `screen.getByText(...)`) that proves the component is in a stable, interactive state. Never use `waitFor(() => expect(mock).toHaveBeenCalled())` as a sync barrier before an interaction — the mock may have fired while loading state is still `true`, leaving inputs disabled. This race condition passes locally (fast machine wins) and fails in CI (slow runner loses) every time.
 
 ## Environment Variables
 
