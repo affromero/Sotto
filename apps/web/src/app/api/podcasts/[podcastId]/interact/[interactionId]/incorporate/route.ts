@@ -125,13 +125,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   let insertAfterOrder = 0;
+  let activeSpeaker = segments[0]?.speaker ?? 'HOST';
   for (const seg of segments) {
     const segEnd = (seg.startTime ?? 0) + (seg.duration ?? 0);
     if (interaction.timestamp <= segEnd) {
       insertAfterOrder = seg.order;
+      activeSpeaker = seg.speaker;
       break;
     }
     insertAfterOrder = seg.order;
+    activeSpeaker = seg.speaker;
   }
 
   // Get surrounding context for generating the incorporation text
@@ -148,7 +151,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const podcastLanguage = interaction.podcast.language || 'en';
   const languageLabel = getLanguageLabel(podcastLanguage) || 'English';
 
-  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the HOST speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text. Write in ${languageLabel}.${CONTENT_SAFETY_INSTRUCTIONS}`;
+  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the ${activeSpeaker} speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text. Write in ${languageLabel}.${CONTENT_SAFETY_INSTRUCTIONS}`;
 
   const response = await generateResponse(systemPrompt, [
     {
@@ -173,7 +176,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     interactionId,
     insertAfterOrder,
     newText: response.content,
-    speaker: 'HOST',
+    speaker: activeSpeaker,
   };
 
   await addJob(segmentRegenerationQueue, JobType.REGENERATE_SEGMENT, payload);
