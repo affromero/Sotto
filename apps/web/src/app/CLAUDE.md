@@ -156,7 +156,8 @@
 | `/api/voices/request`                                            | GET/POST         | Yes        | Voice request listing/creation                                              |
 | `/api/voices/request/[id]`                                       | PATCH            | Yes        | Update voice request status                                                 |
 | `/api/tts-providers`                                             | GET              | Yes        | List available TTS providers + user BYOK status                             |
-| `/api/ai-models`                                                 | GET              | Yes        | List available AI models for user's BYOK provider                           |
+| `/api/tts-options`                                               | GET              | Yes        | Combined TTS provider:model options for dropdown (BYOK or free tier)        |
+| `/api/ai-models`                                                 | GET              | Yes        | List available AI models for user's BYOK provider (or free tier read-only)  |
 | `/api/tts-models`                                                | GET              | Yes        | List available TTS models for user's BYOK provider (by ?provider= param)    |
 | `/api/settings/byok`                                             | GET/POST/DELETE  | Yes        | Multi-provider TTS BYOK key management (5 providers)                        |
 | `/api/admin/config`                                              | GET/PATCH        | ADMIN      | Free tier configuration (AI/TTS provider, model, generation limit)          |
