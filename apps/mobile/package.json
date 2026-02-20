@@ -20,6 +20,7 @@
   "dependencies": {
     "@expo-google-fonts/dm-serif-display": "^0.4.2",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@react-native-google-signin/google-signin": "^16.1.1",
     "@sotto/shared": "*",
     "@tanstack/react-query": "^5.62.0",
     "axios": "^1.7.9",
@@ -58,11 +59,17 @@
   "expo": {
     "doctor": {
       "reactNativeDirectoryCheck": {
-        "exclude": ["react-native-track-player"]
+        "exclude": [
+          "react-native-track-player"
+        ]
       }
     },
     "install": {
-      "exclude": ["react", "react-native-screens", "react-native-worklets"]
+      "exclude": [
+        "react",
+        "react-native-screens",
+        "react-native-worklets"
+      ]
     }
   }
 }

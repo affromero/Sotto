@@ -12,13 +12,30 @@ import {
 } from 'react-native';
 import { Stack } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setToken, notifyAuthSuccess } from '../../lib/auth';
 
 const IS_DEV = __DEV__;
-const GOOGLE_CONFIGURED = !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
+const GOOGLE_CONFIGURED = !!(
+  process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+  process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID
+);
 const GITHUB_CONFIGURED = !!process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID;
+
+GoogleSignin.configure({
+  webClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ||
+    '',
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
+  offlineAccess: false,
+});
 
 interface AuthResponse {
   token: string;
@@ -79,8 +96,54 @@ export default function LoginScreen() {
     }
   }, [email]);
 
+  const handleGoogleSignIn = useCallback(async () => {
+    setErrorMessage('');
+    setLoading(true);
+
+    try {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+
+      if (!response.data?.idToken) {
+        setErrorMessage('Google Sign In failed — no identity token.');
+        return;
+      }
+
+      const res = await api.post<AuthResponse>('/auth/mobile', {
+        provider: 'google',
+        idToken: response.data.idToken,
+        userName: response.data.user.name ?? undefined,
+      });
+
+      const { token } = res.data;
+      if (!token) {
+        setErrorMessage('Invalid response from server.');
+        return;
+      }
+      await setToken(token);
+      notifyAuthSuccess();
+    } catch (err: unknown) {
+      if (isErrorWithCode(err)) {
+        if (
+          err.code === statusCodes.SIGN_IN_CANCELLED ||
+          err.code === statusCodes.IN_PROGRESS
+        ) {
+          setErrorMessage('Sign in was cancelled.');
+          return;
+        }
+      }
+      const axiosError = err as {
+        response?: { data?: { error?: string }; status?: number };
+      };
+      const message = axiosError.response?.data?.error;
+      setErrorMessage(message ?? 'Google sign in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const handleOAuthSignIn = useCallback(
-    async (provider: 'apple' | 'google' | 'github') => {
+    async (provider: 'apple' | 'github') => {
       setErrorMessage('');
       setLoading(true);
 
@@ -116,47 +179,20 @@ export default function LoginScreen() {
           const WebBrowser = await import('expo-web-browser');
           WebBrowser.maybeCompleteAuthSession();
 
-          const configs: Record<
-            string,
-            { authorizationEndpoint: string; scopes: string[] }
-          > = {
-            google: {
-              authorizationEndpoint:
-                'https://accounts.google.com/o/oauth2/v2/auth',
-              scopes: ['openid', 'profile', 'email'],
-            },
-            github: {
-              authorizationEndpoint:
-                'https://github.com/login/oauth/authorize',
-              scopes: ['read:user', 'user:email'],
-            },
-          };
-
-          const config = configs[provider];
-          const clientId =
-            provider === 'google'
-              ? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? ''
-              : process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
-          // Google iOS native clients require the reversed client ID as the URL scheme.
-          // e.g., 123456789.apps.googleusercontent.com → com.googleusercontent.apps.123456789://
-          // Using `sotto://` causes "Access blocked" because Google rejects non-matching redirect URIs.
-          const redirectUri =
-            provider === 'google' && clientId
-              ? AuthSession.makeRedirectUri({
-                  scheme: `com.googleusercontent.apps.${clientId.split('.')[0]}`,
-                })
-              : AuthSession.makeRedirectUri({ scheme: 'sotto' });
+          const clientId = process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
+          const redirectUri = AuthSession.makeRedirectUri({ scheme: 'sotto' });
 
           const request = new AuthSession.AuthRequest({
             clientId,
             redirectUri,
-            scopes: config.scopes,
+            scopes: ['read:user', 'user:email'],
             responseType: AuthSession.ResponseType.Code,
             usePKCE: true,
           });
 
           const result = await request.promptAsync({
-            authorizationEndpoint: config.authorizationEndpoint,
+            authorizationEndpoint:
+              'https://github.com/login/oauth/authorize',
           });
 
           if (result.type !== 'success' || !result.params.code) {
@@ -269,21 +305,23 @@ export default function LoginScreen() {
               </View>
             )}
 
-            <Pressable
-              onPress={() => handleOAuthSignIn('apple')}
-              style={[styles.oauthButton, styles.oauthButtonApple]}
-              disabled={loading}
-              accessibilityLabel="Sign in with Apple"
-              accessibilityRole="button"
-            >
-              <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
-                Sign in with Apple
-              </Text>
-            </Pressable>
+            {Platform.OS === 'ios' && (
+              <Pressable
+                onPress={() => handleOAuthSignIn('apple')}
+                style={[styles.oauthButton, styles.oauthButtonApple]}
+                disabled={loading}
+                accessibilityLabel="Sign in with Apple"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.oauthButtonText, styles.oauthButtonTextApple]}>
+                  Sign in with Apple
+                </Text>
+              </Pressable>
+            )}
 
             {GOOGLE_CONFIGURED && (
               <Pressable
-                onPress={() => handleOAuthSignIn('google')}
+                onPress={handleGoogleSignIn}
                 style={[styles.oauthButton, styles.oauthButtonGoogle]}
                 disabled={loading}
                 accessibilityLabel="Sign in with Google"
