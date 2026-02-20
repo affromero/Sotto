@@ -124,10 +124,10 @@ describe('POST /api/billing/portal', () => {
       url: 'https://billing.stripe.com/session/custom',
     });
 
-    await POST(createRequest({ returnUrl: 'https://myapp.com/settings' }));
+    await POST(createRequest({ returnUrl: 'https://sotto.fm/settings' }));
 
     expect(mockPortalSessionsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ return_url: 'https://myapp.com/settings' })
+      expect.objectContaining({ return_url: 'https://sotto.fm/settings' })
     );
   });
 

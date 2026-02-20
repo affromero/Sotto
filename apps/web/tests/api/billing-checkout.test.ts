@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
-const mockUserFindUniqueOrThrow = vi.fn();
+const mockUserFindUnique = vi.fn();
 const mockCheckoutSessionsCreate = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
@@ -12,7 +12,7 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     user: {
-      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   },
 }));
@@ -81,7 +81,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('returns 400 when user is already on Pro', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'PRO',
       subscription: null,
@@ -96,7 +96,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('creates checkout session and returns url for free user', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'FREE',
       subscription: null,
@@ -115,7 +115,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('reuses existing stripeCustomerId when subscription record exists', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'FREE',
       subscription: { stripeCustomerId: 'cus_existing_123' },
@@ -134,7 +134,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('sets customer_email when no stripeCustomerId exists', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'new@example.com',
       plan: 'FREE',
       subscription: null,
@@ -153,7 +153,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('accepts custom successUrl and cancelUrl from request body', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'FREE',
       subscription: null,
@@ -165,19 +165,19 @@ describe('POST /api/billing/checkout', () => {
 
     await POST(
       createRequest({
-        successUrl: 'https://example.com/success',
-        cancelUrl: 'https://example.com/cancel',
+        successUrl: 'https://sotto.fm/success',
+        cancelUrl: 'https://sotto.fm/cancel',
       })
     );
 
     const callArgs = mockCheckoutSessionsCreate.mock.calls[0][0];
-    expect(callArgs.success_url).toBe('https://example.com/success');
-    expect(callArgs.cancel_url).toBe('https://example.com/cancel');
+    expect(callArgs.success_url).toBe('https://sotto.fm/success');
+    expect(callArgs.cancel_url).toBe('https://sotto.fm/cancel');
   });
 
   it('embeds userId in session metadata', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-42' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'FREE',
       subscription: null,
@@ -196,7 +196,7 @@ describe('POST /api/billing/checkout', () => {
 
   it('returns 500 when Stripe throws', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-    mockUserFindUniqueOrThrow.mockResolvedValue({
+    mockUserFindUnique.mockResolvedValue({
       email: 'user@example.com',
       plan: 'FREE',
       subscription: null,

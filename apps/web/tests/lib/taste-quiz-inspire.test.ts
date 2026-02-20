@@ -9,12 +9,15 @@ const mockGetFreeTierConfig = vi.fn();
 const mockCreateAIProvider = vi.fn();
 const mockResolveAiProvider = vi.fn();
 
+const mockUserFindUnique = vi.fn();
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     tag: { findMany: (...args: unknown[]) => mockTagFindMany(...args) },
     userInterest: { findMany: (...args: unknown[]) => mockUserInterestFindMany(...args) },
     tasteQuizAnswer: { findMany: (...args: unknown[]) => mockTasteQuizAnswerFindMany(...args) },
     apiUsageLog: { create: () => Promise.resolve({}) },
+    user: { findUnique: (...args: unknown[]) => mockUserFindUnique(...args) },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -64,6 +67,7 @@ function setupDefaultMocks() {
   mockTasteQuizAnswerFindMany.mockResolvedValue([]);
   mockGetFreeTierConfig.mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku' });
   mockUserInterestFindMany.mockResolvedValue([]);
+  mockUserFindUnique.mockResolvedValue({ plan: 'FREE' });
   // Default: no BYOK key, falls through to createAIProvider
   mockResolveAiProvider.mockRejectedValue(new Error('No AI provider'));
 }
@@ -98,7 +102,7 @@ describe('generateForYouQuestions', () => {
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain('AI in cooking');
     // Tries BYOK first (resolveAiProvider), falls back to createAIProvider
-    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1');
+    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1', 'FREE');
     expect(mockCreateAIProvider).toHaveBeenCalled();
   });
 
@@ -203,7 +207,7 @@ describe('generateNewsQuestions', () => {
     const result = await generateNewsQuestions('user-1', 1);
 
     expect(result).toHaveLength(1);
-    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1');
+    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1', 'FREE');
   });
 
   it('excludes provided topics in the prompt', async () => {
