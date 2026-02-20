@@ -101,14 +101,22 @@
   }
 }
 
-.turnHost {
-  border-left-color: var(--color-speaker-host);
-  background: var(--color-speaker-host-bg);
+/* Speaker-indexed turn colors */
+.turn[data-speaker-index="0"] {
+  border-left-color: var(--color-speaker-0);
+  background: var(--color-speaker-0-bg);
 }
-
-.turnExpert {
-  border-left-color: var(--color-speaker-expert);
-  background: var(--color-speaker-expert-bg);
+.turn[data-speaker-index="1"] {
+  border-left-color: var(--color-speaker-1);
+  background: var(--color-speaker-1-bg);
+}
+.turn[data-speaker-index="2"] {
+  border-left-color: var(--color-speaker-2);
+  background: var(--color-speaker-2-bg);
+}
+.turn[data-speaker-index="3"] {
+  border-left-color: var(--color-speaker-3);
+  background: var(--color-speaker-3-bg);
 }
 
 .turnEditing {
@@ -176,13 +184,11 @@
   opacity: 0.7;
 }
 
-.speakerLabelHost {
-  color: var(--color-speaker-host);
-}
-
-.speakerLabelExpert {
-  color: var(--color-speaker-expert);
-}
+/* Speaker-indexed label colors */
+.speakerLabel[data-speaker-index="0"] { color: var(--color-speaker-0); }
+.speakerLabel[data-speaker-index="1"] { color: var(--color-speaker-1); }
+.speakerLabel[data-speaker-index="2"] { color: var(--color-speaker-2); }
+.speakerLabel[data-speaker-index="3"] { color: var(--color-speaker-3); }
 
 /* Direction tag */
 

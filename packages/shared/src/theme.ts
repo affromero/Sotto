@@ -32,6 +32,14 @@ export const colors = {
   speakerExpert: '#1E3A5F',
   speakerExpertBg: '#DBEAFE',
 
+  // Indexed speaker palette (up to 4 speakers)
+  speakers: [
+    { color: '#D97706', bg: '#FEF3C7' },
+    { color: '#1E3A5F', bg: '#DBEAFE' },
+    { color: '#065F46', bg: '#D1FAE5' },
+    { color: '#991B1B', bg: '#FEE2E2' },
+  ] as ReadonlyArray<{ color: string; bg: string }>,
+
   success: '#059669',
   successHover: '#047857',
   successLight: '#D1FAE5',

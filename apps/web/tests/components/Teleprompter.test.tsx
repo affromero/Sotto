@@ -53,7 +53,7 @@ describe('Teleprompter', () => {
       />
     );
     // At time=6, segment 2 (EXPERT) should be active
-    const expertLabels = screen.getAllByText('Expert');
+    const expertLabels = screen.getAllByText('EXPERT');
     // The active segment should be present
     expect(expertLabels.length).toBeGreaterThanOrEqual(1);
   });
@@ -66,8 +66,8 @@ describe('Teleprompter', () => {
         currentTime={0}
       />
     );
-    expect(screen.getAllByText('Host').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('Expert').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('HOST').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('EXPERT').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows previous, current, and next segments', () => {

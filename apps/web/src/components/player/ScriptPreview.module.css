@@ -25,13 +25,11 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-.turnHost {
-  border-left-color: var(--color-speaker-host);
-}
-
-.turnExpert {
-  border-left-color: var(--color-speaker-expert);
-}
+/* Speaker-indexed border colors */
+.turn[data-speaker-index="0"] { border-left-color: var(--color-speaker-0); }
+.turn[data-speaker-index="1"] { border-left-color: var(--color-speaker-1); }
+.turn[data-speaker-index="2"] { border-left-color: var(--color-speaker-2); }
+.turn[data-speaker-index="3"] { border-left-color: var(--color-speaker-3); }
 
 .speaker {
   display: inline-block;
@@ -44,14 +42,22 @@
   margin-bottom: var(--spacing-sm);
 }
 
-.speakerHost {
-  color: var(--color-speaker-host);
+/* Speaker-indexed badge colors */
+.speaker[data-speaker-index="0"] {
+  color: var(--color-speaker-0);
   background: rgba(217, 119, 6, 0.2);
 }
-
-.speakerExpert {
+.speaker[data-speaker-index="1"] {
   color: #93C5FD;
   background: rgba(30, 58, 95, 0.4);
+}
+.speaker[data-speaker-index="2"] {
+  color: #6EE7B7;
+  background: rgba(6, 95, 70, 0.4);
+}
+.speaker[data-speaker-index="3"] {
+  color: #FCA5A5;
+  background: rgba(153, 27, 27, 0.4);
 }
 
 .text {

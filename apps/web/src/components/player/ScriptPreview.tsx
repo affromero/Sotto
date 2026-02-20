@@ -1,6 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ReferenceData } from '@/types/reference';
 import styles from './ScriptPreview.module.css';
 
@@ -10,28 +12,28 @@ interface ScriptPreviewProps {
 }
 
 export function ScriptPreview({ turns, references }: ScriptPreviewProps) {
+  const speakers = useMemo(() => getUniqueSpeakers(turns), [turns]);
+
   return (
     <div className={styles.root} aria-label="Script preview">
       <div className={styles.viewport}>
-        {turns.map((turn, i) => (
-          <div
-            key={i}
-            className={`${styles.turn} ${
-              turn.speaker === 'HOST' ? styles.turnHost : styles.turnExpert
-            }`}
-          >
-            <span
-              className={`${styles.speaker} ${
-                turn.speaker === 'HOST' ? styles.speakerHost : styles.speakerExpert
-              }`}
+        {turns.map((turn, i) => {
+          const idx = getSpeakerIndex(turn.speaker, speakers);
+          return (
+            <div
+              key={i}
+              className={styles.turn}
+              data-speaker-index={idx}
             >
-              {turn.speaker === 'HOST' ? 'Host' : 'Expert'}
-            </span>
-            <p className={styles.text}>
-              {parseTextWithCitations(turn.text, references)}
-            </p>
-          </div>
-        ))}
+              <span className={styles.speaker} data-speaker-index={idx}>
+                {turn.speaker}
+              </span>
+              <p className={styles.text}>
+                {parseTextWithCitations(turn.text, references)}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
