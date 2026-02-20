@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fm.sotto.app",
+      "sha256_cert_fingerprints": ["__FILL_AFTER_FIRST_BUILD__"]
+    }
+  }
+]

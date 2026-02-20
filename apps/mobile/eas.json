@@ -9,6 +9,9 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:3000/api"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {
@@ -16,6 +19,9 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://sotto.fm/api"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
@@ -34,6 +40,10 @@
         "ascApiKeyId": "$ASC_API_KEY_ID",
         "ascApiKeyIssuerId": "$ASC_ISSUER_ID",
         "ascApiKeyPath": "/tmp/asc-api-key.p8"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-play-service-account.json",
+        "track": "internal"
       }
     }
   }

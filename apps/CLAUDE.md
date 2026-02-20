@@ -3,7 +3,7 @@
 | App | Package | Description |
 |-----|---------|-------------|
 | `web/` | `@sotto/web` | Next.js web app — App Router, Prisma, BullMQ workers, CSS Modules |
-| `mobile/` | `@sotto/mobile` | React Native + Expo iOS app — expo-router, react-native-track-player |
+| `mobile/` | `@sotto/mobile` | React Native + Expo app (iOS + Android) — expo-router, react-native-track-player |
 
 Both apps import shared types, validations, and design tokens from `@sotto/shared` (`packages/shared/`).
 
