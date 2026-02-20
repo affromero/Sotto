@@ -44,10 +44,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   const [aiKey, hasTts, user] = await Promise.all([
     getAiKey(userId),
     hasByokKey(userId),
-    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
 
-  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
+  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
 
   // Read podcast's aiModel preference
   const podcast = await prisma.podcast.findUniqueOrThrow({

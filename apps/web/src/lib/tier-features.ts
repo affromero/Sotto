@@ -2,9 +2,11 @@
  * Feature caps and toggles per user tier.
  *
  * Usage:
- *   const features = getTierFeatures(user.plan, isByokUser);
+ *   const features = getTierFeatures(user.plan, isByokUser, user.role);
  *   if (!features.privateAllowed) return 403;
  */
+
+const PRIVILEGED_ROLES = new Set(['ADMIN', 'SYSTEM']);
 
 export interface TierFeatures {
   maxDurationMinutes: number;
@@ -42,11 +44,11 @@ const BYOK_FEATURES: TierFeatures = {
 };
 
 /**
- * Get feature caps for a user given their plan and BYOK status.
- * BYOK users always get maximum caps regardless of subscription plan.
+ * Get feature caps for a user given their plan, BYOK status, and role.
+ * BYOK users and privileged roles (ADMIN, SYSTEM) always get maximum caps.
  */
-export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean): TierFeatures {
-  if (isByok) return BYOK_FEATURES;
+export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean, role?: string): TierFeatures {
+  if (isByok || PRIVILEGED_ROLES.has(role ?? '')) return BYOK_FEATURES;
   if (plan === 'PRO') return PRO_FEATURES;
   return FREE_FEATURES;
 }
@@ -55,7 +57,7 @@ export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean): TierFeat
  * BullMQ job priority for a given tier.
  * Lower = higher priority.
  */
-export function getJobPriority(plan: 'FREE' | 'PRO', isByok: boolean): number {
-  if (isByok || plan === 'PRO') return 1;
+export function getJobPriority(plan: 'FREE' | 'PRO', isByok: boolean, role?: string): number {
+  if (isByok || plan === 'PRO' || PRIVILEGED_ROLES.has(role ?? '')) return 1;
   return 10;
 }

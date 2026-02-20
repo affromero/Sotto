@@ -8,7 +8,7 @@ import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generatio
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
-import { checkSuspension } from '@/lib/auth-guards';
+import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 export async function GET(request: NextRequest) {
@@ -74,20 +74,26 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Rate limit: 20/hour, 100/day
-  const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
-  if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 20 generations per hour.' },
-      { status: 429 }
-    );
-  }
-  const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
-  if (!daily.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 100 generations per day.' },
-      { status: 429 }
-    );
+  // Admin bypass: skip rate limits
+  const adminId = await requireAdmin();
+  const isAdmin = adminId !== null;
+
+  // Rate limit: 20/hour, 100/day (skip for admins)
+  if (!isAdmin) {
+    const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
+    if (!hourly.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded: max 20 generations per hour.' },
+        { status: 429 }
+      );
+    }
+    const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
+    if (!daily.allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded: max 100 generations per day.' },
+        { status: 429 }
+      );
+    }
   }
 
   // Generation gate: BYOK, PRO, or free tier daily limit
