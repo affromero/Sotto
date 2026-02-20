@@ -1340,41 +1340,49 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== BYOK — 100% FREE ====== */}
-      <section className={styles.creatorSection} aria-label="Free with your own keys">
+      {/* ====== PRICING — FREE FOREVER + PRO + BYOK ====== */}
+      <section className={styles.creatorSection} aria-label="Pricing">
         <div className={styles.creatorGlow} aria-hidden="true" />
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
-            <span className={styles.overlineLight}>No subscriptions. No credits. No catch.</span>
+            <span className={styles.overlineLight}>Simple, honest pricing</span>
             <h2 className={styles.h2Light}>
-              100% free.
+              1 podcast every day,
               <br />
-              Bring your own keys.
+              free forever.
             </h2>
             <p className={styles.bodyLgLight}>
-              Sotto never charges you a cent. You connect your own AI and voice API keys —
-              Anthropic, OpenAI, ElevenLabs, or any of our supported providers — and every feature
-              is yours. Unlimited podcasts, voice clones, private episodes, downloads, everything.
+              Start free — platform AI and voices included, no card needed. Upgrade to Pro for
+              unlimited generation, better AI, and creator analytics. Or bring your own API keys
+              for unlimited access at cost price.
             </p>
+            <div className={styles.landingProCta}>
+              <a href="/pricing" className={styles.landingProCtaPrimary}>
+                See all plans
+              </a>
+              <a href="/auth/signup" className={styles.landingProCtaSecondary}>
+                Start free
+              </a>
+            </div>
           </div>
           <div className={`${styles.creatorStats} ${styles.creatorStatsCentered}`}>
             <div className={styles.creatorStat}>
               <span className={styles.creatorStatNum}>$0</span>
-              <span className={styles.creatorStatLabel}>Forever</span>
+              <span className={styles.creatorStatLabel}>Free tier, forever</span>
             </div>
             <div className={styles.creatorStatDivider} aria-hidden="true" />
             <div className={styles.creatorStat}>
-              <span className={styles.creatorStatNum}>Unlimited</span>
-              <span className={styles.creatorStatLabel}>Podcasts &amp; features</span>
+              <span className={styles.creatorStatNum}>$12</span>
+              <span className={styles.creatorStatLabel}>Pro / month</span>
             </div>
             <div className={styles.creatorStatDivider} aria-hidden="true" />
             <div className={styles.creatorStat}>
-              <span className={styles.creatorStatNum}>Your keys</span>
-              <span className={styles.creatorStatLabel}>You own the costs</span>
+              <span className={styles.creatorStatNum}>BYOK</span>
+              <span className={styles.creatorStatLabel}>Unlimited at cost</span>
             </div>
           </div>
           <div className={`${styles.byokProviders} ${styles.rev}`}>
-            <span className={styles.byokProvidersLabel}>Supported providers</span>
+            <span className={styles.byokProvidersLabel}>Supported BYOK providers</span>
             <div className={styles.byokProvidersList}>
               <span className={styles.byokProviderPill}>Anthropic</span>
               <span className={styles.byokProviderPill}>OpenAI</span>

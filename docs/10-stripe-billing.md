@@ -1,264 +1,243 @@
-# Stripe & Billing: BYOK + Voice Marketplace
+# Stripe & Billing: Free + Pro + BYOK
 
-> BYOK (Bring Your Own Key) model, voice marketplace via Stripe Connect, generation gating, and free tier configuration.
-
-**Date:** 2026-02-18
+> Three-tier model: Free (1 podcast/day, platform AI), Pro ($12/month, unlimited),
+> BYOK (unlimited, own keys). Voice marketplace via Stripe Connect.
+>
+> Date: February 2026
 
 ---
 
 ## Overview
 
-Sotto uses a **BYOK + Voice Marketplace** model. There are no subscriptions, no tiers, no credits.
+| Tier | Cost | AI | TTS | Limits |
+|---|---|---|---|---|
+| Free | $0 forever | Groq Llama 3.1 8B | KittenTTS (platform) | 1 podcast/day (configurable via admin) |
+| Pro | $12/month | Groq Llama 3.3 70B | KittenTTS (platform) | Unlimited |
+| BYOK | $0 (own provider costs) | Any key user adds | Any key user adds | Unlimited |
 
-- **BYOK**: Users bring their own API keys for LLM (Anthropic/OpenAI) and TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). All features are free and unlimited for BYOK users.
-- **Free tier**: Users without BYOK keys get a limited number of free generations (configurable via `FreeTierConfig` admin singleton, default: 3).
-- **Voice Marketplace**: Voice clone owners connect Stripe (Connect) and set a per-podcast price. Buyers pay once per podcast. Platform takes 10%.
+Voice marketplace is orthogonal to tiers — any user (including Free) can sell voice clones.
 
-| Component             | File                                    | Purpose                                                     |
-| --------------------- | --------------------------------------- | ----------------------------------------------------------- |
-| Stripe client         | `apps/web/src/lib/stripe.ts`            | Stripe SDK init, `PLATFORM_FEE_PERCENT` (10%), flat limits  |
-| Voice pricing         | `apps/web/src/lib/voice-pricing.ts`     | Marketplace: compute charges, create/capture/cancel payments |
-| BYOK key management   | `apps/web/src/lib/byok.ts`              | Encrypt/decrypt/store/validate user API keys (TTS + AI)     |
-| Generation gate       | `apps/web/src/lib/generation-gate.ts`   | BYOK check + free tier counter enforcement                  |
-| Free tier config      | `apps/web/src/lib/free-tier-config.ts`  | Admin-configurable singleton (provider, model, limit)       |
-| Billing API           | `apps/web/src/app/api/billing/route.ts` | Usage stats, BYOK key status                                |
+---
+
+## Key Files
+
+| Component | File | Purpose |
+|---|---|---|
+| Stripe client | `lib/stripe.ts` | SDK init, `PLATFORM_FEE_PERCENT` (10%) |
+| Billing checkout | `app/api/billing/checkout/route.ts` | Create Stripe Checkout session for Pro |
+| Billing portal | `app/api/billing/portal/route.ts` | Customer Portal for Pro subscription management |
+| Stripe webhooks | `app/api/stripe/webhooks/route.ts` | Handles subscription + Connect + payment events |
+| Generation gate | `lib/generation-gate.ts` | Enforces daily limit (Free) / bypass (Pro, BYOK) |
+| Tier features | `lib/tier-features.ts` | Feature caps per tier (duration, Q&A, analytics, etc.) |
+| Free tier config | `lib/free-tier-config.ts` | Admin singleton: daily limit, default AI/TTS provider |
+| BYOK key mgmt | `lib/byok.ts` | Encrypt/decrypt/store/validate user API keys |
+| Voice pricing | `lib/voice-pricing.ts` | Marketplace: charges, PaymentIntents, capture/cancel |
 
 ---
 
 ## Environment Variables
 
-| Variable              | Required            | Description                               | Example                |
-| --------------------- | ------------------- | ----------------------------------------- | ---------------------- |
-| `STRIPE_SECRET_KEY`   | For voice marketplace | Stripe API secret key                     | `sk_test_xxxxxxxxxxxx` |
-| `BYOK_ENCRYPTION_KEY` | Yes                 | AES-256-GCM key for encrypting user keys  | 64-char hex string     |
+| Variable | Required | Description |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | For Pro + voice marketplace | Stripe API secret key |
+| `STRIPE_PUBLISHABLE_KEY` | For checkout redirect | Stripe publishable key |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Build arg (baked into client) | Same as above |
+| `STRIPE_WEBHOOK_SECRET` | For webhooks | `whsec_...` from Stripe destination |
+| `STRIPE_PRO_PRICE_ID` | For Pro checkout | `price_...` from Stripe Dashboard |
+| `BYOK_ENCRYPTION_KEY` | Yes | AES-256-GCM key for encrypting user keys |
 
-Stripe is optional — the app starts without it. Voice marketplace features are disabled gracefully when `STRIPE_SECRET_KEY` is missing. All other billing features (BYOK, generation gating, free tier) work without Stripe.
-
----
-
-## BYOK Model
-
-Users bring their own API keys. Keys are encrypted with AES-256-GCM and stored in the database.
-
-### Key Storage Models
-
-```
-UserAiKey   — one per (userId, provider) — providers: anthropic, openai
-UserTtsKey  — one per (userId, provider) — providers: elevenlabs, openai, playht, cartesia, hume
-```
-
-### Key Operations (`apps/web/src/lib/byok.ts`)
-
-| Function                  | Purpose                                                        |
-| ------------------------- | -------------------------------------------------------------- |
-| `encryptApiKey()`         | Encrypt a plaintext key → base64(salt + iv + authTag + cipher) |
-| `decryptApiKey()`         | Decrypt a stored key                                           |
-| `storeByokKey()`          | Upsert a TTS BYOK key for a provider                          |
-| `getByokKey()`            | Retrieve + decrypt a user's TTS key                            |
-| `storeAiKey()`            | Upsert an AI BYOK key for a provider                           |
-| `getAiKey()`              | Retrieve + decrypt a user's AI key (prefers Anthropic)         |
-| `hasByokKey()`            | Check if user has any TTS key configured                       |
-| `hasAiKey()`              | Check if user has any AI key configured                        |
-| `validateByokKey()`       | Validate a TTS key against the provider's API                  |
-| `validateAiKey()`         | Validate an AI key against the provider's API                  |
-| `markTtsKeyInvalid()`     | Mark a TTS key as invalid after runtime failure                |
-| `markAiKeyInvalid()`      | Mark an AI key as invalid after runtime failure                |
-| `listByokProviders()`     | List all configured TTS providers for a user                   |
-| `listAiProviders()`       | List all configured AI providers for a user                    |
-| `removeByokKey()`         | Delete a user's TTS key for a provider                         |
-| `removeAiKey()`           | Delete a user's AI key for a provider                          |
-
-### Encryption Details
-
-- Algorithm: `aes-256-gcm`
-- Key derivation: `scryptSync(BYOK_ENCRYPTION_KEY, salt, 32)`
-- Storage format: `base64(salt[16] + iv[16] + authTag[16] + ciphertext)`
-- Each key gets a unique random salt and IV
+All managed in Doppler (`project: sotto`, `config: prd`).
 
 ---
 
-## Generation Gate (`apps/web/src/lib/generation-gate.ts`)
+## Pro Subscription Flow
 
-`checkGenerationGate(userId)` determines if a user can start a new generation.
-
-### Decision Flow
+### Checkout
 
 ```
-Is user ADMIN?          → allowed (no counting)
-Has user any TTS key?   → allowed (BYOK user, no counting)
-Has platform TTS key?   → check free tier counter
-  └── freeGenerationsUsed < generationLimit? → allowed (increment counter)
-  └── otherwise → blocked ("free_tier_exhausted")
-No TTS available at all → blocked ("no_provider")
-```
-
-### Key Functions
-
-| Function                        | Purpose                                                              |
-| ------------------------------- | -------------------------------------------------------------------- |
-| `checkGenerationGate(userId)`   | Returns `{ allowed, reason, freeGenerationsUsed, isByokUser }`       |
-| `tryIncrementFreeGeneration()`  | Atomic SQL increment — TOCTOU-safe, returns false if already at limit |
-| `getFreeTierStatus(userId)`     | Display data for dashboard/billing UI                                |
-
-### Rate Limits (Abuse Prevention)
-
-Additional rate limits are enforced independently:
-- 20 generations per hour per user
-- 100 generations per day per user
-- 60 interactions per hour per user
-
----
-
-## Free Tier Configuration (`apps/web/src/lib/free-tier-config.ts`)
-
-Admin-configurable singleton row (`FreeTierConfig` model) controlling platform defaults for users without BYOK keys.
-
-| Field             | Default                       | Description                          |
-| ----------------- | ----------------------------- | ------------------------------------ |
-| `aiProvider`      | `anthropic`                   | AI provider for free tier            |
-| `aiModel`         | `claude-haiku-4-5-20251001`   | AI model for free tier               |
-| `ttsProvider`     | `openai`                      | TTS provider for free tier           |
-| `ttsModel`        | `tts-1-hd`                    | TTS model for free tier              |
-| `sttProvider`     | `groq`                        | STT provider for free tier           |
-| `sttModel`        | `whisper-large-v3-turbo`      | STT model for free tier              |
-| `generationLimit` | `3`                           | Max free generations per user        |
-
-Managed via admin dashboard (`/admin` routes). Functions: `getFreeTierConfig()` and `setFreeTierConfig()`.
-
----
-
-## Voice Marketplace (Stripe Connect)
-
-Voice clone owners monetize their voices by connecting Stripe and setting a per-podcast price.
-
-### Setup
-
-1. Voice owner connects Stripe via OAuth (Stripe Connect onboarding)
-2. `User.stripeAccountId` and `User.stripeOnboarded` are set
-3. Owner sets `VoiceClone.priceInCents` (or leaves null/0 for free)
-
-### Payment Flow
-
-```
-User selects a paid voice for their podcast
+User clicks "Upgrade to Pro"
     │
     ▼
-computeVoiceCharges(userId, hostVoiceId, expertVoiceId)
-    │ — checks free access paths first
-    │ — returns list of VoiceCharge objects (price, platformFee)
+POST /api/billing/checkout
+    │ — creates Stripe Checkout session (mode: 'subscription')
+    │ — uses STRIPE_PRO_PRICE_ID
+    │ — sets subscription_data.metadata.userId
+    │ — returns { url }
     ▼
-createVoicePayment(buyerId, voiceCloneId, podcastId)
-    │ — creates Stripe PaymentIntent with capture_method: 'manual'
-    │ — sets application_fee_amount (10% platform fee)
-    │ — uses transfer_data.destination for Connect payout
-    │ — creates VoicePurchase record (status: 'authorized')
+User redirected to Stripe-hosted checkout page
+    │
     ▼
-Podcast generation pipeline runs...
+On success → redirect to /billing?upgrade=success
+On cancel  → redirect to /pricing
     │
-    ├── On READY: capturePodcastPayments(podcastId)
-    │   — captures all authorized PaymentIntents
-    │   — updates VoicePurchase status → 'captured'
+    ▼
+Stripe fires customer.subscription.created webhook
     │
-    └── On FAILED: cancelPodcastPayments(podcastId)
-        — cancels all authorized PaymentIntents
-        — updates VoicePurchase status → 'cancelled'
+    ▼
+POST /api/stripe/webhooks
+    │ — sets User.plan = 'PRO'
+    │ — upserts Subscription record
 ```
 
-### Free Access Paths
+### Manage Subscription
 
-Before charging, `checkFreeAccess(userId, voiceCloneId)` checks these paths (in order):
+```
+User clicks "Manage Subscription" on /billing
+    │
+    ▼
+POST /api/billing/portal
+    │ — creates Stripe Customer Portal session
+    │ — returns { url }
+    ▼
+User redirected to Stripe-hosted portal (cancel, update card, view invoices)
+    │
+    ▼
+On cancel → Stripe fires customer.subscription.updated (cancel_at_period_end = true)
+            then customer.subscription.deleted at period end
+    │
+    ▼
+POST /api/stripe/webhooks
+    │ — on updated: syncs cancelAtPeriodEnd to Subscription record
+    │ — on deleted: sets User.plan = 'FREE', Subscription.status = 'canceled'
+```
 
-1. **Owner** — the voice clone creator always has free access
-2. **Allowlisted** — user is in the `VoiceAllowlist` for this voice
-3. **Approved VoiceRequest** — user's access request was approved by the owner
-4. **Existing purchase** — user already has an authorized or captured `VoicePurchase` for any podcast
+---
 
-### Platform Fee
+## Webhook Events
 
-`PLATFORM_FEE_PERCENT = 10` — applied via Stripe Connect's `application_fee_amount` on every PaymentIntent.
+The Stripe destination at `https://sotto.fm/api/stripe/webhooks` listens to:
 
-### Key Functions (`apps/web/src/lib/voice-pricing.ts`)
+| Event | Handler | Effect |
+|---|---|---|
+| `customer.subscription.created` | Sets `User.plan = PRO`, creates `Subscription` | User gains Pro access |
+| `customer.subscription.updated` | Syncs status, period end, cancel flag | Keeps `Subscription` in sync |
+| `customer.subscription.deleted` | Sets `User.plan = FREE`, marks `Subscription` canceled | User loses Pro access at period end |
+| `account.updated` | Sets `User.stripeOnboarded` | Enables voice marketplace payouts |
+| `payment_intent.payment_failed` | Cancels `VoicePurchase` | Unlocks voice for future purchase |
 
-| Function                   | Purpose                                                      |
-| -------------------------- | ------------------------------------------------------------ |
-| `getVoicePricing()`        | Fetch pricing info for a voice clone                         |
-| `computeVoiceCharges()`    | Calculate charges for a podcast's voice selection             |
-| `checkFreeAccess()`        | Check if user has free access to a voice                     |
-| `createVoicePayment()`     | Create Stripe PaymentIntent with manual capture              |
-| `captureVoicePayment()`    | Capture an authorized payment on successful generation       |
-| `cancelVoicePayment()`     | Cancel an authorized payment on failed generation            |
-| `capturePodcastPayments()` | Capture all authorized payments for a podcast (on READY)     |
-| `cancelPodcastPayments()`  | Cancel all authorized payments for a podcast (on FAILED)     |
+---
 
-### Database Models
+## Database Models
+
+### `Subscription` (new — Pro tier)
+
+```
+Subscription {
+  id                  String   @id
+  userId              String   @unique
+  stripeCustomerId    String
+  stripeSubscriptionId String
+  stripePriceId       String
+  status              String   (active | trialing | canceled | past_due)
+  currentPeriodEnd    DateTime
+  cancelAtPeriodEnd   Boolean
+  createdAt           DateTime
+  updatedAt           DateTime
+}
+```
+
+### `User` (relevant fields)
+
+```
+User {
+  plan          UserPlan  @default(FREE)   // FREE | PRO
+  subscription  Subscription?
+}
+```
+
+### Voice Marketplace Models (unchanged)
 
 ```
 VoiceClone     — id, name, userId, provider, externalVoiceId, priceInCents, sourceType
 VoicePurchase  — buyerId, voiceCloneId, podcastId, amountCents, platformFeeCents,
                  stripePaymentIntent, status (authorized/captured/cancelled/refunded)
-VoiceAllowlist — voiceCloneId, allowedUserId (unique per pair)
+VoiceAllowlist — voiceCloneId, allowedUserId
 VoiceRequest   — requesterId, voiceCloneId, status (PENDING/APPROVED/REJECTED)
 ```
 
 ---
 
-## Stripe Client (`apps/web/src/lib/stripe.ts`)
+## Generation Gate
 
-Minimal Stripe SDK wrapper — no subscription logic.
+`checkGenerationGate(userId)` determines if a user can start a new podcast generation.
 
-```typescript
-export const PLATFORM_FEE_PERCENT = 10;
+### Decision Flow
 
-export const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
-  : null;
-
-export const LIMITS = {
-  maxDurationMinutes: 40,
-  maxVoiceClones: 10,
-  canDownload: true,
-  canMakePrivate: true,
-  canExportPdf: true,
-  hasPremiumSfx: true,
-} as const;
+```
+Is user ADMIN/SYSTEM?    → allowed (no counting)
+Is user PRO?             → allowed (no counting)
+Has user BYOK TTS key?   → allowed (no counting)
+Is platform TTS up?      → check Redis daily counter
+  └── dailyUsed < dailyLimit? → allowed (increment Redis key free:daily:{userId} TTL 24h)
+  └── otherwise          → blocked ('daily_limit_reached', returns resetInSeconds)
+No platform TTS          → blocked ('no_provider')
 ```
 
-All features are flat-unlocked for everyone. The `LIMITS` object exists for feature-flag consistency but imposes no tier restrictions.
+### Redis Counter
+
+Key: `free:daily:{userId}` · TTL: 86,400 seconds (rolling 24h window)
+
+Incremented atomically via Lua script in `tryIncrementFreeGeneration()`. The `dailyLimit`
+is set by `FreeTierConfig.dailyGenerationLimit` (default: 1, configurable in `/admin`).
 
 ---
 
-## What Was Removed
+## Tier Features
 
-The old subscription billing model has been fully replaced:
+`getTierFeatures(plan, isByok)` returns caps that gate features across the pipeline:
 
-| Removed                | Replaced By                                              |
-| ---------------------- | -------------------------------------------------------- |
-| `Subscription` model   | No subscriptions — all features free                     |
-| `CreditTransaction`    | No credits — BYOK or free tier counter                   |
-| `SubscriptionEvent`    | No subscription webhooks                                 |
-| `TIER_LIMITS` (4 tiers)| Flat `LIMITS` object (all features unlocked)             |
-| `canGenerate()`        | `checkGenerationGate()` — BYOK check + free tier counter |
-| `consumeCredit()`      | `tryIncrementFreeGeneration()` — atomic SQL increment     |
-| `getUserTier()`        | Not needed — no tiers                                    |
-| `getUserCredits()`     | `getFreeTierStatus()` — free generation counter          |
-| Stripe Checkout        | Not needed — no subscription purchases                   |
-| Customer Portal        | Not needed — no subscription management                  |
-| Subscription webhooks  | Not needed — only Stripe Connect for voice marketplace   |
+| Feature | Free | Pro | BYOK |
+|---|---|---|---|
+| Max duration | 15 min | 40 min | 40 min |
+| Q&A interactions | 3/podcast | Unlimited | Unlimited |
+| Web search in scripts | No | Yes | Yes |
+| Auto-approve script | Yes (no pause) | No (user reviews) | No (user reviews) |
+| Private podcasts | No | Yes | Yes |
+| Analytics | No | Yes | Yes |
+| BullMQ priority | 10 (low) | 1 (high) | 1 (high) |
 
 ---
 
-## Testing
+## Free Tier Configuration
 
-### Local Development
+Admin-configurable singleton (`FreeTierConfig`) at `/admin/free-tier`:
 
-In dev mode (`AI_PROVIDER=claude-code`), the Claude CLI is used instead of an API key. Platform-level TTS keys (`ELEVENLABS_API_KEY` or `OPENAI_API_KEY`) also satisfy the TTS requirement. This means developers can run the full pipeline locally without any BYOK keys.
+| Field | Default | Description |
+|---|---|---|
+| `dailyGenerationLimit` | `1` | Max podcasts/day for free users |
+| `aiProvider` | `groq` | Platform AI provider |
+| `aiModel` | `llama-3.1-8b-instant` | Platform AI model |
+| `ttsProvider` | `kittentts` | Platform TTS provider |
+| `ttsModel` | `kitten-tts-mini-0.8` | Platform TTS model |
 
-### Testing Voice Payments
+---
 
-1. Set up a Stripe test account and configure `STRIPE_SECRET_KEY`
-2. Create a voice clone with a price (`priceInCents > 0`)
-3. Set the voice owner's `stripeAccountId` (use Stripe Connect test account)
-4. Generate a podcast using the paid voice
-5. Verify `VoicePurchase` record is created with status `authorized`
-6. On podcast READY, verify status changes to `captured`
-7. On podcast FAILED, verify status changes to `cancelled`
+## BYOK
+
+Users connect their own LLM (Anthropic, OpenAI, Groq) and TTS keys (7 providers).
+Keys are AES-256-GCM encrypted at rest. All features unlock immediately — no daily limit,
+full 40-minute duration, analytics, private podcasts.
+
+See `lib/byok.ts` for encryption details and key management functions.
+
+---
+
+## Voice Marketplace (Stripe Connect)
+
+Voice clone owners set a per-podcast price. Buyers pay once.
+Platform takes 10% via Stripe Connect `application_fee_amount`.
+
+Payment flow: authorize upfront → capture on READY → cancel on FAILED.
+See `lib/voice-pricing.ts` for full implementation.
+
+---
+
+## Local Development
+
+In dev mode (`AI_PROVIDER=claude-code`), Claude CLI handles LLM calls without an API key.
+Platform-level TTS keys satisfy the TTS requirement so the full pipeline runs locally.
+
+For Stripe, use test keys (`sk_test_...`) and the Stripe CLI for local webhooks:
+```bash
+stripe listen --forward-to localhost:3000/api/stripe/webhooks
+```

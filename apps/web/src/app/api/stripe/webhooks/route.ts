@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const sub = event.data.object;
-      const userId = sub.metadata?.userId ?? sub.subscription_data?.metadata?.userId;
+      const userId = sub.metadata?.userId;
 
       if (!userId) {
         logger.warn('Subscription event missing userId metadata', { subscriptionId: sub.id });
@@ -84,7 +84,17 @@ export async function POST(request: NextRequest) {
       const plan = isActive ? ('PRO' as const) : ('FREE' as const);
 
       const customerId =
-        typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+        typeof sub.customer === 'string' ? sub.customer : (sub.customer as { id: string }).id;
+
+      // Stripe SDK v20 uses current_period_end on the subscription object (Unix timestamp)
+      const subAny = sub as unknown as Record<string, unknown>;
+      const periodEndRaw = subAny['current_period_end'];
+      const currentPeriodEnd =
+        typeof periodEndRaw === 'number' ? new Date(periodEndRaw * 1000) : new Date();
+      const cancelAtPeriodEnd =
+        typeof subAny['cancel_at_period_end'] === 'boolean'
+          ? (subAny['cancel_at_period_end'] as boolean)
+          : false;
 
       await prisma.$transaction([
         prisma.user.update({
@@ -99,16 +109,16 @@ export async function POST(request: NextRequest) {
             stripeSubscriptionId: sub.id,
             stripePriceId: sub.items.data[0]?.price?.id ?? '',
             status: sub.status,
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            currentPeriodEnd,
+            cancelAtPeriodEnd,
           },
           update: {
             stripeCustomerId: customerId,
             stripeSubscriptionId: sub.id,
             stripePriceId: sub.items.data[0]?.price?.id ?? '',
             status: sub.status,
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
-            cancelAtPeriodEnd: sub.cancel_at_period_end,
+            currentPeriodEnd,
+            cancelAtPeriodEnd,
           },
         }),
       ]);

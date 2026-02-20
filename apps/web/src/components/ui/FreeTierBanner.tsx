@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useSyncExternalStore, useCallback } from 'react';
+import { useState, useSyncExternalStore, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import styles from './FreeTierBanner.module.css';
 
@@ -19,21 +19,46 @@ function subscribe(callback: () => void): () => void {
   return () => window.removeEventListener('storage', callback);
 }
 
-interface ProviderQuota {
-  provider: string;
-  remaining: number;
+function formatReset(seconds: number): string {
+  if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.ceil((seconds % 3600) / 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 interface FreeTierBannerProps {
   used: number;
   limit: number;
+  dailyUsed: number;
+  dailyLimit: number;
   isByokUser: boolean;
-  ttsQuotas?: ProviderQuota[];
+  isProUser: boolean;
+  resetInSeconds?: number;
 }
 
-export function FreeTierBanner({ used, limit, isByokUser, ttsQuotas }: FreeTierBannerProps) {
+export function FreeTierBanner({
+  dailyUsed,
+  dailyLimit,
+  isByokUser,
+  isProUser,
+  resetInSeconds,
+}: FreeTierBannerProps) {
   const wasPreviouslyDismissed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [dismissedNow, setDismissedNow] = useState(false);
+  const [countdown, setCountdown] = useState(resetInSeconds ?? 0);
+
+  useEffect(() => {
+    if (!resetInSeconds || resetInSeconds <= 0) return;
+    // Local mutable variable avoids calling setState directly in the effect body;
+    // state is only updated inside the interval callback.
+    let remaining = resetInSeconds;
+    const id = setInterval(() => {
+      remaining = Math.max(0, remaining - 1);
+      setCountdown(remaining);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resetInSeconds]);
+
   const dismissed = wasPreviouslyDismissed || dismissedNow;
 
   const handleDismiss = useCallback(() => {
@@ -41,20 +66,12 @@ export function FreeTierBanner({ used, limit, isByokUser, ttsQuotas }: FreeTierB
     localStorage.setItem(DISMISS_KEY, Date.now().toString());
   }, []);
 
-  // BYOK users don't need this banner
-  if (isByokUser) return null;
+  // BYOK and Pro users don't need this banner
+  if (isByokUser || isProUser) return null;
   if (dismissed) return null;
 
-  const remaining = Math.max(0, limit - used);
-  const exhausted = remaining === 0;
-  const variant = exhausted ? 'exhausted' : remaining <= 1 ? 'warning' : 'info';
-
-  // Build richer description when per-provider quotas are available
-  const activeQuotas = ttsQuotas?.filter((q) => q.remaining > 0);
-  const quotaBreakdown =
-    activeQuotas && activeQuotas.length > 0
-      ? ` (${activeQuotas.map((q) => `${q.remaining} ${q.provider}`).join(', ')})`
-      : '';
+  const exhausted = dailyUsed >= dailyLimit;
+  const variant = exhausted ? 'exhausted' : dailyUsed >= dailyLimit - 1 ? 'warning' : 'info';
 
   return (
     <div
@@ -66,33 +83,40 @@ export function FreeTierBanner({ used, limit, isByokUser, ttsQuotas }: FreeTierB
         <div>
           <p className={styles.title}>
             {exhausted
-              ? 'Free generations used'
-              : `${remaining} free generation${remaining !== 1 ? 's' : ''} remaining${quotaBreakdown}`}
+              ? `Daily limit reached — ${countdown > 0 ? `resets in ${formatReset(countdown)}` : 'resets soon'}`
+              : `${dailyLimit - dailyUsed} of ${dailyLimit} free podcast${dailyLimit - dailyUsed !== 1 ? 's' : ''} remaining today`}
           </p>
           <p className={styles.description}>
             {exhausted
-              ? 'Add a voice provider key to keep creating podcasts.'
-              : 'Free podcasts are public by default. Add a voice provider key for unlimited generation and private podcasts.'}
+              ? 'Upgrade to Pro for unlimited generation, or add your own API keys (BYOK).'
+              : 'Free tier: 1 podcast per day, platform AI and voices included.'}
           </p>
         </div>
-        <Link href="/onboarding?step=keys" className={styles.link}>
-          Add voice key
-          <svg
-            className={styles.linkArrow}
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="5" y1="12" x2="19" y2="12" />
-            <polyline points="12 5 19 12 12 19" />
-          </svg>
-        </Link>
+        <div className={styles.actions}>
+          <Link href="/pricing" className={styles.link}>
+            Upgrade to Pro
+            <svg
+              className={styles.linkArrow}
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </Link>
+          {exhausted && (
+            <Link href="/onboarding?step=keys" className={styles.linkSecondary}>
+              Add own keys
+            </Link>
+          )}
+        </div>
       </div>
       {!exhausted && (
         <button

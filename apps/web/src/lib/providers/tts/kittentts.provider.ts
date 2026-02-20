@@ -6,7 +6,7 @@
 import { spawn } from 'child_process';
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
-import { KITTENTTS_VOICE_POOL, selectKittenVoicePair } from '../../voice-pool';
+import { selectKittenVoicePair } from '../../voice-pool';
 import { logger } from '../../logger';
 
 function convertWavToMp3(wavBuffer: Buffer): Promise<Buffer> {

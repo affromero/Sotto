@@ -49,6 +49,9 @@ vi.mock('@/lib/prisma', () => {
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
     },
+    user: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'FREE' }),
+    },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
@@ -105,6 +108,18 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 40,
+    maxQaInteractions: Infinity,
+    webSearchEnabled: true,
+    autoApproveScript: false,
+    privateAllowed: true,
+    analyticsEnabled: true,
+  }),
 }));
 
 const mockGetFreeTierConfig = vi.fn().mockResolvedValue({

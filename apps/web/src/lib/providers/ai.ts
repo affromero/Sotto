@@ -138,7 +138,7 @@ class GroqProvider implements AIProvider {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error('GROQ_API_KEY is not set');
     const { default: OpenAI } = await import('openai');
-    return new OpenAI({ baseURL: 'https://api.groq.com/openai/v1', apiKey });
+    return new OpenAI({ baseURL: 'https://api.groq.com/openai/v1', apiKey } as ConstructorParameters<typeof OpenAI>[0]);
   }
 
   async generateResponse(

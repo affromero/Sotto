@@ -69,7 +69,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       : config.aiModel;
   }
 
-  const maxDurationMinutes = discovery.durationTarget || LIMITS.maxDurationMinutes;
+  const maxDurationMinutes = discovery.durationTarget || tierFeatures.maxDurationMinutes;
 
   const turns = script.turns as ScriptTurn[];
   const generatedRefs: GeneratedReference[] = references.map((r) => ({

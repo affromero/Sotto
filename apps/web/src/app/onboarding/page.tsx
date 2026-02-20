@@ -71,16 +71,37 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
       <main className={styles.main}>
         <div className={styles.containerWide}>
           <header className={styles.header}>
-            <h1 className={styles.title}>Unlock unlimited podcasts</h1>
+            <h1 className={styles.title}>Get more podcasts</h1>
             <p className={styles.subtitle}>
-              You&apos;ve used your free generations. Add your own API keys for unlimited access.
+              You&apos;ve hit your daily limit. Choose how you want to keep creating.
             </p>
           </header>
 
-          <KeySetupForm
-            initialAiConfigured={aiConfigured}
-            initialTtsConfigured={ttsConfigured}
-          />
+          {/* Two upgrade paths */}
+          <div className={styles.upgradePaths}>
+            <div className={styles.upgradePath}>
+              <h2 className={styles.upgradePathTitle}>Upgrade to Pro</h2>
+              <p className={styles.upgradePathDesc}>
+                Unlimited generation, better AI, analytics, priority queue. No API keys needed.
+                $12/month.
+              </p>
+              <a href="/pricing" className={styles.upgradeButtonPrimary}>
+                Go Pro — $12/month
+              </a>
+            </div>
+            <div className={styles.upgradePathDivider}>or</div>
+            <div className={styles.upgradePath}>
+              <h2 className={styles.upgradePathTitle}>Bring your own keys (free)</h2>
+              <p className={styles.upgradePathDesc}>
+                Use your own Anthropic / OpenAI + TTS keys. Unlimited generation at cost price.
+                All features unlocked.
+              </p>
+              <KeySetupForm
+                initialAiConfigured={aiConfigured}
+                initialTtsConfigured={ttsConfigured}
+              />
+            </div>
+          </div>
         </div>
       </main>
     );
