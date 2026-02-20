@@ -86,15 +86,10 @@ export async function POST(request: NextRequest) {
       const customerId =
         typeof sub.customer === 'string' ? sub.customer : (sub.customer as { id: string }).id;
 
-      // Stripe SDK v20 uses current_period_end on the subscription object (Unix timestamp)
-      const subAny = sub as unknown as Record<string, unknown>;
-      const periodEndRaw = subAny['current_period_end'];
-      const currentPeriodEnd =
-        typeof periodEndRaw === 'number' ? new Date(periodEndRaw * 1000) : new Date();
-      const cancelAtPeriodEnd =
-        typeof subAny['cancel_at_period_end'] === 'boolean'
-          ? (subAny['cancel_at_period_end'] as boolean)
-          : false;
+      const currentPeriodEnd = sub.current_period_end
+        ? new Date(sub.current_period_end * 1000)
+        : new Date();
+      const cancelAtPeriodEnd = sub.cancel_at_period_end ?? false;
 
       await prisma.$transaction([
         prisma.user.update({
@@ -143,7 +138,7 @@ export async function POST(request: NextRequest) {
           where: { id: userId },
           data: { plan: 'FREE' },
         }),
-        prisma.subscription.updateMany({
+        prisma.subscription.update({
           where: { userId },
           data: { status: 'canceled' },
         }),

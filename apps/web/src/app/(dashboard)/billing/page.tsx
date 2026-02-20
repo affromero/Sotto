@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { Badge } from '@/components/ui/Badge';
+import { ManageSubscriptionButton } from './ManageSubscriptionButton';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -68,11 +69,7 @@ export default async function BillingPage() {
         </div>
         {isPro ? (
           <div className={styles.manageActions}>
-            <form action="/api/billing/portal" method="post">
-              <button type="submit" className={styles.manageButton}>
-                Manage Subscription
-              </button>
-            </form>
+            <ManageSubscriptionButton className={styles.manageButton} />
           </div>
         ) : (
           <div className={styles.manageActions}>

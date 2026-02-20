@@ -25,10 +25,14 @@ export async function POST(request: NextRequest) {
 
   const userId = session.user.id;
 
-  const user = await prisma.user.findUniqueOrThrow({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { email: true, plan: true, subscription: { select: { stripeCustomerId: true } } },
   });
+
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  }
 
   if (user.plan === 'PRO') {
     return NextResponse.json({ error: 'Already subscribed to Pro' }, { status: 400 });
@@ -42,8 +46,21 @@ export async function POST(request: NextRequest) {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://sotto.fm';
-  const successUrl = body.successUrl ?? `${appUrl}/billing?upgrade=success`;
-  const cancelUrl = body.cancelUrl ?? `${appUrl}/pricing`;
+
+  function isSameOrigin(url: string): boolean {
+    try {
+      return new URL(url).origin === new URL(appUrl).origin;
+    } catch {
+      return false;
+    }
+  }
+
+  const successUrl = body.successUrl && isSameOrigin(body.successUrl)
+    ? body.successUrl
+    : `${appUrl}/billing?upgrade=success`;
+  const cancelUrl = body.cancelUrl && isSameOrigin(body.cancelUrl)
+    ? body.cancelUrl
+    : `${appUrl}/pricing`;
 
   try {
     const checkoutSession = await stripe.checkout.sessions.create({
