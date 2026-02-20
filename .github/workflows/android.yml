@@ -1,0 +1,101 @@
+name: Android Build
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: android-build
+  cancel-in-progress: false
+
+jobs:
+  build-and-submit:
+    name: Build & Submit to Play Store
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install Doppler CLI
+        run: curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh
+
+      - name: Sync EXPO_PUBLIC vars from Doppler to EAS
+        working-directory: apps/mobile
+        run: |
+          doppler secrets download \
+            --token "${{ secrets.DOPPLER_SERVICE_TOKEN }}" \
+            --project sotto \
+            --config prd \
+            --no-file \
+            --format env \
+          | grep '^EXPO_PUBLIC_' > /tmp/expo-public.env
+          eas env:push production --path /tmp/expo-public.env --force
+          rm -f /tmp/expo-public.env
+
+      - name: Build Android app
+        run: eas build --platform android --profile production --non-interactive --wait
+        working-directory: apps/mobile
+
+      - name: Write Google Play service account key
+        run: echo '${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY }}' > apps/mobile/google-play-service-account.json
+
+      - name: Submit to Play Store (internal track)
+        run: eas submit --platform android --latest --non-interactive
+        working-directory: apps/mobile
+
+      - name: Clean up service account key
+        if: always()
+        run: rm -f apps/mobile/google-play-service-account.json
+
+  notify:
+    name: Telegram Notification
+    needs: build-and-submit
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Notify via Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_NOTIFY_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          BUILD_STATUS: ${{ needs.build-and-submit.result }}
+        run: |
+          COMMIT_MSG=$(git log -1 --format='%s')
+          COMMIT_SHA=$(git log -1 --format='%h')
+          AUTHOR=$(git log -1 --format='%an')
+
+          if [ "$BUILD_STATUS" = "success" ]; then
+            EMOJI="✅"
+            STATUS="Play Store build submitted"
+          else
+            EMOJI="❌"
+            STATUS="Android build failed"
+          fi
+
+          NL=$'\n'
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          TEXT="${EMOJI} <b>Sotto Android ${STATUS}</b>${NL}"
+          TEXT="${TEXT}<code>${COMMIT_SHA}</code>  <i>${COMMIT_MSG}</i>${NL}"
+          TEXT="${TEXT}by ${AUTHOR}${NL}${NL}"
+          TEXT="${TEXT}<a href=\"${RUN_URL}\">View run</a>"
+
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg chat_id "$TELEGRAM_CHAT_ID" --arg text "$TEXT" \
+              '{chat_id: $chat_id, text: $text, parse_mode: "HTML", disable_web_page_preview: true}')"

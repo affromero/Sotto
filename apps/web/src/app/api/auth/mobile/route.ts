@@ -42,7 +42,7 @@ const devLoginSchema = z.object({
 });
 
 const oauthIdTokenSchema = z.object({
-  provider: z.enum(['apple']),
+  provider: z.enum(['apple', 'google']),
   idToken: z.string().min(1),
   userName: z.string().optional(),
 });

@@ -27,12 +27,17 @@
     "type-check": "npm run type-check --workspace=@sotto/web",
     "mobile": "npm run start --workspace=@sotto/mobile",
     "mobile:ios": "npm run ios --workspace=@sotto/mobile",
+    "mobile:android": "npm run android --workspace=@sotto/mobile",
     "mobile:xcode": "npm run ios:open --workspace=@sotto/mobile",
     "mobile:env": "doppler secrets download --no-file --format env | grep '^EXPO_PUBLIC_' > apps/mobile/.env",
-    "mobile:build": "npm run ios:build --workspace=@sotto/mobile",
-    "mobile:build:preview": "npm run ios:build:preview --workspace=@sotto/mobile",
-    "mobile:build:production": "npm run ios:build:production --workspace=@sotto/mobile",
-    "mobile:submit": "npm run ios:submit --workspace=@sotto/mobile"
+    "mobile:ios:build": "npm run ios:build --workspace=@sotto/mobile",
+    "mobile:ios:build:preview": "npm run ios:build:preview --workspace=@sotto/mobile",
+    "mobile:ios:build:production": "npm run ios:build:production --workspace=@sotto/mobile",
+    "mobile:ios:submit": "npm run ios:submit --workspace=@sotto/mobile",
+    "mobile:android:build": "npm run android:build --workspace=@sotto/mobile",
+    "mobile:android:build:preview": "npm run android:build:preview --workspace=@sotto/mobile",
+    "mobile:android:build:production": "npm run android:build:production --workspace=@sotto/mobile",
+    "mobile:android:submit": "npm run android:submit --workspace=@sotto/mobile"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -1,24 +1,28 @@
-# apps/mobile/ — Sotto iOS App (React Native + Expo)
+# apps/mobile/ — Sotto Mobile App (iOS + Android)
 
 ## Quick Start
 
 ```bash
-# Prerequisites: Xcode 16+, iOS Simulator, Node 20+
+# Prerequisites:
+#   iOS:     Xcode 16+, iOS Simulator, Node 20+
+#   Android: Android Studio, Android SDK, emulator or device
 
 # 1. Install dependencies (from repo root)
 npm install
 
-# 2. Copy env and set your local IP (NOT localhost — simulator needs a routable address)
+# 2. Copy env and set your local IP (NOT localhost — simulator/emulator needs a routable address)
 cp apps/mobile/.env.example apps/mobile/.env
 # Edit .env → set EXPO_PUBLIC_API_URL=http://<your-lan-ip>:3000/api
 
 # 3. Start the web backend (the mobile app is a thin client)
 npm run dev
 
-# 4. Start Expo dev server with iOS Simulator
-npm run mobile:ios
+# 4. Start Expo dev server
+npm run mobile:ios       # iOS Simulator
+npm run mobile:android   # Android emulator
 # Or from apps/mobile/:
 # npx expo start --ios
+# npx expo start --android
 ```
 
 **Finding your LAN IP**: `ifconfig en0 | grep 'inet '` — use the `192.168.x.x` address.
@@ -31,7 +35,10 @@ npm run mobile:ios
 | Navigation | expo-router (file-based) | Installed |
 | State | React Query (server state) | Installed |
 | API | Axios → EXPO_PUBLIC_API_URL | Installed |
-| Auth | expo-secure-store + expo-auth-session + expo-apple-authentication | Installed |
+| Auth (Google) | @react-native-google-signin/google-signin (native SDK, idToken flow) | Installed |
+| Auth (Apple) | expo-apple-authentication (iOS only) | Installed |
+| Auth (GitHub) | expo-auth-session (browser flow, custom scheme redirect) | Installed |
+| Auth (storage) | expo-secure-store | Installed |
 | Fonts | expo-font + @expo-google-fonts (DM Serif Display, Inter) | Installed |
 | Animations | react-native-reanimated | Installed |
 | Types | @sotto/shared (shared with web) | Installed |
@@ -44,7 +51,7 @@ The mobile app is a **thin client** — all business logic lives in the web back
 
 ```
 ┌──────────────────────────┐
-│   iOS App (Expo)         │
+│   Mobile App (Expo)      │
 │   - UI rendering         │
 │   - Background audio     │
 │   - Push notifications   │
@@ -66,7 +73,10 @@ Mobile uses API key-based auth (`sk_sotto_` tokens), not NextAuth sessions.
 
 **Dev mode** (`__DEV__`): Email-only login → `POST /api/auth/mobile` with `{email}` → receives `{token, user}`.
 
-**Production**: OAuth buttons (Apple, Google, GitHub) → native/browser OAuth flow → sends `{provider, idToken}` to `POST /api/auth/mobile` → receives `{token, user}`.
+**Production**:
+- **Google** (iOS + Android): Native sign-in via `@react-native-google-signin/google-signin` → returns `idToken` directly → sends `{provider: 'google', idToken}` to backend
+- **Apple** (iOS only): Native sign-in via `expo-apple-authentication` → returns `identityToken` → sends `{provider: 'apple', idToken}` to backend
+- **GitHub** (iOS + Android): Browser flow via `expo-auth-session` → code exchange on backend → sends `{provider: 'github', code, codeVerifier, redirectUri}` to backend
 
 Token lifecycle:
 1. Token stored in `expo-secure-store` via `lib/auth.ts`
@@ -128,53 +138,72 @@ See `.env.example`. Key variables:
 |----------|----------|---------|---------|
 | `EXPO_PUBLIC_API_URL` | Yes (dev) | `https://sotto.fm/api` | Backend API base URL |
 | `EXPO_PUBLIC_EAS_PROJECT_ID` | For builds | — | EAS Build project ID |
-| `EXPO_PUBLIC_GOOGLE_CLIENT_ID` | For prod auth | — | Google OAuth client ID |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | For prod auth | — | Google native sign-in web client ID (audience for idToken) |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | For prod auth | — | Google native sign-in iOS client ID |
 | `EXPO_PUBLIC_GITHUB_CLIENT_ID` | For prod auth | — | GitHub OAuth client ID |
 
-In dev, set `EXPO_PUBLIC_API_URL` to your machine's LAN IP so the iOS Simulator can reach the web backend.
+In dev, set `EXPO_PUBLIC_API_URL` to your machine's LAN IP so the simulator/emulator can reach the web backend.
 
 ## Commands
 
 ```bash
 # ── From repo root ──
-npm run mobile              # Start Expo dev server
-npm run mobile:ios           # Start with iOS Simulator
-npm run mobile:xcode         # Generate native project + open in Xcode
-npm run mobile:build         # Dev client build (EAS)
-npm run mobile:build:preview # TestFlight build (EAS)
-npm run mobile:build:production # App Store build (EAS)
-npm run mobile:submit        # Upload to App Store Connect
+npm run mobile               # Start Expo dev server
+npm run mobile:ios            # Start with iOS Simulator
+npm run mobile:android        # Start with Android emulator
+npm run mobile:xcode          # Generate native project + open in Xcode
+npm run mobile:env            # Sync EXPO_PUBLIC vars from Doppler
+
+# iOS builds (from root)
+npm run mobile:ios:build              # Dev client build (EAS)
+npm run mobile:ios:build:preview      # TestFlight build (EAS)
+npm run mobile:ios:build:production   # App Store build (EAS)
+npm run mobile:ios:submit             # Upload to App Store Connect
+
+# Android builds (from root)
+npm run mobile:android:build          # Dev client APK (EAS)
+npm run mobile:android:build:preview  # Preview APK (EAS)
+npm run mobile:android:build:production # Play Store AAB (EAS)
+npm run mobile:android:submit         # Upload to Play Store
 
 # ── From apps/mobile/ ──
-npx expo start              # Dev server (scan QR or press i for iOS)
-npx expo start --ios         # iOS Simulator directly
-npx expo start --clear       # Clear Metro cache (fix stale bundles)
-npm run ios:open              # Generate ios/ folder + open Xcode workspace
-npm run type-check           # tsc --noEmit
+npx expo start               # Dev server (scan QR, press i for iOS, a for Android)
+npx expo start --ios          # iOS Simulator directly
+npx expo start --android      # Android emulator directly
+npx expo start --clear        # Clear Metro cache (fix stale bundles)
+npm run ios:open               # Generate ios/ folder + open Xcode workspace
+npm run type-check            # tsc --noEmit
 
 # ── EAS builds (from apps/mobile/) ──
+# iOS
 eas build --platform ios --profile development   # Custom dev client
 eas build --platform ios --profile preview       # TestFlight internal
 eas build --platform ios --profile production    # App Store release
 eas submit --platform ios --latest               # Upload to App Store Connect
-eas update --branch production --message "fix: description"  # OTA update
+
+# Android
+eas build --platform android --profile development   # Dev client APK
+eas build --platform android --profile preview       # Preview APK
+eas build --platform android --profile production    # Play Store AAB
+eas submit --platform android --latest               # Upload to Play Store
+
+# OTA updates (both platforms)
+eas update --branch production --message "fix: description"
 ```
 
-### First App Store Submission
+## Platform-Specific Notes
 
-Before the first `eas submit`, add the `submit` block to `eas.json` with your Apple Developer credentials:
+### iOS
+- Apple Sign In available (hidden on Android)
+- `expo-apple-authentication` plugin is a no-op on Android builds
+- Universal Links via `associatedDomains` in `app.json` + `.well-known/apple-app-site-association`
 
-```json
-"submit": {
-  "production": {
-    "ios": {
-      "appleId": "me@afromero.co",
-      "ascAppId": "<from App Store Connect → App Information → Apple ID>",
-      "appleTeamId": "<from developer.apple.com → Membership → Team ID>"
-    }
-  }
-}
-```
+### Android
+- Google Sign In uses native SDK (`@react-native-google-signin/google-signin`)
+- Notification icon must be monochrome silhouette (`assets/notification-icon.png`)
+- App Links via `intentFilters` in `app.json` + `.well-known/assetlinks.json`
+- Dev/preview builds produce APK (sideloadable); production builds produce AAB (Play Store)
+- `google-services.json` required for Firebase/push — place in `apps/mobile/` (gitignored)
 
 ## Conventions
 
@@ -205,6 +234,11 @@ Before the first `eas submit`, add the `submit` block to `eas.json` with your Ap
 | Stale JS bundle | `npx expo start --clear` to reset Metro cache |
 | Fonts not rendering | Check `_layout.tsx` — fonts load async via `useFonts` hook |
 | SecureStore error in simulator | SecureStore works in simulators, but clear app data if tokens get stale |
-| Build fails on EAS | Run `eas build --platform ios --profile development --local` for local debug |
+| Build fails on EAS (iOS) | Run `eas build --platform ios --profile development --local` for local debug |
+| Build fails on EAS (Android) | Run `eas build --platform android --profile development --local` for local debug |
 | Auth redirect loop | Check that `_layout.tsx` auth gate is working — `useProtectedRoute()` hook |
 | 401 errors on all API calls | Token may be expired/invalid — clear SecureStore and re-login |
+| Android emulator slow | Enable hardware acceleration (HAXM/KVM). Use x86_64 system image, not ARM |
+| Android notification icon solid square | Replace `assets/notification-icon.png` with white silhouette on transparent bg |
+| Google Sign In fails on Android | Verify `google-services.json` exists and SHA-1 fingerprint matches in Google Cloud Console |
+| Deep links not working (Android) | Run `adb shell am start -a android.intent.action.VIEW -d "https://sotto.fm/podcast/test"` to test. Check `assetlinks.json` SHA-256 fingerprint |
