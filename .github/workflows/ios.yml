@@ -28,6 +28,22 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Install Doppler CLI
+        run: curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sh
+
+      - name: Sync EXPO_PUBLIC vars from Doppler to EAS
+        working-directory: apps/mobile
+        run: |
+          doppler secrets download \
+            --token "${{ secrets.DOPPLER_SERVICE_TOKEN }}" \
+            --project sotto \
+            --config prd \
+            --no-file \
+            --format env \
+          | grep '^EXPO_PUBLIC_' > /tmp/expo-public.env
+          eas env:push production --path /tmp/expo-public.env --force
+          rm -f /tmp/expo-public.env
+
       - name: Build iOS app
         run: eas build --platform ios --profile production --non-interactive --wait
         working-directory: apps/mobile

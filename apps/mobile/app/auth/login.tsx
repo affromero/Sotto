@@ -133,11 +133,19 @@ export default function LoginScreen() {
           };
 
           const config = configs[provider];
-          const redirectUri = AuthSession.makeRedirectUri({ scheme: 'sotto' });
           const clientId =
             provider === 'google'
               ? process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? ''
               : process.env.EXPO_PUBLIC_GITHUB_CLIENT_ID ?? '';
+          // Google iOS native clients require the reversed client ID as the URL scheme.
+          // e.g., 123456789.apps.googleusercontent.com → com.googleusercontent.apps.123456789://
+          // Using `sotto://` causes "Access blocked" because Google rejects non-matching redirect URIs.
+          const redirectUri =
+            provider === 'google' && clientId
+              ? AuthSession.makeRedirectUri({
+                  scheme: `com.googleusercontent.apps.${clientId.split('.')[0]}`,
+                })
+              : AuthSession.makeRedirectUri({ scheme: 'sotto' });
 
           const request = new AuthSession.AuthRequest({
             clientId,

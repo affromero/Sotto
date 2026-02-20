@@ -28,6 +28,7 @@
     "mobile": "npm run start --workspace=@sotto/mobile",
     "mobile:ios": "npm run ios --workspace=@sotto/mobile",
     "mobile:xcode": "npm run ios:open --workspace=@sotto/mobile",
+    "mobile:env": "doppler secrets download --no-file --format env | grep '^EXPO_PUBLIC_' > apps/mobile/.env",
     "mobile:build": "npm run ios:build --workspace=@sotto/mobile",
     "mobile:build:preview": "npm run ios:build:preview --workspace=@sotto/mobile",
     "mobile:build:production": "npm run ios:build:production --workspace=@sotto/mobile",
