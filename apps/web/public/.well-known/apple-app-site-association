@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "2HVQQ4W769.fm.sotto.app",
+        "paths": ["/podcast/*", "/user/*"]
+      }
+    ]
+  }
+}
