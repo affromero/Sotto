@@ -39,6 +39,7 @@ COPY --chown=sotto:sotto tsconfig.base.json ./
 COPY --chown=sotto:sotto apps/web/prisma ./apps/web/prisma/
 COPY --chown=sotto:sotto packages/shared ./packages/shared/
 COPY --chown=sotto:sotto apps/web/src ./apps/web/src/
+COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
 
 USER sotto
 
