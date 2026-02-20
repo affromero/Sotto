@@ -27,6 +27,15 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { message, content, discoveryId, history, model } = body;
+
+  // Block non-admins from using claude-code models
+  if (typeof model === 'string' && model.startsWith('claude-code:')) {
+    const sess = await auth();
+    if (sess?.user?.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+  }
+
   let userMessage: string | undefined = message ?? content;
 
   if (!userMessage) {

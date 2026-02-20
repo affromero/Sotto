@@ -43,6 +43,14 @@ export async function generateResponse(
     }
   }
 
+  // Per-request claude-code routing (admin-selected model via dropdown)
+  if (options?.model?.startsWith('claude-code:')) {
+    const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
+    const ccModel = options.model.split(':')[1] || 'opus';
+    const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), { model: ccModel });
+    return { ...result, model: options.model };
+  }
+
   if (isClaudeCodeMode() && !options?.apiKeyOverride) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
@@ -116,6 +124,15 @@ export async function* streamResponse(
     if (lastUserMsg) {
       await moderateOrThrow(lastUserMsg.content);
     }
+  }
+
+  // Per-request claude-code routing (admin-selected model via dropdown)
+  if (options?.model?.startsWith('claude-code:')) {
+    const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
+    yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
+      model: options.model.split(':')[1] || 'opus',
+    });
+    return;
   }
 
   if (isClaudeCodeMode() && !options?.apiKeyOverride) {
