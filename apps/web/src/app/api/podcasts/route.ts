@@ -169,13 +169,13 @@ export async function POST(request: NextRequest) {
   // Check if selected voices require payment (skip if paymentIntentIds provided)
   const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
   const voiceEntries = parsed.data.voices ?? [];
-  const hostVoiceId = voiceEntries.find(v => v.speaker === 'HOST')?.voiceId;
-  const expertVoiceId = voiceEntries.find(v => v.speaker === 'EXPERT')?.voiceId;
+  const voicesWithIds = voiceEntries.filter(
+    (v): v is { speaker: string; voiceId: string } => !!v.voiceId
+  );
   if (!paymentIntentIds) {
     const voiceCharges = await computeVoiceCharges(
       authResult.userId,
-      hostVoiceId,
-      expertVoiceId
+      voicesWithIds
     );
 
     if (voiceCharges.length > 0) {
