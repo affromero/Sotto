@@ -4,7 +4,7 @@ export interface ImportPodcastRequest {
   title?: string;
   topic?: string;
   isHumanContent: boolean;
-  sourcePlatform?: string;
+  sourcePlatform: string;
   sttProvider?: SttProviderId;
 }
 
