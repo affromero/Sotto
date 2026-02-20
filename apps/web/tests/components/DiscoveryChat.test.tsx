@@ -28,6 +28,10 @@ vi.mock('@/lib/hooks/useDiscovery', () => ({
   useDiscovery: () => hookState,
 }));
 
+vi.mock('@/components/create/LlmModelDropdown', () => ({
+  LlmModelDropdown: () => null,
+}));
+
 // Mock EventProvider (useTrack is used by useDiscovery, but since we mock the whole hook it's not needed —
 // however the module may still be imported transitively, so stub it)
 vi.mock('@/components/providers/EventProvider', () => ({
@@ -125,7 +129,7 @@ describe('DiscoveryChat', () => {
 
     await user.click(screen.getByText('AI & Technology'));
 
-    expect(mockSendMessage).toHaveBeenCalledWith('AI & Technology', undefined, true);
+    expect(mockSendMessage).toHaveBeenCalledWith('AI & Technology', undefined, true, undefined);
   });
 
   it('passes podcastId to sendMessage when chip selected', async () => {
@@ -135,7 +139,7 @@ describe('DiscoveryChat', () => {
 
     await user.click(screen.getByText('Science'));
 
-    expect(mockSendMessage).toHaveBeenCalledWith('Science', 'podcast-123', true);
+    expect(mockSendMessage).toHaveBeenCalledWith('Science', 'podcast-123', true, undefined);
   });
 
   it('sends typed message and clears input', async () => {
@@ -150,7 +154,8 @@ describe('DiscoveryChat', () => {
     expect(mockSendMessage).toHaveBeenCalledWith(
       'I want to learn about quantum computing',
       undefined,
-      false
+      false,
+      undefined
     );
     expect(input).toHaveValue('');
   });
@@ -163,7 +168,7 @@ describe('DiscoveryChat', () => {
     const input = screen.getByLabelText('Chat message input');
     await user.type(input, 'Test{Enter}');
 
-    expect(mockSendMessage).toHaveBeenCalledWith('Test', undefined, false);
+    expect(mockSendMessage).toHaveBeenCalledWith('Test', undefined, false, undefined);
   });
 
   it('does not submit empty messages', () => {
@@ -231,7 +236,7 @@ describe('DiscoveryChat', () => {
       <DiscoveryChat podcastId="podcast-123" onComplete={vi.fn()} initialTopic="quantum physics" />
     );
 
-    expect(mockSendMessage).toHaveBeenCalledWith('quantum physics', 'podcast-123', false);
+    expect(mockSendMessage).toHaveBeenCalledWith('quantum physics', 'podcast-123', false, undefined);
   });
 
   it('only shows chips on the last assistant message', () => {

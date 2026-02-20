@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { message, content, discoveryId, history } = body;
+  const { message, content, discoveryId, history, model } = body;
   let userMessage: string | undefined = message ?? content;
 
   if (!userMessage) {
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       try {
         let fullResponse = '';
-        for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey, undefined, (usage) => {
+        for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey, model || undefined, (usage) => {
           logUsage({
             service: 'anthropic',
             model: usage.model,

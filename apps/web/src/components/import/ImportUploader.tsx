@@ -5,7 +5,7 @@ import { Upload, FileAudio, FileText, X, AlertCircle, ChevronDown, Info } from '
 import { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from '@sotto/shared';
 import type { SourcePlatformValue } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
-import { SttProviderSelector } from './SttProviderSelector';
+import { SttModelDropdown } from '@/components/create/SttModelDropdown';
 import styles from './ImportUploader.module.css';
 
 interface ImportUploaderProps {
@@ -266,7 +266,7 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
         </div>
       </div>
 
-      <SttProviderSelector value={sttProvider} onChange={setSttProvider} />
+      <SttModelDropdown value={sttProvider} onChange={setSttProvider} />
 
       <div className={styles.field}>
         <label htmlFor="title" className={styles.label}>
