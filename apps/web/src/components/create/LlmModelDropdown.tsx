@@ -17,6 +17,7 @@ interface AiModelsResponse {
     displayName: string;
     tier: string;
     isDefault: boolean;
+    group?: string;
   }>;
   readOnly: boolean;
 }
@@ -39,6 +40,7 @@ export function LlmModelDropdown({ value, onChange }: LlmModelDropdownProps) {
           id: m.id,
           displayName: m.displayName,
           badge: TIER_BADGES[m.tier],
+          group: m.group,
         }));
         setOptions(mapped);
         setReadOnly(data.readOnly ?? false);

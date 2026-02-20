@@ -19,6 +19,10 @@ const AI_PRICING: Record<string, ModelPricing> = {
   'gpt-4o-mini': { inputPerMTok: 0.15, outputPerMTok: 0.6 },
   // Embeddings
   'text-embedding-3-small': { inputPerMTok: 0.02, outputPerMTok: 0 },
+  // Claude Code (local CLI — no API cost)
+  'claude-code:haiku': { inputPerMTok: 0, outputPerMTok: 0 },
+  'claude-code:sonnet': { inputPerMTok: 0, outputPerMTok: 0 },
+  'claude-code:opus': { inputPerMTok: 0, outputPerMTok: 0 },
 };
 
 // Default fallback: Sonnet 4.5 pricing (matches prior hardcoded behavior)
