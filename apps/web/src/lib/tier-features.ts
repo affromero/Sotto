@@ -17,7 +17,7 @@ export interface TierFeatures {
 }
 
 const FREE_FEATURES: TierFeatures = {
-  maxDurationMinutes: 15,
+  maxDurationMinutes: 5,
   autoApproveScript: true,
   webSearchEnabled: false,
   maxQaInteractions: 3,

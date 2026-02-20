@@ -117,6 +117,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Duration validation — enforce tier cap (before incrementing counter)
+  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
+    ? tierFeatures.maxDurationMinutes
+    : 9999;
+  const durationTarget = parsed.data.metadata?.durationTarget;
+  if (durationTarget && durationTarget > effectiveMaxDuration) {
+    return NextResponse.json(
+      {
+        error: `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
+      },
+      { status: 400 }
+    );
+  }
+
   // Atomically increment daily free-tier counter BEFORE creating anything (avoids TOCTOU race)
   let freeTierTtsProvider: string | undefined;
   let freeTierTtsModel: string | undefined;
@@ -137,20 +151,6 @@ export async function POST(request: NextRequest) {
     freeTierTtsProvider = selected.ttsProvider;
     freeTierTtsModel = selected.ttsModel;
     freeTierAiModel = selected.aiModel;
-  }
-
-  // Duration validation — enforce tier cap
-  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
-    ? tierFeatures.maxDurationMinutes
-    : 9999;
-  const durationTarget = parsed.data.metadata?.durationTarget;
-  if (durationTarget && durationTarget > effectiveMaxDuration) {
-    return NextResponse.json(
-      {
-        error: `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
-      },
-      { status: 400 }
-    );
   }
 
   // Check if selected voices require payment (skip if paymentIntentIds provided)

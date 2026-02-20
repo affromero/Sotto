@@ -68,7 +68,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClient
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
   const [ttsModel, setTtsModel] = useState<string | undefined>();
-  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
+  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : isProUser ? 30 : FREE_TIER_MAX_DURATION_MINUTES;
   const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
@@ -98,7 +98,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClient
       setDurationTarget(clamped);
     }
     setStep('voice');
-  }, []);
+  }, [maxDuration]);
 
   const handleVoiceSelectionChange = useCallback((selection: VoiceSelection) => {
     setVoiceSelection(selection);
