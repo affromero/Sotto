@@ -52,10 +52,13 @@ export async function executeClaudeCode(
 
   logger.info('claude-code: executing', { model, promptLength: String(prompt.length) });
 
+  // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
+  const { CLAUDECODE: _, ...cleanEnv } = process.env;
+
   return new Promise<ClaudeCodeResponse>((resolve, reject) => {
     const child = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env },
+      env: cleanEnv,
     });
 
     let stdout = '';
@@ -121,14 +124,29 @@ export async function* streamClaudeCode(
 
   logger.info('claude-code: streaming', { model, promptLength: String(prompt.length) });
 
+  // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
+  const { CLAUDECODE: _, ...cleanEnv } = process.env;
+
   const child = spawn('claude', args, {
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env },
+    env: cleanEnv,
   });
 
   const timer = setTimeout(() => {
     child.kill('SIGTERM');
   }, timeoutMs);
+
+  // Capture stderr for error reporting
+  let stderr = '';
+  child.stderr.on('data', (chunk: Buffer) => {
+    stderr += chunk.toString();
+  });
+
+  // Track process exit code (non-blocking — captured via listener)
+  let exitCode: number | null = null;
+  child.on('close', (code) => {
+    exitCode = code;
+  });
 
   child.stdin.write(prompt);
   child.stdin.end();
@@ -155,7 +173,10 @@ export async function* streamClaudeCode(
           } else if (event.type === 'result' && !hasDeltas) {
             // Fallback: yield complete result only if no deltas were received
             const text = typeof event.result === 'string' ? event.result : '';
-            if (text) yield text;
+            if (text) {
+              hasDeltas = true;
+              yield text;
+            }
           } else if (event.type === 'assistant' && !hasDeltas) {
             // Fallback: extract text from assistant message content blocks
             const blocks = event.message?.content ?? event.content;
@@ -184,7 +205,10 @@ export async function* streamClaudeCode(
           yield event.delta.text;
         } else if (event.type === 'result' && !hasDeltas) {
           const text = typeof event.result === 'string' ? event.result : '';
-          if (text) yield text;
+          if (text) {
+            hasDeltas = true;
+            yield text;
+          }
         } else if (event.type === 'assistant' && !hasDeltas) {
           const blocks = event.message?.content ?? event.content;
           if (Array.isArray(blocks)) {
@@ -203,10 +227,24 @@ export async function* streamClaudeCode(
         }
       }
     }
+
+    // Surface errors when no text was produced
+    if (!hasDeltas) {
+      if (exitCode !== null && exitCode !== 0) {
+        const errorMsg = stderr.trim() || `claude-code exited with code ${exitCode}`;
+        logger.error('claude-code: stream failed', { exitCode: String(exitCode), stderr: stderr.slice(0, 500) });
+        throw new Error(errorMsg);
+      }
+      if (stderr.trim()) {
+        logger.error('claude-code: stream produced no output', { stderr: stderr.slice(0, 500) });
+        throw new Error(stderr.trim());
+      }
+    }
   } finally {
     clearTimeout(timer);
     if (!hasDeltas) {
       logger.warn('claude-code: stream ended with no text deltas', {
+        stderr: stderr.slice(0, 500),
         bufferRemainder: buffer.slice(0, 500),
       });
     }
