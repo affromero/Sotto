@@ -93,7 +93,7 @@ async def synthesize(
 
     buf = io.BytesIO()
     audio_array = np.array(audio) if not isinstance(audio, np.ndarray) else audio
-    sf.write(buf, audio_array, 22050, format="WAV", subtype="PCM_16")
+    sf.write(buf, audio_array, 24000, format="WAV", subtype="PCM_16")
     buf.seek(0)
 
     return Response(content=buf.read(), media_type="audio/wav")
