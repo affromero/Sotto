@@ -1,0 +1,171 @@
+/* ModelDropdown — Cursor-style compact model picker */
+
+.container {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* ===== Trigger pill ===== */
+
+.trigger {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.trigger:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.triggerDisabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.triggerLabel {
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.chevron {
+  color: var(--color-text-tertiary);
+  transition: transform var(--transition-fast);
+  transform: rotate(180deg);
+}
+
+.chevronOpen {
+  transform: rotate(0deg);
+}
+
+/* ===== Dropdown popover (opens upward) ===== */
+
+.dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 200px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  padding: var(--spacing-xs) 0;
+  animation: dropdownIn 150ms ease;
+}
+
+.dropdownHeader {
+  padding: 6px 12px 4px;
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.groupHeader {
+  padding: 8px 12px 4px;
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-top: 1px solid var(--color-border);
+  margin-top: 2px;
+}
+
+/* ===== Options ===== */
+
+.option {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  text-align: left;
+}
+
+.option:hover:not(:disabled) {
+  background: var(--color-primary-subtle);
+}
+
+.optionActive {
+  background: var(--color-primary-subtle);
+}
+
+.optionActive .optionName {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.optionUnavailable {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.optionName {
+  flex: 1;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.optionBadge {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-background);
+}
+
+.optionNoKey {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ===== Animation ===== */
+
+@keyframes dropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Responsive ===== */
+
+@media (max-width: 374px) {
+  .trigger {
+    height: 28px;
+    padding: 0 8px;
+  }
+
+  .triggerLabel {
+    font-size: var(--font-size-xs);
+  }
+
+  .dropdown {
+    min-width: 180px;
+  }
+}
