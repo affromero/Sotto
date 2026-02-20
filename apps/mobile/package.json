@@ -14,6 +14,10 @@
     "ios:submit": "eas submit --platform ios --latest",
     "ios:update": "eas update --branch production",
     "android": "expo run:android",
+    "android:build": "eas build --platform android --profile development",
+    "android:build:preview": "eas build --platform android --profile preview",
+    "android:build:production": "eas build --platform android --profile production",
+    "android:submit": "eas submit --platform android --latest",
     "type-check": "tsc --noEmit",
     "lint": "eslint app/ components/ lib/"
   },
