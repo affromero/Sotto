@@ -33,9 +33,10 @@ COPY main.py .
 
 # Pre-download the nano model at build time so the first request is instant.
 # kittentts 0.1.x always fetches KittenML/kitten-tts-nano-0.1 — no model arg.
-# "|| true" prevents a build failure if HuggingFace is unreachable in CI;
-# the model will be pulled on first startup instead.
-RUN python -c "from kittentts import KittenTTS; KittenTTS()" || true
+# HF_HUB_DOWNLOAD_TIMEOUT gives the download up to 5 min before giving up;
+# "|| true" prevents a hard build failure if HuggingFace is unreachable in CI
+# (the model will be pulled on first container startup instead).
+RUN HF_HUB_DOWNLOAD_TIMEOUT=300 python -c "from kittentts import KittenTTS; KittenTTS()" || true
 
 EXPOSE 8000
 
