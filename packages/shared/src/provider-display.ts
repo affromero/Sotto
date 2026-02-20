@@ -2,6 +2,7 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
   anthropic: { label: 'Anthropic (Claude)', shortLabel: 'Claude' },
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
   groq: { label: 'Groq', shortLabel: 'Groq' },
+  'claude-code': { label: 'Claude Code (Local)', shortLabel: 'Claude' },
 };
 
 export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -39,6 +40,9 @@ export const AI_MODEL_DISPLAY: Record<string, string> = {
   'claude-opus-4-6': 'Claude Opus 4.6',
   'gpt-4o-mini': 'GPT-4o Mini',
   'gpt-4o': 'GPT-4o',
+  'claude-code:haiku': 'Claude Haiku 4.5 (Local)',
+  'claude-code:sonnet': 'Claude Sonnet 4.5 (Local)',
+  'claude-code:opus': 'Claude Opus 4.6 (Local)',
 };
 
 /** Short model names without the provider prefix (for "Provider · Model" badges) */
@@ -48,6 +52,9 @@ export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
   'claude-opus-4-6': 'Opus 4.6',
   'gpt-4o-mini': '4o Mini',
   'gpt-4o': '4o',
+  'claude-code:haiku': 'Haiku 4.5',
+  'claude-code:sonnet': 'Sonnet 4.5',
+  'claude-code:opus': 'Opus 4.6',
 };
 
 export const TTS_MODEL_DISPLAY: Record<string, string> = {
