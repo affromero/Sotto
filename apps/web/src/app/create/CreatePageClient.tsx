@@ -130,8 +130,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClient
             title: metadata.topic,
             topic: metadata.topic,
             metadata: { ...metadata, durationTarget },
-            hostVoiceId: voiceSelection.hostVoiceId,
-            expertVoiceId: voiceSelection.expertVoiceId,
+            voices: voiceSelection.voices,
             ttsProvider,
             ttsModel,
             aiModel,
@@ -286,7 +285,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClient
         : 'Upload an existing audio file to share on Sotto';
     }
     if (step === 'discovery') {
-      return 'Tell Sotto what you want to learn. We will craft a two-voice podcast just for you.';
+      return 'Tell Sotto what you want to learn. We will craft a conversational podcast just for you.';
     }
     if (step === 'voice') {
       return 'Pick voices for your Host and Expert, or use auto-assign.';

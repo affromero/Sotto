@@ -61,11 +61,20 @@ body {
   --color-text-inverse: #FFFFFF;
   --color-muted: #6B7280;
 
-  /* Colors - Speaker (Podcast) */
-  --color-speaker-host: #D97706;
-  --color-speaker-host-bg: #FEF3C7;
-  --color-speaker-expert: #1E3A5F;
-  --color-speaker-expert-bg: #DBEAFE;
+  /* Colors - Speaker (Podcast) — indexed palette for up to 4 speakers */
+  --color-speaker-0: #D97706;
+  --color-speaker-0-bg: #FEF3C7;
+  --color-speaker-1: #1E3A5F;
+  --color-speaker-1-bg: #DBEAFE;
+  --color-speaker-2: #065F46;
+  --color-speaker-2-bg: #D1FAE5;
+  --color-speaker-3: #991B1B;
+  --color-speaker-3-bg: #FEE2E2;
+  /* Aliases for legacy CSS (backward compat) */
+  --color-speaker-host: var(--color-speaker-0);
+  --color-speaker-host-bg: var(--color-speaker-0-bg);
+  --color-speaker-expert: var(--color-speaker-1);
+  --color-speaker-expert-bg: var(--color-speaker-1-bg);
 
   /* Colors - Semantic */
   --color-success: #059669;
@@ -217,11 +226,19 @@ body {
   --color-accent-lighter: #1A2535;
   --color-accent-subtle: rgba(91, 138, 189, 0.12);
 
-  /* Speaker */
-  --color-speaker-host: #E8890F;
-  --color-speaker-host-bg: #3D2E14;
-  --color-speaker-expert: #5B8ABD;
-  --color-speaker-expert-bg: #1E2D3F;
+  /* Speaker — indexed palette for up to 4 speakers */
+  --color-speaker-0: #E8890F;
+  --color-speaker-0-bg: #3D2E14;
+  --color-speaker-1: #5B8ABD;
+  --color-speaker-1-bg: #1E2D3F;
+  --color-speaker-2: #34D399;
+  --color-speaker-2-bg: #1A2E25;
+  --color-speaker-3: #F87171;
+  --color-speaker-3-bg: #3D1A1A;
+  --color-speaker-host: var(--color-speaker-0);
+  --color-speaker-host-bg: var(--color-speaker-0-bg);
+  --color-speaker-expert: var(--color-speaker-1);
+  --color-speaker-expert-bg: var(--color-speaker-1-bg);
 
   /* Semantic — lighter base colors for dark bg readability */
   --color-success: #34D399;

@@ -46,8 +46,7 @@ interface SettingsFormProps {
   connectedProviders: string[];
   twitterHandle: string | null;
   twitterEnabled: boolean;
-  preferredHostVoiceId: string | null;
-  preferredExpertVoiceId: string | null;
+  voicePreferences: Array<{ speaker: string; voiceId: string }>;
   preferredLanguage: string | null;
   voiceClones: VoiceCloneData[];
   interestCategories: CategoryTag[];
@@ -78,8 +77,7 @@ export function SettingsForm({
   connectedProviders,
   twitterHandle,
   twitterEnabled: initialTwitterEnabled,
-  preferredHostVoiceId: initialHostVoiceId,
-  preferredExpertVoiceId: initialExpertVoiceId,
+  voicePreferences: initialVoicePreferences,
   preferredLanguage: initialPreferredLanguage,
   voiceClones,
   interestCategories,
@@ -150,8 +148,7 @@ export function SettingsForm({
   // Twitter state
   const isTwitterConnected = connectedProviders.includes('twitter');
   const [twitterEnabled, setTwitterEnabled] = useState(initialTwitterEnabled);
-  const [hostVoiceId, setHostVoiceId] = useState<string | null>(initialHostVoiceId);
-  const [expertVoiceId, setExpertVoiceId] = useState<string | null>(initialExpertVoiceId);
+  const [voicePrefs, setVoicePrefs] = useState(initialVoicePreferences);
   const [twitterSaving, setTwitterSaving] = useState(false);
   const [twitterSaved, setTwitterSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -238,8 +235,7 @@ export function SettingsForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           twitterEnabled,
-          preferredHostVoiceId: hostVoiceId,
-          preferredExpertVoiceId: expertVoiceId,
+          voicePreferences: voicePrefs,
         }),
       });
       if (response.ok) {
@@ -712,19 +708,22 @@ export function SettingsForm({
                 />
               </label>
 
-              <VoicePreferenceSelector
-                label="Preferred Host Voice"
-                value={hostVoiceId}
-                onChange={setHostVoiceId}
-                voiceClones={voiceClones}
-              />
-
-              <VoicePreferenceSelector
-                label="Preferred Expert Voice"
-                value={expertVoiceId}
-                onChange={setExpertVoiceId}
-                voiceClones={voiceClones}
-              />
+              {['Host', 'Expert'].map((speaker) => (
+                <VoicePreferenceSelector
+                  key={speaker}
+                  label={`Preferred ${speaker} Voice`}
+                  value={voicePrefs.find((v) => v.speaker === speaker)?.voiceId ?? null}
+                  onChange={(voiceId) => {
+                    setVoicePrefs((prev) => {
+                      const filtered = prev.filter((v) => v.speaker !== speaker);
+                      return voiceId
+                        ? [...filtered, { speaker, voiceId }]
+                        : filtered;
+                    });
+                  }}
+                  voiceClones={voiceClones}
+                />
+              ))}
 
               <div className={styles.formActions}>
                 <Button

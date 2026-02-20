@@ -408,7 +408,13 @@ export default function PodcastScreen() {
         renderItem={({ item, index }) => {
           const isCurrent = index === currentSegmentIndex;
           const isDimmed = teleprompterEnabled && !isCurrent;
-          const isHost = item.speaker === 'HOST';
+          const speakerPalette = colors.speakers;
+          const allSpeakers: string[] = [];
+          for (const seg of segments) {
+            if (!allSpeakers.includes(seg.speaker)) allSpeakers.push(seg.speaker);
+          }
+          const speakerIdx = Math.max(0, allSpeakers.indexOf(item.speaker)) % speakerPalette.length;
+          const speakerColor = speakerPalette[speakerIdx];
           return (
             <View
               style={[
@@ -421,13 +427,13 @@ export default function PodcastScreen() {
               <View
                 style={[
                   styles.speakerBadge,
-                  isHost ? styles.speakerBadgeHost : styles.speakerBadgeExpert,
+                  { backgroundColor: speakerColor.bg },
                 ]}
               >
                 <Text
                   style={[
                     styles.speakerLabel,
-                    isHost ? styles.speakerLabelHost : styles.speakerLabelExpert,
+                    { color: speakerColor.color },
                   ]}
                 >
                   {item.speaker}
@@ -799,12 +805,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     marginBottom: spacing.xs,
   },
-  speakerBadgeHost: {
-    backgroundColor: colors.speakerHostBg,
-  },
-  speakerBadgeExpert: {
-    backgroundColor: colors.speakerExpertBg,
-  },
+  // Speaker badge colors applied dynamically via colors.speakers[index]
   speakerLabel: {
     fontFamily: typography.fontBody,
     fontSize: 11,
@@ -812,12 +813,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  speakerLabelHost: {
-    color: colors.speakerHost,
-  },
-  speakerLabelExpert: {
-    color: colors.speakerExpert,
-  },
+  // Speaker label colors applied dynamically via colors.speakers[index]
   segmentText: {
     fontFamily: typography.fontBody,
     fontSize: 15,

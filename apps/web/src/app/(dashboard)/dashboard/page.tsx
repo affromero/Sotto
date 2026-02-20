@@ -269,7 +269,7 @@ export default async function DashboardPage() {
             </div>
             <h3 className={styles.emptyTitle}>Create your first podcast</h3>
             <p className={styles.emptyText}>
-              Chat with Sotto about any topic and generate a custom two-voice podcast in minutes.
+              Chat with Sotto about any topic and generate a custom podcast in minutes.
             </p>
             <Link href="/create" className={styles.emptyCta}>
               Get Started

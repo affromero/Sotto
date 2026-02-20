@@ -97,8 +97,7 @@ export default async function SettingsPage() {
         connectedProviders={connectedProviders}
         twitterHandle={user.twitterHandle}
         twitterEnabled={user.twitterEnabled}
-        preferredHostVoiceId={user.voicePreferences.find(v => v.speaker === 'HOST')?.voiceId ?? null}
-        preferredExpertVoiceId={user.voicePreferences.find(v => v.speaker === 'EXPERT')?.voiceId ?? null}
+        voicePreferences={user.voicePreferences}
         preferredLanguage={user.preferredLanguage}
         voiceClones={voiceClones}
         interestCategories={categories}
