@@ -101,52 +101,52 @@ export default function FeedScreen() {
         ))}
       </View>
 
-      {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : isError ? (
-        <ErrorState
-          message={
-            error instanceof Error ? error.message : 'Failed to load feed'
-          }
-          onRetry={() => refetch()}
-        />
-      ) : (
-        <FlatList
-          data={podcasts}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={
-            podcasts.length === 0
-              ? styles.emptyListContainer
-              : styles.listContent
-          }
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching && !isFetchingNextPage}
-              onRefresh={() => refetch()}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+      <FlatList
+        data={podcasts}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        contentContainerStyle={
+          podcasts.length === 0
+            ? styles.emptyListContainer
+            : styles.listContent
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching && !isFetchingNextPage}
+            onRefresh={() => refetch()}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : isError ? (
+            <ErrorState
+              message={
+                error instanceof Error ? error.message : 'Failed to load feed'
+              }
+              onRetry={() => refetch()}
             />
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={
+          ) : (
             <EmptyState
               title="No podcasts yet"
               subtitle="Be the first to create one"
             />
-          }
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <View style={styles.footerLoader}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : null
-          }
-        />
-      )}
+          )
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : null
+        }
+      />
     </View>
   );
 }

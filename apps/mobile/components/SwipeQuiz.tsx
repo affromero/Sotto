@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -35,6 +35,14 @@ export function SwipeQuiz({ onComplete, onSelectTopic }: SwipeQuizProps) {
   const [savedToast, setSavedToast] = useState(false);
   const savedToastTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
   const toastScale = useSharedValue(0);
+
+  useEffect(() => {
+    return () => {
+      if (savedToastTimeout.current) {
+        clearTimeout(savedToastTimeout.current);
+      }
+    };
+  }, []);
 
   const { data, isLoading, isError, refetch } = useQuery<QuestionsResponse>({
     queryKey: ['taste-quiz'],
