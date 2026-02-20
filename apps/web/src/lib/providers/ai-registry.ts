@@ -94,9 +94,11 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   groq: {
     id: 'groq',
     displayName: 'Groq',
-    defaultModel: 'whisper-large-v3-turbo',
+    defaultModel: 'llama-3.3-70b-versatile',
     getApiKeyUrl: 'https://console.groq.com/keys',
     models: [
+      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', tier: 'fast' },
+      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', tier: 'best' },
       { id: 'whisper-large-v3-turbo', displayName: 'Whisper Large v3 Turbo', tier: 'fast' },
     ],
     auth: {
