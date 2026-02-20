@@ -384,11 +384,9 @@ describe('InspireMe', () => {
 
     render(<InspireMe open={true} onClose={vi.fn()} onSelectTopic={vi.fn()} />);
 
+    // Wait for content to appear — confirms loading is done and input is enabled
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/inspire/all',
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
+      expect(screen.getByText('AI meets Ancient History')).toBeInTheDocument();
     });
 
     const input = screen.getByPlaceholderText(/Focus on/);
