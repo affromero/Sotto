@@ -396,7 +396,7 @@ Users can manage their Twitter integration via `GET/PATCH/DELETE /api/users/me/t
 | Method | Action |
 |---|---|
 | `GET` | Returns `connected`, `twitterHandle`, `twitterEnabled`, voice preferences |
-| `PATCH` | Toggle `twitterEnabled`, set `preferredHostVoiceId` / `preferredExpertVoiceId` |
+| `PATCH` | Toggle `twitterEnabled`, set voice preferences via `voicePreferences` array |
 | `DELETE` | Disconnect Twitter: removes Account record, clears handle, sets `twitterEnabled = false` |
 
 ---

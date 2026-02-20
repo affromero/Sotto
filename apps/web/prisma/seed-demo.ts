@@ -186,7 +186,7 @@ async function main() {
   ];
 
   // Segment templates — realistic two-voice podcast dialogue
-  const segmentSets: { speaker: 'HOST' | 'EXPERT'; text: string }[][] = [
+  const segmentSets: { speaker: string; text: string }[][] = [
     // Cryptography
     [
       {
