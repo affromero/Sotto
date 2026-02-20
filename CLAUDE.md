@@ -143,7 +143,7 @@ Each subdirectory has its own `CLAUDE.md` with full file listings:
 | `workers/` | `src/workers/CLAUDE.md` | 25 workers, pipeline flow |
 | `types/` | `src/types/CLAUDE.md` | Type re-exports from @sotto/shared |
 | `styles/` | `src/styles/CLAUDE.md` | Design system tokens |
-| `prisma/` | `prisma/CLAUDE.md` | 58 Prisma models |
+| `prisma/` | `prisma/CLAUDE.md` | 60 Prisma models |
 
 ## Design System: "Warm Intimacy"
 
@@ -203,7 +203,7 @@ Both bots poll for mentions → parse intent via Claude → create Podcast (sour
 
 User taps "Ask a Question" → podcast pauses → Claude answers using segment-based timestamp → user can incorporate answer into podcast → `segment-regeneration` worker creates new HOST segment → `audio-stitching` re-concats.
 
-## Database Schema (58 models)
+## Database Schema (60 models)
 
 Core models — see `apps/web/prisma/CLAUDE.md` for the full breakdown:
 
