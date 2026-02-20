@@ -6,7 +6,6 @@ import { getMentions, getTweet, getThread, replyToTweet } from '@/lib/twitter';
 import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
 import { getAiKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
@@ -264,9 +263,8 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
 
     // Increment free tier counter for non-BYOK users
     if (!gate.isByokUser) {
-      const config = await getFreeTierConfig();
       const selected = await selectFreeTierProviders(userId);
-      await tryIncrementFreeGeneration(userId, config.generationLimit, {
+      await tryIncrementFreeGeneration(userId, gate.dailyLimit, {
         ai: { provider: selected.aiProvider, quota: selected.aiQuota },
         tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
       });

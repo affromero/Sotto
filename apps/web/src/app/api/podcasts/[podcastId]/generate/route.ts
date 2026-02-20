@@ -15,7 +15,6 @@ import {
 } from '@/lib/queue';
 import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey, getByokKey } from '@/lib/byok';
@@ -65,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Generation gate: BYOK or free tier (skip for admins)
   const gate = isAdmin
-    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0 }
+    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0, dailyLimit: 0 }
     : await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
     const msg =
@@ -180,9 +179,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Increment free tier counter (skip for FAILED retries — already counted)
   if (!gate.isByokUser) {
-    const config = await getFreeTierConfig();
     const selected = await selectFreeTierProviders(authResult.userId);
-    await tryIncrementFreeGeneration(authResult.userId, config.generationLimit, {
+    await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });

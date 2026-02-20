@@ -78,7 +78,7 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true },
+      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
     }),
   ]);
 
@@ -86,11 +86,15 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const isProUser = user.plan === 'PRO';
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
+  // Effective daily limit: per-user override takes precedence over global config
+  const effectiveDailyLimit =
+    user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+
   const baseResult = {
     freeGenerationsUsed: user.freeGenerationsUsed,
     freeGenerationsLimit: config.generationLimit,
     dailyUsed: 0,
-    dailyLimit: config.dailyGenerationLimit,
+    dailyLimit: effectiveDailyLimit,
     isByokUser,
     isProUser,
   };
@@ -98,6 +102,11 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   // BYOK, PRO, and privileged users bypass all counters
   if (isByokUser || isProUser || isPrivileged) {
     return { ...baseResult, allowed: true, reason: 'ok', isByokUser: isByokUser || isPrivileged };
+  }
+
+  // Per-user unlimited override (dailyGenerationOverride === 0)
+  if (user.dailyGenerationOverride === 0) {
+    return { ...baseResult, allowed: true, reason: 'ok' };
   }
 
   // Ensure platform TTS (KittenTTS) is available
@@ -112,9 +121,8 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
 
   // Free user: check Redis rolling 24h window
   const { count: dailyUsed, ttl } = await getDailyCount(userId);
-  const dailyLimit = config.dailyGenerationLimit;
 
-  if (dailyUsed >= dailyLimit) {
+  if (dailyUsed >= effectiveDailyLimit) {
     const resetInSeconds = ttl > 0 ? ttl : 86400;
     return {
       ...baseResult,
@@ -219,7 +227,7 @@ export async function getFreeTierStatus(userId: string): Promise<{
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true },
+      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
     }),
     getDailyCount(userId),
   ]);
@@ -228,13 +236,16 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
   const isProUser = user.plan === 'PRO';
 
+  const effectiveDailyLimit =
+    user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+
   const base = {
     freeGenerationsUsed: user.freeGenerationsUsed,
     freeGenerationsLimit: config.generationLimit,
     freeGenerationsRemaining: Math.max(0, config.generationLimit - user.freeGenerationsUsed),
     dailyUsed: dailyData.count,
-    dailyLimit: config.dailyGenerationLimit,
-    dailyRemaining: Math.max(0, config.dailyGenerationLimit - dailyData.count),
+    dailyLimit: effectiveDailyLimit,
+    dailyRemaining: effectiveDailyLimit === 0 ? Infinity : Math.max(0, effectiveDailyLimit - dailyData.count),
     ...(dailyData.ttl > 0 && { resetInSeconds: dailyData.ttl }),
     isByokUser: isByokUser || isPrivileged,
     isProUser,
