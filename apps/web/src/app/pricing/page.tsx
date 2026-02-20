@@ -35,7 +35,7 @@ export default function PricingPage() {
               <ul className={styles.planFeatures}>
                 <li>1 podcast per day</li>
                 <li>Platform Groq AI + KittenTTS</li>
-                <li>Up to 15 minutes</li>
+                <li>Up to 5 minutes</li>
                 <li>3 Q&amp;A interactions per podcast</li>
                 <li>Browse, listen, and fork</li>
                 <li>Collections and social features</li>
