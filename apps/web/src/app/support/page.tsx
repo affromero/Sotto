@@ -41,7 +41,7 @@ export default function SupportPage() {
                 <strong>Discord Community</strong>
                 <p>
                   Join our{' '}
-                  <a href="https://discord.gg/ufrTRR48pV" target="_blank" rel="noopener noreferrer">Discord server</a>{' '}
+                  <a href="https://discord.gg/Dm4T42RXa" target="_blank" rel="noopener noreferrer">Discord server</a>{' '}
                   to chat with other creators, share podcasts, and get help
                   from the community.
                 </p>
