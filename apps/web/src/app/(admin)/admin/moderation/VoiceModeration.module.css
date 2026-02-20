@@ -1,0 +1,222 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font: var(--text-body-sm);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.loading,
+.empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font: var(--text-body);
+}
+
+.tableContainer {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.rowExpanded td {
+  background: var(--color-background);
+}
+
+.voiceNameBtn {
+  background: none;
+  border: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voiceNameBtn:hover {
+  color: var(--color-primary);
+}
+
+.fpBadge {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+  border-radius: var(--radius-sm);
+}
+
+.ownerCell {
+  color: var(--color-text-secondary);
+}
+
+.dateCell {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.statusVerified {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.statusProtected {
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+}
+
+.statusBlocked {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.statusPending {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--color-primary);
+}
+
+.statusDefault {
+  background: var(--color-background);
+  color: var(--color-text-secondary);
+}
+
+.matchInfo {
+  font-size: 12px;
+  color: #dc2626;
+}
+
+.challengeHistory {
+  margin-top: 8px;
+  padding: 8px 0;
+}
+
+.challengeTitle {
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+.challengeRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.challengePhrase {
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.similarity {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.passed { color: #16a34a; font-weight: 600; }
+.failed { color: #dc2626; font-weight: 600; }
+.pending { color: var(--color-text-secondary); }
+
+.actionCell {
+  white-space: nowrap;
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.actionVerify,
+.actionBlock,
+.actionProtect,
+.actionUnblock {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: opacity var(--transition-base);
+}
+
+.actionVerify {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
+.actionBlock {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.actionProtect {
+  background: rgba(30, 58, 95, 0.1);
+  color: var(--color-accent);
+  border-color: rgba(30, 58, 95, 0.2);
+}
+
+.actionUnblock {
+  background: rgba(217, 119, 6, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(217, 119, 6, 0.2);
+}
+
+.actionVerify:disabled,
+.actionBlock:disabled,
+.actionProtect:disabled,
+.actionUnblock:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
