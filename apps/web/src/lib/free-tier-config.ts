@@ -17,18 +17,20 @@ export interface FreeTierConfig {
   sttProvider: SttProviderId;
   sttModel: string;
   generationLimit: number;
+  dailyGenerationLimit: number;
   aiAllocations: ProviderAllocation[];
   ttsAllocations: ProviderAllocation[];
 }
 
 const DEFAULTS: Omit<FreeTierConfig, 'aiAllocations' | 'ttsAllocations'> = {
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'openai',
-  ttsModel: 'tts-1-hd',
+  aiProvider: 'groq',
+  aiModel: 'llama-3.1-8b-instant',
+  ttsProvider: 'kittentts',
+  ttsModel: 'kitten-tts-mini-0.8',
   sttProvider: 'groq',
   sttModel: 'whisper-large-v3-turbo',
   generationLimit: 3,
+  dailyGenerationLimit: 1,
 };
 
 function parseAllocations(json: unknown): ProviderAllocation[] {
@@ -60,6 +62,7 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
       sttProvider: DEFAULTS.sttProvider,
       sttModel: DEFAULTS.sttModel,
       generationLimit: DEFAULTS.generationLimit,
+      dailyGenerationLimit: DEFAULTS.dailyGenerationLimit,
     },
   });
 
@@ -71,6 +74,7 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
     sttProvider: row.sttProvider as SttProviderId,
     sttModel: row.sttModel,
     generationLimit: row.generationLimit,
+    dailyGenerationLimit: row.dailyGenerationLimit,
     aiAllocations: parseAllocations(row.aiAllocations),
     ttsAllocations: parseAllocations(row.ttsAllocations),
   };
@@ -93,6 +97,9 @@ export async function setFreeTierConfig(
       ...(data.sttProvider !== undefined && { sttProvider: data.sttProvider }),
       ...(data.sttModel !== undefined && { sttModel: data.sttModel }),
       ...(data.generationLimit !== undefined && { generationLimit: data.generationLimit }),
+      ...(data.dailyGenerationLimit !== undefined && {
+        dailyGenerationLimit: data.dailyGenerationLimit,
+      }),
       ...(data.aiAllocations !== undefined && { aiAllocations: data.aiAllocations }),
       ...(data.ttsAllocations !== undefined && { ttsAllocations: data.ttsAllocations }),
       updatedBy: adminId,
@@ -106,6 +113,7 @@ export async function setFreeTierConfig(
       sttProvider: data.sttProvider ?? DEFAULTS.sttProvider,
       sttModel: data.sttModel ?? DEFAULTS.sttModel,
       generationLimit: data.generationLimit ?? DEFAULTS.generationLimit,
+      dailyGenerationLimit: data.dailyGenerationLimit ?? DEFAULTS.dailyGenerationLimit,
       aiAllocations: data.aiAllocations ?? [],
       ttsAllocations: data.ttsAllocations ?? [],
       updatedBy: adminId,
