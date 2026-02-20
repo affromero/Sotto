@@ -258,6 +258,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     durationTarget: discovery.durationTarget || 10,
     sourceContent: discovery.sourceContent || undefined,
     sourceMetadata: sourceMetadata || undefined,
+    speakers: (discovery.speakers as Array<{ name: string; description: string }>) || undefined,
     previousScript: turns,
     previousReferences: generatedRefs,
     verificationFeedback: verdict.feedback,
