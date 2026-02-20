@@ -15,8 +15,10 @@ export const createPodcastSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
   discoveryId: z.string().optional(),
-  hostVoiceId: z.string().optional(),
-  expertVoiceId: z.string().optional(),
+  voices: z.array(z.object({
+    speaker: z.string().min(1).max(50),
+    voiceId: z.string().optional(),
+  })).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   aiModel: z.string().optional(),
   ttsModel: z.string().optional(),
@@ -39,7 +41,7 @@ export const createPodcastSchema = z.object({
  */
 export const updateScriptSchema = z.object({
   turns: z.array(z.object({
-    speaker: z.enum(['HOST', 'EXPERT']),
+    speaker: z.string().min(1).max(50),
     text: z.string().min(1).max(10000),
     direction: z.string().optional(),
   })).min(2),
@@ -165,8 +167,10 @@ export const waitlistSchema = z.object({
  */
 export const twitterSettingsSchema = z.object({
   twitterEnabled: z.boolean().optional(),
-  preferredHostVoiceId: z.string().nullable().optional(),
-  preferredExpertVoiceId: z.string().nullable().optional(),
+  voicePreferences: z.array(z.object({
+    speaker: z.string().min(1).max(50),
+    voiceId: z.string().min(1),
+  })).optional(),
   preferredTtsProvider: z.string().nullable().optional(),
   preferredTtsModel: z.string().nullable().optional(),
   preferredAiProvider: z.string().nullable().optional(),
@@ -480,7 +484,7 @@ export const trendGenerateSchema = z.object({
  */
 export const generatedScriptSchema = z.object({
   turns: z.array(z.object({
-    speaker: z.enum(['HOST', 'EXPERT']),
+    speaker: z.string().min(1).max(50),
     text: z.string().min(1),
     direction: z.string().optional(),
   })).min(2),

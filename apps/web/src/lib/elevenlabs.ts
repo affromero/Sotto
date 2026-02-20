@@ -58,7 +58,7 @@ export function selectVoicePair(
  * Get voice ID for a speaker role on a specific podcast.
  * Falls back to env overrides if set, otherwise uses the voice pool.
  */
-export function getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+export function getVoiceId(speaker: string, podcastId?: string): string {
   const envHost = process.env.ELEVENLABS_HOST_VOICE_ID;
   const envExpert = process.env.ELEVENLABS_EXPERT_VOICE_ID;
   if (envHost && envExpert) {

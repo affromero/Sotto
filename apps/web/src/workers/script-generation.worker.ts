@@ -80,6 +80,12 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
     : requestedDuration;
 
+  // Cap speakers to tier limit
+  const requestedSpeakers = discovery.speakers as Array<{ name: string; description: string }> | null;
+  const cappedSpeakers = requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers
+    ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
+    : requestedSpeakers;
+
   const result = await generateScript({
     topic: discovery.topic || '',
     depth: discovery.depth || 'standard',
@@ -90,6 +96,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     durationTarget: cappedDuration,
     sourceContent: discovery.sourceContent || undefined,
     sourceMetadata: sourceMetadata || undefined,
+    speakers: cappedSpeakers ?? undefined,
     apiKeyOverride: aiKey?.apiKey,
     model,
     webSearchEnabled: tierFeatures.webSearchEnabled,

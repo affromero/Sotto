@@ -43,8 +43,6 @@ model User {
   // Twitter integration
   twitterHandle          String?   @unique
   twitterEnabled         Boolean   @default(false)
-  preferredHostVoiceId   String?
-  preferredExpertVoiceId String?
   preferredLanguage      String?
   preferredTtsProvider   String?
   preferredTtsModel      String?
@@ -160,6 +158,9 @@ model User {
   // Voice purchases
   voicePurchases VoicePurchase[] @relation("VoiceBuyer")
 
+  // Voice preferences (multi-speaker)
+  voicePreferences UserVoicePreference[]
+
   // Per-provider free tier usage tracking
   freeProviderUsage FreeProviderUsage[]
 
@@ -258,8 +259,6 @@ model Podcast {
   fileSize           Int?    // bytes
 
   // Voice selection
-  hostVoiceId     String?
-  expertVoiceId   String?
   ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
   ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
@@ -324,6 +323,7 @@ model Podcast {
   comments         Comment[]
   collectionItems  CollectionItem[]
   savedIdea        SavedIdea?
+  voices           PodcastVoice[]
   voicePurchases   VoicePurchase[]
   autoTweets       TwitterAutoTweet[]
   ratings          PodcastRating[]
@@ -384,6 +384,7 @@ model Discovery {
   focusAreas     String[] // array of focus topics
   tone           String?  // casual, professional, socratic
   durationTarget Int?     // minutes
+  speakers       Json?    // [{name: "Host", description: "..."}] for multi-voice
   priorKnowledge String?  @db.Text
   sourceUrl      String?
   sourceContent  String?  @db.Text
@@ -434,7 +435,7 @@ model Script {
 model Segment {
   id        String  @id @default(cuid())
   podcastId String
-  speaker   Speaker
+  speaker   String
   text      String  @db.Text
   audioUrl  String?
   order     Int
@@ -451,9 +452,31 @@ model Segment {
   @@index([order])
 }
 
-enum Speaker {
-  HOST
-  EXPERT
+// ============ PODCAST VOICE ASSIGNMENTS ============
+
+model PodcastVoice {
+  id        String  @id @default(cuid())
+  podcastId String
+  speaker   String  // "Host", "Expert", "Skeptic", etc.
+  voiceId   String? // TTS voice ID (pool or clone)
+  podcast   Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([podcastId, speaker])
+  @@index([podcastId])
+}
+
+// ============ USER VOICE PREFERENCES ============
+
+model UserVoicePreference {
+  id        String @id @default(cuid())
+  userId    String
+  speaker   String
+  voiceId   String
+  sortOrder Int    @default(0)
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, speaker])
+  @@index([userId])
 }
 
 // ============ PODCAST VERSIONS ============

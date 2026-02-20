@@ -66,7 +66,7 @@ export class FalProvider implements TtsProvider {
     return Buffer.from(arrayBuffer);
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string, metadata?: VoiceMatchMetadata): string {
+  getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
     if (!podcastId) {
       return speaker === 'HOST' ? FAL_VOICE_POOL[0].id : FAL_VOICE_POOL[1].id;
     }

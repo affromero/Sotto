@@ -51,14 +51,22 @@
   margin-bottom: var(--spacing-xs);
 }
 
-.host {
-  color: var(--color-speaker-host);
-  background: var(--color-speaker-host-bg);
+/* Speaker-indexed badge colors */
+.speaker[data-speaker-index="0"] {
+  color: var(--color-speaker-0);
+  background: var(--color-speaker-0-bg);
 }
-
-.expert {
-  color: var(--color-speaker-expert);
-  background: var(--color-speaker-expert-bg);
+.speaker[data-speaker-index="1"] {
+  color: var(--color-speaker-1);
+  background: var(--color-speaker-1-bg);
+}
+.speaker[data-speaker-index="2"] {
+  color: var(--color-speaker-2);
+  background: var(--color-speaker-2-bg);
+}
+.speaker[data-speaker-index="3"] {
+  color: var(--color-speaker-3);
+  background: var(--color-speaker-3-bg);
 }
 
 .text {

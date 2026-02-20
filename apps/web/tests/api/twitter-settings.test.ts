@@ -14,6 +14,8 @@ const mockPrismaUserUpdate = vi.fn();
 const mockPrismaAccountFindFirst = vi.fn();
 const mockPrismaAccountDeleteMany = vi.fn();
 const mockPrismaTransaction = vi.fn();
+const mockUserVoicePreferenceDeleteMany = vi.fn().mockResolvedValue({});
+const mockUserVoicePreferenceCreateMany = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -24,6 +26,10 @@ vi.mock('@/lib/prisma', () => {
     account: {
       findFirst: (...args: unknown[]) => mockPrismaAccountFindFirst(...args),
       deleteMany: (...args: unknown[]) => mockPrismaAccountDeleteMany(...args),
+    },
+    userVoicePreference: {
+      deleteMany: (...args: unknown[]) => mockUserVoicePreferenceDeleteMany(...args),
+      createMany: (...args: unknown[]) => mockUserVoicePreferenceCreateMany(...args),
     },
     $transaction: (operations: unknown) => mockPrismaTransaction(operations),
   };
@@ -54,8 +60,10 @@ describe('Twitter Settings API', () => {
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterHandle: '@johndoe',
         twitterEnabled: true,
-        preferredHostVoiceId: 'voice-host-1',
-        preferredExpertVoiceId: 'voice-expert-1',
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'voice-host-1' },
+          { speaker: 'EXPERT', voiceId: 'voice-expert-1' },
+        ],
         preferredTtsProvider: 'elevenlabs',
         preferredTtsModel: null,
         preferredAiProvider: 'anthropic',
@@ -72,8 +80,10 @@ describe('Twitter Settings API', () => {
       expect(data).toEqual({
         twitterHandle: '@johndoe',
         twitterEnabled: true,
-        preferredHostVoiceId: 'voice-host-1',
-        preferredExpertVoiceId: 'voice-expert-1',
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'voice-host-1' },
+          { speaker: 'EXPERT', voiceId: 'voice-expert-1' },
+        ],
         preferredTtsProvider: 'elevenlabs',
         preferredTtsModel: null,
         preferredAiProvider: 'anthropic',
@@ -97,8 +107,7 @@ describe('Twitter Settings API', () => {
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterHandle: null,
         twitterEnabled: false,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -113,13 +122,12 @@ describe('Twitter Settings API', () => {
       expect(data.connected).toBe(false);
     });
 
-    it('returns null voice IDs when not set', async () => {
+    it('returns empty voicePreferences when not set', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-003' } });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterHandle: '@testuser',
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -132,8 +140,7 @@ describe('Twitter Settings API', () => {
       const response = await GET();
       const data = await response.json();
 
-      expect(data.preferredHostVoiceId).toBeNull();
-      expect(data.preferredExpertVoiceId).toBeNull();
+      expect(data.voicePreferences).toEqual([]);
     });
   });
 

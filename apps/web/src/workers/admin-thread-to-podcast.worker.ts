@@ -117,8 +117,14 @@ export async function processAdminThreadToPodcast(
       status: 'EXTRACTING',
       source: 'TWITTER',
       sourceTweetId: tweetId,
-      hostVoiceId: voicePair.host.id,
-      expertVoiceId: voicePair.expert.id,
+      voices: {
+        createMany: {
+          data: [
+            { speaker: 'HOST', voiceId: voicePair.host.id },
+            { speaker: 'EXPERT', voiceId: voicePair.expert.id },
+          ],
+        },
+      },
       visibility: 'PUBLIC',
       discovery: {
         create: {

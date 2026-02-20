@@ -10,6 +10,7 @@ const PRIVILEGED_ROLES = new Set(['ADMIN', 'SYSTEM']);
 
 export interface TierFeatures {
   maxDurationMinutes: number;
+  maxSpeakers: number;
   autoApproveScript: boolean;
   webSearchEnabled: boolean;
   maxQaInteractions: number;
@@ -20,6 +21,7 @@ export interface TierFeatures {
 
 const FREE_FEATURES: TierFeatures = {
   maxDurationMinutes: 5,
+  maxSpeakers: 2,
   autoApproveScript: true,
   webSearchEnabled: false,
   maxQaInteractions: 3,
@@ -30,6 +32,7 @@ const FREE_FEATURES: TierFeatures = {
 
 const PRO_FEATURES: TierFeatures = {
   maxDurationMinutes: 30,
+  maxSpeakers: 4,
   autoApproveScript: false,
   webSearchEnabled: true,
   maxQaInteractions: Infinity,

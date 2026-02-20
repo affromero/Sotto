@@ -253,13 +253,11 @@ export async function capturePodcastPayments(podcastId: string): Promise<void> {
  */
 export async function computeVoiceCharges(
   userId: string,
-  hostVoiceId?: string,
-  expertVoiceId?: string
+  voices: Array<{ speaker: string; voiceId: string }>
 ): Promise<VoiceCharge[]> {
   const charges: VoiceCharge[] = [];
-  const voiceIds = [hostVoiceId, expertVoiceId].filter(Boolean) as string[];
 
-  for (const externalVoiceId of voiceIds) {
+  for (const { voiceId: externalVoiceId } of voices) {
     const voice = await findVoiceCloneByExternalId(externalVoiceId);
     if (!voice || !voice.priceInCents || voice.priceInCents <= 0) continue;
 

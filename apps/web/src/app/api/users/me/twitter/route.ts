@@ -15,8 +15,7 @@ export async function GET(): Promise<NextResponse> {
     select: {
       twitterHandle: true,
       twitterEnabled: true,
-      preferredHostVoiceId: true,
-      preferredExpertVoiceId: true,
+      voicePreferences: { select: { speaker: true, voiceId: true } },
       preferredTtsProvider: true,
       preferredTtsModel: true,
       preferredAiProvider: true,
@@ -32,8 +31,7 @@ export async function GET(): Promise<NextResponse> {
   const data: TwitterSettingsData = {
     twitterHandle: user.twitterHandle,
     twitterEnabled: user.twitterEnabled,
-    preferredHostVoiceId: user.preferredHostVoiceId,
-    preferredExpertVoiceId: user.preferredExpertVoiceId,
+    voicePreferences: user.voicePreferences,
     preferredTtsProvider: user.preferredTtsProvider,
     preferredTtsModel: user.preferredTtsModel,
     preferredAiProvider: user.preferredAiProvider,
@@ -62,19 +60,13 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
   }
 
   const {
-    twitterEnabled, preferredHostVoiceId, preferredExpertVoiceId,
+    twitterEnabled, voicePreferences,
     preferredTtsProvider, preferredTtsModel, preferredAiProvider, preferredAiModel,
   } = parsed.data;
 
   const updateData: Record<string, unknown> = {};
   if (twitterEnabled !== undefined) {
     updateData.twitterEnabled = twitterEnabled;
-  }
-  if (preferredHostVoiceId !== undefined) {
-    updateData.preferredHostVoiceId = preferredHostVoiceId;
-  }
-  if (preferredExpertVoiceId !== undefined) {
-    updateData.preferredExpertVoiceId = preferredExpertVoiceId;
   }
   if (preferredTtsProvider !== undefined) {
     updateData.preferredTtsProvider = preferredTtsProvider;
@@ -89,14 +81,28 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
     updateData.preferredAiModel = preferredAiModel;
   }
 
+  // Update voice preferences if provided
+  if (voicePreferences !== undefined) {
+    await prisma.userVoicePreference.deleteMany({ where: { userId: session.user.id } });
+    if (voicePreferences.length > 0) {
+      await prisma.userVoicePreference.createMany({
+        data: voicePreferences.map((vp, i) => ({
+          userId: session.user.id,
+          speaker: vp.speaker,
+          voiceId: vp.voiceId,
+          sortOrder: i,
+        })),
+      });
+    }
+  }
+
   const user = await prisma.user.update({
     where: { id: session.user.id },
     data: updateData,
     select: {
       twitterHandle: true,
       twitterEnabled: true,
-      preferredHostVoiceId: true,
-      preferredExpertVoiceId: true,
+      voicePreferences: { select: { speaker: true, voiceId: true } },
       preferredTtsProvider: true,
       preferredTtsModel: true,
       preferredAiProvider: true,

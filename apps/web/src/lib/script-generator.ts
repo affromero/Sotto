@@ -4,7 +4,7 @@ import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 
 export type ScriptTurn = {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   direction?: string; // delivery direction: "laughing", "whispering", "excited"
 };
@@ -147,6 +147,7 @@ export async function generateScript(params: {
   durationTarget: number;
   sourceContent?: string;
   sourceMetadata?: SourceMetadata;
+  speakers?: Array<{ name: string; description: string }>;
   apiKeyOverride?: string;
   model?: string;
   webSearchEnabled?: boolean;
@@ -159,11 +160,17 @@ export async function generateScript(params: {
   outputTokens: number;
   model: string;
 }> {
-  const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive 2-voice podcast scripts that listeners can't stop playing.
+  const speakers = params.speakers ?? [
+    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.' },
+    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.' },
+  ];
+  const speakerCount = speakers.length;
+  const speakerSection = speakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+
+  const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive ${speakerCount}-voice podcast scripts that listeners can't stop playing.
 
 ## Speakers:
-- HOST: Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects with short reactions.
-- EXPERT: Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.
+${speakerSection}
 
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture
@@ -234,8 +241,8 @@ You MUST include inline citations in the dialogue using [N] notation (e.g. [1], 
 - Only cite REAL, verifiable sources — search the web to find actual papers, books, and reports
 - Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)
 - For journal papers, always include the DOI in the "doi" field
-- HOST introduces citations conversationally: "I read that researchers at MIT found..." [3]
-- EXPERT cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
+- ${speakers[0].name} introduces citations conversationally: "I read that researchers at MIT found..." [3]
+- ${speakers.length > 1 ? speakers[1].name : speakers[0].name} cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim
 - Do NOT invent fake citations. Do NOT cite Wikipedia, personal blogs, social media, or content farms
 - Each non-obvious factual claim should be supported by at least 3 independent sources
@@ -251,8 +258,8 @@ Include sound effect suggestions as [SFX: description] markers at natural transi
 Return a JSON object with three arrays:
 {
   "turns": [
-    {"speaker": "HOST", "text": "...", "direction": "energetic"},
-    {"speaker": "EXPERT", "text": "According to a 2023 study [1], ...", "direction": "thoughtful"}
+    {"speaker": "${speakers[0].name}", "text": "...", "direction": "energetic"},
+    {"speaker": "${speakers.length > 1 ? speakers[1].name : speakers[0].name}", "text": "According to a 2023 study [1], ...", "direction": "thoughtful"}
   ],
   "soundCues": [
     {"type": "intro", "prompt": "warm upbeat podcast intro jingle with soft chimes", "durationSeconds": 3, "insertAfterTurn": -1},
@@ -372,6 +379,7 @@ export async function generateScriptWithFeedback(params: {
   durationTarget: number;
   sourceContent?: string;
   sourceMetadata?: SourceMetadata;
+  speakers?: Array<{ name: string; description: string }>;
   previousScript: ScriptTurn[];
   previousReferences: GeneratedReference[];
   verificationFeedback: string;
@@ -386,6 +394,12 @@ export async function generateScriptWithFeedback(params: {
   outputTokens: number;
   model: string;
 }> {
+  const feedbackSpeakers = params.speakers ?? [
+    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation' },
+    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies and examples' },
+  ];
+  const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+
   const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on fact-checking feedback.
 
 ## REVISION INSTRUCTIONS:
@@ -399,8 +413,7 @@ Key rules for this revision:
 5. Maintain the conversational quality and engagement of the original script
 
 ## Speakers:
-- HOST: Warm, curious, asks great questions, guides the conversation
-- EXPERT: Knowledgeable, vivid storyteller, uses analogies and examples
+${feedbackSpeakerSection}
 
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture

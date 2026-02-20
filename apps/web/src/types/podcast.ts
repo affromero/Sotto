@@ -1,4 +1,4 @@
-import { PodcastSource, PodcastStatus, PodcastVisibility, Speaker } from '@prisma/client';
+import { PodcastSource, PodcastStatus, PodcastVisibility } from '@prisma/client';
 import { ReferenceData } from './reference';
 import { PodcastVersionSummary } from './version';
 
@@ -76,7 +76,7 @@ export interface PodcastDetail extends PodcastSummary {
 
 export interface SegmentData {
   id: string;
-  speaker: Speaker;
+  speaker: string;
   text: string;
   audioUrl: string | null;
   order: number;

@@ -202,7 +202,52 @@ function hashString(s: string): number {
 }
 
 /**
+ * Select N diverse voices from a provider-specific voice pool.
+ * Alternates genders and avoids duplicate voices. When metadata is
+ * provided, voices are scored by tone-character match and filtered
+ * to a preferred tier before hash-selecting.
+ */
+export function selectVoiceSetFromPool(
+  pool: ProviderVoice[],
+  podcastId: string,
+  speakerCount: number,
+  metadata?: VoiceMatchMetadata
+): ProviderVoice[] {
+  const count = Math.max(1, Math.min(speakerCount, pool.length));
+  const index = hashString(podcastId);
+
+  const hasMetadata = metadata && metadata.tone;
+
+  const filtered = hasMetadata
+    ? (() => {
+        const scored = pool.map((v) => ({ voice: v, score: scoreProviderVoice(v, metadata!) }));
+        const maxScore = Math.max(...scored.map((s) => s.score));
+        return scored.filter((s) => s.score >= maxScore - 3).map((s) => s.voice);
+      })()
+    : pool;
+
+  const selected: ProviderVoice[] = [];
+  const usedIds = new Set<string>();
+
+  for (let i = 0; i < count; i++) {
+    const wantGender = i % 2 === 0 ? 'female' : 'male';
+    const candidates = filtered.filter(
+      (v) => !usedIds.has(v.id) && v.gender === wantGender
+    );
+    const fallback = filtered.filter((v) => !usedIds.has(v.id));
+    const pickFrom = candidates.length > 0 ? candidates : fallback;
+    if (pickFrom.length === 0) break;
+    const pick = pickFrom[(index >>> (i * 4)) % pickFrom.length];
+    selected.push(pick);
+    usedIds.add(pick.id);
+  }
+
+  return selected;
+}
+
+/**
  * Select a diverse voice pair from a provider-specific voice pool.
+ * Wrapper around selectVoiceSetFromPool for backward compatibility.
  * When metadata is provided, voices are scored by tone-character match
  * and filtered to a preferred tier before hash-selecting.
  */

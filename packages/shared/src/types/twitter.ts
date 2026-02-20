@@ -30,8 +30,7 @@ export interface TwitterMention {
 export interface TwitterSettingsData {
   twitterHandle: string | null;
   twitterEnabled: boolean;
-  preferredHostVoiceId: string | null;
-  preferredExpertVoiceId: string | null;
+  voicePreferences: Array<{ speaker: string; voiceId: string }>;
 }
 
 export interface TweetMentionData {

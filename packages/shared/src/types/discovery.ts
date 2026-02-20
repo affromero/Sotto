@@ -14,6 +14,7 @@ export interface DiscoveryMetadata {
   focusAreas: string[];
   tone: 'casual' | 'professional' | 'socratic';
   durationTarget: number;
+  speakers?: Array<{ name: string; description: string }>;
   ready: boolean;
 }
 

@@ -1145,7 +1145,7 @@ export default function LandingPage() {
                       <div className={styles.twCardInfo}>
                         <span>sotto.fm</span>
                         <span>The Psychology of Decision-Making</span>
-                        <span>10 min · 2 voices</span>
+                        <span>10 min · multi-voice</span>
                       </div>
                     </div>
                     <div className={styles.twActions}>
@@ -1365,7 +1365,7 @@ export default function LandingPage() {
               <div className={styles.stepContent}>
                 <h3>Create or import</h3>
                 <p>
-                  Chat with Sotto to generate a two-voice podcast from any topic. Or import from
+                  Chat with Sotto to generate a multi-voice podcast from any topic. Or import from
                   NotebookLM with our Chrome extension, Spotify, Apple Podcasts, YouTube — any
                   audio file works.
                 </p>

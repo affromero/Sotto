@@ -6,8 +6,10 @@ export const createPodcastSchema = z.object({
   title: z.string().min(1).max(200),
   topic: z.string().min(1).max(5000),
   discoveryId: z.string().optional(),
-  hostVoiceId: z.string().optional(),
-  expertVoiceId: z.string().optional(),
+  voices: z.array(z.object({
+    speaker: z.string().min(1).max(50),
+    voiceId: z.string().optional(),
+  })).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
 });
 

@@ -174,8 +174,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -215,8 +214,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -255,8 +253,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -294,8 +291,14 @@ describe('processTwitterMentions', () => {
           status: 'EXTRACTING',
           source: 'TWITTER',
           sourceTweetId: tweet.id,
-          hostVoiceId: 'voice-host-1',
-          expertVoiceId: 'voice-expert-1',
+          voices: {
+            createMany: {
+              data: [
+                { speaker: 'HOST', voiceId: 'voice-host-1' },
+                { speaker: 'EXPERT', voiceId: 'voice-expert-1' },
+              ],
+            },
+          },
           ttsProvider: undefined,
           ttsModel: undefined,
           aiModel: undefined,
@@ -328,8 +331,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: false,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -360,8 +362,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -450,8 +451,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -492,8 +492,10 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: 'user-host-voice',
-        preferredExpertVoiceId: 'user-expert-voice',
+        voicePreferences: [
+          { speaker: 'HOST', voiceId: 'user-host-voice' },
+          { speaker: 'EXPERT', voiceId: 'user-expert-voice' },
+        ],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,
@@ -524,8 +526,14 @@ describe('processTwitterMentions', () => {
       expect(mockPrismaPodcastCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            hostVoiceId: 'user-host-voice',
-            expertVoiceId: 'user-expert-voice',
+            voices: {
+              createMany: {
+                data: [
+                  { speaker: 'HOST', voiceId: 'user-host-voice' },
+                  { speaker: 'EXPERT', voiceId: 'user-expert-voice' },
+                ],
+              },
+            },
           }),
         })
       );
@@ -537,8 +545,7 @@ describe('processTwitterMentions', () => {
       mockPrismaAccountFindFirst.mockResolvedValue({ userId: 'user-001' });
       mockPrismaUserFindUniqueOrThrow.mockResolvedValue({
         twitterEnabled: true,
-        preferredHostVoiceId: null,
-        preferredExpertVoiceId: null,
+        voicePreferences: [],
         preferredTtsProvider: null,
         preferredTtsModel: null,
         preferredAiProvider: null,

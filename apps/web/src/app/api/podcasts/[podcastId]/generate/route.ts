@@ -347,7 +347,7 @@ async function routeResume(
         const payload: GenerateAudioPayload = {
           podcastId,
           segmentId: seg.id,
-          speaker: seg.speaker as 'HOST' | 'EXPERT',
+          speaker: seg.speaker,
           text: seg.text,
         };
         await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, payload);

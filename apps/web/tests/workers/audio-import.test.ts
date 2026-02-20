@@ -119,8 +119,8 @@ vi.mock('@/lib/providers/stt-registry', () => ({
 // ---- Transcript processing mocks ----
 
 const defaultSegments = [
-  { speaker: 'HOST' as const, text: 'Hello world.', order: 0, startTime: 0, endTime: 10 },
-  { speaker: 'EXPERT' as const, text: 'Welcome to the show.', order: 1, startTime: 10, endTime: 20 },
+  { speaker: 'HOST', text: 'Hello world.', order: 0, startTime: 0, endTime: 10 },
+  { speaker: 'EXPERT', text: 'Welcome to the show.', order: 1, startTime: 10, endTime: 20 },
 ];
 
 const mockParseTranscript = vi.fn().mockResolvedValue(defaultSegments);
@@ -308,8 +308,8 @@ describe('processAudioImport', () => {
       expect(mockCreateSttProvider).not.toHaveBeenCalled();
     });
 
-    it('skips diarization when parsed transcript already has an EXPERT speaker', async () => {
-      mockParseTranscript.mockResolvedValue(defaultSegments); // has HOST + EXPERT
+    it('skips diarization when parsed transcript already has multiple speakers', async () => {
+      mockParseTranscript.mockResolvedValue(defaultSegments); // has HOST + EXPERT (2 unique)
 
       const job = createMockJob({ ...defaultPayload, transcriptText: 'Host: Hi.\nExpert: Hello.' });
       await processAudioImport(job);
@@ -317,10 +317,10 @@ describe('processAudioImport', () => {
       expect(mockDiarizeSpeakers).not.toHaveBeenCalled();
     });
 
-    it('runs diarization when parsed transcript has only HOST speakers', async () => {
+    it('runs diarization when parsed transcript has only one unique speaker', async () => {
       mockParseTranscript.mockResolvedValue([
-        { speaker: 'HOST' as const, text: 'First.', order: 0, startTime: 0, endTime: 5 },
-        { speaker: 'HOST' as const, text: 'Second.', order: 1, startTime: 5, endTime: 10 },
+        { speaker: 'HOST' , text: 'First.', order: 0, startTime: 0, endTime: 5 },
+        { speaker: 'HOST' , text: 'Second.', order: 1, startTime: 5, endTime: 10 },
       ]);
 
       const job = createMockJob({ ...defaultPayload, transcriptText: 'Monologue transcript' });

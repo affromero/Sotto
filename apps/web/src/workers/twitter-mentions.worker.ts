@@ -83,8 +83,7 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     where: { id: userId },
     select: {
       twitterEnabled: true,
-      preferredHostVoiceId: true,
-      preferredExpertVoiceId: true,
+      voicePreferences: { select: { speaker: true, voiceId: true } },
       preferredTtsProvider: true,
       preferredTtsModel: true,
       preferredAiProvider: true,
@@ -202,8 +201,10 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
     // 8. Determine voice IDs
     const tempPodcastId = mention.id; // use mention ID as seed for voice selection
     const voicePair = selectVoicePair(tempPodcastId);
-    const hostVoiceId = user.preferredHostVoiceId ?? voicePair.host.id;
-    const expertVoiceId = user.preferredExpertVoiceId ?? voicePair.expert.id;
+    const userHostPref = user.voicePreferences.find(v => v.speaker === 'HOST');
+    const userExpertPref = user.voicePreferences.find(v => v.speaker === 'EXPERT');
+    const hostVoiceId = userHostPref?.voiceId ?? voicePair.host.id;
+    const expertVoiceId = userExpertPref?.voiceId ?? voicePair.expert.id;
 
     // 9. Build podcast metadata — adjust for threads
     const tone = parsed.isDebate ? 'socratic' : parsed.tone;
@@ -224,8 +225,14 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
         status: 'EXTRACTING',
         source: 'TWITTER',
         sourceTweetId: tweet.id,
-        hostVoiceId,
-        expertVoiceId,
+        voices: {
+          createMany: {
+            data: [
+              { speaker: 'HOST', voiceId: hostVoiceId },
+              { speaker: 'EXPERT', voiceId: expertVoiceId },
+            ],
+          },
+        },
         ttsProvider: user.preferredTtsProvider ?? undefined,
         ttsModel: user.preferredTtsModel ?? undefined,
         aiModel: user.preferredAiModel ?? undefined,

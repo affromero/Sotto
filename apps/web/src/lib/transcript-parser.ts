@@ -7,7 +7,7 @@ import type { TranscriptionResult } from './providers/stt';
  * Parsed segment with speaker diarization
  */
 export interface ParsedSegment {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   startTime?: number;
   endTime?: number;

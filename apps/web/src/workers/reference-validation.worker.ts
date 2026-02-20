@@ -95,7 +95,7 @@ export async function processReferenceValidation(
     logger.info('No references to validate, proceeding to audio generation', { podcastId });
     await createSegmentsAndQueueAudio(
       podcastId,
-      script.turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>
+      script.turns as Array<{ speaker: string; text: string }>
     );
     await job.updateProgress(100);
     return;
@@ -285,7 +285,7 @@ export async function processReferenceValidation(
   await job.updateProgress(70);
 
   // Clean script if any references were removed
-  let turns = script.turns as Array<{ speaker: 'HOST' | 'EXPERT'; text: string }>;
+  let turns = script.turns as Array<{ speaker: string; text: string }>;
   let markdown = script.markdown;
 
   if (removedNumbers.size > 0) {

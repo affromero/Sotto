@@ -1,7 +1,7 @@
 import type { ReferenceData } from '@/types/reference';
 
 interface TranscriptSegment {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   startTime: number | null;
 }
@@ -48,7 +48,7 @@ export function generatePodcastTranscript(data: PodcastTranscriptData): string {
   // Transcript body
   for (const segment of data.segments) {
     const timestamp = formatTimestamp(segment.startTime);
-    const speakerLabel = segment.speaker === 'HOST' ? 'Host' : 'Expert';
+    const speakerLabel = segment.speaker;
 
     lines.push(`${timestamp} **${speakerLabel}**`);
     lines.push(segment.text);
