@@ -328,7 +328,7 @@ Source material is optional and only included when the user provided a URL or PD
 
 ```typescript
 export type ScriptTurn = {
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
   text: string;
   direction?: string;
 };
@@ -522,7 +522,7 @@ export interface RegenerateSegmentPayload {
   interactionId: string;
   insertAfterOrder: number; // Position in segment sequence to insert after
   newText: string; // The adapted podcast-format text
-  speaker: 'HOST' | 'EXPERT';
+  speaker: string;
 }
 ```
 
