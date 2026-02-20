@@ -185,8 +185,6 @@ export default async function DashboardPage() {
   return (
     <main className={styles.main}>
       <FreeTierBanner
-        used={freeTier.freeGenerationsUsed}
-        limit={freeTier.freeGenerationsLimit}
         dailyUsed={freeTier.dailyUsed}
         dailyLimit={freeTier.dailyLimit}
         isByokUser={freeTier.isByokUser}

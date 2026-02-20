@@ -27,8 +27,6 @@ function formatReset(seconds: number): string {
 }
 
 interface FreeTierBannerProps {
-  used: number;
-  limit: number;
   dailyUsed: number;
   dailyLimit: number;
   isByokUser: boolean;
