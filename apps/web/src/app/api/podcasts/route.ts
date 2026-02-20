@@ -5,7 +5,6 @@ import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
@@ -145,9 +144,8 @@ export async function POST(request: NextRequest) {
   let freeTierTtsModel: string | undefined;
   let freeTierAiModel: string | undefined;
   if (!gate.isByokUser && !gate.isProUser) {
-    const config = await getFreeTierConfig();
     const selected = await selectFreeTierProviders(authResult.userId);
-    const ok = await tryIncrementFreeGeneration(authResult.userId, config.dailyGenerationLimit, {
+    const ok = await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
