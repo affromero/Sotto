@@ -26,22 +26,27 @@ interface SharedVoice extends VoiceClone {
 }
 
 export interface VoiceSelection {
-  hostVoiceId?: string;
-  expertVoiceId?: string;
+  voices?: Array<{ speaker: string; voiceId: string }>;
   ttsProvider?: string;
 }
 
 interface VoicePickerProps {
   onSelectionChange: (selection: VoiceSelection) => void;
+  /** Speakers to assign voices to (from discovery metadata). Defaults to Host + Expert. */
+  speakers?: Array<{ name: string; description: string }>;
 }
 
-export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
+const DEFAULT_SPEAKERS = [
+  { name: 'Host', description: 'The main host' },
+  { name: 'Expert', description: 'The subject expert' },
+];
+
+export function VoicePicker({ onSelectionChange, speakers = DEFAULT_SPEAKERS }: VoicePickerProps) {
   const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
   const [customMode, setCustomMode] = useState(false);
-  const [hostVoiceId, setHostVoiceId] = useState<string | undefined>();
-  const [expertVoiceId, setExpertVoiceId] = useState<string | undefined>();
+  const [voiceMap, setVoiceMap] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -64,19 +69,28 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
   }, []);
 
   useEffect(() => {
-    onSelectionChange({
-      hostVoiceId: customMode ? hostVoiceId : undefined,
-      expertVoiceId: customMode ? expertVoiceId : undefined,
-    });
-  }, [customMode, hostVoiceId, expertVoiceId, onSelectionChange]);
+    if (!customMode) {
+      onSelectionChange({});
+      return;
+    }
+    const voices = Object.entries(voiceMap)
+      .filter(([, voiceId]) => !!voiceId)
+      .map(([speaker, voiceId]) => ({ speaker, voiceId }));
+    onSelectionChange({ voices: voices.length > 0 ? voices : undefined });
+  }, [customMode, voiceMap, onSelectionChange]);
 
   function handleToggleCustom() {
     setCustomMode((prev) => !prev);
     if (customMode) {
-      setHostVoiceId(undefined);
-      setExpertVoiceId(undefined);
+      setVoiceMap({});
     }
   }
+
+  function handleSelectVoice(speaker: string, voiceId: string) {
+    setVoiceMap((prev) => ({ ...prev, [speaker]: voiceId }));
+  }
+
+  const speakerColors = ['var(--color-speaker-0)', 'var(--color-speaker-1)', 'var(--color-speaker-2)', 'var(--color-speaker-3)'];
 
   return (
     <div className={styles.container}>
@@ -109,7 +123,7 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
           <div className={styles.autoAssignText}>
             <span className={styles.autoAssignTitle}>Auto-assign Voices</span>
             <span className={styles.autoAssignHint}>
-              Two complementary AI voices will be selected automatically.
+              Complementary AI voices will be selected automatically.
             </span>
           </div>
         </div>
@@ -120,7 +134,7 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
           <div className={styles.toggleLabel}>
             <span className={styles.toggleTitle}>Choose Custom Voices</span>
             <span className={styles.toggleHint}>
-              Pick specific voices for host and expert
+              Pick specific voices for each speaker
             </span>
           </div>
           <button
@@ -136,10 +150,14 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
         </div>
       )}
 
-      {customMode && (
-        <>
-          <div className={`${styles.roleSection} ${styles.roleHost}`}>
-            <span className={styles.roleLabel}>Host Voice</span>
+      {customMode && speakers.map((speaker, i) => {
+        const selectedVoiceId = voiceMap[speaker.name];
+        const colorIdx = i % 4;
+        return (
+          <div key={speaker.name} className={styles.roleSection} data-speaker-index={colorIdx}>
+            <span className={styles.roleLabel} style={{ color: speakerColors[colorIdx] }}>
+              {speaker.name} Voice
+            </span>
             {userClones.length > 0 && (
               <>
                 <span className={styles.clonesLabel}>Your Voices</span>
@@ -151,8 +169,8 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                       name={clone.name}
                       accent="custom"
                       character="Cloned voice"
-                      isSelected={hostVoiceId === clone.externalVoiceId}
-                      onSelect={() => setHostVoiceId(clone.externalVoiceId)}
+                      isSelected={selectedVoiceId === clone.externalVoiceId}
+                      onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
                     />
                   ))}
                 </div>
@@ -170,8 +188,8 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                       name={voice.name}
                       accent="shared"
                       character={`by ${voice.owner.name || 'Unknown'}`}
-                      isSelected={hostVoiceId === voice.externalVoiceId}
-                      onSelect={() => setHostVoiceId(voice.externalVoiceId)}
+                      isSelected={selectedVoiceId === voice.externalVoiceId}
+                      onSelect={() => handleSelectVoice(speaker.name, voice.externalVoiceId)}
                     />
                   ))}
                 </div>
@@ -186,69 +204,14 @@ export function VoicePicker({ onSelectionChange }: VoicePickerProps) {
                   name={voice.name}
                   accent={voice.accent}
                   character={voice.character}
-                  isSelected={hostVoiceId === voice.id}
-                  onSelect={() => setHostVoiceId(voice.id)}
+                  isSelected={selectedVoiceId === voice.id}
+                  onSelect={() => handleSelectVoice(speaker.name, voice.id)}
                 />
               ))}
             </div>
           </div>
-
-          <div className={`${styles.roleSection} ${styles.roleExpert}`}>
-            <span className={styles.roleLabel}>Expert Voice</span>
-            {userClones.length > 0 && (
-              <>
-                <span className={styles.clonesLabel}>Your Voices</span>
-                <div className={styles.voiceGrid}>
-                  {userClones.map((clone) => (
-                    <VoiceCard
-                      key={clone.externalVoiceId}
-                      voiceId={clone.externalVoiceId}
-                      name={clone.name}
-                      accent="custom"
-                      character="Cloned voice"
-                      isSelected={expertVoiceId === clone.externalVoiceId}
-                      onSelect={() => setExpertVoiceId(clone.externalVoiceId)}
-                    />
-                  ))}
-                </div>
-                <div className={styles.separator} />
-              </>
-            )}
-            {sharedVoices.length > 0 && (
-              <>
-                <span className={styles.clonesLabel}>Shared With You</span>
-                <div className={styles.voiceGrid}>
-                  {sharedVoices.map((voice) => (
-                    <VoiceCard
-                      key={voice.externalVoiceId}
-                      voiceId={voice.externalVoiceId}
-                      name={voice.name}
-                      accent="shared"
-                      character={`by ${voice.owner.name || 'Unknown'}`}
-                      isSelected={expertVoiceId === voice.externalVoiceId}
-                      onSelect={() => setExpertVoiceId(voice.externalVoiceId)}
-                    />
-                  ))}
-                </div>
-                <div className={styles.separator} />
-              </>
-            )}
-            <div className={styles.voiceGrid}>
-              {poolVoices.map((voice) => (
-                <VoiceCard
-                  key={voice.id}
-                  voiceId={voice.id}
-                  name={voice.name}
-                  accent={voice.accent}
-                  character={voice.character}
-                  isSelected={expertVoiceId === voice.id}
-                  onSelect={() => setExpertVoiceId(voice.id)}
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+        );
+      })}
     </div>
   );
 }

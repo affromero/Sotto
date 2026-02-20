@@ -61,15 +61,11 @@ describe('TranscriptPanel', () => {
     expect(screen.getByText('That sounds fascinating. Can you elaborate?')).toBeInTheDocument();
   });
 
-  it('renders HOST speaker label as "Host"', () => {
+  it('renders speaker labels matching segment data', () => {
     render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    const hostLabels = screen.getAllByText('Host');
+    const hostLabels = screen.getAllByText('HOST');
     expect(hostLabels).toHaveLength(2);
-  });
-
-  it('renders EXPERT speaker label as "Expert"', () => {
-    render(<TranscriptPanel segments={mockSegments} currentTime={0} />);
-    const expertLabels = screen.getAllByText('Expert');
+    const expertLabels = screen.getAllByText('EXPERT');
     expect(expertLabels).toHaveLength(1);
   });
 

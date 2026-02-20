@@ -2,6 +2,7 @@
 
 import { useMemo, useEffect, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import styles from './Teleprompter.module.css';
@@ -23,6 +24,41 @@ function findActiveIndex(segments: SegmentData[], currentTime: number): number {
   return 0;
 }
 
+function SegmentBlock({
+  segment,
+  speakers,
+  references,
+  className,
+  onClick,
+  innerRef,
+}: {
+  segment: SegmentData;
+  speakers: string[];
+  references: ReferenceData[];
+  className: string;
+  onClick?: () => void;
+  innerRef?: React.RefObject<HTMLDivElement | null>;
+}) {
+  const idx = getSpeakerIndex(segment.speaker, speakers);
+  return (
+    <div
+      ref={innerRef}
+      className={className}
+      data-speaker-index={idx}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+    >
+      <span className={styles.speaker} data-speaker-index={idx}>
+        {segment.speaker}
+      </span>
+      <p className={styles.text}>
+        {parseTextWithCitations(segment.text, references)}
+      </p>
+    </div>
+  );
+}
+
 export function Teleprompter({
   segments,
   references,
@@ -34,6 +70,7 @@ export function Teleprompter({
     [segments, currentTime]
   );
   const activeRef = useRef<HTMLDivElement>(null);
+  const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -46,62 +83,35 @@ export function Teleprompter({
   return (
     <div className={styles.root} aria-label="Teleprompter view">
       <div className={styles.viewport}>
-        {/* Previous segment */}
         {prevSegment && (
-          <div
+          <SegmentBlock
+            segment={prevSegment}
+            speakers={speakers}
+            references={references}
             className={`${styles.segment} ${styles.prev}`}
             onClick={() => prevSegment.startTime !== null && onSegmentClick?.(prevSegment.startTime)}
-            role="button"
-            tabIndex={0}
-          >
-            <span
-              className={`${styles.speaker} ${prevSegment.speaker === 'HOST' ? styles.speakerHost : styles.speakerExpert}`}
-            >
-              {prevSegment.speaker === 'HOST' ? 'Host' : 'Expert'}
-            </span>
-            <p className={styles.text}>
-              {parseTextWithCitations(prevSegment.text, references)}
-            </p>
-          </div>
+          />
         )}
 
-        {/* Active segment */}
         {currentSegment && (
-          <div
-            ref={activeRef}
-            className={`${styles.segment} ${styles.active} ${currentSegment.speaker === 'HOST' ? styles.activeHost : styles.activeExpert}`}
+          <SegmentBlock
+            segment={currentSegment}
+            speakers={speakers}
+            references={references}
+            className={`${styles.segment} ${styles.active}`}
             onClick={() => currentSegment.startTime !== null && onSegmentClick?.(currentSegment.startTime)}
-            role="button"
-            tabIndex={0}
-          >
-            <span
-              className={`${styles.speaker} ${currentSegment.speaker === 'HOST' ? styles.speakerHost : styles.speakerExpert}`}
-            >
-              {currentSegment.speaker === 'HOST' ? 'Host' : 'Expert'}
-            </span>
-            <p className={styles.text}>
-              {parseTextWithCitations(currentSegment.text, references)}
-            </p>
-          </div>
+            innerRef={activeRef}
+          />
         )}
 
-        {/* Next segment */}
         {nextSegment && (
-          <div
+          <SegmentBlock
+            segment={nextSegment}
+            speakers={speakers}
+            references={references}
             className={`${styles.segment} ${styles.next}`}
             onClick={() => nextSegment.startTime !== null && onSegmentClick?.(nextSegment.startTime)}
-            role="button"
-            tabIndex={0}
-          >
-            <span
-              className={`${styles.speaker} ${nextSegment.speaker === 'HOST' ? styles.speakerHost : styles.speakerExpert}`}
-            >
-              {nextSegment.speaker === 'HOST' ? 'Host' : 'Expert'}
-            </span>
-            <p className={styles.text}>
-              {parseTextWithCitations(nextSegment.text, references)}
-            </p>
-          </div>
+          />
         )}
       </div>
     </div>

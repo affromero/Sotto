@@ -130,8 +130,14 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
           status: 'EXTRACTING',
           source: 'TWITTER',
           sourceTweetId: tweet.id,
-          hostVoiceId: voicePair.host.id,
-          expertVoiceId: voicePair.expert.id,
+          voices: {
+            createMany: {
+              data: [
+                { speaker: 'HOST', voiceId: voicePair.host.id },
+                { speaker: 'EXPERT', voiceId: voicePair.expert.id },
+              ],
+            },
+          },
           visibility: 'PUBLIC',
           discovery: {
             create: {

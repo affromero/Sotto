@@ -22,7 +22,7 @@ export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
 export type PodcastSource = 'WEB' | 'TWITTER' | 'TELEGRAM' | 'API' | 'IMPORT';
 
-export type Speaker = 'HOST' | 'EXPERT';
+export type Speaker = string;
 
 export type InteractionStatus =
   | 'PENDING'

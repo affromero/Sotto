@@ -77,8 +77,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     where: { id: podcastId },
     select: {
       userId: true,
-      hostVoiceId: true,
-      expertVoiceId: true,
+      voices: { select: { speaker: true, voiceId: true } },
       ttsProvider: true,
       ttsModel: true,
     },
@@ -119,8 +118,8 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   }
 
   // Use custom voice ID if set, otherwise let the provider pick from its pool
-  const customVoiceId = speaker === 'HOST' ? podcast.hostVoiceId : podcast.expertVoiceId;
-  const voiceId = customVoiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
+  const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
+  const voiceId = podcastVoice?.voiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
   // Resolve per-user concurrency limit for the TTS provider
   let concurrencyLimit = 5;

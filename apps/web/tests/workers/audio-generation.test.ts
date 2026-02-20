@@ -11,8 +11,7 @@ const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUnique = vi.fn().mockResolvedValue({ status: 'GENERATING_AUDIO' });
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
   userId: 'user-1',
-  hostVoiceId: null,
-  expertVoiceId: null,
+  voices: [],
   ttsProvider: null,
   ttsModel: null,
 });
@@ -207,8 +206,7 @@ describe('processAudioGeneration', () => {
     mockPrismaPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       userId: 'user-1',
-      hostVoiceId: null,
-      expertVoiceId: null,
+      voices: [],
       ttsProvider: null,
       ttsModel: null,
     });
@@ -280,8 +278,7 @@ describe('processAudioGeneration', () => {
         where: { id: 'podcast-001' },
         select: {
           userId: true,
-          hostVoiceId: true,
-          expertVoiceId: true,
+          voices: { select: { speaker: true, voiceId: true } },
           ttsProvider: true,
           ttsModel: true,
         },
@@ -314,8 +311,9 @@ describe('processAudioGeneration', () => {
     it('uses custom hostVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        hostVoiceId: 'custom-host-voice',
-        expertVoiceId: null,
+        voices: [
+          { speaker: 'HOST', voiceId: 'custom-host-voice' },
+        ],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -330,8 +328,9 @@ describe('processAudioGeneration', () => {
     it('uses custom expertVoiceId when set', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        hostVoiceId: null,
-        expertVoiceId: 'custom-expert-voice',
+        voices: [
+          { speaker: 'EXPERT', voiceId: 'custom-expert-voice' },
+        ],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -374,8 +373,7 @@ describe('processAudioGeneration', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: null,
         ttsModel: null,
       });
@@ -643,8 +641,7 @@ describe('processAudioGeneration', () => {
       // Set ttsProvider + ttsModel so the write-back update is skipped
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: 'elevenlabs',
         ttsModel: 'eleven_v3',
       });
@@ -772,8 +769,7 @@ describe('processAudioGeneration', () => {
       // Set ttsProvider + ttsModel so the write-back update is skipped
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
-        hostVoiceId: null,
-        expertVoiceId: null,
+        voices: [],
         ttsProvider: 'elevenlabs',
         ttsModel: 'eleven_v3',
       });

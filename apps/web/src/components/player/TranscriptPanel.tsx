@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -28,6 +29,7 @@ export function TranscriptPanel({
   questionCounts,
 }: TranscriptPanelProps) {
   const activeRef = useRef<HTMLDivElement>(null);
+  const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -42,6 +44,7 @@ export function TranscriptPanel({
         {segments.map((segment) => {
           const active = isCurrentSegment(segment, currentTime);
           const qCount = questionCounts?.get(segment.order) ?? 0;
+          const idx = getSpeakerIndex(segment.speaker, speakers);
           return (
             <div
               key={segment.id}
@@ -51,10 +54,8 @@ export function TranscriptPanel({
               role="button"
               tabIndex={0}
             >
-              <span
-                className={`${styles.speaker} ${segment.speaker === 'HOST' ? styles.host : styles.expert}`}
-              >
-                {segment.speaker === 'HOST' ? 'Host' : 'Expert'}
+              <span className={styles.speaker} data-speaker-index={idx}>
+                {segment.speaker}
                 {qCount > 0 && <SegmentQuestionBadge count={qCount} />}
               </span>
               <div className={styles.text}>

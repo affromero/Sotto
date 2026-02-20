@@ -37,9 +37,9 @@ describe('pdf-generator', () => {
 
       const result = generatePodcastTranscript(data);
 
-      expect(result).toContain('[00:00] **Host**');
+      expect(result).toContain('[00:00] **HOST**');
       expect(result).toContain('Welcome to the show.');
-      expect(result).toContain('[02:15] **Expert**');
+      expect(result).toContain('[02:15] **EXPERT**');
       expect(result).toContain('Thanks for having me.');
     });
 
@@ -57,7 +57,7 @@ describe('pdf-generator', () => {
 
       const result = generatePodcastTranscript(data);
 
-      expect(result).toContain('[--:--] **Host**');
+      expect(result).toContain('[--:--] **HOST**');
     });
 
     it('formats timestamps with leading zeros', () => {
@@ -75,8 +75,8 @@ describe('pdf-generator', () => {
 
       const result = generatePodcastTranscript(data);
 
-      expect(result).toContain('[00:05] **Host**');
-      expect(result).toContain('[10:42] **Expert**');
+      expect(result).toContain('[00:05] **HOST**');
+      expect(result).toContain('[10:42] **EXPERT**');
     });
   });
 

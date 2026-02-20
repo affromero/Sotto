@@ -13,6 +13,7 @@ import {
   Play,
 } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
 import { wordsToMinutes } from '@/lib/duration';
@@ -193,14 +194,15 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
     }
   }, [cancelEdit, confirmEdit]);
 
-  // Toggle speaker
+  // Cycle speaker through all unique speakers in the script
   const toggleSpeaker = useCallback((index: number) => {
     setTurns((prev) => {
+      const speakers = getUniqueSpeakers(prev);
+      const currentSpeaker = prev[index].speaker;
+      const currentIdx = speakers.indexOf(currentSpeaker);
+      const nextSpeaker = speakers[(currentIdx + 1) % speakers.length];
       const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        speaker: updated[index].speaker === 'HOST' ? 'EXPERT' : 'HOST',
-      };
+      updated[index] = { ...updated[index], speaker: nextSpeaker };
       return updated;
     });
     setDirty(true);
@@ -228,10 +230,12 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
     if (editingIndex === index) setEditingIndex(null);
   }, [editingIndex]);
 
-  // Add turn
+  // Add turn — pick the next speaker in rotation
   const addTurn = useCallback(() => {
-    const lastSpeaker = turns.length > 0 ? turns[turns.length - 1].speaker : 'EXPERT';
-    const newSpeaker = lastSpeaker === 'HOST' ? 'EXPERT' : 'HOST';
+    const speakers = getUniqueSpeakers(turns);
+    const lastSpeaker = turns.length > 0 ? turns[turns.length - 1].speaker : speakers[speakers.length - 1] ?? 'Host';
+    const lastIdx = speakers.indexOf(lastSpeaker);
+    const newSpeaker = speakers[(lastIdx + 1) % speakers.length];
     const newTurn: TurnState = {
       id: nextTurnId(),
       speaker: newSpeaker,
@@ -378,7 +382,8 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       {/* Turns */}
       <div className={styles.turns} role="list" aria-label="Script turns">
         {turns.map((turn, index) => {
-          const isHost = turn.speaker === 'HOST';
+          const allSpeakers = getUniqueSpeakers(turns);
+          const speakerIdx = getSpeakerIndex(turn.speaker, allSpeakers);
           const isEditing = editingIndex === index;
           const isDeleting = deletingIndex === index;
 
@@ -387,11 +392,11 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
               key={turn.id}
               className={[
                 styles.turn,
-                isHost ? styles.turnHost : styles.turnExpert,
                 isEditing ? styles.turnEditing : '',
                 dragIndex === index ? styles.turnDragging : '',
                 dragOverIndex === index ? styles.turnDragOver : '',
               ].filter(Boolean).join(' ')}
+              data-speaker-index={speakerIdx}
               role="listitem"
               style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
               draggable={!isEditing}
@@ -429,14 +434,15 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
 
               {/* Content */}
               <div className={styles.turnContent}>
-                {/* Speaker label (clickable to toggle) */}
+                {/* Speaker label (clickable to cycle) */}
                 <button
                   type="button"
-                  className={`${styles.speakerLabel} ${isHost ? styles.speakerLabelHost : styles.speakerLabelExpert}`}
+                  className={styles.speakerLabel}
+                  data-speaker-index={speakerIdx}
                   onClick={() => toggleSpeaker(index)}
-                  aria-label={`Switch from ${turn.speaker} to ${turn.speaker === 'HOST' ? 'EXPERT' : 'HOST'}`}
+                  aria-label={`Cycle speaker (current: ${turn.speaker})`}
                 >
-                  {turn.speaker === 'HOST' ? 'Host' : 'Expert'}
+                  {turn.speaker}
                 </button>
 
                 {/* Direction */}

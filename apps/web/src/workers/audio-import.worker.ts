@@ -127,7 +127,8 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       segments = await parseTranscript(transcriptText);
       await job.updateProgress(70);
 
-      if (!segments.some((s) => s.speaker === 'EXPERT')) {
+      const uniqueSpeakers = new Set(segments.map((s) => s.speaker));
+      if (uniqueSpeakers.size < 2) {
         logger.info('Running speaker diarization on parsed transcript');
         const whisperSegments = segments.map((s) => ({
           start: s.startTime ?? 0,

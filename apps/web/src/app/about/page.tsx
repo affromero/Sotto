@@ -17,7 +17,7 @@ export default function AboutPage() {
           <header className={styles.hero}>
             <h1 className={styles.heroTitle}>The Open Podcast Network</h1>
             <p className={styles.heroSubtitle}>
-              Sotto turns any topic into a two-voice conversational podcast you
+              Sotto turns any topic into a conversational podcast you
               can interrupt, remix, and share. Built for curious minds who learn
               by listening.
             </p>
@@ -35,7 +35,7 @@ export default function AboutPage() {
               <h2 className={styles.featureTitle}>Create</h2>
               <p className={styles.featureDescription}>
                 Describe what you want to learn. Our AI creates a rich,
-                two-voice podcast with references and natural conversation
+                multi-voice podcast with references and natural conversation
                 flow — no editing required.
               </p>
             </div>

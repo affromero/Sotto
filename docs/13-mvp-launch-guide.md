@@ -229,7 +229,7 @@ ElevenLabs provides multiple voices. Sotto uses a voice pool system with 16 cura
 
 ```typescript
 // In apps/web/src/lib/voice-pool.ts
-// selectVoicePair(podcastId) hashes the podcast ID to pick a unique HOST + EXPERT pair
+// selectVoiceSet(podcastId, speakerCount) hashes the podcast ID to pick unique voices per speaker
 // resolveVoiceId() maps logical voice IDs to provider-specific IDs
 ```
 

@@ -73,7 +73,7 @@ export class KittenTtsProvider implements TtsProvider {
     }
   }
 
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string): string {
+  getVoiceId(speaker: string, podcastId?: string): string {
     if (!podcastId) {
       return speaker === 'HOST' ? 'bella' : 'jasper';
     }

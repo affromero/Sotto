@@ -9,7 +9,7 @@ class MockElevenLabsProvider {
   async generateSoundEffect() {
     return Buffer.from('sfx');
   }
-  getVoiceId(speaker: 'HOST' | 'EXPERT', podcastId?: string) {
+  getVoiceId(speaker: string, podcastId?: string) {
     if (!podcastId) {
       return speaker === 'HOST' ? 'host-default' : 'expert-default';
     }
@@ -22,7 +22,7 @@ class MockOpenAITtsProvider {
   async generateSpeech() {
     return Buffer.from('audio');
   }
-  getVoiceId(speaker: 'HOST' | 'EXPERT') {
+  getVoiceId(speaker: string) {
     return speaker === 'HOST' ? 'nova' : 'onyx';
   }
 }
