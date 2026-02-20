@@ -82,6 +82,20 @@ vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
 }));
 
+const mockUploadFile = vi.fn().mockResolvedValue('https://r2.example.com/sample.mp3');
+
+vi.mock('@/lib/r2', () => ({
+  uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+}));
+
+const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
+
+vi.mock('@/lib/queue', () => ({
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { VERIFY_VOICE: 'verify_voice' },
+  voiceVerificationQueue: { name: 'voice-verification' },
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
