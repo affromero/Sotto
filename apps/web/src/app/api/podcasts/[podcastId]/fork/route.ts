@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
@@ -81,9 +80,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   let freeTierTtsModel: string | undefined;
   let freeTierAiModel: string | undefined;
   if (!gate.isByokUser) {
-    const config = await getFreeTierConfig();
     const selected = await selectFreeTierProviders(userId);
-    const ok = await tryIncrementFreeGeneration(userId, config.generationLimit, {
+    const ok = await tryIncrementFreeGeneration(userId, gate.dailyLimit, {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
