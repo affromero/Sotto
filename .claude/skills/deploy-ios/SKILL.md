@@ -17,7 +17,15 @@ Triggers the `ios.yml` GitHub Actions workflow to build and submit the Sotto iOS
 
 ## Step 1: Pre-flight Checks
 
-### 1a. Check CI status on the current branch
+### 1a. Check build number
+
+Read the current `buildNumber` from `apps/mobile/app.json`. EAS will auto-increment this before building (`autoIncrement: true` in `eas.json`). If a previous build was cancelled after EAS already submitted a build to Apple, the local `app.json` may be stale and EAS will attempt to re-use a build number Apple already has.
+
+If the last `gh run list --workflow=ios.yml` shows a **cancelled** run that lasted > 30 minutes, warn:
+
+> ⚠️ A previous iOS build was cancelled after running for a long time. EAS may have already uploaded build number {N} to Apple. If the next run fails with "bundle version must be higher than previously uploaded version", update `apps/mobile/app.json` → `buildNumber` to match the already-submitted build number, then re-run.
+
+### 1c. Check CI status on the current branch
 
 ```bash
 gh run list --workflow=ci.yml --branch=$(git branch --show-current) --limit=1 --json conclusion,status,headBranch,url
@@ -37,7 +45,7 @@ gh run list --workflow=ci.yml --branch=$(git branch --show-current) --limit=1 --
 
   Stop here.
 
-### 1b. Check for uncommitted changes
+### 1d. Check for uncommitted changes
 
 ```bash
 git status --porcelain
