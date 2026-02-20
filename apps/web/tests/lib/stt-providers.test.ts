@@ -197,6 +197,7 @@ describe('importPodcastSchema — groq STT provider', () => {
   it('accepts groq as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
+      sourcePlatform: 'youtube',
       sttProvider: 'groq',
     });
     expect(result.success).toBe(true);
@@ -208,6 +209,7 @@ describe('importPodcastSchema — groq STT provider', () => {
   it('accepts openai as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
+      sourcePlatform: 'youtube',
       sttProvider: 'openai',
     });
     expect(result.success).toBe(true);
@@ -216,6 +218,7 @@ describe('importPodcastSchema — groq STT provider', () => {
   it('accepts elevenlabs as sttProvider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
+      sourcePlatform: 'youtube',
       sttProvider: 'elevenlabs',
     });
     expect(result.success).toBe(true);
@@ -224,6 +227,7 @@ describe('importPodcastSchema — groq STT provider', () => {
   it('rejects invalid sttProvider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
+      sourcePlatform: 'youtube',
       sttProvider: 'deepgram',
     });
     expect(result.success).toBe(false);
@@ -232,6 +236,7 @@ describe('importPodcastSchema — groq STT provider', () => {
   it('accepts omitted sttProvider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
+      sourcePlatform: 'youtube',
     });
     expect(result.success).toBe(true);
     if (result.success) {
