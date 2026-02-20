@@ -6,9 +6,12 @@ FROM python:3.12.9-slim
 
 WORKDIR /app
 
-# Install system deps needed by soundfile (libsndfile) and audio processing
+# System deps:
+#   libsndfile1  — required by soundfile
+#   espeak-ng    — required by phonemizer (used internally by kittentts 0.1.x)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
+    espeak-ng \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy uv binary from the pinned uv image
@@ -28,12 +31,11 @@ RUN uv pip install -r pyproject.toml
 
 COPY main.py .
 
-# Pre-download the model at build time so the first request is instant.
-# The "|| true" prevents a build failure if the HuggingFace hub is unreachable
-# (e.g., in air-gapped CI); the model will be pulled on first startup instead.
-ARG KITTENTTS_MODEL=KittenML/kitten-tts-mini-0.8
-ENV KITTENTTS_MODEL=${KITTENTTS_MODEL}
-RUN python -c "from kittentts import KittenTTS; KittenTTS('${KITTENTTS_MODEL}')" || true
+# Pre-download the nano model at build time so the first request is instant.
+# kittentts 0.1.x always fetches KittenML/kitten-tts-nano-0.1 — no model arg.
+# "|| true" prevents a build failure if HuggingFace is unreachable in CI;
+# the model will be pulled on first startup instead.
+RUN python -c "from kittentts import KittenTTS; KittenTTS()" || true
 
 EXPOSE 8000
 
