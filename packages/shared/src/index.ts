@@ -120,6 +120,10 @@ export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 // Theme / design tokens
 export { colors, spacing, typography, borderRadius } from './theme';
 
+// Generation messages (rotating sub-messages for pipeline stages)
+export { STAGE_MESSAGES, resolveMessage } from './generation-messages';
+export type { StageMessage, StageMessagePool } from './generation-messages';
+
 // Validations (shared Zod schemas)
 export {
   createPodcastSchema,

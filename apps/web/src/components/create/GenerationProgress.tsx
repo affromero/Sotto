@@ -2,12 +2,14 @@
 
 import { useMemo } from 'react';
 import { Check, AlertCircle, Pause } from 'lucide-react';
+import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
 import styles from './GenerationProgress.module.css';
 
 interface GenerationProgressProps {
   status: string;
   progress?: number;
   error?: string;
+  topic?: string;
 }
 
 const PIPELINE_STEPS = [
@@ -23,7 +25,7 @@ const PIPELINE_STEPS = [
 
 type StepState = 'completed' | 'current' | 'future' | 'error' | 'paused';
 
-export function GenerationProgress({ status, progress, error }: GenerationProgressProps) {
+export function GenerationProgress({ status, progress, error, topic }: GenerationProgressProps) {
   const currentIndex = useMemo(
     () => PIPELINE_STEPS.findIndex((step) => step.key === status),
     [status]
@@ -46,6 +48,12 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
   const currentState = currentIndex >= 0 ? stepStates[currentIndex] : null;
   const isActive = currentState === 'current';
   const isDone = currentStep?.key === 'READY';
+
+  const { message: subMessage, transitionKey } = useRotatingMessage({
+    status,
+    topic,
+    isActive,
+  });
 
   return (
     <div className={styles.root} role="progressbar" aria-label="Podcast generation progress">
@@ -115,6 +123,16 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
           {isActive && (
             <span className={styles.stepCount}>
               Step {currentIndex + 1} of {PIPELINE_STEPS.length}
+            </span>
+          )}
+
+          {subMessage && (
+            <span
+              key={transitionKey}
+              className={styles.subMessage}
+              aria-live="polite"
+            >
+              {subMessage}
             </span>
           )}
         </div>
