@@ -12,7 +12,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId } = job.data;
+  const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
 
   logger.info('Generating script', { podcastId });
   await job.updateProgress(10);
@@ -35,6 +35,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       podcastId,
       userId,
       discoveryId,
+      useAdminCredits,
     });
 
     await job.updateProgress(100);
@@ -42,8 +43,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   }
 
   const [aiKey, hasTts, user] = await Promise.all([
-    getAiKey(userId),
-    hasByokKey(userId),
+    useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
+    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
 
@@ -238,6 +239,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     podcastId,
     userId,
     discoveryId,
+    useAdminCredits,
   });
 
   logger.info('Script queued for verification', {
