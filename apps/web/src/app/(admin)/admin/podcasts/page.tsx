@@ -2,6 +2,7 @@ import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { CreateAsSottoButton } from './CreateAsSottoButton';
+import { CopyButton } from './CopyButton';
 import { RetryButton } from './RetryButton';
 import styles from './page.module.css';
 
@@ -188,7 +189,10 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
                             </div>
                           )}
                           {podcast.technicalError && (
-                            <pre className={styles.errorTechnical}>{podcast.technicalError}</pre>
+                            <div className={styles.errorTechnicalWrapper}>
+                              <CopyButton text={podcast.technicalError} />
+                              <pre className={styles.errorTechnical}>{podcast.technicalError}</pre>
+                            </div>
                           )}
                         </div>
                       </td>
