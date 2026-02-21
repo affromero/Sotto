@@ -57,6 +57,13 @@
   accent-color: var(--color-primary);
 }
 
+.reasonHint {
+  margin: 0 0 var(--spacing-xs) 28px;
+  font: var(--text-caption);
+  color: var(--color-primary);
+  font-style: italic;
+}
+
 .textarea {
   width: 100%;
   padding: var(--spacing-sm);

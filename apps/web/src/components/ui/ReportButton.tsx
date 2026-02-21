@@ -9,9 +9,10 @@ interface ReportButtonProps {
   targetType: 'podcast' | 'comment' | 'user';
   targetId: string;
   variant?: 'icon' | 'text';
+  context?: { isHumanContent?: boolean; source?: string };
 }
 
-export function ReportButton({ targetType, targetId, variant = 'text' }: ReportButtonProps) {
+export function ReportButton({ targetType, targetId, variant = 'text', context }: ReportButtonProps) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -30,6 +31,7 @@ export function ReportButton({ targetType, targetId, variant = 'text' }: ReportB
           targetType={targetType}
           targetId={targetId}
           onClose={() => setShowModal(false)}
+          context={context}
         />
       )}
     </>

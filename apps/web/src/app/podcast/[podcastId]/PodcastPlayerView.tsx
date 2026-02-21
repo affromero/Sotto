@@ -860,6 +860,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
           targetType="podcast"
           targetId={podcast.id}
           onClose={() => setShowReport(false)}
+          context={{ isHumanContent: podcast.isHumanContent, source: podcast.source }}
         />
       )}
     </div>

@@ -63,7 +63,7 @@ The schema is organized into logical sections:
 | `VoiceRequestStatus` | PENDING, APPROVED, DENIED, REVOKED                                                                                                                                              | VoiceRequest.status          |
 | `NotificationType`   | Includes VOICE_REQUEST_*, QUESTION_ON_YOUR_PODCAST, QUESTION_UPVOTED, COMMENT_ON_YOUR_PODCAST, COMMENT_REPLY, SCRIPT_READY (+ others)                                          | Notification.type            |
 | `TelegramMessageStatus` | PENDING, PARSING, GENERATING, READY, REPLIED, FAILED                                                                                                                        | TelegramMessage.status       |
-| `ReportReason`       | HARASSMENT, HATE_SPEECH, SPAM, MISINFORMATION, COPYRIGHT, EXPLICIT, OTHER                                                                                                      | Report.reason                |
+| `ReportReason`       | HARASSMENT, HATE_SPEECH, VIOLENCE, SEXUAL_CONTENT, MISINFORMATION, SPAM, IMPERSONATION, COPYRIGHT, VOICE_THEFT, MUSIC_UPLOAD, FALSE_HUMAN_BADGE, FALSE_CLAIM, OTHER             | Report.reason                |
 | `ReportStatus`       | PENDING, REVIEWING, RESOLVED, DISMISSED                                                                                                                                         | Report.status                |
 | `ClaimReportStatus`  | PENDING, REVIEWING, RESOLVED_VERIFIED, RESOLVED_INACCURATE, DISMISSED                                                                                                          | ClaimReport.status           |
 

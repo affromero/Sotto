@@ -412,9 +412,21 @@ export const createReportSchema = z.object({
     'SPAM',
     'IMPERSONATION',
     'COPYRIGHT',
+    'VOICE_THEFT',
+    'MUSIC_UPLOAD',
+    'FALSE_HUMAN_BADGE',
+    'FALSE_CLAIM',
     'OTHER',
   ]),
   description: z.string().max(2000).optional(),
+});
+
+/**
+ * Admin badge update validation
+ */
+export const adminUpdateBadgeSchema = z.object({
+  isHumanContent: z.boolean(),
+  reason: z.string().min(1).max(2000),
 });
 
 /**
