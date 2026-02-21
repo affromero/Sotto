@@ -1,4 +1,4 @@
-import { generateResponse, streamResponse, WEB_SEARCH_TOOL } from './claude';
+import { generateResponse, streamResponse } from './claude';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 export { detectUrls } from './detect-urls';
 
@@ -53,12 +53,7 @@ End your final message with a metadata block:
 }
 [/METADATA]
 
-Include "source_url" only if the user shared a URL. Otherwise omit it.
-
-## Web Search:
-You have access to web search. When the user asks about current events, recent news, or time-sensitive topics,
-search the web to understand what they're referring to. Use search results to ask better follow-up questions
-and suggest more specific focus areas. Do NOT dump search results — use them to inform your conversation naturally.${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
+Include "source_url" only if the user shared a URL. Otherwise omit it.${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
 
 /**
  * Parse chip suggestions from agent message
@@ -112,7 +107,6 @@ export async function getDiscoveryResponse(
     maxTokens: 1024,
     apiKeyOverride,
     model,
-    tools: [WEB_SEARCH_TOOL],
   });
 }
 
@@ -129,7 +123,6 @@ export function streamDiscoveryResponse(
     maxTokens: 1024,
     apiKeyOverride,
     model,
-    tools: [WEB_SEARCH_TOOL],
     onComplete,
   });
 }
