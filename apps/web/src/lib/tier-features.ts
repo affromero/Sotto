@@ -5,7 +5,7 @@
  *
  * BYOK adds:  unlimited generation, own model choice, unlimited duration.
  * Pro adds:   private/unlisted, priority queue, analytics, voice tracks,
- *             voice cloning, script review, 4 speakers, web search, unlimited Q&A.
+ *             voice cloning, script review, 4 speakers, unlimited Q&A.
  *
  * Usage:
  *   const features = getTierFeatures(user.plan, isByokUser, user.role);
@@ -32,7 +32,7 @@ const FREE_FEATURES: TierFeatures = {
   maxDurationMinutes: 5,
   maxSpeakers: 2,
   autoApproveScript: true,
-  webSearchEnabled: false,
+  webSearchEnabled: true,
   maxQaInteractions: 3,
   privateAllowed: false,
   priorityQueue: false,

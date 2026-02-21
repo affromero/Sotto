@@ -47,6 +47,28 @@ export default function PricingPage() {
               </Link>
             </div>
 
+            {/* BYOK plan */}
+            <div className={styles.plan}>
+              <div className={styles.planHeader}>
+                <h2 className={styles.planName}>BYOK</h2>
+                <p className={styles.planPrice}>Free with your keys</p>
+              </div>
+              <p className={styles.planDescription}>
+                Use your own API keys — no daily cap, own model choice, unlimited duration.
+                Add Pro for private podcasts, analytics, and voice tracks.
+              </p>
+              <ul className={styles.planFeatures}>
+                <li>Unlimited podcasts (no daily limit)</li>
+                <li>Your choice of AI model</li>
+                <li>Unlimited duration</li>
+                <li>7 TTS providers supported</li>
+                <li>Combine with Pro for the full feature set</li>
+              </ul>
+              <Link href="/settings/api" className={styles.planButton}>
+                Set Up Your Keys
+              </Link>
+            </div>
+
             {/* Pro plan */}
             <div className={`${styles.plan} ${styles.planFeatured}`}>
               <div className={styles.planBadge}>Most popular</div>
@@ -75,28 +97,6 @@ export default function PricingPage() {
                 Start Pro — $12/month
               </Link>
             </div>
-
-            {/* BYOK plan */}
-            <div className={styles.plan}>
-              <div className={styles.planHeader}>
-                <h2 className={styles.planName}>BYOK</h2>
-                <p className={styles.planPrice}>Free with your keys</p>
-              </div>
-              <p className={styles.planDescription}>
-                Use your own API keys — no daily cap, own model choice, unlimited duration.
-                Add Pro for private podcasts, analytics, and voice tracks.
-              </p>
-              <ul className={styles.planFeatures}>
-                <li>Unlimited podcasts (no daily limit)</li>
-                <li>Your choice of AI model</li>
-                <li>Unlimited duration</li>
-                <li>7 TTS providers supported</li>
-                <li>Combine with Pro for the full feature set</li>
-              </ul>
-              <Link href="/settings/api" className={styles.planButton}>
-                Set Up Your Keys
-              </Link>
-            </div>
           </section>
 
           <section className={styles.comparisonSection}>
@@ -106,87 +106,101 @@ export default function PricingPage() {
                 <tr>
                   <th>Feature</th>
                   <th>Free</th>
-                  <th>Pro</th>
                   <th>BYOK</th>
+                  <th>Pro</th>
                   <th className={styles.comparisonHighlight}>Pro + BYOK</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>Daily podcasts</td>
+                  <td className={styles.featureCell} data-tooltip="How many podcasts you can generate per day">Daily podcasts</td>
                   <td>1</td>
                   <td>Unlimited</td>
                   <td>Unlimited</td>
                   <td>Unlimited</td>
                 </tr>
                 <tr>
-                  <td>Max duration</td>
+                  <td className={styles.featureCell} data-tooltip="Maximum length of a single podcast episode">Max duration</td>
                   <td>5 min</td>
+                  <td>Unlimited</td>
                   <td>30 min</td>
                   <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td className={styles.featureCell} data-tooltip="Number of distinct speaker voices in your podcast">Speakers</td>
+                  <td>2</td>
+                  <td>2</td>
+                  <td>Up to 4</td>
+                  <td>Up to 4</td>
+                </tr>
+                <tr>
+                  <td className={styles.featureCell} data-tooltip="Questions you can ask while listening to a podcast">Q&amp;A interactions</td>
+                  <td>3 per podcast</td>
+                  <td>3 per podcast</td>
+                  <td>Unlimited</td>
                   <td>Unlimited</td>
                 </tr>
                 <tr>
-                  <td>Q&amp;A interactions</td>
-                  <td>3 per podcast</td>
-                  <td>Unlimited</td>
-                  <td>3 per podcast</td>
-                  <td>Unlimited</td>
-                </tr>
-                <tr>
-                  <td>Voice tracks</td>
+                  <td className={styles.featureCell} data-tooltip="Re-record with different voices without regenerating the script">Voice tracks</td>
+                  <td>&#8212;</td>
                   <td>&#8212;</td>
                   <td className={styles.comparisonHighlight}>Up to 3</td>
-                  <td>&#8212;</td>
                   <td className={styles.comparisonHighlight}>Unlimited</td>
                 </tr>
                 <tr>
-                  <td>Script review</td>
+                  <td className={styles.featureCell} data-tooltip="AI searches the web for current information while writing your script">Web search</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td className={styles.featureCell} data-tooltip="Review and edit the AI-generated script before audio generation">Script review</td>
+                  <td>Auto-approve</td>
                   <td>Auto-approve</td>
                   <td>Manual review</td>
-                  <td>Auto-approve</td>
                   <td>Manual review</td>
                 </tr>
                 <tr>
-                  <td>Private / Unlisted</td>
+                  <td className={styles.featureCell} data-tooltip="Control visibility — private (only you), unlisted (link only), or public">Private / Unlisted</td>
+                  <td>&#8212;</td>
                   <td>&#8212;</td>
                   <td>Yes</td>
-                  <td>&#8212;</td>
-                  <td>Yes</td>
-                </tr>
-                <tr>
-                  <td>Priority queue</td>
-                  <td>&#8212;</td>
-                  <td>Yes</td>
-                  <td>&#8212;</td>
                   <td>Yes</td>
                 </tr>
                 <tr>
-                  <td>Creator analytics</td>
+                  <td className={styles.featureCell} data-tooltip="Your podcasts generate before free-tier users">Priority queue</td>
+                  <td>&#8212;</td>
                   <td>&#8212;</td>
                   <td>Yes</td>
-                  <td>&#8212;</td>
-                  <td>Yes</td>
-                </tr>
-                <tr>
-                  <td>Voice cloning</td>
-                  <td>&#8212;</td>
-                  <td>Yes</td>
-                  <td>&#8212;</td>
                   <td>Yes</td>
                 </tr>
                 <tr>
-                  <td>AI model</td>
+                  <td className={styles.featureCell} data-tooltip="Stats on listens, completion rates, and audience engagement">Creator analytics</td>
+                  <td>&#8212;</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td className={styles.featureCell} data-tooltip="Clone your own voice or use voices from the marketplace">Voice cloning</td>
+                  <td>&#8212;</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td className={styles.featureCell} data-tooltip="Which AI model generates your podcast script">AI model</td>
                   <td>Platform</td>
+                  <td>Your choice</td>
                   <td>Better models</td>
                   <td>Your choice</td>
-                  <td>Your choice</td>
                 </tr>
                 <tr>
-                  <td>TTS provider</td>
-                  <td>Platform</td>
+                  <td className={styles.featureCell} data-tooltip="Which text-to-speech service converts your script to audio">TTS provider</td>
                   <td>Platform</td>
                   <td>7 providers</td>
+                  <td>Platform</td>
                   <td>7 providers</td>
                 </tr>
               </tbody>

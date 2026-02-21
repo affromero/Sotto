@@ -266,6 +266,63 @@
   font-weight: 600 !important;
 }
 
+/* Tooltips */
+
+.featureCell {
+  position: relative;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: var(--color-text-secondary);
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
+.featureCell::before,
+.featureCell::after {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.featureCell::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-text-primary);
+  color: var(--color-background);
+  font: var(--text-body-sm);
+  font-weight: 400;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.featureCell::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--color-text-primary);
+  z-index: 10;
+}
+
+.featureCell:hover::before,
+.featureCell:hover::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCell::before,
+  .featureCell::after {
+    transition: none;
+  }
+}
+
 @media (max-width: 700px) {
   .comparisonTable {
     font-size: 0.8125rem;
@@ -274,6 +331,18 @@
   .comparisonTable th,
   .comparisonTable td {
     padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .featureCell::after {
+    left: 0;
+    transform: none;
+    white-space: normal;
+    max-width: 200px;
+  }
+
+  .featureCell::before {
+    left: 16px;
+    transform: none;
   }
 }
 
