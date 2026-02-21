@@ -36,10 +36,11 @@ interface TestResponse {
 }
 
 async function runTest(p: TestableProvider): Promise<TestResponse> {
+  const keySource = p.hasPlatformKey ? 'platform' : 'byok';
   const res = await fetch('/api/admin/test-model', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId }),
+    body: JSON.stringify({ type: p.category, provider: p.providerId, model: p.modelId, keySource }),
   });
   return res.json() as Promise<TestResponse>;
 }
@@ -49,6 +50,15 @@ function StatusDot({ status }: { status: TestStatus }) {
   if (status === 'running') return <span className={styles.spinner} aria-label="Running" />;
   if (status === 'pass') return <span className={styles.dotPass} aria-label="Pass">✓</span>;
   return <span className={styles.dotFail} aria-label="Fail">✗</span>;
+}
+
+function KeyBadges({ p }: { p: TestableProvider }) {
+  return (
+    <div className={styles.keyCell}>
+      {p.hasPlatformKey && <span className={styles.badgePlatform}>Platform</span>}
+      {p.hasByokKey && <span className={styles.badgeByok}>BYOK</span>}
+    </div>
+  );
 }
 
 function ResultCell({ provider, result }: { provider: TestableProvider; result: TestResult }) {
@@ -131,6 +141,7 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
                 <th className={styles.th}>Provider</th>
                 <th className={styles.th}>Model</th>
                 <th className={styles.th}>Tier</th>
+                <th className={styles.th}>Key</th>
                 <th className={styles.th}>Status</th>
                 <th className={styles.th}>Latency</th>
                 <th className={styles.th}>Result</th>
@@ -150,6 +161,9 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
                       <span className={`${styles.tier} ${styles[`tier_${p.tier.replace('-', '_')}`]}`}>
                         {p.tier}
                       </span>
+                    </td>
+                    <td className={styles.td}>
+                      <KeyBadges p={p} />
                     </td>
                     <td className={styles.td}>
                       <StatusDot status={result.status} />
