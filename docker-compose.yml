@@ -31,6 +31,19 @@ services:
       timeout: 5s
       retries: 5
 
+  kittentts:
+    build:
+      context: ./services/kittentts
+    container_name: sotto-kittentts
+    ports:
+      - '8100:8000'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   sotto_postgres_data:
   sotto_redis_data:
