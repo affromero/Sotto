@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -7,11 +7,16 @@ import Animated, {
   withSequence,
   withTiming,
   Easing,
+  FadeIn,
 } from 'react-native-reanimated';
-import { colors, spacing, typography } from '@sotto/shared';
+import { colors, spacing, typography, STAGE_MESSAGES, resolveMessage } from '@sotto/shared';
+
+const CYCLE_INTERVAL_MS = 9_000;
+const LATE_THRESHOLD_MS = 120_000;
 
 interface GenerationProgressProps {
   status: string;
+  topic?: string;
 }
 
 const STEPS = [
@@ -76,9 +81,54 @@ function StepDot({
   return <View style={[styles.dot, styles.dotFuture]} />;
 }
 
-export function GenerationProgress({ status }: GenerationProgressProps) {
+export function GenerationProgress({ status, topic }: GenerationProgressProps) {
   const currentIndex = getStepIndex(status);
   const fillWidth = useSharedValue(0);
+  const [subMessage, setSubMessage] = useState<string | null>(null);
+  const [messageKey, setMessageKey] = useState(0);
+  const stageStartRef = useRef<number>(Date.now());
+  const indexRef = useRef(0);
+  const prevStatusRef = useRef(status);
+
+  const isActive = status !== 'SCRIPT_READY' && status !== 'READY';
+
+  // Reset on status change
+  useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      stageStartRef.current = Date.now();
+      indexRef.current = 0;
+      prevStatusRef.current = status;
+    }
+  }, [status]);
+
+  const pickMessage = useCallback(() => {
+    const pool = STAGE_MESSAGES[status];
+    if (!pool) return null;
+    const elapsed = Date.now() - stageStartRef.current;
+    const messages = elapsed >= LATE_THRESHOLD_MS ? pool.late : pool.early;
+    if (messages.length === 0) return null;
+    const idx = indexRef.current % messages.length;
+    indexRef.current = idx + 1;
+    return resolveMessage(messages[idx], topic);
+  }, [status, topic]);
+
+  useEffect(() => {
+    if (!isActive) {
+      setSubMessage(null);
+      return;
+    }
+    const first = pickMessage();
+    setSubMessage(first);
+    setMessageKey((k) => k + 1);
+
+    const interval = setInterval(() => {
+      const next = pickMessage();
+      setSubMessage(next);
+      setMessageKey((k) => k + 1);
+    }, CYCLE_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [isActive, pickMessage]);
 
   useEffect(() => {
     const target = STEPS.length > 1 ? (currentIndex / (STEPS.length - 1)) * 100 : 0;
@@ -108,6 +158,16 @@ export function GenerationProgress({ status }: GenerationProgressProps) {
         ))}
       </View>
       <Text style={styles.stepLabel}>{STEPS[currentIndex].label}</Text>
+      {subMessage && (
+        <Animated.Text
+          key={messageKey}
+          entering={FadeIn.duration(500)}
+          style={styles.subMessage}
+          accessibilityLiveRegion="polite"
+        >
+          {subMessage}
+        </Animated.Text>
+      )}
     </View>
   );
 }
@@ -167,5 +227,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.md,
+  },
+  subMessage: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    maxWidth: 280,
+    alignSelf: 'center',
+    lineHeight: 18,
   },
 });

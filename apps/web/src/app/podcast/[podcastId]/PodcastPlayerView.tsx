@@ -536,14 +536,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {/* Processing state */}
       {isProcessing && (
         <div className={styles.processingState}>
-          <GenerationProgress status={liveStatus} />
+          <GenerationProgress status={liveStatus} topic={podcast.topic} />
         </div>
       )}
 
       {/* Script ready for review */}
       {isScriptReady && isOwner && (
         <div className={styles.scriptReadyState}>
-          <GenerationProgress status={liveStatus} />
+          <GenerationProgress status={liveStatus} topic={podcast.topic} />
           <p className={styles.scriptReadyText}>
             Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
           </p>
