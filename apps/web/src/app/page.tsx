@@ -7,15 +7,15 @@ import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import styles from './page.module.css';
 import accessStyles from './access.module.css';
 
-const VOICES = [
-  { name: 'Adam', accent: 'American', character: 'Warm narrator', gender: 'm' },
-  { name: 'Rachel', accent: 'American', character: 'Calm & authoritative', gender: 'f' },
-  { name: 'George', accent: 'British', character: 'Distinguished professor', gender: 'm' },
-  { name: 'Freya', accent: 'British', character: 'Witty & sharp', gender: 'f' },
-  { name: 'Sam', accent: 'American', character: 'Upbeat storyteller', gender: 'm' },
-  { name: 'Charlotte', accent: 'British', character: 'Polished professional', gender: 'f' },
-  { name: 'Charlie', accent: 'Australian', character: 'Casual & curious', gender: 'm' },
-  { name: 'Grace', accent: 'Australian', character: 'Warm & approachable', gender: 'f' },
+const VOICE_TRAITS = [
+  { trait: 'Warm narrator', accent: 'American', icon: '\u266A' },
+  { trait: 'Calm & authoritative', accent: 'American', icon: '\u25CE' },
+  { trait: 'Distinguished professor', accent: 'British', icon: '\u273B' },
+  { trait: 'Witty & sharp', accent: 'British', icon: '\u2726' },
+  { trait: 'Upbeat storyteller', accent: 'American', icon: '\u2606' },
+  { trait: 'Polished professional', accent: 'British', icon: '\u25C7' },
+  { trait: 'Casual & curious', accent: 'Australian', icon: '\u223F' },
+  { trait: 'Warm & approachable', accent: 'Australian', icon: '\u2B50' },
 ];
 
 const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
@@ -484,25 +484,22 @@ export default function LandingPage() {
             <span className={styles.overline}>Voices</span>
             <h2 className={styles.h2}>Every podcast sounds different. By design.</h2>
             <p className={styles.bodyLg}>
-              Choose from 16 curated AI voices or clone your own. Every podcast pairs a unique host
-              and expert for natural, engaging conversation.
+              Choose from dozens of AI voices across providers or clone your own. Every podcast pairs
+              a unique host and expert for natural, engaging conversation.
             </p>
           </div>
           <div className={styles.voiceGrid}>
-            {VOICES.map((v, i) => (
+            {VOICE_TRAITS.map((v, i) => (
               <div
-                key={v.name}
+                key={v.trait}
                 className={`${styles.voiceCard} ${styles.rev}`}
                 style={{ '--vi': i } as React.CSSProperties}
               >
-                <div
-                  className={`${styles.voiceAvatar} ${v.gender === 'f' ? styles.voiceAvatarF : ''}`}
-                >
-                  {v.name[0]}
+                <div className={`${styles.voiceAvatar} ${i % 2 !== 0 ? styles.voiceAvatarF : ''}`}>
+                  {v.icon}
                 </div>
                 <div className={styles.voiceInfo}>
-                  <span className={styles.voiceName}>{v.name}</span>
-                  <span className={styles.voiceChar}>{v.character}</span>
+                  <span className={styles.voiceName}>{v.trait}</span>
                 </div>
                 <span className={styles.voiceAccent}>{v.accent}</span>
               </div>
