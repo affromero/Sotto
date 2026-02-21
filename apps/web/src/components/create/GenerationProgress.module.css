@@ -1,202 +1,228 @@
-/* GenerationProgress — Horizontal pipeline stepper */
+/* GenerationProgress — Pulsing progress indicator */
 
 .root {
   width: 100%;
-  padding: var(--spacing-md) var(--spacing-sm);
-  position: relative;
-}
-
-/* ============================================ */
-/* PROGRESS TRACK (background line)             */
-/* ============================================ */
-
-.track {
-  position: absolute;
-  top: calc(var(--spacing-md) + 11px); /* center on dots (dot = 22px, half = 11px) */
-  left: var(--spacing-sm);
-  right: var(--spacing-sm);
-  height: 2px;
-  background: var(--color-border);
-  z-index: 0;
-}
-
-.trackFill {
-  height: 100%;
-  background: var(--color-success);
-  transition: width 0.6s ease;
-}
-
-/* ============================================ */
-/* STEPPER ROW                                  */
-/* ============================================ */
-
-.stepper {
-  list-style: none;
-  margin: 0;
-  padding: 0;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl) var(--spacing-md);
+}
+
+/* ============================================ */
+/* ANIMATED ORB                                 */
+/* ============================================ */
+
+.orbWrap {
   position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-inverse);
+  position: relative;
+  z-index: 2;
+  transition: background 0.4s ease, transform 0.4s ease;
+}
+
+.orbActive {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* Expanding pulse rings */
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-primary);
+  opacity: 0;
   z-index: 1;
 }
 
+.ring1 {
+  animation: ripple 3s ease-out infinite;
+}
+
+.ring2 {
+  animation: ripple 3s ease-out 1s infinite;
+}
+
+.ring3 {
+  animation: ripple 3s ease-out 2s infinite;
+}
+
+/* Orb inner content: audio bars */
+.orbBars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+
+.orbBar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-text-inverse);
+  animation: barBounce 1.2s ease-in-out infinite;
+}
+
+.orbBar:nth-child(1) {
+  height: 8px;
+  animation-delay: 0s;
+}
+
+.orbBar:nth-child(2) {
+  height: 16px;
+  animation-delay: 0.2s;
+}
+
+.orbBar:nth-child(3) {
+  height: 12px;
+  animation-delay: 0.4s;
+}
+
+/* Orb percentage text */
+.orbPercent {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* State variants */
+.orbError .orb {
+  background: var(--color-error);
+}
+
+.orbError .ring {
+  border-color: var(--color-error);
+}
+
+.orbPaused .orb {
+  background: var(--color-primary);
+  animation: none;
+}
+
+.orbDone .orb {
+  background: var(--color-success);
+  animation: none;
+  transform: scale(1.05);
+}
+
 /* ============================================ */
-/* INDIVIDUAL STEP                              */
+/* STATUS TEXT                                  */
 /* ============================================ */
 
-.step {
+.statusText {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--spacing-xs);
-  flex: 1;
-  min-width: 0;
-}
-
-/* Dot */
-
-.dot {
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-body);
-  font-size: 10px;
-  font-weight: 700;
-  flex-shrink: 0;
-  transition:
-    background 0.3s ease,
-    border-color 0.3s ease,
-    color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-.dotNumber {
-  line-height: 1;
-}
-
-/* Label below dot */
-
-.label {
-  font-family: var(--font-body);
-  font-size: var(--font-size-xs);
-  font-weight: 500;
   text-align: center;
-  transition: color 0.3s ease;
-  white-space: nowrap;
 }
 
-/* ============================================ */
-/* STEP STATES                                  */
-/* ============================================ */
-
-/* Completed */
-
-.completed .dot {
-  background: var(--color-success);
-  color: var(--color-text-inverse);
+.statusLabel {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  line-height: 1.3;
 }
 
-.completed .label {
+.statusError {
+  color: var(--color-error);
+}
+
+.statusPaused {
+  color: var(--color-primary);
+}
+
+.statusDone {
   color: var(--color-success);
 }
 
-/* Current */
-
-.current .dot {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  animation: pulse 2s ease-in-out infinite;
-}
-
-.current .label {
-  color: var(--color-text-primary);
-  font-weight: 600;
-}
-
-/* Future */
-
-.future .dot {
-  background: var(--color-surface);
-  border: 2px solid var(--color-border);
-  color: var(--color-text-tertiary);
-}
-
-.future .label {
-  color: var(--color-text-tertiary);
-}
-
-/* Paused (SCRIPT_READY) */
-
-.paused .dot {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
-  animation: none;
-}
-
-.paused .label {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-/* Error */
-
-.error .dot {
-  background: var(--color-error);
-  color: var(--color-text-inverse);
-  animation: none;
-}
-
-.error .label {
-  color: var(--color-error);
-  font-weight: 600;
-}
-
-/* ============================================ */
-/* DETAIL ROW (active step info)                */
-/* ============================================ */
-
-.detail {
-  margin-top: var(--spacing-md);
-  text-align: center;
-}
-
-.detailLabel {
+.stepCount {
   font-family: var(--font-body);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
   font-weight: 500;
-  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
-.detailPaused {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.detailError {
-  color: var(--color-error);
-  font-weight: 600;
+/* Animated ellipsis */
+.ellipsis::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
 }
 
 /* ============================================ */
-/* PROGRESS BAR (within detail)                 */
+/* DOT TRACKER                                  */
+/* ============================================ */
+
+.dots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dot_completed {
+  background: var(--color-success);
+}
+
+.dot_current {
+  background: var(--color-primary);
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.dot_future {
+  background: var(--color-border);
+}
+
+.dot_paused {
+  background: var(--color-primary);
+  transform: scale(1.25);
+}
+
+.dot_error {
+  background: var(--color-error);
+  transform: scale(1.25);
+}
+
+/* ============================================ */
+/* PROGRESS BAR                                 */
 /* ============================================ */
 
 .progressWrap {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-xs);
-  max-width: 240px;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100%;
+  max-width: 200px;
 }
 
 .progressTrack {
-  flex: 1;
-  height: 4px;
+  height: 3px;
   background: var(--color-primary-light);
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -209,21 +235,11 @@
   transition: width var(--transition-slow);
 }
 
-.progressText {
-  font-family: var(--font-body);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-primary);
-  min-width: 32px;
-  text-align: right;
-}
-
 /* ============================================ */
 /* ERROR MESSAGE                                */
 /* ============================================ */
 
 .errorMessage {
-  margin-top: var(--spacing-xs);
   font-family: var(--font-body);
   font-size: var(--font-size-sm);
   color: var(--color-error);
@@ -234,67 +250,104 @@
   border: 1px solid var(--color-error-light);
   text-align: left;
   max-width: 320px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 /* ============================================ */
-/* ANIMATION                                    */
+/* ANIMATIONS                                   */
 /* ============================================ */
 
-@keyframes pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.4);
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(217, 119, 6, 0);
+    transform: scale(1.06);
   }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+@keyframes barBounce {
+  0%, 100% {
+    height: 6px;
+  }
+  50% {
+    height: 20px;
+  }
+}
+
+@keyframes dotPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(217, 119, 6, 0);
+  }
+}
+
+@keyframes dots {
+  0%   { content: ''; }
+  25%  { content: '.'; }
+  50%  { content: '..'; }
+  75%  { content: '...'; }
+  100% { content: ''; }
 }
 
 /* ============================================ */
 /* RESPONSIVE                                   */
 /* ============================================ */
 
-/* Small phones: hide labels, only show dots */
 @media (max-width: 440px) {
-  .label {
-    display: none;
-  }
-
   .root {
-    padding: var(--spacing-md) var(--spacing-xs);
+    padding: var(--spacing-lg) var(--spacing-sm);
   }
 
-  .track {
-    left: var(--spacing-xs);
-    right: var(--spacing-xs);
-  }
-}
-
-/* Larger screens: more padding */
-@media (min-width: 768px) {
-  .root {
-    padding: var(--spacing-lg) var(--spacing-md);
+  .orbWrap {
+    width: 64px;
+    height: 64px;
   }
 
-  .track {
-    left: var(--spacing-md);
-    right: var(--spacing-md);
+  .orb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .statusLabel {
+    font-size: var(--font-size-md);
   }
 
   .dot {
-    width: 26px;
-    height: 26px;
-    font-size: 11px;
+    width: 6px;
+    height: 6px;
+  }
+}
+
+@media (min-width: 768px) {
+  .root {
+    padding: var(--spacing-xl) var(--spacing-lg);
   }
 
-  .track {
-    top: calc(var(--spacing-lg) + 13px); /* center on 26px dots */
+  .orbWrap {
+    width: 96px;
+    height: 96px;
   }
 
-  .label {
-    font-size: var(--font-size-sm);
+  .orb {
+    width: 64px;
+    height: 64px;
+  }
+
+  .statusLabel {
+    font-size: var(--font-size-xl);
   }
 }
 
@@ -303,23 +356,31 @@
 /* ============================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  .current .dot {
+  .orbActive,
+  .ring1,
+  .ring2,
+  .ring3,
+  .orbBar,
+  .dot_current {
     animation: none;
   }
 
-  .trackFill {
-    transition: none;
-  }
-
+  .orb,
   .dot {
-    transition: none;
-  }
-
-  .label {
     transition: none;
   }
 
   .progressFill {
     transition: none;
+  }
+
+  /* Static indicator for reduced motion */
+  .orbActive {
+    box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.3);
+  }
+
+  .ellipsis::after {
+    content: '...';
+    animation: none;
   }
 }
