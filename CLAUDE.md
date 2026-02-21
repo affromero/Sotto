@@ -58,10 +58,16 @@ npx prisma db push --schema=apps/web/prisma/schema.prisma
 # Generate Prisma client
 npx prisma generate --schema=apps/web/prisma/schema.prisma
 
-# Development (web + workers concurrently)
+# Development (syncs prod DB then starts web + workers)
 npm run dev
 
-# Web only
+# Skip DB sync for fast start
+SKIP_DB_SYNC=1 npm run dev
+
+# Sync prod DB only (no dev server)
+npm run db:sync
+
+# Web only (no DB sync)
 npm run dev:web
 
 # Workers only
