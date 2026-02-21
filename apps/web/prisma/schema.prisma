@@ -327,6 +327,8 @@ model Podcast {
   voicePurchases   VoicePurchase[]
   autoTweets       TwitterAutoTweet[]
   ratings          PodcastRating[]
+  voiceTracks      VoiceTrack[]
+  defaultVoiceTrackId String?
 
   @@index([userId])
   @@index([status])
@@ -446,7 +448,8 @@ model Segment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  voiceTrackSegments VoiceTrackSegment[]
 
   @@index([podcastId])
   @@index([order])
@@ -1686,4 +1689,64 @@ model ContentFlag {
 
   @@index([reviewed, createdAt])
   @@index([targetType, targetId])
+}
+
+// ============ VOICE TRACKS ============
+
+enum VoiceTrackStatus {
+  PENDING
+  GENERATING_AUDIO
+  STITCHING
+  READY
+  FAILED
+  STALE
+}
+
+model VoiceTrack {
+  id            String           @id @default(cuid())
+  podcastId     String
+  name          String
+  status        VoiceTrackStatus @default(PENDING)
+  audioUrl      String?
+  duration      Int?
+  fileSize      Int?
+  ttsProvider   String?
+  ttsModel      String?
+  failureReason String?          @db.Text
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  podcast  Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  voices   VoiceTrackVoice[]
+  segments VoiceTrackSegment[]
+
+  @@index([podcastId])
+  @@index([status])
+}
+
+model VoiceTrackVoice {
+  id           String @id @default(cuid())
+  voiceTrackId String
+  speaker      String
+  voiceId      String
+
+  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
+
+  @@unique([voiceTrackId, speaker])
+}
+
+model VoiceTrackSegment {
+  id           String  @id @default(cuid())
+  voiceTrackId String
+  segmentId    String
+  audioUrl     String?
+  duration     Float?
+  startTime    Float?
+  order        Int
+
+  voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
+  segment    Segment    @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@unique([voiceTrackId, segmentId])
+  @@index([voiceTrackId])
 }
