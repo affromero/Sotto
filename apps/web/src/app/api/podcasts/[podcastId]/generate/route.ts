@@ -44,6 +44,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
+  // Admin-only flag: use platform API keys + skip free-tier counter
+  const useAdminCredits = isAdmin && request.nextUrl.searchParams.get('useAdminCredits') === 'true';
+
   // Rate limit: 20/hour, 100/day (skip for admins)
   if (!isAdmin) {
     const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
@@ -149,11 +152,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     } else {
       // Smart resume: inspect existing data and pick up where we left off
       const resumePoint = await determineResumePoint(podcastId);
+
+      if (useAdminCredits) {
+        const selected = await selectFreeTierProviders(podcast.userId);
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: {
+            ttsProvider: selected.ttsProvider,
+            ttsModel: selected.ttsModel,
+            aiModel: selected.aiModel,
+          },
+        });
+      }
+
       return await routeResume(
         podcastId,
         authResult.userId,
         podcast,
-        resumePoint
+        resumePoint,
+        useAdminCredits
       );
     }
   }
@@ -174,12 +191,24 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     userId: authResult.userId,
     sourceUrl: podcast.discovery?.sourceUrl ?? undefined,
     sourceText: podcast.discovery?.sourceContent ?? undefined,
+    useAdminCredits: useAdminCredits || undefined,
   };
 
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
 
-  // Increment free tier counter (skip for FAILED retries — already counted)
-  if (!gate.isByokUser) {
+  if (useAdminCredits) {
+    // Use platform API keys: write free-tier provider selection, skip counter
+    const selected = await selectFreeTierProviders(podcast.userId);
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: {
+        ttsProvider: selected.ttsProvider,
+        ttsModel: selected.ttsModel,
+        aiModel: selected.aiModel,
+      },
+    });
+  } else if (!gate.isByokUser) {
+    // Increment free tier counter (skip for FAILED retries — already counted)
     const selected = await selectFreeTierProviders(authResult.userId);
     await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
@@ -212,7 +241,8 @@ async function routeResume(
     title: string;
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
-  resumePoint: ResumePoint
+  resumePoint: ResumePoint,
+  useAdminCredits: boolean
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
     case 'IMPORT_AUDIO': {
@@ -230,6 +260,7 @@ async function routeResume(
         userId,
         sourceUrl: podcast.discovery?.sourceUrl ?? undefined,
         sourceText: podcast.discovery?.sourceContent ?? undefined,
+        useAdminCredits: useAdminCredits || undefined,
       };
 
       await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
@@ -259,6 +290,7 @@ async function routeResume(
         userId,
         discoveryId: discovery.id,
         sourceContent: discovery.sourceContent ?? undefined,
+        useAdminCredits: useAdminCredits || undefined,
       };
 
       await addJob(scriptGenerationQueue, JobType.GENERATE_SCRIPT, payload);
@@ -283,6 +315,7 @@ async function routeResume(
         podcastId,
         userId,
         discoveryId: discovery.id,
+        useAdminCredits: useAdminCredits || undefined,
       };
 
       await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload);
@@ -302,6 +335,7 @@ async function routeResume(
       const payload: ValidateReferencesPayload = {
         podcastId,
         userId,
+        useAdminCredits: useAdminCredits || undefined,
       };
 
       await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, payload);

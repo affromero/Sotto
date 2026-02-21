@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ModerationTabs } from './ModerationTabs';
+import { RetryButton } from '../podcasts/RetryButton';
 import styles from './page.module.css';
 
 async function getModerationData() {
@@ -62,6 +63,7 @@ export default async function AdminModerationPage() {
                 <th>Title</th>
                 <th>Creator</th>
                 <th>Failed At</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -88,6 +90,9 @@ export default async function AdminModerationPage() {
                         hour: '2-digit',
                         minute: '2-digit',
                       })}
+                    </td>
+                    <td>
+                      <RetryButton podcastId={podcast.id} />
                     </td>
                   </tr>
                 );

@@ -253,6 +253,30 @@
   border-color: var(--color-primary);
 }
 
+/* Retry row: checkbox + button */
+
+.retryRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.adminCreditsLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.adminCreditsCheckbox {
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
 /* Retry button */
 
 .retryButton {

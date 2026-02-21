@@ -51,6 +51,7 @@ export interface ExtractContentPayload {
   userId: string;
   sourceUrl?: string;
   sourceText?: string;
+  useAdminCredits?: boolean;
 }
 
 export interface GenerateScriptPayload {
@@ -58,6 +59,7 @@ export interface GenerateScriptPayload {
   userId: string;
   discoveryId: string;
   sourceContent?: string;
+  useAdminCredits?: boolean;
 }
 
 export interface GenerateAudioPayload {
@@ -100,6 +102,7 @@ export interface SendNotificationPayload {
 export interface ValidateReferencesPayload {
   podcastId: string;
   userId: string;
+  useAdminCredits?: boolean;
 }
 
 export interface VerifyVoicePayload {
@@ -113,6 +116,7 @@ export interface VerifyScriptPayload {
   podcastId: string;
   userId: string;
   discoveryId: string;
+  useAdminCredits?: boolean;
 }
 
 export interface GeneratePdfPayload {
