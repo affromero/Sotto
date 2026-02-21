@@ -1,6 +1,9 @@
 import { PodcastSource, PodcastStatus, PodcastVisibility } from '@prisma/client';
 import { ReferenceData } from './reference';
 import { PodcastVersionSummary } from './version';
+import type { VoiceTrackSummary } from '@sotto/shared';
+
+export type { VoiceTrackSummary };
 
 export interface PodcastSummary {
   id: string;
@@ -72,6 +75,8 @@ export interface PodcastDetail extends PodcastSummary {
   pdfUrl: string | null;
   isLiked: boolean;
   isSaved: boolean;
+  voiceTracks: VoiceTrackSummary[];
+  defaultVoiceTrackId: string | null;
 }
 
 export interface SegmentData {

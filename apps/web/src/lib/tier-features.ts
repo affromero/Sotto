@@ -50,6 +50,7 @@ const PRO_FEATURES: TierFeatures = {
 const BYOK_FEATURES: TierFeatures = {
   ...PRO_FEATURES,
   maxDurationMinutes: Infinity,
+  maxVoiceTracks: Infinity,
 };
 
 /**
