@@ -37,7 +37,7 @@ All shared business logic and external service integrations live here.
 | `recommendation-engine.ts` | ML-powered recommendation engine: daily picks, explore, trending categories | Uses `prisma.ts`, `providers/ml.ts` |
 | `push-notifications.ts` | Web Push API: send to user devices, clean expired subs | web-push |
 | `subscription.ts` | (Simplified) Usage queries, generation counts — no tiers or credits | Uses `prisma.ts` |
-| `validations.ts` | Zod schemas for all API input validation (includes addToAllowlistSchema, userSearchSchema) | Zod |
+| `validations.ts` | Zod schemas for all API input validation (re-exports `createPodcastSchema` from `@sotto/shared`; includes addToAllowlistSchema, userSearchSchema) | Zod |
 | `validations/` | Additional Zod schemas: `events.ts` (behavioral event validation) | Zod |
 | `logger.ts` | Structured logging with levels (debug/info/warn/error) | Console |
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |

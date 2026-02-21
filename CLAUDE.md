@@ -265,6 +265,7 @@ Core models — see `apps/web/prisma/CLAUDE.md` for the full breakdown:
 14. **No `console.log` in committed code** — unless it's intentional logging (use proper logger)
 15. **Prefer small, modular files** — avoid monolithic files. Split large components, utilities, and routes into focused modules. A 200-line file is better than a 1000-line file with 5 responsibilities.
 16. **Update `.env.example` when adding env vars** — every new environment variable added to `.env` must also be added (commented out with placeholder) to `.env.example` so other developers and deployments stay in sync.
+17. **Web/Mobile feature parity** — every user-facing feature added to the web creation flow must also be added to the mobile creation flow in the same PR or immediately after. The mobile app is NOT a second-class citizen. When adding UI to `apps/web/src/components/create/` or `apps/web/src/components/discovery/`, check if `apps/mobile/` needs a matching component. When adding fields to the podcast creation API payload, update `CreatePodcastRequest` in `@sotto/shared` and ensure mobile sends the same data.
 
 ## Frontend Quality Checklist
 

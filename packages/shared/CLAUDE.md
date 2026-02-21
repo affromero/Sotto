@@ -8,7 +8,7 @@ Prisma-free package consumed by both `apps/web/` and `apps/mobile/`.
 src/
 ├── types/
 │   ├── enums.ts          # String union equivalents of Prisma enums
-│   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, etc.
+│   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData, VerificationLayerResult
 │   ├── twitter.ts        # TweetParseResult, TwitterTweet, TweetMentionData
 │   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState
@@ -24,7 +24,7 @@ src/
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
 ├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
-├── validations.ts        # Shared Zod schemas (createPodcast, interaction, feed, etc.)
+├── validations.ts        # Shared Zod schemas — createPodcastSchema is the canonical schema (web re-exports from here)
 ├── theme.ts              # Design tokens: colors, spacing, typography, borderRadius
 └── index.ts              # Barrel export
 ```
