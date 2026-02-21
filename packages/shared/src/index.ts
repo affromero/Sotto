@@ -14,6 +14,7 @@ export type {
   NotificationType,
   VoiceCloneSource,
   VoiceRequestStatus,
+  VoiceTrackStatus,
   FeedbackType,
   FeedbackStatus,
 } from './types/enums';
@@ -28,6 +29,7 @@ export type {
   InteractionSummary,
   CreatePodcastRequest,
   GeneratePodcastRequest,
+  VoiceTrackSummary,
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';

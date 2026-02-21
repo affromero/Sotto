@@ -1,4 +1,4 @@
-import type { PodcastSource, PodcastStatus, PodcastVisibility, Speaker } from './enums';
+import type { PodcastSource, PodcastStatus, PodcastVisibility, Speaker, VoiceTrackStatus } from './enums';
 import type { ReferenceData } from './reference';
 import type { PodcastVersionSummary } from './version';
 
@@ -71,6 +71,19 @@ export interface PodcastDetail extends PodcastSummary {
   pdfUrl: string | null;
   isLiked: boolean;
   isSaved: boolean;
+  voiceTracks: VoiceTrackSummary[];
+  defaultVoiceTrackId: string | null;
+}
+
+export interface VoiceTrackSummary {
+  id: string;
+  name: string;
+  status: VoiceTrackStatus;
+  audioUrl: string | null;
+  duration: number | null;
+  ttsProvider: string | null;
+  failureReason: string | null;
+  voices: Array<{ speaker: string; voiceId: string }>;
 }
 
 export interface SegmentData {
