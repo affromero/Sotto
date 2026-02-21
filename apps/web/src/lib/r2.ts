@@ -134,6 +134,43 @@ export async function deleteFile(urlOrKey: string): Promise<void> {
 }
 
 /**
+ * Upload individual voice track segment audio
+ */
+export async function uploadVoiceTrackSegmentAudio(
+  podcastId: string,
+  trackId: string,
+  segmentId: string,
+  audio: Buffer
+): Promise<string> {
+  const key = `podcasts/${podcastId}/tracks/${trackId}/segments/${segmentId}.mp3`;
+  return uploadFile(key, audio, 'audio/mpeg');
+}
+
+/**
+ * Upload final stitched voice track audio
+ */
+export async function uploadVoiceTrackAudio(
+  podcastId: string,
+  trackId: string,
+  audio: Buffer
+): Promise<string> {
+  const key = `podcasts/${podcastId}/tracks/${trackId}/audio.mp3`;
+  return uploadFile(key, audio, 'audio/mpeg');
+}
+
+/**
+ * Delete all R2 files for a voice track
+ */
+export async function deleteVoiceTrackFiles(podcastId: string, trackId: string): Promise<void> {
+  const prefix = `podcasts/${podcastId}/tracks/${trackId}/`;
+  const keys = await listFiles(prefix);
+  for (const key of keys) {
+    await deleteFile(key);
+  }
+  logger.info('Voice track files deleted from R2', { podcastId, trackId, count: String(keys.length) });
+}
+
+/**
  * List all object keys under a given prefix, handling pagination
  */
 export async function listFiles(prefix: string): Promise<string[]> {

@@ -81,7 +81,9 @@ export type NotificationType =
   | 'VOICE_VERIFICATION_PASSED'
   | 'VOICE_VERIFICATION_FAILED'
   | 'VOICE_BLOCKED_DUPLICATE'
-  | 'VOICE_OWNERSHIP_ALERT';
+  | 'VOICE_OWNERSHIP_ALERT'
+  | 'VOICE_TRACK_FAILED'
+  | 'VOICE_TRACK_READY';
 
 export type ReportReason =
   | 'HARASSMENT'
@@ -115,6 +117,14 @@ export type VoiceVerificationStatus =
   | 'PROTECTED';
 
 export type VoiceRequestStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'REVOKED';
+
+export type VoiceTrackStatus =
+  | 'PENDING'
+  | 'GENERATING_AUDIO'
+  | 'STITCHING'
+  | 'READY'
+  | 'FAILED'
+  | 'STALE';
 
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 

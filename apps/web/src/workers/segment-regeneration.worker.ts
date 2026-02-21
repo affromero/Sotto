@@ -143,6 +143,12 @@ export async function processSegmentRegeneration(
     data: { status: 'INCORPORATED', incorporated: true },
   });
 
+  // Mark all READY voice tracks as stale — they're missing the new segment's audio
+  await prisma.voiceTrack.updateMany({
+    where: { podcastId, status: 'READY' },
+    data: { status: 'STALE' },
+  });
+
   // Queue re-stitch with skipSfx (SFX positions are invalid after inserting a segment)
   const allSegments = await prisma.segment.findMany({
     where: { podcastId },

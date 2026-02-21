@@ -15,6 +15,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
+const mockPrismaVoiceTrackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
   const tx = {
@@ -43,6 +44,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
+    },
+    voiceTrack: {
+      updateMany: (...args: unknown[]) => mockPrismaVoiceTrackUpdateMany(...args),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockPrismaTransaction(fn),
   };

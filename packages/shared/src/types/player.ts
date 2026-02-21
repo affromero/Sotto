@@ -8,6 +8,7 @@ export interface PlayerState {
   playbackRate: number;
   volume: number;
   isMuted: boolean;
+  activeVoiceTrackId: string | null;
 }
 
 export interface PlayerControls {
