@@ -114,6 +114,73 @@ function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): Sc
 }
 
 /**
+ * Pre-validation coercion: fix common AI output mistakes before Zod validates.
+ * Maps alternate key names, fills missing nullable fields with null, and drops
+ * unsalvageable items — so a few malformed entries don't crash the whole pipeline.
+ */
+function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...raw };
+
+  // --- soundCues: map alternate key names, drop incomplete items ---
+  if (Array.isArray(result.soundCues)) {
+    result.soundCues = (result.soundCues as Record<string, unknown>[])
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        return {
+          type: item.type ?? item.cueType ?? item.cue_type,
+          prompt: item.prompt ?? item.description ?? item.text,
+          durationSeconds:
+            item.durationSeconds ?? item.duration_seconds ?? item.duration,
+          insertAfterTurn:
+            item.insertAfterTurn ?? item.insert_after_turn ?? item.afterTurn,
+        };
+      })
+      .filter(
+        (item) =>
+          item !== null &&
+          item.type !== undefined &&
+          item.prompt !== undefined &&
+          item.durationSeconds !== undefined &&
+          item.insertAfterTurn !== undefined
+      );
+  }
+
+  // --- references: map alternate key names, fill nullable fields ---
+  if (Array.isArray(result.references)) {
+    result.references = (result.references as Record<string, unknown>[])
+      .map((item) => {
+        if (!item || typeof item !== 'object') return null;
+        const title = item.title ?? item.name;
+        if (!title) return null; // unsalvageable without a title
+
+        const authors = item.authors ?? item.author;
+        return {
+          number: item.number ?? item.num ?? item.ref_number ?? item.id,
+          title,
+          authors: authors !== undefined
+            ? (Array.isArray(authors) ? authors : typeof authors === 'string' ? [authors] : [])
+            : [],
+          year: item.year ?? null,
+          url: item.url ?? item.link ?? item.source_url ?? null,
+          type: item.type ?? item.sourceType ?? item.source_type ?? 'WEB',
+          publisher:
+            item.publisher ?? item.publisher_name ?? item.source ?? null,
+          doi: item.doi ?? null,
+        };
+      })
+      .filter(Boolean);
+
+    // Auto-assign numbers if they're all missing
+    const refs = result.references as Record<string, unknown>[];
+    if (refs.length > 0 && refs.every((r) => r.number == null)) {
+      refs.forEach((r, i) => { r.number = i + 1; });
+    }
+  }
+
+  return result;
+}
+
+/**
  * Generate a 2-voice podcast script from discovery metadata.
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
@@ -319,8 +386,9 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     }
   }
 
-  // Validate structure before proceeding
-  const validated = generatedScriptSchema.parse(parsed);
+  // Coerce AI output before validating
+  const coerced = coerceScriptOutput(parsed as Record<string, unknown>);
+  const validated = generatedScriptSchema.parse(coerced);
 
   // Ensure defaults
   if (!validated.soundCues || validated.soundCues.length === 0) {
@@ -533,8 +601,9 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     }
   }
 
-  // Validate structure before proceeding
-  const validated = generatedScriptSchema.parse(parsed);
+  // Coerce AI output before validating
+  const coerced = coerceScriptOutput(parsed as Record<string, unknown>);
+  const validated = generatedScriptSchema.parse(coerced);
 
   if (!validated.soundCues || validated.soundCues.length === 0) {
     validated.soundCues = [
