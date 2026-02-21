@@ -65,7 +65,7 @@ describe('createSttProvider', () => {
   });
 
   it('groq provider throws with correct error when not initialized', async () => {
-    // No API key → provider not initialized
+    vi.stubEnv('GROQ_API_KEY', '');
     const provider = createSttProvider('groq');
     await expect(provider.transcribe(Buffer.from('audio'))).rejects.toThrow(
       'Groq Whisper provider not initialized — set GROQ_API_KEY'
@@ -73,6 +73,7 @@ describe('createSttProvider', () => {
   });
 
   it('openai provider throws with correct error when not initialized', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
     const provider = createSttProvider('openai');
     await expect(provider.transcribe(Buffer.from('audio'))).rejects.toThrow(
       'OpenAI Whisper provider not initialized — set OPENAI_API_KEY'

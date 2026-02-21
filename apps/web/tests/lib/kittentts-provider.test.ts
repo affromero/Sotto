@@ -75,6 +75,8 @@ describe('KittenTtsProvider', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockSelectKittenVoicePair.mockReturnValue({ host: 'rosie', expert: 'hugo' });
+    // Clear Doppler-injected KITTENTTS_URL so the default URL is used
+    delete process.env.KITTENTTS_URL;
   });
 
   it('sends a POST to /synthesize and returns audio buffer', async () => {

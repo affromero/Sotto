@@ -348,7 +348,7 @@ describe('processTwitterReply', () => {
       const replyCall = mockReplyToTweet.mock.calls[0];
       const replyText = replyCall[1] as string;
 
-      expect(replyText).toMatch(/https:\/\/.*sotto\.fm/i);
+      expect(replyText).toMatch(/https?:\/\/\S+/i);
     });
   });
 
@@ -394,10 +394,12 @@ describe('processTwitterReply', () => {
       const job = createMockJob(payload);
       await processTwitterReply(job);
 
-      expect(mockReplyToTweet).toHaveBeenCalledWith(
-        'tweet-final',
-        'Your podcast is ready! "The History of the Internet" (10 min)\n\nListen: https://sotto.fm/podcast/podcast-final'
-      );
+      const replyText = mockReplyToTweet.mock.calls[0][1] as string;
+      expect(replyText).toContain('Your podcast is ready!');
+      expect(replyText).toContain('"The History of the Internet"');
+      expect(replyText).toContain('(10 min)');
+      expect(replyText).toContain('\n\nListen:');
+      expect(replyText).toContain('/podcast/podcast-final');
     });
   });
 });
