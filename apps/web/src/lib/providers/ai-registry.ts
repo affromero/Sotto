@@ -152,7 +152,7 @@ export function isValidAiProviderId(id: string): id is AiProviderId {
 }
 
 /**
- * Get the display name for a model ID (e.g. 'claude-sonnet-4-5-20250929' → 'Claude Sonnet 4.5').
+ * Get the display name for a model ID (e.g. 'claude-sonnet-4-6' → 'Claude Sonnet 4.6').
  * Returns the raw ID if no match is found.
  */
 export function getAiModelDisplayName(modelId: string): string {

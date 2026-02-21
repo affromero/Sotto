@@ -32,7 +32,7 @@ const FALLBACK_PRICING: ModelPricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 
 export function getAiPricing(model: string): ModelPricing {
   const pricing = AI_PRICING[model];
   if (!pricing) {
-    logger.warn('Unknown model for pricing lookup, using Sonnet 4.5 fallback', { model });
+    logger.warn('Unknown model for pricing lookup, using Sonnet 4.6 fallback', { model });
     return FALLBACK_PRICING;
   }
   return pricing;
