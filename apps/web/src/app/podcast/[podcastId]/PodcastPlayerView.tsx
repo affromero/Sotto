@@ -36,6 +36,7 @@ import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { ReportModal } from '@/components/ui/ReportModal';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
+import { VoiceTrackSelector } from '@/components/player/VoiceTrackSelector';
 import { VersionHistory } from '@/components/player/VersionHistory';
 import { CommunityQuestions } from '@/components/player/CommunityQuestions';
 import { CommentSection } from '@/components/player/CommentSection';
@@ -565,6 +566,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {isReady && podcast.audioUrl && (
         <section ref={playerSectionRef} className={styles.playerSection} aria-label="Audio player">
           <AudioPlayer podcastId={podcast.id} audioUrl={podcast.audioUrl!} podcastTitle={podcast.title} />
+          {(podcast.voiceTracks.length > 0 || isOwner) && (
+            <VoiceTrackSelector
+              podcastId={podcast.id}
+              podcastAudioUrl={podcast.audioUrl!}
+              podcastTitle={podcast.title}
+              voiceTracks={podcast.voiceTracks}
+              defaultVoiceTrackId={podcast.defaultVoiceTrackId}
+              isOwner={isOwner}
+            />
+          )}
         </section>
       )}
 
