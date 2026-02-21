@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
+import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import styles from './TranscriptPanel.module.css';
@@ -14,6 +15,7 @@ interface TranscriptPanelProps {
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
   questionCounts?: Map<number, number>;
+  podcastId?: string;
 }
 
 function isCurrentSegment(segment: SegmentData, currentTime: number): boolean {
@@ -27,6 +29,7 @@ export function TranscriptPanel({
   currentTime,
   onSegmentClick,
   questionCounts,
+  podcastId,
 }: TranscriptPanelProps) {
   const activeRef = useRef<HTMLDivElement>(null);
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
@@ -61,6 +64,13 @@ export function TranscriptPanel({
               <div className={styles.text}>
                 {hasRefs ? parseTextWithCitations(segment.text, references) : segment.text}
               </div>
+              {podcastId && (
+                <ClaimFlagButton
+                  podcastId={podcastId}
+                  turnIndex={segment.order}
+                  turnText={segment.text}
+                />
+              )}
             </div>
           );
         })}

@@ -4,7 +4,7 @@ import { ModerationTabs } from './ModerationTabs';
 import styles from './page.module.css';
 
 async function getModerationData() {
-  const [failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount] =
+  const [failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount] =
     await Promise.all([
       prisma.podcast.findMany({
         where: { status: 'FAILED' },
@@ -37,16 +37,17 @@ async function getModerationData() {
         take: 50,
       }),
       prisma.report.count({ where: { status: 'PENDING' } }),
+      prisma.claimReport.count({ where: { status: 'PENDING' } }),
       prisma.voiceClone.count({
         where: { verificationStatus: { in: ['PENDING_VERIFICATION', 'BLOCKED', 'AWAITING_CHALLENGE'] } },
       }),
     ]);
 
-  return { failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount };
+  return { failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount };
 }
 
 export default async function AdminModerationPage() {
-  const { failedPodcasts, feedbackEntries, pendingReportCount, pendingVoiceCount } =
+  const { failedPodcasts, feedbackEntries, pendingReportCount, pendingClaimCount, pendingVoiceCount } =
     await getModerationData();
 
   const failedPodcastsContent = (
@@ -166,6 +167,7 @@ export default async function AdminModerationPage() {
 
       <ModerationTabs
         pendingReportCount={pendingReportCount}
+        pendingClaimCount={pendingClaimCount}
         failedPodcastCount={failedPodcasts.length}
         feedbackCount={feedbackEntries.length}
         pendingVoiceCount={pendingVoiceCount}

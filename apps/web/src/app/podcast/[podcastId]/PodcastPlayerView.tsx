@@ -546,7 +546,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
             Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
           </p>
           {scriptTurns && scriptTurns.length > 0 && (
-            <ScriptPreview turns={scriptTurns} references={scriptRefs} />
+            <ScriptPreview turns={scriptTurns} references={scriptRefs} podcastId={podcast.id} />
           )}
           <div className={styles.scriptReadyActions}>
             <Button onClick={handleApproveScript} loading={approving} disabled={approving || regenerating}>
@@ -755,6 +755,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
                 questionCounts={isOwner ? questionCounts : undefined}
+                podcastId={podcast.id}
               />
             ) : (
               <Teleprompter
