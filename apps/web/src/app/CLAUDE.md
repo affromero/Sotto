@@ -91,6 +91,7 @@
 | `/api/podcasts/[podcastId]/comments/[commentId]`                 | DELETE           | Yes        | Delete own comment                                                          |
 | `/api/podcasts/[podcastId]/comments/[commentId]/replies`         | GET              | No         | List replies to a comment                                                   |
 | `/api/podcasts/[podcastId]/rating`                               | GET/POST         | Yes        | Get/submit creator rating (upsert, creator-only)                            |
+| `/api/podcasts/[podcastId]/claims`                               | POST/GET         | Yes        | Flag inaccurate claim (POST, rate limited 20/hr) / list claims (GET, owner/admin) |
 | `/api/podcasts/[podcastId]/export`                               | POST/GET         | Yes        | Trigger PDF generation / check status                                       |
 | `/api/feed`                                                      | GET              | No         | Public feed with search/filter/sort (includes most_forked, remixes mode)    |
 | `/api/activity`                                                  | GET              | Yes        | Activity feed from followed users                                           |
@@ -172,6 +173,9 @@
 | `/api/admin/reports`                                             | GET              | ADMIN      | List user reports (filter by status, targetType, reason)                    |
 | `/api/admin/reports/[reportId]`                                  | GET/PATCH        | ADMIN      | Get/resolve a report (RESOLVED_ACTIONED or RESOLVED_DISMISSED)              |
 | `/api/admin/reports/stats`                                       | GET              | ADMIN      | Report counts by status (pending, reviewing, actioned, dismissed)           |
+| `/api/admin/claim-reports`                                       | GET              | ADMIN      | List claim reports (filter by status, podcastId) with pagination            |
+| `/api/admin/claim-reports/[claimReportId]`                       | PATCH            | ADMIN      | Resolve claim report (RESOLVED_VERIFIED, RESOLVED_INACCURATE, DISMISSED)    |
+| `/api/admin/claim-reports/stats`                                 | GET              | ADMIN      | Claim report counts by status                                               |
 | `/api/access`                                                    | GET/POST         | No         | Site password gate (GET: check cookie, POST: validate password)             |
 | `/api/auth/mobile`                                               | POST             | No         | Mobile OAuth login (Apple, Google, GitHub, Twitter) — issues API key token  |
 | `/api/connect/telegram`                                          | GET/POST         | Yes        | Telegram account linking (GET: verify code, POST: confirm link)             |
