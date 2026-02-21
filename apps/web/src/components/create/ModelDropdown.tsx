@@ -31,12 +31,28 @@ export function ModelDropdown({
 }: ModelDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Position the fixed dropdown relative to the trigger
+  useEffect(() => {
+    if (!isOpen || !containerRef.current || !dropdownRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdown = dropdownRef.current;
+    const spaceAbove = rect.top - 12;
+
+    dropdown.style.left = `${rect.left}px`;
+    dropdown.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+    dropdown.style.maxHeight = `${Math.min(360, Math.max(200, spaceAbove))}px`;
+  }, [isOpen]);
 
   // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
@@ -90,7 +106,12 @@ export function ModelDropdown({
       </button>
 
       {isOpen && (
-        <div className={styles.dropdown} role="listbox" aria-label={label}>
+        <div
+          ref={dropdownRef}
+          className={styles.dropdown}
+          role="listbox"
+          aria-label={label}
+        >
           <div className={styles.dropdownHeader}>{label}</div>
           {hasGroups
             ? Array.from(groups.entries()).map(([group, opts]) => (
