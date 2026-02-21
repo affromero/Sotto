@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import { auth } from '@/lib/auth';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
@@ -5,6 +6,15 @@ import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { ModelTestPanel } from './ModelTestPanel';
 import styles from './page.module.css';
+
+function isClaudeCliAvailable(): boolean {
+  try {
+    execSync('claude --version', { stdio: 'ignore', timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export type TestableProvider = {
   category: 'ai' | 'tts' | 'stt';
@@ -23,7 +33,7 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
       case 'anthropic': return !!process.env.ANTHROPIC_API_KEY;
       case 'openai': return !!process.env.OPENAI_API_KEY;
       case 'groq': return !!process.env.GROQ_API_KEY;
-      case 'claude-code': return process.env.AI_PROVIDER === 'claude-code';
+      case 'claude-code': return isClaudeCliAvailable();
       default: return false;
     }
   }
