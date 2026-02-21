@@ -6,7 +6,7 @@ import { extractContent } from '@/lib/extractors';
 import { logger } from '@/lib/logger';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
-  const { podcastId, userId, sourceUrl, sourceText } = job.data;
+  const { podcastId, userId, sourceUrl, sourceText, useAdminCredits } = job.data;
 
   logger.info('Extracting content', { podcastId });
   await job.updateProgress(10);
@@ -30,6 +30,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       userId,
       discoveryId: existingDiscovery.id,
       sourceContent: existingDiscovery.sourceContent,
+      useAdminCredits,
     });
 
     await job.updateProgress(100);
@@ -79,6 +80,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     userId,
     discoveryId: discovery.id,
     sourceContent: content || undefined,
+    useAdminCredits,
   });
 
   await job.updateProgress(100);
