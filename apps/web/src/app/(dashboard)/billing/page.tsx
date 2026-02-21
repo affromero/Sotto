@@ -5,6 +5,7 @@ import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { Badge } from '@/components/ui/Badge';
 import { ManageSubscriptionButton } from './ManageSubscriptionButton';
+import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -73,9 +74,7 @@ export default async function BillingPage() {
           </div>
         ) : (
           <div className={styles.manageActions}>
-            <Link href="/pricing" className={styles.upgradeButton}>
-              Upgrade to Pro — $12/month
-            </Link>
+            <ProWaitlistButton email={session.user.email!} source="pro-billing" className={styles.upgradeButton} />
           </div>
         )}
       </section>
@@ -162,9 +161,7 @@ export default async function BillingPage() {
             </div>
           </div>
           <div className={styles.manageActions}>
-            <Link href="/pricing" className={styles.upgradeButton}>
-              Upgrade to Pro — $12/month
-            </Link>
+            <ProWaitlistButton email={session.user.email!} source="pro-billing-byok" className={styles.upgradeButton} />
           </div>
         </section>
       )}

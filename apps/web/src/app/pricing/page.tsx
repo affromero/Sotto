@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { PublicNav } from '@/components/layout/PublicNav';
 import { Footer } from '@/components/layout/Footer';
+import { ProWaitlistForm } from '@/components/ui/ProWaitlistForm';
 import styles from './page.module.css';
 
 export const metadata = {
@@ -93,9 +94,7 @@ export default function PricingPage() {
                 <li>Creator analytics dashboard</li>
                 <li>Everything in Free</li>
               </ul>
-              <Link href="/auth/signup?upgrade=pro" className={styles.planButtonFeatured}>
-                Start Pro — $12/month
-              </Link>
+              <ProWaitlistForm source="pro-pricing-card" variant="featured" />
             </div>
           </section>
 
@@ -265,9 +264,7 @@ export default function PricingPage() {
               <Link href="/auth/signup" className={styles.ctaButtonPrimary}>
                 Get Started Free
               </Link>
-              <Link href="/auth/signup?upgrade=pro" className={styles.ctaButtonSecondary}>
-                Start Pro
-              </Link>
+              <ProWaitlistForm source="pro-pricing-cta" variant="secondary" />
             </div>
           </section>
         </div>

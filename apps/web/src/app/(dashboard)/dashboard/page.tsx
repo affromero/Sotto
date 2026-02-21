@@ -195,6 +195,7 @@ export default async function DashboardPage() {
           isByokUser={freeTier.isByokUser}
           isProUser={freeTier.isProUser}
           resetInSeconds={freeTier.resetInSeconds}
+          email={session?.user?.email ?? undefined}
         />
       )}
 
