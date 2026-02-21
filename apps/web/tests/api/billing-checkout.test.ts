@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
@@ -46,6 +46,11 @@ describe('POST /api/billing/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.STRIPE_PRO_PRICE_ID = 'price_test_123';
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://sotto.fm');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 when unauthenticated', async () => {
