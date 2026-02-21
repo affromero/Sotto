@@ -54,12 +54,12 @@ async function runWithConcurrencyLimit<T>(
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
 ): Promise<void> {
-  const { podcastId, userId } = job.data;
+  const { podcastId, userId, useAdminCredits } = job.data;
 
   logger.info('Starting reference validation', { podcastId });
   await job.updateProgress(5);
 
-  const aiKey = await getAiKey(userId);
+  const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
   const [references, script, podcast] = await Promise.all([
@@ -343,7 +343,7 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { source: true },
     }),
-    hasByokKey(userId),
+    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { plan: true, role: true },

@@ -27,14 +27,14 @@ import { logger } from '@/lib/logger';
 const MAX_VERIFICATION_ATTEMPTS = 3;
 
 export async function processScriptVerification(job: Job<VerifyScriptPayload>): Promise<void> {
-  const { podcastId, userId, discoveryId } = job.data;
+  const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
 
   logger.info('Starting script verification', { podcastId });
   await job.updateProgress(5);
 
   const [aiKey, hasTts, userPlan] = await Promise.all([
-    getAiKey(userId),
-    hasByokKey(userId),
+    useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
+    useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
   ]);
 
@@ -145,6 +145,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       await addJob(referenceValidationQueue, JobType.VALIDATE_REFERENCES, {
         podcastId,
         userId,
+        useAdminCredits,
       });
 
       logger.info('Script verified, routing to reference validation', { podcastId });
@@ -317,6 +318,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     podcastId,
     userId,
     discoveryId,
+    useAdminCredits,
   });
 
   logger.info('Script revised and re-queued for verification', {
