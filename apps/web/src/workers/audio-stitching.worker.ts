@@ -167,7 +167,10 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 7. Post-stitch duration hard check
     const maxDurationSeconds = LIMITS.maxDurationMinutes * 60 * 1.1; // 10% grace
     if (duration > maxDurationSeconds) {
-      await markPodcastFailed(podcastId);
+      await markPodcastFailed(podcastId, {
+        failureReason: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
+        technicalError: `Duration ${Math.round(duration)}s exceeded max ${Math.round(maxDurationSeconds)}s`,
+      });
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
@@ -362,7 +365,9 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     });
   } catch (err) {
     // Mark podcast as failed on unrecoverable error
-    await markPodcastFailed(podcastId).catch(() => {});
+    await markPodcastFailed(podcastId, {
+      technicalError: err instanceof Error ? err.message : String(err),
+    }).catch(() => {});
 
     // If Twitter-sourced, queue failure reply
     if (job.data.podcastId) {

@@ -218,7 +218,10 @@ export async function processReferenceValidation(
   });
 
   if (allFailed) {
-    await markPodcastFailed(podcastId);
+    await markPodcastFailed(podcastId, {
+      failureReason: 'All references could not be verified. Please try again with a different topic.',
+      technicalError: `All ${references.length} references failed verification`,
+    });
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,

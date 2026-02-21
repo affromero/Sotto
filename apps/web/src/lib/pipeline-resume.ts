@@ -16,11 +16,22 @@ export type ResumePoint =
   | { step: 'STITCH_AUDIO'; segmentIds: string[] }
   | { step: 'IMPORT_AUDIO' };
 
+interface MarkFailedOptions {
+  failureReason?: string;
+  technicalError?: string;
+}
+
 /**
  * Mark a podcast as FAILED, recording the status it was in when the failure occurred.
  * Idempotent: skips if the podcast is already FAILED.
  */
-export async function markPodcastFailed(podcastId: string, failureReason?: string): Promise<void> {
+export async function markPodcastFailed(
+  podcastId: string,
+  options?: string | MarkFailedOptions,
+): Promise<void> {
+  const opts: MarkFailedOptions =
+    typeof options === 'string' ? { failureReason: options } : options ?? {};
+
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
     select: { status: true },
@@ -35,7 +46,9 @@ export async function markPodcastFailed(podcastId: string, failureReason?: strin
     data: {
       status: 'FAILED',
       failedAtStatus: podcast.status,
-      failureReason: failureReason ?? null,
+      failureReason: opts.failureReason ?? null,
+      technicalError: opts.technicalError ?? null,
+      failedAt: new Date(),
     },
   });
 
@@ -47,7 +60,11 @@ export async function markPodcastFailed(podcastId: string, failureReason?: strin
     });
   });
 
-  logger.info('Marked podcast as FAILED', { podcastId, failedAtStatus: podcast.status, failureReason });
+  logger.info('Marked podcast as FAILED', {
+    podcastId,
+    failedAtStatus: podcast.status,
+    failureReason: opts.failureReason,
+  });
 }
 
 /**

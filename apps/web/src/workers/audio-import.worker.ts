@@ -405,7 +405,9 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       error: err instanceof Error ? err.message : String(err),
     });
 
-    await markPodcastFailed(podcastId);
+    await markPodcastFailed(podcastId, {
+      technicalError: err instanceof Error ? err.message : String(err),
+    });
 
     throw err;
   } finally {

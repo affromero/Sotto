@@ -296,6 +296,26 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
       if (!podcastId) return;
 
+      // Log every failure (including retries) as a PipelineEvent
+      await prisma.pipelineEvent.create({
+        data: {
+          podcastId,
+          stage: queueName,
+          type: job?.attemptsMade != null && job.attemptsMade < (job.opts?.attempts ?? 3) ? 'retry' : 'error',
+          message: args.failedReason || 'Unknown failure',
+          metadata: {
+            jobId: args.jobId,
+            attemptNumber: job?.attemptsMade,
+            maxAttempts: job?.opts?.attempts,
+            segmentId: (job?.data as Record<string, unknown>)?.segmentId as string | undefined,
+            errorKind: classifyError(args.failedReason || ''),
+          },
+        },
+      }).catch(err => logger.error('Failed to write PipelineEvent', {
+        jobId: args.jobId,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+
       // Voice track jobs: handle separately — the podcast is already READY
       const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
       if (VOICE_TRACK_QUEUES.includes(queueName)) {
@@ -419,7 +439,10 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         }
       }
 
-      await markPodcastFailed(podcastId, failureReason);
+      await markPodcastFailed(podcastId, {
+        failureReason,
+        technicalError: args.failedReason ?? undefined,
+      });
 
       // Queue a podcast failure notification
       if (notifQueue) {

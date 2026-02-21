@@ -699,7 +699,9 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError: 'FFmpeg error',
+      });
     });
 
     it('propagates error from downloadFile', async () => {

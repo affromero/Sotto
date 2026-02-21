@@ -249,6 +249,8 @@ model Podcast {
   status         PodcastStatus @default(PENDING)
   failedAtStatus String?
   failureReason  String?       @db.Text
+  technicalError String?       @db.Text
+  failedAt       DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?
@@ -313,8 +315,9 @@ model Podcast {
   likes        Like[]
   saves        Save[]
   tags         PodcastTag[]
-  jobs         Job[]
-  references   Reference[]
+  jobs             Job[]
+  pipelineEvents   PipelineEvent[]
+  references       Reference[]
   versions     PodcastVersion[]
   tweetMention      TweetMention?
   telegramMessage   TelegramMessage?
@@ -852,6 +855,23 @@ model Job {
   @@index([podcastId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============ PIPELINE EVENTS ============
+
+model PipelineEvent {
+  id        String   @id @default(cuid())
+  podcastId String
+  createdAt DateTime @default(now())
+  stage     String   // queue name: 'audio-generation', 'script-verification', etc.
+  type      String   // 'error' | 'warning' | 'retry'
+  message   String   @db.Text
+  metadata  Json?    // { segmentId?, jobId?, attemptNumber?, errorKind? }
+
+  podcast   Podcast  @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([podcastId, createdAt])
+  @@index([type, createdAt])
 }
 
 // ============ API USAGE TRACKING ============
