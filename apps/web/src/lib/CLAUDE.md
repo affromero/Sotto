@@ -97,6 +97,7 @@ Client-side React hooks (`'use client'`).
 | `useImpressionTracker` | IntersectionObserver-based feed impression tracking (50% visible for 1s, deduped) |
 | `useNotifications` | Notification polling (30s interval): list, unread count, mark read, refresh |
 | `usePlaybackTelemetry` | Playback event tracking: heartbeats (30s), pause/seek/speed counts, abandon detection |
+| `useRotatingMessage` | Rotating sub-messages for generation progress: cycles through stage-specific pools every 9s, switches early→late after 2min |
 | `usePodcast` | Podcast detail fetcher: loading state, like/unlike, save/unsave, fork |
 
 ## Providers (`src/lib/providers/`)

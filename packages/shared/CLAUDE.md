@@ -24,6 +24,7 @@ src/
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
 ├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
+├── generation-messages.ts # STAGE_MESSAGES pools + resolveMessage() — rotating sub-messages for pipeline generation stages
 ├── validations.ts        # Shared Zod schemas — createPodcastSchema is the canonical schema (web re-exports from here)
 ├── theme.ts              # Design tokens: colors, spacing, typography, borderRadius
 └── index.ts              # Barrel export
