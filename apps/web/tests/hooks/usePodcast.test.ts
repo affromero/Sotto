@@ -39,6 +39,8 @@ const mockPodcastData: PodcastDetail = {
   forks: [],
   versions: [],
   interactions: [],
+  voiceTracks: [],
+  defaultVoiceTrackId: null,
 };
 
 beforeEach(() => {

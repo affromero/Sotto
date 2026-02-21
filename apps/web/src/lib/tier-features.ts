@@ -17,6 +17,8 @@ export interface TierFeatures {
   privateAllowed: boolean;
   priorityQueue: boolean;
   analyticsEnabled: boolean;
+  voiceTracksEnabled: boolean;
+  maxVoiceTracks: number;
 }
 
 const FREE_FEATURES: TierFeatures = {
@@ -28,6 +30,8 @@ const FREE_FEATURES: TierFeatures = {
   privateAllowed: false,
   priorityQueue: false,
   analyticsEnabled: false,
+  voiceTracksEnabled: false,
+  maxVoiceTracks: 0,
 };
 
 const PRO_FEATURES: TierFeatures = {
@@ -39,11 +43,14 @@ const PRO_FEATURES: TierFeatures = {
   privateAllowed: true,
   priorityQueue: true,
   analyticsEnabled: true,
+  voiceTracksEnabled: true,
+  maxVoiceTracks: 3,
 };
 
 const BYOK_FEATURES: TierFeatures = {
   ...PRO_FEATURES,
   maxDurationMinutes: Infinity,
+  maxVoiceTracks: Infinity,
 };
 
 /**

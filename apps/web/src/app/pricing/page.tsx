@@ -38,6 +38,7 @@ export default function PricingPage() {
                 <li>Up to 5 minutes</li>
                 <li>3 Q&amp;A interactions per podcast</li>
                 <li>Browse, listen, and fork</li>
+                <li>Single voice per podcast</li>
                 <li>Collections and social features</li>
               </ul>
               <Link href="/auth/signup" className={styles.planButton}>
@@ -64,6 +65,7 @@ export default function PricingPage() {
                 <li>Script review before audio</li>
                 <li>Private &amp; unlisted podcasts</li>
                 <li>Priority queue (faster generation)</li>
+                <li>Up to 3 voice tracks per podcast</li>
                 <li>Creator analytics dashboard</li>
                 <li>Everything in Free</li>
               </ul>
@@ -86,6 +88,7 @@ export default function PricingPage() {
                 <li>Your choice of AI model</li>
                 <li>Unlimited duration</li>
                 <li>Unlimited Q&amp;A interactions</li>
+                <li>Unlimited voice tracks</li>
                 <li>Voice cloning marketplace</li>
                 <li>All Pro features included</li>
                 <li>7 TTS providers supported</li>
@@ -96,13 +99,96 @@ export default function PricingPage() {
             </div>
           </section>
 
+          <section className={styles.comparisonSection}>
+            <h2 className={styles.sectionTitle}>Plan Comparison</h2>
+            <table className={styles.comparisonTable}>
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Free</th>
+                  <th>Pro</th>
+                  <th>BYOK</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Daily podcasts</td>
+                  <td>1</td>
+                  <td>Unlimited</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Max duration</td>
+                  <td>5 min</td>
+                  <td>30 min</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Q&amp;A interactions</td>
+                  <td>3 per podcast</td>
+                  <td>Unlimited</td>
+                  <td>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Voice tracks</td>
+                  <td>&#8212;</td>
+                  <td className={styles.comparisonHighlight}>Up to 3</td>
+                  <td className={styles.comparisonHighlight}>Unlimited</td>
+                </tr>
+                <tr>
+                  <td>Script review</td>
+                  <td>Auto-approve</td>
+                  <td>Manual review</td>
+                  <td>Manual review</td>
+                </tr>
+                <tr>
+                  <td>Private podcasts</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td>Priority queue</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td>Creator analytics</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                  <td>Yes</td>
+                </tr>
+                <tr>
+                  <td>AI model</td>
+                  <td>Platform Groq</td>
+                  <td>Groq Llama 70B</td>
+                  <td>Your choice</td>
+                </tr>
+                <tr>
+                  <td>TTS provider</td>
+                  <td>KittenTTS</td>
+                  <td>Platform TTS</td>
+                  <td>7 providers</td>
+                </tr>
+                <tr>
+                  <td>Voice cloning</td>
+                  <td>&#8212;</td>
+                  <td>&#8212;</td>
+                  <td>Yes</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>Why Pro over BYOK?</h2>
             <p className={styles.sectionText}>
               Pro is for creators who want great results without managing API keys and bills.
               You get Groq&apos;s Llama 70B — the best open-source model for conversational
-              scripts — with zero setup. BYOK is for power users who want custom models like
-              Claude Opus, full voice cloning, and unlimited duration.
+              scripts — plus up to 3 voice tracks per podcast, with zero setup. BYOK is for
+              power users who want custom models like Claude Opus, full voice cloning,
+              unlimited voice tracks, and unlimited duration.
             </p>
           </section>
 

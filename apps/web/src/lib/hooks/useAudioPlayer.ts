@@ -15,6 +15,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     playbackRate: 1,
     volume: 1,
     isMuted: false,
+    activeVoiceTrackId: null,
   });
 
   function getAudio(): HTMLAudioElement | null {
@@ -95,7 +96,8 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     (podcastId: string, audioUrl: string, podcastTitle?: string) => {
       const audio = getAudio();
       if (!audio) return;
-      if (state.podcastId === podcastId) {
+      // Skip if same podcast AND same audio URL (voice track switch changes URL)
+      if (state.podcastId === podcastId && state.audioUrl === audioUrl) {
         setState((s) => ({ ...s, podcastTitle: podcastTitle ?? s.podcastTitle }));
         return;
       }
@@ -110,7 +112,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
         isPlaying: false,
       }));
     },
-    [state.podcastId]
+    [state.podcastId, state.audioUrl]
   );
 
   const clearPodcast = useCallback(() => {
@@ -130,6 +132,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
       playbackRate: 1,
       volume: 1,
       isMuted: false,
+      activeVoiceTrackId: null,
     });
   }, []);
 

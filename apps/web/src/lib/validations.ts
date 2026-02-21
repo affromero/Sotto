@@ -1,6 +1,29 @@
 import { z } from 'zod';
 
 /**
+ * Voice track validation schemas
+ */
+export const createVoiceTrackSchema = z.object({
+  name: z.string().min(1).max(100),
+  ttsProvider: z.string().optional(),
+  ttsModel: z.string().optional(),
+  voices: z.array(z.object({
+    speaker: z.string(),
+    voiceId: z.string(),
+  })).min(1),
+  paymentIntentIds: z.array(z.string()).optional(),
+  skipPaidVoices: z.boolean().optional(),
+});
+
+export const updateVoiceTrackSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+});
+
+export const setDefaultTrackSchema = z.object({
+  voiceTrackId: z.string().nullable(),
+});
+
+/**
  * Discovery chat message validation
  */
 export const discoveryMessageSchema = z.object({
