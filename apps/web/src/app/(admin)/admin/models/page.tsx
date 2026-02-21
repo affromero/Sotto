@@ -23,6 +23,7 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
       case 'anthropic': return !!process.env.ANTHROPIC_API_KEY;
       case 'openai': return !!process.env.OPENAI_API_KEY;
       case 'groq': return !!process.env.GROQ_API_KEY;
+      case 'claude-code': return process.env.AI_PROVIDER === 'claude-code';
       default: return false;
     }
   }

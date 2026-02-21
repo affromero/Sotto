@@ -5,7 +5,7 @@
  */
 import { logger } from '../logger';
 
-export type AiProviderId = 'anthropic' | 'openai' | 'groq';
+export type AiProviderId = 'anthropic' | 'openai' | 'groq' | 'claude-code';
 
 export interface AiProviderAuthField {
   key: string;
@@ -113,6 +113,22 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
           return false;
         }
       },
+    },
+  },
+
+  'claude-code': {
+    id: 'claude-code',
+    displayName: 'Claude Code (CLI)',
+    defaultModel: 'opus',
+    getApiKeyUrl: '',
+    models: [
+      { id: 'haiku', displayName: 'Haiku', tier: 'fast' },
+      { id: 'sonnet', displayName: 'Sonnet', tier: 'balanced' },
+      { id: 'opus', displayName: 'Opus', tier: 'best' },
+    ],
+    auth: {
+      fields: [],
+      validate: async () => true,
     },
   },
 };

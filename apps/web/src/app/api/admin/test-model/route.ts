@@ -107,7 +107,7 @@ function classifyError(error: Error): string {
   const lower = msg.toLowerCase();
 
   if (msg === 'timeout' || lower.includes('timed out') || error.name === 'AbortError') {
-    return 'Timed out after 15s';
+    return 'Timed out';
   }
   if (
     lower.includes('not configured') ||
@@ -187,6 +187,7 @@ export async function POST(request: NextRequest) {
       }
 
       const aiProvider = createAIProvider(provider);
+      const timeoutMs = provider === 'claude-code' ? 60_000 : 15_000;
       const result = await withTimeout(
         aiProvider.generateResponse('', [{ role: 'user', content: 'Say hello in one word.' }], {
           model,
@@ -194,7 +195,7 @@ export async function POST(request: NextRequest) {
           skipModeration: true,
           apiKeyOverride,
         }),
-        15_000
+        timeoutMs
       );
       return NextResponse.json({
         success: true,
