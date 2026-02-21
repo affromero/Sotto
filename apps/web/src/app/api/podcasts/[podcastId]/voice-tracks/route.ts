@@ -193,7 +193,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   return NextResponse.json({ id: voiceTrack.id, status: voiceTrack.status }, { status: 201 });
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
 
   // Auth is optional — public podcasts visible to all

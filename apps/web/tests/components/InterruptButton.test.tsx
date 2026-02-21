@@ -17,6 +17,7 @@ describe('InterruptButton', () => {
     playbackRate: 1,
     volume: 0.8,
     isMuted: false,
+    activeVoiceTrackId: null,
     play: vi.fn(),
     pause: vi.fn(),
     toggle: vi.fn(),

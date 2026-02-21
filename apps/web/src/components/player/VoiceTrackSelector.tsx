@@ -30,15 +30,10 @@ export function VoiceTrackSelector({
   const [activeTrackId, setActiveTrackId] = useState<string | null>(defaultVoiceTrackId);
   const [managerOpen, setManagerOpen] = useState(false);
 
-  // Don't render if no tracks and not owner
-  const readyTracks = voiceTracks.filter(t => t.status === 'READY');
-  if (readyTracks.length === 0 && !isOwner) return null;
-
   const handleSelectOriginal = useCallback(() => {
     const currentTime = player.currentTime;
     setActiveTrackId(null);
     player.loadPodcast(podcastId, podcastAudioUrl, podcastTitle);
-    // Seek after a brief delay to let the new audio source load
     setTimeout(() => player.seek(currentTime), 100);
   }, [player, podcastId, podcastAudioUrl, podcastTitle]);
 
@@ -49,6 +44,10 @@ export function VoiceTrackSelector({
     player.loadPodcast(podcastId, track.audioUrl, podcastTitle);
     setTimeout(() => player.seek(currentTime), 100);
   }, [player, podcastId, podcastTitle]);
+
+  // Don't render if no tracks and not owner
+  const readyTracks = voiceTracks.filter(t => t.status === 'READY');
+  if (readyTracks.length === 0 && !isOwner) return null;
 
   return (
     <>

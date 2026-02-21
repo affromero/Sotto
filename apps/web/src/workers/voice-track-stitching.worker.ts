@@ -3,7 +3,6 @@ import { StitchVoiceTrackPayload, addJob, JobType, notificationQueue } from '@/l
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { downloadFile, uploadVoiceTrackAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
-import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 
@@ -62,8 +61,6 @@ export async function processVoiceTrackStitching(job: Job<StitchVoiceTrackPayloa
       where: { id: voiceTrackId },
       select: { name: true },
     });
-
-    const usePremiumSfx = LIMITS.hasPremiumSfx;
 
     await job.updateProgress(10);
 
