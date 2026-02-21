@@ -761,8 +761,8 @@ export function SettingsForm({
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Voice Providers</h2>
         <p className={styles.sectionDesc}>
-          Add a voice provider key for unlimited podcast generation with premium voices. Keys are
-          encrypted with AES-256-GCM.
+          Add a voice provider key to remove the daily generation cap and unlock your choice of
+          7 TTS providers. Keys are encrypted with AES-256-GCM.
         </p>
         <TtsProviderCards initialConfigured={configuredTtsProviders} />
       </section>

@@ -28,7 +28,7 @@ export function VisibilityToggle({ podcastId, visibility, canMakePrivate }: Visi
 
   const cycle = canMakePrivate !== false
     ? ALL_VISIBILITIES
-    : ALL_VISIBILITIES.filter((v) => v !== 'PRIVATE');
+    : ALL_VISIBILITIES.filter((v) => v !== 'PRIVATE' && v !== 'UNLISTED');
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {

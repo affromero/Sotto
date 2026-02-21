@@ -11,10 +11,15 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+const mockUserFindUniqueOrThrow = vi.fn();
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: {
       count: (...args: unknown[]) => mockPodcastCount(...args),
+    },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
   },
 }));
@@ -22,6 +27,23 @@ vi.mock('@/lib/prisma', () => ({
 vi.mock('@/lib/byok', () => ({
   listAiProviders: (...args: unknown[]) => mockListAiProviders(...args),
   listByokProviders: (...args: unknown[]) => mockListByokProviders(...args),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 30,
+    maxSpeakers: 4,
+    autoApproveScript: false,
+    webSearchEnabled: true,
+    maxQaInteractions: Infinity,
+    privateAllowed: true,
+    priorityQueue: true,
+    analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
+  }),
 }));
 
 vi.mock('@/lib/generation-gate', () => ({
@@ -81,11 +103,28 @@ describe('GET /api/billing/usage', () => {
     mockPodcastCount.mockResolvedValue(7);
     mockListAiProviders.mockResolvedValue([{ provider: 'anthropic', isValid: true }]);
     mockListByokProviders.mockResolvedValue([{ provider: 'elevenlabs', isValid: true }]);
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
     mockGetFreeTierStatus.mockResolvedValue({
       freeGenerationsUsed: 3,
       freeGenerationsLimit: 5,
       freeGenerationsRemaining: 2,
       isByokUser: true,
+    });
+    const { hasByokKey } = await import('@/lib/byok');
+    (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    const { getTierFeatures } = await import('@/lib/tier-features');
+    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+      maxDurationMinutes: Infinity,
+      maxSpeakers: 2,
+      autoApproveScript: true,
+      webSearchEnabled: false,
+      maxQaInteractions: 3,
+      privateAllowed: false,
+      priorityQueue: false,
+      analyticsEnabled: false,
+      voiceTracksEnabled: false,
+      maxVoiceTracks: 0,
+      voiceCloningEnabled: false,
     });
 
     const response = await GET(createRequest());
@@ -97,8 +136,8 @@ describe('GET /api/billing/usage', () => {
     expect(body.byok.ai).toEqual([{ provider: 'anthropic', isValid: true }]);
     expect(body.byok.tts).toEqual([{ provider: 'elevenlabs', isValid: true }]);
     expect(body.freeTier.isByokUser).toBe(true);
-    expect(body.limits.maxDurationMinutes).toBe(40);
-    expect(body.limits.canMakePrivate).toBe(true);
+    expect(body.limits.maxDurationMinutes).toBe(9999);
+    expect(body.limits.canMakePrivate).toBe(false);
   });
 
   it('returns reduced limits for free tier user', async () => {
@@ -106,11 +145,26 @@ describe('GET /api/billing/usage', () => {
     mockPodcastCount.mockResolvedValue(1);
     mockListAiProviders.mockResolvedValue([]);
     mockListByokProviders.mockResolvedValue([]);
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
     mockGetFreeTierStatus.mockResolvedValue({
       freeGenerationsUsed: 1,
       freeGenerationsLimit: 5,
       freeGenerationsRemaining: 4,
       isByokUser: false,
+    });
+    const { getTierFeatures } = await import('@/lib/tier-features');
+    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+      maxDurationMinutes: 5,
+      maxSpeakers: 2,
+      autoApproveScript: true,
+      webSearchEnabled: false,
+      maxQaInteractions: 3,
+      privateAllowed: false,
+      priorityQueue: false,
+      analyticsEnabled: false,
+      voiceTracksEnabled: false,
+      maxVoiceTracks: 0,
+      voiceCloningEnabled: false,
     });
 
     const response = await GET(createRequest());

@@ -13,8 +13,8 @@ import {
   addJob,
   JobType,
 } from '@/lib/queue';
-import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey, getByokKey } from '@/lib/byok';
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Generation gate: BYOK or free tier (skip for admins)
   const gate = isAdmin
-    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0, dailyLimit: 0 }
+    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, isProUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0, dailyLimit: 0 }
     : await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
     const msg =
@@ -110,8 +110,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Duration validation — free tier users capped at 5 min, BYOK at 40 min
-  const effectiveMaxDuration = gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES;
+  // Duration validation — use tier features for duration cap
+  const tierFeatures = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+  const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes) ? tierFeatures.maxDurationMinutes : 9999;
   const durationTarget = podcast.discovery?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
     return NextResponse.json(

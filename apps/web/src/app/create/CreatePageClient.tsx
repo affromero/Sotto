@@ -14,7 +14,7 @@ import { ImportUploader } from '@/components/import/ImportUploader';
 import { ImportProgress } from '@/components/import/ImportProgress';
 import { StripeProvider } from '@/components/providers/StripeProvider';
 import { VoicePaymentModal, type VoiceChargeItem } from '@/components/voices/VoicePaymentModal';
-import { FREE_TIER_MAX_DURATION_MINUTES, LIMITS } from '@/lib/stripe';
+import { FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import styles from './page.module.css';
 
@@ -44,17 +44,18 @@ interface CreatePageClientProps {
   freeTier?: FreeTierInfo | null;
   isByokUser?: boolean;
   isProUser?: boolean;
+  maxDurationMinutes?: number;
 }
 
-export function CreatePageClient({ freeTier, isByokUser, isProUser }: CreatePageClientProps) {
+export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} />
     </Suspense>
   );
 }
 
-function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClientProps) {
+function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
@@ -68,7 +69,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser }: CreatePageClient
   const [ttsProvider, setTtsProvider] = useState<string | undefined>();
   const [aiModel, setAiModel] = useState<string | undefined>();
   const [ttsModel, setTtsModel] = useState<string | undefined>();
-  const maxDuration = isByokUser ? LIMITS.maxDurationMinutes : isProUser ? 30 : FREE_TIER_MAX_DURATION_MINUTES;
+  const maxDuration = maxDurationProp ?? FREE_TIER_MAX_DURATION_MINUTES;
   const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);

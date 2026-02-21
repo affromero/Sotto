@@ -84,11 +84,16 @@ vi.mock('@/lib/byok', () => ({
 vi.mock('@/lib/tier-features', () => ({
   getTierFeatures: vi.fn().mockReturnValue({
     maxDurationMinutes: 40,
+    maxSpeakers: 4,
     maxQaInteractions: Infinity,
     webSearchEnabled: true,
     autoApproveScript: false,
     privateAllowed: true,
+    priorityQueue: true,
     analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
   }),
 }));
 

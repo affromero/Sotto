@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { checkGenerationGate } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
+import { LIMITS } from '@/lib/stripe';
 import { CreatePageClient } from './CreatePageClient';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +23,13 @@ export default async function CreatePage() {
   // Daily limit reached — stay on create page with upgrade prompt (don't redirect)
   // The UI shows the banner with countdown and Pro CTA.
 
+  const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
+  const plan = gate.isProUser ? 'PRO' as const : 'FREE' as const;
+  const tierFeatures = getTierFeatures(plan, gate.isByokUser, userRole);
+  const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
+    ? tierFeatures.maxDurationMinutes
+    : LIMITS.maxDurationMinutes;
+
   const freeTier =
     gate.isByokUser || gate.isProUser
       ? null
@@ -39,6 +48,7 @@ export default async function CreatePage() {
       freeTier={freeTier}
       isByokUser={gate.isByokUser}
       isProUser={gate.isProUser}
+      maxDurationMinutes={maxDurationMinutes}
     />
   );
 }

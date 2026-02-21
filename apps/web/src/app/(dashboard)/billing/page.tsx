@@ -149,6 +149,26 @@ export default async function BillingPage() {
         </section>
       )}
 
+      {/* Pro upsell for BYOK+Free users */}
+      {freeTier.isByokUser && !isPro && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Unlock Pro Features</h2>
+          <div className={styles.creditCard}>
+            <div className={styles.creditMeta}>
+              <span>
+                Your keys give you unlimited generation. Upgrade to Pro for private
+                podcasts, analytics, voice tracks, and more.
+              </span>
+            </div>
+          </div>
+          <div className={styles.manageActions}>
+            <Link href="/pricing" className={styles.upgradeButton}>
+              Upgrade to Pro — $12/month
+            </Link>
+          </div>
+        </section>
+      )}
+
       {/* Usage Stats */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Usage</h2>

@@ -21,6 +21,7 @@ const mockAddJob = vi.fn();
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockAuth = vi.fn();
+const mockUserFindUniqueOrThrow = vi.fn();
 
 const mockTransaction = vi.fn();
 
@@ -46,6 +47,9 @@ vi.mock('@/lib/prisma', () => {
     },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
+    },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   };
@@ -86,6 +90,36 @@ vi.mock('@/lib/stripe', () => ({
 
 vi.mock('@/lib/voice-pricing', () => ({
   computeVoiceCharges: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 30,
+    maxSpeakers: 4,
+    autoApproveScript: false,
+    webSearchEnabled: true,
+    maxQaInteractions: Infinity,
+    privateAllowed: true,
+    priorityQueue: true,
+    analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
+  }),
+  getJobPriority: vi.fn().mockReturnValue(1),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/auth-guards', () => ({
+  checkSuspension: vi.fn().mockReturnValue(null),
+  requireAdmin: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: vi.fn().mockReturnValue({ ai: null, tts: null }),
 }));
 
 import { GET as getList, POST as createPodcast } from '@/app/api/podcasts/route';
@@ -576,8 +610,23 @@ describe('GET /api/podcasts/[podcastId]', () => {
 });
 
 describe('PATCH /api/podcasts/[podcastId]', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    const { getTierFeatures } = await import('@/lib/tier-features');
+    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+      maxDurationMinutes: 30,
+      maxSpeakers: 4,
+      autoApproveScript: false,
+      webSearchEnabled: true,
+      maxQaInteractions: Infinity,
+      privateAllowed: true,
+      priorityQueue: true,
+      analyticsEnabled: true,
+      voiceTracksEnabled: true,
+      maxVoiceTracks: 3,
+      voiceCloningEnabled: true,
+    });
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -657,11 +706,11 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
     expect(body.topic).toBe('Updated topic');
   });
 
-  it('updates podcast visibility to PRIVATE for BYOK user', async () => {
+  it('updates podcast visibility to PRIVATE for Pro user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockGetFreeTierStatus.mockResolvedValue({ isByokUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 3, freeGenerationsRemaining: 3 });
-    mockPrisma.podcast.update.mockResolvedValue({
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockPodcastUpdate.mockResolvedValue({
       ...mockPodcastWithRelations,
       visibility: 'PRIVATE',
     });
@@ -678,8 +727,22 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 
   it('rejects PRIVATE visibility for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockGetFreeTierStatus.mockResolvedValue({ isByokUser: false, freeGenerationsUsed: 1, freeGenerationsLimit: 3, freeGenerationsRemaining: 2 });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
+    const { getTierFeatures } = await import('@/lib/tier-features');
+    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+      privateAllowed: false,
+      maxDurationMinutes: 5,
+      maxSpeakers: 2,
+      autoApproveScript: true,
+      webSearchEnabled: false,
+      maxQaInteractions: 3,
+      priorityQueue: false,
+      analyticsEnabled: false,
+      voiceTracksEnabled: false,
+      maxVoiceTracks: 0,
+      voiceCloningEnabled: false,
+    });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'PRIVATE' });
     const response = await updatePodcast(request, {
@@ -688,15 +751,26 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body.error).toContain('Free tier podcasts cannot be private');
+    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
   });
 
-  it('allows UNLISTED visibility for free tier user', async () => {
+  it('rejects UNLISTED visibility for free tier user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.update.mockResolvedValue({
-      ...mockPodcastWithRelations,
-      visibility: 'UNLISTED',
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
+    const { getTierFeatures } = await import('@/lib/tier-features');
+    (getTierFeatures as ReturnType<typeof vi.fn>).mockReturnValue({
+      privateAllowed: false,
+      maxDurationMinutes: 5,
+      maxSpeakers: 2,
+      autoApproveScript: true,
+      webSearchEnabled: false,
+      maxQaInteractions: 3,
+      priorityQueue: false,
+      analyticsEnabled: false,
+      voiceTracksEnabled: false,
+      maxVoiceTracks: 0,
+      voiceCloningEnabled: false,
     });
 
     const request = createPatchRequest('/api/podcasts/pod-1', { visibility: 'UNLISTED' });
@@ -704,9 +778,9 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
       params: Promise.resolve({ podcastId: 'pod-1' }),
     });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body.visibility).toBe('UNLISTED');
+    expect(body.error).toContain('Private and unlisted podcasts require a Pro subscription');
   });
 
   it('returns 400 for invalid visibility value', async () => {

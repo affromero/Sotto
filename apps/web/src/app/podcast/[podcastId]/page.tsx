@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import styles from './page.module.css';
@@ -213,7 +214,12 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   }
 
   const isOwner = userId === podcast.userId;
-  const canMakePrivate = isOwner && userId ? (await getFreeTierStatus(userId)).isByokUser : undefined;
+  let canMakePrivate: boolean | undefined;
+  if (isOwner && userId) {
+    const freeTier = await getFreeTierStatus(userId);
+    const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
+    canMakePrivate = getTierFeatures(plan, freeTier.isByokUser).privateAllowed;
+  }
 
   const podcastData = {
     id: podcast.id,

@@ -3,9 +3,10 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
 import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
-import { getByokKey } from '@/lib/byok';
+import { getByokKey, hasByokKey } from '@/lib/byok';
 import { cloneVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
+import { getTierFeatures } from '@/lib/tier-features';
 import { logUsage } from '@/lib/usage-logger';
 import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
@@ -14,6 +15,22 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Pro gate — voice cloning requires Pro
+  const [user, isByok] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { plan: true, role: true },
+    }),
+    hasByokKey(session.user.id),
+  ]);
+  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+  if (!tierFeatures.voiceCloningEnabled) {
+    return NextResponse.json(
+      { error: 'Voice cloning requires a Pro subscription.' },
+      { status: 403 }
+    );
   }
 
   const existingCount = await prisma.voiceClone.count({

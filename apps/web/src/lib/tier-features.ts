@@ -1,6 +1,12 @@
 /**
  * Feature caps and toggles per user tier.
  *
+ * 2x2 matrix: (FREE | PRO) x (no-BYOK | BYOK)
+ *
+ * BYOK adds:  unlimited generation, own model choice, unlimited duration.
+ * Pro adds:   private/unlisted, priority queue, analytics, voice tracks,
+ *             voice cloning, script review, 4 speakers, web search, unlimited Q&A.
+ *
  * Usage:
  *   const features = getTierFeatures(user.plan, isByokUser, user.role);
  *   if (!features.privateAllowed) return 403;
@@ -19,12 +25,13 @@ export interface TierFeatures {
   analyticsEnabled: boolean;
   voiceTracksEnabled: boolean;
   maxVoiceTracks: number;
+  voiceCloningEnabled: boolean;
 }
 
 const FREE_FEATURES: TierFeatures = {
   maxDurationMinutes: 5,
   maxSpeakers: 2,
-  autoApproveScript: false,
+  autoApproveScript: true,
   webSearchEnabled: false,
   maxQaInteractions: 3,
   privateAllowed: false,
@@ -32,6 +39,7 @@ const FREE_FEATURES: TierFeatures = {
   analyticsEnabled: false,
   voiceTracksEnabled: false,
   maxVoiceTracks: 0,
+  voiceCloningEnabled: false,
 };
 
 const PRO_FEATURES: TierFeatures = {
@@ -45,9 +53,15 @@ const PRO_FEATURES: TierFeatures = {
   analyticsEnabled: true,
   voiceTracksEnabled: true,
   maxVoiceTracks: 3,
+  voiceCloningEnabled: true,
 };
 
-const BYOK_FEATURES: TierFeatures = {
+const FREE_BYOK_FEATURES: TierFeatures = {
+  ...FREE_FEATURES,
+  maxDurationMinutes: Infinity,
+};
+
+const PRO_BYOK_FEATURES: TierFeatures = {
   ...PRO_FEATURES,
   maxDurationMinutes: Infinity,
   maxVoiceTracks: Infinity,
@@ -55,19 +69,19 @@ const BYOK_FEATURES: TierFeatures = {
 
 /**
  * Get feature caps for a user given their plan, BYOK status, and role.
- * BYOK users and privileged roles (ADMIN, SYSTEM) always get maximum caps.
+ * Privileged roles (ADMIN, SYSTEM) always get maximum caps.
  */
 export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean, role?: string): TierFeatures {
-  if (isByok || PRIVILEGED_ROLES.has(role ?? '')) return BYOK_FEATURES;
-  if (plan === 'PRO') return PRO_FEATURES;
-  return FREE_FEATURES;
+  if (PRIVILEGED_ROLES.has(role ?? '')) return PRO_BYOK_FEATURES;
+  if (plan === 'PRO') return isByok ? PRO_BYOK_FEATURES : PRO_FEATURES;
+  return isByok ? FREE_BYOK_FEATURES : FREE_FEATURES;
 }
 
 /**
  * BullMQ job priority for a given tier.
- * Lower = higher priority.
+ * Lower = higher priority. Only Pro and privileged roles get priority.
  */
-export function getJobPriority(plan: 'FREE' | 'PRO', isByok: boolean, role?: string): number {
-  if (isByok || plan === 'PRO' || PRIVILEGED_ROLES.has(role ?? '')) return 1;
+export function getJobPriority(plan: 'FREE' | 'PRO', _isByok: boolean, role?: string): number {
+  if (plan === 'PRO' || PRIVILEGED_ROLES.has(role ?? '')) return 1;
   return 10;
 }

@@ -96,6 +96,35 @@ vi.mock('@/lib/queue', () => ({
   voiceVerificationQueue: { name: 'voice-verification' },
 }));
 
+vi.mock('@/lib/byok', () => ({
+  hasByokKey: vi.fn().mockResolvedValue(false),
+  getByokKey: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 30,
+    maxSpeakers: 4,
+    autoApproveScript: false,
+    webSearchEnabled: true,
+    maxQaInteractions: Infinity,
+    privateAllowed: true,
+    priorityQueue: true,
+    analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
+  }),
+}));
+
+vi.mock('@/lib/fal-voice-clone', () => ({
+  cloneVoiceViaFal: vi.fn().mockResolvedValue({ voiceId: 'fal-voice-1' }),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -251,6 +280,7 @@ describe('GET /api/voices', () => {
 describe('POST /api/voices/clone', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
   });
 
   it('returns 401 when user is not authenticated', async () => {

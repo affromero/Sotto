@@ -79,10 +79,10 @@ export default function AboutPage() {
             <h2 className={styles.sectionTitle}>Accessible by Design</h2>
             <p className={styles.sectionText}>
               Sotto gives you one podcast every day for free — no credit card, no API keys.
-              Platform AI (Groq) and voices (KittenTTS) are included. Upgrade to Pro ($12/month)
-              for unlimited generation, better AI models, and creator analytics. Or bring your own
-              API keys (BYOK) for unlimited access at cost price — connect Anthropic, OpenAI, or
-              any of seven TTS providers.
+              Platform AI and voices are included. Upgrade to Pro ($12/month)
+              for private podcasts, analytics, voice tracks, voice cloning, and unlimited Q&amp;A.
+              Or bring your own API keys (BYOK) for unlimited generation, duration, and model
+              choice at cost price — connect Anthropic, OpenAI, or any of seven TTS providers.
             </p>
             <p className={styles.sectionText}>
               Your keys are encrypted with AES-256-GCM and never leave our servers unencrypted.

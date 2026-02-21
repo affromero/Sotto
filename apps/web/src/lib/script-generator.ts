@@ -385,6 +385,7 @@ export async function generateScriptWithFeedback(params: {
   verificationFeedback: string;
   apiKeyOverride?: string;
   model?: string;
+  webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
   soundCues: SoundCue[];
@@ -510,7 +511,7 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    tools: [WEB_SEARCH_TOOL],
+    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
   });
 
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };

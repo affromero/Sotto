@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { LIMITS } from '@/lib/stripe';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
@@ -11,14 +12,18 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [aiKeys, ttsKeys, freeTier] = await Promise.all([
+    const [aiKeys, ttsKeys, freeTier, user] = await Promise.all([
       listAiProviders(session.user.id),
       listByokProviders(session.user.id),
       getFreeTierStatus(session.user.id),
+      prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { plan: true },
+      }),
     ]);
 
     return NextResponse.json({
-      tier: 'FREE',
+      tier: user.plan,
       status: 'ACTIVE',
       byok: {
         ai: aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),

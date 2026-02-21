@@ -264,6 +264,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     verificationFeedback: verdict.feedback,
     apiKeyOverride: aiKey?.apiKey,
     model,
+    webSearchEnabled: tierFeatures.webSearchEnabled,
   });
 
   await job.updateProgress(80);

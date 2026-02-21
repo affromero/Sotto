@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
         source: 'IMPORT',
         isHumanContent,
         sourcePlatform: validatedSourcePlatform,
-        visibility: gate.isByokUser ? 'PRIVATE' : 'PUBLIC',
+        visibility: gate.isProUser ? 'PRIVATE' : 'PUBLIC',
       },
     });
 

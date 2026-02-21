@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
 import { EditPodcastForm } from './EditPodcastForm';
 import styles from './page.module.css';
 
@@ -41,6 +42,8 @@ export default async function EditPodcastPage({ params }: EditPodcastPageProps) 
   }
 
   const freeTier = await getFreeTierStatus(userId);
+  const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
+  const tierFeatures = getTierFeatures(plan, freeTier.isByokUser);
 
   return (
     <main className={styles.main}>
@@ -58,7 +61,7 @@ export default async function EditPodcastPage({ params }: EditPodcastPageProps) 
           initialTitle={podcast.title}
           initialTopic={podcast.topic}
           initialVisibility={podcast.visibility}
-          canMakePrivate={freeTier.isByokUser}
+          canMakePrivate={tierFeatures.privateAllowed}
         />
       </div>
     </main>

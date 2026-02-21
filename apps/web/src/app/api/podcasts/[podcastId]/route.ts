@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
-import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
+import { hasByokKey } from '@/lib/byok';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -87,11 +88,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const { dismissSuggestion, ...updateData } = parsed.data;
 
-  if (updateData.visibility === 'PRIVATE') {
-    const freeTier = await getFreeTierStatus(authResult.userId);
-    if (!freeTier.isByokUser) {
+  if (updateData.visibility === 'PRIVATE' || updateData.visibility === 'UNLISTED') {
+    const [user, isByok] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: authResult.userId },
+        select: { plan: true, role: true },
+      }),
+      hasByokKey(authResult.userId),
+    ]);
+    const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+    if (!tierFeatures.privateAllowed) {
       return NextResponse.json(
-        { error: 'Free tier podcasts cannot be private. Add your own API keys to unlock private podcasts.' },
+        { error: 'Private and unlisted podcasts require a Pro subscription.' },
         { status: 403 }
       );
     }

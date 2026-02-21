@@ -30,8 +30,14 @@ vi.mock('@/lib/stripe', () => ({
   },
 }));
 
+const mockUserFindUniqueOrThrow = vi.fn();
+
 vi.mock('@/lib/prisma', () => ({
-  prisma: {},
+  prisma: {
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
+    },
+  },
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -74,6 +80,7 @@ describe('GET /api/billing/subscription', () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockListAiProviders.mockResolvedValue([{ provider: 'anthropic', isValid: true }]);
     mockListByokProviders.mockResolvedValue([{ provider: 'elevenlabs', isValid: true }]);
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
     mockGetFreeTierStatus.mockResolvedValue({
       freeGenerationsUsed: 2,
       freeGenerationsLimit: 5,
