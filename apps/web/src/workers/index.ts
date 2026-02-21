@@ -92,8 +92,10 @@ if (isTelegramBotConfigured()) {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 
   if (webhookUrl && webhookSecret) {
-    // Production: register webhook, no polling needed
-    setWebhook(webhookUrl, webhookSecret)
+    // Webhook mode: clear any stale polling jobs first, then register the webhook
+    telegramBotQueue
+      .obliterate({ force: true })
+      .then(() => setWebhook(webhookUrl, webhookSecret))
       .then(() => logger.info('Telegram webhook registered', { url: webhookUrl }))
       .catch((err) => logger.error('Failed to register Telegram webhook', { error: err.message }));
   } else {
