@@ -17,7 +17,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { colors } from '@sotto/shared';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
-import { onAuthRevoked } from '../lib/api';
+import { api, onAuthRevoked } from '../lib/api';
 
 const queryClient = new QueryClient();
 
@@ -38,24 +38,49 @@ function useProtectedRoute() {
     return () => { unsubRevoke(); unsubSuccess(); };
   }, [router]);
 
-  // Auth check + navigation guard — always verifies SecureStore
+  // Startup auth check — runs once on mount.
+  // Validates the token against the backend so stale tokens (e.g. after a DB
+  // reset in dev) are caught at the loading spinner, not on the first
+  // authenticated API call from a tab screen.
   useEffect(() => {
     let cancelled = false;
 
-    isAuthenticated().then((authed) => {
-      if (cancelled) return;
-      if (!isReady) setIsReady(true);
-
-      const inAuthGroup = segments[0] === 'auth';
-      if (!authed && !inAuthGroup) {
-        router.replace('/auth/login');
-      } else if (authed && inAuthGroup) {
-        router.replace('/(tabs)');
+    async function checkAuth() {
+      const hasToken = await isAuthenticated();
+      if (!hasToken) {
+        if (!cancelled) {
+          setIsReady(true);
+          const inAuthGroup = segments[0] === 'auth';
+          if (!inAuthGroup) router.replace('/auth/login');
+        }
+        return;
       }
-    });
 
+      // Token exists locally — validate against the backend.
+      // A 401 triggers the Axios interceptor: deleteToken() + notifyAuthRevoked().
+      // The listener above handles the redirect.
+      try {
+        await api.get('/users/me');
+      } catch {
+        // Network errors / timeouts → trust the local token.
+        // Runtime 401s on other endpoints will be caught by the interceptor.
+      }
+
+      // Re-check in case the interceptor just deleted the token.
+      const stillValid = await isAuthenticated();
+      if (!cancelled) {
+        setIsReady(true);
+        if (stillValid) {
+          const inAuthGroup = segments[0] === 'auth';
+          if (inAuthGroup) router.replace('/(tabs)');
+        }
+        // If !stillValid: onAuthRevoked already queued router.replace('/auth/login')
+      }
+    }
+
+    checkAuth();
     return () => { cancelled = true; };
-  }, [segments, router, isReady]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional: runs once on mount
 
   return { isChecking: !isReady };
 }
