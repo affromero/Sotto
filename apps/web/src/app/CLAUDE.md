@@ -5,7 +5,7 @@
 | Path                         | File                                       | Auth Required               | Description                                              |
 | ---------------------------- | ------------------------------------------ | --------------------------- | -------------------------------------------------------- |
 | `/`                          | `page.tsx`                                 | No                          | Full landing page — Create. Fork. Share.                 |
-| `/romero`                    | `romero/page.tsx`                          | No                          | Redirects to `/`                                         |
+| `/@handle`                   | Rewrite → `profile/handle/[handle]/page.tsx` | No                        | Vanity profile URL (e.g. `/@romero`)                     |
 | `/auth/login`                | `auth/login/page.tsx`                      | No                          | Sign in with OAuth                                       |
 | `/auth/signup`               | `auth/signup/page.tsx`                     | No                          | Create account                                           |
 | `/dashboard`                 | `(dashboard)/dashboard/page.tsx`           | Yes                         | My podcasts, usage                                       |

@@ -37,7 +37,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   });
 
   const profilePages = users.map((u) => ({
-    url: `${baseUrl}/profile/handle/${u.handle}`,
+    url: `${baseUrl}/@${u.handle}`,
     lastModified: u.updatedAt,
     changeFrequency: 'weekly' as const,
     priority: 0.5,

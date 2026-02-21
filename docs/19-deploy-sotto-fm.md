@@ -1328,19 +1328,6 @@ Expected: You should see a `200` response (the landing page with inline password
 HTTP/2 200
 ```
 
-Then test the legacy URL redirect:
-
-```bash
-curl -I https://sotto.fm/romero 2>&1 | head -5
-```
-
-Expected: `307` redirect to `/` (the landing page now lives at the root):
-
-```
-HTTP/2 307
-location: /access
-```
-
 ### 7.2 Check health endpoint (bypasses password gate)
 
 ```bash
@@ -1397,8 +1384,6 @@ Open a browser and verify each step:
 3. **Enter the correct password** (the `SITE_PASSWORD` you set in `.env`) → Should reveal the full landing page
 4. **Refresh the page** → Should stay on the landing page (the `sotto_access` cookie persists for 30 days)
 5. **Open an incognito/private window** → Visit `sotto.fm` → Should show the password gate again (no cookie in incognito)
-6. **Visit `sotto.fm/romero`** → Should redirect to `sotto.fm`
-
 ### 7.6 Check security headers
 
 These are HTTP response headers that Caddy adds to protect users. They're invisible to normal browsing but browsers read them to enforce security policies.

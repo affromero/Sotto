@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { FollowButton } from './FollowButton';
+import { profileUrl } from '@/lib/urls';
 import styles from './UserCard.module.css';
 
 interface UserCardUser {
@@ -58,7 +59,7 @@ export function UserCard({ user, isFollowing: initialIsFollowing, isOwnProfile, 
 
   return (
     <div className={styles.root}>
-      <Link href={`/profile/${user.id}`} className={styles.userLink} aria-label={`View ${user.name || 'user'}'s profile`}>
+      <Link href={profileUrl(user)} className={styles.userLink} aria-label={`View ${user.name || 'user'}'s profile`}>
         {user.image ? (
           <Image
             src={user.image}
