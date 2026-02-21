@@ -480,6 +480,23 @@ export const trendGenerateSchema = z.object({
 });
 
 /**
+ * Claim report creation validation
+ */
+export const createClaimReportSchema = z.object({
+  turnIndex: z.number().int().min(0),
+  turnText: z.string().min(1).max(10000),
+  description: z.string().min(10, 'Please describe the issue (at least 10 characters)').max(2000),
+});
+
+/**
+ * Claim report resolution validation (admin)
+ */
+export const resolveClaimReportSchema = z.object({
+  status: z.enum(['RESOLVED_VERIFIED', 'RESOLVED_INACCURATE', 'DISMISSED']),
+  resolution: z.string().max(2000).optional(),
+});
+
+/**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
