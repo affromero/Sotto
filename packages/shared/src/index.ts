@@ -28,6 +28,10 @@ export type {
   InteractionSummary,
   CreatePodcastRequest,
   GeneratePodcastRequest,
+  AiModelOption,
+  TtsOption,
+  ScriptTurn,
+  VoiceProfile,
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';

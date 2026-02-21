@@ -5,12 +5,14 @@ import {
   FlatList,
   TextInput,
   Pressable,
+  ScrollView,
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { colors, spacing, typography, borderRadius } from '@sotto/shared';
 import type { DiscoveryMetadata } from '@sotto/shared';
@@ -24,6 +26,23 @@ import Animated, {
 } from 'react-native-reanimated';
 import { api } from '../../lib/api';
 import { SwipeQuiz } from '../../components/SwipeQuiz';
+import { AiModelSelector } from '../../components/AiModelSelector';
+import { TtsModelSelector } from '../../components/TtsModelSelector';
+import { VoicePickerSheet } from '../../components/VoicePickerSheet';
+import { DurationPicker } from '../../components/DurationPicker';
+import { VisibilityPicker } from '../../components/VisibilityPicker';
+import { GenerationProgress } from '../../components/GenerationProgress';
+import { ScriptPreview } from '../../components/ScriptPreview';
+
+type Step = 'discovery' | 'voice' | 'scripting' | 'script-preview' | 'generating';
+
+const STEP_TITLES: Record<Step, string> = {
+  discovery: 'Create',
+  voice: 'Choose Voices',
+  scripting: 'Generating Script',
+  'script-preview': 'Review Script',
+  generating: 'Generating Audio',
+};
 
 interface KeyStatus {
   provider: string;
@@ -47,6 +66,10 @@ interface DiscoveryResponse {
 interface CreatePodcastResponse {
   id: string;
   title: string;
+  status: string;
+}
+
+interface PodcastStatusResponse {
   status: string;
 }
 
@@ -83,6 +106,12 @@ export default function CreateScreen() {
   const router = useRouter();
   const { topic } = useLocalSearchParams<{ topic?: string }>();
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
+
+  // Step state machine
+  const [step, setStep] = useState<Step>('discovery');
+  const [podcastId, setPodcastId] = useState<string | null>(null);
+
+  // Discovery state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [discoveryId, setDiscoveryId] = useState<string | null>(null);
@@ -91,6 +120,17 @@ export default function CreateScreen() {
   const [showQuiz, setShowQuiz] = useState(false);
   const topicHandled = useRef(false);
 
+  // Creation options state
+  const [voiceSelection, setVoiceSelection] = useState<{
+    voices?: Array<{ speaker: string; voiceId: string }>;
+  }>({});
+  const [ttsProvider, setTtsProvider] = useState<string | undefined>();
+  const [ttsModel, setTtsModel] = useState<string | undefined>();
+  const [aiModel, setAiModel] = useState<string | undefined>();
+  const [durationTarget, setDurationTarget] = useState(10);
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'UNLISTED' | 'PRIVATE'>('PUBLIC');
+
+  // Key status queries
   const { data: aiKeys } = useQuery<{ keys: KeyStatus[] }>({
     queryKey: ['settings', 'ai-keys'],
     queryFn: async () => {
@@ -111,6 +151,42 @@ export default function CreateScreen() {
   const hasTtsKey = ttsKeys?.keys?.some((k) => k.configured) ?? false;
   const missingKeys = !hasAiKey || !hasTtsKey;
 
+  // Pipeline status polling
+  const { data: pipelineStatus } = useQuery<PodcastStatusResponse>({
+    queryKey: ['podcast-status', podcastId],
+    queryFn: async () => {
+      const res = await api.get(`/podcasts/${podcastId}`);
+      return res.data;
+    },
+    enabled: !!podcastId && (step === 'scripting' || step === 'generating'),
+    refetchInterval: 3000,
+  });
+
+  // Advance steps based on pipeline status
+  useEffect(() => {
+    if (!pipelineStatus) return;
+    const status = pipelineStatus.status;
+
+    if (step === 'scripting') {
+      if (status === 'SCRIPT_READY') {
+        setStep('script-preview');
+      } else if (status === 'FAILED') {
+        Alert.alert('Generation Failed', 'Script generation failed. Please try again.', [
+          { text: 'Back', onPress: () => setStep('voice') },
+        ]);
+      }
+    } else if (step === 'generating') {
+      if (status === 'READY') {
+        router.push(`/podcast/${podcastId}`);
+      } else if (status === 'FAILED') {
+        Alert.alert('Generation Failed', 'Audio generation failed. Please try again.', [
+          { text: 'Back', onPress: () => setStep('script-preview') },
+        ]);
+      }
+    }
+  }, [pipelineStatus, step, podcastId, router]);
+
+  // Discovery mutation
   const discoveryMutation = useMutation<DiscoveryResponse, Error, string>({
     mutationFn: async (userMessage: string) => {
       const response = await api.post<DiscoveryResponse>('/discovery', {
@@ -134,17 +210,64 @@ export default function CreateScreen() {
     },
   });
 
+  // Create mutation — full payload matching web
   const createMutation = useMutation<CreatePodcastResponse, Error>({
     mutationFn: async () => {
       const response = await api.post<CreatePodcastResponse>('/podcasts', {
         title: metadata?.topic ?? 'Untitled Podcast',
         topic: metadata?.topic ?? '',
         discoveryId,
+        metadata: metadata
+          ? {
+              topic: metadata.topic ?? '',
+              depth: metadata.depth,
+              audienceLevel: metadata.audienceLevel,
+              audience: metadata.audience,
+              focusAreas: metadata.focusAreas,
+              tone: metadata.tone,
+              durationTarget,
+            }
+          : undefined,
+        voices: voiceSelection.voices,
+        ttsProvider,
+        ttsModel,
+        aiModel,
+        visibility,
       });
       return response.data;
     },
     onSuccess: (data) => {
-      router.push(`/podcast/${data.id}`);
+      setPodcastId(data.id);
+      setStep('scripting');
+    },
+    onError: (error: Error & { response?: { status: number } }) => {
+      if (error.response?.status === 402) {
+        Alert.alert(
+          'Voice Payment Required',
+          'This voice requires payment. Please use the web app to complete the purchase.',
+          [{ text: 'OK' }],
+        );
+      }
+    },
+  });
+
+  // Script approve mutation
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`/podcasts/${podcastId}/script/approve`);
+    },
+    onSuccess: () => {
+      setStep('generating');
+    },
+  });
+
+  // Script regenerate mutation
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      await api.post(`/podcasts/${podcastId}/script/regenerate`);
+    },
+    onSuccess: () => {
+      setStep('scripting');
     },
   });
 
@@ -186,7 +309,11 @@ export default function CreateScreen() {
     [sendMessage],
   );
 
-  const handleCreate = useCallback(() => {
+  const handleNextToVoice = useCallback(() => {
+    setStep('voice');
+  }, []);
+
+  const handleGenerateScript = useCallback(() => {
     if (!createMutation.isPending) {
       createMutation.mutate();
     }
@@ -204,7 +331,6 @@ export default function CreateScreen() {
 
   const isReady = metadata?.ready === true;
   const isDiscovering = discoveryMutation.isPending;
-  const isCreating = createMutation.isPending;
 
   const inspirePulse = useSharedValue(0);
 
@@ -225,211 +351,333 @@ export default function CreateScreen() {
     transform: [{ scale: 1 + inspirePulse.value * 0.02 }],
   }));
 
-  return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={88}
-    >
-      {messages.length === 0 && showQuiz ? (
-        <View style={styles.quizContainer}>
-          {missingKeys && (
-            <Pressable
-              style={styles.keyWarning}
-              onPress={() => router.push('/settings/api-keys')}
-            >
-              <Text style={styles.keyWarningText}>
-                {!hasAiKey && !hasTtsKey
-                  ? 'Add AI and TTS API keys to create podcasts'
-                  : !hasAiKey
-                    ? 'Add an AI provider key to create podcasts'
-                    : 'Add a TTS provider key to create podcasts'}
-              </Text>
-              <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
-            </Pressable>
-          )}
-          <SwipeQuiz
-            onComplete={() => setShowQuiz(false)}
-            onSelectTopic={(questionText) => {
-              setShowQuiz(false);
-              sendMessage(questionText);
-            }}
-          />
-          <Pressable
-            style={styles.skipButton}
-            onPress={() => setShowQuiz(false)}
-          >
-            <Text style={styles.skipButtonText}>Skip to chat</Text>
-          </Pressable>
-        </View>
-      ) : messages.length === 0 ? (
-        <View style={styles.welcomeContainer}>
-          {missingKeys && (
-            <Pressable
-              style={styles.keyWarning}
-              onPress={() => router.push('/settings/api-keys')}
-            >
-              <Text style={styles.keyWarningText}>
-                {!hasAiKey && !hasTtsKey
-                  ? 'Add AI and TTS API keys to create podcasts'
-                  : !hasAiKey
-                    ? 'Add an AI provider key to create podcasts'
-                    : 'Add a TTS provider key to create podcasts'}
-              </Text>
-              <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
-            </Pressable>
-          )}
-          <Text style={styles.welcomeTitle}>Create a Podcast</Text>
-          <Text style={styles.welcomeSubtitle}>
-            Tell me what you want to learn about. I will ask a few questions to
-            understand your interests, then generate a conversational podcast
-            just for you.
-          </Text>
-          <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.inspireMeButton,
-                pressed && styles.inspireMeButtonPressed,
-              ]}
-              onPress={() => setShowQuiz(true)}
-            >
-              <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
-              <Text style={styles.inspireMeButtonText}>Inspire me</Text>
-            </Pressable>
-          </Animated.View>
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderMessage}
-          keyExtractor={keyExtractor}
-          contentContainerStyle={styles.messageList}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
-          ListFooterComponent={
-            <>
-              {isDiscovering ? (
-                <View style={styles.typingIndicator}>
-                  <View style={styles.typingDot} />
-                  <View style={[styles.typingDot, styles.typingDotDelay1]} />
-                  <View style={[styles.typingDot, styles.typingDotDelay2]} />
-                </View>
-              ) : null}
+  const handleBack = useCallback(() => {
+    if (step === 'voice') setStep('discovery');
+    else if (step === 'script-preview') setStep('scripting');
+  }, [step]);
 
-              {latestChips.length > 0 && !isDiscovering ? (
-                <View style={styles.chipContainer}>
-                  {latestChips.map((chip) => (
-                    <Pressable
-                      key={chip}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        pressed && styles.chipPressed,
-                      ]}
-                      onPress={() => handleChipPress(chip)}
-                    >
-                      <Text style={styles.chipText}>{chip}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
+  // Discovery step content
+  function renderDiscoveryStep() {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={88}
+      >
+        {messages.length === 0 && showQuiz ? (
+          <View style={styles.quizContainer}>
+            {renderKeyWarning()}
+            <SwipeQuiz
+              onComplete={() => setShowQuiz(false)}
+              onSelectTopic={(questionText) => {
+                setShowQuiz(false);
+                sendMessage(questionText);
+              }}
+            />
+            <Pressable
+              style={styles.skipButton}
+              onPress={() => setShowQuiz(false)}
+            >
+              <Text style={styles.skipButtonText}>Skip to chat</Text>
+            </Pressable>
+          </View>
+        ) : messages.length === 0 ? (
+          <View style={styles.welcomeContainer}>
+            {renderKeyWarning()}
+            <Text style={styles.welcomeTitle}>Create a Podcast</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Tell me what you want to learn about. I will ask a few questions to
+              understand your interests, then generate a conversational podcast
+              just for you.
+            </Text>
+            <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.inspireMeButton,
+                  pressed && styles.inspireMeButtonPressed,
+                ]}
+                onPress={() => setShowQuiz(true)}
+              >
+                <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
+                <Text style={styles.inspireMeButtonText}>Inspire me</Text>
+              </Pressable>
+            </Animated.View>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={keyExtractor}
+            contentContainerStyle={styles.messageList}
+            onContentSizeChange={() =>
+              flatListRef.current?.scrollToEnd({ animated: true })
+            }
+            ListFooterComponent={
+              <>
+                {isDiscovering ? (
+                  <View style={styles.typingIndicator}>
+                    <View style={styles.typingDot} />
+                    <View style={[styles.typingDot, styles.typingDotDelay1]} />
+                    <View style={[styles.typingDot, styles.typingDotDelay2]} />
+                  </View>
+                ) : null}
 
-              {isReady && !isDiscovering ? (
-                <View style={styles.readyContainer}>
-                  <View style={styles.readyCard}>
-                    <Text style={styles.readyTitle}>Ready to create</Text>
-                    <Text style={styles.readySubtitle}>
-                      {metadata?.topic ?? 'Your podcast'}
+                {latestChips.length > 0 && !isDiscovering ? (
+                  <View style={styles.chipContainer}>
+                    {latestChips.map((chip) => (
+                      <Pressable
+                        key={chip}
+                        style={({ pressed }) => [
+                          styles.chip,
+                          pressed && styles.chipPressed,
+                        ]}
+                        onPress={() => handleChipPress(chip)}
+                      >
+                        <Text style={styles.chipText}>{chip}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+
+                {isReady && !isDiscovering ? (
+                  <View style={styles.readyContainer}>
+                    <View style={styles.readyCard}>
+                      <Text style={styles.readyTitle}>Ready to create</Text>
+                      <Text style={styles.readySubtitle}>
+                        {metadata?.topic ?? 'Your podcast'}
+                      </Text>
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.createButton,
+                          pressed && !missingKeys && styles.createButtonPressed,
+                          missingKeys && styles.createButtonDisabled,
+                        ]}
+                        onPress={
+                          missingKeys
+                            ? () => router.push('/settings/api-keys')
+                            : handleNextToVoice
+                        }
+                      >
+                        <Text style={styles.createButtonText}>
+                          {missingKeys
+                            ? 'Add API Keys to Create'
+                            : 'Next: Choose Voices'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ) : null}
+
+                {discoveryMutation.isError ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>
+                      {discoveryMutation.error.message ?? 'Something went wrong'}
                     </Text>
                     <Pressable
-                      style={({ pressed }) => [
-                        styles.createButton,
-                        pressed && !missingKeys && styles.createButtonPressed,
-                        (isCreating || missingKeys) && styles.createButtonDisabled,
-                      ]}
-                      onPress={missingKeys ? () => router.push('/settings/api-keys') : handleCreate}
-                      disabled={isCreating}
+                      style={styles.retryLink}
+                      onPress={() =>
+                        discoveryMutation.mutate(
+                          messages[messages.length - 1]?.content ?? '',
+                        )
+                      }
                     >
-                      {isCreating ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.textInverse}
-                        />
-                      ) : missingKeys ? (
-                        <Text style={styles.createButtonText}>
-                          Add API Keys to Create
-                        </Text>
-                      ) : (
-                        <Text style={styles.createButtonText}>
-                          Create Podcast
-                        </Text>
-                      )}
+                      <Text style={styles.retryLinkText}>Tap to retry</Text>
                     </Pressable>
                   </View>
-                </View>
-              ) : null}
+                ) : null}
+              </>
+            }
+          />
+        )}
 
-              {discoveryMutation.isError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>
-                    {discoveryMutation.error.message ?? 'Something went wrong'}
-                  </Text>
-                  <Pressable
-                    style={styles.retryLink}
-                    onPress={() =>
-                      discoveryMutation.mutate(
-                        messages[messages.length - 1]?.content ?? '',
-                      )
-                    }
-                  >
-                    <Text style={styles.retryLinkText}>Tap to retry</Text>
-                  </Pressable>
-                </View>
-              ) : null}
+        <View style={styles.inputContainer}>
+          <AiModelSelector value={aiModel} onChange={setAiModel} />
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Describe what you want to learn..."
+              placeholderTextColor={colors.textTertiary}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              editable={!isDiscovering}
+              multiline
+              maxLength={1000}
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.sendButton,
+                pressed && styles.sendButtonPressed,
+                (!inputText.trim() || isDiscovering) && styles.sendButtonDisabled,
+              ]}
+              onPress={handleSend}
+              disabled={!inputText.trim() || isDiscovering}
+            >
+              <Text style={styles.sendButtonIcon}>&#8593;</Text>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    );
+  }
 
-              {createMutation.isError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>
-                    Failed to create podcast.{' '}
-                    {createMutation.error.message ?? ''}
-                  </Text>
-                  <Pressable style={styles.retryLink} onPress={handleCreate}>
-                    <Text style={styles.retryLinkText}>Tap to retry</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </>
-          }
-        />
-      )}
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Describe what you want to learn..."
-          placeholderTextColor={colors.textTertiary}
-          value={inputText}
-          onChangeText={setInputText}
-          onSubmitEditing={handleSend}
-          returnKeyType="send"
-          editable={!isDiscovering && !isCreating}
-          multiline
-          maxLength={1000}
-        />
-        <Pressable
-          style={({ pressed }) => [
-            styles.sendButton,
-            pressed && styles.sendButtonPressed,
-            (!inputText.trim() || isDiscovering) && styles.sendButtonDisabled,
-          ]}
-          onPress={handleSend}
-          disabled={!inputText.trim() || isDiscovering}
+  // Voice step content
+  function renderVoiceStep() {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          style={styles.voiceScrollView}
+          contentContainerStyle={styles.voiceScrollContent}
         >
-          <Text style={styles.sendButtonIcon}>&#8593;</Text>
-        </Pressable>
+          <Text style={styles.sectionTitle}>
+            {metadata?.topic ?? 'Your Podcast'}
+          </Text>
+
+          <View style={styles.voiceSection}>
+            <VoicePickerSheet onSelectionChange={setVoiceSelection} />
+          </View>
+
+          <View style={styles.voiceSection}>
+            <Text style={styles.sectionLabel}>TTS Provider</Text>
+            <TtsModelSelector
+              ttsProvider={ttsProvider}
+              ttsModel={ttsModel}
+              onChange={(p, m) => {
+                setTtsProvider(p);
+                setTtsModel(m);
+              }}
+            />
+          </View>
+
+          <View style={styles.voiceSection}>
+            <DurationPicker value={durationTarget} onChange={setDurationTarget} />
+          </View>
+
+          <View style={styles.voiceSection}>
+            <VisibilityPicker value={visibility} onChange={setVisibility} />
+          </View>
+        </ScrollView>
+
+        <View style={styles.voiceFooter}>
+          <Pressable style={styles.backButton} onPress={handleBack}>
+            <Text style={styles.backButtonText}>Back</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.generateButton,
+              pressed && styles.generateButtonPressed,
+              createMutation.isPending && styles.generateButtonDisabled,
+            ]}
+            onPress={handleGenerateScript}
+            disabled={createMutation.isPending}
+          >
+            {createMutation.isPending ? (
+              <ActivityIndicator size="small" color={colors.textInverse} />
+            ) : (
+              <Text style={styles.generateButtonText}>Generate Script</Text>
+            )}
+          </Pressable>
+        </View>
+
+        {createMutation.isError ? (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerText}>
+              {createMutation.error.message ?? 'Failed to start generation'}
+            </Text>
+          </View>
+        ) : null}
       </View>
-    </KeyboardAvoidingView>
+    );
+  }
+
+  // Scripting step content
+  function renderScriptingStep() {
+    return (
+      <View style={styles.pipelineContainer}>
+        <Text style={styles.pipelineTitle}>
+          {metadata?.topic ?? 'Your Podcast'}
+        </Text>
+        <GenerationProgress status={pipelineStatus?.status ?? 'EXTRACTING'} />
+        <Text style={styles.pipelineHint}>
+          This usually takes 1-2 minutes. You can leave this screen and come back.
+        </Text>
+      </View>
+    );
+  }
+
+  // Script preview step content
+  function renderScriptPreviewStep() {
+    if (!podcastId) return null;
+    return (
+      <ScriptPreview
+        podcastId={podcastId}
+        onApprove={() => approveMutation.mutate()}
+        onRegenerate={() => regenerateMutation.mutate()}
+      />
+    );
+  }
+
+  // Generating step content
+  function renderGeneratingStep() {
+    return (
+      <View style={styles.pipelineContainer}>
+        <Text style={styles.pipelineTitle}>
+          {metadata?.topic ?? 'Your Podcast'}
+        </Text>
+        <GenerationProgress status={pipelineStatus?.status ?? 'GENERATING_AUDIO'} />
+        <Text style={styles.pipelineHint}>
+          Generating audio for each segment. Almost there!
+        </Text>
+      </View>
+    );
+  }
+
+  function renderKeyWarning() {
+    if (!missingKeys) return null;
+    return (
+      <Pressable
+        style={styles.keyWarning}
+        onPress={() => router.push('/settings/api-keys')}
+      >
+        <Text style={styles.keyWarningText}>
+          {!hasAiKey && !hasTtsKey
+            ? 'Add AI and TTS API keys to create podcasts'
+            : !hasAiKey
+              ? 'Add an AI provider key to create podcasts'
+              : 'Add a TTS provider key to create podcasts'}
+        </Text>
+        <Text style={styles.keyWarningLink}>Add keys {'\u203A'}</Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          title: STEP_TITLES[step],
+          headerLeft:
+            step !== 'discovery'
+              ? () => (
+                  <Pressable
+                    onPress={handleBack}
+                    style={styles.headerBack}
+                    accessibilityLabel="Go back"
+                  >
+                    <Text style={styles.headerBackText}>‹</Text>
+                  </Pressable>
+                )
+              : undefined,
+        }}
+      />
+      {step === 'discovery' && renderDiscoveryStep()}
+      {step === 'voice' && renderVoiceStep()}
+      {step === 'scripting' && renderScriptingStep()}
+      {step === 'script-preview' && renderScriptPreviewStep()}
+      {step === 'generating' && renderGeneratingStep()}
+    </>
   );
 }
 
@@ -679,13 +927,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
+    gap: spacing.sm,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: spacing.sm,
   },
   textInput: {
@@ -722,5 +973,111 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.textInverse,
+  },
+  // Voice step styles
+  voiceScrollView: {
+    flex: 1,
+  },
+  voiceScrollContent: {
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
+  sectionTitle: {
+    fontFamily: typography.fontHeading,
+    fontSize: 24,
+    color: colors.textPrimary,
+  },
+  sectionLabel: {
+    fontFamily: typography.fontBody,
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  voiceSection: {
+    gap: spacing.xs,
+  },
+  voiceFooter: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  backButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 4,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  generateButton: {
+    flex: 2,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.sm + 4,
+    alignItems: 'center',
+  },
+  generateButtonPressed: {
+    backgroundColor: colors.primaryHover,
+  },
+  generateButtonDisabled: {
+    opacity: 0.7,
+  },
+  generateButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textInverse,
+  },
+  errorBanner: {
+    backgroundColor: colors.errorLighter,
+    padding: spacing.md,
+  },
+  errorBannerText: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  // Pipeline step styles
+  pipelineContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  pipelineTitle: {
+    fontFamily: typography.fontHeading,
+    fontSize: 24,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  pipelineHint: {
+    fontFamily: typography.fontBody,
+    fontSize: 14,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
+  // Header back button
+  headerBack: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  headerBackText: {
+    fontSize: 28,
+    color: colors.primary,
+    fontWeight: '300',
   },
 });
