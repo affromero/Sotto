@@ -83,7 +83,8 @@ export type NotificationType =
   | 'VOICE_BLOCKED_DUPLICATE'
   | 'VOICE_OWNERSHIP_ALERT'
   | 'VOICE_TRACK_FAILED'
-  | 'VOICE_TRACK_READY';
+  | 'VOICE_TRACK_READY'
+  | 'PIPELINE_FAILURE';
 
 export type ReportReason =
   | 'HARASSMENT'
