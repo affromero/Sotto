@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   if (targetType) where.targetType = targetType;
   if (reason) where.reason = reason as Prisma.EnumReportReasonFilter;
 
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     prisma.report.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -34,6 +34,27 @@ export async function GET(request: NextRequest) {
     }),
     prisma.report.count({ where }),
   ]);
+
+  // Enrich podcast reports with podcast context
+  const podcastIds = rawItems
+    .filter((r) => r.targetType === 'podcast')
+    .map((r) => r.targetId);
+
+  const podcastMap = podcastIds.length > 0
+    ? new Map(
+        (
+          await prisma.podcast.findMany({
+            where: { id: { in: podcastIds } },
+            select: { id: true, title: true, source: true, isHumanContent: true, status: true },
+          })
+        ).map((p) => [p.id, p])
+      )
+    : new Map();
+
+  const items = rawItems.map((r) => ({
+    ...r,
+    podcast: r.targetType === 'podcast' ? podcastMap.get(r.targetId) ?? null : null,
+  }));
 
   return NextResponse.json({
     items,

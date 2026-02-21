@@ -95,6 +95,9 @@ export type ReportReason =
   | 'IMPERSONATION'
   | 'COPYRIGHT'
   | 'VOICE_THEFT'
+  | 'MUSIC_UPLOAD'
+  | 'FALSE_HUMAN_BADGE'
+  | 'FALSE_CLAIM'
   | 'OTHER';
 
 export type ReportStatus =

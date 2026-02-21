@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import styles from './ReportQueue.module.css';
 
+interface ReportPodcast {
+  id: string;
+  title: string;
+  source: string;
+  isHumanContent: boolean;
+  status: string;
+}
+
 interface ReportItem {
   id: string;
   targetType: string;
@@ -19,6 +27,7 @@ interface ReportItem {
     email: string | null;
     handle: string | null;
   };
+  podcast: ReportPodcast | null;
 }
 
 interface ReportStats {
@@ -125,6 +134,41 @@ export function ReportQueue() {
     [resolveReport]
   );
 
+  const removeBadge = useCallback(
+    async (reportId: string, podcastId: string) => {
+      setActing(reportId);
+      const response = await fetch(`/api/admin/podcasts/${podcastId}/badge`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isHumanContent: false,
+          reason: 'Removed via report review — false human content claim',
+        }),
+      });
+
+      if (response.ok) {
+        await resolveReport(reportId, 'RESOLVED_ACTIONED', 'Human badge removed');
+      }
+      setActing(null);
+    },
+    [resolveReport]
+  );
+
+  const deletePodcast = useCallback(
+    async (reportId: string, podcastId: string) => {
+      setActing(reportId);
+      const response = await fetch(`/api/admin/podcasts/${podcastId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await resolveReport(reportId, 'RESOLVED_ACTIONED', 'Podcast deleted');
+      }
+      setActing(null);
+    },
+    [resolveReport]
+  );
+
   return (
     <div className={styles.root}>
       {stats && (
@@ -198,6 +242,10 @@ export function ReportQueue() {
           <option value="SPAM">Spam</option>
           <option value="IMPERSONATION">Impersonation</option>
           <option value="COPYRIGHT">Copyright</option>
+          <option value="VOICE_THEFT">Voice Theft</option>
+          <option value="MUSIC_UPLOAD">Music Upload</option>
+          <option value="FALSE_HUMAN_BADGE">False Human Badge</option>
+          <option value="FALSE_CLAIM">False Claim</option>
           <option value="OTHER">Other</option>
         </select>
       </div>
@@ -246,6 +294,14 @@ export function ReportQueue() {
                     {report.resolution && (
                       <p className={styles.reportDescription}>
                         Resolution: {report.resolution}
+                      </p>
+                    )}
+                    {report.podcast && (
+                      <p className={styles.targetPreview}>
+                        Podcast: {report.podcast.title}
+                        {report.podcast.isHumanContent && ' [Human Badge]'}
+                        {' — '}
+                        {report.podcast.source}
                       </p>
                     )}
                   </div>
@@ -332,6 +388,26 @@ export function ReportQueue() {
                           type="button"
                         >
                           Action
+                        </button>
+                      )}
+                      {report.podcast?.isHumanContent && (
+                        <button
+                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                          onClick={() => removeBadge(report.id, report.targetId)}
+                          disabled={isActing}
+                          type="button"
+                        >
+                          Remove Human Badge
+                        </button>
+                      )}
+                      {report.targetType === 'podcast' && report.reason === 'MUSIC_UPLOAD' && (
+                        <button
+                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                          onClick={() => deletePodcast(report.id, report.targetId)}
+                          disabled={isActing}
+                          type="button"
+                        >
+                          Delete Podcast
                         </button>
                       )}
                     </div>

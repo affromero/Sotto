@@ -12,16 +12,26 @@ const REASONS = [
   { value: 'SPAM', label: 'Spam' },
   { value: 'IMPERSONATION', label: 'Impersonation' },
   { value: 'COPYRIGHT', label: 'Copyright Violation' },
+  { value: 'VOICE_THEFT', label: 'Voice Theft' },
+  { value: 'MUSIC_UPLOAD', label: 'Music Upload (Not a Podcast)' },
+  { value: 'FALSE_HUMAN_BADGE', label: 'False Human Content Claim' },
+  { value: 'FALSE_CLAIM', label: 'False Ownership or Attribution' },
   { value: 'OTHER', label: 'Other' },
 ] as const;
+
+interface ReportContext {
+  isHumanContent?: boolean;
+  source?: string;
+}
 
 interface ReportModalProps {
   targetType: 'podcast' | 'comment' | 'user';
   targetId: string;
   onClose: () => void;
+  context?: ReportContext;
 }
 
-export function ReportModal({ targetType, targetId, onClose }: ReportModalProps) {
+export function ReportModal({ targetType, targetId, onClose, context }: ReportModalProps) {
   const [reason, setReason] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -85,17 +95,24 @@ export function ReportModal({ targetType, targetId, onClose }: ReportModalProps)
             <fieldset className={styles.reasons}>
               <legend className={styles.label}>Why are you reporting this?</legend>
               {REASONS.map((r) => (
-                <label key={r.value} className={styles.reasonOption}>
-                  <input
-                    type="radio"
-                    name="reason"
-                    value={r.value}
-                    checked={reason === r.value}
-                    onChange={() => setReason(r.value)}
-                    className={styles.radio}
-                  />
-                  <span>{r.label}</span>
-                </label>
+                <div key={r.value}>
+                  <label className={styles.reasonOption}>
+                    <input
+                      type="radio"
+                      name="reason"
+                      value={r.value}
+                      checked={reason === r.value}
+                      onChange={() => setReason(r.value)}
+                      className={styles.radio}
+                    />
+                    <span>{r.label}</span>
+                  </label>
+                  {r.value === 'FALSE_HUMAN_BADGE' && context?.isHumanContent && context?.source === 'IMPORT' && (
+                    <p className={styles.reasonHint}>
+                      This podcast claims to be human-made but may be AI-generated
+                    </p>
+                  )}
+                </div>
               ))}
             </fieldset>
 

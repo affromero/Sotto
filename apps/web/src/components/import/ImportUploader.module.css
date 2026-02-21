@@ -587,3 +587,38 @@
     align-items: center;
   }
 }
+
+/* Attestation Warning */
+
+.attestation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(217, 119, 6, 0.08);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  margin-top: var(--spacing-xs);
+}
+
+.attestationIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.attestationText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}

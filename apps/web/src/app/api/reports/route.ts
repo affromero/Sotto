@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
+  const HIGH_PRIORITY_REASONS = ['FALSE_HUMAN_BADGE', 'MUSIC_UPLOAD', 'VOICE_THEFT'];
+
   try {
     const report = await prisma.report.create({
       data: {
@@ -54,6 +56,7 @@ export async function POST(request: NextRequest) {
         targetId,
         reason,
         description: description ?? null,
+        ...(HIGH_PRIORITY_REASONS.includes(reason) && { status: 'REVIEWING' }),
       },
     });
 
