@@ -38,6 +38,8 @@ export enum JobType {
   SEND_EMAIL_DIGEST = 'send_email_digest',
   SEND_ANNOUNCEMENT = 'send_announcement',
   VERIFY_VOICE = 'verify_voice',
+  GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
+  STITCH_VOICE_TRACK = 'stitch_voice_track',
 }
 
 /**
@@ -207,6 +209,21 @@ export interface AnnouncementPayload {
   message: string;
 }
 
+export interface GenerateVoiceTrackAudioPayload {
+  podcastId: string;
+  voiceTrackId: string;
+  voiceTrackSegmentId: string;
+  segmentId: string;
+  speaker: string;
+  text: string;
+}
+
+export interface StitchVoiceTrackPayload {
+  podcastId: string;
+  voiceTrackId: string;
+  voiceTrackSegmentIds: string[];
+}
+
 /**
  * Queue configuration
  */
@@ -279,6 +296,55 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const podcastId = (job?.data as Record<string, unknown>)?.podcastId as string | undefined;
       if (!podcastId) return;
 
+      // Voice track jobs: handle separately — the podcast is already READY
+      const VOICE_TRACK_QUEUES = ['voice-track-audio', 'voice-track-stitching'];
+      if (VOICE_TRACK_QUEUES.includes(queueName)) {
+        const voiceTrackId = (job?.data as Record<string, unknown>)?.voiceTrackId as string | undefined;
+        if (!voiceTrackId) return;
+
+        const errorKind = classifyError(args.failedReason || '');
+        const failureReason = userMessage(errorKind, 'the provider');
+
+        const voiceTrack = await prisma.voiceTrack.findUnique({
+          where: { id: voiceTrackId },
+          select: { podcastId: true, name: true },
+        });
+        if (!voiceTrack) return;
+
+        await prisma.voiceTrack.update({
+          where: { id: voiceTrackId },
+          data: { status: 'FAILED', failureReason },
+        });
+
+        if (isKeyInvalidationError(errorKind)) {
+          const podcast = await prisma.podcast.findUnique({
+            where: { id: voiceTrack.podcastId },
+            select: { userId: true, ttsProvider: true },
+          });
+          if (podcast?.ttsProvider) {
+            await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
+          }
+        }
+
+        const notifQueue = queueInstances.get('notifications');
+        if (notifQueue) {
+          const podcast = await prisma.podcast.findUnique({
+            where: { id: voiceTrack.podcastId },
+            select: { userId: true },
+          });
+          if (podcast) {
+            await notifQueue.add('send_notification', {
+              userId: podcast.userId,
+              type: 'VOICE_TRACK_FAILED',
+              title: 'Voice Track Failed',
+              message: `Voice track "${voiceTrack.name}" failed: ${failureReason}`,
+              data: { podcastId: voiceTrack.podcastId, voiceTrackId },
+            });
+          }
+        }
+        return;
+      }
+
       const podcast = await prisma.podcast.findUnique({
         where: { id: podcastId },
         select: { status: true, userId: true, title: true, ttsProvider: true },
@@ -288,7 +354,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const errorKind = classifyError(args.failedReason || '');
       const notifQueue = queueInstances.get('notifications');
 
-      const TTS_QUEUES = ['audio-generation', 'segment-regeneration'];
+      const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
       // Handle interaction failures separately — podcast is already READY
@@ -463,3 +529,5 @@ export const contentModerationQueue = createQueue('content-moderation', { attemp
 export const emailDigestQueue = createQueue('email-digest', { attempts: 2 });
 export const announcementQueue = createQueue('announcements', { attempts: 2 });
 export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2 });
+export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
+export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
