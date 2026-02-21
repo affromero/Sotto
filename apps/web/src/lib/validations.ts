@@ -9,32 +9,9 @@ export const discoveryMessageSchema = z.object({
 });
 
 /**
- * Podcast creation validation
+ * Podcast creation validation — canonical schema lives in @sotto/shared
  */
-export const createPodcastSchema = z.object({
-  title: z.string().min(1).max(200),
-  topic: z.string().min(1).max(5000),
-  discoveryId: z.string().optional(),
-  voices: z.array(z.object({
-    speaker: z.string().min(1).max(50),
-    voiceId: z.string().optional(),
-  })).optional(),
-  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
-  aiModel: z.string().optional(),
-  ttsModel: z.string().optional(),
-  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
-  metadata: z.object({
-    topic: z.string(),
-    depth: z.string().optional(),
-    audienceLevel: z.string().optional(),
-    audience: z.string().optional(),
-    focusAreas: z.array(z.string()).optional(),
-    tone: z.string().optional(),
-    durationTarget: z.number().min(5).max(40).optional(),
-    sourceUrl: z.string().url().optional(),
-    sourceContent: z.string().optional(),
-  }).optional(),
-});
+export { createPodcastSchema } from '@sotto/shared';
 
 /**
  * Script turn update validation
