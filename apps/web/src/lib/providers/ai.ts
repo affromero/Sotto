@@ -90,7 +90,7 @@ class OpenAIProvider implements AIProvider {
 
     const response = await client.chat.completions.create({
       model,
-      max_tokens: opts?.maxTokens || 4096,
+      max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: [{ role: 'system', content: system }, ...messages],
     });
@@ -119,7 +119,7 @@ class OpenAIProvider implements AIProvider {
 
     const stream = await client.chat.completions.create({
       model,
-      max_tokens: opts?.maxTokens || 4096,
+      max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: [{ role: 'system', content: system }, ...messages],
       stream: true,
