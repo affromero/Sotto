@@ -7,6 +7,7 @@ import { classifyError, isKeyInvalidationError, userMessage } from './byok-error
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
+import { sendEmail } from './email';
 
 /**
  * Job types for the Sotto queue system
@@ -453,6 +454,44 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           message: failureReason,
           data: { podcastId },
         });
+      }
+
+      // Notify all admins: in-app bell + email
+      const podcastLabel = podcast.title || podcastId;
+      const techError = args.failedReason || 'Unknown error';
+      const adminUsers = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true, email: true },
+      });
+      const adminMessage = `[${queueName}] ${podcastLabel} — ${errorKind}`;
+      for (const admin of adminUsers) {
+        // In-app notification (bell)
+        if (notifQueue) {
+          notifQueue.add('send_notification', {
+            userId: admin.id,
+            type: 'PIPELINE_FAILURE',
+            title: 'Pipeline Failure',
+            message: adminMessage,
+            data: { podcastId },
+          }).catch(() => {});
+        }
+        // Email alert
+        if (admin.email) {
+          sendEmail({
+            to: admin.email,
+            subject: `[Sotto] Pipeline failure: ${queueName}`,
+            html: [
+              `<h2>Pipeline Failure</h2>`,
+              `<p><strong>Queue:</strong> ${queueName}</p>`,
+              `<p><strong>Podcast:</strong> ${podcastLabel}</p>`,
+              `<p><strong>Podcast ID:</strong> ${podcastId}</p>`,
+              `<p><strong>User ID:</strong> ${podcast.userId}</p>`,
+              `<p><strong>Error classification:</strong> ${errorKind}</p>`,
+              `<p><strong>Technical error:</strong></p>`,
+              `<pre>${techError}</pre>`,
+            ].join('\n'),
+          }).catch(() => {});
+        }
       }
 
       logger.info('Marked podcast as FAILED after generation failure', {

@@ -19,12 +19,13 @@ interface NotificationListProps {
 }
 
 const typeIcons: Record<string, typeof Bell> = {
-  podcast_ready: Headphones,
-  podcast_failed: AlertTriangle,
-  key_invalid: AlertTriangle,
-  liked: Heart,
-  forked: GitFork,
-  follower: UserPlus,
+  PODCAST_READY: Headphones,
+  PODCAST_FAILED: AlertTriangle,
+  KEY_INVALID: AlertTriangle,
+  PODCAST_LIKED: Heart,
+  PODCAST_FORKED: GitFork,
+  NEW_FOLLOWER: UserPlus,
+  PIPELINE_FAILURE: AlertTriangle,
 };
 
 function getRelativeTime(dateString: string): string {
