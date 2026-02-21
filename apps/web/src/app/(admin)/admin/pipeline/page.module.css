@@ -80,3 +80,65 @@
   border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
+
+/* Recent failures table */
+
+.tableContainer {
+  composes: tableContainer from '../admin.module.css';
+}
+
+.recentTable {
+  composes: table from '../admin.module.css';
+}
+
+.recentTable th,
+.recentTable td {
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.errorCell {
+  font-family: monospace;
+  font-size: 12px;
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podcastLink {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.podcastLink:hover {
+  text-decoration: underline;
+}
+
+.dateCell {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  font: var(--text-body-sm);
+}
+
+.badgeError {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.badgeRetry {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--color-warning-light);
+  color: var(--color-warning);
+}

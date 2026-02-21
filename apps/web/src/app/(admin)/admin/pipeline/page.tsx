@@ -3,7 +3,9 @@ import {
   getByokAdoption,
   getPipelineHealth,
 } from '@/lib/funnel-metrics';
+import { getRecentPipelineErrors } from '@/lib/pipeline-events';
 import { subDays, startOfDay } from 'date-fns';
+import Link from 'next/link';
 import styles from './page.module.css';
 
 interface PageProps {
@@ -23,10 +25,11 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
   const since = subDays(startOfDay(new Date()), days);
 
-  const [funnel, adoption, pipeline] = await Promise.all([
+  const [funnel, adoption, pipeline, recentErrors] = await Promise.all([
     getFreeTierFunnel(),
     getByokAdoption(),
     getPipelineHealth(since),
+    getRecentPipelineErrors(20),
   ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
@@ -191,6 +194,54 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      {/* Recent failures */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Recent Failures</h2>
+        {recentErrors.length === 0 ? (
+          <p className={styles.empty}>No pipeline events recorded yet.</p>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.recentTable}>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Podcast</th>
+                  <th>Stage</th>
+                  <th>Type</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentErrors.map((evt) => (
+                  <tr key={evt.id}>
+                    <td className={styles.dateCell}>
+                      {new Date(evt.createdAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td>
+                      <Link href={`/podcast/${evt.podcastId}`} className={styles.podcastLink}>
+                        {evt.podcastTitle}
+                      </Link>
+                    </td>
+                    <td>{evt.stage}</td>
+                    <td>
+                      <span className={evt.type === 'error' ? styles.badgeError : styles.badgeRetry}>
+                        {evt.type}
+                      </span>
+                    </td>
+                    <td className={styles.errorCell}>{evt.message}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

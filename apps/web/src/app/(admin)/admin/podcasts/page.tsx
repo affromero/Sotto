@@ -1,3 +1,4 @@
+import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { CreateAsSottoButton } from './CreateAsSottoButton';
@@ -36,6 +37,8 @@ async function getPodcasts(search: string | undefined, status: string | undefine
         status: true,
         failedAtStatus: true,
         failureReason: true,
+        technicalError: true,
+        failedAt: true,
         playCount: true,
         visibility: true,
         createdAt: true,
@@ -123,42 +126,75 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
           <tbody>
             {podcasts.map((podcast) => {
               const creatorName = podcast.user.name || podcast.user.email || 'Unknown';
+              const isFailed = podcast.status === 'FAILED';
 
               return (
-                <tr key={podcast.id}>
-                  <td>
-                    <Link href={`/podcast/${podcast.id}`} className={styles.podcastLink}>
-                      {podcast.title}
-                    </Link>
-                  </td>
-                  <td className={styles.creatorCell}>{creatorName}</td>
-                  <td>
-                    <span
-                      className={`${styles.badge} ${styles[`badge${podcast.status}`]}`}
-                      title={podcast.status === 'FAILED' && podcast.failureReason ? podcast.failureReason : undefined}
-                    >
-                      {podcast.status.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className={styles.numberCell}>{podcast.playCount}</td>
-                  <td>
-                    <span className={`${styles.badge} ${styles[`badge${podcast.visibility}`]}`}>
-                      {podcast.visibility}
-                    </span>
-                  </td>
-                  <td className={styles.dateCell}>
-                    {new Date(podcast.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                    })}
-                  </td>
-                  <td>
-                    {podcast.status === 'FAILED' && (
-                      <RetryButton podcastId={podcast.id} />
-                    )}
-                  </td>
-                </tr>
+                <React.Fragment key={podcast.id}>
+                  <tr>
+                    <td>
+                      <Link href={`/podcast/${podcast.id}`} className={styles.podcastLink}>
+                        {podcast.title}
+                      </Link>
+                    </td>
+                    <td className={styles.creatorCell}>{creatorName}</td>
+                    <td>
+                      <span className={`${styles.badge} ${styles[`badge${podcast.status}`]}`}>
+                        {podcast.status.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className={styles.numberCell}>{podcast.playCount}</td>
+                    <td>
+                      <span className={`${styles.badge} ${styles[`badge${podcast.visibility}`]}`}>
+                        {podcast.visibility}
+                      </span>
+                    </td>
+                    <td className={styles.dateCell}>
+                      {new Date(podcast.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </td>
+                    <td>
+                      {isFailed && (
+                        <RetryButton podcastId={podcast.id} />
+                      )}
+                    </td>
+                  </tr>
+                  {isFailed && (podcast.failureReason || podcast.technicalError) && (
+                    <tr>
+                      <td colSpan={7} className={styles.errorDetailCell}>
+                        <div className={styles.errorDetail}>
+                          {podcast.failedAtStatus && (
+                            <div>
+                              <span className={styles.errorLabel}>Failed at stage</span>{' '}
+                              <span>{podcast.failedAtStatus.replace(/_/g, ' ')}</span>
+                              {podcast.failedAt && (
+                                <span className={styles.errorLabel}>
+                                  {' '}— {new Date(podcast.failedAt).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {podcast.failureReason && (
+                            <div>
+                              <span className={styles.errorLabel}>Reason:</span>{' '}
+                              <span className={styles.errorReason}>{podcast.failureReason}</span>
+                            </div>
+                          )}
+                          {podcast.technicalError && (
+                            <pre className={styles.errorTechnical}>{podcast.technicalError}</pre>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>

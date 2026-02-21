@@ -195,7 +195,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   // Script failed verification
   if (attemptNumber >= MAX_VERIFICATION_ATTEMPTS) {
-    await markPodcastFailed(podcastId);
+    await markPodcastFailed(podcastId, {
+      failureReason: "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
+      technicalError: `Verification failed ${attemptNumber}/${MAX_VERIFICATION_ATTEMPTS}: ${verdict.feedback.substring(0, 500)}`,
+    });
 
     await prisma.script.update({
       where: { podcastId },
