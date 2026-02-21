@@ -22,7 +22,7 @@ export interface TierFeatures {
 const FREE_FEATURES: TierFeatures = {
   maxDurationMinutes: 5,
   maxSpeakers: 2,
-  autoApproveScript: true,
+  autoApproveScript: false,
   webSearchEnabled: false,
   maxQaInteractions: 3,
   privateAllowed: false,
