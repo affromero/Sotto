@@ -32,6 +32,7 @@ interface FreeTierBannerProps {
   isByokUser: boolean;
   isProUser: boolean;
   resetInSeconds?: number;
+  email?: string;
 }
 
 export function FreeTierBanner({
@@ -40,10 +41,27 @@ export function FreeTierBanner({
   isByokUser,
   isProUser,
   resetInSeconds,
+  email,
 }: FreeTierBannerProps) {
   const wasPreviouslyDismissed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const [dismissedNow, setDismissedNow] = useState(false);
   const [countdown, setCountdown] = useState(resetInSeconds ?? 0);
+  const [waitlistState, setWaitlistState] = useState<'idle' | 'loading' | 'success'>('idle');
+
+  const handleJoinWaitlist = useCallback(async (source: string) => {
+    if (!email) return;
+    setWaitlistState('loading');
+    try {
+      await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, source }),
+      });
+      setWaitlistState('success');
+    } catch {
+      setWaitlistState('success');
+    }
+  }, [email]);
 
   useEffect(() => {
     if (!resetInSeconds || resetInSeconds <= 0) return;
@@ -84,24 +102,33 @@ export function FreeTierBanner({
             </p>
           </div>
           <div className={styles.actions}>
-            <Link href="/pricing" className={styles.link}>
-              Upgrade to Pro
-              <svg
-                className={styles.linkArrow}
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
+            {waitlistState === 'success' ? (
+              <span className={styles.successText}>You&apos;re on the list!</span>
+            ) : (
+              <button
+                type="button"
+                className={styles.waitlistButton}
+                onClick={() => handleJoinWaitlist('pro-banner-byok')}
+                disabled={waitlistState === 'loading'}
               >
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </Link>
+                {waitlistState === 'loading' ? 'Joining...' : 'Join Pro Waitlist'}
+                <svg
+                  className={styles.linkArrow}
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
         <button
@@ -152,24 +179,33 @@ export function FreeTierBanner({
           </p>
         </div>
         <div className={styles.actions}>
-          <Link href="/pricing" className={styles.link}>
-            Upgrade to Pro
-            <svg
-              className={styles.linkArrow}
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          {waitlistState === 'success' ? (
+            <span className={styles.successText}>You&apos;re on the list!</span>
+          ) : (
+            <button
+              type="button"
+              className={styles.waitlistButton}
+              onClick={() => handleJoinWaitlist('pro-banner-free')}
+              disabled={waitlistState === 'loading'}
             >
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
-          </Link>
+              {waitlistState === 'loading' ? 'Joining...' : 'Join Pro Waitlist'}
+              <svg
+                className={styles.linkArrow}
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          )}
           {exhausted && (
             <Link href="/onboarding?step=keys" className={styles.linkSecondary}>
               Add own keys

@@ -87,6 +87,38 @@
   color: var(--color-text-primary);
 }
 
+.waitlistButton {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  margin-top: var(--spacing-xs);
+  transition: color var(--transition-fast);
+}
+
+.waitlistButton:hover:not(:disabled) {
+  color: var(--color-primary-hover);
+}
+
+.waitlistButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.successText {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-success);
+  margin-top: var(--spacing-xs);
+}
+
 .dismissButton {
   appearance: none;
   border: none;

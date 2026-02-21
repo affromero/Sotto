@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { generateQuestions } from '@/lib/taste-quiz';
+import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
 import { QuizStep } from './QuizStep';
 import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
@@ -85,9 +86,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                 Unlimited generation, better AI, analytics, priority queue. No API keys needed.
                 $12/month.
               </p>
-              <a href="/pricing" className={styles.upgradeButtonPrimary}>
-                Go Pro — $12/month
-              </a>
+              <ProWaitlistButton email={session.user.email!} source="pro-onboarding" className={styles.upgradeButtonPrimary} />
             </div>
             <div className={styles.upgradePathDivider}>or</div>
             <div className={styles.upgradePath}>

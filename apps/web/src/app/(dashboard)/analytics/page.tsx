@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
+import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
 import { AnalyticsClient } from './AnalyticsClient';
 import styles from './page.module.css';
 
@@ -40,9 +41,7 @@ export default async function AnalyticsPage() {
             Analytics is a Pro feature. Upgrade to Pro to unlock performance analytics,
             audience insights, and engagement data.
           </p>
-          <Link href="/pricing" className={styles.upgradeLink}>
-            Upgrade to Pro
-          </Link>
+          <ProWaitlistButton email={session.user.email!} source="pro-analytics" className={styles.upgradeLink} />
         </div>
       </main>
     );
