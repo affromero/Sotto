@@ -202,20 +202,16 @@ export function useDiscovery(): UseDiscoveryReturn {
 
               // Handle completion with chips and metadata
               if (parsed.done) {
-                if (parsed.chips) {
-                  setState((prev) => ({
-                    ...prev,
-                    messages: prev.messages.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, chips: parsed.chips as string[] }
-                        : msg
-                    ),
-                  }));
-                }
+                // Strip raw [METADATA]...[/METADATA] and [chips:...] blocks from displayed text
+                const stripMarkup = (text: string) =>
+                  text
+                    .replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '')
+                    .replace(/\[chips:\s*.+?\]/g, '')
+                    .trim();
 
-                if (parsed.metadata) {
-                  setState((prev) => {
-                    const newMetadata = prev.metadata
+                setState((prev) => {
+                  const newMetadata = parsed.metadata
+                    ? prev.metadata
                       ? { ...prev.metadata, ...parsed.metadata }
                       : ({
                           topic: '',
@@ -227,29 +223,38 @@ export function useDiscovery(): UseDiscoveryReturn {
                           durationTarget: 10,
                           ready: false,
                           ...parsed.metadata,
-                        } as DiscoveryMetadata);
+                        } as DiscoveryMetadata)
+                    : prev.metadata;
 
-                    const isComplete = parsed.metadata?.ready === true;
+                  const isComplete = parsed.metadata?.ready === true;
 
-                    if (isComplete) {
-                      track({
-                        eventType: 'discovery.metadata_complete',
-                        turnsCount: messageIndexRef.current,
-                        topic: newMetadata.topic || '',
-                        depth: newMetadata.depth || 'standard',
-                        audience: newMetadata.audienceLevel || 'intermediate',
-                        tone: newMetadata.tone || 'casual',
-                        durationTarget: newMetadata.durationTarget || 10,
-                      });
-                    }
+                  if (isComplete && newMetadata) {
+                    track({
+                      eventType: 'discovery.metadata_complete',
+                      turnsCount: messageIndexRef.current,
+                      topic: newMetadata.topic || '',
+                      depth: newMetadata.depth || 'standard',
+                      audience: newMetadata.audienceLevel || 'intermediate',
+                      tone: newMetadata.tone || 'casual',
+                      durationTarget: newMetadata.durationTarget || 10,
+                    });
+                  }
 
-                    return {
-                      ...prev,
-                      metadata: newMetadata,
-                      isComplete,
-                    };
-                  });
-                }
+                  return {
+                    ...prev,
+                    messages: prev.messages.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            content: stripMarkup(msg.content),
+                            ...(parsed.chips ? { chips: parsed.chips } : {}),
+                          }
+                        : msg
+                    ),
+                    ...(newMetadata ? { metadata: newMetadata } : {}),
+                    ...(isComplete ? { isComplete } : {}),
+                  };
+                });
               }
 
               // Legacy: handle type-based format
