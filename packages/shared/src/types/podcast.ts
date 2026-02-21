@@ -94,9 +94,55 @@ export interface InteractionSummary {
 export interface CreatePodcastRequest {
   title: string;
   topic: string;
-  discoveryId: string;
+  discoveryId?: string;
+  voices?: Array<{ speaker: string; voiceId?: string }>;
+  ttsProvider?: string;
+  ttsModel?: string;
+  aiModel?: string;
+  visibility?: 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
+  metadata?: {
+    topic: string;
+    depth?: string;
+    audienceLevel?: string;
+    audience?: string;
+    focusAreas?: string[];
+    tone?: string;
+    durationTarget?: number;
+    sourceUrl?: string;
+    sourceContent?: string;
+  };
 }
 
 export interface GeneratePodcastRequest {
   podcastId: string;
+}
+
+export interface AiModelOption {
+  id: string;
+  displayName: string;
+  tier: string;
+  isDefault: boolean;
+  group?: string;
+}
+
+export interface TtsOption {
+  id: string;
+  displayName: string;
+  badge?: string;
+  group?: string;
+}
+
+export interface ScriptTurn {
+  speaker: string;
+  text: string;
+  direction?: string;
+}
+
+export interface VoiceProfile {
+  id: string;
+  name: string;
+  gender: 'male' | 'female';
+  accent: string;
+  ageRange: string;
+  character: string;
 }

@@ -11,6 +11,20 @@ export const createPodcastSchema = z.object({
     voiceId: z.string().optional(),
   })).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
+  aiModel: z.string().optional(),
+  ttsModel: z.string().optional(),
+  visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
+  metadata: z.object({
+    topic: z.string(),
+    depth: z.string().optional(),
+    audienceLevel: z.string().optional(),
+    audience: z.string().optional(),
+    focusAreas: z.array(z.string()).optional(),
+    tone: z.string().optional(),
+    durationTarget: z.number().min(5).max(40).optional(),
+    sourceUrl: z.string().url().optional(),
+    sourceContent: z.string().optional(),
+  }).optional(),
 });
 
 export const interactionSchema = z.object({
