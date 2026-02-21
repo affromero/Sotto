@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { profileUrl } from '@/lib/urls';
 import styles from './VoiceMarketplaceCard.module.css';
 
 export interface BrowseVoice {
@@ -47,9 +48,7 @@ export function VoiceMarketplaceCard({
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const isOwner = currentUserId === voice.owner.id;
-  const profileUrl = voice.owner.handle
-    ? `/profile/handle/${voice.owner.handle}`
-    : `/profile/${voice.owner.id}`;
+  const ownerUrl = profileUrl(voice.owner);
 
   async function handlePreview() {
     if (!isAuthenticated) return;
@@ -139,7 +138,7 @@ export function VoiceMarketplaceCard({
   return (
     <div className={styles.card}>
       <div className={styles.cardHeader}>
-        <Link href={profileUrl} className={styles.ownerLink}>
+        <Link href={ownerUrl} className={styles.ownerLink}>
           {voice.owner.image ? (
             <Image
               src={voice.owner.image}

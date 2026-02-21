@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import type { Metadata } from 'next';
@@ -92,6 +92,10 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
   if (!user) {
     notFound();
+  }
+
+  if (user.handle) {
+    redirect(`/@${user.handle}`);
   }
 
   // Check if current user follows this user

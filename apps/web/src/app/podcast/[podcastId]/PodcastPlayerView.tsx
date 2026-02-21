@@ -51,6 +51,7 @@ import { MiniPlayer } from '@/components/player/MiniPlayer';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { PodcastStatus } from '@prisma/client';
+import { profileUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
 interface PodcastPlayerViewProps {
@@ -446,7 +447,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
         )}
 
         <div className={styles.metaRow}>
-          <Link href={`/profile/${podcast.user.id}`} className={styles.creator}>
+          <Link href={profileUrl(podcast.user)} className={styles.creator}>
             <div className={styles.creatorAvatar}>
               {podcast.user.image ? (
                 <Image

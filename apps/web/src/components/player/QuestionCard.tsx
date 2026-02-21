@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { profileUrl } from '@/lib/urls';
 import styles from './QuestionCard.module.css';
 
 export interface QuestionData {
@@ -123,7 +124,7 @@ export function QuestionCard({ question, podcastId }: QuestionCardProps) {
 
       <div className={styles.content}>
         <div className={styles.header}>
-          <Link href={`/profile/${question.user.id}`} className={styles.userLink}>
+          <Link href={profileUrl(question.user)} className={styles.userLink}>
             <div className={styles.avatar}>
               {question.user.image ? (
                 <Image

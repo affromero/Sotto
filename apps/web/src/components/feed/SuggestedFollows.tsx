@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { FollowButton } from '@/components/profile/FollowButton';
+import { profileUrl } from '@/lib/urls';
 import styles from './SuggestedFollows.module.css';
 
 interface SuggestedUser {
@@ -59,9 +60,7 @@ function SuggestedUserCard({
     }
   }, [following, user.id]);
 
-  const profileHref = user.handle
-    ? `/profile/handle/${user.handle}`
-    : `/profile/${user.id}`;
+  const profileHref = profileUrl(user);
 
   return (
     <div className={styles.cardWrapper}>

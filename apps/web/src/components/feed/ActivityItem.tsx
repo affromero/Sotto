@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { profileUrl } from '@/lib/urls';
 import styles from './ActivityItem.module.css';
 
 export interface ActivityData {
@@ -94,7 +95,7 @@ function getTargetLink(activity: ActivityData): { href: string; label: string } 
       };
     case 'user':
       return {
-        href: `/profile/${activity.targetId}`,
+        href: profileUrl({ id: activity.targetId, handle: activity.target.handle }),
         label: activity.target.name || 'a user',
       };
     case 'collection':
@@ -168,7 +169,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
 
   return (
     <article className={styles.root} aria-label={`${activity.user.name || 'User'} ${actionText}`}>
-      <Link href={`/profile/${activity.user.id}`} className={styles.avatarLink} aria-label={`View ${activity.user.name || 'user'}'s profile`}>
+      <Link href={profileUrl(activity.user)} className={styles.avatarLink} aria-label={`View ${activity.user.name || 'user'}'s profile`}>
         {activity.user.image ? (
           <Image
             src={activity.user.image}
@@ -187,7 +188,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
 
       <div className={styles.body}>
         <p className={styles.text}>
-          <Link href={`/profile/${activity.user.id}`} className={styles.userName}>
+          <Link href={profileUrl(activity.user)} className={styles.userName}>
             {activity.user.name || 'Anonymous'}
           </Link>
           {' '}

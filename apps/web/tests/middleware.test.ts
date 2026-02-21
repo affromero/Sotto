@@ -103,15 +103,6 @@ describe('Middleware — Evil Agent Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/');
     });
 
-    it('/romero passes through as public (redirects to / server-side)', async () => {
-      const res = await middleware(createRequest('/romero'));
-      expect(isPassThrough(res)).toBe(true);
-    });
-
-    it('redirects /romero subpaths to / (not in PUBLIC_ROUTES)', async () => {
-      const res = await middleware(createRequest('/romero/settings'));
-      expect(getRedirectLocation(res)).toBe('/');
-    });
   });
 
   // =====================================================================
@@ -481,11 +472,6 @@ describe('Middleware — Evil Agent Security Tests', () => {
   describe('No Password Gate (SITE_PASSWORD unset)', () => {
     beforeEach(() => {
       delete process.env.SITE_PASSWORD;
-    });
-
-    it('allows /romero without password (redirect page is public)', async () => {
-      const res = await middleware(createRequest('/romero'));
-      expect(isPassThrough(res)).toBe(true);
     });
 
     it('redirects unauthenticated user from /dashboard to login (auth still works)', async () => {

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import { ReportButton } from '@/components/ui/ReportButton';
+import { profileUrl } from '@/lib/urls';
 import { CommentCompose } from './CommentCompose';
 import type { CommentData } from './CommentCompose';
 import styles from './CommentCard.module.css';
@@ -106,9 +107,7 @@ export function CommentCard({
     setReplyCount((c) => Math.max(0, c - 1));
   }, []);
 
-  const profileHref = comment.user.handle
-    ? `/profile/handle/${comment.user.handle}`
-    : `/profile/${comment.user.id}`;
+  const profileHref = profileUrl(comment.user);
 
   return (
     <div className={styles.root}>
@@ -206,7 +205,7 @@ export function CommentCard({
             <div key={reply.id} className={styles.replyCard}>
               <div className={styles.main}>
                 <Link
-                  href={reply.user.handle ? `/profile/handle/${reply.user.handle}` : `/profile/${reply.user.id}`}
+                  href={profileUrl(reply.user)}
                   className={styles.avatar}
                   aria-label={`View ${reply.user.name || 'user'} profile`}
                 >
@@ -228,7 +227,7 @@ export function CommentCard({
                 <div className={styles.body}>
                   <div className={styles.header}>
                     <Link
-                      href={reply.user.handle ? `/profile/handle/${reply.user.handle}` : `/profile/${reply.user.id}`}
+                      href={profileUrl(reply.user)}
                       className={styles.authorName}
                     >
                       {reply.user.name || 'Anonymous'}

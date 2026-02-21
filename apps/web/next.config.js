@@ -35,6 +35,11 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/profile/handle/:handle', destination: '/@:handle', permanent: true },
+    ];
+  },
   async rewrites() {
     return [
       {

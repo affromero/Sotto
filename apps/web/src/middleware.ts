@@ -15,7 +15,6 @@ const AUTH_ROUTES = ['/auth/login', '/auth/signup'];
 // Routes that are always public — no password gate, no auth required
 const PUBLIC_ROUTES = new Set([
   '/',
-  '/romero',
   '/api/access',
   '/api/health',
   '/feedback',

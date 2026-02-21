@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ListMusic, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { profileUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './CollectionDetail.module.css';
 
@@ -125,7 +126,7 @@ export function CollectionDetail({
           {description && <p className={styles.description}>{description}</p>}
 
           <div className={styles.meta}>
-            <Link href={`/profile/${user.id}`} className={styles.creator}>
+            <Link href={profileUrl(user)} className={styles.creator}>
               <div className={styles.creatorAvatar}>
                 {user.image ? (
                   <Image
