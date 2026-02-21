@@ -186,7 +186,7 @@ describe('POST /api/admin/test-model', () => {
       const body = await res.json();
 
       expect(body.success).toBe(false);
-      expect(body.error).toBe('Timed out after 15s');
+      expect(body.error).toBe('Timed out');
     });
 
     it('passes through unknown errors verbatim', async () => {
