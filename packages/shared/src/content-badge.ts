@@ -44,7 +44,7 @@ export function getPodcastBadges(
     variant: isHuman ? 'success' : isImport ? 'default' : 'info',
   });
 
-  // 2. AI badge — "Provider · Model" format (e.g. "Claude · Sonnet 4.5")
+  // 2. AI badge — "Provider · Model" format (e.g. "Claude · Sonnet 4.6")
   if (!isImport) {
     const providerShort = podcast.aiProvider
       ? AI_PROVIDER_DISPLAY[podcast.aiProvider]?.shortLabel

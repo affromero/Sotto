@@ -12,7 +12,7 @@ const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
 
 const CLAUDE_CODE_MODELS = [
   { id: 'claude-code:haiku', displayName: 'Haiku 4.5', tier: 'fast', isDefault: false, group: 'Claude Code (Local)' },
-  { id: 'claude-code:sonnet', displayName: 'Sonnet 4.5', tier: 'balanced', isDefault: false, group: 'Claude Code (Local)' },
+  { id: 'claude-code:sonnet', displayName: 'Sonnet 4.6', tier: 'balanced', isDefault: false, group: 'Claude Code (Local)' },
   { id: 'claude-code:opus', displayName: 'Opus 4.6', tier: 'best', isDefault: false, group: 'Claude Code (Local)' },
 ];
 
