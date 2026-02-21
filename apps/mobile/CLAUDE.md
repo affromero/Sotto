@@ -93,7 +93,7 @@ app/
 ├── (tabs)/
 │   ├── _layout.tsx        # Tab navigator (Ionicons icons)
 │   ├── index.tsx          # Feed (home) — infinite scroll, sort chips
-│   ├── create.tsx         # Create podcast — chat-based discovery
+│   ├── create.tsx         # Create podcast — 5-step flow (discovery → voice → scripting → preview → generating)
 │   ├── notifications.tsx  # Notifications — mark read, mark all read
 │   └── profile.tsx        # Current user profile — podcasts list, logout
 ├── auth/
@@ -129,6 +129,32 @@ app/
 | `PodcastCard.tsx` | Unified podcast card with `variant="feed"` (full card with avatar, tags, stats) and `variant="compact"` (list row) |
 | `SwipeCard.tsx` | Gesture-driven swipe card (reanimated + gesture-handler) for taste quiz yes/no/skip interactions |
 | `SwipeQuiz.tsx` | Taste quiz flow — renders SwipeCard stack, handles responses, saves ideas on "yes" |
+| `BottomSheet.tsx` | Reusable bottom sheet modal with drag handle, title, and scrollable content |
+| `OptionPicker.tsx` | Selectable option list with groups, badges, and checkmark indicator (used inside BottomSheet) |
+| `PillGroup.tsx` | Horizontal scrollable row of pill buttons for single-select choices |
+| `AiModelSelector.tsx` | AI model picker trigger pill + BottomSheet (fetches `/api/ai-models`, persists to SecureStore) |
+| `TtsModelSelector.tsx` | TTS provider:model picker trigger pill + BottomSheet (fetches `/api/tts-options`, persists to SecureStore) |
+| `VoicePickerSheet.tsx` | Voice selection with auto-assign toggle and custom voice grid per speaker |
+| `DurationPicker.tsx` | Duration selector using PillGroup (5-40 min options) |
+| `VisibilityPicker.tsx` | Visibility selector using PillGroup (Public, Unlisted, Private) |
+| `GenerationProgress.tsx` | 8-step pipeline progress indicator with animated dots and fill track |
+| `ScriptPreview.tsx` | Read-only script preview with stats bar, turn list, and approve/regenerate actions |
+
+## Creation Flow
+
+The create screen (`app/(tabs)/create.tsx`) implements a 5-step state machine:
+
+```
+discovery → voice → scripting → script-preview → generating
+```
+
+1. **discovery** — Chat-based topic exploration with AI model selector pill
+2. **voice** — VoicePickerSheet, TtsModelSelector, DurationPicker, VisibilityPicker
+3. **scripting** — GenerationProgress with 3s status polling, auto-advances to script-preview on SCRIPT_READY
+4. **script-preview** — ScriptPreview (read-only), approve → generating, regenerate → scripting
+5. **generating** — GenerationProgress with 3s status polling, auto-navigates to podcast page on READY
+
+Model/TTS preferences persist via `expo-secure-store` keys: `sotto:aiModel`, `sotto:ttsOption`.
 
 ## Environment Variables
 
