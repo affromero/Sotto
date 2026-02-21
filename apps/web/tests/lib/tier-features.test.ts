@@ -17,8 +17,8 @@ describe('getTierFeatures', () => {
       expect(features.autoApproveScript).toBe(true);
     });
 
-    it('disables web search', () => {
-      expect(features.webSearchEnabled).toBe(false);
+    it('enables web search', () => {
+      expect(features.webSearchEnabled).toBe(true);
     });
 
     it('limits QA interactions to 3', () => {
@@ -60,7 +60,7 @@ describe('getTierFeatures', () => {
     it('keeps free limits for everything else', () => {
       expect(features.maxSpeakers).toBe(2);
       expect(features.autoApproveScript).toBe(true);
-      expect(features.webSearchEnabled).toBe(false);
+      expect(features.webSearchEnabled).toBe(true);
       expect(features.maxQaInteractions).toBe(3);
       expect(features.privateAllowed).toBe(false);
       expect(features.priorityQueue).toBe(false);
