@@ -10,7 +10,8 @@
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
-    "dev": "doppler run -- npm run dev --workspace=@sotto/web",
+    "db:sync": "bash scripts/sync-prod-db.sh",
+    "dev": "npm run db:sync && doppler run -- npm run dev --workspace=@sotto/web",
     "dev:web": "doppler run -- npm run dev:web --workspace=@sotto/web",
     "dev:workers": "doppler run -- npm run dev:workers --workspace=@sotto/web",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
