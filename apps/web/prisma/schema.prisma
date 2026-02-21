@@ -145,6 +145,7 @@ model User {
   moderationActions   ModerationAction[] @relation("ModeratedUser")
   moderationPerformed ModerationAction[] @relation("Moderator")
   reports             Report[]           @relation("Reporter")
+  claimReports        ClaimReport[]      @relation("ClaimReporter")
 
   // Referrals
   referredById String?
@@ -327,6 +328,7 @@ model Podcast {
   voicePurchases   VoicePurchase[]
   autoTweets       TwitterAutoTweet[]
   ratings          PodcastRating[]
+  claimReports     ClaimReport[]
 
   @@index([userId])
   @@index([status])
@@ -778,6 +780,7 @@ enum NotificationType {
   VOICE_VERIFICATION_FAILED
   VOICE_BLOCKED_DUPLICATE
   VOICE_OWNERSHIP_ALERT
+  CLAIM_REPORT_ON_YOUR_PODCAST
 }
 
 // ============ MODERATION ============
@@ -1686,4 +1689,35 @@ model ContentFlag {
 
   @@index([reviewed, createdAt])
   @@index([targetType, targetId])
+}
+
+// ============ CLAIM REPORTS ============
+
+enum ClaimReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED_VERIFIED
+  RESOLVED_INACCURATE
+  DISMISSED
+}
+
+model ClaimReport {
+  id          String            @id @default(cuid())
+  reporterId  String
+  podcastId   String
+  turnIndex   Int
+  turnText    String            @db.Text
+  description String            @db.Text
+  status      ClaimReportStatus @default(PENDING)
+  resolvedBy  String?
+  resolution  String?           @db.Text
+  resolvedAt  DateTime?
+  createdAt   DateTime          @default(now())
+
+  reporter User    @relation("ClaimReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  podcast  Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@unique([reporterId, podcastId, turnIndex])
+  @@index([podcastId, status])
+  @@index([status, createdAt])
 }

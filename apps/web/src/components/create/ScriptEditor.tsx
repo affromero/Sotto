@@ -17,6 +17,7 @@ import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { ScriptTurn } from '@/lib/script-generator';
 import type { ReferenceData } from '@/types/reference';
 import { wordsToMinutes } from '@/lib/duration';
+import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
 import styles from './ScriptEditor.module.css';
 
 interface ScriptEditorProps {
@@ -527,6 +528,11 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
                         <Trash2 size={14} />
                       </button>
                     )}
+                    <ClaimFlagButton
+                      podcastId={podcastId}
+                      turnIndex={index}
+                      turnText={turn.text}
+                    />
                   </>
                 )}
               </div>
