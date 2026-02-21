@@ -59,6 +59,7 @@
 | `/admin/inspire`             | `(admin)/admin/inspire/page.tsx`           | Yes (ADMIN only)            | Inspire Me analytics (forYou, trending, news stats)      |
 | `/admin/ratings`             | `(admin)/admin/ratings/page.tsx`           | Yes (ADMIN only)            | TTS quality ratings by provider (creator feedback)       |
 | `/admin/announcements`       | `(admin)/admin/announcements/page.tsx`     | Yes (ADMIN only)            | Compose + send platform announcements to all users        |
+| `/admin/models`              | `(admin)/admin/models/page.tsx`            | Yes (ADMIN only)            | Live smoke-test panel: AI/TTS/STT models with pass/fail, latency, inline results |
 
 ## API Route Index
 
@@ -168,6 +169,7 @@
 | `/api/admin/twitter/thread-to-podcast`                           | POST             | ADMIN      | Queue thread-to-podcast conversion job                                      |
 | `/api/admin/twitter/job-status/[jobId]`                          | GET              | ADMIN      | BullMQ job state + progress + podcastId for thread-to-podcast jobs          |
 | `/api/admin/twitter/analytics`                                   | GET              | ADMIN      | 30-day Twitter engagement analytics                                         |
+| `/api/admin/test-model`                                          | POST             | ADMIN      | Smoke-test a provider+model (AI/TTS/STT) using platform keys; returns pass/fail + latency |
 | `/api/admin/moderation-log`                                      | GET              | ADMIN      | Paginated moderation action history                                         |
 | `/api/admin/reports`                                             | GET              | ADMIN      | List user reports (filter by status, targetType, reason)                    |
 | `/api/admin/reports/[reportId]`                                  | GET/PATCH        | ADMIN      | Get/resolve a report (RESOLVED_ACTIONED or RESOLVED_DISMISSED)              |

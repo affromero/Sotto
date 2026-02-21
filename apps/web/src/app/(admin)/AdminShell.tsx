@@ -24,6 +24,7 @@ import {
   Brain,
   Target,
   Megaphone,
+  FlaskConical,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -86,6 +87,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
       { href: '/admin/config', label: 'Config', icon: Settings },
       { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+      { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
     ],
   },
   {
