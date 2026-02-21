@@ -176,9 +176,10 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, on
               </div>
               <div className={styles.bubbleContent}>
                 <div className={styles.typing} aria-label="Sotto is thinking">
-                  <span className={styles.typingDot} />
-                  <span className={styles.typingDot} />
-                  <span className={styles.typingDot} />
+                  <span className={styles.typingBar} />
+                  <span className={styles.typingBar} />
+                  <span className={styles.typingBar} />
+                  <span className={styles.typingBar} />
                 </div>
               </div>
             </div>

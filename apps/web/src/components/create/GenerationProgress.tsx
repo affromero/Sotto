@@ -102,7 +102,14 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
             }`}
           >
             {currentStep.label}
-            {isActive && <span className={styles.ellipsis} />}
+            {isActive && (
+              <span className={styles.wave} aria-hidden="true">
+                <span className={styles.waveBar} />
+                <span className={styles.waveBar} />
+                <span className={styles.waveBar} />
+                <span className={styles.waveBar} />
+              </span>
+            )}
           </span>
 
           {isActive && (
