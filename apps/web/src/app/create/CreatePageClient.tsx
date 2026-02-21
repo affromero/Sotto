@@ -466,7 +466,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {step === 'scripting' && (
           <div className={styles.chatArea}>
-            <GenerationProgress status={pipelineStatus} />
+            <GenerationProgress status={pipelineStatus} topic={metadata?.topic} />
           </div>
         )}
 
@@ -482,7 +482,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {step === 'generating' && (
           <div className={styles.chatArea}>
-            <GenerationProgress status={pipelineStatus} />
+            <GenerationProgress status={pipelineStatus} topic={metadata?.topic} />
           </div>
         )}
       </div>

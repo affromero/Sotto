@@ -599,7 +599,7 @@ export default function CreateScreen() {
         <Text style={styles.pipelineTitle}>
           {metadata?.topic ?? 'Your Podcast'}
         </Text>
-        <GenerationProgress status={pipelineStatus?.status ?? 'EXTRACTING'} />
+        <GenerationProgress status={pipelineStatus?.status ?? 'EXTRACTING'} topic={metadata?.topic} />
         <Text style={styles.pipelineHint}>
           This usually takes 1-2 minutes. You can leave this screen and come back.
         </Text>
@@ -626,7 +626,7 @@ export default function CreateScreen() {
         <Text style={styles.pipelineTitle}>
           {metadata?.topic ?? 'Your Podcast'}
         </Text>
-        <GenerationProgress status={pipelineStatus?.status ?? 'GENERATING_AUDIO'} />
+        <GenerationProgress status={pipelineStatus?.status ?? 'GENERATING_AUDIO'} topic={metadata?.topic} />
         <Text style={styles.pipelineHint}>
           Generating audio for each segment. Almost there!
         </Text>
