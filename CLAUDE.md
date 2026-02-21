@@ -49,7 +49,7 @@ Root `package.json` is a workspace orchestrator — all scripts proxy to `@sotto
 # Install dependencies (all workspaces)
 npm install
 
-# Start PostgreSQL + Redis
+# Start PostgreSQL + Redis + KittenTTS
 docker-compose up -d
 
 # Push database schema
@@ -321,15 +321,29 @@ Every commit **must** pass this checklist. Do not commit until every item is ver
 
 ## Environment Variables
 
-See `.env.example` for the full list. Critical:
+**All secrets and env vars are managed via [Doppler](https://doppler.com/) — never use `.env` files.** The dev config lives in the `sotto` project, `dev` config. All dev scripts in `package.json` wrap commands with `doppler run --`.
+
+```bash
+# View current secrets
+doppler secrets
+
+# Add/update a secret
+doppler secrets set KEY=value
+
+# Run any command with secrets injected
+doppler run -- <command>
+```
+
+Critical variables (in Doppler):
 
 - `DATABASE_URL`, `REDIS_URL` — PostgreSQL + Redis
 - `NEXTAUTH_SECRET` — Auth encryption
 - `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY` — Platform default AI + TTS keys
 - `R2_*` — Cloudflare R2 storage
 - `BYOK_ENCRYPTION_KEY` — AES-256-GCM for user API key encryption
+- `KITTENTTS_URL` — KittenTTS sidecar (default: `http://localhost:8100` in dev)
 
-Provider selection (swap via env): `AI_PROVIDER` (`anthropic`/`openai`/`claude-code`), `TTS_PROVIDER`, `STT_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER` — see `.env.example` for all options.
+Provider selection (swap via env): `AI_PROVIDER` (`anthropic`/`openai`/`claude-code`), `TTS_PROVIDER`, `STT_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
 
 ## Reference
 
