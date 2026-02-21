@@ -11,14 +11,14 @@ interface GenerationProgressProps {
 }
 
 const PIPELINE_STEPS = [
-  { key: 'EXTRACTING', label: 'Extract', fullLabel: 'Extracting content' },
-  { key: 'SCRIPTING', label: 'Script', fullLabel: 'Writing script' },
-  { key: 'VERIFYING_SCRIPT', label: 'Verify', fullLabel: 'Fact-checking claims' },
-  { key: 'VALIDATING_REFERENCES', label: 'Refs', fullLabel: 'Verifying references' },
-  { key: 'SCRIPT_READY', label: 'Review', fullLabel: 'Script ready for review' },
-  { key: 'GENERATING_AUDIO', label: 'Audio', fullLabel: 'Generating audio' },
-  { key: 'STITCHING', label: 'Stitch', fullLabel: 'Stitching together' },
-  { key: 'READY', label: 'Done', fullLabel: 'Ready!' },
+  { key: 'EXTRACTING', label: 'Reading your source material' },
+  { key: 'SCRIPTING', label: 'Writing your podcast script' },
+  { key: 'VERIFYING_SCRIPT', label: 'Fact-checking the content' },
+  { key: 'VALIDATING_REFERENCES', label: 'Verifying sources' },
+  { key: 'SCRIPT_READY', label: 'Your script is ready for review' },
+  { key: 'GENERATING_AUDIO', label: 'Recording the voices' },
+  { key: 'STITCHING', label: 'Mixing the final audio' },
+  { key: 'READY', label: 'Your podcast is ready!' },
 ] as const;
 
 type StepState = 'completed' | 'current' | 'future' | 'error' | 'paused';
@@ -44,80 +44,107 @@ export function GenerationProgress({ status, progress, error }: GenerationProgre
 
   const currentStep = currentIndex >= 0 ? PIPELINE_STEPS[currentIndex] : null;
   const currentState = currentIndex >= 0 ? stepStates[currentIndex] : null;
+  const isActive = currentState === 'current';
+  const isDone = currentStep?.key === 'READY';
 
   return (
     <div className={styles.root} role="progressbar" aria-label="Podcast generation progress">
-      {/* Progress track */}
-      <div className={styles.track}>
-        <div
-          className={styles.trackFill}
-          style={{
-            width:
-              currentIndex === -1
-                ? '0%'
-                : `${(currentIndex / (PIPELINE_STEPS.length - 1)) * 100}%`,
-          }}
-        />
+      {/* Animated orb */}
+      <div
+        className={`${styles.orbWrap} ${
+          currentState === 'error'
+            ? styles.orbError
+            : currentState === 'paused'
+              ? styles.orbPaused
+              : isDone
+                ? styles.orbDone
+                : ''
+        }`}
+      >
+        {isActive && (
+          <>
+            <div className={`${styles.ring} ${styles.ring1}`} />
+            <div className={`${styles.ring} ${styles.ring2}`} />
+            <div className={`${styles.ring} ${styles.ring3}`} />
+          </>
+        )}
+        <div className={`${styles.orb} ${isActive ? styles.orbActive : ''}`}>
+          {currentState === 'error' ? (
+            <AlertCircle size={24} strokeWidth={2} aria-hidden="true" />
+          ) : currentState === 'paused' ? (
+            <Pause size={24} strokeWidth={2} aria-hidden="true" />
+          ) : isDone ? (
+            <Check size={24} strokeWidth={2.5} aria-hidden="true" />
+          ) : progress !== undefined && isActive ? (
+            <span className={styles.orbPercent}>{Math.round(progress)}%</span>
+          ) : (
+            <div className={styles.orbBars} aria-hidden="true">
+              <span className={styles.orbBar} />
+              <span className={styles.orbBar} />
+              <span className={styles.orbBar} />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Step dots */}
-      <ol className={styles.stepper} aria-label="Generation steps">
+      {/* Status text */}
+      {currentStep && (
+        <div className={styles.statusText}>
+          <span
+            className={`${styles.statusLabel} ${
+              currentState === 'error'
+                ? styles.statusError
+                : currentState === 'paused'
+                  ? styles.statusPaused
+                  : isDone
+                    ? styles.statusDone
+                    : ''
+            }`}
+          >
+            {currentStep.label}
+            {isActive && <span className={styles.ellipsis} />}
+          </span>
+
+          {isActive && (
+            <span className={styles.stepCount}>
+              Step {currentIndex + 1} of {PIPELINE_STEPS.length}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Dot tracker */}
+      <ol className={styles.dots} aria-label="Generation steps">
         {PIPELINE_STEPS.map((step, index) => {
           const state = stepStates[index];
-
           return (
             <li
               key={step.key}
-              className={`${styles.step} ${styles[state]}`}
+              className={`${styles.dot} ${styles[`dot_${state}`]}`}
               aria-current={state === 'current' || state === 'paused' ? 'step' : undefined}
-              aria-label={step.fullLabel}
-            >
-              <div className={styles.dot}>
-                {state === 'completed' ? (
-                  <Check size={10} strokeWidth={3} aria-hidden="true" />
-                ) : state === 'error' ? (
-                  <AlertCircle size={10} strokeWidth={3} aria-hidden="true" />
-                ) : state === 'paused' ? (
-                  <Pause size={10} strokeWidth={3} aria-hidden="true" />
-                ) : (
-                  <span className={styles.dotNumber} aria-hidden="true">
-                    {index + 1}
-                  </span>
-                )}
-              </div>
-              <span className={styles.label}>{step.label}</span>
-            </li>
+              aria-label={step.label}
+            />
           );
         })}
       </ol>
 
-      {/* Active step detail */}
-      {currentStep && (
-        <div className={styles.detail}>
-          <span
-            className={`${styles.detailLabel} ${currentState === 'error' ? styles.detailError : currentState === 'paused' ? styles.detailPaused : ''}`}
-          >
-            {currentStep.fullLabel}
-          </span>
-
-          {currentState === 'current' && progress !== undefined && (
-            <div className={styles.progressWrap}>
-              <div className={styles.progressTrack}>
-                <div
-                  className={styles.progressFill}
-                  style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
-                />
-              </div>
-              <span className={styles.progressText}>{Math.round(progress)}%</span>
-            </div>
-          )}
-
-          {currentState === 'error' && error && (
-            <p className={styles.errorMessage} role="alert">
-              {error}
-            </p>
-          )}
+      {/* Progress bar (when percentage is available) */}
+      {isActive && progress !== undefined && (
+        <div className={styles.progressWrap}>
+          <div className={styles.progressTrack}>
+            <div
+              className={styles.progressFill}
+              style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}
+            />
+          </div>
         </div>
+      )}
+
+      {/* Error message */}
+      {currentState === 'error' && error && (
+        <p className={styles.errorMessage} role="alert">
+          {error}
+        </p>
       )}
     </div>
   );
