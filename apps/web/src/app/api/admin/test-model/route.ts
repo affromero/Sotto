@@ -102,6 +102,20 @@ function createSilenceWav(): Buffer {
   return buf;
 }
 
+/** Detect audio MIME type from buffer magic bytes. */
+function detectAudioMime(buf: Buffer): string {
+  if (buf.length < 4) return 'audio/mpeg';
+  // WAV: RIFF header
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) return 'audio/wav';
+  // OGG: OggS header
+  if (buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53) return 'audio/ogg';
+  // FLAC: fLaC header
+  if (buf[0] === 0x66 && buf[1] === 0x4c && buf[2] === 0x61 && buf[3] === 0x43) return 'audio/flac';
+  // MP3: ID3 tag or sync word
+  if ((buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) || (buf[0] === 0xff && (buf[1] & 0xe0) === 0xe0)) return 'audio/mpeg';
+  return 'audio/mpeg';
+}
+
 function classifyError(error: Error): string {
   const msg = error.message;
   const lower = msg.toLowerCase();
@@ -277,10 +291,11 @@ export async function POST(request: NextRequest) {
       );
 
       const base64 = audioBuffer.toString('base64');
+      const mime = detectAudioMime(audioBuffer);
       return NextResponse.json({
         success: true,
         latencyMs: Date.now() - start,
-        audioData: `data:audio/mpeg;base64,${base64}`,
+        audioData: `data:${mime};base64,${base64}`,
       });
     }
 
