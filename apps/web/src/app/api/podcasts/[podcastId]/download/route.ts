@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
 
   const podcast = await prisma.podcast.findUnique({
@@ -24,14 +24,32 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'This podcast is private' }, { status: 403 });
   }
 
+  // Support ?track=<voiceTrackId> to download a specific voice track
+  let audioUrl = podcast.audioUrl;
+  let titleSuffix = '';
+  const trackId = request.nextUrl.searchParams.get('track');
+  if (trackId) {
+    const track = await prisma.voiceTrack.findUnique({
+      where: { id: trackId },
+      select: { podcastId: true, status: true, audioUrl: true, name: true },
+    });
+
+    if (!track || track.podcastId !== podcastId || track.status !== 'READY' || !track.audioUrl) {
+      return NextResponse.json({ error: 'Voice track not found or not ready' }, { status: 404 });
+    }
+
+    audioUrl = track.audioUrl;
+    titleSuffix = ` - ${track.name}`;
+  }
+
   // Fetch audio from R2/storage and stream with Content-Disposition
   try {
-    const audioResponse = await fetch(podcast.audioUrl);
+    const audioResponse = await fetch(audioUrl);
     if (!audioResponse.ok || !audioResponse.body) {
       return NextResponse.json({ error: 'Audio file not available' }, { status: 502 });
     }
 
-    const sanitizedTitle = podcast.title.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'podcast';
+    const sanitizedTitle = (podcast.title + titleSuffix).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'podcast';
 
     return new NextResponse(audioResponse.body, {
       headers: {
