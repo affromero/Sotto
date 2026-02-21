@@ -17,6 +17,9 @@ const mockCreateTtsProviderAsync = vi.hoisted(() =>
 );
 const mockTranscribe = vi.hoisted(() => vi.fn());
 const mockCreateSttProvider = vi.hoisted(() => vi.fn(() => ({ transcribe: mockTranscribe })));
+const mockGetAiKey = vi.hoisted(() => vi.fn());
+const mockGetByokKey = vi.hoisted(() => vi.fn());
+const mockGetByokExtraData = vi.hoisted(() => vi.fn());
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -24,6 +27,11 @@ vi.mock('@/lib/auth-guards', () => ({ requireAdmin: mockRequireAdmin }));
 vi.mock('@/lib/providers/ai', () => ({ createAIProvider: mockCreateAIProvider }));
 vi.mock('@/lib/providers/tts', () => ({ createTtsProviderAsync: mockCreateTtsProviderAsync }));
 vi.mock('@/lib/providers/stt', () => ({ createSttProvider: mockCreateSttProvider }));
+vi.mock('@/lib/byok', () => ({
+  getAiKey: mockGetAiKey,
+  getByokKey: mockGetByokKey,
+  getByokExtraData: mockGetByokExtraData,
+}));
 
 vi.mock('@/lib/providers/tts-voices', () => ({
   PLAYHT_VOICE_POOL: [{ id: 'playht-test-voice', name: 'Jennifer', gender: 'female', character: 'warm' }],
@@ -50,6 +58,9 @@ describe('POST /api/admin/test-model', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue('admin-1');
+    mockGetAiKey.mockResolvedValue(null);
+    mockGetByokKey.mockResolvedValue(null);
+    mockGetByokExtraData.mockResolvedValue(null);
     // Clear provider env vars so tests start from a known state
     vi.stubEnv('ELEVENLABS_API_KEY', '');
     vi.stubEnv('OPENAI_API_KEY', '');
@@ -330,6 +341,137 @@ describe('POST /api/admin/test-model', () => {
 
       expect(body.success).toBe(false);
       expect(body.error).toMatch(/^Network error:/);
+    });
+  });
+
+  // ── BYOK key source ──────────────────────────────────────────────────────────
+
+  describe('BYOK key source', () => {
+    describe('AI BYOK', () => {
+      it('calls generateResponse with apiKeyOverride from BYOK key', async () => {
+        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-anthropic-key', provider: 'anthropic' });
+        mockGenerateResponse.mockResolvedValue({ content: 'Hello', inputTokens: 5, outputTokens: 1, model: 'claude' });
+
+        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const body = await res.json();
+
+        expect(body.success).toBe(true);
+        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'anthropic');
+        expect(mockGenerateResponse).toHaveBeenCalledWith(
+          '',
+          [{ role: 'user', content: 'Say hello in one word.' }],
+          expect.objectContaining({ apiKeyOverride: 'byok-anthropic-key' })
+        );
+      });
+
+      it('returns failure when BYOK AI key is not found', async () => {
+        mockGetAiKey.mockResolvedValue(null);
+
+        const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude', keySource: 'byok' }));
+        const body = await res.json();
+
+        expect(body.success).toBe(false);
+        expect(body.error).toMatch(/BYOK key not found/);
+      });
+    });
+
+    describe('TTS BYOK', () => {
+      it('uses BYOK key for TTS provider', async () => {
+        mockGetByokKey.mockResolvedValue('byok-xi-key');
+        mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
+
+        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const body = await res.json();
+
+        expect(body.success).toBe(true);
+        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
+        expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith(
+          'elevenlabs',
+          'byok-xi-key',
+          undefined,
+          'eleven_v3'
+        );
+      });
+
+      it('fetches extraData for PlayHT BYOK', async () => {
+        mockGetByokKey.mockResolvedValue('playht-byok-key');
+        mockGetByokExtraData.mockResolvedValue({ userId: 'playht-user-byok' });
+        mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
+
+        await POST(createRequest({ type: 'tts', provider: 'playht', model: 'premium', keySource: 'byok' }));
+
+        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'playht');
+        expect(mockGetByokExtraData).toHaveBeenCalledWith('admin-1', 'playht');
+        expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith(
+          'playht',
+          'playht-byok-key',
+          { userId: 'playht-user-byok' },
+          'premium'
+        );
+      });
+
+      it('returns failure when BYOK TTS key is not found', async () => {
+        mockGetByokKey.mockResolvedValue(null);
+
+        const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3', keySource: 'byok' }));
+        const body = await res.json();
+
+        expect(body.success).toBe(false);
+        expect(body.error).toMatch(/BYOK key not found/);
+      });
+    });
+
+    describe('STT BYOK', () => {
+      it('uses AI BYOK key for openai STT', async () => {
+        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
+        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
+
+        await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+
+        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'openai');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith('openai', 'byok-openai-key', 'whisper-1');
+      });
+
+      it('uses AI BYOK key for groq STT', async () => {
+        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-groq-key', provider: 'groq' });
+        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
+
+        await POST(createRequest({ type: 'stt', provider: 'groq', model: 'whisper-large-v3-turbo', keySource: 'byok' }));
+
+        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'groq');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith('groq', 'byok-groq-key', 'whisper-large-v3-turbo');
+      });
+
+      it('uses TTS BYOK key for elevenlabs STT', async () => {
+        mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
+        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
+
+        await POST(createRequest({ type: 'stt', provider: 'elevenlabs', model: 'scribe_v1', keySource: 'byok' }));
+
+        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'elevenlabs');
+        expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'byok-xi-stt-key', 'scribe_v1');
+      });
+
+      it('returns failure when BYOK STT key is not found', async () => {
+        mockGetAiKey.mockResolvedValue(null);
+
+        const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1', keySource: 'byok' }));
+        const body = await res.json();
+
+        expect(body.success).toBe(false);
+        expect(body.error).toMatch(/BYOK key not found/);
+      });
+    });
+
+    it('defaults to platform path when keySource is omitted', async () => {
+      vi.stubEnv('ELEVENLABS_API_KEY', 'xi-platform-key');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
+
+      const res = await POST(createRequest({ type: 'tts', provider: 'elevenlabs', model: 'eleven_v3' }));
+      const body = await res.json();
+
+      expect(body.success).toBe(true);
+      expect(mockGetByokKey).not.toHaveBeenCalled();
     });
   });
 });

@@ -6,6 +6,8 @@ import { createTtsProviderAsync } from '@/lib/providers/tts';
 import { createSttProvider } from '@/lib/providers/stt';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { SttProviderId } from '@/lib/providers/stt-registry';
+import type { AiProviderId } from '@/lib/providers/ai-registry';
+import { getAiKey, getByokKey, getByokExtraData } from '@/lib/byok';
 import {
   PLAYHT_VOICE_POOL,
   CARTESIA_VOICE_POOL,
@@ -17,6 +19,7 @@ const requestSchema = z.object({
   type: z.enum(['ai', 'tts', 'stt']),
   provider: z.string().min(1),
   model: z.string().min(1),
+  keySource: z.enum(['platform', 'byok']).default('platform'),
 });
 
 // Stable test voice per TTS provider
@@ -164,17 +167,32 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { type, provider, model } = parsed.data;
+  const { type, provider, model, keySource } = parsed.data;
   const start = Date.now();
 
   try {
     if (type === 'ai') {
+      let apiKeyOverride: string | undefined;
+
+      if (keySource === 'byok') {
+        const keyData = await getAiKey(adminId, provider as AiProviderId);
+        if (!keyData) {
+          return NextResponse.json({
+            success: false,
+            latencyMs: Date.now() - start,
+            error: 'BYOK key not found for this provider',
+          });
+        }
+        apiKeyOverride = keyData.apiKey;
+      }
+
       const aiProvider = createAIProvider(provider);
       const result = await withTimeout(
         aiProvider.generateResponse('', [{ role: 'user', content: 'Say hello in one word.' }], {
           model,
           maxTokens: 20,
           skipModeration: true,
+          apiKeyOverride,
         }),
         15_000
       );
@@ -186,30 +204,62 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'tts') {
-      const { apiKey, extraData } = getTtsPlatformKey(provider);
+      let apiKey: string | undefined;
+      let extraData: Record<string, string> | undefined;
 
-      if (provider === 'kittentts') {
-        if (!process.env.KITTENTTS_URL) {
+      if (keySource === 'byok') {
+        if (provider === 'kittentts') {
+          // KittenTTS has no BYOK concept — just needs KITTENTTS_URL set
+          if (!process.env.KITTENTTS_URL) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'Platform API key not configured (check .env)',
+            });
+          }
+        } else {
+          const key = await getByokKey(adminId, provider as TtsProviderId);
+          if (!key) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'BYOK key not found for this provider',
+            });
+          }
+          apiKey = key;
+          if (provider === 'playht') {
+            const extra = await getByokExtraData(adminId, provider as TtsProviderId);
+            if (extra) extraData = extra;
+          }
+        }
+      } else {
+        const platformData = getTtsPlatformKey(provider);
+        apiKey = platformData.apiKey;
+        extraData = platformData.extraData;
+
+        if (provider === 'kittentts') {
+          if (!process.env.KITTENTTS_URL) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'Platform API key not configured (check .env)',
+            });
+          }
+        } else if (provider === 'playht') {
+          if (!apiKey || !extraData?.userId) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'Platform API key not configured (check .env)',
+            });
+          }
+        } else if (!apiKey) {
           return NextResponse.json({
             success: false,
             latencyMs: Date.now() - start,
             error: 'Platform API key not configured (check .env)',
           });
         }
-      } else if (provider === 'playht') {
-        if (!apiKey || !extraData?.userId) {
-          return NextResponse.json({
-            success: false,
-            latencyMs: Date.now() - start,
-            error: 'Platform API key not configured (check .env)',
-          });
-        }
-      } else if (!apiKey) {
-        return NextResponse.json({
-          success: false,
-          latencyMs: Date.now() - start,
-          error: 'Platform API key not configured (check .env)',
-        });
       }
 
       const voiceId = TTS_TEST_VOICES[provider] ?? 'alloy';
@@ -234,16 +284,42 @@ export async function POST(request: NextRequest) {
     }
 
     if (type === 'stt') {
-      const platformKey = getSttPlatformKey(provider);
-      if (!platformKey) {
-        return NextResponse.json({
-          success: false,
-          latencyMs: Date.now() - start,
-          error: 'Platform API key not configured (check .env)',
-        });
+      let sttKey: string | undefined;
+
+      if (keySource === 'byok') {
+        if (provider === 'openai' || provider === 'groq') {
+          const keyData = await getAiKey(adminId, provider as AiProviderId);
+          if (!keyData) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'BYOK key not found for this provider',
+            });
+          }
+          sttKey = keyData.apiKey;
+        } else if (provider === 'elevenlabs') {
+          const key = await getByokKey(adminId, 'elevenlabs');
+          if (!key) {
+            return NextResponse.json({
+              success: false,
+              latencyMs: Date.now() - start,
+              error: 'BYOK key not found for this provider',
+            });
+          }
+          sttKey = key;
+        }
+      } else {
+        sttKey = getSttPlatformKey(provider);
+        if (!sttKey) {
+          return NextResponse.json({
+            success: false,
+            latencyMs: Date.now() - start,
+            error: 'Platform API key not configured (check .env)',
+          });
+        }
       }
 
-      const sttProvider = createSttProvider(provider as SttProviderId, platformKey, model);
+      const sttProvider = createSttProvider(provider as SttProviderId, sttKey!, model);
       const wavBuffer = createSilenceWav();
       const result = await withTimeout(sttProvider.transcribe(wavBuffer), 15_000);
       return NextResponse.json({

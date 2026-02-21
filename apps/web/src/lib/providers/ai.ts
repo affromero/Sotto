@@ -13,6 +13,7 @@ export interface AIOptions {
   temperature?: number;
   model?: string;
   skipModeration?: boolean;
+  apiKeyOverride?: string;
 }
 
 export interface AIResponse {
@@ -45,6 +46,8 @@ class AnthropicProvider implements AIProvider {
     return claude.generateResponse(system, messages, {
       maxTokens: opts?.maxTokens,
       model: opts?.model,
+      apiKeyOverride: opts?.apiKeyOverride,
+      skipModeration: opts?.skipModeration,
     });
   }
 
@@ -65,8 +68,8 @@ class AnthropicProvider implements AIProvider {
  * OpenAI provider — uses OpenAI SDK if configured.
  */
 class OpenAIProvider implements AIProvider {
-  private async getClient() {
-    const apiKey = process.env.OPENAI_API_KEY;
+  private async getClient(apiKeyOverride?: string) {
+    const apiKey = apiKeyOverride || process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error('OPENAI_API_KEY is not set');
     const { default: OpenAI } = await import('openai');
     return new OpenAI({ apiKey });
@@ -82,7 +85,7 @@ class OpenAIProvider implements AIProvider {
       if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
     }
 
-    const client = await this.getClient();
+    const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
     const response = await client.chat.completions.create({
@@ -111,7 +114,7 @@ class OpenAIProvider implements AIProvider {
       if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
     }
 
-    const client = await this.getClient();
+    const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
     const stream = await client.chat.completions.create({
@@ -134,8 +137,8 @@ class OpenAIProvider implements AIProvider {
  * Uses OpenAI-compatible API at api.groq.com.
  */
 class GroqProvider implements AIProvider {
-  private async getClient() {
-    const apiKey = process.env.GROQ_API_KEY;
+  private async getClient(apiKeyOverride?: string) {
+    const apiKey = apiKeyOverride || process.env.GROQ_API_KEY;
     if (!apiKey) throw new Error('GROQ_API_KEY is not set');
     const { default: OpenAI } = await import('openai');
     return new OpenAI({ baseURL: 'https://api.groq.com/openai/v1', apiKey } as ConstructorParameters<typeof OpenAI>[0]);
@@ -151,7 +154,7 @@ class GroqProvider implements AIProvider {
       if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
     }
 
-    const client = await this.getClient();
+    const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
     const response = await client.chat.completions.create({
@@ -180,7 +183,7 @@ class GroqProvider implements AIProvider {
       if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
     }
 
-    const client = await this.getClient();
+    const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 
     const stream = await client.chat.completions.create({
