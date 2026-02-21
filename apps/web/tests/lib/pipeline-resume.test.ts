@@ -64,6 +64,8 @@ describe('markPodcastFailed', () => {
         status: 'FAILED',
         failedAtStatus: 'GENERATING_AUDIO',
         failureReason: null,
+        technicalError: null,
+        failedAt: expect.any(Date),
       },
     });
   });
@@ -112,6 +114,8 @@ describe('markPodcastFailed', () => {
         status: 'FAILED',
         failedAtStatus: 'STITCHING',
         failureReason: null,
+        technicalError: null,
+        failedAt: expect.any(Date),
       },
     });
   });

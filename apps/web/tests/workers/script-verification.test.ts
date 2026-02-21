@@ -542,7 +542,10 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        failureReason: "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
+        technicalError: expect.stringContaining('Verification failed 3/3'),
+      });
     });
 
     it('saves final attempt count and feedback', async () => {

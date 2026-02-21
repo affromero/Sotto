@@ -613,7 +613,9 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow('R2 network error');
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError: 'R2 network error',
+      });
     });
 
     it('marks podcast failed and rethrows on FFmpeg error', async () => {
@@ -621,7 +623,9 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow('FFmpeg: Invalid data found');
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError: 'FFmpeg: Invalid data found',
+      });
     });
 
     it('marks podcast failed and rethrows on STT transcription error', async () => {
@@ -629,7 +633,9 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow('STT quota exceeded');
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError: 'STT quota exceeded',
+      });
     });
 
     it('marks podcast failed and rethrows on R2 upload error', async () => {
@@ -637,7 +643,9 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow('R2 upload failed');
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001');
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        technicalError: 'R2 upload failed',
+      });
     });
 
     it('cleans up tmp directory even when an error occurs', async () => {
