@@ -6,26 +6,20 @@
 # Prerequisites:
 #   iOS:     Xcode 16+, iOS Simulator, Node 20+
 #   Android: Android Studio, Android SDK, emulator or device
+#   Doppler: `doppler setup` (project: sotto, config: dev)
 
 # 1. Install dependencies (from repo root)
 npm install
 
-# 2. Copy env and set your local IP (NOT localhost — simulator/emulator needs a routable address)
-cp apps/mobile/.env.example apps/mobile/.env
-# Edit .env → set EXPO_PUBLIC_API_URL=http://<your-lan-ip>:3000/api
-
-# 3. Start the web backend (the mobile app is a thin client)
+# 2. Start the web backend (the mobile app is a thin client)
 npm run dev
 
-# 4. Start Expo dev server
+# 3. Start Expo dev server (auto-syncs env from Doppler + detects LAN IP)
 npm run mobile:ios       # iOS Simulator
 npm run mobile:android   # Android emulator
-# Or from apps/mobile/:
-# npx expo start --ios
-# npx expo start --android
 ```
 
-**Finding your LAN IP**: `ifconfig en0 | grep 'inet '` — use the `192.168.x.x` address.
+Environment is managed via Doppler. `npm run mobile:ios` auto-runs `mobile:env` which pulls `EXPO_PUBLIC_*` vars and replaces the `LAN_IP` placeholder with your machine's `en0` address. No manual `.env` editing needed.
 
 ## Tech Stack
 
@@ -158,27 +152,28 @@ Model/TTS preferences persist via `expo-secure-store` keys: `sotto:aiModel`, `so
 
 ## Environment Variables
 
-See `.env.example`. Key variables:
+All `EXPO_PUBLIC_*` vars are managed in **Doppler** (project: `sotto`). No manual `.env` editing needed.
 
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `EXPO_PUBLIC_API_URL` | Yes (dev) | `https://sotto.fm/api` | Backend API base URL |
-| `EXPO_PUBLIC_EAS_PROJECT_ID` | For builds | — | EAS Build project ID |
-| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | For prod auth | — | Google native sign-in web client ID (audience for idToken) |
-| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | For prod auth | — | Google native sign-in iOS client ID |
-| `EXPO_PUBLIC_GITHUB_CLIENT_ID` | For prod auth | — | GitHub OAuth client ID |
+`npm run mobile:env` pulls them from Doppler and writes `apps/mobile/.env`. The `LAN_IP` placeholder in `EXPO_PUBLIC_API_URL` is replaced with your machine's `en0` address automatically. This runs as part of `mobile:ios`, `mobile:android`, and `mobile`.
 
-In dev, set `EXPO_PUBLIC_API_URL` to your machine's LAN IP so the simulator/emulator can reach the web backend.
+| Variable | Purpose |
+|----------|---------|
+| `EXPO_PUBLIC_API_URL` | Backend API base URL (LAN IP auto-detected for dev) |
+| `EXPO_PUBLIC_EAS_PROJECT_ID` | EAS Build project ID |
+| `EXPO_PUBLIC_PROJECT_ID` | Expo push notifications project ID |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | Google sign-in web client ID (audience for idToken) |
+| `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | Google sign-in iOS client ID |
+| `EXPO_PUBLIC_GITHUB_CLIENT_ID` | GitHub OAuth client ID |
 
 ## Commands
 
 ```bash
 # ── From repo root ──
-npm run mobile               # Start Expo dev server
-npm run mobile:ios            # Start with iOS Simulator
-npm run mobile:android        # Start with Android emulator
+npm run mobile               # Start Expo dev server (auto-syncs env)
+npm run mobile:ios            # Start with iOS Simulator (auto-syncs env)
+npm run mobile:android        # Start with Android emulator (auto-syncs env)
 npm run mobile:xcode          # Generate native project + open in Xcode
-npm run mobile:env            # Sync EXPO_PUBLIC vars from Doppler
+npm run mobile:env            # Manually sync EXPO_PUBLIC vars from Doppler
 
 # iOS builds (from root)
 npm run mobile:ios:build              # Dev client build (EAS)
@@ -256,7 +251,7 @@ eas update --branch production --message "fix: description"
 
 | Problem | Solution |
 |---------|----------|
-| "Network request failed" | Check `EXPO_PUBLIC_API_URL` — must be LAN IP, not `localhost` |
+| "Network request failed" | Run `npm run mobile:env` to re-sync. Check that `en0` has an IP (`ipconfig getifaddr en0`). If on VPN/ethernet, the auto-detected IP may be wrong — set `EXPO_PUBLIC_API_URL` manually in Doppler dev config |
 | Stale JS bundle | `npx expo start --clear` to reset Metro cache |
 | Fonts not rendering | Check `_layout.tsx` — fonts load async via `useFonts` hook |
 | SecureStore error in simulator | SecureStore works in simulators, but clear app data if tokens get stale |
