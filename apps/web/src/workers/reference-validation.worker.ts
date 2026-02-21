@@ -24,8 +24,9 @@ import {
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
-import { getAiKey } from '@/lib/byok';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { getTierFeatures } from '@/lib/tier-features';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 
@@ -333,14 +334,26 @@ export async function processReferenceValidation(
 
   await job.updateProgress(80);
 
-  // Check source to decide whether to pause for review
-  const podcastRecord = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
-    select: { source: true },
-  });
+  // Check source + tier to decide whether to pause for review
+  const [podcastRecord, isByok, userRecord] = await Promise.all([
+    prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { source: true },
+    }),
+    hasByokKey(userId),
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { plan: true, role: true },
+    }),
+  ]);
+  const tierFeatures = getTierFeatures(userRecord.plan as 'FREE' | 'PRO', isByok, userRecord.role);
 
-  if (podcastRecord.source === 'WEB' || podcastRecord.source === 'IMPORT') {
-    // Pause for user review
+  // Non-WEB/IMPORT sources always auto-approve; for WEB/IMPORT, check tier
+  const isWebOrImport = podcastRecord.source === 'WEB' || podcastRecord.source === 'IMPORT';
+  const shouldAutoApprove = tierFeatures.autoApproveScript || !isWebOrImport;
+
+  if (!shouldAutoApprove) {
+    // Pause for user review (Pro users get script review)
     await prisma.podcast.update({
       where: { id: podcastId },
       data: { status: 'SCRIPT_READY' },
@@ -356,7 +369,7 @@ export async function processReferenceValidation(
 
     logger.info('References validated, paused at SCRIPT_READY for review', { podcastId });
   } else {
-    // Auto-approve for TWITTER/API sources
+    // Auto-approve for TWITTER/API sources or Free users
     await createSegmentsAndQueueAudio(podcastId, turns);
 
     await prisma.podcast.update({

@@ -1411,7 +1411,7 @@ export default function LandingPage() {
             <p className={styles.bodyLgLight}>
               Start free — platform AI and voices included, no card needed. Upgrade to Pro for
               unlimited generation, better AI, voice tracks, and creator analytics. Or bring your
-              own API keys for unlimited voice tracks at cost price.
+              own API keys for unlimited generation at cost price.
             </p>
             <div className={styles.landingProCta}>
               <a href="/pricing" className={styles.landingProCtaPrimary}>

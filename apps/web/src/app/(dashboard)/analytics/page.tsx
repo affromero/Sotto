@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { hasByokKey } from '@/lib/byok';
+import { getTierFeatures } from '@/lib/tier-features';
 import { AnalyticsClient } from './AnalyticsClient';
 import styles from './page.module.css';
 
@@ -16,25 +18,43 @@ export default async function AnalyticsPage() {
     redirect('/auth/login');
   }
 
-  const [dbUser, podcastCount] = await Promise.all([
+  const [dbUser, podcastCount, isByok] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role: true, plan: true },
     }),
     prisma.podcast.count({ where: { userId, deletedAt: null } }),
+    hasByokKey(userId),
   ]);
 
   const role = dbUser?.role || 'USER';
-  const hasAccess = podcastCount > 0 || role === 'ADMIN';
+  const plan = (dbUser?.plan as 'FREE' | 'PRO') || 'FREE';
+  const tierFeatures = getTierFeatures(plan, isByok, role);
 
-  if (!hasAccess) {
+  if (!tierFeatures.analyticsEnabled) {
     return (
       <main className={styles.main}>
         <div className={styles.upgradeCard}>
           <h1 className={styles.upgradeTitle}>Analytics</h1>
           <p className={styles.upgradeText}>
-            Analytics is available for podcast creators. Start creating podcasts to unlock
-            performance analytics, audience insights, and engagement data.
+            Analytics is a Pro feature. Upgrade to Pro to unlock performance analytics,
+            audience insights, and engagement data.
+          </p>
+          <Link href="/pricing" className={styles.upgradeLink}>
+            Upgrade to Pro
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (podcastCount === 0 && role !== 'ADMIN') {
+    return (
+      <main className={styles.main}>
+        <div className={styles.upgradeCard}>
+          <h1 className={styles.upgradeTitle}>Analytics</h1>
+          <p className={styles.upgradeText}>
+            Create your first podcast to see analytics data here.
           </p>
           <Link href="/create" className={styles.upgradeLink}>
             Create a Podcast

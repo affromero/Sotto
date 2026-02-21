@@ -13,6 +13,9 @@ vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
+const mockUserFindUniqueOrThrow = vi.fn();
+const mockInteractionCount = vi.fn();
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
@@ -20,6 +23,10 @@ vi.mock('@/lib/prisma', () => {
     },
     interaction: {
       create: (...args: unknown[]) => mockInteractionCreate(...args),
+      count: (...args: unknown[]) => mockInteractionCount(...args),
+    },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -35,6 +42,30 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+}));
+
+vi.mock('@/lib/auth-guards', () => ({
+  checkSuspension: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 30,
+    maxSpeakers: 4,
+    autoApproveScript: false,
+    webSearchEnabled: true,
+    maxQaInteractions: Infinity,
+    privateAllowed: true,
+    priorityQueue: true,
+    analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
+  }),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  hasByokKey: vi.fn().mockResolvedValue(false),
 }));
 
 // Import route after mocks are set up
@@ -94,6 +125,8 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: 0 });
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockInteractionCount.mockResolvedValue(0);
   });
 
   it('returns 401 when user is not authenticated', async () => {

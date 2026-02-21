@@ -228,8 +228,9 @@ export default function ApiKeysScreen() {
           <>
             <View style={styles.infoCard}>
               <Text style={styles.infoText}>
-                Sotto uses a Bring Your Own Key model. Add your API keys to
-                generate podcasts. Keys are encrypted and never shared.
+                Add your own API keys for unlimited generation, duration, and model
+                choice. Keys are encrypted and never shared. Pro features like private
+                podcasts and analytics require a separate subscription.
               </Text>
             </View>
 

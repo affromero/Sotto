@@ -8,7 +8,7 @@ import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import { checkRateLimit } from '@/lib/redis';
-import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
+import { getTierFeatures } from '@/lib/tier-features';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
@@ -222,7 +222,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         tone: tone || sourcePodcast.discovery?.tone || 'casual',
         durationTarget: Math.min(
           sourcePodcast.discovery?.durationTarget || 10,
-          gate.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES
+          (() => {
+            const tf = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+            return isFinite(tf.maxDurationMinutes) ? tf.maxDurationMinutes : 9999;
+          })()
         ),
         sourceContent: sourcePodcast.script?.markdown || null,
       },

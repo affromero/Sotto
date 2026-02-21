@@ -38,6 +38,9 @@ vi.mock('@/lib/prisma', () => {
     segment: {
       create: (...args: unknown[]) => mockPrismaSegmentCreate(...args),
     },
+    user: {
+      findUniqueOrThrow: vi.fn().mockResolvedValue({ plan: 'PRO', role: 'USER' }),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -105,6 +108,24 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/tier-features', () => ({
+  getTierFeatures: vi.fn().mockReturnValue({
+    maxDurationMinutes: 30,
+    maxSpeakers: 4,
+    autoApproveScript: false,
+    webSearchEnabled: true,
+    maxQaInteractions: Infinity,
+    privateAllowed: true,
+    priorityQueue: true,
+    analyticsEnabled: true,
+    voiceTracksEnabled: true,
+    maxVoiceTracks: 3,
+    voiceCloningEnabled: true,
+  }),
+  getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
 vi.mock('@/lib/free-tier-config', () => ({

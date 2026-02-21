@@ -123,10 +123,10 @@ export async function POST(request: NextRequest) {
     gate.isByokUser
   );
 
-  // Gate private podcast creation
-  if (parsed.data.visibility === 'PRIVATE' && !tierFeatures.privateAllowed) {
+  // Gate private and unlisted podcast creation
+  if ((parsed.data.visibility === 'PRIVATE' || parsed.data.visibility === 'UNLISTED') && !tierFeatures.privateAllowed) {
     return NextResponse.json(
-      { error: 'Private podcasts require Pro or BYOK. Upgrade to Pro to create private content.' },
+      { error: 'Private and unlisted podcasts require a Pro subscription.' },
       { status: 403 }
     );
   }

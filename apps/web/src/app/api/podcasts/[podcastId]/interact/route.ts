@@ -5,6 +5,8 @@ import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, addJob, JobType } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
+import { getTierFeatures } from '@/lib/tier-features';
+import { hasByokKey } from '@/lib/byok';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -27,6 +29,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { error: 'Rate limit exceeded: max 60 interactions per hour.' },
       { status: 429 }
     );
+  }
+
+  // Check Q&A interaction limit based on tier
+  const [user, isByok] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.user.id },
+      select: { plan: true, role: true },
+    }),
+    hasByokKey(session.user.id),
+  ]);
+  const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+
+  if (isFinite(tierFeatures.maxQaInteractions)) {
+    const existingCount = await prisma.interaction.count({
+      where: { userId: session.user.id, podcastId },
+    });
+    if (existingCount >= tierFeatures.maxQaInteractions) {
+      return NextResponse.json(
+        { error: `Q&A limit reached (${tierFeatures.maxQaInteractions} per podcast). Upgrade to Pro for unlimited Q&A.` },
+        { status: 403 }
+      );
+    }
   }
 
   const podcast = await prisma.podcast.findUnique({

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
 import { Badge } from '@/components/ui/Badge';
 import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
@@ -169,6 +170,9 @@ export default async function DashboardPage() {
     getFreeTierStatus(userId),
   ]);
 
+  const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
+  const tierFeatures = getTierFeatures(plan, freeTier.isByokUser, userRole);
+
   const displayName = user?.name || 'there';
   const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
   const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
@@ -305,7 +309,7 @@ export default async function DashboardPage() {
                     </div>
                     <div className={styles.miniGradientBody}>
                       <p className={styles.miniGradientTopic}>{podcast.topic}</p>
-                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={freeTier.isByokUser || freeTier.isProUser} />
+                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={tierFeatures.privateAllowed} />
                       <div className={styles.miniGradientMeta}>
                         <span>{formatDuration(podcast.duration)}</span>
                         <span>{formatDate(podcast.createdAt)}</span>

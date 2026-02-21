@@ -67,10 +67,11 @@ export default function SupportPage() {
             <div className={styles.faqItem}>
               <h3>What are BYOK keys and why do I need them?</h3>
               <p>
-                Sotto uses a &quot;Bring Your Own Key&quot; model. You provide API keys for AI
-                providers (like Anthropic or OpenAI) and text-to-speech providers (like
-                ElevenLabs). This keeps Sotto free — you pay providers directly for what
-                you use. Add your keys in Settings &gt; API Keys.
+                BYOK (Bring Your Own Key) removes daily generation limits and lets you
+                use your own AI and TTS providers. You provide API keys for providers like
+                Anthropic, OpenAI, or ElevenLabs — you pay them directly for what you use.
+                Pro features like private podcasts, analytics, and voice tracks require a
+                Pro subscription separately. Add your keys in Settings &gt; API Keys.
               </p>
             </div>
             <div className={styles.faqItem}>

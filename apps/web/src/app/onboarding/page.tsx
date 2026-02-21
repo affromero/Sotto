@@ -94,7 +94,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
               <h2 className={styles.upgradePathTitle}>Bring your own keys (free)</h2>
               <p className={styles.upgradePathDesc}>
                 Use your own Anthropic / OpenAI + TTS keys. Unlimited generation at cost price.
-                All features unlocked.
+                Unlimited generation at cost price. Pair with Pro for private podcasts, analytics, and more.
               </p>
               <KeySetupForm
                 initialAiConfigured={aiConfigured}

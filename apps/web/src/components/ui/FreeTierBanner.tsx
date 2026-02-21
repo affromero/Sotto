@@ -64,9 +64,70 @@ export function FreeTierBanner({
     localStorage.setItem(DISMISS_KEY, Date.now().toString());
   }, []);
 
-  // BYOK and Pro users don't need this banner
-  if (isByokUser || isProUser) return null;
+  // Pro users don't need this banner
+  if (isProUser) return null;
   if (dismissed) return null;
+
+  // BYOK+Free users see a subtle Pro upsell
+  if (isByokUser) {
+    return (
+      <div
+        className={`${styles.banner} ${styles.info}`}
+        role="status"
+        aria-label="Pro upgrade suggestion"
+      >
+        <div className={styles.content}>
+          <div>
+            <p className={styles.title}>Unlimited generation active</p>
+            <p className={styles.description}>
+              Upgrade to Pro for private podcasts, analytics, voice tracks, and priority queue.
+            </p>
+          </div>
+          <div className={styles.actions}>
+            <Link href="/pricing" className={styles.link}>
+              Upgrade to Pro
+              <svg
+                className={styles.linkArrow}
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </Link>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={styles.dismissButton}
+          onClick={handleDismiss}
+          aria-label="Dismiss banner"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
 
   const exhausted = dailyUsed >= dailyLimit;
   const variant = exhausted ? 'exhausted' : dailyUsed >= dailyLimit - 1 ? 'warning' : 'info';

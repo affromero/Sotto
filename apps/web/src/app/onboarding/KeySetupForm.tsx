@@ -47,8 +47,8 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
         </svg>
         <p className={styles.tipText}>
           <span className={styles.tipHighlight}>AI is free for everyone</span>
-          {' '}&mdash; you only need a voice provider key for unlimited generation. One OpenAI key
-          covers both if you want to bring your own AI too.
+          {' '}&mdash; add a voice provider key to remove the daily generation cap. BYOK gives you
+          unlimited generation and model choice. Pro adds private podcasts, analytics, and more.
         </p>
       </div>
 

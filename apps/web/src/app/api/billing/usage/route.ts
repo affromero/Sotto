@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { LIMITS, FREE_TIER_MAX_DURATION_MINUTES } from '@/lib/stripe';
-import { listByokProviders, listAiProviders } from '@/lib/byok';
+import { LIMITS } from '@/lib/stripe';
+import { listByokProviders, listAiProviders, hasByokKey } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
+import { getTierFeatures } from '@/lib/tier-features';
 
 export async function GET(_request: NextRequest) {
   try {
@@ -12,15 +13,22 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [podcastCount, ttsKeys, aiKeys, freeTier] = await Promise.all([
+    const [podcastCount, ttsKeys, aiKeys, freeTier, user, isByok] = await Promise.all([
       prisma.podcast.count({ where: { userId: session.user.id } }),
       listByokProviders(session.user.id),
       listAiProviders(session.user.id),
       getFreeTierStatus(session.user.id),
+      prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { plan: true, role: true },
+      }),
+      hasByokKey(session.user.id),
     ]);
 
+    const features = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+
     return NextResponse.json({
-      tier: 'FREE',
+      tier: user.plan,
       podcastCount,
       byok: {
         ai: aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
@@ -35,10 +43,10 @@ export async function GET(_request: NextRequest) {
         ttsQuotas: freeTier.ttsQuotas,
       },
       limits: {
-        maxDurationMinutes: freeTier.isByokUser ? LIMITS.maxDurationMinutes : FREE_TIER_MAX_DURATION_MINUTES,
+        maxDurationMinutes: isFinite(features.maxDurationMinutes) ? features.maxDurationMinutes : 9999,
         maxVoiceClones: LIMITS.maxVoiceClones,
         canDownload: LIMITS.canDownload,
-        canMakePrivate: freeTier.isByokUser,
+        canMakePrivate: features.privateAllowed,
         canExportPdf: LIMITS.canExportPdf,
         hasPremiumSfx: LIMITS.hasPremiumSfx,
       },
