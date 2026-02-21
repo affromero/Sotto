@@ -188,13 +188,15 @@ export default async function DashboardPage() {
 
   return (
     <main className={styles.main}>
-      <FreeTierBanner
-        dailyUsed={freeTier.dailyUsed}
-        dailyLimit={freeTier.dailyLimit}
-        isByokUser={freeTier.isByokUser}
-        isProUser={freeTier.isProUser}
-        resetInSeconds={freeTier.resetInSeconds}
-      />
+      {userRole !== 'ADMIN' && userRole !== 'SYSTEM' && (
+        <FreeTierBanner
+          dailyUsed={freeTier.dailyUsed}
+          dailyLimit={freeTier.dailyLimit}
+          isByokUser={freeTier.isByokUser}
+          isProUser={freeTier.isProUser}
+          resetInSeconds={freeTier.resetInSeconds}
+        />
+      )}
 
       <section className={styles.header}>
         <h1 className={styles.greeting}>Welcome back, {displayName}</h1>
