@@ -14,7 +14,14 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
   const { podcastId } = await params;
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { title: true, topic: true, audioUrl: true, user: { select: { name: true } } },
+    select: {
+      title: true,
+      topic: true,
+      audioUrl: true,
+      defaultVoiceTrackId: true,
+      voiceTracks: { where: { status: 'READY' }, select: { id: true, audioUrl: true } },
+      user: { select: { name: true } },
+    },
   });
 
   if (!podcast) return { title: 'Podcast Not Found' };
@@ -32,7 +39,13 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       type: 'article',
       url: podcastUrl,
       siteName: 'Sotto',
-      ...(podcast.audioUrl ? { audio: podcast.audioUrl } : {}),
+      ...(() => {
+        const defaultTrack = podcast.defaultVoiceTrackId
+          ? podcast.voiceTracks.find(t => t.id === podcast.defaultVoiceTrackId)
+          : null;
+        const ogAudioUrl = defaultTrack?.audioUrl || podcast.audioUrl;
+        return ogAudioUrl ? { audio: ogAudioUrl } : {};
+      })(),
     },
     twitter: {
       card: 'summary_large_image',
@@ -158,6 +171,19 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           createdAt: true,
         },
       },
+      voiceTracks: {
+        orderBy: { createdAt: 'asc' as const },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          audioUrl: true,
+          duration: true,
+          ttsProvider: true,
+          failureReason: true,
+          voices: { select: { speaker: true, voiceId: true } },
+        },
+      },
     },
   });
 
@@ -252,6 +278,20 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       interactionId: v.interactionId,
       createdAt: v.createdAt.toISOString(),
     })),
+    voiceTracks: (isOwner
+      ? podcast.voiceTracks
+      : podcast.voiceTracks.filter(t => t.status === 'READY')
+    ).map(t => ({
+      id: t.id,
+      name: t.name,
+      status: t.status,
+      audioUrl: t.audioUrl,
+      duration: t.duration,
+      ttsProvider: t.ttsProvider,
+      failureReason: t.failureReason,
+      voices: t.voices,
+    })),
+    defaultVoiceTrackId: podcast.defaultVoiceTrackId,
     isLiked,
     isSaved,
   };
