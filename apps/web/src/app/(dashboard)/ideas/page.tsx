@@ -1,11 +1,11 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { IdeasList } from './IdeasList';
+import { LibraryClient } from './LibraryClient';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'My Library' };
 
-export default async function IdeasPage() {
+export default async function LibraryPage() {
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -13,7 +13,7 @@ export default async function IdeasPage() {
     return null;
   }
 
-  const [ideas, podcastIdeas] = await Promise.all([
+  const [ideas, podcastIdeas, savedCount, collectionsCount, queueCount] = await Promise.all([
     prisma.savedIdea.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
@@ -37,6 +37,9 @@ export default async function IdeasPage() {
         createdAt: true,
       },
     }),
+    prisma.save.count({ where: { userId } }),
+    prisma.collection.count({ where: { userId } }),
+    prisma.listeningQueue.count({ where: { userId } }),
   ]);
 
   const serializedIdeas = ideas.map((idea) => ({
@@ -49,5 +52,16 @@ export default async function IdeasPage() {
     createdAt: idea.createdAt.toISOString(),
   }));
 
-  return <IdeasList ideas={serializedIdeas} podcastIdeas={serializedPodcastIdeas} />;
+  return (
+    <LibraryClient
+      ideas={serializedIdeas}
+      podcastIdeas={serializedPodcastIdeas}
+      counts={{
+        ideas: ideas.length + podcastIdeas.length,
+        saved: savedCount,
+        collections: collectionsCount,
+        queue: queueCount,
+      }}
+    />
+  );
 }
