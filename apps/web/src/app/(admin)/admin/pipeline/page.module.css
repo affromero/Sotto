@@ -99,10 +99,9 @@
 .errorCell {
   font-family: monospace;
   font-size: 12px;
-  max-width: 400px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 600px;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .podcastLink {
