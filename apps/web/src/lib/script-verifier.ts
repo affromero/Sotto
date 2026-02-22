@@ -32,7 +32,6 @@ export interface VerificationVerdict {
 }
 
 const UNRELIABLE_DOMAINS = [
-  'wikipedia.org',
   'medium.com',
   'substack.com',
   'reddit.com',
@@ -188,18 +187,24 @@ Note: The script may contain inline audio tags like [laughs], [sighs], [whispers
    - REQUIRES_SOURCING: specific statistics, study results, historical claims, technical details, quotes, dates, biographical claims (a person's title, affiliation, institution, credentials, professional role). Any statement of the form "X is a professor/CEO/researcher/expert at Y" is a factual claim that REQUIRES_SOURCING — not common knowledge.
 3. For each REQUIRES_SOURCING claim:
    - Check if it has citation markers [N] in the text
-   - Check if the cited references are from reliable sources (NOT Wikipedia, personal blogs, social media, content farms)
+   - Check if the cited references are from reliable sources (NOT personal blogs, social media, content farms)
    - Assess whether 3+ independent, reputable sources could verify the claim
-4. Flag any claims backed only by unreliable sources (Wikipedia, Medium, Substack, Reddit, Quora, Twitter/X, Facebook, Blogspot, WordPress free hosted, Tumblr, BuzzFeed, eHow, wikiHow, About.com)
+4. Flag any claims backed only by unreliable sources (Medium, Substack, Reddit, Quora, Twitter/X, Facebook, Blogspot, WordPress free hosted, Tumblr, BuzzFeed, eHow, wikiHow, About.com)
 
-## Reliable Sources Include:
+## Source Reliability Tiers (prefer higher tiers):
+**Tier 1 — Strongest:**
 - Peer-reviewed journals (Nature, Science, PNAS, Lancet, etc.)
 - Published books from academic/major publishers
 - Government reports (.gov domains)
+- Official organization reports (WHO, UNESCO, etc.)
+
+**Tier 2 — Strong:**
 - Academic institutions (.edu, .ac.* domains)
 - Established news outlets (Reuters, AP, BBC, NYT, etc.)
 - ArXiv preprints (acceptable for recent research)
-- Official organization reports (WHO, UNESCO, etc.)
+
+**Tier 3 — Acceptable for established facts:**
+- Wikipedia — acceptable for well-established historical facts, dates, and definitions. Do NOT flag Wikipedia as unreliable. However, for contested claims, recent statistics, or cutting-edge research, prefer Tier 1–2 sources.
 
 ## Passing Criteria:
 - Every non-obvious factual claim must have at least 1 citation
