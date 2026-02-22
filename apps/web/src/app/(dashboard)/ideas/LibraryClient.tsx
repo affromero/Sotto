@@ -3,7 +3,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { Lightbulb, Bookmark, ListMusic, ListOrdered } from 'lucide-react';
 import { IdeasTab } from './tabs/IdeasTab';
+import { SavedTab } from './tabs/SavedTab';
 import type { SerializedSavedIdea, SerializedPodcastIdea } from './tabs/IdeasTab';
+import type { PodcastSummary } from '@/types/podcast';
 import styles from './LibraryClient.module.css';
 
 type TabId = 'ideas' | 'saved' | 'collections' | 'queue';
@@ -31,7 +33,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
   const [activeTab, setActiveTab] = useState<TabId>('ideas');
 
   // Lazy-load state for non-default tabs
-  const [savedData, setSavedData] = useState<unknown[] | null>(null);
+  const [savedData, setSavedData] = useState<PodcastSummary[] | null>(null);
   const [savedLoading, setSavedLoading] = useState(false);
   const savedLoadedRef = useRef(false);
 
@@ -129,7 +131,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
               <span>Loading saved podcasts...</span>
             </div>
           ) : savedData !== null ? (
-            <div className={styles.placeholder}>Saved tab content</div>
+            <SavedTab podcasts={savedData} />
           ) : null
         )}
 
