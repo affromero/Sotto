@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Sparkles, RefreshCw, Search } from 'lucide-react';
-import type { TasteQuestion } from '@sotto/shared';
+import type { TasteQuestion, InspireSection, NewsTimeRange } from '@sotto/shared';
+import { INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS } from '@sotto/shared';
 import type { PodcastSummary } from '@/types/podcast';
 import { Spinner } from '@/components/ui/Spinner';
 import { InspireQuiz } from './InspireQuiz';
@@ -15,22 +16,7 @@ interface InspireMeProps {
   onSelectTopic: (topic: string) => void;
 }
 
-type Section = 'forYou' | 'trending' | 'news';
-type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
-
-const SECTION_LABELS: Record<Section, string> = {
-  forYou: 'For You',
-  trending: 'Trending',
-  news: 'In the News',
-};
-
-const TIME_RANGE_LABELS: Record<NewsTimeRange, string> = {
-  '1h': 'Past hour',
-  '12h': 'Past 12 hours',
-  '24h': 'Past 24 hours',
-  '1w': 'Past week',
-  '1m': 'Past month',
-};
+type Section = InspireSection;
 
 function buildUrl(params: Record<string, string | undefined>): string {
   const url = new URLSearchParams();
@@ -54,10 +40,12 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     forYou: false,
     trending: false,
     news: false,
+    curiosity: false,
   });
   const [forYouQuestions, setForYouQuestions] = useState<TasteQuestion[]>([]);
   const [trendingPodcasts, setTrendingPodcasts] = useState<PodcastSummary[]>([]);
   const [newsQuestions, setNewsQuestions] = useState<TasteQuestion[]>([]);
+  const [curiosityQuestions, setCuriosityQuestions] = useState<TasteQuestion[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [newsTimeRange, setNewsTimeRange] = useState<NewsTimeRange>('1w');
   const [isLoadingNews, setIsLoadingNews] = useState(false);
@@ -67,7 +55,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   const topicInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const isAnyLoading = sectionsLoading.forYou || sectionsLoading.trending || sectionsLoading.news;
+  const isAnyLoading = sectionsLoading.forYou || sectionsLoading.trending || sectionsLoading.news || sectionsLoading.curiosity;
 
   const fetchAll = useCallback((topic?: string) => {
     // Abort any in-flight request
@@ -75,7 +63,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setSectionsLoading({ forYou: true, trending: true, news: true });
+    setSectionsLoading({ forYou: true, trending: true, news: true, curiosity: true });
     setFetchError(false);
 
     const url = buildUrl({ topic });
@@ -92,7 +80,8 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
           setForYouQuestions(data.forYou ?? []);
           setTrendingPodcasts(data.trending ?? []);
           setNewsQuestions(data.news ?? []);
-          setSectionsLoading({ forYou: false, trending: false, news: false });
+          setCuriosityQuestions(data.curiosity ?? []);
+          setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
           return;
         }
 
@@ -121,7 +110,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
               const event: SseEvent = JSON.parse(jsonStr);
 
               if (event.done) {
-                setSectionsLoading({ forYou: false, trending: false, news: false });
+                setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
                 return;
               }
 
@@ -136,6 +125,9 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                   case 'news':
                     setNewsQuestions(event.data as TasteQuestion[]);
                     break;
+                  case 'curiosity':
+                    setCuriosityQuestions(event.data as TasteQuestion[]);
+                    break;
                 }
                 setSectionsLoading((prev) => ({ ...prev, [event.section!]: false }));
               }
@@ -146,12 +138,12 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         }
 
         // Stream ended without explicit done event
-        setSectionsLoading({ forYou: false, trending: false, news: false });
+        setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
       })
       .catch((err) => {
         if ((err as Error).name === 'AbortError') return;
         setFetchError(true);
-        setSectionsLoading({ forYou: false, trending: false, news: false });
+        setSectionsLoading({ forYou: false, trending: false, news: false, curiosity: false });
       });
 
     return () => controller.abort();
@@ -178,7 +170,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
   );
 
   const handleLoadMore = useCallback(
-    async (section: 'forYou' | 'news', timeRange?: NewsTimeRange) => {
+    async (section: 'forYou' | 'news' | 'curiosity', timeRange?: NewsTimeRange) => {
       setIsLoadingMore(true);
       try {
         const res = await fetch(buildUrl({ section, timeRange, topic: activeTopic }));
@@ -188,6 +180,8 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
           setForYouQuestions(data.forYou);
         } else if (section === 'news' && data.news) {
           setNewsQuestions(data.news);
+        } else if (section === 'curiosity' && data.curiosity) {
+          setCuriosityQuestions(data.curiosity);
         }
       } finally {
         setIsLoadingMore(false);
@@ -246,7 +240,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
 
         {/* Tabs + inline topic filter */}
         <div className={styles.tabs} role="tablist" aria-label="Inspiration sections">
-          {(Object.keys(SECTION_LABELS) as Section[]).map((sec) => (
+          {(Object.keys(INSPIRE_SECTION_LABELS) as Section[]).map((sec) => (
             <button
               key={sec}
               type="button"
@@ -255,7 +249,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
               className={`${styles.tab} ${activeSection === sec ? styles.tabActive : ''} ${sectionsLoading[sec] && activeSection !== sec ? styles.tabLoading : ''}`}
               onClick={() => setActiveSection(sec)}
             >
-              {SECTION_LABELS[sec]}
+              {INSPIRE_SECTION_LABELS[sec]}
             </button>
           ))}
 
@@ -317,9 +311,11 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                   ? 'Searching for news...'
                   : activeSection === 'trending'
                     ? 'Loading trending podcasts...'
-                    : activeTopic
-                      ? `Finding ideas about "${activeTopic}"...`
-                      : 'Finding ideas for you...'}
+                    : activeSection === 'curiosity'
+                      ? 'Discovering curiosities...'
+                      : activeTopic
+                        ? `Finding ideas about "${activeTopic}"...`
+                        : 'Finding ideas for you...'}
               </p>
             </div>
           ) : activeSection === 'trending' ? (
@@ -340,9 +336,9 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                   onChange={(e) => handleTimeRangeChange(e.target.value as NewsTimeRange)}
                   disabled={isLoadingNews}
                 >
-                  {(Object.keys(TIME_RANGE_LABELS) as NewsTimeRange[]).map((range) => (
+                  {(Object.keys(NEWS_TIME_RANGE_LABELS) as NewsTimeRange[]).map((range) => (
                     <option key={range} value={range}>
-                      {TIME_RANGE_LABELS[range]}
+                      {NEWS_TIME_RANGE_LABELS[range]}
                     </option>
                   ))}
                 </select>
@@ -362,6 +358,14 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
                 />
               )}
             </>
+          ) : activeSection === 'curiosity' ? (
+            <InspireQuiz
+              key={`curiosity-${curiosityQuestions[0]?.id ?? 'empty'}`}
+              questions={curiosityQuestions}
+              onSelectTopic={handleSelectTopic}
+              onLoadMore={() => handleLoadMore('curiosity')}
+              isLoadingMore={isLoadingMore}
+            />
           ) : (
             <InspireQuiz
               key={`forYou-${forYouQuestions[0]?.id ?? 'empty'}`}

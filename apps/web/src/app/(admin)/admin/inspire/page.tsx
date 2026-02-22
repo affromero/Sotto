@@ -15,8 +15,11 @@ async function getInspireStats(days: number) {
     forYouAvg,
     newsCount,
     newsAvg,
+    curiosityCount,
+    curiosityAvg,
     forYouDaily,
     newsDaily,
+    curiosityDaily,
   ] = await Promise.all([
     prisma.apiUsageLog.count({
       where: { category: 'inspire_foryou', createdAt: { gte: since } },
@@ -32,6 +35,13 @@ async function getInspireStats(days: number) {
       where: { category: 'inspire_news', createdAt: { gte: since }, durationMs: { not: null } },
       _avg: { durationMs: true },
     }),
+    prisma.apiUsageLog.count({
+      where: { category: 'inspire_curiosity', createdAt: { gte: since } },
+    }),
+    prisma.apiUsageLog.aggregate({
+      where: { category: 'inspire_curiosity', createdAt: { gte: since }, durationMs: { not: null } },
+      _avg: { durationMs: true },
+    }),
     prisma.$queryRaw<Array<{ day: Date; calls: bigint; avg_ms: number }>>`
       SELECT DATE_TRUNC('day', "createdAt") AS day,
              COUNT(*)::bigint AS calls,
@@ -47,13 +57,22 @@ async function getInspireStats(days: number) {
              AVG("durationMs")::float AS avg_ms
       FROM "ApiUsageLog"
       WHERE category = 'inspire_news' AND "createdAt" >= ${since} AND "durationMs" IS NOT NULL
+      GROUP BY DATE_TRUNC('day', "createdAt")
+      ORDER BY day ASC
+    `,
+    prisma.$queryRaw<Array<{ day: Date; calls: bigint; avg_ms: number }>>`
+      SELECT DATE_TRUNC('day', "createdAt") AS day,
+             COUNT(*)::bigint AS calls,
+             AVG("durationMs")::float AS avg_ms
+      FROM "ApiUsageLog"
+      WHERE category = 'inspire_curiosity' AND "createdAt" >= ${since} AND "durationMs" IS NOT NULL
       GROUP BY DATE_TRUNC('day', "createdAt")
       ORDER BY day ASC
     `,
   ]);
 
   // P95 latency via raw SQL
-  const [forYouP95, newsP95] = await Promise.all([
+  const [forYouP95, newsP95, curiosityP95] = await Promise.all([
     prisma.$queryRaw<Array<{ p95: number }>>`
       SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::float AS p95
       FROM "ApiUsageLog"
@@ -63,6 +82,11 @@ async function getInspireStats(days: number) {
       SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::float AS p95
       FROM "ApiUsageLog"
       WHERE category = 'inspire_news' AND "createdAt" >= ${since} AND "durationMs" IS NOT NULL
+    `,
+    prisma.$queryRaw<Array<{ p95: number }>>`
+      SELECT PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "durationMs")::float AS p95
+      FROM "ApiUsageLog"
+      WHERE category = 'inspire_curiosity' AND "createdAt" >= ${since} AND "durationMs" IS NOT NULL
     `,
   ]);
 
@@ -71,6 +95,7 @@ async function getInspireStats(days: number) {
   const cacheStats: Record<string, { hits: number; misses: number }> = {
     forYou: { hits: 0, misses: 0 },
     news: { hits: 0, misses: 0 },
+    curiosity: { hits: 0, misses: 0 },
     trending: { hits: 0, misses: 0 },
   };
 
@@ -78,7 +103,7 @@ async function getInspireStats(days: number) {
   const counterPromises: Promise<void>[] = [];
   for (let i = 0; i < lookbackDays; i++) {
     const date = subDays(today, i).toISOString().split('T')[0];
-    for (const section of ['forYou', 'news', 'trending'] as const) {
+    for (const section of ['forYou', 'news', 'curiosity', 'trending'] as const) {
       counterPromises.push(
         (async () => {
           const [hits, misses] = await Promise.all([
@@ -114,6 +139,16 @@ async function getInspireStats(days: number) {
         avgMs: Math.round(d.avg_ms),
       })),
     },
+    curiosity: {
+      totalCalls: curiosityCount,
+      avgLatencyMs: Math.round(curiosityAvg._avg.durationMs ?? 0),
+      p95LatencyMs: Math.round(curiosityP95[0]?.p95 ?? 0),
+      daily: curiosityDaily.map((d) => ({
+        day: d.day.toISOString().split('T')[0],
+        calls: Number(d.calls),
+        avgMs: Math.round(d.avg_ms),
+      })),
+    },
     cache: Object.entries(cacheStats).map(([section, { hits, misses }]) => {
       const total = hits + misses;
       return {
@@ -140,6 +175,7 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
 
   const maxForYouCalls = Math.max(...stats.forYou.daily.map((d) => d.calls), 1);
   const maxNewsCalls = Math.max(...stats.news.daily.map((d) => d.calls), 1);
+  const maxCuriosityCalls = Math.max(...stats.curiosity.daily.map((d) => d.calls), 1);
 
   return (
     <div className={styles.container}>
@@ -188,6 +224,18 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
           <span className={styles.cardLabel}>News P95 Latency</span>
           <span className={styles.cardValue}>{formatMs(stats.news.p95LatencyMs)}</span>
         </div>
+        <div className={styles.card}>
+          <span className={styles.cardLabel}>Curiosity Calls</span>
+          <span className={styles.cardValue}>{stats.curiosity.totalCalls.toLocaleString()}</span>
+        </div>
+        <div className={styles.card}>
+          <span className={styles.cardLabel}>Curiosity Avg Latency</span>
+          <span className={styles.cardValue}>{formatMs(stats.curiosity.avgLatencyMs)}</span>
+        </div>
+        <div className={styles.card}>
+          <span className={styles.cardLabel}>Curiosity P95 Latency</span>
+          <span className={styles.cardValue}>{formatMs(stats.curiosity.p95LatencyMs)}</span>
+        </div>
       </div>
 
       {/* Daily charts — two columns */}
@@ -228,6 +276,31 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
                   <div
                     className={styles.chartBarFillAccent}
                     style={{ height: `${(d.calls / maxNewsCalls) * 100}%` }}
+                    title={`${d.day}: ${d.calls} calls, avg ${formatMs(d.avgMs)}`}
+                  />
+                  <span className={styles.chartLabel}>
+                    {new Date(d.day + 'T00:00:00').toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Curiosity — Daily Calls</h2>
+          {stats.curiosity.daily.length === 0 ? (
+            <p className={styles.empty}>No Curiosity data yet.</p>
+          ) : (
+            <div className={styles.chartContainer} role="img" aria-label="Curiosity daily calls bar chart">
+              {stats.curiosity.daily.map((d) => (
+                <div key={d.day} className={styles.chartBar}>
+                  <div
+                    className={styles.chartBarFill}
+                    style={{ height: `${(d.calls / maxCuriosityCalls) * 100}%` }}
                     title={`${d.day}: ${d.calls} calls, avg ${formatMs(d.avgMs)}`}
                   />
                   <span className={styles.chartLabel}>
