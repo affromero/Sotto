@@ -17,7 +17,7 @@ export default async function CreatePage() {
   const gate = await checkGenerationGate(session.user.id);
 
   if (!gate.allowed && gate.reason === 'no_provider') {
-    redirect('/onboarding?step=keys');
+    redirect('/onboarding?step=keys&reason=no_provider');
   }
 
   // Daily limit reached — stay on create page with upgrade prompt (don't redirect)
