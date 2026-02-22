@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { IdeasList } from './IdeasList';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Saved Ideas' };
+export const metadata = { title: 'My Library' };
 
 export default async function IdeasPage() {
   const session = await auth();
