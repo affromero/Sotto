@@ -4,9 +4,20 @@ import { useCallback, useRef, useState } from 'react';
 import { Lightbulb, Bookmark, ListMusic, ListOrdered } from 'lucide-react';
 import { IdeasTab } from './tabs/IdeasTab';
 import { SavedTab } from './tabs/SavedTab';
+import { CollectionsTab } from './tabs/CollectionsTab';
 import type { SerializedSavedIdea, SerializedPodcastIdea } from './tabs/IdeasTab';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './LibraryClient.module.css';
+
+interface CollectionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  isPublic: boolean;
+  podcastCount: number;
+  followerCount: number;
+  createdAt: string;
+}
 
 type TabId = 'ideas' | 'saved' | 'collections' | 'queue';
 
@@ -37,7 +48,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
   const [savedLoading, setSavedLoading] = useState(false);
   const savedLoadedRef = useRef(false);
 
-  const [collectionsData, setCollectionsData] = useState<unknown[] | null>(null);
+  const [collectionsData, setCollectionsData] = useState<CollectionSummary[] | null>(null);
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const collectionsLoadedRef = useRef(false);
 
@@ -142,7 +153,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
               <span>Loading collections...</span>
             </div>
           ) : collectionsData !== null ? (
-            <div className={styles.placeholder}>Collections tab content</div>
+            <CollectionsTab collections={collectionsData} />
           ) : null
         )}
 
