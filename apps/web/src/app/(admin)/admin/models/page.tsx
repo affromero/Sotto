@@ -152,6 +152,7 @@ export default async function AdminModelsPage() {
         aiProviders={aiProviders}
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
+        kittenConfigured={!!process.env.KITTENTTS_URL}
       />
     </div>
   );

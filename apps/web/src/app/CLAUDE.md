@@ -124,6 +124,7 @@
 | `/api/feedback` | POST/GET | No | Feedback |
 | `/api/access` | GET/POST | No | Password gate |
 | `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, config, costs, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, traffic-report) |
+| `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 
 ## Route Groups
 
