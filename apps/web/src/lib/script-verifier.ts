@@ -239,8 +239,18 @@ Set hasMisattribution to true if:
 - The script states a year that doesn't match the reference's year
 - The script names specific authors not listed in the reference's authors array
 
-## This is attempt ${attemptNumber} of 3.
-${previousFeedback ? `\n## Previous Feedback (that the script was revised to address):\n${previousFeedback}` : ''}
+## This is verification attempt ${attemptNumber} of 3.
+${previousFeedback ? `
+## Previous Feedback (for context only — the script has been revised since):
+The following issues were flagged in the previous round. The script was revised to address them.
+Your job is to evaluate the CURRENT script on its own merits:
+- If a previously flagged issue has been corrected, do NOT re-flag it.
+- If a previously flagged issue still exists in the current text, flag it again with fresh evidence.
+- Turn indices may have shifted after revision — match claims by their content, not by turn number.
+- Do not assume an issue persists just because it was flagged before — verify against the actual current text.
+
+Previous feedback for reference:
+${previousFeedback}` : ''}
 
 ## Output Format:
 Return a JSON object:
