@@ -23,7 +23,10 @@ async function getPodcasts(search: string | undefined, status: string | undefine
   const where: Record<string, any> = {};
 
   if (search) {
-    where.title = { contains: search, mode: 'insensitive' };
+    where.OR = [
+      { title: { contains: search, mode: 'insensitive' } },
+      { id: search },
+    ];
   }
 
   if (status && status !== 'ALL') {

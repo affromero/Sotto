@@ -214,6 +214,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   }
 
   const isOwner = userId === podcast.userId;
+  const isAdmin = session?.user?.role === 'ADMIN';
   let canMakePrivate: boolean | undefined;
   if (isOwner && userId) {
     const freeTier = await getFreeTierStatus(userId);
@@ -305,7 +306,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
       </div>
     </main>
   );

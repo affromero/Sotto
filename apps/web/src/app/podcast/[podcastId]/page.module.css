@@ -168,6 +168,20 @@
   color: var(--color-error);
 }
 
+.adminLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.adminLink:hover {
+  text-decoration: underline;
+}
+
 .failedActions {
   display: flex;
   align-items: center;
