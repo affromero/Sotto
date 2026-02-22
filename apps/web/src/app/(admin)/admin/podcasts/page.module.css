@@ -213,7 +213,14 @@
 }
 
 .errorTechnicalWrapper {
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.errorActions {
+  display: flex;
+  gap: var(--spacing-xs);
 }
 
 .errorTechnical {
@@ -231,9 +238,6 @@
 }
 
 .copyButton {
-  position: absolute;
-  top: var(--spacing-xs);
-  right: var(--spacing-xs);
   appearance: none;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -244,13 +248,31 @@
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
-  z-index: 1;
 }
 
 .copyButton:hover {
   background: var(--color-primary);
   color: white;
   border-color: var(--color-primary);
+}
+
+.githubIssueButton {
+  appearance: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.githubIssueButton:hover {
+  background: #24292f;
+  color: white;
+  border-color: #24292f;
 }
 
 /* Retry row: checkbox + button */
