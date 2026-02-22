@@ -128,3 +128,22 @@
   font: var(--text-caption);
   color: var(--color-error);
 }
+
+.capabilityRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.capabilityPill {
+  font: var(--text-caption);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-secondary, var(--color-background));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+}

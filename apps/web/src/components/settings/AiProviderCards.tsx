@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
-import styles from './TtsProviderCards.module.css';
+import styles from './ProviderCards.module.css';
 
 interface ProviderStatus {
   provider: string;

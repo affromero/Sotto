@@ -36,6 +36,7 @@ const defaultProps = {
   configuredTtsProviders: [],
   configuredAiProviders: [],
   aiProviderMeta: [],
+  ttsProviderMeta: [],
   isTwitterProviderAvailable: false,
   quizAnswerCount: 0,
   referralCount: 0,
