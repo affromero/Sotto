@@ -47,9 +47,10 @@ export function estimateDurationFromText(text: string): number {
   return text.length / CHARS_PER_SECOND;
 }
 
-/** Count words in text (matches verifier behavior — no .filter(Boolean)). */
+/** Count words in text (trim to avoid empty-string inflation from leading/trailing whitespace). */
 export function countWords(text: string): number {
-  return text.split(/\s+/).length;
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
 }
 
 /** Sum word counts across script turns. */

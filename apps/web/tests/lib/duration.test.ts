@@ -35,8 +35,45 @@ describe('duration helpers', () => {
     expect(countWords('hello world foo')).toBe(3);
   });
 
+  it('countWords ignores trailing whitespace', () => {
+    expect(countWords('hello world ')).toBe(2);
+  });
+
+  it('countWords ignores leading whitespace', () => {
+    expect(countWords(' hello world')).toBe(2);
+  });
+
+  it('countWords ignores leading and trailing whitespace', () => {
+    expect(countWords(' hello world ')).toBe(2);
+  });
+
+  it('countWords returns 0 for empty string', () => {
+    expect(countWords('')).toBe(0);
+  });
+
+  it('countWords returns 0 for whitespace-only string', () => {
+    expect(countWords('   ')).toBe(0);
+  });
+
+  it('countWords handles multiple internal spaces', () => {
+    expect(countWords('hello   world')).toBe(2);
+  });
+
+  it('countWords handles newlines and tabs', () => {
+    expect(countWords('hello\n\tworld')).toBe(2);
+  });
+
   it('countScriptWords sums across turns', () => {
     const turns = [{ text: 'hello world' }, { text: 'foo bar baz' }];
     expect(countScriptWords(turns)).toBe(5);
+  });
+
+  it('countScriptWords is not inflated by whitespace in turns', () => {
+    const turns = [
+      { text: ' hello world ' },
+      { text: 'foo bar baz ' },
+      { text: ' one ' },
+    ];
+    expect(countScriptWords(turns)).toBe(6);
   });
 });
