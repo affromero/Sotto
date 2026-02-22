@@ -9,7 +9,7 @@ export type { SttProviderId };
 export interface SttModelOption {
   id: string;
   displayName: string;
-  tier: 'fast' | 'balanced' | 'best';
+  tier: 'fast' | 'balanced' | 'best' | 'max';
 }
 
 export interface SttProviderMeta {
