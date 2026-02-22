@@ -111,13 +111,6 @@
   }
 }
 
-.placeholder {
-  padding: var(--spacing-xl);
-  text-align: center;
-  font: var(--text-body);
-  color: var(--color-text-tertiary);
-}
-
 /* Responsive */
 
 @media (min-width: 769px) {
