@@ -13,6 +13,7 @@ import { LANGUAGE_DISPLAY } from '@sotto/shared';
 import { TasteQuiz } from '@/components/discovery/TasteQuiz';
 import { VoicePreferenceSelector } from '@/components/settings/VoicePreferenceSelector';
 import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
+import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
@@ -55,6 +56,7 @@ interface SettingsFormProps {
   configuredTtsProviders: Array<{ provider: string; isValid: boolean }>;
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
+  ttsProviderMeta: TtsProviderClientMeta[];
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
@@ -87,6 +89,7 @@ export function SettingsForm({
   configuredTtsProviders,
   configuredAiProviders,
   aiProviderMeta,
+  ttsProviderMeta,
   initialEmailNotifications,
   initialPushNotifications,
   isTwitterProviderAvailable,
@@ -767,7 +770,7 @@ export function SettingsForm({
           Add a voice provider key to remove the daily generation cap and unlock your choice of
           7 TTS providers. Keys are encrypted with AES-256-GCM.
         </p>
-        <TtsProviderCards initialConfigured={configuredTtsProviders} />
+        <TtsProviderCards initialConfigured={configuredTtsProviders} providerMeta={ttsProviderMeta} />
       </section>
 
       {/* Reset Recommendations */}

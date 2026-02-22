@@ -1,65 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
-import styles from './TtsProviderCards.module.css';
-
-const PROVIDERS = [
-  {
-    id: 'elevenlabs' as const,
-    name: 'ElevenLabs',
-    quality: 'Premium',
-    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'xi-xxxxxxxxxxxxxxxxxxxx' }],
-    getKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
-  },
-  {
-    id: 'openai' as const,
-    name: 'OpenAI',
-    quality: 'Standard',
-    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
-    getKeyUrl: 'https://platform.openai.com/api-keys',
-  },
-  {
-    id: 'playht' as const,
-    name: 'PlayHT',
-    quality: 'Premium',
-    fields: [
-      { key: 'apiKey', label: 'API Key', placeholder: 'Your PlayHT API key' },
-      { key: 'userId', label: 'User ID', placeholder: 'Your PlayHT User ID' },
-    ],
-    getKeyUrl: 'https://play.ht/studio/api-access',
-  },
-  {
-    id: 'cartesia' as const,
-    name: 'Cartesia',
-    quality: 'Premium',
-    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Cartesia API key' }],
-    getKeyUrl: 'https://play.cartesia.ai/keys',
-  },
-  {
-    id: 'hume' as const,
-    name: 'Hume AI',
-    quality: 'Ultra',
-    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Hume AI API key' }],
-    getKeyUrl: 'https://platform.hume.ai/settings/keys',
-  },
-  {
-    id: 'fal' as const,
-    name: 'Fal (Qwen3-TTS)',
-    quality: 'Premium',
-    fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
-    getKeyUrl: 'https://fal.ai/dashboard/keys',
-  },
-  {
-    id: 'replicate' as const,
-    name: 'Replicate (Qwen3-TTS)',
-    quality: 'Premium',
-    fields: [{ key: 'apiKey', label: 'API Token', placeholder: 'r8_xxxxxxxxxxxx' }],
-    getKeyUrl: 'https://replicate.com/account/api-tokens',
-  },
-];
+import styles from './ProviderCards.module.css';
 
 interface ProviderStatus {
   provider: string;
@@ -68,33 +15,41 @@ interface ProviderStatus {
 
 interface TtsProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
+  providerMeta: TtsProviderClientMeta[];
 }
 
-export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
+const QUALITY_LABELS: Record<string, string> = {
+  standard: 'Standard',
+  premium: 'Premium',
+  ultra: 'Ultra',
+};
+
+export function TtsProviderCards({ initialConfigured, providerMeta }: TtsProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
     new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error'>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSaveKey = async (providerId: string) => {
-    const provider = PROVIDERS.find((p) => p.id === providerId);
-    if (!provider) return;
-
+  const handleSaveKey = async (providerId: string, authFields: TtsProviderClientMeta['authFields']) => {
     const apiKey = fieldValues[`${providerId}-apiKey`]?.trim();
     if (!apiKey) return;
 
-    setSaving(true);
-    setStatus((prev) => ({ ...prev, [providerId]: 'idle' }));
+    setSavingId(providerId);
+    setStatus((prev) => ({ ...prev, [providerId]: 'validating' }));
     setErrors((prev) => ({ ...prev, [providerId]: '' }));
 
     try {
       const body: Record<string, string> = { provider: providerId, apiKey };
-      const userIdVal = fieldValues[`${providerId}-userId`]?.trim();
-      if (userIdVal) body.userId = userIdVal;
+      for (const field of authFields) {
+        if (field.key !== 'apiKey') {
+          const val = fieldValues[`${providerId}-${field.key}`]?.trim();
+          if (val) body[field.key] = val;
+        }
+      }
 
       const res = await fetch('/api/settings/byok', {
         method: 'POST',
@@ -112,8 +67,9 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
       setConfigured((prev) => new Map(prev).set(providerId, true));
       setFieldValues((prev) => {
         const next = { ...prev };
-        delete next[`${providerId}-apiKey`];
-        delete next[`${providerId}-userId`];
+        for (const field of authFields) {
+          delete next[`${providerId}-${field.key}`];
+        }
         return next;
       });
       setExpandedId(null);
@@ -123,12 +79,12 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
       setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
       setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
   };
 
   const handleRemoveKey = async (providerId: string) => {
-    setSaving(true);
+    setSavingId(providerId);
     try {
       await fetch('/api/settings/byok', {
         method: 'DELETE',
@@ -146,16 +102,19 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
       setErrors((prev) => ({ ...prev, [providerId]: 'Failed to remove key.' }));
       setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
   };
 
   return (
     <div className={styles.grid}>
-      {PROVIDERS.map((provider) => {
+      {providerMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
+        const isSaving = savingId === provider.id;
+        const qualityLabel = QUALITY_LABELS[provider.qualityTier] ?? provider.qualityTier;
+        const modelCount = provider.models.length;
 
         return (
           <div key={provider.id} className={styles.card}>
@@ -163,11 +122,29 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
               <div className={styles.cardHeaderLeft}>
                 <TtsProviderLogo provider={provider.id} size={28} />
                 <div className={styles.cardInfo}>
-                  <span className={styles.cardName}>{provider.name}</span>
-                  <span className={styles.cardQuality}>{provider.quality}</span>
+                  <span className={styles.cardNameRow}>
+                    <span className={styles.cardName}>{provider.displayName}</span>
+                    {provider.recommended && <Badge variant="success">Recommended</Badge>}
+                  </span>
+                  <span className={styles.cardQuality}>
+                    {qualityLabel} · {modelCount} {modelCount === 1 ? 'model' : 'models'}
+                  </span>
+                  <div className={styles.capabilityRow}>
+                    {provider.supportsVoiceCloning && (
+                      <span className={styles.capabilityPill}>Voice Cloning</span>
+                    )}
+                    {provider.supportsSfx && (
+                      <span className={styles.capabilityPill}>SFX</span>
+                    )}
+                    {provider.supportsStreaming && (
+                      <span className={styles.capabilityPill}>Streaming</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              {isConfigured ? (
+              {status[provider.id] === 'validating' ? (
+                <span className={styles.statusValidating}>Validating key...</span>
+              ) : isConfigured ? (
                 isValid ? (
                   <span className={styles.statusConnected}>Connected</span>
                 ) : (
@@ -180,11 +157,18 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
 
             {isConfigured && !isExpanded && (
               <div className={styles.cardActions}>
+                <button
+                  type="button"
+                  className={styles.addKeyBtn}
+                  onClick={() => setExpandedId(provider.id)}
+                >
+                  Update Key
+                </button>
                 <Button
                   variant="ghost"
                   onClick={() => handleRemoveKey(provider.id)}
-                  loading={saving}
-                  disabled={saving}
+                  loading={isSaving}
+                  disabled={savingId !== null}
                 >
                   Remove Key
                 </Button>
@@ -203,20 +187,22 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
                 >
                   Add Key
                 </button>
-                <a
-                  href={provider.getKeyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.getKeyLink}
-                >
-                  Get API Key
-                </a>
+                {provider.getApiKeyUrl && (
+                  <a
+                    href={provider.getApiKeyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.getKeyLink}
+                  >
+                    Get API Key
+                  </a>
+                )}
               </div>
             )}
 
             {isExpanded && (
               <div className={styles.keyForm}>
-                {provider.fields.map((field) => (
+                {provider.authFields.map((field) => (
                   <Input
                     key={field.key}
                     label={field.label}
@@ -233,9 +219,9 @@ export function TtsProviderCards({ initialConfigured }: TtsProviderCardsProps) {
                 ))}
                 <div className={styles.keyFormActions}>
                   <Button
-                    onClick={() => handleSaveKey(provider.id)}
-                    loading={saving}
-                    disabled={saving || !fieldValues[`${provider.id}-apiKey`]?.trim()}
+                    onClick={() => handleSaveKey(provider.id, provider.authFields)}
+                    loading={isSaving}
+                    disabled={savingId !== null || !fieldValues[`${provider.id}-apiKey`]?.trim()}
                   >
                     Save Key
                   </Button>

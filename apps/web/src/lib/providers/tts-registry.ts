@@ -334,7 +334,7 @@ export async function validateProviderCredentials(
 // ---------------------------------------------------------------------------
 
 export interface TtsProviderClientMeta {
-  id: TtsProviderId;
+  id: Exclude<TtsProviderId, 'kittentts'>;
   displayName: string;
   getApiKeyUrl: string;
   qualityTier: 'standard' | 'premium' | 'ultra';
@@ -353,7 +353,7 @@ export interface TtsProviderClientMeta {
  */
 export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
   return Object.values(TTS_PROVIDERS)
-    .filter((p) => p.id !== 'kittentts')
+    .filter((p): p is TtsProviderMeta & { id: Exclude<TtsProviderId, 'kittentts'> } => p.id !== 'kittentts')
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
