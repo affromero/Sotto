@@ -15,6 +15,15 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   replicate: { label: 'Replicate (Qwen3-TTS)', shortLabel: 'Replicate' },
 };
 
+export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
+  openai: { label: 'OpenAI Whisper', shortLabel: 'Whisper' },
+  groq: { label: 'Groq Whisper', shortLabel: 'Groq' },
+  elevenlabs: { label: 'ElevenLabs Scribe', shortLabel: 'Scribe' },
+  together: { label: 'Together AI Whisper', shortLabel: 'Together' },
+  deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
+  assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
+};
+
 export const LANGUAGE_DISPLAY: Record<string, string> = {
   en: 'English',
   es: 'Spanish',

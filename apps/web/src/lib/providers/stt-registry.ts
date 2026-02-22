@@ -54,6 +54,39 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     ],
     platformCostPerMinute: 0,
   },
+
+  together: {
+    id: 'together',
+    displayName: 'Together AI',
+    defaultModel: 'openai/whisper-large-v3',
+    models: [
+      { id: 'openai/whisper-large-v3', displayName: 'Whisper Large v3', tier: 'balanced' },
+    ],
+    platformCostPerMinute: 0.0015,
+  },
+
+  deepgram: {
+    id: 'deepgram',
+    displayName: 'Deepgram',
+    defaultModel: 'nova-3',
+    models: [
+      { id: 'nova-3', displayName: 'Nova-3', tier: 'best' },
+      { id: 'nova-2', displayName: 'Nova-2', tier: 'balanced' },
+    ],
+    platformCostPerMinute: 0.0077,
+  },
+
+  assemblyai: {
+    id: 'assemblyai',
+    displayName: 'AssemblyAI',
+    defaultModel: 'best',
+    models: [
+      { id: 'best', displayName: 'Universal-2', tier: 'best' },
+      { id: 'nano', displayName: 'Nano', tier: 'fast' },
+      { id: 'universal-3-pro', displayName: 'Universal-3 Pro', tier: 'max' },
+    ],
+    platformCostPerMinute: 0.0025,
+  },
 };
 
 export function getAllSttProviderMeta(): SttProviderMeta[] {

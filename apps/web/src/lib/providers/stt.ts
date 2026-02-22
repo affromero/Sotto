@@ -45,6 +45,13 @@ const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
   name: 'Groq Whisper',
 };
 
+const TOGETHER_WHISPER_CONFIG: WhisperProviderConfig = {
+  baseURL: 'https://api.together.xyz/v1',
+  model: 'openai/whisper-large-v3',
+  envVar: 'TOGETHER_API_KEY',
+  name: 'Together AI Whisper',
+};
+
 class OpenAIWhisperProvider implements SttProvider {
   private client: any | null = null;
   private initPromise: Promise<void> | null = null;
@@ -293,6 +300,12 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string, mod
       const config = model
         ? { ...GROQ_WHISPER_CONFIG, model }
         : GROQ_WHISPER_CONFIG;
+      return new OpenAIWhisperProvider(apiKey, config);
+    }
+    case 'together': {
+      const config = model
+        ? { ...TOGETHER_WHISPER_CONFIG, model }
+        : TOGETHER_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
     case 'openai':
