@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
+import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import styles from './KeySetupForm.module.css';
@@ -13,9 +15,11 @@ interface ProviderStatus {
 interface KeySetupFormProps {
   initialAiConfigured: Array<ProviderStatus>;
   initialTtsConfigured: Array<ProviderStatus>;
+  aiProviderMeta?: AiProviderClientMeta[];
+  ttsProviderMeta?: TtsProviderClientMeta[];
 }
 
-export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeySetupFormProps) {
+export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProviderMeta = [], ttsProviderMeta = [] }: KeySetupFormProps) {
   const router = useRouter();
 
   const handleContinue = () => {
@@ -63,7 +67,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
             add your own key for faster models.
           </p>
         </div>
-        <AiProviderCards initialConfigured={initialAiConfigured} />
+        <AiProviderCards initialConfigured={initialAiConfigured} providerMeta={aiProviderMeta} />
       </section>
 
       <div className={styles.divider} role="separator" />
@@ -79,7 +83,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
             one, you get a few free generations.
           </p>
         </div>
-        <TtsProviderCards initialConfigured={initialTtsConfigured} />
+        <TtsProviderCards initialConfigured={initialTtsConfigured} providerMeta={ttsProviderMeta} />
       </section>
 
       <div className={styles.actions}>
