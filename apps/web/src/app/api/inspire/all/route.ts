@@ -1,21 +1,21 @@
 import { createHash } from 'crypto';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { cache, checkRateLimit, counters } from '@/lib/redis';
 import {
   generateForYouQuestions,
   generateNewsQuestions,
+  generateCuriosityQuestions,
   loadInspireContext,
 } from '@/lib/taste-quiz';
-import type { NewsTimeRange } from '@/lib/taste-quiz';
-import type { TasteQuestion } from '@sotto/shared';
+import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
 import { logger } from '@/lib/logger';
 
 const inspireAllSchema = z.object({
-  section: z.enum(['forYou', 'news']).optional(),
+  section: z.enum(['forYou', 'news', 'curiosity', 'trending']).optional(),
   timeRange: z.enum(['1h', '12h', '24h', '1w', '1m']).optional(),
   topic: z.string().max(50).optional(),
 });
@@ -39,15 +39,20 @@ const CACHE_TTL = {
   forYou: 600, // 10 min
   news: 300, // 5 min
   trending: 120, // 2 min (global)
+  curiosity: 600, // 10 min (timeless content caches well)
 } as const;
 
-type Section = 'forYou' | 'trending' | 'news';
+type Section = 'forYou' | 'trending' | 'news' | 'curiosity';
 
 function cacheKey(section: Section, userId: string, topic?: string, timeRange?: string): string {
   if (section === 'trending') return 'inspire:trending';
   const topicHash = topic ? createHash('md5').update(topic).digest('hex').slice(0, 8) : '_';
   const suffix = section === 'news' && timeRange ? `:${timeRange}` : '';
   return `inspire:${section}:${userId}:${topicHash}${suffix}`;
+}
+
+function cacheTtl(section: Section): number {
+  return CACHE_TTL[section] ?? 600;
 }
 
 function today(): string {
@@ -91,8 +96,8 @@ function mapTrendingToPodcastSummary(
  * Single-section refresh (?section=forYou|news): returns JSON, bypasses cache read.
  */
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -111,10 +116,10 @@ export async function GET(request: NextRequest) {
   const { section, timeRange, topic } = validation.data;
   const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
   const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
-  const userId = session.user.id;
+  const userId = authResult.userId;
 
   // Single-section refresh — always bypass cache read, return JSON
-  if (section === 'forYou' || section === 'news') {
+  if (section) {
     const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
     if (!rateLimit.allowed) {
       return new Response(
@@ -125,38 +130,66 @@ export async function GET(request: NextRequest) {
 
     if (section === 'forYou') {
       const forYou = await generateForYouQuestions(userId, 6, topicHint);
-      // Cache fresh result for subsequent full fetches
       await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
       return new Response(JSON.stringify({ forYou }), {
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
-    await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
-    return new Response(JSON.stringify({ news }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (section === 'news') {
+      const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
+      await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
+      return new Response(JSON.stringify({ news }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (section === 'curiosity') {
+      const curiosity = await generateCuriosityQuestions(userId, 6, topicHint);
+      await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, CACHE_TTL.curiosity);
+      return new Response(JSON.stringify({ curiosity }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (section === 'trending') {
+      const trendingRaw = await getTrending().catch((err) => {
+        logger.warn('Failed to fetch trending for inspire', { error: (err as Error).message });
+        return [];
+      });
+      const trending = mapTrendingToPodcastSummary(trendingRaw);
+      await cache.set(cacheKey('trending', userId), trending, CACHE_TTL.trending);
+      return new Response(JSON.stringify({ trending }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
   }
 
-  // Full fetch — check cache for all 3 sections in parallel
-  const [cachedForYou, cachedTrending, cachedNews] = await Promise.all([
+  // Full fetch — check cache for all 4 sections in parallel
+  const [cachedForYou, cachedTrending, cachedNews, cachedCuriosity] = await Promise.all([
     cache.get<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)),
     cache.get<PodcastSummary[]>(cacheKey('trending', userId)),
     cache.get<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)),
+    cache.get<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)),
   ]);
 
-  const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null;
+  const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null && cachedCuriosity !== null;
 
   // Track cache metrics per section
   trackCacheMetric('forYou', cachedForYou !== null);
   trackCacheMetric('trending', cachedTrending !== null);
   trackCacheMetric('news', cachedNews !== null);
+  trackCacheMetric('curiosity', cachedCuriosity !== null);
 
   // All cached — return immediately, skip rate limit
   if (allCached) {
     logger.debug('Inspire: all sections cached, returning immediately');
-    return new Response(JSON.stringify({ forYou: cachedForYou, trending: cachedTrending, news: cachedNews }), {
+    return new Response(JSON.stringify({
+      forYou: cachedForYou,
+      trending: cachedTrending,
+      news: cachedNews,
+      curiosity: cachedCuriosity,
+    }), {
       headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -164,12 +197,12 @@ export async function GET(request: NextRequest) {
   // At least one section needs generation — rate limit check
   const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
   if (!rateLimit.allowed) {
-    // Return whatever we have cached + empty arrays for uncached
     return new Response(
       JSON.stringify({
         forYou: cachedForYou ?? [],
         trending: cachedTrending ?? [],
         news: cachedNews ?? [],
+        curiosity: cachedCuriosity ?? [],
         error: 'Rate limit exceeded. Try again later.',
         resetAt: rateLimit.resetAt,
       }),
@@ -185,10 +218,10 @@ export async function GET(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
       }
 
-      // Load shared context once for both generators
+      // Load shared context once for generators
       const ctxPromise = loadInspireContext(userId);
 
-      // Fire all 3 sections in parallel
+      // Fire all 4 sections in parallel
       const results = await Promise.allSettled([
         // Trending
         (async () => {
@@ -227,6 +260,18 @@ export async function GET(request: NextRequest) {
           const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx);
           await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
           send({ section: 'news', data: news });
+        })(),
+
+        // Curiosity
+        (async () => {
+          if (cachedCuriosity !== null) {
+            send({ section: 'curiosity', data: cachedCuriosity });
+            return;
+          }
+          const ctx = await ctxPromise;
+          const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, ctx);
+          await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, cacheTtl('curiosity'));
+          send({ section: 'curiosity', data: curiosity });
         })(),
       ]);
 

@@ -25,7 +25,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { api } from '../../lib/api';
-import { SwipeQuiz } from '../../components/SwipeQuiz';
+import { InspireMe } from '../../components/InspireMe';
 import { AiModelSelector } from '../../components/AiModelSelector';
 import { TtsModelSelector } from '../../components/TtsModelSelector';
 import { VoicePickerSheet } from '../../components/VoicePickerSheet';
@@ -117,7 +117,7 @@ export default function CreateScreen() {
   const [discoveryId, setDiscoveryId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [latestChips, setLatestChips] = useState<string[]>([]);
-  const [showQuiz, setShowQuiz] = useState(false);
+  const [showInspire, setShowInspire] = useState(false);
   const topicHandled = useRef(false);
 
   // Creation options state
@@ -293,7 +293,7 @@ export default function CreateScreen() {
   useEffect(() => {
     if (topic && !topicHandled.current) {
       topicHandled.current = true;
-      setShowQuiz(false);
+      setShowInspire(false);
       sendMessage(topic);
     }
   }, [topic, sendMessage]);
@@ -364,24 +364,7 @@ export default function CreateScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={88}
       >
-        {messages.length === 0 && showQuiz ? (
-          <View style={styles.quizContainer}>
-            {renderKeyWarning()}
-            <SwipeQuiz
-              onComplete={() => setShowQuiz(false)}
-              onSelectTopic={(questionText) => {
-                setShowQuiz(false);
-                sendMessage(questionText);
-              }}
-            />
-            <Pressable
-              style={styles.skipButton}
-              onPress={() => setShowQuiz(false)}
-            >
-              <Text style={styles.skipButtonText}>Skip to chat</Text>
-            </Pressable>
-          </View>
-        ) : messages.length === 0 ? (
+        {messages.length === 0 ? (
           <View style={styles.welcomeContainer}>
             {renderKeyWarning()}
             <Text style={styles.welcomeTitle}>Create a Podcast</Text>
@@ -396,7 +379,7 @@ export default function CreateScreen() {
                   styles.inspireMeButton,
                   pressed && styles.inspireMeButtonPressed,
                 ]}
-                onPress={() => setShowQuiz(true)}
+                onPress={() => setShowInspire(true)}
               >
                 <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
                 <Text style={styles.inspireMeButtonText}>Inspire me</Text>
@@ -677,6 +660,14 @@ export default function CreateScreen() {
       {step === 'scripting' && renderScriptingStep()}
       {step === 'script-preview' && renderScriptPreviewStep()}
       {step === 'generating' && renderGeneratingStep()}
+      <InspireMe
+        visible={showInspire}
+        onClose={() => setShowInspire(false)}
+        onSelectTopic={(topic) => {
+          setShowInspire(false);
+          sendMessage(topic);
+        }}
+      />
     </>
   );
 }

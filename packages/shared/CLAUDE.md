@@ -11,7 +11,7 @@ src/
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
 │   ├── reference.ts      # ReferenceData, VerificationLayerResult
 │   ├── twitter.ts        # TweetParseResult, TwitterTweet, TweetMentionData
-│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState
+│   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
 │   ├── feed.ts           # FeedResponse, FeedSort, FeedFilters
 │   ├── player.ts         # PlayerState, PlayerControls
 │   ├── interaction.ts    # InteractionRequest, InteractionResponse
