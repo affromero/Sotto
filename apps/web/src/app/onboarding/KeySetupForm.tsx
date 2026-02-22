@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import styles from './KeySetupForm.module.css';
@@ -13,9 +14,10 @@ interface ProviderStatus {
 interface KeySetupFormProps {
   initialAiConfigured: Array<ProviderStatus>;
   initialTtsConfigured: Array<ProviderStatus>;
+  aiProviderMeta?: AiProviderClientMeta[];
 }
 
-export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeySetupFormProps) {
+export function KeySetupForm({ initialAiConfigured, initialTtsConfigured, aiProviderMeta = [] }: KeySetupFormProps) {
   const router = useRouter();
 
   const handleContinue = () => {
@@ -63,7 +65,7 @@ export function KeySetupForm({ initialAiConfigured, initialTtsConfigured }: KeyS
             add your own key for faster models.
           </p>
         </div>
-        <AiProviderCards initialConfigured={initialAiConfigured} />
+        <AiProviderCards initialConfigured={initialAiConfigured} providerMeta={aiProviderMeta} />
       </section>
 
       <div className={styles.divider} role="separator" />

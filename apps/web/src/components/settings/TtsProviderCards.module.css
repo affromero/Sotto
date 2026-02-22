@@ -68,6 +68,12 @@
   color: var(--color-text-tertiary);
 }
 
+.statusValidating {
+  font: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
 .cardActions {
   display: flex;
   align-items: center;

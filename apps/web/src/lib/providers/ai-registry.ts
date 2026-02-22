@@ -168,7 +168,7 @@ export function getAiModelDisplayName(modelId: string): string {
 // ---------------------------------------------------------------------------
 
 export interface AiProviderClientMeta {
-  id: AiProviderId;
+  id: Exclude<AiProviderId, 'claude-code'>;
   displayName: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
