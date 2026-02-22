@@ -311,7 +311,7 @@ You MUST include inline citations in the dialogue using [N] notation (e.g. [1], 
 - ${speakers[0].name} introduces citations conversationally: "I read that researchers at MIT found..." [3]
 - ${speakers.length > 1 ? speakers[1].name : speakers[0].name} cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
 - Grouped citations are fine: [1,2] when multiple sources support one claim
-- Do NOT invent fake citations. Do NOT cite Wikipedia, personal blogs, social media, or content farms
+- Do NOT invent fake citations. Do NOT cite personal blogs, social media, or content farms
 - Each non-obvious factual claim should be supported by at least 3 independent sources
 
 ## Sound Effect Cues:
@@ -476,7 +476,7 @@ A fact-checking agent reviewed your previous script and found issues. You MUST a
 
 Key rules for this revision:
 1. Fix ALL unsourced claims — add real citations or remove the claim
-2. Replace ALL unreliable sources (Wikipedia, blogs, social media) with peer-reviewed journals, books, government reports, or established news outlets
+2. Replace ALL unreliable sources (blogs, social media) with peer-reviewed journals, books, government reports, or established news outlets
 3. Ensure every non-obvious factual claim has at least 1 citation, ideally 3+ independent sources
 4. If a claim cannot be properly sourced, remove it and replace with a well-sourced alternative
 5. Maintain the conversational quality and engagement of the original script
@@ -534,7 +534,7 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 
 ### Rules:
 - Do NOT invent fake citations. Every citation MUST reference a real, verifiable source
-- Do NOT cite Wikipedia, personal blogs, social media, or content farms
+- Do NOT cite personal blogs, social media, or content farms
 - Set the correct "type" field for each reference
 - For journal papers, always include the DOI in the "doi" field
 - Use [N] notation for inline citations
