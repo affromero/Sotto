@@ -39,7 +39,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { generateForYouQuestions, generateNewsQuestions } from '@/lib/taste-quiz';
+import { generateForYouQuestions, generateNewsQuestions, generateCuriosityQuestions } from '@/lib/taste-quiz';
 
 // ---- Helpers ----
 
@@ -237,5 +237,79 @@ describe('generateNewsQuestions', () => {
 
     const result = await generateNewsQuestions('user-1', 3);
     expect(result).toEqual([]);
+  });
+});
+
+describe('generateCuriosityQuestions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  it('generates questions without loading UserInterest (no personalization)', async () => {
+    const questions = JSON.stringify([
+      { text: 'Would you listen to a podcast about why we can\'t tickle ourselves?', tagSlugs: ['science'], category: 'science' },
+    ]);
+    mockCreateAIProvider.mockReturnValue(createMockAI(questions));
+
+    const result = await generateCuriosityQuestions('user-1', 1);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toContain('tickle');
+    // Should NOT load UserInterest — curiosity is not personalized
+    expect(mockUserInterestFindMany).not.toHaveBeenCalled();
+  });
+
+  it('filters questions with invalid tag slugs', async () => {
+    const questions = JSON.stringify([
+      { text: 'Valid curiosity', tagSlugs: ['physics'], category: 'science' },
+      { text: 'Bad slugs curiosity', tagSlugs: ['nonexistent'], category: 'fake' },
+    ]);
+    mockCreateAIProvider.mockReturnValue(createMockAI(questions));
+
+    const result = await generateCuriosityQuestions('user-1', 5);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('Valid curiosity');
+  });
+
+  it('deduplicates against prior answers', async () => {
+    const text = 'Would you listen to a podcast about paradoxes?';
+    const { createHash } = await import('crypto');
+    const hash = createHash('sha256').update(text.toLowerCase().trim()).digest('hex').slice(0, 12);
+    mockTasteQuizAnswerFindMany.mockResolvedValue([{ questionId: hash }]);
+
+    const questions = JSON.stringify([
+      { text, tagSlugs: ['science'], category: 'science' },
+      { text: 'Fresh curiosity about biology', tagSlugs: ['biology'], category: 'science' },
+    ]);
+    mockCreateAIProvider.mockReturnValue(createMockAI(questions));
+
+    const result = await generateCuriosityQuestions('user-1', 5);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toBe('Fresh curiosity about biology');
+  });
+
+  it('returns empty array on AI failure', async () => {
+    mockCreateAIProvider.mockReturnValue({
+      generateResponse: vi.fn().mockRejectedValue(new Error('API down')),
+    });
+
+    const result = await generateCuriosityQuestions('user-1', 3);
+    expect(result).toEqual([]);
+  });
+
+  it('includes topic context in prompt when provided', async () => {
+    const questions = JSON.stringify([
+      { text: 'Curiosity about math puzzles', tagSlugs: ['ai'], category: 'technology' },
+    ]);
+    const ai = createMockAI(questions);
+    mockCreateAIProvider.mockReturnValue(ai);
+
+    await generateCuriosityQuestions('user-1', 1, 'mathematics');
+
+    const prompt = ai.generateResponse.mock.calls[0][0];
+    expect(prompt).toContain('mathematics');
   });
 });
