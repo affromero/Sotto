@@ -816,7 +816,7 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 
 | Component                              | Current Limit                      | Bottleneck                   |
 | -------------------------------------- | ---------------------------------- | ---------------------------- |
-| Web app (Hetzner CPX31, Docker)        | ~500 concurrent users              | CPU + memory (8GB shared)    |
+| Web app (Hetzner CX32, Docker)         | ~500 concurrent users              | CPU + memory (8GB shared)    |
 | Workers (same VPS, 23 workers)         | ~10 concurrent podcast generations | CPU + memory for FFmpeg      |
 | PostgreSQL (Docker, single instance)   | ~1,000 queries/second              | Connection pool size         |
 | Redis (Docker, 512MB)                  | ~50,000 operations/second          | Memory (queue depth)         |
@@ -827,7 +827,7 @@ Rate limiting is applied at the API route level using Redis-backed sliding windo
 
 | User Count | Architecture Change                                                          | Estimated Cost |
 | ---------- | ---------------------------------------------------------------------------- | -------------- |
-| 0-500      | Single server (Hetzner CPX31): web + workers + DB + Redis                    | $11/month      |
+| 0-500      | Single server (Hetzner CX32): web + workers + DB + Redis                     | $8/month       |
 | 500-2K     | Upgrade to CPX41, separate worker process                                    | $21/month      |
 | 2K-5K      | Dedicated CPU (CCX33), separate PostgreSQL instance, external Redis          | $80/month      |
 | 5K-10K     | Split web and workers to separate servers, connection pooling (PgBouncer)    | $150/month     |

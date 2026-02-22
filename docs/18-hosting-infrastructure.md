@@ -28,7 +28,7 @@ Run everything on a single VPS. Cheapest at scale, full control.
 
 | Component     | Setup                                   | Cost/Month           | Notes                           |
 | ------------- | --------------------------------------- | -------------------- | ------------------------------- |
-| VPS           | Hetzner CPX31 (4 vCPU, 8GB RAM)         | **€10/mo (~$11)**    | Runs web + workers + DB + Redis |
+| VPS           | Hetzner CX32 (4 vCPU, 8GB RAM)          | **€7/mo (~$8)**      | Runs web + workers + DB + Redis |
 | VPS (bigger)  | Hetzner CPX41 (8 vCPU, 16GB RAM)        | **€19/mo (~$21)**    | For 1K+ users                   |
 | VPS (scaling) | Hetzner CCX33 (8 vCPU, 32GB, dedicated) | **€50/mo (~$55)**    | For 5K+ users                   |
 | Storage       | Hetzner Storage Box 1TB                 | **€4/mo**            | For podcast audio files         |
@@ -71,7 +71,7 @@ Run everything on a single VPS. Cheapest at scale, full control.
 1. Sign up at [hetzner.com](https://www.hetzner.com/)
 2. Create a Cloud Server:
    - **Image**: Ubuntu 24.04
-   - **Type**: CPX31 (4 vCPU, 8GB RAM, 160GB SSD) — €10/mo
+   - **Type**: CX32 (4 vCPU, 8GB RAM, 80GB SSD) — €7/mo
    - **Location**: Ashburn, VA (closest to US users) or Nuremberg (EU)
    - **Networking**: Enable IPv4 + IPv6
    - **SSH Key**: Add your public key (more secure than password)
@@ -299,7 +299,7 @@ Private podcasts are served through the API, which verifies the user owns the po
 
 | Users  | Infrastructure                          | Monthly Cost | Action                          |
 | ------ | --------------------------------------- | ------------ | ------------------------------- |
-| 0-100  | Hetzner CPX31 (4 vCPU, 8GB)             | ~$17         | Single server, everything       |
+| 0-100  | Hetzner CX32 (4 vCPU, 8GB)              | ~$14         | Single server, everything       |
 | 100-1K | Hetzner CPX41 (8 vCPU, 16GB)            | ~$27         | Upgrade VPS                     |
 | 1K-5K  | Hetzner CCX33 (dedicated) + Storage Box | ~$60         | Dedicated CPU, separate storage |
 | 5K-10K | 2 servers (web + workers) + managed DB  | ~$150        | Split web and workers           |

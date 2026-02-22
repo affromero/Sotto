@@ -158,11 +158,11 @@ The narration is the descriptive part after the payee. Build it from the remaini
 
 - Include the service/product name
 - Include the month/period if it's a recurring charge
-- Use an em-dash to separate details: `"VPS CPX31 — February 2026"`
+- Use an em-dash to separate details: `"VPS CX32 — February 2026"`
 
 Examples:
 
-- `/expense 11.00 Hetzner VPS feb` → Payee: `"Hetzner"`, Narration: `"VPS CPX31 — February 2026"`
+- `/expense 8.00 Hetzner VPS feb` → Payee: `"Hetzner"`, Narration: `"VPS CX32 — February 2026"`
 - `/expense 0.50 R2 storage` → Payee: `"Cloudflare"`, Narration: `"R2 storage — February 2026"`
 - `/expense 5.00 Claude API usage` → Payee: `"Anthropic"`, Narration: `"Claude API usage — February 2026"`
 

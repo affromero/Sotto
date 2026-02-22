@@ -35,9 +35,9 @@
 
 - [ ] **Multi-currency EUR** — Proper Hetzner EUR tracking:
   ```beancount
-  2026-03-01 * "Hetzner" "VPS CPX31 — March 2026"
-    Expenses:Infrastructure:Compute:Hetzner  10.59 EUR @@ 11.00 USD
-    Assets:Current:Cash:Bank  -11.00 USD
+  2026-03-01 * "Hetzner" "VPS CX32 — March 2026"
+    Expenses:Infrastructure:Compute:Hetzner  6.80 EUR @@ 8.00 USD
+    Assets:Current:Cash:Bank  -8.00 USD
   ```
   Requires `commodity EUR` directive and looking up the actual bank FX rate each month.
 

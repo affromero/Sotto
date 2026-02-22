@@ -309,9 +309,9 @@ Expected output format: `ssh-ed25519 AAAA...long-string... your@email.com`
 
 - Click **Shared vCPU** tab (cheaper, fine for our workload). "Shared vCPU" means your server shares physical CPU cores with other customers — fine for a small app, much cheaper than dedicated cores
 - Select **x86 (Intel/AMD)** architecture
-- Select **CPX31**: 4 vCPU AMD, 8 GB RAM, 160 GB SSD NVMe
-- Cost: ~€11.49/month (~$12.50/month)
-- Why CPX31: Docker builds need RAM. The 4GB tier will OOM (Out Of Memory — the OS kills the process when RAM is exhausted) during `npm run build`. 8GB gives headroom for Postgres + Redis + Web + Workers running simultaneously
+- Select **CX32**: 4 vCPU, 8 GB RAM, 80 GB SSD NVMe
+- Cost: ~€6.80/month (~$8/month)
+- Why CX32: Docker builds need RAM. The 4GB tier will OOM (Out Of Memory — the OS kills the process when RAM is exhausted) during `npm run build`. 8GB gives headroom for Postgres + Redis + Web + Workers running simultaneously
 
 **Networking:**
 

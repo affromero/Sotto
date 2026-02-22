@@ -6,7 +6,7 @@
 ; ============================================================
 
 ; Hetzner not yet provisioned — add transactions when VPS is started
-; Expected: CPX31 ~EUR 10.59/mo + 20% backups
+; Expected: CX32 ~EUR 6.80/mo + 20% backups
 
 ; ============================================================
 ; Infrastructure — Cloudflare (free tier)

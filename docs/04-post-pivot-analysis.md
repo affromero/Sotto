@@ -106,7 +106,7 @@ From `docs/18-hosting-infrastructure.md`:
 
 | Component | Monthly Cost |
 |---|---|
-| Hetzner CPX31 (4 vCPU, 8GB) | $11 |
+| Hetzner CX32 (4 vCPU, 8GB) | $8 |
 | Hetzner Storage Box 1TB | $4 |
 | Automated backups (20% of VPS) | $2 |
 | Domain (sotto.fm) | $1 |
