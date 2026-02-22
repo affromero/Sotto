@@ -5,7 +5,7 @@
  */
 import { logger } from '../logger';
 
-export type AiProviderId = 'anthropic' | 'openai' | 'groq' | 'claude-code';
+export type AiProviderId = 'anthropic' | 'openai' | 'groq' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
 
 export interface AiProviderAuthField {
   key: string;
@@ -16,7 +16,7 @@ export interface AiProviderAuthField {
 export interface AiModelOption {
   id: string;
   displayName: string;
-  tier: 'fast' | 'balanced' | 'best';
+  tier: 'fast' | 'balanced' | 'best' | 'max';
 }
 
 export interface AiProviderMeta {
@@ -131,6 +131,69 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       validate: async () => true,
     },
   },
+
+  together: {
+    id: 'together',
+    displayName: 'Together AI',
+    defaultModel: '',
+    getApiKeyUrl: 'https://api.together.xyz/settings/api-keys',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.together.xyz/v1/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  deepgram: {
+    id: 'deepgram',
+    displayName: 'Deepgram (STT)',
+    defaultModel: '',
+    getApiKeyUrl: 'https://console.deepgram.com/',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.deepgram.com/v1/projects', {
+            headers: { Authorization: `Token ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  assemblyai: {
+    id: 'assemblyai',
+    displayName: 'AssemblyAI (STT)',
+    defaultModel: '',
+    getApiKeyUrl: 'https://www.assemblyai.com/app',
+    models: [],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: '' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.assemblyai.com/v2/transcript?limit=1', {
+            headers: { authorization: creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
 };
 
 export function getAiProviderMeta(id: AiProviderId): AiProviderMeta {
@@ -181,6 +244,9 @@ const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { des
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
   groq: { description: 'Free Whisper transcription — no credit card needed', badge: 'free' },
+  together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
+  deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
+  assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
 };
 
 /**

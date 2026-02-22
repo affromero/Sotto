@@ -4,7 +4,7 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'anthropic' | 'groq';
+  provider: 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'anthropic' | 'groq' | 'together' | 'deepgram' | 'assemblyai';
   size?: number;
   className?: string;
 }
@@ -118,6 +118,27 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           />
         </svg>
       );
+    case 'together':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#0EA5E9" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">T</text>
+        </svg>
+      );
+    case 'deepgram':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#13EF93" />
+          <path d="M8 8h8v2H8zM8 12h6v2H8zM8 16h4v2H8z" fill="#000" />
+        </svg>
+      );
+    case 'assemblyai':
+      return (
+        <svg {...props}>
+          <rect width="24" height="24" rx="4" fill="#1651F5" />
+          <text x="12" y="16" textAnchor="middle" fill="#fff" fontSize="9" fontWeight="700" fontFamily="sans-serif">AI</text>
+        </svg>
+      );
     default:
       return null;
   }
@@ -133,6 +154,9 @@ const PROVIDER_NAMES: Record<string, string> = {
   replicate: 'Replicate',
   anthropic: 'Anthropic',
   groq: 'Groq',
+  together: 'Together AI',
+  deepgram: 'Deepgram',
+  assemblyai: 'AssemblyAI',
 };
 
 /**

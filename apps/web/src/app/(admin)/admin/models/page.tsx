@@ -55,6 +55,9 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
       case 'openai': return !!process.env.OPENAI_API_KEY;
       case 'groq': return !!process.env.GROQ_API_KEY;
       case 'elevenlabs': return !!process.env.ELEVENLABS_API_KEY;
+      case 'together': return !!process.env.TOGETHER_API_KEY;
+      case 'deepgram': return !!process.env.DEEPGRAM_API_KEY;
+      case 'assemblyai': return !!process.env.ASSEMBLYAI_API_KEY;
       default: return false;
     }
   }
@@ -70,7 +73,7 @@ function hasByokKey(
   if (category === 'ai') return aiSet.has(providerId);
   if (category === 'tts') return ttsSet.has(providerId);
   if (category === 'stt') {
-    if (providerId === 'openai' || providerId === 'groq') return aiSet.has(providerId);
+    if (providerId === 'openai' || providerId === 'groq' || providerId === 'together' || providerId === 'deepgram' || providerId === 'assemblyai') return aiSet.has(providerId);
     if (providerId === 'elevenlabs') return ttsSet.has('elevenlabs');
   }
   return false;

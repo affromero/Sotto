@@ -45,6 +45,13 @@ const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
   name: 'Groq Whisper',
 };
 
+const TOGETHER_WHISPER_CONFIG: WhisperProviderConfig = {
+  baseURL: 'https://api.together.xyz/v1',
+  model: 'openai/whisper-large-v3',
+  envVar: 'TOGETHER_API_KEY',
+  name: 'Together AI Whisper',
+};
+
 class OpenAIWhisperProvider implements SttProvider {
   private client: any | null = null;
   private initPromise: Promise<void> | null = null;
@@ -277,6 +284,246 @@ class ElevenLabsScribeProvider implements SttProvider {
   }
 }
 
+/**
+ * Deepgram STT provider
+ * Uses Nova-3/Nova-2 via REST API with raw binary body
+ */
+class DeepgramProvider implements SttProvider {
+  private apiKey: string;
+  private model: string;
+
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.DEEPGRAM_API_KEY;
+    if (!key) {
+      throw new Error('No Deepgram API key provided — Deepgram STT will not work');
+    }
+    this.apiKey = key;
+    this.model = model ?? 'nova-3';
+    logger.info('Deepgram STT provider initialized', { model: this.model });
+  }
+
+  async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
+    const startTime = Date.now();
+
+    const params = new URLSearchParams({
+      model: this.model,
+      smart_format: 'true',
+      utterances: 'true',
+      punctuate: 'true',
+    });
+    if (opts?.language) params.set('language', opts.language);
+
+    const response = await fetch(
+      `https://api.deepgram.com/v1/listen?${params.toString()}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${this.apiKey}`,
+          'Content-Type': 'audio/mpeg',
+        },
+        body: new Uint8Array(audio),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      throw new Error(`Deepgram API error (${response.status}): ${errorText}`);
+    }
+
+    const data = (await response.json()) as {
+      results: {
+        channels: Array<{
+          alternatives: Array<{
+            transcript: string;
+            words?: Array<{
+              word: string;
+              start: number;
+              end: number;
+              punctuated_word?: string;
+            }>;
+            paragraphs?: {
+              paragraphs: Array<{
+                sentences: Array<{
+                  text: string;
+                  start: number;
+                  end: number;
+                }>;
+              }>;
+            };
+          }>;
+        }>;
+        utterances?: Array<{
+          transcript: string;
+          start: number;
+          end: number;
+          speaker: number;
+        }>;
+      };
+      metadata?: { language?: string };
+    };
+
+    const durationMs = Date.now() - startTime;
+    const alt = data.results.channels[0]?.alternatives[0];
+    const text = alt?.transcript ?? '';
+
+    // Prefer utterances (speaker-diarized segments), fall back to paragraphs → words
+    let segments: Array<{ start: number; end: number; text: string; speaker?: string }>;
+
+    if (data.results.utterances && data.results.utterances.length > 0) {
+      segments = data.results.utterances.map((u) => ({
+        start: u.start,
+        end: u.end,
+        text: u.transcript,
+        speaker: `Speaker ${u.speaker}`,
+      }));
+    } else if (alt?.paragraphs?.paragraphs) {
+      segments = alt.paragraphs.paragraphs.flatMap((p) =>
+        p.sentences.map((s) => ({
+          start: s.start,
+          end: s.end,
+          text: s.text,
+        }))
+      );
+    } else {
+      segments = text ? [{ start: 0, end: 0, text }] : [];
+    }
+
+    logger.info('Deepgram transcription complete', {
+      model: this.model,
+      language: data.metadata?.language,
+      segments: String(segments.length),
+      durationMs: String(durationMs),
+    });
+
+    return { text, segments, language: data.metadata?.language };
+  }
+}
+
+/**
+ * AssemblyAI STT provider
+ * Async polling: upload audio → submit transcript → poll until complete
+ */
+class AssemblyAIProvider implements SttProvider {
+  private apiKey: string;
+  private speechModel: string;
+
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.ASSEMBLYAI_API_KEY;
+    if (!key) {
+      throw new Error('No AssemblyAI API key provided — AssemblyAI STT will not work');
+    }
+    this.apiKey = key;
+    this.speechModel = model ?? 'best';
+    logger.info('AssemblyAI STT provider initialized', { model: this.speechModel });
+  }
+
+  async transcribe(audio: Buffer, opts?: { language?: string }): Promise<TranscriptionResult> {
+    const startTime = Date.now();
+    const headers = { authorization: this.apiKey, 'content-type': 'application/json' };
+
+    // Step 1: Upload audio
+    const uploadRes = await fetch('https://api.assemblyai.com/v2/upload', {
+      method: 'POST',
+      headers: { authorization: this.apiKey, 'content-type': 'application/octet-stream' },
+      body: new Uint8Array(audio),
+    });
+
+    if (!uploadRes.ok) {
+      const errorText = await uploadRes.text().catch(() => 'Unknown error');
+      throw new Error(`AssemblyAI upload error (${uploadRes.status}): ${errorText}`);
+    }
+
+    const { upload_url } = (await uploadRes.json()) as { upload_url: string };
+
+    // Step 2: Submit transcript job
+    const submitBody: Record<string, unknown> = {
+      audio_url: upload_url,
+      speaker_labels: true,
+    };
+
+    // Map model to speech_model param
+    if (this.speechModel === 'nano') {
+      submitBody.speech_model = 'nano';
+    } else if (this.speechModel === 'universal-3-pro') {
+      submitBody.speech_model = 'conformer-2';
+    }
+
+    if (opts?.language) {
+      submitBody.language_code = opts.language;
+    }
+
+    const submitRes = await fetch('https://api.assemblyai.com/v2/transcript', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(submitBody),
+    });
+
+    if (!submitRes.ok) {
+      const errorText = await submitRes.text().catch(() => 'Unknown error');
+      throw new Error(`AssemblyAI submit error (${submitRes.status}): ${errorText}`);
+    }
+
+    const { id: transcriptId } = (await submitRes.json()) as { id: string; status: string };
+
+    // Step 3: Poll until complete (3s interval, 10 min max)
+    const maxWait = 600_000;
+    const pollInterval = 3_000;
+    const deadline = Date.now() + maxWait;
+
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+
+      const pollRes = await fetch(`https://api.assemblyai.com/v2/transcript/${transcriptId}`, {
+        headers: { authorization: this.apiKey },
+      });
+
+      if (!pollRes.ok) {
+        throw new Error(`AssemblyAI poll error (${pollRes.status})`);
+      }
+
+      const result = (await pollRes.json()) as {
+        status: string;
+        text?: string;
+        error?: string;
+        utterances?: Array<{
+          text: string;
+          start: number;
+          end: number;
+          speaker: string;
+        }>;
+        language_code?: string;
+      };
+
+      if (result.status === 'error') {
+        throw new Error(`AssemblyAI transcription failed: ${result.error ?? 'unknown error'}`);
+      }
+
+      if (result.status === 'completed') {
+        const durationMs = Date.now() - startTime;
+        const text = result.text ?? '';
+
+        const segments = result.utterances?.map((u) => ({
+          start: u.start / 1000,
+          end: u.end / 1000,
+          text: u.text,
+          speaker: u.speaker,
+        })) ?? (text ? [{ start: 0, end: 0, text }] : []);
+
+        logger.info('AssemblyAI transcription complete', {
+          model: this.speechModel,
+          language: result.language_code,
+          segments: String(segments.length),
+          durationMs: String(durationMs),
+        });
+
+        return { text, segments, language: result.language_code };
+      }
+    }
+
+    throw new Error('AssemblyAI transcription timed out after 10 minutes');
+  }
+}
+
 export type { SttProviderId } from '@sotto/shared';
 import type { SttProviderId } from '@sotto/shared';
 
@@ -295,6 +542,16 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string, mod
         : GROQ_WHISPER_CONFIG;
       return new OpenAIWhisperProvider(apiKey, config);
     }
+    case 'together': {
+      const config = model
+        ? { ...TOGETHER_WHISPER_CONFIG, model }
+        : TOGETHER_WHISPER_CONFIG;
+      return new OpenAIWhisperProvider(apiKey, config);
+    }
+    case 'deepgram':
+      return new DeepgramProvider(apiKey, model);
+    case 'assemblyai':
+      return new AssemblyAIProvider(apiKey, model);
     case 'openai':
     default: {
       const config = model
