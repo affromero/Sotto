@@ -87,7 +87,7 @@ app/
 ├── (tabs)/
 │   ├── _layout.tsx        # Tab navigator (Ionicons icons)
 │   ├── index.tsx          # Feed (home) — infinite scroll, sort chips
-│   ├── create.tsx         # Create podcast — 5-step flow (discovery → voice → scripting → preview → generating)
+│   ├── create.tsx         # Create podcast — InspireMe replaces SwipeQuiz, 5-step flow (discovery → voice → scripting → preview → generating)
 │   ├── notifications.tsx  # Notifications — mark read, mark all read
 │   └── profile.tsx        # Current user profile — podcasts list, logout
 ├── auth/
@@ -123,6 +123,9 @@ app/
 | `PodcastCard.tsx` | Unified podcast card with `variant="feed"` (full card with avatar, tags, stats) and `variant="compact"` (list row) |
 | `SwipeCard.tsx` | Gesture-driven swipe card (reanimated + gesture-handler) for taste quiz yes/no/skip interactions |
 | `SwipeQuiz.tsx` | Taste quiz flow — renders SwipeCard stack, handles responses, saves ideas on "yes" |
+| `InspireMe.tsx` | Inspire Me container — tabbed sections (forYou, trending, news, curiosity) replacing SwipeQuiz on create screen |
+| `InspireSwipeQuiz.tsx` | Swipeable question cards for forYou/news/curiosity sections within Inspire Me |
+| `InspireTrendingList.tsx` | Scrollable trending topics list within Inspire Me |
 | `BottomSheet.tsx` | Reusable bottom sheet modal with drag handle, title, and scrollable content |
 | `OptionPicker.tsx` | Selectable option list with groups, badges, and checkmark indicator (used inside BottomSheet) |
 | `PillGroup.tsx` | Horizontal scrollable row of pill buttons for single-select choices |
