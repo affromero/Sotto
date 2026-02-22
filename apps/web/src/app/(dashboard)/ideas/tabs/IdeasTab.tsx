@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Trash2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import styles from './page.module.css';
+import styles from './IdeasTab.module.css';
 
-interface SavedIdea {
+export interface SerializedSavedIdea {
   id: string;
   questionId: string;
   question: string;
@@ -16,7 +16,7 @@ interface SavedIdea {
   createdAt: string;
 }
 
-interface PodcastIdea {
+export interface SerializedPodcastIdea {
   id: string;
   text: string;
   sourceUrl: string | null;
@@ -24,9 +24,9 @@ interface PodcastIdea {
   createdAt: string;
 }
 
-interface IdeasListProps {
-  ideas: SavedIdea[];
-  podcastIdeas: PodcastIdea[];
+interface IdeasTabProps {
+  ideas: SerializedSavedIdea[];
+  podcastIdeas: SerializedPodcastIdea[];
 }
 
 function formatDate(dateStr: string): string {
@@ -37,7 +37,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export function IdeasList({ ideas: initialIdeas, podcastIdeas: initialPodcastIdeas }: IdeasListProps) {
+export function IdeasTab({ ideas: initialIdeas, podcastIdeas: initialPodcastIdeas }: IdeasTabProps) {
   const router = useRouter();
   const [ideas, setIdeas] = useState(initialIdeas);
   const [podcastIdeas, setPodcastIdeas] = useState(initialPodcastIdeas);
@@ -88,33 +88,21 @@ export function IdeasList({ ideas: initialIdeas, podcastIdeas: initialPodcastIde
 
   if (totalCount === 0) {
     return (
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Saved Ideas</h1>
-        </header>
-        <div className={styles.emptyState}>
-          <p className={styles.emptyText}>
-            No saved ideas yet. Tap the bookmark icon on quiz questions or browse Inspire Me to save
-            podcast ideas. You can also send any topic or URL to @SottoFMBot on Telegram.
-          </p>
-          <Link href="/create" className={styles.emptyLink}>
-            <Sparkles size={16} aria-hidden="true" />
-            Create a podcast
-          </Link>
-        </div>
-      </main>
+      <div className={styles.emptyState}>
+        <p className={styles.emptyText}>
+          No saved ideas yet. Tap the bookmark icon on quiz questions or browse Inspire Me to save
+          podcast ideas. You can also send any topic or URL to @SottoFMBot on Telegram.
+        </p>
+        <Link href="/create" className={styles.emptyLink}>
+          <Sparkles size={16} aria-hidden="true" />
+          Create a podcast
+        </Link>
+      </div>
     );
   }
 
   return (
-    <main className={styles.main}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>Saved Ideas</h1>
-        <p className={styles.subtitle}>
-          {totalCount} idea{totalCount !== 1 ? 's' : ''} saved
-        </p>
-      </header>
-
+    <>
       {ideas.length > 0 && (
         <div className={styles.grid} role="list" aria-label="Saved ideas">
           {ideas.map((idea) => (
@@ -218,6 +206,6 @@ export function IdeasList({ ideas: initialIdeas, podcastIdeas: initialPodcastIde
           ))}
         </div>
       )}
-    </main>
+    </>
   );
 }
