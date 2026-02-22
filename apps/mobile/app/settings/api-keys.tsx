@@ -16,34 +16,42 @@ import { api } from '../../lib/api';
 
 interface KeyStatus {
   provider: string;
-  configured: boolean;
+  isValid: boolean;
+  lastUsedAt?: string | null;
   label?: string;
 }
 
 const AI_PROVIDERS = [
   { id: 'anthropic', name: 'Anthropic (Claude)' },
   { id: 'openai', name: 'OpenAI' },
+  { id: 'groq', name: 'Groq' },
 ] as const;
 
 const TTS_PROVIDERS = [
-  { id: 'elevenlabs', name: 'ElevenLabs' },
-  { id: 'openai', name: 'OpenAI TTS' },
-  { id: 'playht', name: 'PlayHT', hasUserId: true },
-  { id: 'cartesia', name: 'Cartesia' },
-  { id: 'hume', name: 'Hume' },
+  { id: 'elevenlabs', name: 'ElevenLabs', qualityTier: 'Premium' },
+  { id: 'openai', name: 'OpenAI TTS', qualityTier: 'Standard' },
+  { id: 'playht', name: 'PlayHT', hasUserId: true, qualityTier: 'Premium' },
+  { id: 'cartesia', name: 'Cartesia', qualityTier: 'Premium' },
+  { id: 'hume', name: 'Hume', qualityTier: 'Ultra' },
+  { id: 'fal', name: 'Fal (Qwen3-TTS)', qualityTier: 'Premium' },
+  { id: 'replicate', name: 'Replicate (Qwen3-TTS)', qualityTier: 'Premium' },
 ] as const;
 
 function ProviderRow({
   name,
   providerId,
-  configured,
+  isValid,
+  isConfigured,
+  qualityTier,
   hasUserId,
   endpoint,
   onMutated,
 }: {
   name: string;
   providerId: string;
-  configured: boolean;
+  isValid: boolean;
+  isConfigured: boolean;
+  qualityTier?: string;
   hasUserId?: boolean;
   endpoint: string;
   onMutated: () => void;
@@ -99,30 +107,48 @@ function ProviderRow({
     ]);
   }, [name, removeMutation]);
 
+  const dotStyle = isConfigured
+    ? isValid
+      ? styles.statusDotActive
+      : styles.statusDotInvalid
+    : styles.statusDotInactive;
+
   return (
     <View style={styles.providerRow}>
       <View style={styles.providerHeader}>
-        <View style={styles.providerNameRow}>
-          <View
-            style={[
-              styles.statusDot,
-              configured ? styles.statusDotActive : styles.statusDotInactive,
-            ]}
-          />
-          <Text style={styles.providerName}>{name}</Text>
+        <View style={styles.providerInfoCol}>
+          <View style={styles.providerNameRow}>
+            <View style={[styles.statusDot, dotStyle]} />
+            <Text style={styles.providerName}>{name}</Text>
+          </View>
+          {qualityTier && (
+            <Text style={styles.qualityTierText}>{qualityTier}</Text>
+          )}
         </View>
-        {configured ? (
-          <Pressable
-            onPress={handleRemove}
-            style={styles.removeButton}
-            disabled={removeMutation.isPending}
-          >
-            {removeMutation.isPending ? (
-              <ActivityIndicator size="small" color={colors.error} />
-            ) : (
-              <Text style={styles.removeButtonText}>Remove</Text>
+        {isConfigured ? (
+          <View style={styles.configuredActions}>
+            {!isValid && (
+              <Pressable
+                onPress={() => setExpanded(!expanded)}
+                style={styles.updateButton}
+              >
+                <Text style={styles.updateButtonText}>
+                  {expanded ? 'Cancel' : 'Update'}
+                </Text>
+              </Pressable>
             )}
-          </Pressable>
+            <Pressable
+              onPress={handleRemove}
+              style={styles.removeButton}
+              disabled={removeMutation.isPending}
+            >
+              {removeMutation.isPending ? (
+                <ActivityIndicator size="small" color={colors.error} />
+              ) : (
+                <Text style={styles.removeButtonText}>Remove</Text>
+              )}
+            </Pressable>
+          </View>
         ) : (
           <Pressable
             onPress={() => setExpanded(!expanded)}
@@ -135,7 +161,7 @@ function ProviderRow({
         )}
       </View>
 
-      {expanded && !configured && (
+      {expanded && (
         <View style={styles.expandedForm}>
           <TextInput
             style={styles.keyInput}
@@ -205,8 +231,10 @@ export default function ApiKeysScreen() {
     queryClient.invalidateQueries({ queryKey: ['settings', 'byok'] });
   }, [queryClient]);
 
-  const isConfigured = (keys: KeyStatus[] | undefined, provider: string) =>
-    keys?.find((k) => k.provider === provider)?.configured ?? false;
+  const getKeyStatus = (keys: KeyStatus[] | undefined, provider: string) => {
+    const entry = keys?.find((k) => k.provider === provider);
+    return { isConfigured: !!entry, isValid: entry?.isValid ?? false };
+  };
 
   const isLoading = aiLoading || ttsLoading;
 
@@ -237,21 +265,25 @@ export default function ApiKeysScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>AI Providers</Text>
               <Text style={styles.sectionSubtitle}>
-                Required for podcast generation, Q&amp;A, and discovery chat
+                AI is free — add your own key for faster models or higher limits
               </Text>
               <View style={styles.card}>
-                {AI_PROVIDERS.map((p, i) => (
-                  <View key={p.id}>
-                    {i > 0 && <View style={styles.separator} />}
-                    <ProviderRow
-                      name={p.name}
-                      providerId={p.id}
-                      configured={isConfigured(aiKeys?.keys, p.id)}
-                      endpoint="ai-keys"
-                      onMutated={handleMutated}
-                    />
-                  </View>
-                ))}
+                {AI_PROVIDERS.map((p, i) => {
+                  const status = getKeyStatus(aiKeys?.keys, p.id);
+                  return (
+                    <View key={p.id}>
+                      {i > 0 && <View style={styles.separator} />}
+                      <ProviderRow
+                        name={p.name}
+                        providerId={p.id}
+                        isConfigured={status.isConfigured}
+                        isValid={status.isValid}
+                        endpoint="ai-keys"
+                        onMutated={handleMutated}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             </View>
 
@@ -261,19 +293,24 @@ export default function ApiKeysScreen() {
                 Required for audio generation — at least one provider needed
               </Text>
               <View style={styles.card}>
-                {TTS_PROVIDERS.map((p, i) => (
-                  <View key={p.id}>
-                    {i > 0 && <View style={styles.separator} />}
-                    <ProviderRow
-                      name={p.name}
-                      providerId={p.id}
-                      configured={isConfigured(ttsKeys?.keys, p.id)}
-                      hasUserId={'hasUserId' in p ? p.hasUserId : undefined}
-                      endpoint="byok"
-                      onMutated={handleMutated}
-                    />
-                  </View>
-                ))}
+                {TTS_PROVIDERS.map((p, i) => {
+                  const status = getKeyStatus(ttsKeys?.keys, p.id);
+                  return (
+                    <View key={p.id}>
+                      {i > 0 && <View style={styles.separator} />}
+                      <ProviderRow
+                        name={p.name}
+                        providerId={p.id}
+                        isConfigured={status.isConfigured}
+                        isValid={status.isValid}
+                        qualityTier={p.qualityTier}
+                        hasUserId={'hasUserId' in p ? p.hasUserId : undefined}
+                        endpoint="byok"
+                        onMutated={handleMutated}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             </View>
           </>
@@ -348,10 +385,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  providerInfoCol: {
+    flexDirection: 'column',
+    gap: 1,
+  },
   providerNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  qualityTierText: {
+    fontFamily: typography.fontBody,
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginLeft: 20,
   },
   statusDot: {
     width: 10,
@@ -361,6 +408,9 @@ const styles = StyleSheet.create({
   statusDotActive: {
     backgroundColor: colors.success,
   },
+  statusDotInvalid: {
+    backgroundColor: colors.error,
+  },
   statusDotInactive: {
     backgroundColor: colors.border,
   },
@@ -368,6 +418,11 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontBody,
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  configuredActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   addButton: {
     paddingVertical: spacing.xs,
@@ -377,6 +432,19 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   addButtonText: {
+    fontFamily: typography.fontBody,
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  updateButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  updateButtonText: {
     fontFamily: typography.fontBody,
     fontSize: 13,
     fontWeight: '600',
