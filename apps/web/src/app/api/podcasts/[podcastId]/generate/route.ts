@@ -443,20 +443,39 @@ async function startImport(
   let sttProvider: SttProviderId | undefined;
   let sttApiKey: string | undefined;
 
+  // STT fallback chain: groq → together → openai → deepgram → assemblyai → elevenlabs
   const groqKey = await getAiKey(userId, 'groq');
   if (groqKey?.apiKey || process.env.GROQ_API_KEY) {
     sttProvider = 'groq';
     sttApiKey = groqKey?.apiKey ?? process.env.GROQ_API_KEY;
   } else {
-    const openaiKey = await getAiKey(userId, 'openai');
-    if (openaiKey?.apiKey || process.env.OPENAI_API_KEY) {
-      sttProvider = 'openai';
-      sttApiKey = openaiKey?.apiKey ?? process.env.OPENAI_API_KEY;
+    const togetherKey = await getAiKey(userId, 'together');
+    if (togetherKey?.apiKey || process.env.TOGETHER_API_KEY) {
+      sttProvider = 'together';
+      sttApiKey = togetherKey?.apiKey ?? process.env.TOGETHER_API_KEY;
     } else {
-      const elKey = await getByokKey(userId, 'elevenlabs');
-      if (elKey || process.env.ELEVENLABS_API_KEY) {
-        sttProvider = 'elevenlabs';
-        sttApiKey = elKey ?? process.env.ELEVENLABS_API_KEY;
+      const openaiKey = await getAiKey(userId, 'openai');
+      if (openaiKey?.apiKey || process.env.OPENAI_API_KEY) {
+        sttProvider = 'openai';
+        sttApiKey = openaiKey?.apiKey ?? process.env.OPENAI_API_KEY;
+      } else {
+        const dgKey = await getAiKey(userId, 'deepgram');
+        if (dgKey?.apiKey || process.env.DEEPGRAM_API_KEY) {
+          sttProvider = 'deepgram';
+          sttApiKey = dgKey?.apiKey ?? process.env.DEEPGRAM_API_KEY;
+        } else {
+          const aaiKey = await getAiKey(userId, 'assemblyai');
+          if (aaiKey?.apiKey || process.env.ASSEMBLYAI_API_KEY) {
+            sttProvider = 'assemblyai';
+            sttApiKey = aaiKey?.apiKey ?? process.env.ASSEMBLYAI_API_KEY;
+          } else {
+            const elKey = await getByokKey(userId, 'elevenlabs');
+            if (elKey || process.env.ELEVENLABS_API_KEY) {
+              sttProvider = 'elevenlabs';
+              sttApiKey = elKey ?? process.env.ELEVENLABS_API_KEY;
+            }
+          }
+        }
       }
     }
   }
