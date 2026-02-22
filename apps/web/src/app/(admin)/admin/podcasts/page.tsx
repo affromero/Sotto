@@ -2,7 +2,7 @@ import React from 'react';
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { CreateAsSottoButton } from './CreateAsSottoButton';
-import { CopyButton } from './CopyButton';
+import { CopyButton } from '@/components/admin/CopyButton';
 import { CreateGitHubIssueButton } from './CreateGitHubIssueButton';
 import { RetryButton } from './RetryButton';
 import styles from './page.module.css';
@@ -190,6 +190,7 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
                             <div>
                               <span className={styles.errorLabel}>Reason:</span>{' '}
                               <span className={styles.errorReason}>{podcast.failureReason}</span>
+                              {' '}<CopyButton text={podcast.failureReason} />
                             </div>
                           )}
                           {podcast.technicalError && (
