@@ -425,6 +425,115 @@ Respond with a JSON array only, no markdown. Each item:
   }
 }
 
+/**
+ * Generate serendipitous "Curiosity" questions — random topics for learning out of pure curiosity.
+ * No web search, no personalization. Maximum diversity and surprise.
+ */
+export async function generateCuriosityQuestions(
+  userId: string,
+  count: number,
+  topic?: string,
+  preloadedCtx?: InspireContext
+): Promise<TasteQuestion[]> {
+
+  const ctx = preloadedCtx ?? await loadInspireContext(userId);
+
+  const safeTopic = topic?.replace(/["\n\r]/g, ' ').trim();
+
+  const topicContext = safeTopic
+    ? `\n\nThe user wants curiosity questions about "${safeTopic}". ALL questions must relate to this topic area, but still be surprising, counterintuitive, and rabbit-hole-worthy.`
+    : '';
+
+  const requestCount = count + 5;
+
+  const systemPrompt = `You generate serendipitous curiosity questions for Sotto's "Curiosity" feed — the feeling of falling down a Wikipedia rabbit hole at 2am.
+
+Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
+
+Your job is to surface the most SURPRISING, COUNTERINTUITIVE, and FASCINATING topics across all of human knowledge:
+- Counterintuitive science (quantum weirdness, time perception, paradoxes)
+- Obscure history (forgotten civilizations, bizarre events, historical coincidences)
+- Philosophical thought experiments (trolley problems, ship of Theseus variants, consciousness puzzles)
+- Linguistic oddities (untranslatable words, language quirks, etymology surprises)
+- Mathematical curiosities (infinity types, impossible shapes, elegant proofs)
+- Cross-disciplinary mashups (music + neuroscience, cooking + chemistry, sports + game theory)
+- Emerging fields (synthetic biology, computational archaeology, astrolinguistics)
+- "Things most people get wrong about X"
+- Unexpected connections between unrelated fields
+
+Do NOT personalize to the user's interests — the whole point is serendipity and surprise.${topicContext}
+
+Rules:
+- Generate exactly ${requestCount} questions
+- Each question maps to 1-3 existing tag slugs from the taxonomy
+- Questions must be specific, vivid, and concrete — not generic
+- Maximize diversity: no two questions from the same narrow topic area
+- Category is the parent slug the question belongs to
+
+Taxonomy (parent: [children]):
+${ctx.taxonomyLines.join('\n')}
+${INPUT_SANITIZATION_INSTRUCTIONS}
+
+Respond with a JSON array only, no markdown. Each item:
+{"text": "Would you listen to a podcast about why we can't tickle ourselves but robots might be able to?", "topic": "why we can't tickle ourselves but robots might be able to", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+
+  try {
+    const resolved = await resolveAiProvider(userId).catch(() => null);
+    let responseText: string;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let usedModel = ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001';
+    const llmStart = Date.now();
+
+    if (resolved?.apiKey && resolved.provider === 'anthropic') {
+      const { default: Anthropic } = await import('@anthropic-ai/sdk');
+      const client = new Anthropic({ apiKey: resolved.apiKey });
+      const response = await client.messages.create({
+        model: usedModel,
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: systemPrompt }],
+      });
+      const textBlock = response.content.find((block) => block.type === 'text');
+      responseText = textBlock?.type === 'text' ? textBlock.text : '';
+      inputTokens = response.usage.input_tokens;
+      outputTokens = response.usage.output_tokens;
+    } else {
+      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const result = await ai.generateResponse(
+        systemPrompt,
+        [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
+        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+      );
+      responseText = result.content;
+      inputTokens = result.inputTokens;
+      outputTokens = result.outputTokens;
+      usedModel = result.model;
+    }
+
+    const durationMs = Date.now() - llmStart;
+
+    const questions = parseAndFilterQuestions(
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
+    );
+
+    logUsage({
+      service: resolved?.provider === 'openai' ? 'openai' : 'anthropic',
+      model: usedModel,
+      category: 'inspire_curiosity',
+      inputTokens,
+      outputTokens,
+      durationMs,
+      userId,
+      metadata: { questionCount: questions.length, topic: topic ?? null },
+    });
+
+    return questions;
+  } catch (err) {
+    logger.warn('Failed to generate Curiosity questions', { error: (err as Error).message });
+    return [];
+  }
+}
+
 export type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
 
 const NEWS_TIME_LABELS: Record<NewsTimeRange, string> = {
