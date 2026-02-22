@@ -138,7 +138,7 @@ export function assessReferenceQuality(
   };
 }
 
-import { wordCountBounds } from './duration';
+import { countWords, wordCountBounds } from './duration';
 
 /**
  * Verify a podcast script by extracting factual claims and evaluating sourcing.
@@ -371,7 +371,7 @@ Analyze every factual claim. Return JSON only.`;
   );
 
   // Duration check — bidirectional (too long OR too short), only when target is set
-  const totalWords = turns.reduce((sum, t) => sum + t.text.split(/\s+/).length, 0);
+  const totalWords = turns.reduce((sum, t) => sum + countWords(t.text), 0);
   let tooLong = false;
   let tooShort = false;
   if (maxDurationMinutes) {
