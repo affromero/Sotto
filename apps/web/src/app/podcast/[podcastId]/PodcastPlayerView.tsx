@@ -18,6 +18,7 @@ import {
   Check,
   Flag,
   BarChart2,
+  Shield,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -57,6 +58,7 @@ import styles from './page.module.css';
 interface PodcastPlayerViewProps {
   podcast: PodcastDetail;
   isOwner: boolean;
+  isAdmin?: boolean;
   isAuthenticated: boolean;
   currentUserId?: string;
   canMakePrivate?: boolean;
@@ -128,7 +130,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUserId, canMakePrivate }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
@@ -502,11 +504,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAuthenticated, currentUs
       {podcast.forkedFrom && <ForkAttribution forkedFrom={podcast.forkedFrom} />}
 
       {/* Failed state */}
-      {liveStatus === 'FAILED' && isOwner && (
+      {liveStatus === 'FAILED' && (isOwner || isAdmin) && (
         <div className={styles.failedState}>
           <p className={styles.failedText}>
             {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
           </p>
+          {isAdmin && (
+            <Link href={`/admin/podcasts?search=${podcast.id}`} className={styles.adminLink}>
+              <Shield size={14} />
+              View in Admin Panel
+            </Link>
+          )}
           <div className={styles.failedActions}>
             <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
               <RefreshCw size={16} />
