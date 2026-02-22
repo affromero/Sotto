@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import styles from './page.module.css';
+import styles from './CopyButton.module.css';
 
 export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
