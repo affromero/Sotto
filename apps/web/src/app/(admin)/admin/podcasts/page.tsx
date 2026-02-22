@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { CreateAsSottoButton } from './CreateAsSottoButton';
 import { CopyButton } from './CopyButton';
+import { CreateGitHubIssueButton } from './CreateGitHubIssueButton';
 import { RetryButton } from './RetryButton';
 import styles from './page.module.css';
 
@@ -190,7 +191,18 @@ export default async function AdminPodcastsPage({ searchParams }: PageProps) {
                           )}
                           {podcast.technicalError && (
                             <div className={styles.errorTechnicalWrapper}>
-                              <CopyButton text={podcast.technicalError} />
+                              <div className={styles.errorActions}>
+                                <CopyButton text={podcast.technicalError} />
+                                <CreateGitHubIssueButton
+                                  podcastId={podcast.id}
+                                  title={podcast.title}
+                                  creatorEmail={podcast.user.email ?? ''}
+                                  failedAtStatus={podcast.failedAtStatus}
+                                  failedAt={podcast.failedAt?.toISOString() ?? null}
+                                  failureReason={podcast.failureReason}
+                                  technicalError={podcast.technicalError}
+                                />
+                              </div>
                               <pre className={styles.errorTechnical}>{podcast.technicalError}</pre>
                             </div>
                           )}
