@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
+import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -81,6 +82,7 @@ export default async function SettingsPage() {
 
   const configuredProviders = byokKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
   const configuredAiProviders = aiKeys.map((k) => ({ provider: k.provider, isValid: k.isValid }));
+  const aiProviderMeta = getAllAiProviderClientMeta();
   const isTwitterProviderAvailable = !!process.env.TWITTER_CLIENT_ID && !!process.env.TWITTER_CLIENT_SECRET;
 
   return (
@@ -104,6 +106,7 @@ export default async function SettingsPage() {
         selectedInterestTagIds={selectedInterestTagIds}
         configuredTtsProviders={configuredProviders}
         configuredAiProviders={configuredAiProviders}
+        aiProviderMeta={aiProviderMeta}
         isTwitterProviderAvailable={isTwitterProviderAvailable}
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}

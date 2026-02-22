@@ -1,38 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import type { AiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TtsProviderLogo } from '@/components/ui/TtsProviderLogo';
 import styles from './TtsProviderCards.module.css';
-
-const PROVIDERS = [
-  {
-    id: 'anthropic' as const,
-    name: 'Anthropic (Claude)',
-    description: 'Better script generation and creative writing',
-    badge: 'optional' as const,
-    placeholder: 'sk-ant-...',
-    getKeyUrl: 'https://console.anthropic.com/settings/keys',
-  },
-  {
-    id: 'openai' as const,
-    name: 'OpenAI',
-    description: 'Covers both LLM and TTS with one key',
-    badge: 'optional' as const,
-    placeholder: 'sk-...',
-    getKeyUrl: 'https://platform.openai.com/api-keys',
-  },
-  {
-    id: 'groq' as const,
-    name: 'Groq',
-    description: 'Free Whisper transcription — no credit card needed',
-    badge: 'free' as const,
-    placeholder: 'gsk_...',
-    getKeyUrl: 'https://console.groq.com/keys',
-  },
-];
 
 interface ProviderStatus {
   provider: string;
@@ -41,24 +15,25 @@ interface ProviderStatus {
 
 interface AiProviderCardsProps {
   initialConfigured: Array<ProviderStatus>;
+  providerMeta: AiProviderClientMeta[];
 }
 
-export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
+export function AiProviderCards({ initialConfigured, providerMeta }: AiProviderCardsProps) {
   const [configured, setConfigured] = useState<Map<string, boolean>>(
     new Map(initialConfigured.map((p) => [p.provider, p.isValid]))
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error'>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<Record<string, 'idle' | 'saved' | 'removed' | 'error' | 'validating'>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSaveKey = async (providerId: string) => {
     const apiKey = fieldValues[providerId]?.trim();
     if (!apiKey) return;
 
-    setSaving(true);
-    setStatus((prev) => ({ ...prev, [providerId]: 'idle' }));
+    setSavingId(providerId);
+    setStatus((prev) => ({ ...prev, [providerId]: 'validating' }));
     setErrors((prev) => ({ ...prev, [providerId]: '' }));
 
     try {
@@ -88,12 +63,12 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
       setErrors((prev) => ({ ...prev, [providerId]: 'Network error. Please try again.' }));
       setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
   };
 
   const handleRemoveKey = async (providerId: string) => {
-    setSaving(true);
+    setSavingId(providerId);
     try {
       await fetch('/api/settings/ai-keys', {
         method: 'DELETE',
@@ -111,16 +86,18 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
       setErrors((prev) => ({ ...prev, [providerId]: 'Failed to remove key.' }));
       setStatus((prev) => ({ ...prev, [providerId]: 'error' }));
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
   };
 
   return (
     <div className={styles.grid}>
-      {PROVIDERS.map((provider) => {
+      {providerMeta.map((provider) => {
         const isConfigured = configured.has(provider.id);
         const isValid = configured.get(provider.id) ?? true;
         const isExpanded = expandedId === provider.id;
+        const isSaving = savingId === provider.id;
+        const modelNames = provider.models.map((m) => m.displayName).join(' · ');
 
         return (
           <div key={provider.id} className={styles.card}>
@@ -129,14 +106,17 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
                 <TtsProviderLogo provider={provider.id} size={28} />
                 <div className={styles.cardInfo}>
                   <span className={styles.cardNameRow}>
-                    <span className={styles.cardName}>{provider.name}</span>
+                    <span className={styles.cardName}>{provider.displayName}</span>
                     {provider.badge === 'free' && <Badge variant="success">Free</Badge>}
                     {provider.badge === 'optional' && <Badge variant="system">Optional</Badge>}
                   </span>
                   <span className={styles.cardQuality}>{provider.description}</span>
+                  <span className={styles.cardQuality}>{modelNames}</span>
                 </div>
               </div>
-              {isConfigured ? (
+              {status[provider.id] === 'validating' ? (
+                <span className={styles.statusValidating}>Validating key...</span>
+              ) : isConfigured ? (
                 isValid ? (
                   <span className={styles.statusConnected}>Connected</span>
                 ) : (
@@ -149,11 +129,18 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
 
             {isConfigured && !isExpanded && (
               <div className={styles.cardActions}>
+                <button
+                  type="button"
+                  className={styles.addKeyBtn}
+                  onClick={() => setExpandedId(provider.id)}
+                >
+                  Update Key
+                </button>
                 <Button
                   variant="ghost"
                   onClick={() => handleRemoveKey(provider.id)}
-                  loading={saving}
-                  disabled={saving}
+                  loading={isSaving}
+                  disabled={savingId !== null}
                 >
                   Remove Key
                 </Button>
@@ -172,36 +159,41 @@ export function AiProviderCards({ initialConfigured }: AiProviderCardsProps) {
                 >
                   Add Key
                 </button>
-                <a
-                  href={provider.getKeyUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.getKeyLink}
-                >
-                  Get API Key
-                </a>
+                {provider.getApiKeyUrl && (
+                  <a
+                    href={provider.getApiKeyUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.getKeyLink}
+                  >
+                    Get API Key
+                  </a>
+                )}
               </div>
             )}
 
             {isExpanded && (
               <div className={styles.keyForm}>
-                <Input
-                  label="API Key"
-                  type="password"
-                  value={fieldValues[provider.id] || ''}
-                  onChange={(e) =>
-                    setFieldValues((prev) => ({
-                      ...prev,
-                      [provider.id]: e.target.value,
-                    }))
-                  }
-                  placeholder={provider.placeholder}
-                />
+                {provider.authFields.map((field) => (
+                  <Input
+                    key={field.key}
+                    label={field.label}
+                    type="password"
+                    value={fieldValues[provider.id] || ''}
+                    onChange={(e) =>
+                      setFieldValues((prev) => ({
+                        ...prev,
+                        [provider.id]: e.target.value,
+                      }))
+                    }
+                    placeholder={field.placeholder}
+                  />
+                ))}
                 <div className={styles.keyFormActions}>
                   <Button
                     onClick={() => handleSaveKey(provider.id)}
-                    loading={saving}
-                    disabled={saving || !fieldValues[provider.id]?.trim()}
+                    loading={isSaving}
+                    disabled={savingId !== null || !fieldValues[provider.id]?.trim()}
                   >
                     Save Key
                   </Button>
