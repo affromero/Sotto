@@ -21,6 +21,7 @@ export interface TtsModelOption {
 export interface TtsProviderMeta {
   id: TtsProviderId;
   displayName: string;
+  getApiKeyUrl: string;
   supportsSfx: boolean;
   supportsVoiceCloning: boolean;
   supportsStreaming: boolean;
@@ -40,6 +41,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   elevenlabs: {
     id: 'elevenlabs',
     displayName: 'ElevenLabs',
+    getApiKeyUrl: 'https://elevenlabs.io/app/settings/api-keys',
     supportsSfx: true,
     supportsVoiceCloning: true,
     supportsStreaming: true,
@@ -71,6 +73,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   openai: {
     id: 'openai',
     displayName: 'OpenAI',
+    getApiKeyUrl: 'https://platform.openai.com/api-keys',
     supportsSfx: false,
     supportsVoiceCloning: false,
     supportsStreaming: true,
@@ -102,6 +105,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   playht: {
     id: 'playht',
     displayName: 'PlayHT',
+    getApiKeyUrl: 'https://play.ht/studio/api-access',
     supportsSfx: false,
     supportsVoiceCloning: true,
     supportsStreaming: true,
@@ -137,6 +141,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   cartesia: {
     id: 'cartesia',
     displayName: 'Cartesia',
+    getApiKeyUrl: 'https://play.cartesia.ai/keys',
     supportsSfx: false,
     supportsVoiceCloning: true,
     supportsStreaming: true,
@@ -169,6 +174,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   hume: {
     id: 'hume',
     displayName: 'Hume AI',
+    getApiKeyUrl: 'https://platform.hume.ai/settings/keys',
     supportsSfx: false,
     supportsVoiceCloning: true,
     supportsStreaming: false,
@@ -207,6 +213,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   fal: {
     id: 'fal',
     displayName: 'Fal (Qwen3-TTS)',
+    getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
     supportsVoiceCloning: true,
     supportsStreaming: false,
@@ -237,6 +244,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   replicate: {
     id: 'replicate',
     displayName: 'Replicate (Qwen3-TTS)',
+    getApiKeyUrl: 'https://replicate.com/account/api-tokens',
     supportsSfx: false,
     supportsVoiceCloning: false,
     supportsStreaming: false,
@@ -264,6 +272,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
   kittentts: {
     id: 'kittentts',
     displayName: 'KittenTTS (Platform)',
+    getApiKeyUrl: '',
     supportsSfx: false,
     supportsVoiceCloning: false,
     supportsStreaming: false,
@@ -318,6 +327,45 @@ export async function validateProviderCredentials(
     });
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Client-safe DTO — serializable subset of TtsProviderMeta (no validate())
+// ---------------------------------------------------------------------------
+
+export interface TtsProviderClientMeta {
+  id: Exclude<TtsProviderId, 'kittentts'>;
+  displayName: string;
+  getApiKeyUrl: string;
+  qualityTier: 'standard' | 'premium' | 'ultra';
+  supportsSfx: boolean;
+  supportsVoiceCloning: boolean;
+  supportsStreaming: boolean;
+  models: TtsModelOption[];
+  authFields: TtsProviderAuthField[];
+  recommended: boolean;
+}
+
+/**
+ * Returns serializable provider metadata for client components.
+ * Strips `validate()`, filters out `kittentts` (platform-only, not user-facing).
+ * Called server-side only — client components receive this as props.
+ */
+export function getAllTtsProviderClientMeta(): TtsProviderClientMeta[] {
+  return Object.values(TTS_PROVIDERS)
+    .filter((p): p is TtsProviderMeta & { id: Exclude<TtsProviderId, 'kittentts'> } => p.id !== 'kittentts')
+    .map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      getApiKeyUrl: p.getApiKeyUrl,
+      qualityTier: p.qualityTier,
+      supportsSfx: p.supportsSfx,
+      supportsVoiceCloning: p.supportsVoiceCloning,
+      supportsStreaming: p.supportsStreaming,
+      models: p.models,
+      authFields: p.auth.fields,
+      recommended: p.id === 'elevenlabs',
+    }));
 }
 
 /**

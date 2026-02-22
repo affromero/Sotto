@@ -163,6 +163,45 @@ export function getAiModelDisplayName(modelId: string): string {
   return modelId;
 }
 
+// ---------------------------------------------------------------------------
+// Client-safe DTO — serializable subset of AiProviderMeta (no validate())
+// ---------------------------------------------------------------------------
+
+export interface AiProviderClientMeta {
+  id: Exclude<AiProviderId, 'claude-code'>;
+  displayName: string;
+  getApiKeyUrl: string;
+  models: AiModelOption[];
+  authFields: AiProviderAuthField[];
+  description: string;
+  badge: 'optional' | 'free' | null;
+}
+
+const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { description: string; badge: 'optional' | 'free' | null }> = {
+  anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
+  openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
+  groq: { description: 'Free Whisper transcription — no credit card needed', badge: 'free' },
+};
+
+/**
+ * Returns serializable provider metadata for client components.
+ * Strips `validate()`, filters out `claude-code` (not user-facing).
+ * Called server-side only — client components receive this as props.
+ */
+export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
+  return Object.values(AI_PROVIDERS)
+    .filter((p): p is AiProviderMeta & { id: Exclude<AiProviderId, 'claude-code'> } => p.id !== 'claude-code')
+    .map((p) => ({
+      id: p.id,
+      displayName: p.displayName,
+      getApiKeyUrl: p.getApiKeyUrl,
+      models: p.models,
+      authFields: p.auth.fields,
+      description: AI_CLIENT_DESCRIPTIONS[p.id].description,
+      badge: AI_CLIENT_DESCRIPTIONS[p.id].badge,
+    }));
+}
+
 export async function validateAiProviderCredentials(
   providerId: AiProviderId,
   credentials: Record<string, string>
