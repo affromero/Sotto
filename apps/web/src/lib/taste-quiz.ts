@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import type { TasteQuestion } from '@sotto/shared';
+import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { prisma } from './prisma';
 import { getFreeTierConfig } from './free-tier-config';
 import { createAIProvider } from './providers/ai';
@@ -534,7 +534,8 @@ Respond with a JSON array only, no markdown. Each item:
   }
 }
 
-export type NewsTimeRange = '1h' | '12h' | '24h' | '1w' | '1m';
+// Re-export for consumers that import from this file
+export type { NewsTimeRange } from '@sotto/shared';
 
 const NEWS_TIME_LABELS: Record<NewsTimeRange, string> = {
   '1h': 'the past hour',

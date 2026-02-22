@@ -52,6 +52,13 @@ export type {
   DiscoveryState,
   TasteQuestion,
   TasteAnswer,
+  InspireSection,
+  NewsTimeRange,
+} from './types/discovery';
+
+export {
+  INSPIRE_SECTION_LABELS,
+  NEWS_TIME_RANGE_LABELS,
 } from './types/discovery';
 
 export type { PlayerState, PlayerControls } from './types/player';

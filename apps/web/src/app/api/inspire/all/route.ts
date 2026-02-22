@@ -9,8 +9,7 @@ import {
   generateCuriosityQuestions,
   loadInspireContext,
 } from '@/lib/taste-quiz';
-import type { NewsTimeRange } from '@/lib/taste-quiz';
-import type { TasteQuestion } from '@sotto/shared';
+import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
 import { logger } from '@/lib/logger';
