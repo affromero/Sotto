@@ -52,7 +52,7 @@ function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
     items.push({ href: '/settings/voices', label: 'Voices', icon: Mic });
   }
 
-  items.push({ href: '/ideas', label: 'Saved Ideas', icon: Bookmark });
+  items.push({ href: '/ideas', label: 'Library', icon: Bookmark });
   items.push({ href: '/billing', label: 'API Keys', icon: Key });
   items.push({ href: '/settings', label: 'Settings', icon: Settings });
 
