@@ -229,6 +229,8 @@
   color: var(--color-text-secondary);
   white-space: pre-wrap;
   word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
   margin: 0;
   padding: var(--spacing-xs);
   background: var(--color-background);
