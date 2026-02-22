@@ -1,18 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
 const mockCountersIncrement = vi.fn();
 const mockGenerateForYou = vi.fn();
 const mockGenerateNews = vi.fn();
+const mockGenerateCuriosity = vi.fn();
 const mockLoadInspireContext = vi.fn();
 const mockGetTrending = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -29,6 +30,7 @@ vi.mock('@/lib/redis', () => ({
 vi.mock('@/lib/taste-quiz', () => ({
   generateForYouQuestions: (...args: unknown[]) => mockGenerateForYou(...args),
   generateNewsQuestions: (...args: unknown[]) => mockGenerateNews(...args),
+  generateCuriosityQuestions: (...args: unknown[]) => mockGenerateCuriosity(...args),
   loadInspireContext: (...args: unknown[]) => mockLoadInspireContext(...args),
 }));
 
@@ -56,6 +58,10 @@ const mockForYou = [
 
 const mockNews = [
   { id: 'n1', text: 'Mars Discovery', tagSlugs: ['science'], category: 'science' },
+];
+
+const mockCuriosity = [
+  { id: 'c1', text: 'Why we can\'t tickle ourselves', tagSlugs: ['science'], category: 'science' },
 ];
 
 const mockTrending = [
@@ -102,30 +108,32 @@ async function readSseEvents(res: Response): Promise<Record<string, unknown>[]> 
 describe('GET /api/inspire/all', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 9, resetAt: 0 });
     mockCacheGet.mockResolvedValue(null); // cache miss by default
     mockCacheSet.mockResolvedValue(undefined);
     mockCountersIncrement.mockResolvedValue(undefined);
     mockGenerateForYou.mockResolvedValue(mockForYou);
     mockGenerateNews.mockResolvedValue(mockNews);
+    mockGenerateCuriosity.mockResolvedValue(mockCuriosity);
     mockGetTrending.mockResolvedValue(mockTrending);
     mockLoadInspireContext.mockResolvedValue(mockContext);
   });
 
   it('returns 401 for unauthenticated requests', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
     const res = await GET(createRequest());
     expect(res.status).toBe(401);
   });
 
   it('returns all cached sections as JSON when all hit', async () => {
     const cachedTrending = [{ id: 'pod-1', title: 'Top Pod' }];
-    // Return cached values for all 3
+    // Return cached values for all 4
     mockCacheGet
       .mockResolvedValueOnce(mockForYou) // forYou
       .mockResolvedValueOnce(cachedTrending) // trending
-      .mockResolvedValueOnce(mockNews); // news
+      .mockResolvedValueOnce(mockNews) // news
+      .mockResolvedValueOnce(mockCuriosity); // curiosity
 
     const res = await GET(createRequest());
     const body = await res.json();
@@ -135,9 +143,10 @@ describe('GET /api/inspire/all', () => {
     expect(body.forYou).toEqual(mockForYou);
     expect(body.trending).toEqual(cachedTrending);
     expect(body.news).toEqual(mockNews);
+    expect(body.curiosity).toEqual(mockCuriosity);
   });
 
-  it('returns SSE stream on cache miss', async () => {
+  it('returns SSE stream with 4 sections on cache miss', async () => {
     const res = await GET(createRequest());
 
     expect(res.headers.get('content-type')).toBe('text/event-stream');
@@ -148,6 +157,7 @@ describe('GET /api/inspire/all', () => {
     expect(sectionNames).toContain('trending');
     expect(sectionNames).toContain('forYou');
     expect(sectionNames).toContain('news');
+    expect(sectionNames).toContain('curiosity');
     expect(events[events.length - 1]).toEqual({ done: true });
   });
 
@@ -191,4 +201,36 @@ describe('GET /api/inspire/all', () => {
     expect(trendingEvent!.data).toEqual([]);
   });
 
+  it('returns only curiosity when section=curiosity', async () => {
+    const res = await GET(createRequest({ section: 'curiosity' }));
+    const body = await res.json();
+
+    expect(body.curiosity).toEqual(mockCuriosity);
+    expect(body.forYou).toBeUndefined();
+    expect(body.trending).toBeUndefined();
+    expect(body.news).toBeUndefined();
+  });
+
+  it('returns only trending when section=trending', async () => {
+    const res = await GET(createRequest({ section: 'trending' }));
+    const body = await res.json();
+
+    expect(body.trending).toBeDefined();
+    expect(body.forYou).toBeUndefined();
+    expect(body.news).toBeUndefined();
+    expect(body.curiosity).toBeUndefined();
+  });
+
+  it('supports Bearer token auth (mobile)', async () => {
+    const url = new URL('http://localhost:3000/api/inspire/all?section=forYou');
+    const req = new NextRequest(url, {
+      headers: { Authorization: 'Bearer sk_sotto_test123' },
+    });
+
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(mockAuthenticateRequest).toHaveBeenCalledWith(req);
+    expect(body.forYou).toEqual(mockForYou);
+  });
 });
