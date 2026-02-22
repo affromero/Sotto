@@ -6,6 +6,7 @@ import {
 import { getRecentPipelineErrors } from '@/lib/pipeline-events';
 import { subDays, startOfDay } from 'date-fns';
 import Link from 'next/link';
+import { CopyButton } from '@/components/admin/CopyButton';
 import styles from './page.module.css';
 
 interface PageProps {
@@ -236,7 +237,10 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
                         {evt.type}
                       </span>
                     </td>
-                    <td className={styles.errorCell}>{evt.message}</td>
+                    <td className={styles.errorCell}>
+                      {evt.message}
+                      {evt.message && <> <CopyButton text={evt.message} /></>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
