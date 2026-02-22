@@ -1,38 +1,10 @@
-/* Saved Ideas Page */
-
-.main {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
-
-/* Header */
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-}
-
-.subtitle {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-}
-
-/* Grid */
+/* Ideas Tab */
 
 .grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--spacing-md);
 }
-
-/* Card */
 
 .card {
   display: flex;
@@ -83,8 +55,6 @@
   font: var(--text-caption);
   color: var(--color-text-tertiary);
 }
-
-/* Card actions */
 
 .cardActions {
   display: flex;
