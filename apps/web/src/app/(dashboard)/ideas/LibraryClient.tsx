@@ -5,6 +5,7 @@ import { Lightbulb, Bookmark, ListMusic, ListOrdered } from 'lucide-react';
 import { IdeasTab } from './tabs/IdeasTab';
 import { SavedTab } from './tabs/SavedTab';
 import { CollectionsTab } from './tabs/CollectionsTab';
+import { QueueTab } from './tabs/QueueTab';
 import type { SerializedSavedIdea, SerializedPodcastIdea } from './tabs/IdeasTab';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './LibraryClient.module.css';
@@ -17,6 +18,19 @@ interface CollectionSummary {
   podcastCount: number;
   followerCount: number;
   createdAt: string;
+}
+
+interface QueueItem {
+  id: string;
+  position: number;
+  podcastId: string;
+  podcast: {
+    id: string;
+    title: string;
+    topic: string;
+    duration: number | null;
+    user: { id: string; name: string | null; image: string | null };
+  };
 }
 
 type TabId = 'ideas' | 'saved' | 'collections' | 'queue';
@@ -52,7 +66,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
   const [collectionsLoading, setCollectionsLoading] = useState(false);
   const collectionsLoadedRef = useRef(false);
 
-  const [queueData, setQueueData] = useState<unknown[] | null>(null);
+  const [queueData, setQueueData] = useState<QueueItem[] | null>(null);
   const [queueLoading, setQueueLoading] = useState(false);
   const queueLoadedRef = useRef(false);
 
@@ -164,7 +178,7 @@ export function LibraryClient({ ideas, podcastIdeas, counts }: LibraryClientProp
               <span>Loading queue...</span>
             </div>
           ) : queueData !== null ? (
-            <div className={styles.placeholder}>Queue tab content</div>
+            <QueueTab items={queueData} />
           ) : null
         )}
       </div>
