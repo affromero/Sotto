@@ -28,7 +28,7 @@ Before starting, ensure you have:
 ### Required Accounts
 
 - **Domain name**: `sotto.fm`, `trysotto.com`, or similar
-- **Hetzner account**: For VPS hosting (CPX31 ~$11/mo runs everything)
+- **Hetzner account**: For VPS hosting (CX32 ~$8/mo runs everything)
 - **GitHub account**: For repo hosting and CI/CD
 - **Cloudflare account**: For R2 storage (10GB free)
 - **Stripe account**: For voice marketplace payments (Stripe Connect)
@@ -387,7 +387,7 @@ STRIPE_WEBHOOK_SECRET="whsec_xxxxx"
 3. Add a server:
    - Location: Choose closest to your users (e.g., Falkenstein, Ashburn)
    - Image: Ubuntu 22.04
-   - Type: **CPX31** (4 vCPU, 8GB RAM, 160GB SSD) — €10/mo (~$11)
+   - Type: **CX32** (4 vCPU, 8GB RAM, 80GB SSD) — €7/mo (~$8)
    - Add your SSH key
 4. Note the server IP address
 
@@ -550,7 +550,7 @@ Monthly costs for MVP with 50 beta users (estimated):
 
 | Service | Tier | Cost | Notes |
 |---------|------|------|-------|
-| **Hetzner VPS** | CPX31 (4 vCPU, 8GB) | $11 | Web + workers + PostgreSQL + Redis |
+| **Hetzner VPS** | CX32 (4 vCPU, 8GB) | $8 | Web + workers + PostgreSQL + Redis |
 | **Cloudflare R2** | Free | $0 | 10GB storage, 10M Class A requests |
 | **Anthropic Claude** | Pay-as-you-go | $15-30 | Platform fallback only (most users BYOK) |
 | **ElevenLabs** | Creator | $22 | Platform fallback only (most users BYOK) |
@@ -562,7 +562,7 @@ Monthly costs for MVP with 50 beta users (estimated):
 
 **At 100 users** (most providing own keys):
 
-- Hetzner: $11 (CPX31 still sufficient)
+- Hetzner: $8 (CX32 still sufficient)
 - Claude: $10-20 (free tier fallback only)
 - ElevenLabs: $22 (free tier fallback only)
 - **Total: ~$45/mo**

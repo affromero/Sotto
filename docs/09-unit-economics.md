@@ -83,8 +83,8 @@ This is a SaaS gross margin profile. The model works at any realistic usage leve
 | 2K–10K users | 2× CCX33 | 2TB | **$115** | $1,380 |
 | 10K–50K users | Dedicated + CDN | 5TB | **~$400** | $4,800 |
 
-Note: Upgraded from CPX31 to CPX41 baseline because KittenTTS is CPU-intensive
-(2–4 vCPU per concurrent synthesis). The $11/month CPX31 is too tight under real load.
+Note: Upgraded from CX32 to CPX41 baseline because KittenTTS is CPU-intensive
+(2–4 vCPU per concurrent synthesis). The $8/month CX32 is too tight under real load.
 
 ---
 
