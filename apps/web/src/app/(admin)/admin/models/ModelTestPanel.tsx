@@ -3,12 +3,14 @@
 import { useState, useCallback } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { TestableProvider } from './page';
+import { KittenHealthBanner } from './KittenHealthBanner';
 import styles from './ModelTestPanel.module.css';
 
 interface ModelTestPanelProps {
   aiProviders: TestableProvider[];
   ttsProviders: TestableProvider[];
   sttProviders: TestableProvider[];
+  kittenConfigured: boolean;
 }
 
 type TestStatus = 'idle' | 'running' | 'pass' | 'fail';
@@ -195,7 +197,7 @@ function Section({ label, providers, results, onTest, onTestAll }: SectionProps)
   );
 }
 
-export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders }: ModelTestPanelProps) {
+export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kittenConfigured }: ModelTestPanelProps) {
   const [results, setResults] = useState<Record<string, TestResult>>({});
 
   const setResult = useCallback((key: string, result: TestResult) => {
@@ -257,6 +259,7 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders }: Mode
 
   return (
     <div className={styles.panel}>
+      {kittenConfigured && <KittenHealthBanner />}
       <Section
         label="AI (LLM)"
         providers={aiProviders}
