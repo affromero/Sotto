@@ -32,6 +32,30 @@ const PROVIDERS = [
     placeholder: 'gsk_...',
     getKeyUrl: 'https://console.groq.com/keys',
   },
+  {
+    id: 'together' as const,
+    name: 'Together AI',
+    description: 'Cheap Whisper STT at $0.0015/min',
+    badge: 'optional' as const,
+    placeholder: '',
+    getKeyUrl: 'https://api.together.xyz/settings/api-keys',
+  },
+  {
+    id: 'deepgram' as const,
+    name: 'Deepgram',
+    description: 'Nova-3 STT — high accuracy with $200 free credits',
+    badge: 'optional' as const,
+    placeholder: '',
+    getKeyUrl: 'https://console.deepgram.com/',
+  },
+  {
+    id: 'assemblyai' as const,
+    name: 'AssemblyAI',
+    description: 'Universal-2 STT — 99 languages with $50 free credits',
+    badge: 'optional' as const,
+    placeholder: '',
+    getKeyUrl: 'https://www.assemblyai.com/app',
+  },
 ];
 
 interface ProviderStatus {

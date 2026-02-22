@@ -229,9 +229,36 @@ describe('importPodcastSchema — groq STT provider', () => {
     const result = importPodcastSchema.safeParse({
       isHumanContent: false,
       sourcePlatform: 'youtube',
-      sttProvider: 'deepgram',
+      sttProvider: 'invalid-provider',
     });
     expect(result.success).toBe(false);
+  });
+
+  it('accepts together as sttProvider', () => {
+    const result = importPodcastSchema.safeParse({
+      isHumanContent: false,
+      sourcePlatform: 'youtube',
+      sttProvider: 'together',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts deepgram as sttProvider', () => {
+    const result = importPodcastSchema.safeParse({
+      isHumanContent: false,
+      sourcePlatform: 'youtube',
+      sttProvider: 'deepgram',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts assemblyai as sttProvider', () => {
+    const result = importPodcastSchema.safeParse({
+      isHumanContent: false,
+      sourcePlatform: 'youtube',
+      sttProvider: 'assemblyai',
+    });
+    expect(result.success).toBe(true);
   });
 
   it('accepts omitted sttProvider', () => {

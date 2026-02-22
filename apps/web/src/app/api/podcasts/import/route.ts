@@ -119,6 +119,21 @@ async function resolveSttApiKey(
     return byokKey?.apiKey ?? process.env.GROQ_API_KEY ?? undefined;
   }
 
+  if (provider === 'together') {
+    const byokKey = await getAiKey(userId, 'together');
+    return byokKey?.apiKey ?? process.env.TOGETHER_API_KEY ?? undefined;
+  }
+
+  if (provider === 'deepgram') {
+    const byokKey = await getAiKey(userId, 'deepgram');
+    return byokKey?.apiKey ?? process.env.DEEPGRAM_API_KEY ?? undefined;
+  }
+
+  if (provider === 'assemblyai') {
+    const byokKey = await getAiKey(userId, 'assemblyai');
+    return byokKey?.apiKey ?? process.env.ASSEMBLYAI_API_KEY ?? undefined;
+  }
+
   // elevenlabs
   const byokKey = await getByokKey(userId, 'elevenlabs');
   return byokKey ?? process.env.ELEVENLABS_API_KEY ?? undefined;
@@ -259,7 +274,9 @@ export async function POST(request: NextRequest) {
       const provider = validatedSttProvider ?? 'openai';
       return NextResponse.json(
         {
-          error: `No API key available for speech-to-text provider "${provider}". Add a ${provider === 'openai' ? 'OpenAI' : provider === 'groq' ? 'Groq' : 'ElevenLabs'} key in Settings → API Keys, or provide a transcript file.`,
+          error: `No API key available for speech-to-text provider "${provider}". Add a ${
+            { openai: 'OpenAI', groq: 'Groq', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider
+          } key in Settings → API Keys, or provide a transcript file.`,
         },
         { status: 400 }
       );
