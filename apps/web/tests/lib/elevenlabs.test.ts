@@ -221,6 +221,61 @@ describe('elevenlabs', () => {
       });
     });
 
+    it('includes output_format query parameter in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+
+      const url = mockFetch.mock.calls[0][0];
+      expect(url).toContain('output_format=mp3_44100_128');
+    });
+
+    it('does not include use_speaker_boost in request body', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.voice_settings).not.toHaveProperty('use_speaker_boost');
+    });
+
+    it('passes previous_text and next_text when provided', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({
+        text: 'Current segment',
+        voiceId: 'voice-123',
+        previousText: 'Previous segment text',
+        nextText: 'Next segment text',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.previous_text).toBe('Previous segment text');
+      expect(body.next_text).toBe('Next segment text');
+    });
+
+    it('omits previous_text and next_text when not provided', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({ text: 'Test', voiceId: 'voice-123' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).not.toHaveProperty('previous_text');
+      expect(body).not.toHaveProperty('next_text');
+    });
+
     it('throws error when API key is not configured', async () => {
       delete process.env.ELEVENLABS_API_KEY;
 

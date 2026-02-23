@@ -27,7 +27,13 @@ export class ElevenLabsProvider implements TtsProvider {
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
     const el = await this.getClient();
     const apiKeyOverride = params.apiKeyOverride || this.byokApiKey;
-    return el.generateSpeech({ ...params, modelId: params.modelId ?? this.model, apiKeyOverride });
+    return el.generateSpeech({
+      ...params,
+      modelId: params.modelId ?? this.model,
+      apiKeyOverride,
+      previousText: params.previousText,
+      nextText: params.nextText,
+    });
   }
 
   async generateSoundEffect(params: SfxParams): Promise<Buffer> {

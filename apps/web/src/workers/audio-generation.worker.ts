@@ -19,7 +19,7 @@ import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
-  const { podcastId, segmentId, speaker, text } = job.data;
+  const { podcastId, segmentId, speaker, text, previousText, nextText } = job.data;
 
   logger.info('Generating audio for segment', { podcastId, segmentId, speaker });
   await job.updateProgress(10);
@@ -170,7 +170,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
   let audioBuffer: Buffer;
   try {
-    audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
+    audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId, previousText, nextText });
   } finally {
     await semaphore.release(semaphoreKey);
   }

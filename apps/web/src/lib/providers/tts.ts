@@ -20,6 +20,8 @@ export interface SpeechParams {
   similarityBoost?: number;
   style?: number;
   apiKeyOverride?: string;
+  previousText?: string;
+  nextText?: string;
 }
 
 export interface SfxParams {

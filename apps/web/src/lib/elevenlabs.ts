@@ -93,30 +93,39 @@ export async function generateSpeech(params: {
   similarityBoost?: number;
   style?: number;
   apiKeyOverride?: string;
+  previousText?: string;
+  nextText?: string;
 }): Promise<Buffer> {
   const apiKey = params.apiKeyOverride || getApiKey();
   if (!apiKey) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
-  const response = await fetch(`${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': apiKey,
-      'Content-Type': 'application/json',
-      Accept: 'audio/mpeg',
+  const body: Record<string, unknown> = {
+    text: params.text,
+    model_id: params.modelId || 'eleven_v3',
+    voice_settings: {
+      stability: params.stability ?? 0.45,
+      similarity_boost: params.similarityBoost ?? 0.75,
+      style: params.style ?? 0.45,
     },
-    body: JSON.stringify({
-      text: params.text,
-      model_id: params.modelId || 'eleven_v3',
-      voice_settings: {
-        stability: params.stability ?? 0.5,
-        similarity_boost: params.similarityBoost ?? 0.75,
-        style: params.style ?? 0.3,
-        use_speaker_boost: true,
+  };
+
+  if (params.previousText) body.previous_text = params.previousText;
+  if (params.nextText) body.next_text = params.nextText;
+
+  const response = await fetch(
+    `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_128`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
       },
-    }),
-  });
+      body: JSON.stringify(body),
+    },
+  );
 
   if (!response.ok) {
     const errorText = await response.text();

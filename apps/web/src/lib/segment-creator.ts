@@ -19,11 +19,16 @@ export async function createSegmentsAndQueueAudio(
       },
     });
 
+    const previousText = i > 0 ? turns[i - 1].text.slice(-500) : undefined;
+    const nextText = i < turns.length - 1 ? turns[i + 1].text.slice(0, 500) : undefined;
+
     await addJob(audioGenerationQueue, JobType.GENERATE_AUDIO, {
       podcastId,
       segmentId: segment.id,
       speaker: turns[i].speaker,
       text: turns[i].text,
+      previousText,
+      nextText,
     });
   }
 }
