@@ -268,7 +268,7 @@ ${params.depth === 'eli5' ? `## ELI5 Depth — Explain Like I'm 5:
 - Keep sentences short and punchy
 - Avoid jargon entirely — if a technical term is unavoidable, immediately explain it in plain words
 - Make it fun and engaging — wonder and curiosity over precision
-- It's OK to simplify — accuracy matters less than comprehension at this depth` : ''}
+- It's OK to simplify — use analogies and concrete examples over technical precision, but do NOT fabricate statistics, invent citations, or state specific percentages without a real source` : ''}
 
 ## Audience: ${params.audience || 'general'}
 ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
@@ -314,6 +314,36 @@ You MUST include inline citations in the dialogue using [N] notation (e.g. [1], 
 - Do NOT invent fake citations. Do NOT cite personal blogs, social media, or content farms
 - Each non-obvious factual claim should be supported by at least 3 independent sources
 
+### Citation Accuracy — Anti-Hallucination:
+Violations of these rules WILL cause the script to be rejected by the fact-checker:
+
+**Statistics and percentages:**
+- NEVER state a specific percentage, ratio, or magnitude without first verifying it via web search
+- If web search finds no peer-reviewed primary source for a figure, use hedged language: "research suggests..." or "studies indicate..." — never specify a number you cannot source
+- Commonly hallucinated figures to avoid unless verified with a DOI-linked source: "X% more trustworthy", "Y% of consumers", "Z% faster", "N in 10 people"
+
+**Citation-to-claim accuracy:**
+- The dialogue must accurately reflect what the cited source actually says — do not overstate findings
+- Do NOT attribute a source to an institution that did not publish it (e.g. do not say "Google researchers found X" when reference [1] is from OpenAI)
+- Do NOT describe a correlational study as proving causation
+- Do NOT cite a source for a claim the source does not actually make
+
+**Study verification:**
+- Before citing any journal article by name, year, or journal, use web search to confirm the paper exists and the DOI resolves
+- NEVER cite a study from memory — always verify via web search before writing the citation into the script
+- If a study cannot be found via DOI or title search, do NOT cite it and do NOT substitute a different fake study
+
+**Source quality for statistics:**
+- Design blogs, marketing sites, SEO content farms, and secondary "roundup" articles are NOT acceptable sources for quantitative claims
+- A specific statistic requires a primary source: the original peer-reviewed paper, official survey report, or government data
+- If a statistic exists only in blog posts citing other blog posts, trace it to the original study or remove the figure entirely
+
+**When no verifiable source exists:**
+- If web search finds no primary source for a specific claim, rephrase without the number: e.g. "serif fonts are generally perceived as more formal and trustworthy" instead of "serif fonts increase perceived trustworthiness by 40%"
+- If a claim has no credible source at all, remove it and replace with a well-sourced alternative on the same theme
+- Fewer claims with solid citations is better than more claims with weak or fabricated sources
+- This rule applies at all depth levels including eli5
+
 ## Sound Effect Cues:
 Include sound effect suggestions as [SFX: description] markers at natural transition points:
 - [SFX: warm podcast intro jingle, 3s] at the very start
@@ -350,6 +380,7 @@ You have access to web search. Use it to:
 - Discover recent studies, reports, and publications
 - Ground the podcast in real, current information rather than outdated training data
 For time-sensitive topics (current events, "what happened today/this week", latest developments), ALWAYS search the web first before writing the script.
+Always search before stating any specific percentage, statistic, or numerical finding — do not rely on training data for figures.
 
 Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
 
@@ -540,6 +571,38 @@ ${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
 - Use [N] notation for inline citations
 - Each non-obvious factual claim should be supported by at least 3 independent sources
 - If the previous feedback flagged REFERENCES quality issues, use web search to find REAL peer-reviewed papers, books, and official reports to replace weak WEB/ARTICLE sources
+
+### Addressing Each Feedback Type:
+For each issue flagged by the fact-checker, apply the fix below exactly — do NOT just rephrase the same claim with different wording:
+
+**MISATTRIBUTION:**
+- Use web search to find what the cited reference actually says and who actually published it
+- Rewrite the surrounding dialogue to accurately reflect the source — if the real finding is weaker than claimed, soften the claim in the script to match
+- Do NOT simply swap citation numbers; rewrite the text that describes the finding so it matches the actual source
+- If the cited source does not support the claim at all, find a new source that does or remove the claim entirely
+
+**Unverified statistics (specific percentages or numbers):**
+- Use web search to find the original primary source (peer-reviewed paper or official report) for the figure
+- If no primary source exists after searching, rewrite the claim using hedged language with no specific number
+- NEVER retain a specific percentage or numerical claim in the revised script without a verified, DOI-linked source
+- Replacing one unverified number with a different unverified number is NOT a fix
+
+**Fabricated or unverifiable citations:**
+- Use web search to find a real paper, book, or report that supports the underlying claim
+- If no real source supports the claim, remove the claim entirely — do not substitute a plausible-sounding fake citation
+- Verify each new citation exists before including it: confirm the DOI resolves or the title appears in search results
+- Do not re-use the same fake citation reassigned to a different claim
+
+**Empty or insufficient references:**
+- Use web search to find 3+ peer-reviewed papers, books, or official reports for each major claim
+- Replace WEB-type references backing statistical or causal claims with PAPER, BOOK, or REPORT types
+- Address each unsourced claim listed in the feedback individually — do not just append references to the list without connecting them to specific claims in the turns via [N] markers
+- Every [N] marker in the revised turns must correspond to an entry in the references array
+
+**Source misattribution by institution or author:**
+- Do not say a finding comes from "Harvard researchers" or "a Stanford study" unless the reference is actually published by those institutions
+- Verify the publishing institution, lead author, and journal name via web search before stating them in dialogue
+- If the actual institution differs from what was stated, rewrite the dialogue line to use the correct institution
 
 ## Sound Effect Cues:
 Include [SFX: description] markers at natural transition points (3-5 per episode max).
