@@ -43,12 +43,15 @@ export default async function CreatePage() {
           ttsQuotas: gate.ttsQuotas,
         };
 
+  const isAdmin = userRole === 'ADMIN';
+
   return (
     <CreatePageClient
       freeTier={freeTier}
       isByokUser={gate.isByokUser}
       isProUser={gate.isProUser}
       maxDurationMinutes={maxDurationMinutes}
+      isAdmin={isAdmin}
     />
   );
 }
