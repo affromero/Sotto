@@ -245,7 +245,7 @@ describe('elevenlabs', () => {
       expect(body.voice_settings).not.toHaveProperty('use_speaker_boost');
     });
 
-    it('passes previous_text and next_text when provided', async () => {
+    it('passes previous_text and next_text for non-v3 models', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         arrayBuffer: async () => Buffer.from('audio').buffer,
@@ -254,6 +254,7 @@ describe('elevenlabs', () => {
       await generateSpeech({
         text: 'Current segment',
         voiceId: 'voice-123',
+        modelId: 'eleven_turbo_v2',
         previousText: 'Previous segment text',
         nextText: 'Next segment text',
       });
@@ -261,6 +262,44 @@ describe('elevenlabs', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.previous_text).toBe('Previous segment text');
       expect(body.next_text).toBe('Next segment text');
+    });
+
+    it('skips previous_text and next_text for eleven_v3 model', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({
+        text: 'Current segment',
+        voiceId: 'voice-123',
+        modelId: 'eleven_v3',
+        previousText: 'Previous segment text',
+        nextText: 'Next segment text',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).not.toHaveProperty('previous_text');
+      expect(body).not.toHaveProperty('next_text');
+    });
+
+    it('skips previous_text and next_text for eleven_v3 variants', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => Buffer.from('audio').buffer,
+      });
+
+      await generateSpeech({
+        text: 'Current segment',
+        voiceId: 'voice-123',
+        modelId: 'eleven_v3_flash',
+        previousText: 'Previous segment text',
+        nextText: 'Next segment text',
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).not.toHaveProperty('previous_text');
+      expect(body).not.toHaveProperty('next_text');
     });
 
     it('omits previous_text and next_text when not provided', async () => {

@@ -101,18 +101,20 @@ export async function generateSpeech(params: {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
+  const modelId = params.modelId || 'eleven_v3';
+  const supportsContext = !modelId.startsWith('eleven_v3');
+
   const body: Record<string, unknown> = {
     text: params.text,
-    model_id: params.modelId || 'eleven_v3',
+    model_id: modelId,
     voice_settings: {
       stability: params.stability ?? 0.45,
       similarity_boost: params.similarityBoost ?? 0.75,
       style: params.style ?? 0.45,
     },
   };
-
-  if (params.previousText) body.previous_text = params.previousText;
-  if (params.nextText) body.next_text = params.nextText;
+  if (supportsContext && params.previousText) body.previous_text = params.previousText;
+  if (supportsContext && params.nextText) body.next_text = params.nextText;
 
   const response = await fetch(
     `${ELEVENLABS_BASE_URL}/text-to-speech/${params.voiceId}?output_format=mp3_44100_128`,
