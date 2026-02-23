@@ -810,6 +810,36 @@ describe('processAudioGeneration', () => {
     });
   });
 
+  describe('prosody context passthrough', () => {
+    it('passes previousText and nextText to generateSpeech when provided', async () => {
+      const job = createMockJob({
+        ...defaultPayload,
+        previousText: 'Previous segment text',
+        nextText: 'Next segment text',
+      });
+      await processAudioGeneration(job);
+
+      expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previousText: 'Previous segment text',
+          nextText: 'Next segment text',
+        })
+      );
+    });
+
+    it('passes undefined previousText and nextText when not in payload', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previousText: undefined,
+          nextText: undefined,
+        })
+      );
+    });
+  });
+
   describe('error propagation', () => {
     it('propagates errors from premium generateSpeech', async () => {
       mockPremiumGenerateSpeech.mockRejectedValue(

@@ -49,6 +49,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     defaultModel: 'eleven_v3',
     models: [
       { id: 'eleven_v3', displayName: 'Eleven v3', tier: 'premium' },
+      { id: 'eleven_flash_v2_5', displayName: 'Eleven Flash v2.5', tier: 'standard' },
       { id: 'eleven_turbo_v2', displayName: 'Eleven Turbo v2', tier: 'standard' },
       { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium' },
     ],

@@ -286,6 +286,8 @@ describe('processReferenceValidation', () => {
         segmentId: 'segment-000',
         speaker: 'HOST',
         text: 'Welcome to the show! [1]',
+        previousText: undefined,
+        nextText: 'Thanks for having me!',
       });
 
       expect(mockAddJob).toHaveBeenCalledWith({ name: 'audio-generation' }, 'generate_audio', {
@@ -293,6 +295,8 @@ describe('processReferenceValidation', () => {
         segmentId: 'segment-001',
         speaker: 'EXPERT',
         text: 'Thanks for having me!',
+        previousText: 'Welcome to the show! [1]',
+        nextText: undefined,
       });
     });
 

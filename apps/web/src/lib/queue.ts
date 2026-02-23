@@ -67,6 +67,8 @@ export interface GenerateAudioPayload {
   segmentId: string;
   speaker: string;
   text: string;
+  previousText?: string;
+  nextText?: string;
 }
 
 export interface StitchAudioPayload {
