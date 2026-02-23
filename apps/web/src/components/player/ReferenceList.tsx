@@ -17,8 +17,6 @@ const TYPE_LABELS: Record<string, string> = {
   REPORT: 'Report',
 };
 
-const VERIFICATION_LAYERS = ['url_check', 'crossref', 'openalex', 'ai_evaluation'] as const;
-
 const LAYER_LABELS: Record<string, string> = {
   url_check: 'URL Check',
   crossref: 'CrossRef',
@@ -55,36 +53,41 @@ function VerificationBadge({ status }: { status: string }) {
   );
 }
 
+interface CheckEntry {
+  layer: string;
+  passed: boolean;
+  confidence?: number;
+  detail?: string;
+}
+
 function VerificationDetails({ details }: { details: Record<string, unknown> | null }) {
   if (!details) return null;
 
+  const checks = (details.checks as CheckEntry[] | undefined) ?? [];
+  if (checks.length === 0) return null;
+
   return (
     <div className={styles.verificationDetails}>
-      {VERIFICATION_LAYERS.map((layer) => {
-        const layerData = details[layer] as Record<string, unknown> | undefined;
-        if (!layerData) return null;
-        const passed = layerData.passed === true;
-        return (
-          <div key={layer} className={styles.layerRow}>
-            <span className={passed ? styles.layerPassed : styles.layerFailed}>
-              {passed ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              )}
-            </span>
-            <span className={styles.layerName}>{LAYER_LABELS[layer] || layer}</span>
-            {typeof layerData.details === 'string' && (
-              <span className={styles.layerDetail}>{layerData.details}</span>
+      {checks.map((check, i) => (
+        <div key={`${check.layer}-${i}`} className={styles.layerRow}>
+          <span className={check.passed ? styles.layerPassed : styles.layerFailed}>
+            {check.passed ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             )}
-          </div>
-        );
-      })}
+          </span>
+          <span className={styles.layerName}>{LAYER_LABELS[check.layer] || check.layer}</span>
+          {check.detail && (
+            <span className={styles.layerDetail}>{check.detail}</span>
+          )}
+        </div>
+      ))}
     </div>
   );
 }
