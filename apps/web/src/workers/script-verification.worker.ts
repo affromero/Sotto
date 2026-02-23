@@ -320,11 +320,6 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     },
   });
 
-  // Delete old references (will be regenerated)
-  await prisma.reference.deleteMany({
-    where: { podcastId },
-  });
-
   logger.info('Regenerating script with feedback', {
     podcastId,
     attempt: String(attemptNumber),
@@ -375,8 +370,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     },
   });
 
-  // Persist new references
+  // Replace references only if the revision produced new ones — otherwise keep
+  // the old set so the next verification pass doesn't see 0 references.
   if (revised.references.length > 0) {
+    await prisma.reference.deleteMany({ where: { podcastId } });
     await prisma.reference.createMany({
       data: revised.references.map((ref) => ({
         podcastId,
@@ -390,6 +387,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         doi: ref.doi,
       })),
     });
+  } else {
+    logger.warn('Revision produced 0 references, keeping previous set', { podcastId });
   }
 
   await job.updateProgress(90);
