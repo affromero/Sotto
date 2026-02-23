@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { GenerateScriptPayload, addJob, JobType, scriptVerificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generateScript, type SourceMetadata } from '@/lib/script-generator';
+import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
@@ -87,21 +87,42 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     ? requestedSpeakers.slice(0, tierFeatures.maxSpeakers)
     : requestedSpeakers;
 
-  const result = await generateScript({
-    topic: discovery.topic || '',
-    depth: discovery.depth || 'standard',
-    audienceLevel: discovery.audienceLevel || 'intermediate',
-    audience: discovery.audience || 'general',
-    focusAreas: discovery.focusAreas,
-    tone: discovery.tone || 'casual',
-    durationTarget: cappedDuration,
-    sourceContent: discovery.sourceContent || undefined,
-    sourceMetadata: sourceMetadata || undefined,
-    speakers: cappedSpeakers ?? undefined,
-    apiKeyOverride: aiKey?.apiKey,
-    model,
-    webSearchEnabled: tierFeatures.webSearchEnabled,
-  });
+  const hasUserFeedback = job.data.userFeedback && job.data.previousTurns;
+
+  const result = hasUserFeedback
+    ? await generateScriptWithUserFeedback({
+        topic: discovery.topic || '',
+        depth: discovery.depth || 'standard',
+        audienceLevel: discovery.audienceLevel || 'intermediate',
+        audience: discovery.audience || 'general',
+        focusAreas: discovery.focusAreas,
+        tone: discovery.tone || 'casual',
+        durationTarget: cappedDuration,
+        sourceContent: discovery.sourceContent || undefined,
+        sourceMetadata: sourceMetadata || undefined,
+        speakers: cappedSpeakers ?? undefined,
+        previousScript: job.data.previousTurns!,
+        previousReferences: job.data.previousReferences ?? [],
+        userFeedback: job.data.userFeedback!,
+        apiKeyOverride: aiKey?.apiKey,
+        model,
+        webSearchEnabled: tierFeatures.webSearchEnabled,
+      })
+    : await generateScript({
+        topic: discovery.topic || '',
+        depth: discovery.depth || 'standard',
+        audienceLevel: discovery.audienceLevel || 'intermediate',
+        audience: discovery.audience || 'general',
+        focusAreas: discovery.focusAreas,
+        tone: discovery.tone || 'casual',
+        durationTarget: cappedDuration,
+        sourceContent: discovery.sourceContent || undefined,
+        sourceMetadata: sourceMetadata || undefined,
+        speakers: cappedSpeakers ?? undefined,
+        apiKeyOverride: aiKey?.apiKey,
+        model,
+        webSearchEnabled: tierFeatures.webSearchEnabled,
+      });
 
   await job.updateProgress(50);
 

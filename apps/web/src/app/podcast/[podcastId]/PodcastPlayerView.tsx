@@ -153,6 +153,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showReport, setShowReport] = useState(false);
   const [approving, setApproving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
   const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
   const playerSectionRef = useRef<HTMLElement>(null);
@@ -334,18 +335,24 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const handleRegenerateScript = useCallback(async () => {
     setRegenerating(true);
     try {
+      const feedbackText = regenerateFeedback.trim();
       const response = await fetch(`/api/podcasts/${podcast.id}/script/regenerate`, {
         method: 'POST',
+        ...(feedbackText ? {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedback: feedbackText }),
+        } : {}),
       });
       if (response.ok) {
         setLiveStatus('SCRIPTING');
+        setRegenerateFeedback('');
       }
     } catch {
       // ignore
     } finally {
       setRegenerating(false);
     }
-  }, [podcast.id]);
+  }, [podcast.id, regenerateFeedback]);
 
   const handleExportPdf = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -558,6 +565,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           {scriptTurns && scriptTurns.length > 0 && (
             <ScriptPreview turns={scriptTurns} references={scriptRefs} podcastId={podcast.id} />
           )}
+          <textarea
+            className={styles.regenerateFeedback}
+            value={regenerateFeedback}
+            onChange={(e) => setRegenerateFeedback(e.target.value)}
+            placeholder="Optional: describe what you'd like changed before regenerating..."
+            rows={3}
+            maxLength={5000}
+            aria-label="Feedback for script regeneration"
+          />
           <div className={styles.scriptReadyActions}>
             <Button onClick={handleApproveScript} loading={approving} disabled={approving || regenerating}>
               <Check size={16} />
@@ -565,7 +581,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </Button>
             <Button variant="secondary" onClick={handleRegenerateScript} loading={regenerating} disabled={approving || regenerating}>
               <RefreshCw size={16} />
-              {regenerating ? 'Regenerating...' : 'Regenerate Script'}
+              {regenerating ? 'Regenerating...' : (regenerateFeedback.trim() ? 'Regenerate with Notes' : 'Regenerate Script')}
             </Button>
           </div>
         </div>
