@@ -115,6 +115,11 @@ export function useDiscovery(): UseDiscoveryReturn {
         messages: [...prev.messages, assistantMessage],
       }));
 
+      // Track state for the finally block's error-reporting logic.
+      let accumulatedContent = '';
+      let serverSentError = false;
+      let wasAborted = false;
+
       try {
         // Build conversation history from all prior messages (exclude the empty assistant placeholder)
         const history = messagesRef.current
@@ -176,6 +181,7 @@ export function useDiscovery(): UseDiscoveryReturn {
 
               // Handle error events from the server
               if (parsed.error) {
+                serverSentError = true;
                 setState((prev) => ({
                   ...prev,
                   messages: prev.messages.map((msg) =>
@@ -190,6 +196,7 @@ export function useDiscovery(): UseDiscoveryReturn {
               // Handle streaming text chunks
               const textChunk = parsed.text ?? parsed.content;
               if (textChunk && !parsed.done) {
+                accumulatedContent += textChunk;
                 setState((prev) => ({
                   ...prev,
                   messages: prev.messages.map((msg) =>
@@ -313,6 +320,12 @@ export function useDiscovery(): UseDiscoveryReturn {
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
+          wasAborted = true;
+          // Remove the placeholder so the finally fallback doesn't show for intentional aborts
+          setState((prev) => ({
+            ...prev,
+            messages: prev.messages.filter((msg) => msg.id !== assistantMessageId),
+          }));
           return;
         }
 
@@ -324,6 +337,25 @@ export function useDiscovery(): UseDiscoveryReturn {
       } finally {
         if (abortControllerRef.current === abortController) {
           abortControllerRef.current = null;
+        }
+
+        // If content is empty after stripping markup and the server didn't already send an
+        // error event, report this to the server so the admin panel can surface the entry.
+        if (!wasAborted && !serverSentError) {
+          const strippedContent = accumulatedContent
+            .replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '')
+            .replace(/\[chips:\s*.+?\]/g, '')
+            .trim();
+          if (!strippedContent) {
+            fetch('/api/discovery/client-error', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: content.slice(0, 2000),
+                errorKind: 'client_stream_fallback',
+              }),
+            }).catch(() => {});
+          }
         }
 
         // If streaming completed but assistant message is still empty, show fallback
