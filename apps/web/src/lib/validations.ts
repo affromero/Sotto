@@ -523,14 +523,31 @@ export const generatedScriptSchema = z.object({
     durationSeconds: z.number().positive(),
     insertAfterTurn: z.number().int(),
   })).catch([]),
-  references: z.array(z.object({
-    number: z.number().int().positive(),
-    title: z.string().min(1),
-    authors: z.union([z.array(z.string()), z.string()]),
-    year: z.number().nullish(),
-    url: z.string().nullish(),
-    type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
-    publisher: z.string().nullish(),
-    doi: z.string().nullish(),
-  })).catch([]),
+  references: z.preprocess(
+    (val) => {
+      if (!Array.isArray(val)) return [];
+      const itemSchema = z.object({
+        number: z.number().int().positive(),
+        title: z.string().min(1),
+        authors: z.union([z.array(z.string()), z.string()]),
+        year: z.number().nullish(),
+        url: z.string().nullish(),
+        type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
+        publisher: z.string().nullish(),
+        doi: z.string().nullish(),
+      });
+      // Filter invalid items individually instead of dropping the entire array
+      return val.filter((item) => itemSchema.safeParse(item).success);
+    },
+    z.array(z.object({
+      number: z.number().int().positive(),
+      title: z.string().min(1),
+      authors: z.union([z.array(z.string()), z.string()]),
+      year: z.number().nullish(),
+      url: z.string().nullish(),
+      type: z.enum(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']),
+      publisher: z.string().nullish(),
+      doi: z.string().nullish(),
+    })),
+  ),
 });
