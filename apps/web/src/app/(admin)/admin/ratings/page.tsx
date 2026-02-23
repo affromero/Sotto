@@ -15,8 +15,7 @@ interface ProviderStats {
   avgOverallSatisfaction: number;
 }
 
-async function getRatingStats(days: number | null) {
-  const since = days ? subDays(startOfDay(new Date()), days) : new Date(0);
+async function getRatingStats(since: Date) {
 
   const [byProvider, overallAverages, recentRatings, totalCount] = await Promise.all([
     prisma.$queryRaw<ProviderStats[]>`
@@ -83,10 +82,16 @@ function scoreColor(score: number): string {
 export default async function AdminRatingsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const daysMap: Record<string, number | null> = { '7': 7, '30': 30, '90': 90, all: null };
-  const days = rangeParam in daysMap ? daysMap[rangeParam] : 30;
+  const since = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return today;
+    if (rangeParam === 'yesterday') return subDays(today, 1);
+    if (rangeParam === 'all') return new Date(0);
+    const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return subDays(today, days);
+  })();
 
-  const stats = await getRatingStats(days);
+  const stats = await getRatingStats(since);
   const avg = stats.overallAverages;
 
   return (
@@ -100,18 +105,20 @@ export default async function AdminRatingsPage({ searchParams }: PageProps) {
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
           {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
             { value: '7', label: '7d' },
             { value: '30', label: '30d' },
             { value: '90', label: '90d' },
             { value: 'all', label: 'All' },
-          ].map((r) => (
+          ].map(({ value, label }) => (
             <a
-              key={r.value}
-              href={`/admin/ratings?range=${r.value}`}
-              className={`${styles.rangeLink} ${rangeParam === r.value ? styles.rangeLinkActive : ''}`}
-              aria-current={rangeParam === r.value ? 'page' : undefined}
+              key={value}
+              href={`/admin/ratings?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {r.label}
+              {label}
             </a>
           ))}
         </nav>

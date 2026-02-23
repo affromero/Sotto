@@ -169,7 +169,11 @@ function formatMs(ms: number): string {
 export default async function AdminInspirePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '7';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 7;
+  const days = (() => {
+    if (rangeParam === 'today') return 1;
+    if (rangeParam === 'yesterday') return 1;
+    return [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 7;
+  })();
 
   const stats = await getInspireStats(days);
 
@@ -185,14 +189,20 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>LLM performance, cache efficiency, and usage trends</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/inspire?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/inspire?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>

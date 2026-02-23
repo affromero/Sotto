@@ -19,7 +19,11 @@ function cellStyle(pct: number): string {
 export default async function AdminRetentionPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+  const days = (() => {
+    if (rangeParam === 'today') return 1;
+    if (rangeParam === 'yesterday') return 1;
+    return [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+  })();
 
   const [activeUsers, dauTrend, cohorts] = await Promise.all([
     getDAU_WAU_MAU(),
@@ -38,14 +42,20 @@ export default async function AdminRetentionPage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>Active users, stickiness, and weekly cohort retention</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/retention?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/retention?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>

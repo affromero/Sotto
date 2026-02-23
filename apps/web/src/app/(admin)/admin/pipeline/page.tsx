@@ -3,14 +3,18 @@ import {
   getByokAdoption,
   getPipelineHealth,
 } from '@/lib/funnel-metrics';
-import { getRecentPipelineErrors, getRecentDiscoveryChatErrors } from '@/lib/pipeline-events';
+import {
+  getRecentPipelineErrors,
+  getRecentDiscoveryChatErrors,
+  getDiscoveryChatErrorStats,
+} from '@/lib/pipeline-events';
 import { subDays, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { CopyButton } from '@/components/admin/CopyButton';
 import styles from './page.module.css';
 
 interface PageProps {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; kind?: string; sort?: string }>;
 }
 
 function formatSeconds(seconds: number | null): string {
@@ -20,23 +24,80 @@ function formatSeconds(seconds: number | null): string {
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 }
 
+function parseRange(rangeParam: string): { since: Date; until?: Date; label: string } {
+  const today = startOfDay(new Date());
+  if (rangeParam === 'today') return { since: today, label: 'Today' };
+  if (rangeParam === 'yesterday') {
+    return { since: subDays(today, 1), until: today, label: 'Yesterday' };
+  }
+  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+  return { since: subDays(today, days), label: `${days}d` };
+}
+
+const RANGE_OPTIONS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: '7', label: '7d' },
+  { value: '30', label: '30d' },
+  { value: '90', label: '90d' },
+];
+
+const KIND_OPTIONS = [
+  { value: '', label: 'All' },
+  { value: 'exception', label: 'Exception' },
+  { value: 'empty_response', label: 'Empty Response' },
+  { value: 'client_stream_fallback', label: 'Client Fallback' },
+];
+
+function kindBadgeClass(kind: string): string {
+  if (kind === 'exception') return styles.badgeError;
+  if (kind === 'empty_response') return styles.badgeWarning;
+  return styles.badgeInfo;
+}
+
 export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = subDays(startOfDay(new Date()), days);
+  const { since, until, label: rangeLabel } = parseRange(rangeParam);
+  const kindFilter = KIND_OPTIONS.some((k) => k.value === (params.kind ?? ''))
+    ? (params.kind ?? '')
+    : '';
+  const sort = params.sort === 'asc' ? 'asc' : 'desc';
 
-  const [funnel, adoption, pipeline, recentErrors, discoveryChatErrors] = await Promise.all([
-    getFreeTierFunnel(),
-    getByokAdoption(),
-    getPipelineHealth(since),
-    getRecentPipelineErrors(20),
-    getRecentDiscoveryChatErrors(20),
-  ]);
+  const [funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats] =
+    await Promise.all([
+      getFreeTierFunnel(),
+      getByokAdoption(),
+      getPipelineHealth(since),
+      getRecentPipelineErrors(20),
+      getRecentDiscoveryChatErrors(50, kindFilter || undefined, sort, since, until),
+      getDiscoveryChatErrorStats(since, until),
+    ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
   const maxAi = Math.max(...adoption.ai.map((a) => a.count), 1);
   const maxTts = Math.max(...adoption.tts.map((t) => t.count), 1);
+  const maxDay = Math.max(...errorStats.daily.map((d) => d.total), 1);
+  const CHART_HEIGHT = 72;
+
+  function rangeHref(r: string) {
+    const p = new URLSearchParams({ range: r });
+    if (kindFilter) p.set('kind', kindFilter);
+    if (sort !== 'desc') p.set('sort', sort);
+    return `/admin/pipeline?${p}`;
+  }
+  function kindHref(k: string) {
+    const p = new URLSearchParams({ range: rangeParam });
+    if (k) p.set('kind', k);
+    if (sort !== 'desc') p.set('sort', sort);
+    return `/admin/pipeline?${p}`;
+  }
+  function sortHref() {
+    const p = new URLSearchParams({ range: rangeParam });
+    if (kindFilter) p.set('kind', kindFilter);
+    p.set('sort', sort === 'desc' ? 'asc' : 'desc');
+    return `/admin/pipeline?${p}`;
+  }
 
   return (
     <div className={styles.container}>
@@ -46,14 +107,14 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>Generation pipeline health and BYOK conversion funnel</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {RANGE_OPTIONS.map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/pipeline?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={rangeHref(value)}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>
@@ -199,7 +260,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
         )}
       </section>
 
-      {/* Recent failures */}
+      {/* Recent pipeline failures */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Recent Failures</h2>
         {recentErrors.length === 0 ? (
@@ -253,8 +314,111 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
       {/* Discovery chat errors */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Discovery Chat Errors</h2>
+
+        {/* Summary stats pills */}
+        <div className={styles.statsRow}>
+          <div className={styles.statPill}>
+            <span className={`${styles.statPillDot} ${styles.statPillDotTotal}`} />
+            <span className={styles.statPillCount}>{errorStats.total}</span>
+            <span className={styles.statPillLabel}>Total ({rangeLabel})</span>
+          </div>
+          {(errorStats.byKind['exception'] ?? 0) > 0 && (
+            <div className={styles.statPill}>
+              <span className={`${styles.statPillDot} ${styles.statPillDotError}`} />
+              <span className={styles.statPillCount}>{errorStats.byKind['exception']}</span>
+              <span className={styles.statPillLabel}>Exception</span>
+            </div>
+          )}
+          {(errorStats.byKind['empty_response'] ?? 0) > 0 && (
+            <div className={styles.statPill}>
+              <span className={`${styles.statPillDot} ${styles.statPillDotWarning}`} />
+              <span className={styles.statPillCount}>{errorStats.byKind['empty_response']}</span>
+              <span className={styles.statPillLabel}>Empty Response</span>
+            </div>
+          )}
+          {(errorStats.byKind['client_stream_fallback'] ?? 0) > 0 && (
+            <div className={styles.statPill}>
+              <span className={`${styles.statPillDot} ${styles.statPillDotInfo}`} />
+              <span className={styles.statPillCount}>{errorStats.byKind['client_stream_fallback']}</span>
+              <span className={styles.statPillLabel}>Client Fallback</span>
+            </div>
+          )}
+        </div>
+
+        {/* Daily bar chart */}
+        {errorStats.total > 0 && errorStats.daily.length > 1 && (
+          <div className={styles.chartWrap}>
+            <div className={styles.chartContainer}>
+              {errorStats.daily.map((day, i) => {
+                const barPx = Math.round((day.total / maxDay) * CHART_HEIGHT);
+                const showLabel =
+                  i === 0 ||
+                  i === errorStats.daily.length - 1 ||
+                  i % Math.max(1, Math.floor(errorStats.daily.length / 6)) === 0;
+                const dateLabel = new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', {
+                  month: 'numeric',
+                  day: 'numeric',
+                });
+                const exPx = day.total > 0
+                  ? Math.round(((day.byKind['exception'] ?? 0) / day.total) * barPx)
+                  : 0;
+                const emPx = day.total > 0
+                  ? Math.round(((day.byKind['empty_response'] ?? 0) / day.total) * barPx)
+                  : 0;
+                const clPx = barPx - exPx - emPx;
+
+                return (
+                  <div key={day.date} className={styles.chartCol}>
+                    <div className={styles.chartBar} style={{ height: `${barPx}px` }}>
+                      {clPx > 0 && <div className={styles.chartSegmentInfo} style={{ height: `${clPx}px` }} />}
+                      {emPx > 0 && <div className={styles.chartSegmentWarning} style={{ height: `${emPx}px` }} />}
+                      {exPx > 0 && <div className={styles.chartSegmentError} style={{ height: `${exPx}px` }} />}
+                    </div>
+                    <span className={styles.chartLabel}>{showLabel ? dateLabel : ''}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.chartLegend}>
+              <div className={styles.chartLegendItem}>
+                <span className={styles.chartLegendDot} style={{ background: 'var(--color-error)' }} />
+                Exception
+              </div>
+              <div className={styles.chartLegendItem}>
+                <span className={styles.chartLegendDot} style={{ background: 'var(--color-warning)' }} />
+                Empty Response
+              </div>
+              <div className={styles.chartLegendItem}>
+                <span className={styles.chartLegendDot} style={{ background: 'var(--color-accent)', opacity: 0.7 }} />
+                Client Fallback
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Kind filter + sort controls */}
+        <div className={styles.filterRow}>
+          <nav className={styles.kindNav} aria-label="Error kind filter">
+            {KIND_OPTIONS.map(({ value, label }) => (
+              <a
+                key={value || 'all'}
+                href={kindHref(value)}
+                className={`${styles.kindLink} ${kindFilter === value ? styles.kindLinkActive : ''}`}
+              >
+                {label}
+                {value !== '' && (errorStats.byKind[value] ?? 0) > 0 && (
+                  <> ({errorStats.byKind[value]})</>
+                )}
+              </a>
+            ))}
+          </nav>
+          <a href={sortHref()} className={styles.sortLink}>
+            {sort === 'desc' ? '↓ Newest first' : '↑ Oldest first'}
+          </a>
+        </div>
+
         {discoveryChatErrors.length === 0 ? (
-          <p className={styles.empty}>No discovery chat errors recorded.</p>
+          <p className={styles.empty}>No discovery chat errors in this period.</p>
         ) : (
           <div className={styles.tableContainer}>
             <table className={styles.recentTable}>
@@ -279,17 +443,22 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
                       })}
                     </td>
                     <td>
-                      <Link href={`/admin/users?search=${encodeURIComponent(evt.userEmail ?? evt.userId)}`}>
+                      <Link
+                        href={`/admin/users?search=${encodeURIComponent(evt.userEmail ?? evt.userId)}`}
+                      >
                         {evt.userName ?? evt.userEmail ?? evt.userId}
                       </Link>
                     </td>
                     <td>
-                      <span className={styles.badgeError}>{evt.errorKind}</span>
+                      <span className={kindBadgeClass(evt.errorKind)}>{evt.errorKind}</span>
                     </td>
                     <td className={styles.errorCell}>{evt.userMessage.slice(0, 200)}</td>
                     <td className={styles.errorCell}>
                       {evt.errorDetail ? (
-                        <>{evt.errorDetail.slice(0, 200)} <CopyButton text={evt.errorDetail} /></>
+                        <>
+                          {evt.errorDetail.slice(0, 200)}{' '}
+                          <CopyButton text={evt.errorDetail} />
+                        </>
                       ) : (
                         '—'
                       )}
