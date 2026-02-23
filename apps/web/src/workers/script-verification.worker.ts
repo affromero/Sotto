@@ -8,6 +8,7 @@ import {
   scriptVerificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { verifyScript, type ClaimAnalysis } from '@/lib/script-verifier';
 import {
@@ -87,7 +88,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   }));
 
   const attemptNumber = script.verificationAttempts + 1;
-  const previousClaims = (script.verificationClaims ?? []) as ClaimAnalysis[];
+  const previousClaims = (script.verificationClaims as unknown as ClaimAnalysis[]) ?? [];
 
   await job.updateProgress(15);
 
@@ -137,7 +138,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       where: { podcastId },
       data: {
         verificationAttempts: attemptNumber,
-        verificationClaims: null,
+        verificationClaims: Prisma.JsonNull,
       },
     });
 
@@ -284,7 +285,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       data: {
         verificationAttempts: attemptNumber,
         verificationFeedback: verdict.feedback,
-        verificationClaims: verdict.allClaims,
+        verificationClaims: verdict.allClaims as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -315,7 +316,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     data: {
       verificationAttempts: attemptNumber,
       verificationFeedback: verdict.feedback,
-      verificationClaims: verdict.allClaims,
+      verificationClaims: verdict.allClaims as unknown as Prisma.InputJsonValue,
     },
   });
 

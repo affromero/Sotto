@@ -10,7 +10,8 @@ vi.mock('@/lib/claude', () => ({
 }));
 
 // ---- Import under test ----
-import { verifyScript, assessReferenceQuality } from '@/lib/script-verifier';
+import { verifyScript, assessReferenceQuality, type ClaimAnalysis } from '@/lib/script-verifier';
+import { hashTurn } from '@/lib/turn-diff';
 import type { GeneratedReference } from '@/lib/script-generator';
 
 function makeRef(num: number, type: GeneratedReference['type']): GeneratedReference {
@@ -670,5 +671,390 @@ describe('reference quality enforcement', () => {
     expect(result.referenceQuality.countPassed).toBe(true);
     expect(result.referenceQuality.ratioPassed).toBe(true);
     expect(result.referenceQuality.qualityScore).toBeGreaterThan(0.8);
+  });
+});
+
+describe('incremental verification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('sends only changed turns to AI when previousClaims match unchanged turns', async () => {
+    const unchangedTurn = { speaker: 'HOST', text: 'The sky is blue.' };
+    const changedTurn = { speaker: 'EXPERT', text: 'New research shows X [1].' };
+
+    const previousClaims: ClaimAnalysis[] = [
+      {
+        claimText: 'The sky is blue',
+        turnIndex: 0,
+        speaker: 'HOST',
+        isCommonKnowledge: true,
+        existingCitations: [],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'Common knowledge',
+        turnHash: hashTurn('HOST', 'The sky is blue.'),
+      },
+    ];
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'New research shows X',
+            turnIndex: 1,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Well sourced',
+          },
+        ],
+        overallScore: 0.9,
+        feedback: '',
+      }),
+      inputTokens: 300,
+      outputTokens: 150,
+    });
+
+    const result = await verifyScript({
+      topic: 'Test',
+      turns: [unchangedTurn, changedTurn],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    // AI was called (for the changed turn)
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
+    // System prompt should contain incremental instructions
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).toContain('INCREMENTAL VERIFICATION');
+    expect(systemPrompt).toContain('Pre-verified turns');
+    // Result should include both carried and new claims
+    expect(result.totalClaims).toBe(2);
+    expect(result.allClaims).toHaveLength(2);
+  });
+
+  it('skips AI call entirely when all turns are unchanged', async () => {
+    const turns = [
+      { speaker: 'HOST', text: 'Water boils at 100C.' },
+      { speaker: 'EXPERT', text: 'That is correct [1].' },
+    ];
+
+    const previousClaims: ClaimAnalysis[] = [
+      {
+        claimText: 'Water boils at 100C',
+        turnIndex: 0,
+        speaker: 'HOST',
+        isCommonKnowledge: true,
+        existingCitations: [],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'Common knowledge',
+        turnHash: hashTurn('HOST', 'Water boils at 100C.'),
+      },
+      {
+        claimText: 'That is correct',
+        turnIndex: 1,
+        speaker: 'EXPERT',
+        isCommonKnowledge: true,
+        existingCitations: [1],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'Verified',
+        turnHash: hashTurn('EXPERT', 'That is correct [1].'),
+      },
+    ];
+
+    const result = await verifyScript({
+      topic: 'Test',
+      turns,
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    // AI should NOT have been called
+    expect(mockGenerateResponse).not.toHaveBeenCalled();
+    expect(result.totalClaims).toBe(2);
+    expect(result.inputTokens).toBe(0);
+    expect(result.outputTokens).toBe(0);
+    expect(result.allClaims).toHaveLength(2);
+  });
+
+  it('carried claims have remapped turnIndex values', async () => {
+    // Original: [A at 0, B at 1] → New: [NEW at 0, A at 1, B at 2]
+    const turns = [
+      { speaker: 'HOST', text: 'New intro.' },
+      { speaker: 'HOST', text: 'Turn A.' },
+      { speaker: 'EXPERT', text: 'Turn B [1].' },
+    ];
+
+    const previousClaims: ClaimAnalysis[] = [
+      {
+        claimText: 'claim A',
+        turnIndex: 0,
+        speaker: 'HOST',
+        isCommonKnowledge: true,
+        existingCitations: [],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'ok',
+        turnHash: hashTurn('HOST', 'Turn A.'),
+      },
+      {
+        claimText: 'claim B',
+        turnIndex: 1,
+        speaker: 'EXPERT',
+        isCommonKnowledge: false,
+        existingCitations: [1],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'ok',
+        turnHash: hashTurn('EXPERT', 'Turn B [1].'),
+      },
+    ];
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'new intro claim',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'ok',
+          },
+        ],
+        overallScore: 0.9,
+        feedback: '',
+      }),
+      inputTokens: 200,
+      outputTokens: 100,
+    });
+
+    const result = await verifyScript({
+      topic: 'Test',
+      turns,
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    expect(result.totalClaims).toBe(3);
+    const claimA = result.allClaims.find((c) => c.claimText === 'claim A');
+    const claimB = result.allClaims.find((c) => c.claimText === 'claim B');
+    expect(claimA?.turnIndex).toBe(1); // remapped from 0→1
+    expect(claimB?.turnIndex).toBe(2); // remapped from 1→2
+  });
+
+  it('falls back to full verification when previousClaims is empty', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Water boils at 100C',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Common knowledge',
+          },
+        ],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 500,
+      outputTokens: 300,
+    });
+
+    const result = await verifyScript({
+      topic: 'Test',
+      turns: [{ speaker: 'HOST', text: 'Water boils at 100C.' }],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims: [],
+    });
+
+    // Full verification — no incremental instructions
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).not.toContain('INCREMENTAL VERIFICATION');
+    expect(result.passed).toBe(true);
+  });
+
+  it('falls back to full verification when previousClaims is undefined', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'Test',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+      previousClaims: undefined,
+    });
+
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    expect(systemPrompt).not.toContain('INCREMENTAL VERIFICATION');
+  });
+
+  it('computes correct merged score from carried + new claims', async () => {
+    const turns = [
+      { speaker: 'HOST', text: 'Unchanged turn.' },
+      { speaker: 'EXPERT', text: 'Changed turn with bad sourcing.' },
+    ];
+
+    const previousClaims: ClaimAnalysis[] = [
+      {
+        claimText: 'carried claim',
+        turnIndex: 0,
+        speaker: 'HOST',
+        isCommonKnowledge: false,
+        existingCitations: [1],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'ok',
+        turnHash: hashTurn('HOST', 'Unchanged turn.'),
+      },
+    ];
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'unsourced claim',
+            turnIndex: 1,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [],
+            needsMoreCitations: true,
+            hasUnreliableSource: false,
+            verificationNote: 'No citation',
+          },
+        ],
+        overallScore: 0.5,
+        feedback: 'Add citations.',
+      }),
+      inputTokens: 300,
+      outputTokens: 150,
+    });
+
+    const result = await verifyScript({
+      topic: 'Test',
+      turns,
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    // 2 sourcing-required claims: 1 adequate + 1 unsupported = 0.5 score
+    expect(result.score).toBe(0.5);
+    expect(result.unsupportedClaims).toHaveLength(1);
+    expect(result.allClaims).toHaveLength(2);
+  });
+
+  it('populates allClaims on full verification path', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'The earth is round',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'Common knowledge',
+          },
+        ],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 500,
+      outputTokens: 300,
+    });
+
+    const result = await verifyScript({
+      topic: 'Geography',
+      turns: [{ speaker: 'HOST', text: 'The earth is round.' }],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(result.allClaims).toHaveLength(1);
+    expect(result.allClaims[0].turnHash).toBeDefined();
+    expect(result.allClaims[0].turnHash).toHaveLength(64);
+  });
+
+  it('stamps turnHash on claims from full verification', async () => {
+    const turnText = 'Quantum computing uses qubits [1].';
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Quantum computing uses qubits',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            verificationNote: 'ok',
+          },
+        ],
+        overallScore: 0.95,
+        feedback: '',
+      }),
+      inputTokens: 600,
+      outputTokens: 300,
+    });
+
+    const result = await verifyScript({
+      topic: 'Quantum',
+      turns: [{ speaker: 'EXPERT', text: turnText }],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    const expectedHash = hashTurn('EXPERT', turnText);
+    expect(result.allClaims[0].turnHash).toBe(expectedHash);
   });
 });

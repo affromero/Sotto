@@ -256,10 +256,12 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockPrismaScriptUpdate).toHaveBeenCalledWith({
-        where: { podcastId: 'podcast-001' },
-        data: { verificationAttempts: 1 },
-      });
+      expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { podcastId: 'podcast-001' },
+          data: expect.objectContaining({ verificationAttempts: 1 }),
+        })
+      );
     });
 
     it('does not create segments when references exist', async () => {
