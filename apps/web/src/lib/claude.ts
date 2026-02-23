@@ -14,6 +14,37 @@ if (!ANTHROPIC_API_KEY && !isClaudeCodeMode()) {
 
 const client = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
 
+/** Status codes that indicate a transient server-side problem worth retrying. */
+const RETRYABLE_STATUS = new Set([429, 500, 503, 529]);
+const MAX_RETRIES = 3;
+
+function isRetryableError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    'status' in err &&
+    typeof (err as { status: unknown }).status === 'number' &&
+    RETRYABLE_STATUS.has((err as { status: number }).status)
+  );
+}
+
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isRetryableError(err) || attempt === MAX_RETRIES) throw err;
+      const delayMs = 1000 * Math.pow(2, attempt) + Math.random() * 500;
+      logger.warn(`${label} — Claude API transient error, retrying`, {
+        attempt: String(attempt + 1),
+        status: String((err as { status?: number }).status),
+        delayMs: String(Math.round(delayMs)),
+      });
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+  throw new Error('unreachable');
+}
+
 export const WEB_SEARCH_TOOL = {
   type: 'web_search_20250305' as const,
   name: 'web_search' as const,
@@ -70,13 +101,15 @@ export async function generateResponse(
 
   const resolvedModel = options?.model || 'claude-sonnet-4-6';
 
-  const response = await activeClient.messages.create({
-    model: resolvedModel,
-    max_tokens: options?.maxTokens || 4096,
-    system: systemPrompt,
-    messages,
-    ...(options?.tools?.length ? { tools: options.tools } : {}),
-  });
+  const response = await withRetry('generateResponse', () =>
+    activeClient.messages.create({
+      model: resolvedModel,
+      max_tokens: options?.maxTokens || 4096,
+      system: systemPrompt,
+      messages,
+      ...(options?.tools?.length ? { tools: options.tools } : {}),
+    })
+  );
 
   const textBlocks = response.content.filter(
     (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
@@ -153,27 +186,46 @@ export async function* streamResponse(
 
   const streamModel = options?.model || 'claude-sonnet-4-6';
 
-  const stream = activeClient.messages.stream({
-    model: streamModel,
-    max_tokens: options?.maxTokens || 4096,
-    system: systemPrompt,
-    messages,
-    ...(options?.tools?.length ? { tools: options.tools } : {}),
-  });
+  let yieldedAny = false;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const stream = activeClient.messages.stream({
+        model: streamModel,
+        max_tokens: options?.maxTokens || 4096,
+        system: systemPrompt,
+        messages,
+        ...(options?.tools?.length ? { tools: options.tools } : {}),
+      });
 
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      yield event.delta.text;
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          yieldedAny = true;
+          yield event.delta.text;
+        }
+      }
+
+      if (options?.onComplete) {
+        const finalMessage = await stream.finalMessage();
+        options.onComplete({
+          inputTokens: finalMessage.usage.input_tokens,
+          outputTokens: finalMessage.usage.output_tokens,
+          model: streamModel,
+        });
+      }
+      return;
+    } catch (err) {
+      // Only retry if no content was yielded yet (safe to restart the stream)
+      const isRetryable = !yieldedAny && isRetryableError(err);
+      if (!isRetryable || attempt === MAX_RETRIES) throw err;
+      const delayMs = 1000 * Math.pow(2, attempt) + Math.random() * 500;
+      const status = (err as { status?: number }).status;
+      logger.warn('streamResponse — Claude API transient error, retrying', {
+        attempt: String(attempt + 1),
+        status: String(status),
+        delayMs: String(Math.round(delayMs)),
+      });
+      await new Promise((r) => setTimeout(r, delayMs));
     }
-  }
-
-  if (options?.onComplete) {
-    const finalMessage = await stream.finalMessage();
-    options.onComplete({
-      inputTokens: finalMessage.usage.input_tokens,
-      outputTokens: finalMessage.usage.output_tokens,
-      model: streamModel,
-    });
   }
 }
 
