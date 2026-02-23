@@ -43,3 +43,46 @@ export async function getRecentPipelineErrors(
     metadata: e.metadata as Record<string, unknown> | null,
   }));
 }
+
+export interface RecentDiscoveryChatError {
+  id: string;
+  userId: string;
+  userName: string | null;
+  userEmail: string | null;
+  userMessage: string;
+  errorKind: string;
+  errorDetail: string | null;
+  discoveryId: string | null;
+  createdAt: Date;
+}
+
+export async function getRecentDiscoveryChatErrors(
+  limit: number = 20,
+): Promise<RecentDiscoveryChatError[]> {
+  const errors = await prisma.discoveryChatError.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    select: {
+      id: true,
+      userId: true,
+      userMessage: true,
+      errorKind: true,
+      errorDetail: true,
+      discoveryId: true,
+      createdAt: true,
+      user: { select: { name: true, email: true } },
+    },
+  });
+
+  return errors.map((e) => ({
+    id: e.id,
+    userId: e.userId,
+    userName: e.user.name,
+    userEmail: e.user.email,
+    userMessage: e.userMessage,
+    errorKind: e.errorKind,
+    errorDetail: e.errorDetail,
+    discoveryId: e.discoveryId,
+    createdAt: e.createdAt,
+  }));
+}
