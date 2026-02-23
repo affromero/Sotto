@@ -165,14 +165,17 @@ export async function* streamResponse(
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
       model: options.model.split(':')[1] || 'opus',
     });
+    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
     return;
   }
 
   if (isClaudeCodeMode() && !options?.apiKeyOverride) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
+    const ccModel = options?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
-      model: options?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
+      model: ccModel,
     });
+    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: ccModel });
     return;
   }
 
