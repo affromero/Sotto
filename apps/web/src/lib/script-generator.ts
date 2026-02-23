@@ -604,6 +604,15 @@ For each issue flagged by the fact-checker, apply the fix below exactly — do N
 - Verify the publishing institution, lead author, and journal name via web search before stating them in dialogue
 - If the actual institution differs from what was stated, rewrite the dialogue line to use the correct institution
 
+**Unreliable or low-quality sources (design blogs, marketing sites, career advice sites, educational aggregator blogs):**
+- If the fact-checker flags a source as unreliable (e.g., "designmodo.com is a design agency blog"), do NOT retain that citation even if the claim text is accurate
+- If the fact-checker names specific replacement papers in its feedback (e.g., "Arditi & Cho 2005", "Song & Schwarz 2008"), use web search to find those exact papers first — search by author + year + topic, verify the DOI exists, then cite them
+- If no peer-reviewed source supports the specific claim after searching, rewrite the claim in hedged language ("research suggests..." / "designers generally believe...") without citing a specific study
+- Design/marketing blogs (e.g., designmodo.com, gouldingmedia.com) are NOT acceptable for psychological, behavioral, or statistical claims even if they appear authoritative
+- Educational aggregator blogs (e.g., cognitiontoday.com) are NOT acceptable as primary sources — trace their claims back to the original peer-reviewed paper and cite that instead
+- Career advice / lifestyle sites are NOT acceptable sources for empirical behavioral claims
+- Replacing one low-quality source with a different low-quality source is NOT a fix — the replacement must be Tier 1 (peer-reviewed) or Tier 2 (academic institution, established news outlet)
+
 ## Sound Effect Cues:
 Include [SFX: description] markers at natural transition points (3-5 per episode max).
 

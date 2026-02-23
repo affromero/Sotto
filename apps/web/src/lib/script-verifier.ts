@@ -274,11 +274,20 @@ Note: The script may contain inline audio tags like [laughs], [sighs], [whispers
 **Tier 3 — Acceptable for established facts:**
 - Wikipedia — acceptable for well-established historical facts, dates, and definitions. Do NOT flag Wikipedia as unreliable. However, for contested claims, recent statistics, or cutting-edge research, prefer Tier 1–2 sources.
 
+**NOT acceptable for empirical, statistical, or causal claims (set hasUnreliableSource: true):**
+- Design agency blogs and marketing sites (e.g., designmodo.com, gouldingmedia.com, canva.com/learn, hubspot.com/blog) — acceptable for design opinions but NOT for psychological or behavioral statistics
+- Educational aggregator blogs (e.g., cognitiontoday.com, psychologytoday.com when citing secondary sources) — not acceptable as primary sources for research findings
+- Career advice / lifestyle sites (e.g., interviewguys.com, thebalancecareers.com, indeed.com/career-advice) — not acceptable for behavioral or psychological claims
+- SEO content farms and "roundup" articles that cite other blogs rather than primary sources
+- Any source that itself cites only secondary sources (blog → blog → no primary)
+Note: These sources may be acceptable for definitions, opinions, or practical advice — but any quantitative finding, study result, or causal claim from them requires a Tier 1–2 primary source.
+
 ## Passing Criteria:
 - Every non-obvious factual claim must have at least 1 citation
-- No claims should be backed only by unreliable sources
+- **HARD FAIL (regardless of score): If ANY claim has hasUnreliableSource: true, the script fails.** Include "FAIL:" at the start of your feedback and explicitly list which citations are unacceptable and what Tier 1–2 replacements would work.
 - Depth-scaled threshold: deep_dive requires 90%, standard 80%, quick_overview 70% of sourced claims to have 3+ verifiable sources
 - Overall score must be >= 0.7
+- **If all hard conditions pass AND score >= threshold: begin feedback with "PASS:" followed by any improvement suggestions.**
 
 ## Audience Level Context:
 Level "${audienceLevel}" — adjust expectations accordingly. Expert-level content needs stricter sourcing.
