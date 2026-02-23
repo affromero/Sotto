@@ -23,6 +23,9 @@ vi.mock('@/lib/prisma', () => {
     userAiKey: {
       updateMany: (...args: unknown[]) => mockUserAiKeyUpdateMany(...args),
     },
+    discoveryChatError: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
