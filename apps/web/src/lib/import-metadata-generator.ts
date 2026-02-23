@@ -17,6 +17,24 @@ const MAX_TRANSCRIPT_LENGTH = 8000;
  * Generate a title and topic description from a transcript using Claude.
  * Used when users import audio without providing metadata.
  */
+function extractFirstJsonObject(text: string): string {
+  const trimmed = text.trim();
+  try { JSON.parse(trimmed); return trimmed; } catch {}
+  const start = text.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in response');
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}' && --depth === 0) return text.slice(start, i + 1);
+  }
+  throw new Error('Unbalanced JSON in response');
+}
+
 export async function generateImportMetadata(
   transcriptText: string,
   apiKeyOverride?: string
@@ -37,15 +55,15 @@ export async function generateImportMetadata(
     outputTokens: response.outputTokens,
   });
 
-  const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
+  let parsed: { title?: string; topic?: string };
+  try {
+    parsed = JSON.parse(extractFirstJsonObject(response.content));
+  } catch {
     logger.error('Failed to parse metadata JSON from Claude', {
       response: response.content.slice(0, 200),
     });
     throw new Error('Failed to parse metadata from transcript');
   }
-
-  const parsed = JSON.parse(jsonMatch[0]) as { title?: string; topic?: string };
 
   const title = (parsed.title || 'Untitled Import').slice(0, 200);
   const topic = (parsed.topic || '').slice(0, 5000);

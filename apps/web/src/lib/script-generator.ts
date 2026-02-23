@@ -3,6 +3,26 @@ import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 
+/** Extract the first complete JSON object or array from a string containing surrounding text. */
+function extractFirstJson(text: string, open: '{' | '['): string {
+  const close = open === '{' ? '}' : ']';
+  const trimmed = text.trim();
+  try { JSON.parse(trimmed); return trimmed; } catch {}
+  const start = text.indexOf(open);
+  if (start === -1) throw new Error(`No JSON ${open === '{' ? 'object' : 'array'} found in response`);
+  let depth = 0, inString = false, escape = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === open) depth++;
+    if (ch === close && --depth === 0) return text.slice(start, i + 1);
+  }
+  throw new Error('Unbalanced JSON in response');
+}
+
 export type ScriptTurn = {
   speaker: string;
   text: string;
@@ -405,15 +425,15 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
       parsed = rawParsed;
     }
   } catch {
-    // Try to extract JSON from response
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
-    } else {
-      // Fallback: try parsing as just an array of turns (backward compat)
-      const arrayMatch = response.content.match(/\[[\s\S]*\]/);
-      const turns = arrayMatch ? JSON.parse(arrayMatch[0]) : [];
-      parsed = { turns, soundCues: [], references: [] };
+    try {
+      parsed = JSON.parse(extractFirstJson(response.content, '{'));
+    } catch {
+      try {
+        const turns = JSON.parse(extractFirstJson(response.content, '['));
+        parsed = { turns, soundCues: [], references: [] };
+      } catch {
+        parsed = { turns: [], soundCues: [], references: [] };
+      }
     }
   }
 
@@ -663,13 +683,15 @@ Revise the script addressing ALL feedback. Return JSON only.`;
       parsed = rawParsed;
     }
   } catch {
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      parsed = JSON.parse(jsonMatch[0]);
-    } else {
-      const arrayMatch = response.content.match(/\[[\s\S]*\]/);
-      const turns = arrayMatch ? JSON.parse(arrayMatch[0]) : [];
-      parsed = { turns, soundCues: [], references: [] };
+    try {
+      parsed = JSON.parse(extractFirstJson(response.content, '{'));
+    } catch {
+      try {
+        const turns = JSON.parse(extractFirstJson(response.content, '['));
+        parsed = { turns, soundCues: [], references: [] };
+      } catch {
+        parsed = { turns: [], soundCues: [], references: [] };
+      }
     }
   }
 
