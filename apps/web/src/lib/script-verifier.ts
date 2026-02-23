@@ -409,8 +409,6 @@ Analyze every factual claim. Return JSON only.`;
     score >= threshold &&
     unreliableSourceClaims.length === 0 &&
     misattributedClaims.length === 0 &&
-    !tooLong &&
-    !tooShort &&
     refQuality.countPassed &&
     refQuality.ratioPassed;
 
@@ -420,9 +418,8 @@ Analyze every factual claim. Return JSON only.`;
       misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
     feedback = feedback ? `${feedback}\n\n${misattrFeedback}` : misattrFeedback;
   }
-  if (durationFeedback) {
-    feedback = feedback ? `${feedback}\n\nDURATION: ${durationFeedback}` : durationFeedback;
-  }
+  // Duration feedback is returned as a separate field — the worker handles it
+  // by auto-trimming/expanding the script instead of failing verification.
   if (refQuality.feedback) {
     feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
   }

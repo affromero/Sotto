@@ -74,7 +74,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
     : requestedDuration;
 
-  const turns = script.turns as ScriptTurn[];
+  let turns = script.turns as ScriptTurn[];
   const generatedRefs: GeneratedReference[] = references.map((r) => ({
     number: r.number,
     title: r.title,
@@ -135,6 +135,79 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       where: { podcastId },
       data: { verificationAttempts: attemptNumber },
     });
+
+    // Auto-adjust duration if script is too long/short (don't waste a verification attempt)
+    if (verdict.durationFeedback) {
+      logger.info('Script passed fact-check but needs duration adjustment', {
+        podcastId,
+        durationFeedback: verdict.durationFeedback,
+      });
+
+      const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
+
+      const adjusted = await generateScriptWithFeedback({
+        topic: discovery.topic || '',
+        depth: discovery.depth || 'standard',
+        audienceLevel: discovery.audienceLevel || 'intermediate',
+        audience: discovery.audience || 'general',
+        focusAreas: discovery.focusAreas,
+        tone: discovery.tone || 'casual',
+        durationTarget: discovery.durationTarget || 10,
+        sourceContent: discovery.sourceContent || undefined,
+        sourceMetadata: sourceMetadata || undefined,
+        speakers: (discovery.speakers as Array<{ name: string; description: string }>) || undefined,
+        previousScript: turns,
+        previousReferences: generatedRefs,
+        verificationFeedback: `DURATION: ${verdict.durationFeedback}`,
+        apiKeyOverride: aiKey?.apiKey,
+        model,
+        webSearchEnabled: tierFeatures.webSearchEnabled,
+      });
+
+      await logUsage({
+        service: 'anthropic',
+        model: adjusted.model,
+        category: 'script_generation',
+        inputTokens: adjusted.inputTokens,
+        outputTokens: adjusted.outputTokens,
+        podcastId,
+        userId,
+      });
+
+      // Save adjusted script
+      await prisma.script.update({
+        where: { podcastId },
+        data: {
+          turns: adjusted.turns,
+          soundCues: adjusted.soundCues.length > 0 ? adjusted.soundCues : undefined,
+          markdown: adjusted.markdown,
+          version: { increment: 1 },
+        },
+      });
+
+      // Update references if changed
+      if (adjusted.references.length > 0) {
+        await prisma.reference.deleteMany({ where: { podcastId } });
+        await prisma.reference.createMany({
+          data: adjusted.references.map((ref) => ({
+            podcastId,
+            number: ref.number,
+            title: ref.title,
+            authors: ref.authors,
+            year: ref.year,
+            url: ref.url,
+            type: ref.type,
+            publisher: ref.publisher,
+            doi: ref.doi,
+          })),
+        });
+      }
+
+      // Use adjusted turns for downstream routing
+      turns = adjusted.turns;
+
+      logger.info('Script duration adjusted', { podcastId });
+    }
 
     if (references.length > 0) {
       await prisma.podcast.update({
