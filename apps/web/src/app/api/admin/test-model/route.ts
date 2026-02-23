@@ -8,6 +8,7 @@ import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { SttProviderId } from '@/lib/providers/stt-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { getAiKey, getByokKey, getByokExtraData } from '@/lib/byok';
+import { logUsage } from '@/lib/usage-logger';
 import {
   PLAYHT_VOICE_POOL,
   CARTESIA_VOICE_POOL,
@@ -217,6 +218,14 @@ export async function POST(request: NextRequest) {
         }),
         timeoutMs
       );
+      logUsage({
+        service: provider,
+        model: result.model,
+        category: 'admin_test',
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        userId: adminId,
+      });
       return NextResponse.json({
         success: true,
         latencyMs: Date.now() - start,

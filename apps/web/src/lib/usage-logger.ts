@@ -4,6 +4,7 @@
  */
 import { prisma } from './prisma';
 import { getAiCost } from './pricing';
+import { logger } from './logger';
 
 const AI_SERVICES = new Set(['anthropic', 'openai']);
 
@@ -41,7 +42,13 @@ export async function logUsage(params: {
           metadata: params.metadata ?? {},
         },
       })
-      .catch(() => {});
+      .catch((err) => {
+        logger.warn('logUsage: failed to write ApiUsageLog', {
+          category: params.category,
+          service: params.service,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
   } catch {
     // Silently ignore — prisma.apiUsageLog may not exist in test environments
   }
