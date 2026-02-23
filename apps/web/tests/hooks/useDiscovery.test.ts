@@ -340,7 +340,7 @@ describe('useDiscovery', () => {
       expect(abortSpy).toHaveBeenCalled();
     });
 
-    it('handles abort error silently', async () => {
+    it('handles abort error silently and removes the placeholder', async () => {
       const abortError = new DOMException('Aborted', 'AbortError');
       vi.mocked(fetch).mockRejectedValue(abortError);
 
@@ -354,7 +354,9 @@ describe('useDiscovery', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      expect(result.current.messages).toHaveLength(2);
+      // Aborted request removes the empty assistant placeholder — only user message remains
+      expect(result.current.messages).toHaveLength(1);
+      expect(result.current.messages[0].role).toBe('user');
     });
   });
 
