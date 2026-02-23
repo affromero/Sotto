@@ -31,6 +31,11 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// These endpoints return key-presence status and can 401 for server-side
+// reasons unrelated to the user's session token. Token validity was already
+// confirmed by /users/me at startup — a 401 here shouldn't kick the user out.
+const AUTH_REVOCATION_EXEMPT = ['/settings/ai-keys', '/settings/byok'];
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -38,7 +43,9 @@ api.interceptors.response.use(
     // Skip revocation for requests that had no token (pre-login background queries).
     if (error.response?.status === 401) {
       const hadToken = !!error.config?.headers?.Authorization;
-      if (hadToken) {
+      const url: string = error.config?.url ?? '';
+      const isExempt = AUTH_REVOCATION_EXEMPT.some((p) => url.endsWith(p));
+      if (hadToken && !isExempt) {
         await deleteToken();
         notifyAuthRevoked();
       }
