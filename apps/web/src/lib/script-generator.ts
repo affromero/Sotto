@@ -3,6 +3,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 
+
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
 function extractFirstJson(text: string, open: '{' | '['): string {
   const close = open === '{' ? '}' : ']';
@@ -432,73 +433,7 @@ Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
     ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
   });
 
-  let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
-  try {
-    const rawParsed = JSON.parse(response.content);
-    // Handle backward compat: if response is just an array, wrap it
-    if (Array.isArray(rawParsed)) {
-      parsed = { turns: rawParsed, soundCues: [], references: [] };
-    } else {
-      parsed = rawParsed;
-    }
-  } catch {
-    try {
-      parsed = JSON.parse(extractFirstJson(response.content, '{'));
-    } catch {
-      try {
-        const turns = JSON.parse(extractFirstJson(response.content, '['));
-        parsed = { turns, soundCues: [], references: [] };
-      } catch {
-        parsed = { turns: [], soundCues: [], references: [] };
-      }
-    }
-  }
-
-  // Coerce AI output before validating
-  const coerced = coerceScriptOutput(parsed as Record<string, unknown>);
-  const validated = generatedScriptSchema.parse(coerced);
-
-  // Ensure defaults
-  if (!validated.soundCues || validated.soundCues.length === 0) {
-    validated.soundCues = [
-      {
-        type: 'intro',
-        prompt: 'warm podcast intro jingle with soft chimes',
-        durationSeconds: 3,
-        insertAfterTurn: -1,
-      },
-      {
-        type: 'outro',
-        prompt: 'gentle melodic podcast outro with fade out',
-        durationSeconds: 4,
-        insertAfterTurn: validated.turns.length - 1,
-      },
-    ];
-  }
-
-  const normalized = normalizeReferences(
-    (validated.references as Array<Record<string, unknown>>) || []
-  );
-  const { references, numberMap } = deduplicateReferences(normalized);
-  const turns = remapCitations(validated.turns, numberMap);
-
-  // Generate markdown version with delivery directions
-  const markdown = turns
-    .map((turn) => {
-      const direction = turn.direction ? ` _(${turn.direction})_` : '';
-      return `**${turn.speaker}:**${direction} ${turn.text}`;
-    })
-    .join('\n\n');
-
-  return {
-    turns,
-    soundCues: validated.soundCues as SoundCue[],
-    references,
-    markdown,
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
-    model: response.model,
-  };
+  return parseScriptResponse(response);
 }
 
 /**
@@ -691,6 +626,155 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
   });
 
+  return parseScriptResponse(response);
+}
+
+/**
+ * Regenerate a script incorporating user feedback (general notes, per-turn comments, highlights).
+ * Unlike generateScriptWithFeedback() (which handles fact-checker feedback with strict citation rules),
+ * this function uses a lighter system prompt focused on addressing user preferences.
+ */
+export async function generateScriptWithUserFeedback(params: {
+  topic: string;
+  depth: string;
+  audienceLevel: string;
+  audience?: string;
+  focusAreas: string[];
+  tone: string;
+  durationTarget: number;
+  sourceContent?: string;
+  sourceMetadata?: SourceMetadata;
+  speakers?: Array<{ name: string; description: string }>;
+  previousScript: Array<{ speaker: string; text: string; direction?: string }>;
+  previousReferences: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }>;
+  userFeedback: string;
+  apiKeyOverride?: string;
+  model?: string;
+  webSearchEnabled?: boolean;
+}): Promise<{
+  turns: ScriptTurn[];
+  soundCues: SoundCue[];
+  references: GeneratedReference[];
+  markdown: string;
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
+}> {
+  const feedbackSpeakers = params.speakers ?? [
+    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation' },
+    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies and examples' },
+  ];
+  const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
+
+  const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on **user feedback**.
+
+## REVISION INSTRUCTIONS:
+The user reviewed the script and provided feedback. Address every piece of feedback while maintaining the overall quality and flow of the script.
+
+Key rules for this revision:
+1. Keep what works — only change what the user flagged
+2. Address ALL user notes: general feedback, turn-specific comments, and text annotations
+3. Maintain conversational quality and engagement
+4. Preserve existing citations and references unless the user specifically asks to change them
+5. If the user requests new information, use web search to find accurate, well-sourced content
+
+## Speakers:
+${feedbackSpeakerSection}
+
+## Voice & Delivery Guidelines:
+- Write dialogue that sounds like a REAL conversation, not a lecture
+- Include natural speech patterns and delivery directions in parentheses when tone shifts
+
+## Audio Expression Tags:
+For richer vocal expression, embed inline audio tags in the turn TEXT:
+- [laughs], [chuckles] — genuine amusement
+- [sighs] — exasperation, relief, or contemplation
+- [whispers] — emphasis or dramatic effect
+- [gasps] — surprise or shock
+Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
+These go inline in the text field, NOT in the direction field.
+
+- ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
+- ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
+- ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}
+- ${params.tone === 'storytelling' ? 'Frame everything as narrative — characters, conflict, resolution' : ''}
+
+## Audience: ${params.audience || 'general'}
+${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
+
+## Pacing:
+- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
+- Audience level: ${params.audienceLevel}
+- Focus areas: ${params.focusAreas.join(', ')}
+
+## Citation Rules:
+- Use [N] notation for inline citations
+- Keep existing citations intact unless the user asks to change them
+- If adding new content, cite real, verifiable sources
+- Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)
+
+## Sound Effect Cues:
+Include [SFX: description] markers at natural transition points (3-5 per episode max).
+
+## Web Search:
+You have access to web search. Use it to verify facts and find accurate information for any new content the user requests.
+
+## Output Format:
+Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
+Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
+
+  const previousScriptText = params.previousScript
+    .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
+    .join('\n');
+
+  const previousRefsText = params.previousReferences
+    .map((r) => `[${r.number}] "${r.title}" (${r.type}) — ${r.url || 'no url'}`)
+    .join('\n');
+
+  const userMessage = `Topic: ${params.topic}
+Depth: ${params.depth}
+
+## USER FEEDBACK:
+${params.userFeedback}
+
+## PREVIOUS SCRIPT (to revise):
+${previousScriptText}
+
+## PREVIOUS REFERENCES:
+${previousRefsText}
+
+${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}` : ''}
+
+Revise the script addressing ALL user feedback. Keep what works, change what the user flagged. Return JSON only.`;
+
+  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+    maxTokens: 12288,
+    apiKeyOverride: params.apiKeyOverride,
+    model: params.model,
+    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
+  });
+
+  return parseScriptResponse(response);
+}
+
+/**
+ * Shared response parser: JSON extraction, Zod validation, coercion,
+ * sound cue defaults, reference dedup, and markdown generation.
+ */
+function parseScriptResponse(response: {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
+}): {
+  turns: ScriptTurn[];
+  soundCues: SoundCue[];
+  references: GeneratedReference[];
+  markdown: string;
+  inputTokens: number;
+  outputTokens: number;
+  model: string;
+} {
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
   try {
     const rawParsed = JSON.parse(response.content);
@@ -712,7 +796,6 @@ Revise the script addressing ALL feedback. Return JSON only.`;
     }
   }
 
-  // Coerce AI output before validating
   const coerced = coerceScriptOutput(parsed as Record<string, unknown>);
   const validated = generatedScriptSchema.parse(coerced);
 

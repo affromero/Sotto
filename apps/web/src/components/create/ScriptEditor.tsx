@@ -52,6 +52,8 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
   const [regenerating, setRegenerating] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [generalFeedback, setGeneralFeedback] = useState('');
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const savedTurnsRef = useRef<TurnState[]>([]);
@@ -107,14 +109,15 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
   }, [turns, dirty]);
 
   // beforeunload warning
+  const hasFeedback = generalFeedback.trim().length > 0;
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !hasFeedback) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dirty]);
+  }, [dirty, hasFeedback]);
 
   // Stats
   const stats = useMemo(() => {
@@ -284,13 +287,19 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
     }
   }, [dirty, turns, podcastId, onApprove]);
 
-  // Regenerate
-  const handleRegenerate = useCallback(async () => {
+  // Regenerate (with optional feedback)
+  const handleRegenerate = useCallback(async (withFeedback = false) => {
     setRegenerating(true);
     setShowRegenerateConfirm(false);
     try {
+      const feedbackText = generalFeedback.trim();
+      const hasFeedbackBody = withFeedback && feedbackText;
       const res = await fetch(`/api/podcasts/${podcastId}/script/regenerate`, {
         method: 'POST',
+        ...(hasFeedbackBody ? {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ feedback: feedbackText }),
+        } : {}),
       });
       if (!res.ok) throw new Error('Failed to regenerate');
       onRegenerate();
@@ -298,7 +307,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       setError(err instanceof Error ? err.message : 'Failed to regenerate');
       setRegenerating(false);
     }
-  }, [podcastId, onRegenerate]);
+  }, [podcastId, onRegenerate, generalFeedback]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((index: number) => {
@@ -553,6 +562,33 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
         </button>
       </div>
 
+      {/* Feedback panel */}
+      <div className={styles.feedbackPanel}>
+        <button
+          type="button"
+          className={styles.feedbackToggle}
+          onClick={() => setShowFeedbackPanel(!showFeedbackPanel)}
+          aria-expanded={showFeedbackPanel}
+        >
+          {showFeedbackPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          Notes for regeneration
+          {generalFeedback.trim() && !showFeedbackPanel && (
+            <span className={styles.feedbackBadge}>1</span>
+          )}
+        </button>
+        {showFeedbackPanel && (
+          <textarea
+            className={styles.feedbackTextarea}
+            value={generalFeedback}
+            onChange={(e) => setGeneralFeedback(e.target.value)}
+            placeholder="Describe what you'd like changed — tone, emphasis, missing topics, too technical, etc."
+            rows={4}
+            maxLength={5000}
+            aria-label="General feedback for script regeneration"
+          />
+        )}
+      </div>
+
       {/* Actions footer */}
       <footer className={styles.actions}>
         <button
@@ -600,26 +636,59 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
             <h4 id="regen-title" className={styles.confirmTitle}>
               Regenerate Script?
             </h4>
-            <p className={styles.confirmText}>
-              This will discard the current script and generate a new one from scratch.
-              This action cannot be undone.
-            </p>
-            <div className={styles.confirmActions}>
-              <button
-                type="button"
-                className={styles.confirmCancel}
-                onClick={() => setShowRegenerateConfirm(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={styles.confirmConfirm}
-                onClick={handleRegenerate}
-              >
-                Regenerate
-              </button>
-            </div>
+            {generalFeedback.trim() ? (
+              <>
+                <p className={styles.confirmText}>
+                  Regenerate using your notes, or start fresh from scratch?
+                </p>
+                <div className={styles.confirmActions}>
+                  <button
+                    type="button"
+                    className={styles.confirmCancel}
+                    onClick={() => setShowRegenerateConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.confirmSecondary}
+                    onClick={() => handleRegenerate(false)}
+                  >
+                    From Scratch
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.confirmConfirm}
+                    onClick={() => handleRegenerate(true)}
+                  >
+                    Regenerate with Notes
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={styles.confirmText}>
+                  This will discard the current script and generate a new one from scratch.
+                  This action cannot be undone.
+                </p>
+                <div className={styles.confirmActions}>
+                  <button
+                    type="button"
+                    className={styles.confirmCancel}
+                    onClick={() => setShowRegenerateConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.confirmConfirm}
+                    onClick={() => handleRegenerate(false)}
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

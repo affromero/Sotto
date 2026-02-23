@@ -60,6 +60,9 @@ export interface GenerateScriptPayload {
   discoveryId: string;
   sourceContent?: string;
   useAdminCredits?: boolean;
+  userFeedback?: string;
+  previousTurns?: Array<{ speaker: string; text: string; direction?: string }>;
+  previousReferences?: Array<{ number: number; title: string; authors?: string; year?: number; url?: string; type: string; publisher?: string; doi?: string }>;
 }
 
 export interface GenerateAudioPayload {

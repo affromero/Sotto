@@ -390,6 +390,74 @@
 }
 
 /* ============================================ */
+/* FEEDBACK PANEL                               */
+/* ============================================ */
+
+.feedbackPanel {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.feedbackToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-xs) 0;
+  transition: color var(--transition-fast);
+}
+
+.feedbackToggle:hover {
+  color: var(--color-text-primary);
+}
+
+.feedbackBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.feedbackTextarea {
+  width: 100%;
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  line-height: 1.5;
+}
+
+.feedbackTextarea:focus {
+  border-color: var(--color-primary);
+}
+
+.feedbackTextarea::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* ============================================ */
 /* ACTIONS FOOTER (sticky)                      */
 /* ============================================ */
 
@@ -574,13 +642,31 @@
   cursor: pointer;
 }
 
+.confirmSecondary {
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.confirmSecondary:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
 .confirmConfirm {
   height: 40px;
   padding: 0 var(--spacing-lg);
   font: var(--text-body-sm);
   font-weight: 600;
   color: var(--color-text-inverse);
-  background: var(--color-error);
+  background: var(--color-primary);
   border: none;
   border-radius: var(--radius-lg);
   cursor: pointer;

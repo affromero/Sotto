@@ -21,7 +21,8 @@ All shared business logic and external service integrations live here.
 | `r2.ts` | Cloudflare R2 file storage (upload, download, presign) | AWS S3 SDK → R2 |
 | `duration.ts` | Centralized duration constants (WPM, chars/sec, tolerance) & helpers (word↔minute, bounds, estimation) | Pure utility |
 | `discovery-agent.ts` | Chat-based discovery: system prompt, chip parsing, metadata extraction | Uses `claude.ts` |
-| `script-generator.ts` | 2-voice podcast script generation with `[N]` citations + revision with feedback | Uses `claude.ts` |
+| `feedback-formatter.ts` | Format user feedback (general, per-turn, highlights) into prompt string for script revision | Pure utility |
+| `script-generator.ts` | 2-voice podcast script generation with `[N]` citations + revision with feedback (fact-checker + user) | Uses `claude.ts` |
 | `script-verifier.ts` | Claude-based "teacher" agent: extracts claims, evaluates sourcing, enforces duration limits | Uses `claude.ts` |
 | `reference-validator.ts` | Source quality pre-filter + 4-layer verification: URL HEAD, CrossRef DOI, OpenAlex title, Claude AI | fetch, `claude.ts` |
 | `script-updater.ts` | Citation cleanup + renumbering when references are removed after verification | Pure utility |
