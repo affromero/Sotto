@@ -1,5 +1,6 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
+import { hashTurn, matchClaimsToTurns } from './turn-diff';
 
 export interface ClaimAnalysis {
   claimText: string;
@@ -11,6 +12,7 @@ export interface ClaimAnalysis {
   hasUnreliableSource: boolean;
   hasMisattribution: boolean;
   verificationNote: string;
+  turnHash?: string;
 }
 
 export interface VerificationVerdict {
@@ -29,6 +31,7 @@ export interface VerificationVerdict {
   inputTokens: number;
   outputTokens: number;
   model: string;
+  allClaims: ClaimAnalysis[];
 }
 
 const UNRELIABLE_DOMAINS = [
@@ -139,44 +142,109 @@ export function assessReferenceQuality(
 
 import { countWords, wordCountBounds } from './duration';
 
-/**
- * Verify a podcast script by extracting factual claims and evaluating sourcing.
- * Acts as a "teacher" checking homework — every non-obvious claim needs adequate sourcing.
- */
-export async function verifyScript(params: {
-  topic: string;
-  turns: ScriptTurn[];
-  references: GeneratedReference[];
-  depth: string;
-  audienceLevel: string;
-  attemptNumber: number;
-  maxDurationMinutes?: number;
-  previousFeedback?: string;
-  apiKeyOverride?: string;
-  model?: string;
-}): Promise<VerificationVerdict> {
-  const {
-    topic,
-    turns,
-    references,
-    depth,
-    audienceLevel,
-    attemptNumber,
-    maxDurationMinutes,
-    previousFeedback,
-  } = params;
+function buildVerdict(
+  claims: ClaimAnalysis[],
+  references: GeneratedReference[],
+  depth: string,
+  maxDurationMinutes: number | undefined,
+  turns: ScriptTurn[],
+  aiFeedback: string,
+  tokenUsage: { inputTokens: number; outputTokens: number; model: string }
+): VerificationVerdict {
+  const commonKnowledgeClaims = claims.filter((c) => c.isCommonKnowledge);
+  const sourcingRequired = claims.filter((c) => !c.isCommonKnowledge);
+  const unsupportedClaims = sourcingRequired.filter((c) => c.existingCitations.length === 0);
+  const underSourcedClaims = sourcingRequired.filter(
+    (c) => c.needsMoreCitations && c.existingCitations.length > 0
+  );
+  const unreliableSourceClaims = sourcingRequired.filter((c) => c.hasUnreliableSource);
+  const misattributedClaims = sourcingRequired.filter((c) => c.hasMisattribution);
+  const adequatelySourcedClaims = sourcingRequired.filter(
+    (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource && !c.hasMisattribution
+  );
 
-  const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
+  const totalWords = turns.reduce((sum, t) => sum + countWords(t.text), 0);
+  let tooLong = false;
+  let tooShort = false;
+  if (maxDurationMinutes) {
+    const bounds = wordCountBounds(maxDurationMinutes);
+    tooLong = totalWords > bounds.max;
+    tooShort = totalWords < bounds.min;
+  }
 
-  const referencesText = references
+  let durationFeedback: string | null = null;
+  if (maxDurationMinutes && (tooLong || tooShort)) {
+    const bounds = wordCountBounds(maxDurationMinutes);
+    if (tooLong) {
+      durationFeedback = `The script is ${totalWords} words, which exceeds the maximum of ${bounds.max} words for a ${maxDurationMinutes}-minute podcast. Reduce to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+    } else {
+      durationFeedback = `The script is ${totalWords} words, which is below the minimum of ${bounds.min} words for a ${maxDurationMinutes}-minute podcast. Expand to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
+    }
+  }
+
+  const score =
+    sourcingRequired.length === 0
+      ? 1
+      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length - misattributedClaims.length) /
+        sourcingRequired.length;
+  const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
+
+  const refQuality = assessReferenceQuality(references, depth);
+
+  const passed =
+    score >= threshold &&
+    unreliableSourceClaims.length === 0 &&
+    misattributedClaims.length === 0 &&
+    refQuality.countPassed &&
+    refQuality.ratioPassed;
+
+  let feedback = aiFeedback;
+  if (misattributedClaims.length > 0) {
+    const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
+      misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
+    feedback = feedback ? `${feedback}\n\n${misattrFeedback}` : misattrFeedback;
+  }
+  if (refQuality.feedback) {
+    feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
+  }
+
+  return {
+    passed,
+    score,
+    totalClaims: claims.length,
+    commonKnowledgeClaims: commonKnowledgeClaims.length,
+    adequatelySourcedClaims: adequatelySourcedClaims.length,
+    unsupportedClaims,
+    underSourcedClaims,
+    unreliableSourceClaims,
+    misattributedClaims,
+    referenceQuality: refQuality,
+    durationFeedback,
+    feedback,
+    allClaims: claims,
+    inputTokens: tokenUsage.inputTokens,
+    outputTokens: tokenUsage.outputTokens,
+    model: tokenUsage.model,
+  };
+}
+
+function formatReferencesText(references: GeneratedReference[]): string {
+  return references
     .map((r) => {
       const domain = r.url ? extractDomain(r.url) : 'no-url';
       const unreliable = UNRELIABLE_DOMAINS.some((d) => domain.includes(d));
       return `[${r.number}] "${r.title}" by ${r.authors.join(', ') || 'unknown'} (${r.year || 'n/a'}) — ${r.type} — URL: ${r.url || 'none'} — DOI: ${r.doi || 'none'}${unreliable ? ' [UNRELIABLE SOURCE]' : ''}`;
     })
     .join('\n');
+}
 
-  const systemPrompt = `You are a rigorous fact-checking agent for Sotto podcasts. Your job is to review a podcast script like a teacher grading homework.
+function buildSystemPrompt(
+  audienceLevel: string,
+  attemptNumber: number,
+  previousFeedback: string | undefined,
+  incrementalContext?: { carriedClaims: ClaimAnalysis[]; changedIndices: Set<number> }
+): string {
+  const basePrompt = `You are a rigorous fact-checking agent for Sotto podcasts. Your job is to review a podcast script like a teacher grading homework.
 
 Note: The script may contain inline audio tags like [laughs], [sighs], [whispers], [gasps], [chuckles]. These are TTS formatting markers — ignore them when evaluating claims.
 
@@ -244,8 +312,12 @@ Set hasMisattribution to true if:
 - The script states a year that doesn't match the reference's year
 - The script names specific authors not listed in the reference's authors array
 
-## This is verification attempt ${attemptNumber} of 3.
-${previousFeedback ? `
+## This is verification attempt ${attemptNumber} of 3.`;
+
+  let prompt = basePrompt;
+
+  if (previousFeedback) {
+    prompt += `
 ## Previous Feedback (for context only — the script has been revised since):
 The following issues were flagged in the previous round. The script was revised to address them.
 Your job is to evaluate the CURRENT script on its own merits:
@@ -255,7 +327,29 @@ Your job is to evaluate the CURRENT script on its own merits:
 - Do not assume an issue persists just because it was flagged before — verify against the actual current text.
 
 Previous feedback for reference:
-${previousFeedback}` : ''}
+${previousFeedback}`;
+  }
+
+  if (incrementalContext) {
+    const unchangedIndices = [...Array(incrementalContext.changedIndices.size + incrementalContext.carriedClaims.length).keys()]
+      .filter((i) => !incrementalContext.changedIndices.has(i));
+    const changedList = [...incrementalContext.changedIndices].sort((a, b) => a - b);
+
+    prompt += `
+
+## INCREMENTAL VERIFICATION — IMPORTANT
+This is a re-verification after script revision. Some turns are UNCHANGED from the previous version and have already been verified.
+
+**Pre-verified turns (DO NOT re-analyze these):** ${unchangedIndices.length > 0 ? unchangedIndices.join(', ') : 'none'}
+Previously verified claims for context:
+${incrementalContext.carriedClaims.map((c) => `- Turn ${c.turnIndex} (${c.speaker}): "${c.claimText}" — ${c.verificationNote}`).join('\n')}
+
+**Turns requiring analysis (ONLY analyze these):** ${changedList.join(', ')}
+
+You MUST only return claims for the turns listed above as "requiring analysis". Do NOT return claims for pre-verified turns.`;
+  }
+
+  prompt += `
 
 ## Output Format:
 Return a JSON object:
@@ -279,6 +373,158 @@ Return a JSON object:
 
 Return ONLY the JSON object.`;
 
+  return prompt;
+}
+
+function parseClaims(
+  parsed: { claims: Array<Record<string, unknown>>; feedback: string },
+  turns: ScriptTurn[]
+): { claims: ClaimAnalysis[]; aiFeedback: string } {
+  const claims: ClaimAnalysis[] = (parsed.claims || []).map((c) => ({
+    claimText: c.claimText as string,
+    turnIndex: c.turnIndex as number,
+    speaker: c.speaker as string,
+    isCommonKnowledge: c.isCommonKnowledge as boolean,
+    existingCitations: (c.existingCitations as number[]) || [],
+    needsMoreCitations: c.needsMoreCitations as boolean,
+    hasUnreliableSource: c.hasUnreliableSource as boolean,
+    hasMisattribution: (c.hasMisattribution as boolean) ?? false,
+    verificationNote: c.verificationNote as string,
+    turnHash: c.turnIndex != null && (c.turnIndex as number) < turns.length
+      ? hashTurn(turns[c.turnIndex as number].speaker, turns[c.turnIndex as number].text)
+      : undefined,
+  }));
+  return { claims, aiFeedback: parsed.feedback || '' };
+}
+
+/**
+ * Verify a podcast script by extracting factual claims and evaluating sourcing.
+ * Acts as a "teacher" checking homework — every non-obvious claim needs adequate sourcing.
+ *
+ * When `previousClaims` is provided, unchanged turns are carried forward without
+ * re-analysis, and only changed/new turns are sent to the AI.
+ */
+export async function verifyScript(params: {
+  topic: string;
+  turns: ScriptTurn[];
+  references: GeneratedReference[];
+  depth: string;
+  audienceLevel: string;
+  attemptNumber: number;
+  maxDurationMinutes?: number;
+  previousFeedback?: string;
+  apiKeyOverride?: string;
+  model?: string;
+  previousClaims?: ClaimAnalysis[];
+}): Promise<VerificationVerdict> {
+  const {
+    topic,
+    turns,
+    references,
+    depth,
+    audienceLevel,
+    attemptNumber,
+    maxDurationMinutes,
+    previousFeedback,
+    previousClaims,
+  } = params;
+
+  // Incremental path: carry forward verified claims for unchanged turns
+  if (previousClaims && previousClaims.length > 0) {
+    const { carried, changedIndices } = matchClaimsToTurns(previousClaims, turns);
+
+    // All turns unchanged → skip AI call entirely
+    if (changedIndices.size === 0) {
+      return buildVerdict(carried, references, depth, maxDurationMinutes, turns, '', {
+        inputTokens: 0,
+        outputTokens: 0,
+        model: params.model || 'skipped',
+      });
+    }
+
+    const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
+    const referencesText = formatReferencesText(references);
+
+    const systemPrompt = buildSystemPrompt(audienceLevel, attemptNumber, previousFeedback, {
+      carriedClaims: carried,
+      changedIndices,
+    });
+
+    const userMessage = `Topic: ${topic}
+Depth: ${depth}
+Audience: ${audienceLevel}
+
+=== SCRIPT ===
+${turnsText}
+
+=== REFERENCES ===
+${referencesText}
+
+Analyze ONLY the changed turns listed in the system instructions. Return JSON only.`;
+
+    const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+      maxTokens: 8192,
+      apiKeyOverride: params.apiKeyOverride,
+      model: params.model,
+      tools: [WEB_SEARCH_TOOL],
+      skipModeration: true,
+    });
+
+    let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
+    try {
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in response');
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      return {
+        passed: false,
+        score: 0,
+        totalClaims: 0,
+        commonKnowledgeClaims: 0,
+        adequatelySourcedClaims: 0,
+        unsupportedClaims: [],
+        underSourcedClaims: [],
+        unreliableSourceClaims: [],
+        misattributedClaims: [],
+        referenceQuality: {
+          totalCount: 0,
+          requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+          countPassed: false,
+          seriousCount: 0,
+          seriousRatio: 0,
+          requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+          ratioPassed: false,
+          qualityScore: 0,
+          feedback: null,
+        },
+        durationFeedback: null,
+        feedback: 'Script verification failed: could not parse AI response. Will retry.',
+        allClaims: [],
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+      };
+    }
+
+    const { claims: newClaims, aiFeedback } = parseClaims(parsed, turns);
+
+    // Dedup: if AI re-analyzed a pre-verified turn, new claim takes precedence
+    const newClaimTurnIndices = new Set(newClaims.map((c) => c.turnIndex));
+    const dedupedCarried = carried.filter((c) => !newClaimTurnIndices.has(c.turnIndex));
+    const allClaims = [...dedupedCarried, ...newClaims];
+
+    return buildVerdict(allClaims, references, depth, maxDurationMinutes, turns, aiFeedback, {
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+      model: response.model,
+    });
+  }
+
+  // Full verification path (attempt 1 or no previous claims)
+  const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
+  const referencesText = formatReferencesText(references);
+  const systemPrompt = buildSystemPrompt(audienceLevel, attemptNumber, previousFeedback);
+
   const userMessage = `Topic: ${topic}
 Depth: ${depth}
 Audience: ${audienceLevel}
@@ -299,21 +545,7 @@ Analyze every factual claim. Return JSON only.`;
     skipModeration: true,
   });
 
-  let parsed: {
-    claims: Array<{
-      claimText: string;
-      turnIndex: number;
-      speaker: string;
-      isCommonKnowledge: boolean;
-      existingCitations: number[];
-      needsMoreCitations: boolean;
-      hasUnreliableSource: boolean;
-      hasMisattribution: boolean;
-      verificationNote: string;
-    }>;
-    overallScore: number;
-    feedback: string;
-  };
+  let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
 
   try {
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
@@ -345,102 +577,20 @@ Analyze every factual claim. Return JSON only.`;
       },
       durationFeedback: null,
       feedback: 'Script verification failed: could not parse AI response. Will retry.',
+      allClaims: [],
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
       model: response.model,
     };
   }
 
-  const claims: ClaimAnalysis[] = (parsed.claims || []).map((c) => ({
-    claimText: c.claimText,
-    turnIndex: c.turnIndex,
-    speaker: c.speaker,
-    isCommonKnowledge: c.isCommonKnowledge,
-    existingCitations: c.existingCitations || [],
-    needsMoreCitations: c.needsMoreCitations,
-    hasUnreliableSource: c.hasUnreliableSource,
-    hasMisattribution: c.hasMisattribution ?? false,
-    verificationNote: c.verificationNote,
-  }));
+  const { claims, aiFeedback } = parseClaims(parsed, turns);
 
-  const commonKnowledgeClaims = claims.filter((c) => c.isCommonKnowledge);
-  const sourcingRequired = claims.filter((c) => !c.isCommonKnowledge);
-  const unsupportedClaims = sourcingRequired.filter((c) => c.existingCitations.length === 0);
-  const underSourcedClaims = sourcingRequired.filter(
-    (c) => c.needsMoreCitations && c.existingCitations.length > 0
-  );
-  const unreliableSourceClaims = sourcingRequired.filter((c) => c.hasUnreliableSource);
-  const misattributedClaims = sourcingRequired.filter((c) => c.hasMisattribution);
-  const adequatelySourcedClaims = sourcingRequired.filter(
-    (c) => c.existingCitations.length > 0 && !c.needsMoreCitations && !c.hasUnreliableSource && !c.hasMisattribution
-  );
-
-  // Duration check — bidirectional (too long OR too short), only when target is set
-  const totalWords = turns.reduce((sum, t) => sum + countWords(t.text), 0);
-  let tooLong = false;
-  let tooShort = false;
-  if (maxDurationMinutes) {
-    const bounds = wordCountBounds(maxDurationMinutes);
-    tooLong = totalWords > bounds.max;
-    tooShort = totalWords < bounds.min;
-  }
-
-  let durationFeedback: string | null = null;
-  if (maxDurationMinutes && (tooLong || tooShort)) {
-    const bounds = wordCountBounds(maxDurationMinutes);
-    if (tooLong) {
-      durationFeedback = `The script is ${totalWords} words, which exceeds the maximum of ${bounds.max} words for a ${maxDurationMinutes}-minute podcast. Reduce to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
-    } else {
-      durationFeedback = `The script is ${totalWords} words, which is below the minimum of ${bounds.min} words for a ${maxDurationMinutes}-minute podcast. Expand to ${bounds.min}–${bounds.max} words (${bounds.target} ideal).`;
-    }
-  }
-
-  // Compute score from actual data rather than trusting AI's self-reported score
-  const score =
-    sourcingRequired.length === 0
-      ? 1
-      : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length - misattributedClaims.length) /
-        sourcingRequired.length;
-  const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
-
-  const refQuality = assessReferenceQuality(references, depth);
-
-  const passed =
-    score >= threshold &&
-    unreliableSourceClaims.length === 0 &&
-    misattributedClaims.length === 0 &&
-    refQuality.countPassed &&
-    refQuality.ratioPassed;
-
-  let feedback = parsed.feedback || '';
-  if (misattributedClaims.length > 0) {
-    const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
-      misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
-    feedback = feedback ? `${feedback}\n\n${misattrFeedback}` : misattrFeedback;
-  }
-  // Duration feedback is returned as a separate field — the worker handles it
-  // by auto-trimming/expanding the script instead of failing verification.
-  if (refQuality.feedback) {
-    feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
-  }
-
-  return {
-    passed,
-    score,
-    totalClaims: claims.length,
-    commonKnowledgeClaims: commonKnowledgeClaims.length,
-    adequatelySourcedClaims: adequatelySourcedClaims.length,
-    unsupportedClaims,
-    underSourcedClaims,
-    unreliableSourceClaims,
-    misattributedClaims,
-    referenceQuality: refQuality,
-    durationFeedback,
-    feedback,
+  return buildVerdict(claims, references, depth, maxDurationMinutes, turns, aiFeedback, {
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     model: response.model,
-  };
+  });
 }
 
 function extractDomain(url: string): string {
