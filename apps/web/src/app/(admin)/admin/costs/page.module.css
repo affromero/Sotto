@@ -96,10 +96,11 @@
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  padding: 4px 8px;
-  background: var(--color-text-primary, #1a1a1a);
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: #111;
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   border-radius: var(--radius-sm);
   white-space: nowrap;
@@ -107,13 +108,14 @@
   pointer-events: none;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .chartTooltipDetail {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 400;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .chartBar:hover .chartTooltip {
@@ -124,4 +126,21 @@
 .cellGrouped {
   vertical-align: top;
   font-weight: 500;
+}
+
+/* Model total row */
+.modelTotalRow {
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.modelTotalLabel {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.modelTotalValue {
+  font-weight: 600;
 }

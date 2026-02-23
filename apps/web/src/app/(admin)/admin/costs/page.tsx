@@ -170,31 +170,48 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
               </tr>
             </thead>
             <tbody>
-              {breakdown.providers.flatMap((p) =>
-                p.categories.length > 0
-                  ? p.categories.map((cat, i) => (
-                      <tr key={`${p.service}-${p.modelId ?? 'none'}-${cat.category}`}>
-                        {i === 0 ? (
-                          <>
-                            <td rowSpan={p.categories.length} className={styles.cellGrouped}>{p.service}</td>
-                            <td rowSpan={p.categories.length} className={styles.cellGrouped}>{p.modelId ?? '—'}</td>
-                          </>
-                        ) : null}
-                        <td>{cat.category}</td>
-                        <td>${cat.totalCost.toFixed(4)}</td>
-                        <td>{cat.callCount.toLocaleString()}</td>
-                      </tr>
-                    ))
-                  : [(
-                      <tr key={`${p.service}-${p.modelId ?? 'none'}`}>
-                        <td>{p.service}</td>
-                        <td>{p.modelId ?? '—'}</td>
-                        <td>—</td>
-                        <td>${p.totalCost.toFixed(4)}</td>
-                        <td>{p.callCount.toLocaleString()}</td>
-                      </tr>
-                    )]
-              )}
+              {breakdown.providers.flatMap((p) => {
+                const hasMultipleCategories = p.categories.length > 1;
+                const rowSpan = hasMultipleCategories ? p.categories.length + 1 : p.categories.length || 1;
+
+                if (p.categories.length === 0) {
+                  return [(
+                    <tr key={`${p.service}-${p.modelId ?? 'none'}`}>
+                      <td>{p.service}</td>
+                      <td>{p.modelId ?? '—'}</td>
+                      <td>—</td>
+                      <td>${p.totalCost.toFixed(4)}</td>
+                      <td>{p.callCount.toLocaleString()}</td>
+                    </tr>
+                  )];
+                }
+
+                const rows = p.categories.map((cat, i) => (
+                  <tr key={`${p.service}-${p.modelId ?? 'none'}-${cat.category}`}>
+                    {i === 0 ? (
+                      <>
+                        <td rowSpan={rowSpan} className={styles.cellGrouped}>{p.service}</td>
+                        <td rowSpan={rowSpan} className={styles.cellGrouped}>{p.modelId ?? '—'}</td>
+                      </>
+                    ) : null}
+                    <td>{cat.category}</td>
+                    <td>${cat.totalCost.toFixed(4)}</td>
+                    <td>{cat.callCount.toLocaleString()}</td>
+                  </tr>
+                ));
+
+                if (hasMultipleCategories) {
+                  rows.push(
+                    <tr key={`${p.service}-${p.modelId ?? 'none'}-total`} className={styles.modelTotalRow}>
+                      <td className={styles.modelTotalLabel}>Total</td>
+                      <td className={styles.modelTotalValue}>${p.totalCost.toFixed(4)}</td>
+                      <td className={styles.modelTotalValue}>{p.callCount.toLocaleString()}</td>
+                    </tr>
+                  );
+                }
+
+                return rows;
+              })}
             </tbody>
           </table>
         )}
