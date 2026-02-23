@@ -89,12 +89,15 @@ export async function getPipelineHealth(since: Date): Promise<PipelineHealth> {
       orderBy: { _count: { failedAtStatus: 'desc' } },
     }),
     prisma.$queryRaw<[{ avg: number | null }]>`
-      SELECT AVG(EXTRACT(EPOCH FROM ("updatedAt" - "createdAt")))::float AS avg
-      FROM "Podcast"
-      WHERE "status" = 'READY'
-        AND "deletedAt" IS NULL
-        AND "source" != 'IMPORT'
-        AND "createdAt" >= ${since}
+      SELECT AVG(EXTRACT(EPOCH FROM (pe."createdAt" - p."createdAt")))::float AS avg
+      FROM "Podcast" p
+      JOIN "PipelineEvent" pe ON pe."podcastId" = p."id"
+        AND pe."type" = 'complete'
+        AND pe."stage" = 'audio-stitching'
+      WHERE p."status" = 'READY'
+        AND p."deletedAt" IS NULL
+        AND p."source" != 'IMPORT'
+        AND p."createdAt" >= ${since}
     `,
   ]);
 
