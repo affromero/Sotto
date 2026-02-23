@@ -612,6 +612,31 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
     });
 
+    it('sends error SSE and logs DiscoveryChatError when response is markup-only', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      // Claude returns only a metadata block with no prose text
+      mockStreamDiscoveryResponse.mockReturnValue(
+        mockStreamGenerator(['[METADATA]{"topic":"test","ready":false}[/METADATA]'])
+      );
+
+      const { prisma: mockPrismaRef } = await import('@/lib/prisma');
+
+      const request = createPostRequest({ message: 'Mexican security forces kill El Mencho' });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const errorEvent = events.find((e) => {
+        try { return JSON.parse(e).error; } catch { return false; }
+      });
+      expect(errorEvent).toBeDefined();
+      expect(JSON.parse(errorEvent!).error).toContain("couldn't generate a response");
+      expect(mockPrismaRef.discoveryChatError.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ errorKind: 'empty_response' }),
+        })
+      );
+    });
+
     it('handles multiple concurrent streams from different users', async () => {
       mockAuth.mockResolvedValueOnce({ user: { id: 'user-1' } });
       mockStreamDiscoveryResponse.mockReturnValueOnce(mockStreamGenerator(['Stream 1']));
