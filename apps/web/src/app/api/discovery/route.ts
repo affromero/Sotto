@@ -128,7 +128,13 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        if (!fullResponse.trim()) {
+        // Check for visually-empty response: truly empty OR response contains only metadata/chips markup
+        const visibleContent = fullResponse
+          .replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '')
+          .replace(/\[chips:\s*.+?\]/g, '')
+          .trim();
+
+        if (!visibleContent) {
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ error: "I couldn't generate a response. Please try again." })}\n\n`
@@ -142,8 +148,7 @@ export async function POST(request: NextRequest) {
               discoveryId: discoveryId ?? null,
             },
           }).catch((err: Error) => logger.warn('Failed to save discovery chat error', { error: err.message }));
-          controller.close();
-          return;
+          return; // no controller.close() here — finally handles it for all paths
         }
 
         const { chips } = parseChips(fullResponse);
