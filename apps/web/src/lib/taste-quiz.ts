@@ -77,13 +77,20 @@ export async function generateQuestions(
 
   const systemPrompt = `You generate taste quiz questions for a podcast discovery platform called Sotto.
 
-Each question should be a yes/no prompt like "Would you listen to a podcast about...?" or "Are you curious about...?" or "Do you enjoy debates about...?"
+Each question is a short yes/no prompt. VARY the phrasing — never start more than one question the same way. Good openers:
+- "Ever wonder why…?"
+- "Did you know…?"
+- "Are you curious about…?"
+- "What if…?"
+- "Should we rethink…?"
+- "How does…?"
+- Direct statements that provoke: "Octopuses taste the world by licking their arms."
 
 Rules:
 - Generate exactly ${requestCount} questions
 - Each question maps to 1-3 existing tag slugs from the taxonomy below
 - Mix question styles: curiosity-driven, opinion-based, niche deep-dives, contrarian takes
-- Questions should be specific and vivid, not generic ("Would you listen to a podcast about why cats purr?" not "Are you interested in animals?")
+- Questions should be specific and vivid, not generic ("Ever wonder why cats purr even when they're alone?" not "Are you interested in animals?")
 - Never repeat questions the user has already answered
 - Bias toward unexplored areas the user hasn't engaged with yet
 - Category is the parent slug the question primarily belongs to
@@ -97,7 +104,7 @@ ${dislikedSummary ? `User dislikes: ${dislikedSummary}` : ''}
 ${recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recentQuestions}` : ''}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Did you know octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   const ai = createAIProvider(freeTierConfig.aiProvider);
   const response = await ai.generateResponse(
@@ -331,8 +338,8 @@ export async function generateForYouQuestions(
     ? `The user is interested in: ${interestNames.join(', ')}.
 
 Your job is to COMBINE these interests in unexpected, creative ways. Examples:
-- If they like "AI" and "History" → "Would you listen to a podcast about how ancient civilizations would have used artificial intelligence?"
-- If they like "Psychology" and "Sports" → "Would you listen to a podcast about the mental tricks Olympic athletes use to overcome fear?"
+- If they like "AI" and "History" → "What if ancient civilizations had artificial intelligence?"
+- If they like "Psychology" and "Sports" → "Ever wonder what mental tricks Olympic athletes use to overcome fear?"
 
 Also explore topics ADJACENT to their interests — things they haven't explicitly said but would likely enjoy based on their taste profile.`
     : `The user has no stated interests yet. Generate broadly appealing, curiosity-driven questions across diverse topics. Aim for surprise and delight — topics that make someone think "I never knew I wanted to learn about that."`;
@@ -348,7 +355,9 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
 
   const systemPrompt = `You generate personalized podcast topic questions for Sotto's "For You" feed.
 
-Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
+Each question is a short, compelling yes/no prompt — specific enough that answering "yes" means the user wants a podcast on that exact topic.
+
+IMPORTANT: Vary your phrasing. Never start more than one question the same way. Mix openers like "Ever wonder…?", "Did you know…?", "What if…?", "How does…?", or direct provocative statements.
 
 ${interestContext}${topicContext}
 
@@ -364,7 +373,7 @@ ${ctx.taxonomyLines.join('\n')}
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Ever wonder how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
     // Use user's BYOK key if available (faster than platform claude-code CLI)
@@ -448,7 +457,7 @@ export async function generateCuriosityQuestions(
 
   const systemPrompt = `You generate serendipitous curiosity questions for Sotto's "Curiosity" feed — the feeling of falling down a Wikipedia rabbit hole at 2am.
 
-Each question should be a compelling yes/no prompt like "Would you listen to a podcast about...?" — specific enough that answering "yes" means the user wants a podcast created on that exact topic.
+Each question is a short, compelling yes/no prompt — specific enough that answering "yes" means a podcast gets created on that exact topic. VARY your phrasing: "Ever wonder…?", "Did you know…?", "What if…?", direct provocative statements, etc. Never start more than one question the same way.
 
 Your job is to surface the most SURPRISING, COUNTERINTUITIVE, and FASCINATING topics across all of human knowledge:
 - Counterintuitive science (quantum weirdness, time perception, paradoxes)
@@ -475,7 +484,7 @@ ${ctx.taxonomyLines.join('\n')}
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about why we can't tickle ourselves but robots might be able to?", "topic": "why we can't tickle ourselves but robots might be able to", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "Why can't you tickle yourself — but a robot might be able to?", "topic": "why we can't tickle ourselves but robots might be able to", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
     const resolved = await resolveAiProvider(userId).catch(() => null);
@@ -588,7 +597,7 @@ Rules:
 - Generate exactly ${requestCount} questions as a JSON array
 - Each question should reference a real event, person, date, or development — prefer recent but fall back to relevant ongoing stories if no recent results exist
 - Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must feel timely and compelling — "Would you listen to a podcast about [something newsworthy]?"
+- Questions must feel timely and compelling — vary phrasing (never start more than one the same way)
 - Category is the parent slug the question belongs to
 - NEVER refuse or apologize — always generate the full count of questions
 - ${diversityNote}${excludeContext}${topicFocus}
@@ -598,7 +607,7 @@ ${ctx.taxonomyLines.join('\n')}
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with a JSON array only, no markdown. Each item:
-{"text": "Would you listen to a podcast about how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+{"text": "How is the EU's new AI Act already reshaping Silicon Valley?", "topic": "EU AI Act impact on Silicon Valley", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
