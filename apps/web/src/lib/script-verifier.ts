@@ -440,7 +440,20 @@ export async function verifyScript(params: {
 
   // Incremental path: carry forward verified claims for unchanged turns
   if (previousClaims && previousClaims.length > 0) {
-    const { carried, changedIndices } = matchClaimsToTurns(previousClaims, turns);
+    const { carried: rawCarried, changedIndices } = matchClaimsToTurns(previousClaims, turns);
+
+    // Force re-analysis of turns that had problems in previous rounds.
+    // The generator may have fixed a reference while keeping the turn text unchanged —
+    // the hash matches but the verdict could now differ with the replaced source.
+    const problemTurnIndices = new Set(
+      rawCarried
+        .filter((c) => c.hasUnreliableSource || c.hasMisattribution)
+        .map((c) => c.turnIndex)
+    );
+    for (const idx of problemTurnIndices) {
+      changedIndices.add(idx);
+    }
+    const carried = rawCarried.filter((c) => !problemTurnIndices.has(c.turnIndex));
 
     // All turns unchanged → skip AI call entirely
     if (changedIndices.size === 0) {
