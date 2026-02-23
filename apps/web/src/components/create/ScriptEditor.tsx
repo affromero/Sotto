@@ -11,6 +11,7 @@ import {
   Save,
   RefreshCw,
   Play,
+  MessageSquare,
 } from 'lucide-react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
@@ -54,6 +55,8 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const [generalFeedback, setGeneralFeedback] = useState('');
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(false);
+  const [turnComments, setTurnComments] = useState<Record<number, string>>({});
+  const [commentingIndex, setCommentingIndex] = useState<number | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const savedTurnsRef = useRef<TurnState[]>([]);
@@ -110,14 +113,15 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
 
   // beforeunload warning
   const hasFeedback = generalFeedback.trim().length > 0;
+  const hasComments = Object.values(turnComments).some((c) => c.trim().length > 0);
   useEffect(() => {
-    if (!dirty && !hasFeedback) return;
+    if (!dirty && !hasFeedback && !hasComments) return;
     function handleBeforeUnload(e: BeforeUnloadEvent) {
       e.preventDefault();
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [dirty, hasFeedback]);
+  }, [dirty, hasFeedback, hasComments]);
 
   // Stats
   const stats = useMemo(() => {
@@ -293,12 +297,21 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
     setShowRegenerateConfirm(false);
     try {
       const feedbackText = generalFeedback.trim();
-      const hasFeedbackBody = withFeedback && feedbackText;
+      // Filter to only non-empty comments
+      const filteredComments: Record<number, string> = {};
+      for (const [k, v] of Object.entries(turnComments)) {
+        if (v.trim()) filteredComments[Number(k)] = v.trim();
+      }
+      const hasAnyFeedback = feedbackText || Object.keys(filteredComments).length > 0;
+      const shouldSendBody = withFeedback && hasAnyFeedback;
       const res = await fetch(`/api/podcasts/${podcastId}/script/regenerate`, {
         method: 'POST',
-        ...(hasFeedbackBody ? {
+        ...(shouldSendBody ? {
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feedback: feedbackText }),
+          body: JSON.stringify({
+            ...(feedbackText ? { feedback: feedbackText } : {}),
+            ...(Object.keys(filteredComments).length > 0 ? { turnComments: filteredComments } : {}),
+          }),
         } : {}),
       });
       if (!res.ok) throw new Error('Failed to regenerate');
@@ -307,7 +320,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
       setError(err instanceof Error ? err.message : 'Failed to regenerate');
       setRegenerating(false);
     }
-  }, [podcastId, onRegenerate, generalFeedback]);
+  }, [podcastId, onRegenerate, generalFeedback, turnComments]);
 
   // Drag and drop handlers
   const handleDragStart = useCallback((index: number) => {
@@ -415,136 +428,165 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
               onDrop={() => handleDrop(index)}
               onDragEnd={handleDragEnd}
             >
-              {/* Desktop drag handle */}
-              <div className={styles.dragHandle} aria-hidden="true">
-                <GripVertical size={16} />
-              </div>
+              <div className={styles.turnRow}>
+                {/* Desktop drag handle */}
+                <div className={styles.dragHandle} aria-hidden="true">
+                  <GripVertical size={16} />
+                </div>
 
-              {/* Mobile move buttons */}
-              <div className={styles.moveButtons}>
-                <button
-                  type="button"
-                  className={styles.moveBtn}
-                  onClick={() => moveTurn(index, index - 1)}
-                  disabled={index === 0}
-                  aria-label="Move up"
-                >
-                  <ChevronUp size={16} />
-                </button>
-                <button
-                  type="button"
-                  className={styles.moveBtn}
-                  onClick={() => moveTurn(index, index + 1)}
-                  disabled={index === turns.length - 1}
-                  aria-label="Move down"
-                >
-                  <ChevronDown size={16} />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className={styles.turnContent}>
-                {/* Speaker label (clickable to cycle) */}
-                <button
-                  type="button"
-                  className={styles.speakerLabel}
-                  data-speaker-index={speakerIdx}
-                  onClick={() => toggleSpeaker(index)}
-                  aria-label={`Cycle speaker (current: ${turn.speaker})`}
-                >
-                  {turn.speaker}
-                </button>
-
-                {/* Direction */}
-                {isEditing ? (
-                  <input
-                    type="text"
-                    className={styles.directionInput}
-                    value={editDirection}
-                    onChange={(e) => setEditDirection(e.target.value)}
-                    placeholder="Direction (e.g., laughing, excited)..."
-                    aria-label="Delivery direction"
-                  />
-                ) : (
-                  turn.direction && (
-                    <span className={styles.direction}>({turn.direction})</span>
-                  )
-                )}
-
-                {/* Text */}
-                {isEditing ? (
-                  <textarea
-                    ref={textareaRef}
-                    className={styles.turnTextarea}
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    onKeyDown={handleTextareaKeyDown}
-                    onBlur={confirmEdit}
-                    aria-label="Edit turn text"
-                    rows={3}
-                  />
-                ) : (
-                  <p
-                    className={styles.turnText}
-                    onDoubleClick={() => startEdit(index)}
+                {/* Mobile move buttons */}
+                <div className={styles.moveButtons}>
+                  <button
+                    type="button"
+                    className={styles.moveBtn}
+                    onClick={() => moveTurn(index, index - 1)}
+                    disabled={index === 0}
+                    aria-label="Move up"
                   >
-                    {references.length > 0
-                      ? parseTextWithCitations(turn.text, references)
-                      : turn.text}
-                  </p>
-                )}
+                    <ChevronUp size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.moveBtn}
+                    onClick={() => moveTurn(index, index + 1)}
+                    disabled={index === turns.length - 1}
+                    aria-label="Move down"
+                  >
+                    <ChevronDown size={16} />
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div className={styles.turnContent}>
+                  {/* Speaker label (clickable to cycle) */}
+                  <button
+                    type="button"
+                    className={styles.speakerLabel}
+                    data-speaker-index={speakerIdx}
+                    onClick={() => toggleSpeaker(index)}
+                    aria-label={`Cycle speaker (current: ${turn.speaker})`}
+                  >
+                    {turn.speaker}
+                  </button>
+
+                  {/* Direction */}
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      className={styles.directionInput}
+                      value={editDirection}
+                      onChange={(e) => setEditDirection(e.target.value)}
+                      placeholder="Direction (e.g., laughing, excited)..."
+                      aria-label="Delivery direction"
+                    />
+                  ) : (
+                    turn.direction && (
+                      <span className={styles.direction}>({turn.direction})</span>
+                    )
+                  )}
+
+                  {/* Text */}
+                  {isEditing ? (
+                    <textarea
+                      ref={textareaRef}
+                      className={styles.turnTextarea}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={handleTextareaKeyDown}
+                      onBlur={confirmEdit}
+                      aria-label="Edit turn text"
+                      rows={3}
+                    />
+                  ) : (
+                    <p
+                      className={styles.turnText}
+                      onDoubleClick={() => startEdit(index)}
+                    >
+                      {references.length > 0
+                        ? parseTextWithCitations(turn.text, references)
+                        : turn.text}
+                    </p>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className={styles.turnActions}>
+                  {isDeleting ? (
+                    <div className={styles.deleteConfirm}>
+                      <span>Delete?</span>
+                      <button
+                        type="button"
+                        className={`${styles.deleteConfirmBtn} ${styles.deleteConfirmYes}`}
+                        onClick={() => deleteTurn(index)}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        className={`${styles.deleteConfirmBtn} ${styles.deleteConfirmNo}`}
+                        onClick={() => setDeletingIndex(null)}
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {!isEditing && (
+                        <button
+                          type="button"
+                          className={styles.turnActionBtn}
+                          onClick={() => startEdit(index)}
+                          aria-label="Edit turn"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                      {turns.length > 2 && (
+                        <button
+                          type="button"
+                          className={`${styles.turnActionBtn} ${styles.turnActionBtnDanger}`}
+                          onClick={() => setDeletingIndex(index)}
+                          aria-label="Delete turn"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={`${styles.turnActionBtn} ${turnComments[index]?.trim() ? styles.turnActionBtnActive : ''}`}
+                        onClick={() => setCommentingIndex(commentingIndex === index ? null : index)}
+                        aria-label={turnComments[index]?.trim() ? 'Edit comment' : 'Add comment'}
+                      >
+                        <MessageSquare size={14} />
+                        {turnComments[index]?.trim() && (
+                          <span className={styles.turnCommentBadge} />
+                        )}
+                      </button>
+                      <ClaimFlagButton
+                        podcastId={podcastId}
+                        turnIndex={index}
+                        turnText={turn.text}
+                      />
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Action buttons */}
-              <div className={styles.turnActions}>
-                {isDeleting ? (
-                  <div className={styles.deleteConfirm}>
-                    <span>Delete?</span>
-                    <button
-                      type="button"
-                      className={`${styles.deleteConfirmBtn} ${styles.deleteConfirmYes}`}
-                      onClick={() => deleteTurn(index)}
-                    >
-                      Yes
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.deleteConfirmBtn} ${styles.deleteConfirmNo}`}
-                      onClick={() => setDeletingIndex(null)}
-                    >
-                      No
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    {!isEditing && (
-                      <button
-                        type="button"
-                        className={styles.turnActionBtn}
-                        onClick={() => startEdit(index)}
-                        aria-label="Edit turn"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    {turns.length > 2 && (
-                      <button
-                        type="button"
-                        className={`${styles.turnActionBtn} ${styles.turnActionBtnDanger}`}
-                        onClick={() => setDeletingIndex(index)}
-                        aria-label="Delete turn"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                    <ClaimFlagButton
-                      podcastId={podcastId}
-                      turnIndex={index}
-                      turnText={turn.text}
-                    />
-                  </>
-                )}
-              </div>
+              {/* Inline comment */}
+              {(commentingIndex === index || turnComments[index]?.trim()) && (
+                <div className={styles.turnComment}>
+                  <textarea
+                    className={styles.turnCommentInput}
+                    value={turnComments[index] ?? ''}
+                    onChange={(e) => setTurnComments((prev) => ({ ...prev, [index]: e.target.value }))}
+                    placeholder={`Comment on this ${turn.speaker} turn...`}
+                    rows={2}
+                    maxLength={2000}
+                    aria-label={`Comment on turn ${index + 1}`}
+                    autoFocus={commentingIndex === index}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -572,8 +614,10 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
         >
           {showFeedbackPanel ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           Notes for regeneration
-          {generalFeedback.trim() && !showFeedbackPanel && (
-            <span className={styles.feedbackBadge}>1</span>
+          {(hasFeedback || hasComments) && !showFeedbackPanel && (
+            <span className={styles.feedbackBadge}>
+              {(hasFeedback ? 1 : 0) + Object.values(turnComments).filter((c) => c.trim()).length}
+            </span>
           )}
         </button>
         {showFeedbackPanel && (
@@ -636,7 +680,7 @@ export function ScriptEditor({ podcastId, onApprove, onRegenerate }: ScriptEdito
             <h4 id="regen-title" className={styles.confirmTitle}>
               Regenerate Script?
             </h4>
-            {generalFeedback.trim() ? (
+            {(hasFeedback || hasComments) ? (
               <>
                 <p className={styles.confirmText}>
                   Regenerate using your notes, or start fresh from scratch?

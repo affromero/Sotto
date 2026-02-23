@@ -76,12 +76,17 @@
 
 .turn {
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
+  flex-direction: column;
   padding: var(--spacing-md) var(--spacing-lg);
   border-left: 4px solid transparent;
   transition: background var(--transition-fast);
   animation: turnEntrance 0.3s ease-out both;
+}
+
+.turnRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
 }
 
 @keyframes turnEntrance {
@@ -282,6 +287,60 @@
 .turnActionBtnDanger:hover {
   background: var(--color-error-lighter);
   color: var(--color-error);
+}
+
+.turnActionBtnActive {
+  color: var(--color-primary);
+  position: relative;
+}
+
+.turnActionBtnActive:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+/* Turn comment badge (dot on comment button) */
+
+.turnCommentBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+/* Inline turn comment */
+
+.turnComment {
+  padding: var(--spacing-xs) 0 0 0;
+  margin-left: calc(24px + var(--spacing-sm)); /* align with turnContent past drag handle */
+}
+
+.turnCommentInput {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 48px;
+  max-height: 120px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  line-height: 1.5;
+}
+
+.turnCommentInput:focus {
+  border-color: var(--color-primary);
+}
+
+.turnCommentInput::placeholder {
+  color: var(--color-text-tertiary);
 }
 
 /* Delete confirmation */
@@ -710,6 +769,10 @@
   .turnActionBtn {
     width: 44px;
     height: 44px;
+  }
+
+  .turnComment {
+    margin-left: 0;
   }
 }
 
