@@ -354,7 +354,14 @@ export function useDiscovery(): UseDiscoveryReturn {
                 message: content.slice(0, 2000),
                 errorKind: 'client_stream_fallback',
               }),
-            }).catch(() => {});
+            })
+              .then((res) =>
+                res.json().then((body) => {
+                  if (!res.ok)
+                    console.warn('[sotto] client-error report failed', res.status, body);
+                })
+              )
+              .catch((err) => console.warn('[sotto] client-error report network error', err));
           }
         }
 
