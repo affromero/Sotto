@@ -307,10 +307,34 @@
   gap: var(--space-3);
 }
 
+.failureReason {
+  margin: 0;
+  font: var(--text-caption);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .retryHint {
   font: var(--text-caption);
   color: var(--color-error);
   font-weight: 500;
+}
+
+.adminLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.adminLink:hover {
+  text-decoration: underline;
 }
 
 /* Trending to Fork — horizontal scroll */

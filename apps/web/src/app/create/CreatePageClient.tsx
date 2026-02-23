@@ -2,6 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import { Shield } from 'lucide-react';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
@@ -45,17 +47,18 @@ interface CreatePageClientProps {
   isByokUser?: boolean;
   isProUser?: boolean;
   maxDurationMinutes?: number;
+  isAdmin?: boolean;
 }
 
-export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes }: CreatePageClientProps) {
+export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes, isAdmin }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} isAdmin={isAdmin} />
     </Suspense>
   );
 }
 
-function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp }: CreatePageClientProps) {
+function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, isAdmin }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
@@ -190,7 +193,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           setStep('script-preview');
         } else if (data.status === 'FAILED') {
           scriptingPollRef.current = false;
-          setError('Script generation failed. Please try again.');
+          setError(data.failureReason || 'Script generation failed. Please try again.');
           setStep('voice');
         }
       } catch {
@@ -223,7 +226,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           router.push(`/podcast/${podcastId}`);
         } else if (data.status === 'FAILED') {
           generatingPollRef.current = false;
-          setError('Audio generation failed. Please try again.');
+          setError(data.failureReason || 'Audio generation failed. Please try again.');
           setStep('script-preview');
         }
       } catch {
@@ -343,7 +346,15 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {error && (
           <div className={styles.error} role="alert">
-            <p>{error}</p>
+            <div className={styles.errorContent}>
+              <p>{error}</p>
+              {isAdmin && podcastId && (
+                <Link href={`/admin/podcasts?search=${podcastId}`} className={styles.adminLink}>
+                  <Shield size={14} />
+                  View in Admin Panel
+                </Link>
+              )}
+            </div>
             <button
               className={styles.errorDismiss}
               onClick={() => setError(null)}
@@ -426,7 +437,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           <div className={styles.chatArea}>
             {importStep === 'upload' && <ImportUploader onImportStarted={handleImportStarted} />}
             {importStep === 'importing' && importingPodcastId && (
-              <ImportProgress podcastId={importingPodcastId} />
+              <ImportProgress podcastId={importingPodcastId} isAdmin={isAdmin} />
             )}
           </div>
         )}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Upload, FileAudio, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Upload, FileAudio, CheckCircle, XCircle, Loader2, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MetadataSuggestion } from './MetadataSuggestion';
 import type { Podcast } from '@prisma/client';
@@ -10,6 +10,7 @@ import styles from './ImportProgress.module.css';
 
 interface ImportProgressProps {
   podcastId: string;
+  isAdmin?: boolean;
 }
 
 type StepStatus = 'pending' | 'active' | 'complete' | 'error';
@@ -30,7 +31,7 @@ const statusToStepMap: Record<string, number> = {
   FAILED: -1,
 };
 
-export function ImportProgress({ podcastId }: ImportProgressProps) {
+export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
   const [podcast, setPodcast] = useState<Podcast | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
@@ -207,8 +208,14 @@ export function ImportProgress({ podcastId }: ImportProgressProps) {
         {isFailed && (
           <div className={styles.failedSection}>
             <p className={styles.failedMessage}>
-              Import failed. Please try again or contact support if the problem persists.
+              {podcast.failureReason || 'Import failed. Please try again or contact support if the problem persists.'}
             </p>
+            {isAdmin && (
+              <Link href={`/admin/podcasts?search=${podcast.id}`} className={styles.adminLink}>
+                <Shield size={14} />
+                View in Admin Panel
+              </Link>
+            )}
             <Button
               variant="primary"
               size="medium"

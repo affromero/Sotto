@@ -8,6 +8,7 @@ import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
+import { Shield } from 'lucide-react';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
@@ -107,6 +108,7 @@ export default async function DashboardPage() {
         isHumanContent: true,
         visibility: true,
         forkedFromId: true,
+        failureReason: true,
         user: {
           select: {
             id: true,
@@ -174,7 +176,8 @@ export default async function DashboardPage() {
   const tierFeatures = getTierFeatures(plan, freeTier.isByokUser, userRole);
 
   const displayName = user?.name || 'there';
-  const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
+  const isAdmin = userRole === 'ADMIN';
+  const isCreatorOrAdmin = userRole === 'CREATOR' || isAdmin;
   const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
   const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
   const totalLikes = podcasts.reduce((sum, p) => sum + p.likeCount, 0);
@@ -321,7 +324,22 @@ export default async function DashboardPage() {
                         )}
                       </div>
                       {podcast.status === 'FAILED' && (
-                        <span className={styles.retryHint}>Tap to retry</span>
+                        <>
+                          {isAdmin && podcast.failureReason && (
+                            <p className={styles.failureReason}>{podcast.failureReason}</p>
+                          )}
+                          <span className={styles.retryHint}>Tap to retry</span>
+                          {isAdmin && (
+                            <Link
+                              href={`/admin/podcasts?search=${podcast.id}`}
+                              className={styles.adminLink}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Shield size={12} />
+                              Admin Panel
+                            </Link>
+                          )}
+                        </>
                       )}
                     </div>
                   </Link>
