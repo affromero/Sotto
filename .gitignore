@@ -89,5 +89,8 @@ packages/mcp/dist/
 # MCP config (contains API tokens)
 .mcp.json
 
+# CodeGraph (generated index)
+.codegraph/
+
 # VS Code
 Sotto.code-workspace
