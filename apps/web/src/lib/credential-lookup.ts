@@ -1,5 +1,6 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { logger } from './logger';
+import { logUsage } from './usage-logger';
 
 export interface ParticipantInput {
   authorUsername: string;
@@ -77,6 +78,14 @@ export async function lookupParticipantCredentials(
         skipModeration: true,
       }
     );
+
+    logUsage({
+      service: 'anthropic',
+      model: response.model,
+      category: 'credential_lookup',
+      inputTokens: response.inputTokens,
+      outputTokens: response.outputTokens,
+    });
 
     const jsonMatch = response.content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
