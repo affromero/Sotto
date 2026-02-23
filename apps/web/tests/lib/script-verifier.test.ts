@@ -864,6 +864,80 @@ describe('incremental verification', () => {
     expect(claimB?.turnIndex).toBe(2); // remapped from 1→2
   });
 
+  it('re-analyzes turns whose carried claim had hasUnreliableSource even if turn text is unchanged', async () => {
+    // Scenario: generator fixed reference [3] (blog → paper) but kept the sentence
+    // text identical. The turn hash matches, so matchClaimsToTurns would carry the
+    // old claim forward. Without the eviction logic the hard-fail on
+    // unreliableSourceClaims.length > 0 would trigger even though the source is now good.
+    const fixedTurn = { speaker: 'EXPERT', text: 'Serif fonts signal trustworthiness [3].' };
+    const otherTurn = { speaker: 'HOST', text: 'Interesting!' };
+
+    const previousClaims: ClaimAnalysis[] = [
+      {
+        claimText: 'Serif fonts signal trustworthiness',
+        turnIndex: 0,
+        speaker: 'EXPERT',
+        isCommonKnowledge: false,
+        existingCitations: [3],
+        needsMoreCitations: false,
+        hasUnreliableSource: true, // old blog source — now replaced by generator
+        hasMisattribution: false,
+        verificationNote: 'interviewguys.com is not acceptable for empirical claims',
+        turnHash: hashTurn('EXPERT', fixedTurn.text), // same text → same hash
+      },
+      {
+        claimText: 'filler',
+        turnIndex: 1,
+        speaker: 'HOST',
+        isCommonKnowledge: true,
+        existingCitations: [],
+        needsMoreCitations: false,
+        hasUnreliableSource: false,
+        hasMisattribution: false,
+        verificationNote: 'ok',
+        turnHash: hashTurn('HOST', otherTurn.text),
+      },
+    ];
+
+    // AI re-analyzes turn 0 and now reports it as clean (reference fixed)
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Serif fonts signal trustworthiness',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [3],
+            needsMoreCitations: false,
+            hasUnreliableSource: false, // fixed
+            hasMisattribution: false,
+            verificationNote: 'Monotype 2021 is a credible industry report',
+          },
+        ],
+        overallScore: 0.9,
+        feedback: 'PASS: sourcing improved',
+      }),
+      inputTokens: 300,
+      outputTokens: 150,
+    });
+
+    const result = await verifyScript({
+      topic: 'Font Psychology',
+      turns: [fixedTurn, otherTurn],
+      references: makePaperRefs(5),
+      depth: 'quick_overview',
+      audienceLevel: 'intermediate',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    // AI must have been called (turn 0 evicted from carried and re-analyzed)
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(1);
+    expect(result.unreliableSourceClaims).toHaveLength(0);
+    expect(result.passed).toBe(true);
+  });
+
   it('falls back to full verification when previousClaims is empty', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
