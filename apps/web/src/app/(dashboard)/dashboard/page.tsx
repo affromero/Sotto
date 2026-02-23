@@ -333,7 +333,7 @@ export default async function DashboardPage() {
                             <Link
                               href={`/admin/podcasts?search=${podcast.id}`}
                               className={styles.adminLink}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
                             >
                               <Shield size={12} />
                               Admin Panel
