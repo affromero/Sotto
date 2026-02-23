@@ -2,6 +2,42 @@ import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 import { hashTurn, matchClaimsToTurns } from './turn-diff';
 
+/**
+ * Extract the first complete JSON object from a string that may contain
+ * surrounding text (markdown fences, AI preamble, trailing notes).
+ * Uses balanced-brace counting instead of a greedy regex so trailing `}`
+ * characters in non-JSON text don't extend the match past the object boundary.
+ */
+function extractFirstJsonObject(text: string): string {
+  const trimmed = text.trim();
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {}
+
+  const start = text.indexOf('{');
+  if (start === -1) throw new Error('No JSON object found in response');
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+
+  throw new Error('Unbalanced JSON object in response');
+}
+
 export interface ClaimAnalysis {
   claimText: string;
   turnIndex: number;
@@ -494,9 +530,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
 
     let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
     try {
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found in response');
-      parsed = JSON.parse(jsonMatch[0]);
+      parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
       return {
         passed: false,
@@ -570,11 +604,7 @@ Analyze every factual claim. Return JSON only.`;
   let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
 
   try {
-    const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
-    }
-    parsed = JSON.parse(jsonMatch[0]);
+    parsed = JSON.parse(extractFirstJsonObject(response.content));
   } catch {
     return {
       passed: false,
