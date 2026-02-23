@@ -104,11 +104,19 @@ export async function generateSpeech(params: {
   const modelId = params.modelId || 'eleven_v3';
   const supportsContext = !modelId.startsWith('eleven_v3');
 
+  const rawStability = params.stability ?? 0.45;
+  // eleven_v3 only accepts discrete stability values: 0.0 (Creative), 0.5 (Natural), 1.0 (Robust)
+  const stability = supportsContext
+    ? rawStability
+    : ([0.0, 0.5, 1.0] as const).reduce((a, b) =>
+        Math.abs(b - rawStability) < Math.abs(a - rawStability) ? b : a,
+      );
+
   const body: Record<string, unknown> = {
     text: params.text,
     model_id: modelId,
     voice_settings: {
-      stability: params.stability ?? 0.45,
+      stability,
       similarity_boost: params.similarityBoost ?? 0.75,
       style: params.style ?? 0.45,
     },
