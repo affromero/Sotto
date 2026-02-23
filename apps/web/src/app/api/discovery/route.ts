@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
               `data: ${JSON.stringify({ error: "I couldn't generate a response. Please try again." })}\n\n`
             )
           );
-          prisma.discoveryChatError.create({
+          await prisma.discoveryChatError.create({
             data: {
               userId: authed.userId,
               userMessage: (message ?? content ?? '').slice(0, 2000),
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
           ? 'Your AI API key is invalid or has been revoked. Please update it in Settings.'
           : 'An error occurred while generating a response. Please try again.';
 
-        prisma.discoveryChatError.create({
+        await prisma.discoveryChatError.create({
           data: {
             userId: authed.userId,
             userMessage: (message ?? content ?? '').slice(0, 2000),
