@@ -25,8 +25,13 @@ function formatSeconds(seconds: number): string {
 export default async function AdminPlaybackPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = subDays(startOfDay(new Date()), days);
+  const since = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return today;
+    if (rangeParam === 'yesterday') return subDays(today, 1);
+    const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return subDays(today, days);
+  })();
 
   const [overview, speedDist, completionDist, dailyHours] = await Promise.all([
     getPlaybackOverview(since),
@@ -47,14 +52,20 @@ export default async function AdminPlaybackPage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>Listening hours, completion rates, and playback speed</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/playback?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/playback?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>

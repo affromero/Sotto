@@ -1,4 +1,5 @@
 import { generateResponse, streamResponse } from './claude';
+import { createAIProvider } from './providers/ai';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 export { detectUrls } from './detect-urls';
 
@@ -111,14 +112,29 @@ export async function getDiscoveryResponse(
 }
 
 /**
- * Stream a discovery chat response
+ * Stream a discovery chat response.
+ * When providerType is 'anthropic' or unset, uses the optimised claude.ts path (with onComplete).
+ * For other providers (openai, groq, etc.) routes via the provider-agnostic AIProvider interface.
  */
 export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string,
   model?: string,
-  onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void
+  onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void,
+  providerType?: string
 ): AsyncGenerator<string> {
+  if (providerType && providerType !== 'anthropic' && providerType !== 'claude-code') {
+    const provider = createAIProvider(providerType);
+    async function* gen() {
+      yield* provider.streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+        maxTokens: 1024,
+        apiKeyOverride,
+        model,
+      });
+      onComplete?.({ inputTokens: 0, outputTokens: 0, model: model ?? providerType ?? 'unknown' });
+    }
+    return gen();
+  }
   return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 1024,
     apiKeyOverride,

@@ -26,8 +26,13 @@ const statusStyles: Record<string, string> = {
 export default async function AdminRevenuePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = subDays(startOfDay(new Date()), days);
+  const { since, days } = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return { since: today, days: 1 };
+    if (rangeParam === 'yesterday') return { since: subDays(today, 1), days: 1 };
+    const d = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return { since: subDays(today, d), days: d };
+  })();
 
   const [overview, dailyTrend, topVoices, statusBreakdown, marketplace] = await Promise.all([
     getRevenueOverview(since),
@@ -47,14 +52,20 @@ export default async function AdminRevenuePage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>Voice marketplace revenue, purchases, and seller metrics</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/revenue?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/revenue?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>

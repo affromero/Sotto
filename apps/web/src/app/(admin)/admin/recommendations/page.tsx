@@ -16,8 +16,13 @@ interface PageProps {
 export default async function AdminRecommendationsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = days === 90 ? subMonths(startOfDay(new Date()), 3) : subDays(startOfDay(new Date()), days);
+  const since = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return today;
+    if (rangeParam === 'yesterday') return subDays(today, 1);
+    const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return days === 90 ? subMonths(today, 3) : subDays(today, days);
+  })();
 
   const [overview, surfaces, positionBias, dailyTrend, topPodcasts] = await Promise.all([
     getRecommendationOverview(since),
@@ -41,14 +46,20 @@ export default async function AdminRecommendationsPage({ searchParams }: PagePro
           <p className={styles.subtitle}>Funnel performance and position bias</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/recommendations?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/recommendations?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>
