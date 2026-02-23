@@ -7,6 +7,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   overflow: hidden;
+  position: relative;
 }
 
 /* ============================================ */
@@ -76,12 +77,17 @@
 
 .turn {
   display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
+  flex-direction: column;
   padding: var(--spacing-md) var(--spacing-lg);
   border-left: 4px solid transparent;
   transition: background var(--transition-fast);
   animation: turnEntrance 0.3s ease-out both;
+}
+
+.turnRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
 }
 
 @keyframes turnEntrance {
@@ -284,6 +290,60 @@
   color: var(--color-error);
 }
 
+.turnActionBtnActive {
+  color: var(--color-primary);
+  position: relative;
+}
+
+.turnActionBtnActive:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+/* Turn comment badge (dot on comment button) */
+
+.turnCommentBadge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+}
+
+/* Inline turn comment */
+
+.turnComment {
+  padding: var(--spacing-xs) 0 0 0;
+  margin-left: calc(24px + var(--spacing-sm)); /* align with turnContent past drag handle */
+}
+
+.turnCommentInput {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 48px;
+  max-height: 120px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  line-height: 1.5;
+}
+
+.turnCommentInput:focus {
+  border-color: var(--color-primary);
+}
+
+.turnCommentInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
 /* Delete confirmation */
 
 .deleteConfirm {
@@ -387,6 +447,258 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
   background: var(--color-primary-light);
+}
+
+/* ============================================ */
+/* HIGHLIGHTS                                    */
+/* ============================================ */
+
+/* Selection popover (positioned absolutely within .root) */
+
+.highlightPopover {
+  position: absolute;
+  z-index: 10;
+  width: 240px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.highlightPopoverQuote {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.highlightNoteInput {
+  width: 100%;
+  padding: var(--spacing-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.highlightNoteInput:focus {
+  border-color: var(--color-primary);
+}
+
+.highlightPopoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+}
+
+.highlightPopoverCancel {
+  padding: 4px var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.highlightPopoverCancel:hover {
+  color: var(--color-text-primary);
+}
+
+.highlightPopoverSave {
+  padding: 4px var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.highlightPopoverSave:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Highlighted text in turn */
+
+.highlightedText {
+  background: var(--color-primary-light);
+  border-radius: 2px;
+  padding: 0 1px;
+  position: relative;
+  cursor: default;
+}
+
+.annotationBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 2px;
+  vertical-align: super;
+  line-height: 1;
+}
+
+/* Highlights list in feedback panel */
+
+.highlightsList {
+  margin-top: var(--spacing-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.highlightsLabel {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.highlightItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.highlightItemText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.highlightItemQuote {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.highlightItemNote {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+}
+
+.highlightItemRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.highlightItemRemove:hover {
+  background: var(--color-error-lighter);
+  color: var(--color-error);
+}
+
+/* ============================================ */
+/* FEEDBACK PANEL                               */
+/* ============================================ */
+
+.feedbackPanel {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+}
+
+.feedbackToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-xs) 0;
+  transition: color var(--transition-fast);
+}
+
+.feedbackToggle:hover {
+  color: var(--color-text-primary);
+}
+
+.feedbackBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.feedbackTextarea {
+  width: 100%;
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  resize: vertical;
+  min-height: 80px;
+  max-height: 200px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+  line-height: 1.5;
+}
+
+.feedbackTextarea:focus {
+  border-color: var(--color-primary);
+}
+
+.feedbackTextarea::placeholder {
+  color: var(--color-text-tertiary);
 }
 
 /* ============================================ */
@@ -574,13 +886,31 @@
   cursor: pointer;
 }
 
+.confirmSecondary {
+  height: 40px;
+  padding: 0 var(--spacing-lg);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.confirmSecondary:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
 .confirmConfirm {
   height: 40px;
   padding: 0 var(--spacing-lg);
   font: var(--text-body-sm);
   font-weight: 600;
   color: var(--color-text-inverse);
-  background: var(--color-error);
+  background: var(--color-primary);
   border: none;
   border-radius: var(--radius-lg);
   cursor: pointer;
@@ -624,6 +954,14 @@
   .turnActionBtn {
     width: 44px;
     height: 44px;
+  }
+
+  .turnComment {
+    margin-left: 0;
+  }
+
+  .highlightPopover {
+    display: none;
   }
 }
 

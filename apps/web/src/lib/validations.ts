@@ -509,6 +509,19 @@ export const resolveClaimReportSchema = z.object({
 });
 
 /**
+ * Script regeneration with optional user feedback
+ */
+export const regenerateWithFeedbackSchema = z.object({
+  feedback: z.string().max(5000).optional(),
+  turnComments: z.record(z.coerce.number(), z.string().max(2000)).optional(),
+  highlights: z.array(z.object({
+    turnIndex: z.number().int().min(0),
+    text: z.string().max(500),
+    note: z.string().max(2000),
+  })).max(50).optional(),
+}).optional();
+
+/**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
