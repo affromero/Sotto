@@ -185,7 +185,7 @@ export function UserActions({
         <option value="CREATOR">Creator</option>
         <option value="ADMIN">Admin</option>
       </select>
-      {!isOwnUser && (
+      {!isOwnUser && !isAdmin && (
         <>
           <select
             value={plan}
