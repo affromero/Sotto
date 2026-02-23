@@ -251,6 +251,16 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       },
     });
 
+    // Record pipeline completion event for accurate timing metrics
+    await prisma.pipelineEvent.create({
+      data: {
+        podcastId,
+        stage: 'audio-stitching',
+        type: 'complete',
+        message: `Pipeline completed — ${Math.round(duration)}s of audio`,
+      },
+    });
+
     // 9a. Capture voice payments on successful generation
     await capturePodcastPayments(podcastId).catch((err) => {
       logger.error('Failed to capture voice payments', {
