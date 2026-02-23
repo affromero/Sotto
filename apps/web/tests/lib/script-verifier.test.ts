@@ -220,7 +220,7 @@ describe('verifyScript', () => {
     expect(result.unreliableSourceClaims).toHaveLength(1);
   });
 
-  it('fails when script exceeds word count bounds', async () => {
+  it('passes but flags durationFeedback when script exceeds word count bounds', async () => {
     const longText = 'word '.repeat(2000); // ~2000 words, well above 1575 max for 10 min
 
     mockGenerateResponse.mockResolvedValue({
@@ -236,19 +236,19 @@ describe('verifyScript', () => {
     const result = await verifyScript({
       topic: 'Long Script',
       turns: [{ speaker: 'HOST', text: longText }],
-      references: [],
+      references: makePaperRefs(5),
       depth: 'standard',
       audienceLevel: 'beginner',
       attemptNumber: 1,
       maxDurationMinutes: 10,
     });
 
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
     expect(result.durationFeedback).toContain('exceeds');
     expect(result.durationFeedback).toContain('Reduce');
   });
 
-  it('fails when script is too short', async () => {
+  it('passes but flags durationFeedback when script is too short', async () => {
     const shortText = 'word '.repeat(500); // ~500 words, well below 1425 min for 10 min
 
     mockGenerateResponse.mockResolvedValue({
@@ -264,14 +264,14 @@ describe('verifyScript', () => {
     const result = await verifyScript({
       topic: 'Short Script',
       turns: [{ speaker: 'HOST', text: shortText }],
-      references: [],
+      references: makePaperRefs(5),
       depth: 'standard',
       audienceLevel: 'beginner',
       attemptNumber: 1,
       maxDurationMinutes: 10,
     });
 
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
     expect(result.durationFeedback).toContain('below');
     expect(result.durationFeedback).toContain('Expand');
   });

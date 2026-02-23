@@ -294,6 +294,80 @@ describe('processScriptVerification', () => {
     });
   });
 
+  describe('verification pass — with duration adjustment', () => {
+    const durationVerdict = {
+      ...passedVerdict,
+      durationFeedback: 'The script is 2000 words, which exceeds the maximum of 1575 words for a 10-minute podcast. Reduce to 1425–1575 words (1500 ideal).',
+    };
+
+    beforeEach(() => {
+      mockVerifyScript.mockResolvedValue(durationVerdict);
+    });
+
+    it('calls generateScriptWithFeedback with duration feedback', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockGenerateScriptWithFeedback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          verificationFeedback: `DURATION: ${durationVerdict.durationFeedback}`,
+          previousScript: defaultScript.turns,
+        })
+      );
+    });
+
+    it('saves adjusted script with version increment', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            turns: revisedScriptResult.turns,
+            version: { increment: 1 },
+          }),
+        })
+      );
+    });
+
+    it('still routes to reference validation after adjustment', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith({
+        where: { id: 'podcast-001' },
+        data: { status: 'VALIDATING_REFERENCES' },
+      });
+    });
+
+    it('logs usage for both verification and duration adjustment', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'script_verification' })
+      );
+      expect(mockLogUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'script_generation' })
+      );
+    });
+
+    it('does not count as a verification failure', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
+    });
+
+    it('skips adjustment when durationFeedback is null', async () => {
+      mockVerifyScript.mockResolvedValue(passedVerdict);
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockGenerateScriptWithFeedback).not.toHaveBeenCalled();
+    });
+  });
+
   describe('verification pass — no references, WEB source', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([]);
