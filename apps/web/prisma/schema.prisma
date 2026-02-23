@@ -62,6 +62,7 @@ model User {
   sessions           Session[]
   podcasts           Podcast[]
   discoveries        Discovery[]
+  discoveryChatErrors DiscoveryChatError[]
   interactions       Interaction[]
   notifications      Notification[]
   apiUsageLogs       ApiUsageLog[]
@@ -417,6 +418,21 @@ model DiscoveryMessage {
   discovery Discovery @relation(fields: [discoveryId], references: [id], onDelete: Cascade)
 
   @@index([discoveryId])
+}
+
+model DiscoveryChatError {
+  id          String   @id @default(cuid())
+  userId      String
+  userMessage String   @db.Text
+  errorKind   String   // 'empty_response' | 'exception' | 'auth_error'
+  errorDetail String?  @db.Text
+  discoveryId String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([userId])
 }
 
 // ============ SCRIPTS ============
