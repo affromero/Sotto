@@ -7,7 +7,8 @@ interface PageProps {
   searchParams: Promise<{ range?: string }>;
 }
 
-function periodFromDays(days: number): '7d' | '30d' | '90d' {
+function periodFromDays(days: number): '24h' | '7d' | '30d' | '90d' {
+  if (days <= 1) return '24h';
   if (days <= 7) return '7d';
   if (days <= 30) return '30d';
   return '90d';
@@ -30,7 +31,7 @@ async function getCostPerPodcast(since: Date): Promise<number> {
 export default async function AdminCostsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+  const days = [1, 7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
   const since = subDays(startOfDay(new Date()), days);
   const period = periodFromDays(days);
 
@@ -61,14 +62,14 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>API costs by provider, daily trends, and threshold alerts</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[1, 7, 30, 90].map((d) => (
             <a
               key={d}
               href={`/admin/costs?range=${d}`}
               className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
               aria-current={days === d ? 'page' : undefined}
             >
-              {d}d
+              {d === 1 ? 'today' : `${d}d`}
             </a>
           ))}
         </nav>
@@ -96,7 +97,19 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
 
       {/* Daily cost trend chart */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Daily Cost Trend</h2>
+        <div className={styles.chartHeader}>
+          <h2 className={styles.sectionTitle}>Daily Cost Trend</h2>
+          <div className={styles.chartLegend}>
+            <span className={styles.legendItem}>
+              <span className={styles.legendDotAi} />
+              AI
+            </span>
+            <span className={styles.legendItem}>
+              <span className={styles.legendDotTts} />
+              TTS
+            </span>
+          </div>
+        </div>
         {dailyTrend.length === 0 ? (
           <p className={styles.empty}>No cost data yet.</p>
         ) : (
@@ -111,16 +124,22 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
 
               return (
                 <div key={d.date} className={styles.chartBar}>
-                  <div
-                    className={styles.chartBarFillAccent}
-                    style={{ height: `${ttsPct}%` }}
-                    title={`TTS: $${ttsDayCost.toFixed(2)}`}
-                  />
-                  <div
-                    className={styles.chartBarFill}
-                    style={{ height: `${aiPct}%` }}
-                    title={`AI: $${aiDayCost.toFixed(2)}`}
-                  />
+                  <span className={styles.chartTooltip}>
+                    ${d.totalCost.toFixed(2)}
+                    <span className={styles.chartTooltipDetail}>AI: ${aiDayCost.toFixed(2)} &middot; TTS: ${ttsDayCost.toFixed(2)}</span>
+                  </span>
+                  {ttsDayCost > 0 && (
+                    <div
+                      className={styles.chartBarFillAccent}
+                      style={{ height: `${ttsPct}%` }}
+                    />
+                  )}
+                  {aiDayCost > 0 && (
+                    <div
+                      className={styles.chartBarFill}
+                      style={{ height: `${aiPct}%` }}
+                    />
+                  )}
                   <span className={styles.chartLabel}>
                     {new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', {
                       month: 'short',
@@ -145,21 +164,37 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
               <tr>
                 <th>Service</th>
                 <th>Model</th>
-                <th>Total Cost</th>
+                <th>Category</th>
+                <th>Cost</th>
                 <th>Calls</th>
-                <th>Avg Cost/Call</th>
               </tr>
             </thead>
             <tbody>
-              {breakdown.providers.map((p) => (
-                <tr key={`${p.service}-${p.modelId ?? 'none'}`}>
-                  <td>{p.service}</td>
-                  <td>{p.modelId ?? '—'}</td>
-                  <td>${p.totalCost.toFixed(4)}</td>
-                  <td>{p.callCount.toLocaleString()}</td>
-                  <td>${p.avgCostPerCall.toFixed(4)}</td>
-                </tr>
-              ))}
+              {breakdown.providers.flatMap((p) =>
+                p.categories.length > 0
+                  ? p.categories.map((cat, i) => (
+                      <tr key={`${p.service}-${p.modelId ?? 'none'}-${cat.category}`}>
+                        {i === 0 ? (
+                          <>
+                            <td rowSpan={p.categories.length} className={styles.cellGrouped}>{p.service}</td>
+                            <td rowSpan={p.categories.length} className={styles.cellGrouped}>{p.modelId ?? '—'}</td>
+                          </>
+                        ) : null}
+                        <td>{cat.category}</td>
+                        <td>${cat.totalCost.toFixed(4)}</td>
+                        <td>{cat.callCount.toLocaleString()}</td>
+                      </tr>
+                    ))
+                  : [(
+                      <tr key={`${p.service}-${p.modelId ?? 'none'}`}>
+                        <td>{p.service}</td>
+                        <td>{p.modelId ?? '—'}</td>
+                        <td>—</td>
+                        <td>${p.totalCost.toFixed(4)}</td>
+                        <td>{p.callCount.toLocaleString()}</td>
+                      </tr>
+                    )]
+              )}
             </tbody>
           </table>
         )}

@@ -86,7 +86,7 @@ export function ModelDropdown({
 
   const handleSelect = (opt: ModelOption) => {
     if (opt.unavailable) return;
-    onChange(opt.id === options[0]?.id ? undefined : opt.id);
+    onChange(opt.id);
     setIsOpen(false);
   };
 

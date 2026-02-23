@@ -45,10 +45,12 @@ export function LlmModelDropdown({ value, onChange }: LlmModelDropdownProps) {
         setOptions(mapped);
         setReadOnly(data.readOnly ?? false);
 
-        // Restore from localStorage if valid
+        // Restore from localStorage if valid, otherwise use first option
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored && mapped.some((o) => o.id === stored)) {
           onChange(stored);
+        } else if (mapped.length > 0) {
+          onChange(mapped[0].id);
         }
       })
       .catch(() => {})
