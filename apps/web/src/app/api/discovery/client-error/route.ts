@@ -15,18 +15,22 @@ export async function POST(request: NextRequest) {
     typeof body.errorKind === 'string' ? body.errorKind : 'client_stream_fallback';
   const discoveryId = typeof body.discoveryId === 'string' ? body.discoveryId : null;
 
-  await prisma.discoveryChatError
-    .create({
+  logger.info('Discovery client-error received', { userId: session.user.id, errorKind });
+
+  try {
+    const record = await prisma.discoveryChatError.create({
       data: {
         userId: session.user.id,
         userMessage,
         errorKind,
         discoveryId,
       },
-    })
-    .catch((err: Error) =>
-      logger.warn('Failed to save client-side discovery error', { error: err.message })
-    );
-
-  return NextResponse.json({ ok: true });
+    });
+    logger.info('Discovery client-error saved', { id: record.id, errorKind });
+    return NextResponse.json({ ok: true, id: record.id });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn('Failed to save client-side discovery error', { error: message });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+  }
 }

@@ -135,19 +135,30 @@ export async function POST(request: NextRequest) {
           .trim();
 
         if (!visibleContent) {
+          logger.info('Discovery: empty/markup-only response detected', {
+            userId: authed.userId,
+            fullResponseLength: fullResponse.length,
+          });
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ error: "I couldn't generate a response. Please try again." })}\n\n`
             )
           );
-          await prisma.discoveryChatError.create({
-            data: {
-              userId: authed.userId,
-              userMessage: (message ?? content ?? '').slice(0, 2000),
-              errorKind: 'empty_response',
-              discoveryId: discoveryId ?? null,
-            },
-          }).catch((err: Error) => logger.warn('Failed to save discovery chat error', { error: err.message }));
+          try {
+            const record = await prisma.discoveryChatError.create({
+              data: {
+                userId: authed.userId,
+                userMessage: (message ?? content ?? '').slice(0, 2000),
+                errorKind: 'empty_response',
+                discoveryId: discoveryId ?? null,
+              },
+            });
+            logger.info('Discovery: empty_response error saved', { id: record.id });
+          } catch (err) {
+            logger.warn('Failed to save discovery chat error', {
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
           return; // no controller.close() here — finally handles it for all paths
         }
 
@@ -186,17 +197,29 @@ export async function POST(request: NextRequest) {
           ? 'Your AI API key is invalid or has been revoked. Please update it in Settings.'
           : 'An error occurred while generating a response. Please try again.';
 
-        await prisma.discoveryChatError.create({
-          data: {
-            userId: authed.userId,
-            userMessage: (message ?? content ?? '').slice(0, 2000),
-            errorKind: isAuthError ? 'auth_error' : 'exception',
-            errorDetail: error instanceof Error
-              ? `${error.message}\n${error.stack ?? ''}`.slice(0, 4000)
-              : String(error).slice(0, 4000),
-            discoveryId: discoveryId ?? null,
-          },
-        }).catch((err: Error) => logger.warn('Failed to save discovery chat error', { error: err.message }));
+        logger.info('Discovery: exception path triggered', {
+          userId: authed.userId,
+          errorKind: isAuthError ? 'auth_error' : 'exception',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        try {
+          const record = await prisma.discoveryChatError.create({
+            data: {
+              userId: authed.userId,
+              userMessage: (message ?? content ?? '').slice(0, 2000),
+              errorKind: isAuthError ? 'auth_error' : 'exception',
+              errorDetail: error instanceof Error
+                ? `${error.message}\n${error.stack ?? ''}`.slice(0, 4000)
+                : String(error).slice(0, 4000),
+              discoveryId: discoveryId ?? null,
+            },
+          });
+          logger.info('Discovery: exception error saved', { id: record.id });
+        } catch (dbErr) {
+          logger.warn('Failed to save discovery chat error', {
+            error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+          });
+        }
 
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`)
