@@ -38,6 +38,7 @@
 | `/api/auth/[...nextauth]` | GET/POST | — | NextAuth handlers |
 | `/api/auth/mobile` | POST | No | Mobile OAuth → API key token |
 | `/api/discovery` | POST | Yes | Streaming discovery chat |
+| `/api/discovery/client-error` | POST | Yes | Log client-side stream fallback errors for admin panel |
 | `/api/podcasts` | GET/POST | Yes | List/create podcasts |
 | `/api/podcasts/import` | POST | Yes | Import audio (multipart) |
 | `/api/podcasts/[id]` | GET/PATCH/DELETE | Yes | Podcast CRUD |
