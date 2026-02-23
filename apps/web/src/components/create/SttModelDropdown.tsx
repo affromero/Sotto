@@ -46,12 +46,10 @@ export function SttModelDropdown({ value, onChange }: SttModelDropdownProps) {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist to localStorage on change
+  // Persist to localStorage on change (skip initial undefined before providers load)
   useEffect(() => {
     if (value) {
       localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
     }
   }, [value]);
 

@@ -57,12 +57,10 @@ export function LlmModelDropdown({ value, onChange }: LlmModelDropdownProps) {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist to localStorage on change
+  // Persist to localStorage on change (skip initial undefined before models load)
   useEffect(() => {
     if (value) {
       localStorage.setItem(STORAGE_KEY, value);
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
     }
   }, [value]);
 
