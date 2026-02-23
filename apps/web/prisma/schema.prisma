@@ -431,6 +431,7 @@ model Script {
   version   Int      @default(1)
   verificationAttempts Int      @default(0)
   verificationFeedback String?  @db.Text
+  verificationClaims   Json?    // ClaimAnalysis[] with turnHash — persisted for incremental re-use
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
