@@ -234,7 +234,9 @@ function buildVerdict(
     refQuality.countPassed &&
     refQuality.ratioPassed;
 
-  let feedback = aiFeedback;
+  // Strip any PASS:/FAIL: prefix the AI may have written (instruction removed, but AI is non-deterministic)
+  const cleanAiFeedback = aiFeedback.replace(/^(PASS|FAIL):\s*/i, '');
+  let feedback = cleanAiFeedback;
   if (misattributedClaims.length > 0) {
     const misattrFeedback = `MISATTRIBUTION: ${misattributedClaims.length} claim(s) inaccurately describe their cited references. ` +
       misattributedClaims.map((c) => `Turn ${c.turnIndex}: "${c.claimText}" — ${c.verificationNote}`).join('; ');
@@ -242,6 +244,12 @@ function buildVerdict(
   }
   if (refQuality.feedback) {
     feedback = feedback ? `${feedback}\n\nREFERENCES: ${refQuality.feedback}` : `REFERENCES: ${refQuality.feedback}`;
+  }
+
+  // Programmatically signal failure so the revision loop always knows to act,
+  // even when the AI judged the score passing but a reference quality gate failed.
+  if (!passed) {
+    feedback = feedback ? `FAIL: ${feedback}` : 'FAIL: Script did not meet verification requirements.';
   }
 
   return {
@@ -278,7 +286,7 @@ function buildSystemPrompt(
   audienceLevel: string,
   attemptNumber: number,
   previousFeedback: string | undefined,
-  incrementalContext?: { carriedClaims: ClaimAnalysis[]; changedIndices: Set<number> }
+  incrementalContext?: { carriedClaims: ClaimAnalysis[]; changedIndices: Set<number>; turnsLength: number }
 ): string {
   const basePrompt = `You are a rigorous fact-checking agent for Sotto podcasts. Your job is to review a podcast script like a teacher grading homework.
 
@@ -320,10 +328,9 @@ Note: These sources may be acceptable for definitions, opinions, or practical ad
 
 ## Passing Criteria:
 - Every non-obvious factual claim must have at least 1 citation
-- **HARD FAIL (regardless of score): If ANY claim has hasUnreliableSource: true, the script fails.** Include "FAIL:" at the start of your feedback and explicitly list which citations are unacceptable and what Tier 1–2 replacements would work.
+- **HARD FAIL (regardless of score): If ANY claim has hasUnreliableSource: true, the script fails.** Explicitly list which citations are unacceptable and what Tier 1–2 replacements would work.
 - Depth-scaled threshold: deep_dive requires 90%, standard 80%, quick_overview 70% of sourced claims to have 3+ verifiable sources
 - Overall score must be >= 0.7
-- **If all hard conditions pass AND score >= threshold: begin feedback with "PASS:" followed by any improvement suggestions.**
 
 ## Audience Level Context:
 Level "${audienceLevel}" — adjust expectations accordingly. Expert-level content needs stricter sourcing.
@@ -376,7 +383,7 @@ ${previousFeedback}`;
   }
 
   if (incrementalContext) {
-    const unchangedIndices = [...Array(incrementalContext.changedIndices.size + incrementalContext.carriedClaims.length).keys()]
+    const unchangedIndices = [...Array(incrementalContext.turnsLength).keys()]
       .filter((i) => !incrementalContext.changedIndices.has(i));
     const changedList = [...incrementalContext.changedIndices].sort((a, b) => a - b);
 
@@ -506,6 +513,7 @@ export async function verifyScript(params: {
     const systemPrompt = buildSystemPrompt(audienceLevel, attemptNumber, previousFeedback, {
       carriedClaims: carried,
       changedIndices,
+      turnsLength: turns.length,
     });
 
     const userMessage = `Topic: ${topic}

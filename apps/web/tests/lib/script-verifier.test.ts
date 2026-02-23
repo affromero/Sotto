@@ -1095,6 +1095,120 @@ describe('incremental verification', () => {
     expect(result.allClaims[0].turnHash).toHaveLength(64);
   });
 
+  it('prepends FAIL: to feedback when reference ratio gate fails despite clean claims', async () => {
+    // AI returns clean claims (no unreliable sources, score 0.9), but all WEB refs
+    // for a standard depth that requires 40% serious (PAPER/BOOK/REPORT).
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Exercise improves cognition',
+            turnIndex: 0,
+            speaker: 'EXPERT',
+            isCommonKnowledge: false,
+            existingCitations: [1, 2, 3, 4, 5],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            hasMisattribution: false,
+            verificationNote: 'Well sourced',
+          },
+        ],
+        overallScore: 0.9,
+        feedback: 'Great sourcing overall.',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    // All 5 refs are WEB — standard depth requires 40% serious, so ratioPassed=false
+    const webRefs: GeneratedReference[] = Array.from({ length: 5 }, (_, i) => makeRef(i + 1, 'WEB'));
+
+    const result = await verifyScript({
+      topic: 'Exercise',
+      turns: [{ speaker: 'EXPERT', text: 'Exercise improves cognition [1,2,3,4,5].' }],
+      references: webRefs,
+      depth: 'standard',
+      audienceLevel: 'intermediate',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.referenceQuality.ratioPassed).toBe(false);
+    expect(result.feedback).toMatch(/^FAIL:/);
+  });
+
+  it('lists correct unchanged turn indices for a 10-turn script with 2 changed turns', async () => {
+    const turns = Array.from({ length: 10 }, (_, i) => ({
+      speaker: i % 2 === 0 ? 'HOST' : 'EXPERT',
+      text: `Turn ${i} content.`,
+    }));
+
+    // Previous claims for turns 0, 1, 2, 3, 4, 5, 6, 7 (8 unchanged, turns 8 and 9 changed)
+    const previousClaims: ClaimAnalysis[] = Array.from({ length: 8 }, (_, i) => ({
+      claimText: `Claim for turn ${i}`,
+      turnIndex: i,
+      speaker: i % 2 === 0 ? 'HOST' : 'EXPERT',
+      isCommonKnowledge: true,
+      existingCitations: [],
+      needsMoreCitations: false,
+      hasUnreliableSource: false,
+      hasMisattribution: false,
+      verificationNote: 'ok',
+      turnHash: hashTurn(turns[i].speaker, turns[i].text),
+    }));
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Claim for turn 8',
+            turnIndex: 8,
+            speaker: 'HOST',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            hasMisattribution: false,
+            verificationNote: 'ok',
+          },
+          {
+            claimText: 'Claim for turn 9',
+            turnIndex: 9,
+            speaker: 'EXPERT',
+            isCommonKnowledge: true,
+            existingCitations: [],
+            needsMoreCitations: false,
+            hasUnreliableSource: false,
+            hasMisattribution: false,
+            verificationNote: 'ok',
+          },
+        ],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 300,
+      outputTokens: 150,
+    });
+
+    await verifyScript({
+      topic: 'Test',
+      turns,
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 2,
+      previousClaims,
+    });
+
+    const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+    // Pre-verified should list turns 0-7 (all except 8 and 9)
+    expect(systemPrompt).toContain('0, 1, 2, 3, 4, 5, 6, 7');
+    // Turns requiring analysis should be 8 and 9
+    expect(systemPrompt).toContain('8, 9');
+    // Turns 8 and 9 should NOT appear in the pre-verified section (they are the changed ones)
+    expect(systemPrompt).toContain('INCREMENTAL VERIFICATION');
+  });
+
   it('stamps turnHash on claims from full verification', async () => {
     const turnText = 'Quantum computing uses qubits [1].';
 
