@@ -133,6 +133,23 @@ function remapCitations(turns: ScriptTurn[], numberMap: Map<number, number>): Sc
   }));
 }
 
+const VALID_REF_TYPES = new Set(['WEB', 'PAPER', 'BOOK', 'ARTICLE', 'VIDEO', 'REPORT']);
+const REF_TYPE_ALIASES: Record<string, string> = {
+  JOURNAL: 'PAPER', journal: 'PAPER', paper: 'PAPER',
+  WEBPAGE: 'WEB', webpage: 'WEB', web: 'WEB', website: 'WEB', URL: 'WEB',
+  NEWS: 'ARTICLE', article: 'ARTICLE', news: 'ARTICLE',
+  book: 'BOOK', TEXTBOOK: 'BOOK',
+  video: 'VIDEO', YOUTUBE: 'VIDEO',
+  report: 'REPORT', GOVERNMENT: 'REPORT',
+};
+
+function coerceRefType(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const upper = raw.toUpperCase();
+  if (VALID_REF_TYPES.has(upper)) return upper;
+  return REF_TYPE_ALIASES[raw] ?? REF_TYPE_ALIASES[upper] ?? null;
+}
+
 /**
  * Pre-validation coercion: fix common AI output mistakes before Zod validates.
  * Maps alternate key names, fills missing nullable fields with null, and drops
@@ -182,7 +199,7 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
             : [],
           year: item.year ?? null,
           url: item.url ?? item.link ?? item.source_url ?? null,
-          type: item.type ?? item.sourceType ?? item.source_type ?? 'WEB',
+          type: coerceRefType(item.type ?? item.sourceType ?? item.source_type) ?? 'WEB',
           publisher:
             item.publisher ?? item.publisher_name ?? item.source ?? null,
           doi: item.doi ?? null,

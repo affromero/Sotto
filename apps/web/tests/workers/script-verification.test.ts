@@ -512,11 +512,30 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('deletes old references before regenerating', async () => {
+    it('keeps old references when revision produces none', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockPrismaReferenceDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it('replaces references when revision produces new ones', async () => {
+      mockGenerateScriptWithFeedback.mockResolvedValue({
+        ...revisedScriptResult,
+        references: [
+          { number: 1, title: 'Replacement Paper', authors: ['Smith'], year: 2024, url: 'https://new.com', type: 'PAPER', publisher: null, doi: null },
+        ],
+      });
+
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith({ where: { podcastId: 'podcast-001' } });
+      expect(mockPrismaReferenceCreateMany).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({ podcastId: 'podcast-001', number: 1, title: 'Replacement Paper' }),
+        ]),
+      });
     });
 
     it('calls generateScriptWithFeedback with the verdict feedback', async () => {
