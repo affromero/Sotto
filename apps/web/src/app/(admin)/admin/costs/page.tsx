@@ -31,8 +31,13 @@ async function getCostPerPodcast(since: Date): Promise<number> {
 export default async function AdminCostsPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [1, 7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = subDays(startOfDay(new Date()), days);
+  const { since, days } = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return { since: today, days: 1 };
+    if (rangeParam === 'yesterday') return { since: subDays(today, 1), days: 1 };
+    const d = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return { since: subDays(today, d), days: d };
+  })();
   const period = periodFromDays(days);
 
   const [breakdown, dailyTrend, warnings, costPerPodcast] = await Promise.all([
@@ -62,14 +67,20 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>API costs by provider, daily trends, and threshold alerts</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[1, 7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/costs?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/costs?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d === 1 ? 'today' : `${d}d`}
+              {label}
             </a>
           ))}
         </nav>

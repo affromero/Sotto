@@ -21,8 +21,13 @@ function pct(num: number, denom: number): string {
 export default async function AdminEngagementPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
-  const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
-  const since = subDays(startOfDay(new Date()), days);
+  const since = (() => {
+    const today = startOfDay(new Date());
+    if (rangeParam === 'today') return today;
+    if (rangeParam === 'yesterday') return subDays(today, 1);
+    const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+    return subDays(today, days);
+  })();
 
   const [overview, dailyTrend, topLiked, topForked, topCommented, interactions] = await Promise.all([
     getEngagementOverview(since),
@@ -46,14 +51,20 @@ export default async function AdminEngagementPage({ searchParams }: PageProps) {
           <p className={styles.subtitle}>Social engagement, top content, and Q&A metrics</p>
         </div>
         <nav className={styles.rangeNav} aria-label="Time range">
-          {[7, 30, 90].map((d) => (
+          {[
+            { value: 'today', label: 'Today' },
+            { value: 'yesterday', label: 'Yesterday' },
+            { value: '7', label: '7d' },
+            { value: '30', label: '30d' },
+            { value: '90', label: '90d' },
+          ].map(({ value, label }) => (
             <a
-              key={d}
-              href={`/admin/engagement?range=${d}`}
-              className={`${styles.rangeLink} ${days === d ? styles.rangeLinkActive : ''}`}
-              aria-current={days === d ? 'page' : undefined}
+              key={value}
+              href={`/admin/engagement?range=${value}`}
+              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+              aria-current={rangeParam === value ? 'page' : undefined}
             >
-              {d}d
+              {label}
             </a>
           ))}
         </nav>

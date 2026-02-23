@@ -5,6 +5,8 @@ import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
+import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
+import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { auth } from '@/lib/auth';
@@ -51,8 +53,22 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Resolve user's AI key for BYOK passthrough
-  const aiKey = await getAiKey(authed.userId);
+  // Resolve which provider owns the requested model so we use the right BYOK key.
+  // e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic'
+  let modelProvider: AiProviderId | undefined;
+  if (typeof model === 'string' && !model.startsWith('claude-code:')) {
+    for (const p of getAllAiProviderMeta()) {
+      if (p.models.some((m) => m.id === model)) {
+        modelProvider = p.id as AiProviderId;
+        break;
+      }
+    }
+  }
+
+  // Fetch the BYOK key for the resolved provider (falls back to any valid key if no match)
+  const aiKey = modelProvider
+    ? (await getAiKey(authed.userId, modelProvider)) ?? (await getAiKey(authed.userId))
+    : await getAiKey(authed.userId);
 
   // Inline URL extraction: detect URLs in the latest message and inject context
   const detectedUrls = detectUrls(userMessage);
@@ -104,22 +120,30 @@ export async function POST(request: NextRequest) {
 
   const messages = [...priorMessages, { role: 'user' as const, content: userMessage }];
 
+  const effectiveProvider = modelProvider ?? aiKey?.provider ?? 'anthropic';
+
   // Stream response
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
       try {
         let fullResponse = '';
-        for await (const chunk of streamDiscoveryResponse(messages, aiKey?.apiKey, model || undefined, (usage) => {
-          logUsage({
-            service: 'anthropic',
-            model: usage.model,
-            category: 'discovery',
-            inputTokens: usage.inputTokens,
-            outputTokens: usage.outputTokens,
-            userId: authed.userId,
-          });
-        })) {
+        for await (const chunk of streamDiscoveryResponse(
+          messages,
+          aiKey?.apiKey,
+          model || undefined,
+          (usage) => {
+            logUsage({
+              service: effectiveProvider as 'anthropic' | 'openai',
+              model: usage.model,
+              category: 'discovery',
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              userId: authed.userId,
+            });
+          },
+          effectiveProvider,
+        )) {
           // Only stream string chunks (skip objects from claude-code stream-json)
           const text = typeof chunk === 'string' ? chunk : '';
           if (text) {
@@ -188,7 +212,7 @@ export async function POST(request: NextRequest) {
 
         if (isAuthError && aiKey) {
           await prisma.userAiKey.updateMany({
-            where: { userId: authed.userId, provider: aiKey.provider },
+            where: { userId: authed.userId, provider: effectiveProvider as AiProviderId },
             data: { isValid: false },
           });
         }
