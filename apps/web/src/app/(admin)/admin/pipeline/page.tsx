@@ -3,7 +3,7 @@ import {
   getByokAdoption,
   getPipelineHealth,
 } from '@/lib/funnel-metrics';
-import { getRecentPipelineErrors } from '@/lib/pipeline-events';
+import { getRecentPipelineErrors, getRecentDiscoveryChatErrors } from '@/lib/pipeline-events';
 import { subDays, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { CopyButton } from '@/components/admin/CopyButton';
@@ -26,11 +26,12 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
   const since = subDays(startOfDay(new Date()), days);
 
-  const [funnel, adoption, pipeline, recentErrors] = await Promise.all([
+  const [funnel, adoption, pipeline, recentErrors, discoveryChatErrors] = await Promise.all([
     getFreeTierFunnel(),
     getByokAdoption(),
     getPipelineHealth(since),
     getRecentPipelineErrors(20),
+    getRecentDiscoveryChatErrors(20),
   ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
@@ -240,6 +241,58 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
                     <td className={styles.errorCell}>
                       {evt.message}
                       {evt.message && <> <CopyButton text={evt.message} /></>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Discovery chat errors */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Discovery Chat Errors</h2>
+        {discoveryChatErrors.length === 0 ? (
+          <p className={styles.empty}>No discovery chat errors recorded.</p>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.recentTable}>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>User</th>
+                  <th>Kind</th>
+                  <th>Message</th>
+                  <th>Detail</th>
+                </tr>
+              </thead>
+              <tbody>
+                {discoveryChatErrors.map((evt) => (
+                  <tr key={evt.id}>
+                    <td className={styles.dateCell}>
+                      {new Date(evt.createdAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                    <td>
+                      <Link href={`/admin/users?search=${encodeURIComponent(evt.userEmail ?? evt.userId)}`}>
+                        {evt.userName ?? evt.userEmail ?? evt.userId}
+                      </Link>
+                    </td>
+                    <td>
+                      <span className={styles.badgeError}>{evt.errorKind}</span>
+                    </td>
+                    <td className={styles.errorCell}>{evt.userMessage.slice(0, 200)}</td>
+                    <td className={styles.errorCell}>
+                      {evt.errorDetail ? (
+                        <>{evt.errorDetail.slice(0, 200)} <CopyButton text={evt.errorDetail} /></>
+                      ) : (
+                        '—'
+                      )}
                     </td>
                   </tr>
                 ))}
