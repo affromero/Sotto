@@ -1,6 +1,6 @@
 import '../service';
-import { useEffect, useState } from 'react';
-import { Stack, useSegments, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { Stack, useSegments, useRouter, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -24,16 +24,30 @@ const queryClient = new QueryClient();
 function useProtectedRoute() {
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
   const [isReady, setIsReady] = useState(false);
+
+  // Track current path so we can restore it after re-auth
+  const pathnameRef = useRef(pathname);
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
+  const pendingPostAuthRoute = useRef<string | null>(null);
 
   // Instant navigation on login/logout events
   useEffect(() => {
     const unsubRevoke = onAuthRevoked(() => {
+      // Remember where the user was before being kicked to login
+      const current = pathnameRef.current;
+      if (current && current !== '/auth/login') {
+        pendingPostAuthRoute.current = current;
+      }
       queryClient.clear();
       router.replace('/auth/login');
     });
     const unsubSuccess = onAuthSuccess(() => {
-      router.replace('/(tabs)');
+      // Return to where the user was, not always to the Feed
+      const dest = pendingPostAuthRoute.current ?? '/(tabs)';
+      pendingPostAuthRoute.current = null;
+      router.replace(dest as Parameters<typeof router.replace>[0]);
     });
     return () => { unsubRevoke(); unsubSuccess(); };
   }, [router]);
