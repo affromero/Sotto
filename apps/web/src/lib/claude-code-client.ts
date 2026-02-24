@@ -249,10 +249,9 @@ export async function* streamClaudeCode(
         throw new Error(stderr.trim());
       } else {
         // Exit 0, no stderr, no output — this is the empty-response failure mode
-        logger.error('claude-code: exited cleanly but produced no output', {
-          bufferRemainder: buffer.slice(0, 500),
-        });
-        throw new Error('claude-code: no output produced (empty response)');
+        const detail = buffer.trim().slice(0, 300) || '(empty)';
+        logger.error('claude-code: exited cleanly but produced no output', { bufferRemainder: detail });
+        throw new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`);
       }
     }
   } finally {
