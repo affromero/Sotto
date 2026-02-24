@@ -11,12 +11,28 @@ export interface RecentPipelineError {
   metadata: Record<string, unknown> | null;
 }
 
+export type PipelineErrorSortCol = 'createdAt' | 'stage' | 'type';
+
 export async function getRecentPipelineErrors(
   limit: number = 20,
+  since?: Date,
+  until?: Date,
+  sortCol: PipelineErrorSortCol = 'createdAt',
+  sortDir: 'asc' | 'desc' = 'desc',
 ): Promise<RecentPipelineError[]> {
   const events = await prisma.pipelineEvent.findMany({
-    where: { type: { in: ['error', 'retry'] } },
-    orderBy: { createdAt: 'desc' },
+    where: {
+      type: { in: ['error', 'retry'] },
+      ...(since || until
+        ? {
+            createdAt: {
+              ...(since ? { gte: since } : {}),
+              ...(until ? { lt: until } : {}),
+            },
+          }
+        : {}),
+    },
+    orderBy: { [sortCol]: sortDir },
     take: limit,
     select: {
       id: true,
@@ -117,12 +133,15 @@ export async function getDiscoveryChatErrorStats(
   return { total, byKind, daily };
 }
 
+export type DiscoveryChatErrorSortCol = 'createdAt' | 'errorKind';
+
 export async function getRecentDiscoveryChatErrors(
   limit: number = 50,
   kindFilter?: string,
   sort: 'asc' | 'desc' = 'desc',
   since?: Date,
   until?: Date,
+  sortCol: DiscoveryChatErrorSortCol = 'createdAt',
 ): Promise<RecentDiscoveryChatError[]> {
   const errors = await prisma.discoveryChatError.findMany({
     where: {
@@ -136,7 +155,7 @@ export async function getRecentDiscoveryChatErrors(
           }
         : {}),
     },
-    orderBy: { createdAt: sort },
+    orderBy: { [sortCol]: sort },
     take: limit,
     select: {
       id: true,
