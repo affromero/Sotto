@@ -182,6 +182,7 @@ export async function POST(request: NextRequest) {
     const isHumanContentStr = fields.isHumanContent || null;
     const sourcePlatform = fields.sourcePlatform || null;
     const sttProviderField = fields.sttProvider || undefined;
+    const sttModelField = fields.sttModel || undefined;
     const audioFile = files.audio || null;
     const transcriptFile = files.transcript || null;
 
@@ -195,6 +196,7 @@ export async function POST(request: NextRequest) {
       isHumanContent: isHumanContentStr === 'true',
       sourcePlatform: sourcePlatform ?? undefined,
       sttProvider: sttProviderField || undefined,
+      sttModel: sttModelField || undefined,
     });
 
     if (!validation.success) {
@@ -229,6 +231,7 @@ export async function POST(request: NextRequest) {
       isHumanContent,
       sourcePlatform: validatedSourcePlatform,
       sttProvider: validatedSttProvider,
+      sttModel: validatedSttModel,
     } = validation.data;
 
     const validatedTitle = validation.data.title || 'Untitled Import';
@@ -244,6 +247,8 @@ export async function POST(request: NextRequest) {
         source: 'IMPORT',
         isHumanContent,
         sourcePlatform: validatedSourcePlatform,
+        sttProvider: validatedSttProvider,
+        sttModel: validatedSttModel,
         visibility: gate.isProUser ? 'PRIVATE' : 'PUBLIC',
       },
     });
@@ -290,6 +295,7 @@ export async function POST(request: NextRequest) {
       isHumanContent,
       generateMetadata,
       sttProvider: validatedSttProvider,
+      sttModel: validatedSttModel,
       sttApiKey,
     });
 

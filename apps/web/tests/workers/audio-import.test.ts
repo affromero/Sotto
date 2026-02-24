@@ -335,7 +335,7 @@ describe('processAudioImport', () => {
       const job = createMockJob({ ...defaultPayload, sttProvider: 'elevenlabs', sttApiKey: 'el-key-abc' });
       await processAudioImport(job);
 
-      expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'el-key-abc');
+      expect(mockCreateSttProvider).toHaveBeenCalledWith('elevenlabs', 'el-key-abc', undefined);
     });
 
     it('runs diarization on STT transcription output', async () => {
