@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 const mockAuth = vi.fn();
 const mockDiscoveryFindUniqueOrThrow = vi.fn();
 const mockStreamDiscoveryResponse = vi.fn();
+const mockStreamFallbackDiscoveryResponse = vi.fn();
 const mockParseChips = vi.fn();
 const mockParseMetadata = vi.fn();
 const mockGetAiKey = vi.fn();
@@ -40,6 +41,7 @@ vi.mock('@/lib/claude', () => ({
 
 vi.mock('@/lib/discovery-agent', () => ({
   streamDiscoveryResponse: (...args: unknown[]) => mockStreamDiscoveryResponse(...args),
+  streamFallbackDiscoveryResponse: (...args: unknown[]) => mockStreamFallbackDiscoveryResponse(...args),
   parseChips: (...args: unknown[]) => mockParseChips(...args),
   parseMetadata: (...args: unknown[]) => mockParseMetadata(...args),
   detectUrls: () => [],
@@ -613,12 +615,17 @@ describe('POST /api/discovery', () => {
       expect(response.status).toBe(200);
     });
 
-    it('sends error SSE and logs DiscoveryChatError when response is markup-only', async () => {
+    it('streams fallback podcast suggestions and logs DiscoveryChatError when response is markup-only', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
       // Claude returns only a metadata block with no prose text
       mockStreamDiscoveryResponse.mockReturnValue(
         mockStreamGenerator(['[METADATA]{"topic":"test","ready":false}[/METADATA]'])
       );
+      // Fallback returns helpful podcast angle suggestions
+      mockStreamFallbackDiscoveryResponse.mockReturnValue(
+        mockStreamGenerator(['Here are some podcast angles you could explore. [chips: Angle A · Angle B · Angle C]'])
+      );
+      mockParseChips.mockReturnValue({ text: 'Here are some podcast angles you could explore.', chips: ['Angle A', 'Angle B', 'Angle C'] });
 
       const { prisma: mockPrismaRef } = await import('@/lib/prisma');
 
@@ -626,16 +633,24 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
       const events = await readSSEStream(response);
 
+      // Should stream fallback text, not a static error
+      const textEvents = events.filter((e) => {
+        try { return 'text' in JSON.parse(e); } catch { return false; }
+      });
+      expect(textEvents.length).toBeGreaterThan(0);
+      // No static error event
       const errorEvent = events.find((e) => {
         try { return JSON.parse(e).error; } catch { return false; }
       });
-      expect(errorEvent).toBeDefined();
-      expect(JSON.parse(errorEvent!).error).toContain("couldn't generate a response");
+      expect(errorEvent).toBeUndefined();
+      // Error still logged to DB
       expect(mockPrismaRef.discoveryChatError.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ errorKind: 'empty_response' }),
         })
       );
+      // Fallback was invoked
+      expect(mockStreamFallbackDiscoveryResponse).toHaveBeenCalled();
     });
 
     it('handles multiple concurrent streams from different users', async () => {
