@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { isClaudeAvailable } from '@/lib/claude-code-client';
 
 // Env var names for each platform-level AI provider key
 const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
@@ -23,8 +24,12 @@ export async function GET() {
   }
 
   const isAdmin = session.user.role === 'ADMIN';
-  const aiKeys = await listAiProviders(session.user.id);
+  const [aiKeys, claudeAvailable] = await Promise.all([
+    listAiProviders(session.user.id),
+    isAdmin ? isClaudeAvailable() : Promise.resolve(false),
+  ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
+  const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];
 
   // No BYOK AI key
   if (validKeys.length === 0) {
@@ -44,7 +49,6 @@ export async function GET() {
           }))
         );
 
-      const claudeCodeModels = process.env.CLAUDE_CODE_ENABLED === 'true' ? CLAUDE_CODE_MODELS : [];
       return NextResponse.json({
         provider: config.aiProvider,
         readOnly: false,
@@ -82,7 +86,6 @@ export async function GET() {
     }));
   });
 
-  const claudeCodeModels = process.env.CLAUDE_CODE_ENABLED === 'true' ? CLAUDE_CODE_MODELS : [];
   return NextResponse.json({
     provider: defaultProvider.id,
     readOnly: false,

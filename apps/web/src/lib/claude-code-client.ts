@@ -1,6 +1,33 @@
 import { spawn } from 'child_process';
 import { logger } from './logger';
 
+/**
+ * Check whether the `claude` CLI is installed and reachable.
+ * Result is cached after the first call — the binary doesn't appear/disappear at runtime.
+ */
+let _claudeAvailable: boolean | null = null;
+export function isClaudeAvailable(): Promise<boolean> {
+  if (_claudeAvailable !== null) return Promise.resolve(_claudeAvailable);
+  return new Promise((resolve) => {
+    const child = spawn('claude', ['--version'], { stdio: 'ignore' });
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      _claudeAvailable = false;
+      resolve(false);
+    }, 3000);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      _claudeAvailable = code === 0;
+      resolve(_claudeAvailable!);
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      _claudeAvailable = false;
+      resolve(false);
+    });
+  });
+}
+
 interface ClaudeCodeResponse {
   content: string;
   inputTokens: number;
