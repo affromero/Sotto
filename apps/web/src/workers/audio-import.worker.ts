@@ -27,7 +27,7 @@ const execFileAsync = promisify(execFile);
  * Handles the full pipeline for user-uploaded audio podcasts
  */
 export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<void> {
-  const { podcastId, userId, audioKey, transcriptText, sttProvider, sttApiKey, generateMetadata } =
+  const { podcastId, userId, audioKey, transcriptText, sttProvider, sttModel, sttApiKey, generateMetadata } =
     job.data;
 
   logger.info('Starting audio import', {
@@ -138,8 +138,8 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         segments = await diarizeSpeakers(whisperSegments, aiApiKey);
       }
     } else {
-      logger.info('Transcribing audio', { provider: sttProvider ?? 'openai' });
-      const provider = createSttProvider(sttProvider, sttApiKey);
+      logger.info('Transcribing audio', { provider: sttProvider ?? 'openai', model: sttModel ?? 'default' });
+      const provider = createSttProvider(sttProvider, sttApiKey, sttModel);
       const normalizedBuffer = await import('fs/promises').then((fs) =>
         fs.readFile(normalizedPath)
       );
@@ -150,7 +150,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       const durationMin = duration / 60;
       logUsage({
         service: sttId,
-        model: sttMeta.defaultModel,
+        model: sttModel ?? sttMeta.defaultModel,
         category: 'stt_transcription',
         totalCost: durationMin * sttMeta.platformCostPerMinute,
         podcastId,

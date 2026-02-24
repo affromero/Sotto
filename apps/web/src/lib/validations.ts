@@ -280,6 +280,7 @@ export const importPodcastSchema = z.object({
   isHumanContent: z.boolean().default(false),
   sourcePlatform: z.string().min(1).max(50),
   sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
+  sttModel: z.string().max(100).optional(),
 });
 
 /**
