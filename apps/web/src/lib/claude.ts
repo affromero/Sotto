@@ -4,11 +4,7 @@ import { logger } from './logger';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
-function isClaudeCodeMode(): boolean {
-  return process.env.AI_PROVIDER === 'claude-code';
-}
-
-if (!ANTHROPIC_API_KEY && !isClaudeCodeMode()) {
+if (!ANTHROPIC_API_KEY) {
   logger.warn('ANTHROPIC_API_KEY is not set — Claude features will not work');
 }
 
@@ -74,21 +70,16 @@ export async function generateResponse(
     }
   }
 
-  // Per-request claude-code routing (admin-selected model via dropdown)
+  // Per-request claude-code routing (model selected via dropdown, e.g. "claude-code:opus")
   if (options?.model?.startsWith('claude-code:')) {
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options.model.split(':')[1] || 'opus';
-    const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), { model: ccModel });
-    return { ...result, model: options.model };
-  }
-
-  if (isClaudeCodeMode() && !options?.apiKeyOverride) {
-    const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
-    const ccModel = options?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
     const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), {
       model: ccModel,
+      useWebSearch: hasWebSearch,
     });
-    return { ...result, model: ccModel };
+    return { ...result, model: options.model };
   }
 
   const activeClient = options?.apiKeyOverride
@@ -161,23 +152,16 @@ export async function* streamResponse(
     }
   }
 
-  // Per-request claude-code routing (admin-selected model via dropdown)
+  // Per-request claude-code routing (model selected via dropdown, e.g. "claude-code:opus")
   if (options?.model?.startsWith('claude-code:')) {
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
-    yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
-      model: options.model.split(':')[1] || 'opus',
-    });
-    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
-    return;
-  }
-
-  if (isClaudeCodeMode() && !options?.apiKeyOverride) {
-    const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
-    const ccModel = options?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const ccModel = options.model.split(':')[1] || 'opus';
+    const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
     yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
       model: ccModel,
+      useWebSearch: hasWebSearch,
     });
-    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: ccModel });
+    options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: options.model });
     return;
   }
 

@@ -162,20 +162,14 @@ export async function processReferenceValidation(
   await job.updateProgress(50);
 
   // Layer 4: AI evaluation (single batch call, only accepted refs)
-  // Skip in claude-code mode — CLI doesn't support web search tool and times out
   let aiResults: Map<string, VerificationCheck>;
-  if (process.env.AI_PROVIDER === 'claude-code' && !aiKey?.apiKey) {
-    logger.info('Skipping AI reference evaluation in claude-code mode', { podcastId });
+  try {
+    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey, model);
+  } catch (error) {
+    logger.warn('AI evaluation failed, using external checks only', {
+      error: error instanceof Error ? error.message : 'Unknown',
+    });
     aiResults = new Map();
-  } else {
-    try {
-      aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey, model);
-    } catch (error) {
-      logger.warn('AI evaluation failed, using external checks only', {
-        error: error instanceof Error ? error.message : 'Unknown',
-      });
-      aiResults = new Map();
-    }
   }
 
   // Merge AI results into allChecks
