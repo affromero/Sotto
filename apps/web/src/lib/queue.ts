@@ -7,6 +7,7 @@ import { classifyError, isKeyInvalidationError, userMessage } from './byok-error
 import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
+import type { SttProviderId } from '@sotto/shared';
 import { sendEmail } from './email';
 
 /**
@@ -445,6 +446,25 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
                 data: { podcastId },
               });
             }
+          }
+        } else if (queueName === 'audio-import') {
+          // STT key: elevenlabs uses TTS key store; all others use AI key store
+          const sttProvider = ((job?.data as Record<string, unknown>)?.sttProvider ?? 'openai') as SttProviderId;
+          if (sttProvider === 'elevenlabs') {
+            await markTtsKeyInvalid(podcast.userId, 'elevenlabs');
+            failureReason = userMessage(errorKind, 'ElevenLabs');
+          } else {
+            await markAiKeyInvalid(podcast.userId, sttProvider as AiProviderId);
+            failureReason = userMessage(errorKind, sttProvider);
+          }
+          if (notifQueue) {
+            await notifQueue.add('send_notification', {
+              userId: podcast.userId,
+              type: 'KEY_INVALID',
+              title: 'API Key Invalid',
+              message: failureReason,
+              data: { podcastId },
+            });
           }
         }
       }
