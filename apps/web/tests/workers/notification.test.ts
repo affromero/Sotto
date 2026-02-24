@@ -324,11 +324,17 @@ describe('processNotification', () => {
       await expect(processNotification(job)).rejects.toThrow('Database connection lost');
     });
 
-    it('propagates errors from push notification sending', async () => {
+    it('logs push notification failure without rethrowing (in-app already created)', async () => {
+      const { logger } = await import('@/lib/logger');
       mockSendPushNotification.mockRejectedValue(new Error('Push service unavailable'));
       const job = createMockJob(defaultPayload);
 
-      await expect(processNotification(job)).rejects.toThrow('Push service unavailable');
+      // Should not throw — push failure is logged, job succeeds
+      await expect(processNotification(job)).resolves.toBeUndefined();
+      expect(logger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('Push notification channel failed'),
+        expect.objectContaining({ error: 'Push service unavailable' }),
+      );
     });
 
     it('does not send push notification if in-app creation fails', async () => {

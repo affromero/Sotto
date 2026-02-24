@@ -162,16 +162,16 @@ export async function moderateOrThrow(text: string): Promise<void> {
  * Record a content flag for audit purposes. Fire-and-forget — never throws.
  * Used by the content moderation worker and inline screening.
  */
-export function recordContentFlag(params: {
+export async function recordContentFlag(params: {
   targetType: string;
   targetId: string;
   userId?: string;
   result: ModerationResult;
   source: 'auto_input' | 'auto_output' | 'worker_scan';
-}): void {
+}): Promise<void> {
   if (!params.result.flagged) return;
 
-  prisma.contentFlag
+  await prisma.contentFlag
     .create({
       data: {
         targetType: params.targetType,

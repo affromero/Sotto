@@ -27,11 +27,21 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
   });
 
   // Send push notifications (web + mobile) only if user has opted in
+  // Use allSettled so a failure in one channel doesn't abort the other or retry the in-app notification
   if (user?.pushNotifications) {
-    await Promise.all([
+    const pushResults = await Promise.allSettled([
       sendPushNotification({ userId, title, body: message, data }),
       sendExpoPushNotification({ userId, title, body: message, data }),
     ]);
+    for (const result of pushResults) {
+      if (result.status === 'rejected') {
+        logger.warn('Push notification channel failed', {
+          userId,
+          type,
+          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+        });
+      }
+    }
   }
 
   logger.info('Notification sent', { userId, type });
