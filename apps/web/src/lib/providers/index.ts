@@ -14,7 +14,6 @@ let _providers: Providers | null = null;
 
 /**
  * Get the singleton provider instances, selected by environment variables:
- * - AI_PROVIDER: anthropic (default) | openai
  * - TTS_PROVIDER: elevenlabs (default) | openai
  * - STORAGE_PROVIDER: r2 (default) | s3 | local
  */

@@ -10,6 +10,7 @@ interface ClaudeCodeResponse {
 interface ClaudeCodeOptions {
   model?: string;
   timeoutMs?: number;
+  useWebSearch?: boolean;
 }
 
 /**
@@ -32,6 +33,13 @@ export function serializeMessages(
     .join('\n\n---\n\n');
 }
 
+function buildArgs(model: string, systemPrompt: string, opts?: ClaudeCodeOptions): string[] {
+  const args = ['-p', '--model', model, '--output-format', 'text'];
+  if (systemPrompt) args.push('--system-prompt', systemPrompt);
+  if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
+  return args;
+}
+
 /**
  * Spawn `claude -p` and return the full response.
  * Prompt is piped via stdin to avoid OS argument length limits.
@@ -44,22 +52,23 @@ export async function executeClaudeCode(
   const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
   const timeoutMs = opts?.timeoutMs || 600_000;
 
-  const args = ['-p', '--model', model, '--output-format', 'text'];
+  const args = buildArgs(model, systemPrompt, opts);
 
-  if (systemPrompt) {
-    args.push('--system-prompt', systemPrompt);
-  }
-
-  logger.info('claude-code: executing', { model, promptLength: String(prompt.length) });
+  logger.info('claude-code: executing', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
   // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
   const { CLAUDECODE: _, ...cleanEnv } = process.env;
 
-  return new Promise<ClaudeCodeResponse>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const child = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: cleanEnv,
     });
+
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error(`claude-code: timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
 
     let stdout = '';
     let stderr = '';
@@ -72,31 +81,29 @@ export async function executeClaudeCode(
       stderr += chunk.toString();
     });
 
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error(`claude-code: timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-
-    child.on('error', (err) => {
-      clearTimeout(timer);
-      reject(
-        new Error(`claude-code: failed to spawn — ${err.message}. Is the 'claude' CLI installed?`)
-      );
-    });
-
     child.on('close', (code) => {
       clearTimeout(timer);
+
       if (code !== 0) {
         logger.error('claude-code: non-zero exit', { code: String(code), stderr });
         reject(new Error(`claude-code: exited with code ${code} — ${stderr.slice(0, 500)}`));
         return;
       }
 
-      resolve({
-        content: stdout.trim(),
-        inputTokens: 0,
-        outputTokens: 0,
-      });
+      const content = stdout.trim();
+      if (!content) {
+        const detail = stderr.trim().slice(0, 300) || '(empty)';
+        logger.error('claude-code: exited cleanly but produced no output', { bufferRemainder: detail });
+        reject(new Error(`claude-code: no output produced (empty response). Buffer: ${detail}`));
+        return;
+      }
+
+      resolve({ content, inputTokens: 0, outputTokens: 0 });
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timer);
+      reject(new Error(`claude-code: failed to spawn — ${err.message}. Is the 'claude' CLI installed?`));
     });
 
     child.stdin.write(prompt);
@@ -117,12 +124,10 @@ export async function* streamClaudeCode(
   const timeoutMs = opts?.timeoutMs || 600_000;
 
   const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];
+  if (systemPrompt) args.push('--system-prompt', systemPrompt);
+  if (opts?.useWebSearch) args.push('--allowedTools', 'WebSearch,WebFetch');
 
-  if (systemPrompt) {
-    args.push('--system-prompt', systemPrompt);
-  }
-
-  logger.info('claude-code: streaming', { model, promptLength: String(prompt.length) });
+  logger.info('claude-code: streaming', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
   // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
   const { CLAUDECODE: _, ...cleanEnv } = process.env;
@@ -158,6 +163,7 @@ export async function* streamClaudeCode(
   try {
     for await (const chunk of child.stdout) {
       buffer += chunk.toString();
+
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 

@@ -82,15 +82,6 @@ export async function GET() {
     checks.storage = { status: 'error', latencyMs: Date.now() - r2Start };
   }
 
-  // --- Claude Code (non-critical, env-based — CLI lives on host, not in web container) ---
-  const aiProvider = process.env.AI_PROVIDER || 'anthropic';
-  if (aiProvider === 'claude-code') {
-    const model = process.env.CLAUDE_CODE_MODEL || 'haiku';
-    checks.claudeCode = { status: 'ok', detail: `provider=claude-code, model=${model}` };
-  } else {
-    checks.claudeCode = { status: 'not_configured', detail: `provider=${aiProvider}` };
-  }
-
   // --- Anthropic API (non-critical) ---
   const anthropicStart = Date.now();
   try {
