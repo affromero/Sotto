@@ -329,20 +329,19 @@ export default async function DashboardPage() {
                             <p className={styles.failureReason}>{podcast.failureReason}</p>
                           )}
                           <span className={styles.retryHint}>Tap to retry</span>
-                          {isAdmin && (
-                            <Link
-                              href={`/admin/podcasts?search=${podcast.id}`}
-                              className={styles.adminLink}
-                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                            >
-                              <Shield size={12} />
-                              Admin Panel
-                            </Link>
-                          )}
                         </>
                       )}
                     </div>
                   </Link>
+                  {podcast.status === 'FAILED' && isAdmin && (
+                    <Link
+                      href={`/admin/podcasts?search=${podcast.id}`}
+                      className={styles.adminLink}
+                    >
+                      <Shield size={12} />
+                      Admin Panel
+                    </Link>
+                  )}
                   <DeletePodcastButton podcastId={podcast.id} />
                 </div>
               );
