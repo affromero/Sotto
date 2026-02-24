@@ -36,8 +36,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma };
 });
 
-// Prevent claude-code-client from spawning a real CLI process
-// (e.g. when AI_PROVIDER=claude-code leaks from .env into tests)
+// Prevent claude-code-client from spawning a real CLI process in tests
 vi.mock('@/lib/claude-code-client', () => ({
   executeClaudeCode: vi.fn().mockResolvedValue({ content: '', inputTokens: 0, outputTokens: 0 }),
   serializeMessages: vi.fn().mockReturnValue(''),
@@ -48,26 +47,17 @@ vi.mock('@/lib/claude-code-client', () => ({
 
 describe('claude', () => {
   let originalApiKey: string | undefined;
-  let originalAiProvider: string | undefined;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     originalApiKey = process.env.ANTHROPIC_API_KEY;
-    originalAiProvider = process.env.AI_PROVIDER;
-    // Set API key and force Anthropic SDK path (not claude-code)
     process.env.ANTHROPIC_API_KEY = 'test-api-key-123';
-    process.env.AI_PROVIDER = 'anthropic';
     // Clear module cache to force re-import
     vi.resetModules();
   });
 
   afterEach(() => {
     process.env.ANTHROPIC_API_KEY = originalApiKey;
-    if (originalAiProvider !== undefined) {
-      process.env.AI_PROVIDER = originalAiProvider;
-    } else {
-      delete process.env.AI_PROVIDER;
-    }
   });
 
   describe('generateResponse', () => {
@@ -354,68 +344,6 @@ describe('claude', () => {
 
       expect(chunks).toEqual(['Hello']);
     });
-  });
-
-  describe('claude-code delegation', () => {
-    it('generateResponse delegates to claude-code-client when AI_PROVIDER=claude-code', async () => {
-      process.env.AI_PROVIDER = 'claude-code';
-      delete process.env.ANTHROPIC_API_KEY;
-      vi.resetModules();
-
-      const mockExecute = vi.fn().mockResolvedValue({
-        content: 'CLI response',
-        inputTokens: 0,
-        outputTokens: 0,
-      });
-      const mockSerialize = vi.fn().mockReturnValue('serialized prompt');
-
-      vi.doMock('@/lib/claude-code-client', () => ({
-        executeClaudeCode: mockExecute,
-        serializeMessages: mockSerialize,
-      }));
-
-      const { generateResponse } = await import('@/lib/claude');
-
-      const result = await generateResponse('System prompt', [{ role: 'user', content: 'Hello' }]);
-
-      expect(result.content).toBe('CLI response');
-      expect(result.inputTokens).toBe(0);
-      expect(result.outputTokens).toBe(0);
-      // Anthropic SDK should NOT be called
-      expect(mockMessagesCreate).not.toHaveBeenCalled();
-    });
-
-    it('streamResponse delegates to claude-code-client when AI_PROVIDER=claude-code', async () => {
-      process.env.AI_PROVIDER = 'claude-code';
-      delete process.env.ANTHROPIC_API_KEY;
-      vi.resetModules();
-
-      async function* mockStream() {
-        yield 'chunk1';
-        yield 'chunk2';
-      }
-
-      const mockStreamFn = vi.fn().mockReturnValue(mockStream());
-      const mockSerialize = vi.fn().mockReturnValue('serialized prompt');
-
-      vi.doMock('@/lib/claude-code-client', () => ({
-        streamClaudeCode: mockStreamFn,
-        serializeMessages: mockSerialize,
-      }));
-
-      const { streamResponse } = await import('@/lib/claude');
-
-      const chunks: string[] = [];
-      for await (const chunk of streamResponse('System', [{ role: 'user', content: 'Test' }])) {
-        chunks.push(chunk);
-      }
-
-      expect(chunks).toEqual(['chunk1', 'chunk2']);
-      expect(mockStreamFn).toHaveBeenCalled();
-      // Anthropic SDK should NOT be called
-      expect(mockMessagesStream).not.toHaveBeenCalled();
-    });
-
   });
 
   describe('logUsage (usage-logger)', () => {
