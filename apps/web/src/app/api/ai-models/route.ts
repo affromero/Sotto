@@ -44,10 +44,11 @@ export async function GET() {
           }))
         );
 
+      const claudeCodeModels = process.env.CLAUDE_CODE_ENABLED === 'true' ? CLAUDE_CODE_MODELS : [];
       return NextResponse.json({
         provider: config.aiProvider,
         readOnly: false,
-        models: [...platformModels, ...CLAUDE_CODE_MODELS],
+        models: [...platformModels, ...claudeCodeModels],
       });
     }
 
@@ -81,9 +82,10 @@ export async function GET() {
     }));
   });
 
+  const claudeCodeModels = process.env.CLAUDE_CODE_ENABLED === 'true' ? CLAUDE_CODE_MODELS : [];
   return NextResponse.json({
     provider: defaultProvider.id,
     readOnly: false,
-    models: isAdmin ? [...byokModels, ...CLAUDE_CODE_MODELS] : byokModels,
+    models: isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels,
   });
 }

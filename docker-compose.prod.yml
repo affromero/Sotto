@@ -57,6 +57,9 @@ services:
       - '127.0.0.1:3000:3000'
     volumes:
       - ./.pitch:/app/apps/web/.pitch:ro
+      # Mount host Claude CLI credentials so claude-code:* models work in Docker.
+      # CLAUDE_CREDENTIALS_PATH defaults to /root/.claude — override in .env if needed.
+      - ${CLAUDE_CREDENTIALS_PATH:-/root/.claude}:/home/sotto/.claude:ro
     env_file:
       - .env
     environment:
