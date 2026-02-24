@@ -7,6 +7,8 @@ import {
   getRecentPipelineErrors,
   getRecentDiscoveryChatErrors,
   getDiscoveryChatErrorStats,
+  type PipelineErrorSortCol,
+  type DiscoveryChatErrorSortCol,
 } from '@/lib/pipeline-events';
 import { subDays, startOfDay } from 'date-fns';
 import Link from 'next/link';
@@ -14,7 +16,14 @@ import { CopyButton } from '@/components/admin/CopyButton';
 import styles from './page.module.css';
 
 interface PageProps {
-  searchParams: Promise<{ range?: string; kind?: string; sort?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    kind?: string;
+    sort?: string;
+    sortcol?: string;
+    psortcol?: string;
+    psortdir?: string;
+  }>;
 }
 
 function formatSeconds(seconds: number | null): string {
@@ -49,10 +58,22 @@ const KIND_OPTIONS = [
   { value: 'client_stream_fallback', label: 'Client Fallback' },
 ];
 
+const PIPELINE_SORT_COLS: PipelineErrorSortCol[] = ['createdAt', 'stage', 'type'];
+const DISCOVERY_SORT_COLS: DiscoveryChatErrorSortCol[] = ['createdAt', 'errorKind'];
+
 function kindBadgeClass(kind: string): string {
   if (kind === 'exception') return styles.badgeError;
   if (kind === 'empty_response') return styles.badgeWarning;
   return styles.badgeInfo;
+}
+
+function kindLabel(kind: string): string {
+  return KIND_OPTIONS.find((k) => k.value === kind)?.label ?? kind;
+}
+
+function sortIndicator(active: boolean, dir: 'asc' | 'desc'): string {
+  if (!active) return ' ⇅';
+  return dir === 'desc' ? ' ↓' : ' ↑';
 }
 
 export default async function AdminPipelinePage({ searchParams }: PageProps) {
@@ -62,15 +83,28 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const kindFilter = KIND_OPTIONS.some((k) => k.value === (params.kind ?? ''))
     ? (params.kind ?? '')
     : '';
+  // Discovery chat errors: sort direction + column
   const sort = params.sort === 'asc' ? 'asc' : 'desc';
+  const dSortCol: DiscoveryChatErrorSortCol = DISCOVERY_SORT_COLS.includes(
+    params.sortcol as DiscoveryChatErrorSortCol,
+  )
+    ? (params.sortcol as DiscoveryChatErrorSortCol)
+    : 'createdAt';
+  // Pipeline failures: sort column + direction (independent from discovery sort)
+  const pSortCol: PipelineErrorSortCol = PIPELINE_SORT_COLS.includes(
+    params.psortcol as PipelineErrorSortCol,
+  )
+    ? (params.psortcol as PipelineErrorSortCol)
+    : 'createdAt';
+  const pSortDir = params.psortdir === 'asc' ? 'asc' : ('desc' as const);
 
   const [funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats] =
     await Promise.all([
       getFreeTierFunnel(),
       getByokAdoption(),
       getPipelineHealth(since),
-      getRecentPipelineErrors(20),
-      getRecentDiscoveryChatErrors(50, kindFilter || undefined, sort, since, until),
+      getRecentPipelineErrors(20, since, until, pSortCol, pSortDir),
+      getRecentDiscoveryChatErrors(50, kindFilter || undefined, sort, since, until, dSortCol),
       getDiscoveryChatErrorStats(since, until),
     ]);
 
@@ -80,22 +114,43 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const maxDay = Math.max(...errorStats.daily.map((d) => d.total), 1);
   const CHART_HEIGHT = 72;
 
-  function rangeHref(r: string) {
-    const p = new URLSearchParams({ range: r });
+  // Preserve all current params, then override specific ones
+  function baseParams() {
+    const p = new URLSearchParams({ range: rangeParam });
     if (kindFilter) p.set('kind', kindFilter);
     if (sort !== 'desc') p.set('sort', sort);
+    if (dSortCol !== 'createdAt') p.set('sortcol', dSortCol);
+    if (pSortCol !== 'createdAt') p.set('psortcol', pSortCol);
+    if (pSortDir !== 'desc') p.set('psortdir', pSortDir);
+    return p;
+  }
+
+  function rangeHref(r: string) {
+    const p = baseParams();
+    p.set('range', r);
     return `/admin/pipeline?${p}`;
   }
   function kindHref(k: string) {
-    const p = new URLSearchParams({ range: rangeParam });
-    if (k) p.set('kind', k);
-    if (sort !== 'desc') p.set('sort', sort);
+    const p = baseParams();
+    if (k) p.set('kind', k); else p.delete('kind');
     return `/admin/pipeline?${p}`;
   }
-  function sortHref() {
-    const p = new URLSearchParams({ range: rangeParam });
-    if (kindFilter) p.set('kind', kindFilter);
-    p.set('sort', sort === 'desc' ? 'asc' : 'desc');
+
+  // Pipeline failures column sort: clicking a column toggles direction if already active, else sets desc
+  function pipelineThHref(col: PipelineErrorSortCol) {
+    const p = baseParams();
+    p.set('psortcol', col);
+    p.set('psortdir', pSortCol === col && pSortDir === 'desc' ? 'asc' : 'desc');
+    return `/admin/pipeline?${p}`;
+  }
+
+  // Discovery chat errors column sort
+  function discoveryThHref(col: DiscoveryChatErrorSortCol) {
+    const p = baseParams();
+    p.set('sortcol', col);
+    // Toggle direction if clicking active column, else default to desc
+    const nextDir = dSortCol === col && sort === 'desc' ? 'asc' : 'desc';
+    if (nextDir !== 'desc') p.set('sort', nextDir); else p.delete('sort');
     return `/admin/pipeline?${p}`;
   }
 
@@ -270,10 +325,22 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
             <table className={styles.recentTable}>
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th>
+                    <a href={pipelineThHref('createdAt')} className={styles.thSortLink}>
+                      Time{sortIndicator(pSortCol === 'createdAt', pSortDir)}
+                    </a>
+                  </th>
                   <th>Podcast</th>
-                  <th>Stage</th>
-                  <th>Type</th>
+                  <th>
+                    <a href={pipelineThHref('stage')} className={styles.thSortLink}>
+                      Stage{sortIndicator(pSortCol === 'stage', pSortDir)}
+                    </a>
+                  </th>
+                  <th>
+                    <a href={pipelineThHref('type')} className={styles.thSortLink}>
+                      Type{sortIndicator(pSortCol === 'type', pSortDir)}
+                    </a>
+                  </th>
                   <th>Error</th>
                 </tr>
               </thead>
@@ -396,7 +463,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
           </div>
         )}
 
-        {/* Kind filter + sort controls */}
+        {/* Kind filter */}
         <div className={styles.filterRow}>
           <nav className={styles.kindNav} aria-label="Error kind filter">
             {KIND_OPTIONS.map(({ value, label }) => (
@@ -412,9 +479,6 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
               </a>
             ))}
           </nav>
-          <a href={sortHref()} className={styles.sortLink}>
-            {sort === 'desc' ? '↓ Newest first' : '↑ Oldest first'}
-          </a>
         </div>
 
         {discoveryChatErrors.length === 0 ? (
@@ -424,9 +488,17 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
             <table className={styles.recentTable}>
               <thead>
                 <tr>
-                  <th>Time</th>
+                  <th>
+                    <a href={discoveryThHref('createdAt')} className={styles.thSortLink}>
+                      Time{sortIndicator(dSortCol === 'createdAt', sort)}
+                    </a>
+                  </th>
                   <th>User</th>
-                  <th>Kind</th>
+                  <th>
+                    <a href={discoveryThHref('errorKind')} className={styles.thSortLink}>
+                      Kind{sortIndicator(dSortCol === 'errorKind', sort)}
+                    </a>
+                  </th>
                   <th>Message</th>
                   <th>Detail</th>
                 </tr>
@@ -450,7 +522,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
                       </Link>
                     </td>
                     <td>
-                      <span className={kindBadgeClass(evt.errorKind)}>{evt.errorKind}</span>
+                      <span className={kindBadgeClass(evt.errorKind)}>{kindLabel(evt.errorKind)}</span>
                     </td>
                     <td className={styles.errorCell}>{evt.userMessage.slice(0, 200)}</td>
                     <td className={styles.errorCell}>

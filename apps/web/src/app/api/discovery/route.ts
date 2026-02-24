@@ -174,6 +174,7 @@ export async function POST(request: NextRequest) {
                 userId: authed.userId,
                 userMessage: (message ?? content ?? '').slice(0, 2000),
                 errorKind: 'empty_response',
+                errorDetail: fullResponse ? fullResponse.slice(0, 4000) : '(truly empty — no bytes streamed)',
                 discoveryId: discoveryId ?? null,
               },
             });
