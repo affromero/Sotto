@@ -124,7 +124,9 @@ export async function generateResponse(
           categories: result.blockedCategories.join(','),
         });
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.warn('Output moderation check failed', { error: err instanceof Error ? err.message : String(err) });
+    });
   }
 
   return {

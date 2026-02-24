@@ -19,7 +19,7 @@ export async function processContentModeration(
   const result = await moderateContent(content);
 
   if (result.flagged) {
-    recordContentFlag({
+    await recordContentFlag({
       targetType,
       targetId,
       userId,

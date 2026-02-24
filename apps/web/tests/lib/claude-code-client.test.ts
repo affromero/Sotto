@@ -320,7 +320,7 @@ describe('claude-code-client', () => {
       expect(chunks).toEqual(['Complete']);
     });
 
-    it('kills process on cleanup', async () => {
+    it('kills process on cleanup even when no output is produced', async () => {
       const { streamClaudeCode } = await import('@/lib/claude-code-client');
 
       const proc = createMockProcess();
@@ -332,10 +332,14 @@ describe('claude-code-client', () => {
         proc._stdout.end();
       }, 0);
 
-      for await (const _chunk of gen) {
-        // consume
-      }
+      // Generator now throws when no output is produced
+      await expect(async () => {
+        for await (const _chunk of gen) {
+          // consume
+        }
+      }).rejects.toThrow('no output produced');
 
+      // SIGTERM must still be sent via the finally block
       expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
     });
   });

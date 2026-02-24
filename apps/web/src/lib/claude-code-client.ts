@@ -153,6 +153,7 @@ export async function* streamClaudeCode(
 
   let buffer = '';
   let hasDeltas = false;
+  let consecutiveParseFailures = 0;
 
   try {
     for await (const chunk of child.stdout) {
@@ -191,7 +192,16 @@ export async function* streamClaudeCode(
           }
         } catch {
           // Not valid JSON — skip partial lines
+          consecutiveParseFailures++;
+          if (consecutiveParseFailures >= 10) {
+            logger.warn('claude-code: repeated JSON parse failures in stream', {
+              consecutiveParseFailures: String(consecutiveParseFailures),
+              sample: line.slice(0, 200),
+            });
+          }
+          continue;
         }
+        consecutiveParseFailures = 0;
       }
     }
 
@@ -234,20 +244,19 @@ export async function* streamClaudeCode(
         const errorMsg = stderr.trim() || `claude-code exited with code ${exitCode}`;
         logger.error('claude-code: stream failed', { exitCode: String(exitCode), stderr: stderr.slice(0, 500) });
         throw new Error(errorMsg);
-      }
-      if (stderr.trim()) {
+      } else if (stderr.trim()) {
         logger.error('claude-code: stream produced no output', { stderr: stderr.slice(0, 500) });
         throw new Error(stderr.trim());
+      } else {
+        // Exit 0, no stderr, no output — this is the empty-response failure mode
+        logger.error('claude-code: exited cleanly but produced no output', {
+          bufferRemainder: buffer.slice(0, 500),
+        });
+        throw new Error('claude-code: no output produced (empty response)');
       }
     }
   } finally {
     clearTimeout(timer);
-    if (!hasDeltas) {
-      logger.warn('claude-code: stream ended with no text deltas', {
-        stderr: stderr.slice(0, 500),
-        bufferRemainder: buffer.slice(0, 500),
-      });
-    }
     child.kill('SIGTERM');
   }
 }
