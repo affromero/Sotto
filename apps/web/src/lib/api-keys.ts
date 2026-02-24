@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from './prisma';
 import { auth } from './auth';
+import { logger } from './logger';
 import type { NextRequest } from 'next/server';
 
 const KEY_PREFIX = 'sk_sotto_';
@@ -33,7 +34,9 @@ export async function validateApiKey(key: string): Promise<{ userId: string } | 
   prisma.apiKey.update({
     where: { id: apiKey.id },
     data: { lastUsedAt: new Date() },
-  }).catch(() => {});
+  }).catch((err) => {
+    logger.warn('Failed to update API key lastUsedAt', { keyId: apiKey.id, error: err instanceof Error ? err.message : String(err) });
+  });
 
   return { userId: apiKey.userId };
 }

@@ -114,7 +114,9 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     await prisma.podcast.update({
       where: { id: podcastId },
       data: { ttsProvider: providerId, ttsModel: ttsModelId },
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.warn('Failed to write back TTS provider to podcast', { podcastId, error: err instanceof Error ? err.message : String(err) });
+    });
   }
 
   // Use custom voice ID if set, otherwise let the provider pick from its pool

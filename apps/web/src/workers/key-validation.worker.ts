@@ -35,8 +35,12 @@ export async function processKeyValidation(job: Job<ValidateKeysPayload>): Promi
         try {
           const extra = JSON.parse(decryptApiKey(key.extraData));
           if (extra.userId) creds.userId = extra.userId;
-        } catch {
-          // extra data decryption failure — skip extra
+        } catch (err) {
+          logger.warn('Failed to decrypt TTS key extraData, proceeding without it', {
+            keyId: key.id,
+            provider: key.provider,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
 
