@@ -112,6 +112,49 @@ export async function getDiscoveryResponse(
 }
 
 /**
+ * Fallback system prompt used when the main discovery agent returns an empty response.
+ * Suggests concrete podcast angles based on the user's original message without requiring
+ * the full structured conversation format.
+ */
+const FALLBACK_SYSTEM_PROMPT = `You are Sotto's podcast assistant. The user wants to create a podcast and has shared an idea or topic.
+
+Your job: suggest 2-3 distinct, specific podcast angles they could explore. Each should be a different take — different audience, framing, depth, or perspective.
+
+Be warm, specific, and brief. Name each angle clearly so the user can picture the podcast. End with chip suggestions:[chips: Angle 1 title · Angle 2 title · Angle 3 title]`;
+
+/**
+ * Stream a fallback response when the main discovery agent returns nothing visible.
+ * Takes only the user's latest message (no history) and suggests podcast angles.
+ */
+export function streamFallbackDiscoveryResponse(
+  userMessage: string,
+  apiKeyOverride?: string,
+  model?: string,
+  onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void,
+  providerType?: string
+): AsyncGenerator<string> {
+  const messages = [{ role: 'user' as const, content: userMessage }];
+  if (providerType && providerType !== 'anthropic' && providerType !== 'claude-code') {
+    const provider = createAIProvider(providerType);
+    async function* gen() {
+      yield* provider.streamResponse(FALLBACK_SYSTEM_PROMPT, messages, {
+        maxTokens: 512,
+        apiKeyOverride,
+        model,
+      });
+      onComplete?.({ inputTokens: 0, outputTokens: 0, model: model ?? providerType ?? 'unknown' });
+    }
+    return gen();
+  }
+  return streamResponse(FALLBACK_SYSTEM_PROMPT, messages, {
+    maxTokens: 512,
+    apiKeyOverride,
+    model,
+    onComplete,
+  });
+}
+
+/**
  * Stream a discovery chat response.
  * When providerType is 'anthropic' or unset, uses the optimised claude.ts path (with onComplete).
  * For other providers (openai, groq, etc.) routes via the provider-agnostic AIProvider interface.

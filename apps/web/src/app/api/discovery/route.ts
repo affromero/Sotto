@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
-import { streamDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
+import { streamDiscoveryResponse, streamFallbackDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
 import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
@@ -159,15 +159,12 @@ export async function POST(request: NextRequest) {
           .trim();
 
         if (!visibleContent) {
-          logger.info('Discovery: empty/markup-only response detected', {
+          logger.info('Discovery: empty/markup-only response detected, attempting fallback', {
             userId: authed.userId,
             fullResponseLength: fullResponse.length,
           });
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({ error: "I couldn't generate a response. Please try again." })}\n\n`
-            )
-          );
+
+          // Save the error record so admins can see what the AI returned
           try {
             const record = await prisma.discoveryChatError.create({
               data: {
@@ -184,6 +181,58 @@ export async function POST(request: NextRequest) {
               error: err instanceof Error ? err.message : String(err),
             });
           }
+
+          // Attempt a fallback: suggest podcast angles based on the original message.
+          // Uses a simpler prompt that doesn't require the full structured format,
+          // giving the user something useful even when the main agent can't respond.
+          const originalMessage = (message ?? content ?? '').trim();
+          let fallbackText = '';
+          try {
+            for await (const chunk of streamFallbackDiscoveryResponse(
+              originalMessage,
+              aiKey?.apiKey,
+              model || undefined,
+              (usage) => {
+                logUsage({
+                  service: effectiveProvider as 'anthropic' | 'openai',
+                  model: usage.model,
+                  category: 'discovery',
+                  inputTokens: usage.inputTokens,
+                  outputTokens: usage.outputTokens,
+                  userId: authed.userId,
+                });
+              },
+              effectiveProvider,
+            )) {
+              const text = typeof chunk === 'string' ? chunk : '';
+              if (text) {
+                fallbackText += text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+              }
+            }
+          } catch (fallbackErr) {
+            logger.warn('Discovery: fallback stream failed', {
+              error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+            });
+          }
+
+          // If the fallback also produced nothing, show a helpful static message
+          const fallbackVisible = fallbackText
+            .replace(/\[chips:\s*.+?\]/g, '')
+            .trim();
+          if (!fallbackVisible) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ text: "I wasn't able to generate a response for that topic. Try describing the podcast you have in mind — what should listeners learn or feel?" })}\n\n`
+              )
+            );
+          }
+
+          // Send chips parsed from the fallback response (if any)
+          const { chips: fallbackChips } = parseChips(fallbackText);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ done: true, chips: fallbackChips })}\n\n`)
+          );
           return; // no controller.close() here — finally handles it for all paths
         }
 
