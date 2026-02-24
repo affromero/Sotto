@@ -502,7 +502,9 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             title: 'Pipeline Failure',
             message: adminMessage,
             data: { podcastId },
-          }).catch(() => {});
+          }).catch((err: unknown) => {
+            logger.warn('Failed to queue admin pipeline-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+          });
         }
         // Email alert
         if (admin.email) {
@@ -519,7 +521,9 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
               `<p><strong>Technical error:</strong></p>`,
               `<pre>${techError}</pre>`,
             ].join('\n'),
-          }).catch(() => {});
+          }).catch((err: unknown) => {
+            logger.warn('Failed to send admin pipeline-failure email', { adminEmail: admin.email, error: err instanceof Error ? err.message : String(err) });
+          });
         }
       }
 

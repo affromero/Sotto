@@ -49,7 +49,11 @@ export async function logUsage(params: {
           error: err instanceof Error ? err.message : String(err),
         });
       });
-  } catch {
-    // Silently ignore — prisma.apiUsageLog may not exist in test environments
+  } catch (err) {
+    logger.warn('logUsage: unexpected error creating ApiUsageLog', {
+      category: params.category,
+      service: params.service,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }

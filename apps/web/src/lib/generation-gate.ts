@@ -2,6 +2,7 @@ import { prisma } from './prisma';
 import { hasByokKey } from './byok';
 import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
 import { getRedisClient } from './redis';
+import { logger } from './logger';
 
 export interface ProviderQuotaStatus {
   provider: string;
@@ -177,7 +178,9 @@ export async function tryIncrementFreeGeneration(
       where: { id: userId },
       data: { freeGenerationsUsed: { increment: 1 } },
     })
-    .catch(() => {});
+    .catch((err) => {
+      logger.warn('Failed to increment freeGenerationsUsed', { userId, error: err instanceof Error ? err.message : String(err) });
+    });
 
   // Per-provider TTS usage tracking
   if (providerUsage?.tts) {

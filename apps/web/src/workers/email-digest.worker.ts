@@ -65,7 +65,7 @@ export async function processEmailDigest(job: Job): Promise<{ sent: number; skip
       }
     }
 
-    job.updateProgress(Math.round(((i + batch.length) / waitlistEntries.length) * 100));
+    await job.updateProgress(Math.round(((i + batch.length) / waitlistEntries.length) * 100));
   }
 
   logger.info('Weekly email digest complete', { sent, skipped, total: waitlistEntries.length });

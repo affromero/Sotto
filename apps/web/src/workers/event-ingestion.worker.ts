@@ -84,12 +84,14 @@ export async function processEventIngestion(
   try {
     await prisma.behavioralEvent.createMany({
       data: eventRecords,
+      skipDuplicates: true,
     });
   } catch (err) {
     logger.error('Failed to batch-insert BehavioralEvents', {
       count: String(eventRecords.length),
       error: (err as Error).message,
     });
+    throw err;
   }
 
   await job.updateProgress(70);
@@ -126,7 +128,9 @@ export async function processEventIngestion(
         });
 
         // Fire-and-forget auto-tweet threshold check (after transaction committed)
-        checkAutoTweetThreshold(podcastId).catch(() => {});
+        checkAutoTweetThreshold(podcastId).catch((err) => {
+          logger.warn('checkAutoTweetThreshold failed', { podcastId, error: err instanceof Error ? err.message : String(err) });
+        });
       }
 
       if (!playbackSession) continue;

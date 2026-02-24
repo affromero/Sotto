@@ -103,7 +103,9 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     await prisma.voiceTrack.update({
       where: { id: voiceTrackId },
       data: { ttsProvider: providerId, ttsModel: ttsModelId },
-    }).catch(() => {});
+    }).catch((err) => {
+      logger.warn('Failed to write back TTS provider to voice track', { voiceTrackId, error: err instanceof Error ? err.message : String(err) });
+    });
   }
 
   // Use voice track voice assignment, otherwise let provider pick from pool
