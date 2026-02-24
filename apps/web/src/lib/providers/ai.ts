@@ -14,6 +14,8 @@ export interface AIOptions {
   model?: string;
   skipModeration?: boolean;
   apiKeyOverride?: string;
+  /** Enable web search for this call. Each provider handles it natively. */
+  useWebSearch?: boolean;
 }
 
 export interface AIResponse {
@@ -33,7 +35,6 @@ export interface AIProvider {
  */
 class AnthropicProvider implements AIProvider {
   private getClient() {
-    // Dynamic import to avoid loading SDK when not selected
     return import('../claude');
   }
 
@@ -43,11 +44,13 @@ class AnthropicProvider implements AIProvider {
     opts?: AIOptions
   ): Promise<AIResponse> {
     const claude = await this.getClient();
+    const tools = opts?.useWebSearch ? [claude.WEB_SEARCH_TOOL] : undefined;
     return claude.generateResponse(system, messages, {
       maxTokens: opts?.maxTokens,
       model: opts?.model,
       apiKeyOverride: opts?.apiKeyOverride,
       skipModeration: opts?.skipModeration,
+      ...(tools ? { tools } : {}),
     });
   }
 
@@ -57,15 +60,18 @@ class AnthropicProvider implements AIProvider {
     opts?: AIOptions
   ): AsyncGenerator<string> {
     const claude = await this.getClient();
+    const tools = opts?.useWebSearch ? [claude.WEB_SEARCH_TOOL] : undefined;
     yield* claude.streamResponse(system, messages, {
       maxTokens: opts?.maxTokens,
       model: opts?.model,
+      ...(tools ? { tools } : {}),
     });
   }
 }
 
 /**
  * OpenAI provider — uses OpenAI SDK if configured.
+ * Supports web search via the web_search_preview hosted tool.
  */
 class OpenAIProvider implements AIProvider {
   private async getClient(apiKeyOverride?: string) {
@@ -88,11 +94,17 @@ class OpenAIProvider implements AIProvider {
     const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tools: any[] | undefined = opts?.useWebSearch
+      ? [{ type: 'web_search_preview' }]
+      : undefined;
+
     const response = await client.chat.completions.create({
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: [{ role: 'system', content: system }, ...messages],
+      ...(tools ? { tools } : {}),
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -117,12 +129,18 @@ class OpenAIProvider implements AIProvider {
     const client = await this.getClient(opts?.apiKeyOverride);
     const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tools: any[] | undefined = opts?.useWebSearch
+      ? [{ type: 'web_search_preview' }]
+      : undefined;
+
     const stream = await client.chat.completions.create({
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: [{ role: 'system', content: system }, ...messages],
       stream: true,
+      ...(tools ? { tools } : {}),
     });
 
     for await (const chunk of stream) {
@@ -201,59 +219,23 @@ class GroqProvider implements AIProvider {
   }
 }
 
-/**
- * Claude Code CLI provider — uses `claude -p` for free local testing.
- */
-class ClaudeCodeLazyProvider implements AIProvider {
-  private getClient() {
-    return import('../claude-code-client');
-  }
-
-  async generateResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): Promise<AIResponse> {
-    const { executeClaudeCode, serializeMessages } = await this.getClient();
-    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
-    const result = await executeClaudeCode(system, serializeMessages(messages), {
-      model: ccModel,
-    });
-    return { ...result, model: ccModel };
-  }
-
-  async *streamResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): AsyncGenerator<string> {
-    const { streamClaudeCode, serializeMessages } = await this.getClient();
-    yield* streamClaudeCode(system, serializeMessages(messages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
-    });
-  }
-}
-
 export function createAIProvider(type?: string): AIProvider {
-  const providerType = type || process.env.AI_PROVIDER || 'anthropic';
-  switch (providerType) {
+  switch (type) {
     case 'anthropic':
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
     case 'groq':
       return new GroqProvider();
-    case 'claude-code':
-      return new ClaudeCodeLazyProvider();
     default:
-      logger.warn(`Unknown AI_PROVIDER "${providerType}", falling back to anthropic`);
+      if (type) logger.warn(`Unknown AI provider type "${type}", falling back to anthropic`);
       return new AnthropicProvider();
   }
 }
 
 export interface ResolvedAiProvider {
   provider: AiProviderId;
-  source: 'byok' | 'platform' | 'claude-code';
+  source: 'byok' | 'platform';
   apiKey?: string;
   model?: string;
 }
@@ -263,11 +245,10 @@ export interface ResolvedAiProvider {
  *
  * Priority:
  * 1. User BYOK key → their chosen provider
- * 2. Platform Groq key + user plan:
+ * 2. Platform Groq key (primary platform LLM)
  *    - PRO → llama-3.3-70b-versatile
  *    - FREE → llama-3.1-8b-instant
  * 3. Platform Anthropic / OpenAI keys (legacy fallback)
- * 4. Dev mode: claude-code
  */
 export async function resolveAiProvider(
   userId: string,
@@ -294,11 +275,6 @@ export async function resolveAiProvider(
     return { provider: 'openai', source: 'platform' };
   }
 
-  // 4. Dev mode: claude-code
-  if (process.env.AI_PROVIDER === 'claude-code') {
-    return { provider: 'anthropic', source: 'claude-code' };
-  }
-
   throw new Error('No AI provider available. Configure an API key in settings.');
 }
 
@@ -310,6 +286,5 @@ export async function canResolveAi(userId: string): Promise<boolean> {
   if (process.env.GROQ_API_KEY) return true;
   if (process.env.ANTHROPIC_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
-  if (process.env.AI_PROVIDER === 'claude-code') return true;
   return false;
 }
