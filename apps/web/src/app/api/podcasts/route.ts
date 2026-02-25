@@ -119,7 +119,8 @@ export async function POST(request: NextRequest) {
   // Get tier features for this user
   const tierFeatures = getTierFeatures(
     gate.isProUser ? 'PRO' : 'FREE',
-    gate.isByokUser
+    gate.isByokUser,
+    isAdmin ? 'ADMIN' : undefined
   );
 
   // Gate private and unlisted podcast creation

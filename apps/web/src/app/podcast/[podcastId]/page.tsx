@@ -228,7 +228,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   if (isOwner && userId) {
     const freeTier = await getFreeTierStatus(userId);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
-    canMakePrivate = getTierFeatures(plan, freeTier.isByokUser).privateAllowed;
+    canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
   }
 
   const podcastData = {
