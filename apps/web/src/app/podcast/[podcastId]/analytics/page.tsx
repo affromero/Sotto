@@ -58,7 +58,7 @@ export default async function PodcastAnalyticsPage({ params, searchParams }: Pag
   ]);
 
   const isPrivileged = role === 'ADMIN' || role === 'SYSTEM';
-  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
+  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, role);
 
   if (!features.analyticsEnabled && !isPrivileged) {
     redirect(`/podcast/${podcast.id}?upgrade=analytics`);

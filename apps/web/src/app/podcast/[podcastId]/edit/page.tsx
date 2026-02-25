@@ -43,7 +43,7 @@ export default async function EditPodcastPage({ params }: EditPodcastPageProps) 
 
   const freeTier = await getFreeTierStatus(userId);
   const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
-  const tierFeatures = getTierFeatures(plan, freeTier.isByokUser);
+  const tierFeatures = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined);
 
   return (
     <main className={styles.main}>
