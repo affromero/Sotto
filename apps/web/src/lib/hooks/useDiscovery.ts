@@ -19,6 +19,7 @@ interface UseDiscoveryReturn {
   isLoading: boolean;
   isComplete: boolean;
   linkPreview: LinkPreviewData | null;
+  draftId: string | null;
   sendMessage: (content: string, podcastId?: string, isChipBased?: boolean, model?: string) => Promise<void>;
   reset: () => void;
 }
@@ -30,14 +31,25 @@ const initialState: DiscoveryState = {
   isComplete: false,
 };
 
-export function useDiscovery(): UseDiscoveryReturn {
-  const [state, setState] = useState<DiscoveryState>(initialState);
+export function useDiscovery(
+  initialDraftId?: string,
+  initialMessages?: DiscoveryMessage[],
+): UseDiscoveryReturn {
+  const [state, setState] = useState<DiscoveryState>(() => {
+    if (initialMessages && initialMessages.length > 0) {
+      return { ...initialState, messages: initialMessages };
+    }
+    return initialState;
+  });
   const [linkPreview, setLinkPreview] = useState<LinkPreviewData | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const track = useTrack();
-  const messageIndexRef = useRef(0);
+  const messageIndexRef = useRef(initialMessages ? initialMessages.length : 0);
   const messagesRef = useRef<DiscoveryMessage[]>([]);
   messagesRef.current = state.messages;
+  const draftIdRef = useRef<string | null>(initialDraftId ?? null);
+  const creatingDraftRef = useRef(false);
 
   const sendMessage = useCallback(
     async (content: string, podcastId?: string, isChipBased: boolean = false, model?: string) => {
@@ -381,6 +393,53 @@ export function useDiscovery(): UseDiscoveryReturn {
           }
           return { ...prev, isLoading: false };
         });
+
+        // Auto-save draft after successful exchange
+        if (!wasAborted && !serverSentError && accumulatedContent) {
+          const currentMessages = messagesRef.current;
+
+          if (!draftIdRef.current && !creatingDraftRef.current && currentMessages.length >= 2) {
+            // First exchange: create draft
+            creatingDraftRef.current = true;
+            fetch('/api/drafts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tabMode: 'create',
+                messages: currentMessages.map((m) => ({
+                  role: m.role,
+                  content: m.content,
+                  chips: m.chips.length > 0 ? m.chips : undefined,
+                })),
+              }),
+            })
+              .then((res) => (res.ok ? res.json() : null))
+              .then((data) => {
+                if (data?.id) {
+                  draftIdRef.current = data.id;
+                  setDraftId(data.id);
+                }
+              })
+              .catch((err) => console.warn('[sotto] draft save failed', err))
+              .finally(() => {
+                creatingDraftRef.current = false;
+              });
+          } else if (draftIdRef.current && currentMessages.length > 2) {
+            // Subsequent exchanges: append latest user+assistant pair
+            const latestPair = currentMessages.slice(-2);
+            fetch(`/api/drafts/${draftIdRef.current}/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messages: latestPair.map((m) => ({
+                  role: m.role,
+                  content: m.content,
+                  chips: m.chips.length > 0 ? m.chips : undefined,
+                })),
+              }),
+            }).catch((err) => console.warn('[sotto] draft save failed', err));
+          }
+        }
       }
     },
     [track]
@@ -402,6 +461,7 @@ export function useDiscovery(): UseDiscoveryReturn {
     isLoading: state.isLoading,
     isComplete: state.isComplete,
     linkPreview,
+    draftId,
     sendMessage,
     reset,
   };

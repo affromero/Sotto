@@ -68,6 +68,7 @@ type ViewMode = 'transcript' | 'teleprompter';
 
 const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
+    DRAFT: 'default',
     PENDING: 'default',
     DISCOVERING: 'info',
     EXTRACTING: 'info',

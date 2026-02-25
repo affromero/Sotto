@@ -309,6 +309,9 @@ model Podcast {
   suggestedTitle       String?
   suggestedTopic       String?  @db.Text
 
+  // Draft data (voice/config JSON, cleared on generation)
+  draftData Json?
+
   // Relations
   user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   discovery    Discovery?
@@ -348,6 +351,7 @@ model Podcast {
 }
 
 enum PodcastStatus {
+  DRAFT
   PENDING
   DISCOVERING
   EXTRACTING

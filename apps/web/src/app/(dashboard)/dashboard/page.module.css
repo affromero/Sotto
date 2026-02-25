@@ -317,6 +317,16 @@
   -webkit-box-orient: vertical;
 }
 
+.draftHint {
+  font: var(--text-caption);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.miniGradientDraft {
+  opacity: 0.7;
+}
+
 .retryHint {
   font: var(--text-caption);
   color: var(--color-error);
