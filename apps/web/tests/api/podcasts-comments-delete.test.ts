@@ -44,7 +44,7 @@ describe('DELETE /api/podcasts/[podcastId]/comments/[commentId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
@@ -56,7 +56,7 @@ describe('DELETE /api/podcasts/[podcastId]/comments/[commentId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when comment does not exist', async () => {
@@ -69,7 +69,7 @@ describe('DELETE /api/podcasts/[podcastId]/comments/[commentId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Comment not found' });
+    expect(body).toMatchObject({ error: 'Comment not found' });
   });
 
   it('returns 404 when comment belongs to different podcast', async () => {
@@ -88,7 +88,7 @@ describe('DELETE /api/podcasts/[podcastId]/comments/[commentId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Comment not found' });
+    expect(body).toMatchObject({ error: 'Comment not found' });
   });
 
   it('returns 403 when user is neither comment author nor podcast owner', async () => {
@@ -107,7 +107,7 @@ describe('DELETE /api/podcasts/[podcastId]/comments/[commentId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('allows comment author to delete their own comment', async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ userId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -12,7 +13,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!targetUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   const collections = await prisma.collection.findMany({

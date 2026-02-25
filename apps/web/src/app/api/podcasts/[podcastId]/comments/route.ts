@@ -6,6 +6,7 @@ import { createCommentSchema, paginationSchema } from '@/lib/validations';
 import { moderateOrThrow, ContentModerationError } from '@/lib/moderation';
 import { checkSuspension } from '@/lib/auth-guards';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 const commentUserSelect = {
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    return errorResponse('Invalid query parameters', 400);
   }
 
   const { page, limit } = parsed.data;
@@ -36,14 +37,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   // For private/unlisted podcasts, only the owner can view comments
   if (podcast.visibility !== 'PUBLIC') {
     const session = await auth();
     if (session?.user?.id !== podcast.userId) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return errorResponse('Not found', 404);
     }
   }
 
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const suspended = checkSuspension(session);
@@ -95,20 +96,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Rate limit: 30 comments per hour
   const rateLimit = await checkRateLimit(`comment:${userId}`, 30, 3600);
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Too many comments. Please try again later.', resetAt: rateLimit.resetAt },
-      { status: 429 }
-    );
+    return errorResponse('Too many comments. Please try again later.', 429, { resetAt: rateLimit.resetAt });
   }
 
   const body = await request.json();
   const parsed = createCommentSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid input', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return errorResponse('Invalid input', 400, { details: parsed.error.flatten().fieldErrors });
   }
 
   const { content, parentId, timestamp } = parsed.data;
@@ -118,10 +113,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await moderateOrThrow(content);
   } catch (err) {
     if (err instanceof ContentModerationError) {
-      return NextResponse.json(
-        { error: 'Your comment was flagged by our content policy.', categories: err.categories },
-        { status: 400 }
-      );
+      return errorResponse('Your comment was flagged by our content policy.', 400, { categories: err.categories });
     }
     throw err;
   }
@@ -132,7 +124,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   // If replying, verify parent exists and belongs to the same podcast
@@ -143,7 +135,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!parent || parent.podcastId !== podcastId) {
-      return NextResponse.json({ error: 'Parent comment not found' }, { status: 404 });
+      return errorResponse('Parent comment not found', 404);
     }
   }
 

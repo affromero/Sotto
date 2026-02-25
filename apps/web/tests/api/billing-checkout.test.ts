@@ -60,7 +60,7 @@ describe('POST /api/billing/checkout', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -70,7 +70,7 @@ describe('POST /api/billing/checkout', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 503 when pro price is not configured', async () => {
@@ -81,7 +81,7 @@ describe('POST /api/billing/checkout', () => {
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body).toEqual({ error: 'Pro price not configured' });
+    expect(body).toMatchObject({ error: 'Pro price not configured' });
   });
 
   it('returns 400 when user is already on Pro', async () => {
@@ -96,7 +96,7 @@ describe('POST /api/billing/checkout', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Already subscribed to Pro' });
+    expect(body).toMatchObject({ error: 'Already subscribed to Pro' });
   });
 
   it('creates checkout session and returns url for free user', async () => {
@@ -212,6 +212,6 @@ describe('POST /api/billing/checkout', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'Failed to create checkout session' });
+    expect(body).toMatchObject({ error: 'Failed to create checkout session' });
   });
 });

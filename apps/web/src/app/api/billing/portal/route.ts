@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 /**
  * Create a Stripe Customer Portal session.
@@ -10,12 +11,12 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(request: NextRequest) {
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    return errorResponse('Stripe not configured', 503);
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -26,10 +27,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!subscription?.stripeCustomerId) {
-    return NextResponse.json(
-      { error: 'No subscription found. Subscribe to Pro first.' },
-      { status: 404 }
-    );
+    return errorResponse('No subscription found. Subscribe to Pro first.', 404);
   }
 
   let body: { returnUrl?: string } = {};
@@ -66,6 +64,6 @@ export async function POST(request: NextRequest) {
       userId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 });
+    return errorResponse('Failed to create portal session', 500);
   }
 }

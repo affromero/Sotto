@@ -7,6 +7,7 @@ import { generateApiKey } from '@/lib/api-keys';
 import { generateUniqueHandle } from '@/lib/handles';
 import { isAdminEmail } from '@/lib/admin-emails';
 
+import { errorResponse } from '@/lib/api-response';
 // --- JWKS for Apple + Google JWT verification ---
 
 const appleJWKS = createRemoteJWKSet(
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
   const ip = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
   const { allowed } = await checkRateLimit(`auth:mobile:${ip}`, 10, 15 * 60);
   if (!allowed) {
-    return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
+    return errorResponse('Too many attempts', 429);
   }
 
   const body = await request.json();
@@ -114,10 +115,7 @@ async function issueTokenAndRespond(user: {
 async function handleDevLogin(body: unknown) {
   const parsed = devLoginSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Valid email is required' },
-      { status: 400 },
-    );
+    return errorResponse('Valid email is required', 400);
   }
 
   const { email } = parsed.data;
@@ -148,10 +146,7 @@ async function handleDevLogin(body: unknown) {
 async function handleOAuthLogin(body: unknown) {
   const parsed = oauthLoginSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'provider and idToken or code are required' },
-      { status: 400 },
-    );
+    return errorResponse('provider and idToken or code are required', 400);
   }
 
   const { provider } = parsed.data;
@@ -171,10 +166,7 @@ async function handleOAuthLogin(body: unknown) {
   }
 
   if (!profile) {
-    return NextResponse.json(
-      { error: 'Invalid or expired token' },
-      { status: 401 },
-    );
+    return errorResponse('Invalid or expired token', 401);
   }
 
   // Step 1: Check for existing Account

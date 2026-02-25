@@ -61,7 +61,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user ID', async () => {
@@ -73,7 +73,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast does not exist', async () => {
@@ -86,7 +86,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Podcast not found' });
+    expect(data).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 404 when accessing private podcast owned by another user', async () => {
@@ -105,7 +105,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Not found' });
+    expect(data).toMatchObject({ error: 'Not found' });
   });
 
   it('allows export of private podcast by owner', async () => {
@@ -186,7 +186,7 @@ describe('POST /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Podcast must be in READY status to export' });
+    expect(data).toMatchObject({ error: 'Podcast must be in READY status to export' });
   });
 
   it('returns existing PDF URL immediately without queuing job when PDF exists', async () => {
@@ -269,7 +269,7 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user ID', async () => {
@@ -281,7 +281,7 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast does not exist', async () => {
@@ -294,7 +294,7 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Podcast not found' });
+    expect(data).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 404 when accessing private podcast owned by another user', async () => {
@@ -311,7 +311,7 @@ describe('GET /api/podcasts/[podcastId]/export', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Not found' });
+    expect(data).toMatchObject({ error: 'Not found' });
   });
 
   it('allows checking status of public podcast by non-owner', async () => {

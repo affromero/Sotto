@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prismaUnfiltered } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<{ podcastId: string }> }
@@ -9,13 +10,13 @@ export async function DELETE(
   const session = await auth();
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userRole = (session.user as Record<string, unknown>)?.role as string;
 
   if (userRole !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const { podcastId } = await context.params;
@@ -27,11 +28,11 @@ export async function DELETE(
     });
 
     if (!podcast) {
-      return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+      return errorResponse('Podcast not found', 404);
     }
 
     if (podcast.deletedAt) {
-      return NextResponse.json({ error: 'Podcast already deleted' }, { status: 409 });
+      return errorResponse('Podcast already deleted', 409);
     }
 
     await prismaUnfiltered.$transaction(async (tx) => {
@@ -61,6 +62,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch {
-    return NextResponse.json({ error: 'Failed to delete podcast' }, { status: 500 });
+    return errorResponse('Failed to delete podcast', 500);
   }
 }

@@ -40,7 +40,7 @@ describe('GET /api/admin/costs', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -50,7 +50,7 @@ describe('GET /api/admin/costs', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Admin access required' });
+    expect(body).toMatchObject({ error: 'Admin access required' });
   });
 
   it('returns 400 for invalid period', async () => {
@@ -60,7 +60,7 @@ describe('GET /api/admin/costs', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid period' });
+    expect(body).toMatchObject({ error: 'Invalid period' });
   });
 
   it('returns cost data with default period', async () => {

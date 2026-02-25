@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { updateVoiceTrackSchema } from '@/lib/validations';
 import { deleteVoiceTrackFiles } from '@/lib/r2';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; trackId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -25,7 +26,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!track || track.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Voice track not found' }, { status: 404 });
+    return errorResponse('Voice track not found', 404);
   }
 
   return NextResponse.json(track);
@@ -35,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { podcastId, trackId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -44,7 +45,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast || podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const track = await prisma.voiceTrack.findUnique({
@@ -53,13 +54,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!track || track.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Voice track not found' }, { status: 404 });
+    return errorResponse('Voice track not found', 404);
   }
 
   const body = await request.json().catch(() => ({}));
   const parsed = updateVoiceTrackSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const updated = await prisma.voiceTrack.update({
@@ -75,7 +76,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { podcastId, trackId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -84,7 +85,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast || podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const track = await prisma.voiceTrack.findUnique({
@@ -93,7 +94,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!track || track.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Voice track not found' }, { status: 404 });
+    return errorResponse('Voice track not found', 404);
   }
 
   // Delete from database (cascade deletes voices + segments)

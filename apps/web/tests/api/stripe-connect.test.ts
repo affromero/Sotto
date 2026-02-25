@@ -54,7 +54,7 @@ describe('POST /api/stripe/connect', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('creates a new Stripe account and returns onboarding URL', async () => {
@@ -104,7 +104,7 @@ describe('GET /api/stripe/connect', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns onboarded: false when user has no Stripe account', async () => {

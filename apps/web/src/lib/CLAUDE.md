@@ -40,6 +40,7 @@ All shared business logic and external service integrations live here.
 | `subscription.ts` | (Simplified) Usage queries, generation counts — no tiers or credits | Uses `prisma.ts` |
 | `validations.ts` | Zod schemas for all API input validation (re-exports `createPodcastSchema` from `@sotto/shared`; includes addToAllowlistSchema, userSearchSchema) | Zod |
 | `validations/` | Additional Zod schemas: `events.ts` (behavioral event validation) | Zod |
+| `api-response.ts` | `errorResponse()` helper: returns JSON error with `requestId` for tracking, logs 5xx errors, sets `x-request-id` header | Uses `logger.ts` |
 | `logger.ts` | Structured logging with levels (debug/info/warn/error) | Console |
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |
 | `twitter.ts` | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a) | Twitter API v2 |

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { addJob, JobType, pdfGenerationQueue } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 /**
@@ -12,7 +13,7 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { podcastId } = await params;
@@ -23,19 +24,16 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   // Allow export for owner, or for public/unlisted podcasts
   if (podcast.visibility === 'PRIVATE' && podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   if (podcast.status !== 'READY') {
-    return NextResponse.json(
-      { error: 'Podcast must be in READY status to export' },
-      { status: 400 }
-    );
+    return errorResponse('Podcast must be in READY status to export', 400);
   }
 
   // If PDF already exists, return it immediately
@@ -59,7 +57,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { podcastId } = await params;
@@ -70,11 +68,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.visibility === 'PRIVATE' && podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   if (podcast.pdfUrl) {

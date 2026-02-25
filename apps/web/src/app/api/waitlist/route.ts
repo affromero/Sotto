@@ -4,12 +4,13 @@ import { waitlistSchema } from '@/lib/validations';
 import { sendEmail } from '@/lib/email';
 import { buildWaitlistWelcomeEmail } from '@/lib/email-templates';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const parsed = waitlistSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { email, source } = parsed.data;

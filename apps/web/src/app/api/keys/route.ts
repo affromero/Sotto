@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma';
 import { generateApiKey } from '@/lib/api-keys';
 import { createApiKeySchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 const MAX_ACTIVE_KEYS = 10;
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const keys = await prisma.apiKey.findMany({
@@ -31,13 +32,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = createApiKeySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   // Check active key limit
@@ -46,10 +47,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (activeCount >= MAX_ACTIVE_KEYS) {
-    return NextResponse.json(
-      { error: `Maximum of ${MAX_ACTIVE_KEYS} active API keys allowed` },
-      { status: 400 }
-    );
+    return errorResponse(`Maximum of ${MAX_ACTIVE_KEYS} active API keys allowed`, 400);
   }
 
   const { key, hash, prefix } = generateApiKey();

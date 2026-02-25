@@ -106,7 +106,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 for invalid body with missing voiceCloneId', async () => {
@@ -149,7 +149,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Voice clone not found or not owned by you' });
+    expect(body).toMatchObject({ error: 'Voice clone not found or not owned by you' });
   });
 
   it('returns 404 when voice clone not owned by user', async () => {
@@ -164,7 +164,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Voice clone not found or not owned by you' });
+    expect(body).toMatchObject({ error: 'Voice clone not found or not owned by you' });
   });
 
   it('returns 404 when target user handle not found', async () => {
@@ -181,7 +181,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'User @nonexistent not found' });
+    expect(body).toMatchObject({ error: 'User @nonexistent not found' });
   });
 
   it('returns 400 when trying to self-allowlist', async () => {
@@ -203,7 +203,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'You cannot add yourself to the allowlist' });
+    expect(body).toMatchObject({ error: 'You cannot add yourself to the allowlist' });
   });
 
   it('returns 409 on duplicate entry', async () => {
@@ -221,7 +221,7 @@ describe('POST /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body).toEqual({ error: 'User is already on the allowlist for this voice' });
+    expect(body).toMatchObject({ error: 'User is already on the allowlist for this voice' });
   });
 
   it('returns 201 on successful add', async () => {
@@ -258,7 +258,7 @@ describe('GET /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when voiceCloneId query param missing', async () => {
@@ -269,7 +269,7 @@ describe('GET /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'voiceCloneId is required' });
+    expect(body).toMatchObject({ error: 'voiceCloneId is required' });
   });
 
   it('returns 404 when voice clone not owned', async () => {
@@ -283,7 +283,7 @@ describe('GET /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Voice clone not found or not owned by you' });
+    expect(body).toMatchObject({ error: 'Voice clone not found or not owned by you' });
   });
 
   it('returns 404 when voice clone not found', async () => {
@@ -297,7 +297,7 @@ describe('GET /api/voices/allowlist', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Voice clone not found or not owned by you' });
+    expect(body).toMatchObject({ error: 'Voice clone not found or not owned by you' });
   });
 
   it('returns entries for valid request', async () => {
@@ -332,7 +332,7 @@ describe('DELETE /api/voices/allowlist/[entryId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when entry not found', async () => {
@@ -347,7 +347,7 @@ describe('DELETE /api/voices/allowlist/[entryId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Allowlist entry not found' });
+    expect(body).toMatchObject({ error: 'Allowlist entry not found' });
   });
 
   it('returns 403 when voice clone not owned by user', async () => {
@@ -365,7 +365,7 @@ describe('DELETE /api/voices/allowlist/[entryId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 200 on successful delete', async () => {

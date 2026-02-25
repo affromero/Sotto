@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { VOICE_POOL } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const [user, userClones, approvedRequests, allowlistEntries] = await Promise.all([

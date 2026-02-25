@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { analyticsQuerySchema } from '@/lib/validations';
 import type { AnalyticsResponse } from '@/types/analytics';
 
+import { errorResponse } from '@/lib/api-response';
 function getPeriodDate(period: string): Date | null {
   const now = new Date();
   switch (period) {
@@ -23,13 +24,13 @@ export async function GET(request: NextRequest) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const searchParams = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = analyticsQuerySchema.safeParse(searchParams);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { period } = parsed.data;

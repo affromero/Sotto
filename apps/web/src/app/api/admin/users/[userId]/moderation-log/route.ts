@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ userId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -9,7 +10,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const actions = await prisma.moderationAction.findMany({

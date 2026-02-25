@@ -3,15 +3,13 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { findSimilarPodcasts } from '@/lib/recommendations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const podcastId = request.nextUrl.searchParams.get('podcastId');
   const topic = request.nextUrl.searchParams.get('topic');
 
   if (!podcastId && !topic) {
-    return NextResponse.json(
-      { error: 'Either podcastId or topic query parameter is required' },
-      { status: 400 }
-    );
+    return errorResponse('Either podcastId or topic query parameter is required', 400);
   }
 
   const session = await auth();
@@ -25,7 +23,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!podcast) {
-      return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+      return errorResponse('Podcast not found', 404);
     }
 
     searchTopic = podcast.topic || podcast.title;

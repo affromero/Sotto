@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 const registerTokenSchema = z.object({
   token: z.string().min(1),
   platform: z.enum(['ios', 'android']),
@@ -11,16 +12,13 @@ const registerTokenSchema = z.object({
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request);
   if (!auth) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = registerTokenSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.flatten() },
-      { status: 400 },
-    );
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { token, platform } = parsed.data;

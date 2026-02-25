@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { userDiscoverySearchSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const session = await auth();
   const currentUserId = session?.user?.id;
@@ -15,10 +16,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: parsed.error.errors[0].message },
-      { status: 400 }
-    );
+    return errorResponse(parsed.error.errors[0].message, 400);
   }
 
   const { query, page, limit } = parsed.data;

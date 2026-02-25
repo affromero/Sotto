@@ -103,7 +103,7 @@ describe('GET /api/notifications', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns notifications with correct response shape', async () => {
@@ -269,7 +269,7 @@ describe('PATCH /api/notifications/[notificationId]', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('marks notification as read and returns updated notification', async () => {
@@ -300,7 +300,7 @@ describe('PATCH /api/notifications/[notificationId]', () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Notification not found' });
+    expect(body).toMatchObject({ error: 'Notification not found' });
   });
 
   it('returns 403 when user does not own the notification', async () => {
@@ -316,7 +316,7 @@ describe('PATCH /api/notifications/[notificationId]', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
 });
@@ -334,7 +334,7 @@ describe('POST /api/notifications/mark-all-read', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('marks all unread notifications as read and returns count', async () => {

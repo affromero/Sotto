@@ -36,7 +36,7 @@ describe('GET /api/admin/kittentts/health', () => {
       const res = await GET();
       expect(res.status).toBe(403);
       const body = await res.json();
-      expect(body).toEqual({ error: 'Forbidden' });
+      expect(body).toMatchObject({ error: 'Forbidden' });
     });
   });
 

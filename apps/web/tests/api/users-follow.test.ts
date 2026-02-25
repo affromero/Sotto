@@ -57,7 +57,7 @@ describe('POST /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -70,7 +70,7 @@ describe('POST /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when trying to follow yourself', async () => {
@@ -83,7 +83,7 @@ describe('POST /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Cannot follow yourself' });
+    expect(data).toMatchObject({ error: 'Cannot follow yourself' });
   });
 
   it('returns 404 when target user does not exist', async () => {
@@ -97,7 +97,7 @@ describe('POST /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'User not found' });
+    expect(data).toMatchObject({ error: 'User not found' });
   });
 
   it('successfully creates a new follow relationship', async () => {
@@ -181,7 +181,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -194,7 +194,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('successfully deletes an existing follow relationship', async () => {

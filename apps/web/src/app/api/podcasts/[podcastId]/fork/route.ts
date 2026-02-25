@@ -12,6 +12,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const authResult = await authenticateRequest(request);
 
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Detect API key auth (Bearer token) vs browser session
@@ -40,10 +41,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (isApiKeyAuth) {
     const rateLimit = await checkRateLimit(`api:fork:${authResult.userId}`, 60, 60);
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', resetAt: rateLimit.resetAt },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded', 429, { resetAt: rateLimit.resetAt });
     }
   }
 
@@ -52,17 +50,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 20 generations per hour.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
   }
   const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
   if (!daily.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 100 generations per day.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
   // Generation gate: BYOK or free tier
@@ -72,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
@@ -86,10 +78,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
     if (!ok) {
-      return NextResponse.json(
-        { error: 'Free generations used.', code: 'free_tier_exhausted' },
-        { status: 403 }
-      );
+      return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
     }
     freeTierTtsProvider = selected.ttsProvider;
     freeTierTtsModel = selected.ttsModel;
@@ -99,7 +88,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const body = await request.json().catch(() => ({}));
   const parsed = forkBodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { topic, remixNote, focusAreas, depth, tone } = parsed.data;
@@ -125,18 +114,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!sourcePodcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (sourcePodcast.visibility !== 'PUBLIC') {
-    return NextResponse.json({ error: 'Only public podcasts can be forked' }, { status: 403 });
+    return errorResponse('Only public podcasts can be forked', 403);
   }
 
   if (sourcePodcast.status !== 'READY') {
-    return NextResponse.json(
-      { error: 'Only podcasts with READY status can be forked' },
-      { status: 400 }
-    );
+    return errorResponse('Only podcasts with READY status can be forked', 400);
   }
 
   // Check if the source podcast's voices are paid and forker needs to pay
@@ -177,7 +163,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         where: { stripePaymentIntent: piId },
       });
       if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== userId) {
-        return NextResponse.json({ error: 'Invalid or unauthorized payment' }, { status: 400 });
+        return errorResponse('Invalid or unauthorized payment', 400);
       }
     }
   }

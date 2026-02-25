@@ -3,16 +3,17 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createVoiceRequestSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = createVoiceRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    return errorResponse(parsed.error.errors[0].message, 400);
   }
 
   const { voiceCloneId, message } = parsed.data;
@@ -30,15 +31,15 @@ export async function POST(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   if (!voiceClone.requestable) {
-    return NextResponse.json({ error: 'This voice is not available for sharing' }, { status: 403 });
+    return errorResponse('This voice is not available for sharing', 403);
   }
 
   if (voiceClone.userId === session.user.id) {
-    return NextResponse.json({ error: 'You cannot request your own voice' }, { status: 400 });
+    return errorResponse('You cannot request your own voice', 400);
   }
 
   // Create the request (unique constraint prevents duplicates)
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       'code' in err &&
       (err as { code: string }).code === 'P2002'
     ) {
-      return NextResponse.json({ error: 'You have already requested this voice' }, { status: 409 });
+      return errorResponse('You have already requested this voice', 409);
     }
     throw err;
   }
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const [sent, received] = await Promise.all([

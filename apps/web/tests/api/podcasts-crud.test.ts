@@ -245,7 +245,7 @@ describe('GET /api/podcasts', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns user podcasts with tags', async () => {
@@ -303,7 +303,7 @@ describe('POST /api/podcasts', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('creates podcast and queues extraction pipeline', async () => {
@@ -461,7 +461,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns public podcast without authentication', async () => {
@@ -494,7 +494,7 @@ describe('GET /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Not found' });
+    expect(body).toMatchObject({ error: 'Not found' });
   });
 
   it('returns 404 for private podcast when authenticated as different user', async () => {
@@ -639,7 +639,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast not found', async () => {
@@ -653,7 +653,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 403 when user is not the owner', async () => {
@@ -667,7 +667,7 @@ describe('PATCH /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('updates podcast title when owner', async () => {
@@ -865,7 +865,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(401);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast not found', async () => {
@@ -879,7 +879,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 403 when user is not the owner', async () => {
@@ -893,7 +893,7 @@ describe('DELETE /api/podcasts/[podcastId]', () => {
 
     expect(response.status).toBe(403);
     const body = await response.json();
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('soft-deletes podcast when user is owner', async () => {

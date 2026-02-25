@@ -55,7 +55,7 @@ describe('POST /api/stripe/webhooks', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Missing signature' });
+    expect(body).toMatchObject({ error: 'Missing signature' });
   });
 
   it('returns 503 when webhook secret is not configured', async () => {
@@ -66,7 +66,7 @@ describe('POST /api/stripe/webhooks', () => {
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body).toEqual({ error: 'Webhook secret not configured' });
+    expect(body).toMatchObject({ error: 'Webhook secret not configured' });
   });
 
   it('returns 400 when signature verification fails', async () => {
@@ -79,7 +79,7 @@ describe('POST /api/stripe/webhooks', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid signature' });
+    expect(body).toMatchObject({ error: 'Invalid signature' });
   });
 
   it('handles account.updated event and syncs onboarding status', async () => {

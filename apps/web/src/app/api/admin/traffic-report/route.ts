@@ -3,21 +3,22 @@ import crypto from 'crypto';
 import { subDays, startOfDay } from 'date-fns';
 import { buildTrafficReport } from '@/lib/traffic-report';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const key = process.env.ADMIN_REPORT_KEY;
   if (!key) {
-    return NextResponse.json({ error: 'ADMIN_REPORT_KEY not configured' }, { status: 500 });
+    return errorResponse('ADMIN_REPORT_KEY not configured', 500);
   }
 
   const authHeader = request.headers.get('authorization');
   if (!authHeader) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
   const expected = `Bearer ${key}`;
   const authBuf = Buffer.from(authHeader);
   const expectedBuf = Buffer.from(expected);
   if (authBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(authBuf, expectedBuf)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const periodParam = request.nextUrl.searchParams.get('period') ?? '7';
