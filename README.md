@@ -2,9 +2,9 @@
 
 # Sotto
 
-### The Open Podcast Network.
+### Where Podcasts Get Social.
 
-Generate AI podcasts from any topic. Interrupt to ask questions. Share knowledge with the world.
+AI or human — create, discover, interrupt, fork, and remix.
 
 [Getting Started](#getting-started) · [How It Works](#how-it-works) · [Architecture](#architecture) · [Documentation](#documentation)
 
@@ -14,7 +14,7 @@ Generate AI podcasts from any topic. Interrupt to ask questions. Share knowledge
 
 ## What is Sotto?
 
-**Sotto** (from Italian *"sotto voce"* — speaking in a soft, intimate voice) is an interactive AI podcast platform that transforms curiosity into understanding.
+**Sotto** (from Italian *"sotto voce"* — speaking in a soft, intimate voice) is the social podcast network — AI or human, create, discover, interrupt, fork, and remix.
 
 Describe what you want to learn through a natural conversation. Sotto generates a personalized two-voice podcast — a warm Host and a grounding Expert — that you can listen to anywhere. The twist: you can **interrupt mid-playback** to ask questions, get contextual answers, and update the episode with those clarifications for all future listeners.
 

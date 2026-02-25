@@ -80,9 +80,8 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
           You&apos;re in.
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          Thanks for joining the Sotto waitlist. We&apos;re building the open podcast network
-          where anyone can generate AI podcasts, interrupt to ask questions, fork &amp; remix,
-          and share knowledge with the world.
+          Thanks for joining the Sotto waitlist. We&apos;re building the social podcast network
+          &mdash; AI or human, create, discover, interrupt, fork, and remix.
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
           We&apos;ll send you updates as we launch new features. In the meantime, check out
@@ -105,9 +104,8 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
           Your spot is ready
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          You&apos;ve been approved to join Sotto &mdash; the open podcast network where you can
-          generate AI podcasts, interrupt to ask questions, fork &amp; remix, and share knowledge
-          with the world.
+          You&apos;ve been approved to join Sotto &mdash; where podcasts get social.
+          AI or human, create, discover, interrupt, fork, and remix.
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
           Click below to create your account and start exploring.
@@ -139,9 +137,8 @@ export function buildWelcomeEmail(name: string): { subject: string; html: string
           Welcome, ${name}!
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          You&apos;re all set. Sotto is the open podcast network where you can generate
-          AI podcasts from any topic, interrupt to ask questions, fork &amp; remix, and
-          share knowledge with the world.
+          You&apos;re all set. Sotto is where podcasts get social &mdash; AI or human,
+          create, discover, interrupt, fork, and remix.
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
           Create your first podcast in minutes &mdash; just describe what you want to learn

@@ -5,7 +5,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: 'About — Sotto',
   description:
-    'Sotto is the open podcast network. Generate AI podcasts, interrupt to ask questions, fork & remix, and share knowledge with the world.',
+    'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
 };
 
 export default function AboutPage() {
@@ -15,7 +15,7 @@ export default function AboutPage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.hero}>
-            <h1 className={styles.heroTitle}>The Open Podcast Network</h1>
+            <h1 className={styles.heroTitle}>Where Podcasts Get Social</h1>
             <p className={styles.heroSubtitle}>
               Sotto turns any topic into a conversational podcast you
               can interrupt, remix, and share. Built for curious minds who learn

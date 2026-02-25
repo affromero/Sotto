@@ -174,7 +174,7 @@ export default function LandingPage() {
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            The Open Podcast Network
+            Where Podcasts Get Social
           </div>
           <h1 className={styles.heroTitle}>
             Create. Fork.
@@ -182,8 +182,8 @@ export default function LandingPage() {
             <em>Share.</em>
           </h1>
           <p className={styles.heroSub}>
-            Generate AI podcasts, import your own, or fork someone else&apos;s. Ask questions
-            mid-playback. Discover what others are learning on the social feed.
+            AI or human &mdash; create, discover, interrupt, fork, and remix.
+            The social podcast network.
           </p>
           {isAuthenticated ? (
             <div className={styles.heroCtas}>
@@ -1722,8 +1722,7 @@ export default function LandingPage() {
             Create. Fork. <em>Share.</em>
           </h2>
           <p className={styles.ctaSub}>
-            Generate AI podcasts, import your own, or fork someone else&apos;s. Join the open podcast
-            network.
+            AI or human &mdash; create, discover, interrupt, fork, and remix.
           </p>
           {isAuthenticated ? (
             <div className={styles.heroCtas}>
@@ -1785,7 +1784,7 @@ export default function LandingPage() {
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
             <span className={styles.footerLogo}>Sotto</span>
-            <p>The open podcast network.</p>
+            <p>Where podcasts get social.</p>
           </div>
           <div className={styles.footerCols}>
             <div>

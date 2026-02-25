@@ -29,12 +29,12 @@ export const metadata: Metadata = {
     template: '%s | Sotto',
   },
   description:
-    'The open podcast network. Create AI podcasts, import your own, fork and remix, and share knowledge with the world.',
+    'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
   keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
   openGraph: {
-    title: 'Sotto — The Open Podcast Network',
+    title: 'Sotto — Where Podcasts Get Social',
     description:
-      'Podcasts you can remix, question, and share with the world. Create with AI or import your own.',
+      'AI or human — create, discover, interrupt, fork, and remix.',
     type: 'website',
     locale: 'en_US',
     siteName: 'Sotto',
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Sotto — Create. Fork. Share.',
-    description: 'The open podcast network. Create AI podcasts, import your own, fork and remix.',
+    description: 'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
   },
   manifest: '/manifest.json',
   themeColor: '#D97706',

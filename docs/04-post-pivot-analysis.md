@@ -2,7 +2,7 @@
 
 > **Date**: 2026-02-14
 >
-> **Summary**: Second pivot analysis. Pivot 1 moved Sotto from "Podcasts That Listen Back" (interactive Q&A tool) to "The Open Podcast Network" (social platform with import, fork, remix). Pivot 2 goes further: strip all monetization, make every feature free, require users to bring their own API keys (LLM + TTS). The value is the network, not the AI generation. This document explains why, what changes, and what the new odds look like.
+> **Summary**: Second pivot analysis. Pivot 1 moved Sotto from "Podcasts That Listen Back" (interactive Q&A tool) to "Where Podcasts Get Social" (social platform with import, fork, remix). Pivot 2 goes further: strip all monetization, make every feature free, require users to bring their own API keys (LLM + TTS). The value is the network, not the AI generation. This document explains why, what changes, and what the new odds look like.
 
 ---
 
