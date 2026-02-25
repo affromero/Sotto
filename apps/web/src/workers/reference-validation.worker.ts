@@ -6,17 +6,8 @@ import {
   notificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import {
-  verifyUrl,
-  verifyDoi,
-  searchTitle,
-  aiEvaluateReferences,
-  computeVerificationVerdict,
-  assessSourceQuality,
-  type ReferenceInput,
-  type VerificationCheck,
-  type VerificationVerdict,
-} from '@/lib/reference-validator';
+import { type ReferenceInput } from '@/lib/reference-validator';
+import { runReferenceVerification } from '@/lib/reference-verification';
 import {
   buildRenumberMap,
   cleanAndRenumberCitations,
@@ -28,27 +19,6 @@ import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
-
-const MAX_CONCURRENT = 5;
-
-async function runWithConcurrencyLimit<T>(
-  tasks: Array<() => Promise<T>>,
-  limit: number
-): Promise<T[]> {
-  const results: T[] = [];
-  let index = 0;
-
-  async function runNext(): Promise<void> {
-    while (index < tasks.length) {
-      const currentIndex = index++;
-      results[currentIndex] = await tasks[currentIndex]();
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => runNext());
-  await Promise.all(workers);
-  return results;
-}
 
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
@@ -112,93 +82,32 @@ export async function processReferenceValidation(
     type: r.type,
   }));
 
-  // Source quality pre-filter: reject blocked domains before running verification layers
-  const rejectedRefIds = new Set<string>();
-  for (const ref of refInputs) {
-    const quality = assessSourceQuality(ref);
-    if (!quality.accepted) {
-      rejectedRefIds.add(ref.id);
-      logger.info('Reference rejected by source quality filter', {
-        podcastId,
-        refNumber: String(ref.number),
-        reason: quality.reason,
-      });
-    }
-  }
-
-  // Filter to only refs that passed the quality check
-  const acceptedRefInputs = refInputs.filter((r) => !rejectedRefIds.has(r.id));
-
-  // Layers 1-3: run in parallel per reference, with concurrency limit
-  const allChecks = new Map<string, VerificationCheck[]>();
-
-  const layer1to3Tasks = acceptedRefInputs.map((ref) => async () => {
-    const [urlCheck, doiCheck, titleCheck] = await Promise.all([
-      verifyUrl(ref),
-      verifyDoi(ref),
-      searchTitle(ref),
-    ]);
-    return { id: ref.id, checks: [urlCheck, doiCheck, titleCheck] };
-  });
+  const scriptTurns = script.turns as Array<{ speaker: string; text: string }>;
 
   await job.updateProgress(15);
 
-  let externalChecksResults: Array<{ id: string; checks: VerificationCheck[] }>;
-  try {
-    externalChecksResults = await runWithConcurrencyLimit(layer1to3Tasks, MAX_CONCURRENT);
-  } catch (error) {
-    // If all external APIs are down, proceed with empty checks
-    logger.warn('External verification APIs failed, proceeding with AI-only', {
-      error: error instanceof Error ? error.message : 'Unknown',
-    });
-    externalChecksResults = refInputs.map((ref) => ({ id: ref.id, checks: [] }));
-  }
-
-  for (const result of externalChecksResults) {
-    allChecks.set(result.id, result.checks);
-  }
-
-  await job.updateProgress(50);
-
-  // Layer 4: AI evaluation (single batch call, only accepted refs)
-  let aiResults: Map<string, VerificationCheck>;
-  try {
-    aiResults = await aiEvaluateReferences(acceptedRefInputs, allChecks, podcast?.topic || '', aiKey?.apiKey, model);
-  } catch (error) {
-    logger.warn('AI evaluation failed, using external checks only', {
-      error: error instanceof Error ? error.message : 'Unknown',
-    });
-    aiResults = new Map();
-  }
-
-  // Merge AI results into allChecks
-  for (const [refId, aiCheck] of aiResults) {
-    const existing = allChecks.get(refId) || [];
-    existing.push(aiCheck);
-    allChecks.set(refId, existing);
-  }
+  // Run domain-aware verification pipeline
+  const { results: verificationResults, rejectedRefIds } = await runReferenceVerification(
+    refInputs,
+    scriptTurns,
+    podcast?.topic || '',
+    aiKey?.apiKey,
+    model
+  );
 
   await job.updateProgress(55);
 
-  // Compute verdicts
-  const verdicts = new Map<string, VerificationVerdict>();
+  // Compute final verdicts (rejected refs → REMOVED)
   const removedNumbers = new Set<number>();
 
   for (const ref of references) {
-    // References rejected by source quality filter are immediately REMOVED
     if (rejectedRefIds.has(ref.id)) {
-      verdicts.set(ref.id, { status: 'REMOVED', confidence: 0 });
       removedNumbers.add(ref.number);
-      continue;
-    }
-
-    const checks = allChecks.get(ref.id) || [];
-    const verdict = computeVerificationVerdict(checks);
-
-    verdicts.set(ref.id, verdict);
-
-    if (verdict.status === 'REMOVED' || verdict.status === 'FAILED') {
-      removedNumbers.add(ref.number);
+    } else {
+      const result = verificationResults.get(ref.id);
+      if (result && (result.verdict.status === 'REMOVED' || result.verdict.status === 'FAILED')) {
+        removedNumbers.add(ref.number);
+      }
     }
   }
 
@@ -206,12 +115,22 @@ export async function processReferenceValidation(
 
   // Update Reference records
   for (const ref of references) {
-    const verdict = verdicts.get(ref.id);
-    if (!verdict) continue;
+    if (rejectedRefIds.has(ref.id)) {
+      await prisma.reference.update({
+        where: { id: ref.id },
+        data: {
+          verificationStatus: 'REMOVED',
+          verificationDetails: { checks: [], verifiedAt: new Date().toISOString() },
+        },
+      });
+      continue;
+    }
 
-    const checks = allChecks.get(ref.id) || [];
+    const result = verificationResults.get(ref.id);
+    if (!result) continue;
+
     const verificationDetails = {
-      checks: checks.map((c) => ({
+      checks: result.checks.map((c) => ({
         layer: c.layer,
         passed: c.passed,
         confidence: c.confidence,
@@ -220,10 +139,13 @@ export async function processReferenceValidation(
       verifiedAt: new Date().toISOString(),
     };
 
+    const { verdict } = result;
+
     if (verdict.status === 'REPLACED' && verdict.replacement) {
       await prisma.reference.update({
         where: { id: ref.id },
         data: {
+          contentDomain: result.domain,
           verificationStatus: 'REPLACED',
           verificationDetails,
           originalTitle: ref.title,
@@ -239,6 +161,7 @@ export async function processReferenceValidation(
       await prisma.reference.update({
         where: { id: ref.id },
         data: {
+          contentDomain: result.domain,
           verificationStatus: verdict.status === 'REMOVED' ? 'REMOVED' : 'FAILED',
           verificationDetails,
         },
@@ -247,6 +170,7 @@ export async function processReferenceValidation(
       await prisma.reference.update({
         where: { id: ref.id },
         data: {
+          contentDomain: result.domain,
           verificationStatus: 'VERIFIED',
           verificationDetails,
         },
@@ -257,7 +181,7 @@ export async function processReferenceValidation(
   await job.updateProgress(70);
 
   // Clean script if any references were removed
-  let turns = script.turns as Array<{ speaker: string; text: string }>;
+  let turns = scriptTurns;
   let markdown = script.markdown;
 
   if (removedNumbers.size > 0) {
@@ -353,8 +277,12 @@ export async function processReferenceValidation(
 
   await job.updateProgress(100);
 
-  const verifiedCount = [...verdicts.values()].filter((v) => v.status === 'VERIFIED').length;
-  const replacedCount = [...verdicts.values()].filter((v) => v.status === 'REPLACED').length;
+  const verifiedCount = [...verificationResults.values()].filter(
+    (r) => r.verdict.status === 'VERIFIED'
+  ).length;
+  const replacedCount = [...verificationResults.values()].filter(
+    (r) => r.verdict.status === 'REPLACED'
+  ).length;
   const removedCount = removedNumbers.size;
 
   logger.info('Reference validation complete', {
