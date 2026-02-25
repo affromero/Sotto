@@ -25,10 +25,14 @@ const QUEUE_NAMES = [
 ];
 
 export async function GET() {
+  // Auth first — determines which checks to run
+  const session = await auth();
+  const isAdmin = session?.user?.id && session.user.role === 'ADMIN';
+
   const checks: Record<string, CheckResult> = {};
   let healthy = true;
 
-  // --- Database ---
+  // --- Database (always) ---
   const dbStart = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -38,7 +42,7 @@ export async function GET() {
     healthy = false;
   }
 
-  // --- Redis ---
+  // --- Redis (always) ---
   const redisStart = Date.now();
   try {
     const client = getRedisClient();
@@ -49,7 +53,20 @@ export async function GET() {
     healthy = false;
   }
 
-  // --- OAuth providers (not sensitive — just reports which are configured) ---
+  // Public response — only status + timestamp, no infrastructure details
+  if (!isAdmin) {
+    return NextResponse.json(
+      {
+        status: healthy ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
+      },
+      { status: healthy ? 200 : 503 }
+    );
+  }
+
+  // --- Admin-only checks below ---
+
+  // --- OAuth providers ---
   const oauth: Record<string, boolean> = {
     google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
@@ -196,22 +213,6 @@ export async function GET() {
     };
   } catch {
     checks.queues = { status: 'error' };
-  }
-
-  // Public response — includes all checks (ok/error + latency only, no secrets)
-  const session = await auth();
-  if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json(
-      {
-        status: healthy ? 'healthy' : 'degraded',
-        version: process.env.COMMIT_SHA || 'dev',
-        timestamp: new Date().toISOString(),
-        checks,
-        oauth,
-        vapid,
-      },
-      { status: healthy ? 200 : 503 }
-    );
   }
 
   // --- Admin-only: env var configuration ---

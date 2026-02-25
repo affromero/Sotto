@@ -62,7 +62,7 @@ describe('GET /api/health', () => {
     globalThis.fetch = originalFetch;
   });
 
-  it('returns checks but no env for unauthenticated requests', async () => {
+  it('returns only status and timestamp for unauthenticated requests', async () => {
     mockAuth.mockResolvedValue(null);
 
     const response = await GET();
@@ -71,15 +71,14 @@ describe('GET /api/health', () => {
     expect(response.status).toBe(200);
     expect(body.status).toBe('healthy');
     expect(body.timestamp).toBeDefined();
-    expect(body.checks).toBeDefined();
-    expect(body.checks.database.status).toBe('ok');
+    expect(body.checks).toBeUndefined();
     expect(body.env).toBeUndefined();
-    expect(body.version).toBeDefined();
-    expect(body.oauth).toBeDefined();
-    expect(body.vapid).toBeDefined();
+    expect(body.version).toBeUndefined();
+    expect(body.oauth).toBeUndefined();
+    expect(body.vapid).toBeUndefined();
   });
 
-  it('returns checks but no env for non-admin users', async () => {
+  it('returns only status and timestamp for non-admin users', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
     const response = await GET();
@@ -87,10 +86,21 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(200);
     expect(body.status).toBe('healthy');
-    expect(body.checks).toBeDefined();
-    expect(body.checks.database.status).toBe('ok');
+    expect(body.checks).toBeUndefined();
     expect(body.env).toBeUndefined();
-    expect(body.oauth).toBeDefined();
+    expect(body.oauth).toBeUndefined();
+    expect(body.vapid).toBeUndefined();
+  });
+
+  it('does not call external APIs for public requests', async () => {
+    mockAuth.mockResolvedValue(null);
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    globalThis.fetch = fetchSpy;
+
+    await GET();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockS3Send).not.toHaveBeenCalled();
   });
 
   it('returns 200 healthy when DB and Redis pass', async () => {
@@ -127,7 +137,7 @@ describe('GET /api/health', () => {
     expect(body.checks.redis.status).toBe('error');
   });
 
-  it('returns degraded with checks for non-admin when DB fails', async () => {
+  it('returns degraded for non-admin when DB fails', async () => {
     mockAuth.mockResolvedValue(null);
     mockQueryRaw.mockRejectedValue(new Error('Connection refused'));
 
@@ -136,7 +146,7 @@ describe('GET /api/health', () => {
 
     expect(response.status).toBe(503);
     expect(body.status).toBe('degraded');
-    expect(body.checks.database.status).toBe('error');
+    expect(body.checks).toBeUndefined();
     expect(body.env).toBeUndefined();
   });
 
