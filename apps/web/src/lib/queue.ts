@@ -412,7 +412,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       }
 
       // Skip already-terminal states
-      if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') return;
+      if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') return;
 
       // Determine provider label and attempt key invalidation
       let failureReason = userMessage(errorKind, 'the provider');

@@ -37,7 +37,7 @@ export async function markPodcastFailed(
     select: { status: true },
   });
 
-  if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY') {
+  if (!podcast || podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') {
     return;
   }
 
