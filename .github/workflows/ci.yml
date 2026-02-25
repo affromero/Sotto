@@ -1,10 +1,20 @@
 name: CI
 
+# Only run on PRs — push to main is covered by deploy.yml which includes the same CI steps.
+# Running CI twice on every push to main was consuming ~50% of the monthly minute budget.
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ci.yml'
+
+concurrency:
+  group: ci-${{ github.head_ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
