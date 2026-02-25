@@ -7,6 +7,9 @@ import type { TtsProviderId } from '../tts-registry';
 import { selectVoicePair, resolveVoiceId, findByVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 
 const OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
+
+// Speakers at even indices (HOST, GUEST) → host voice slot; odd (EXPERT, SKEPTIC) → expert slot.
+const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 type OpenAIVoice = (typeof OPENAI_VOICES)[number];
 
 export class OpenAITtsProvider implements TtsProvider {
@@ -51,11 +54,12 @@ export class OpenAITtsProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+    const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
-      return speaker === 'HOST' ? 'nova' : 'onyx';
+      return isHostVoice ? 'nova' : 'onyx';
     }
     const pair = selectVoicePair(podcastId, metadata);
-    const entry = speaker === 'HOST' ? pair.host : pair.expert;
+    const entry = isHostVoice ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'openai');
   }
 

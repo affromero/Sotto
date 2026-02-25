@@ -5,6 +5,9 @@ import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { HUME_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+
+// HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
+const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 import type { VoiceMatchMetadata } from '../../voice-pool';
 
 interface HumeTtsResponse {
@@ -58,11 +61,12 @@ export class HumeProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+    const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
-      return speaker === 'HOST' ? HUME_VOICE_POOL[0].id : HUME_VOICE_POOL[1].id;
+      return isHostVoice ? HUME_VOICE_POOL[0].id : HUME_VOICE_POOL[1].id;
     }
     const pair = selectVoicePairFromPool(HUME_VOICE_POOL, podcastId, metadata);
-    return speaker === 'HOST' ? pair.host.id : pair.expert.id;
+    return isHostVoice ? pair.host.id : pair.expert.id;
   }
 
   getModelId(): string {

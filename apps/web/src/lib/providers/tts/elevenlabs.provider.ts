@@ -6,6 +6,10 @@ import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 
+// Speakers that use the "host" voice slot; all others use "expert" slot.
+// HOST/GUEST are at even indices (0, 2); EXPERT/SKEPTIC at odd (1, 3).
+const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
+
 export class ElevenLabsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'elevenlabs';
   private clientPromise: Promise<typeof import('../../elevenlabs')> | null = null;
@@ -42,11 +46,12 @@ export class ElevenLabsProvider implements TtsProvider {
   }
 
   getVoiceId(speaker: string, podcastId?: string, metadata?: VoiceMatchMetadata): string {
+    const isHostVoice = SPEAKER_VOICE_HOST_SET.has(speaker.toUpperCase());
     if (!podcastId) {
-      return speaker === 'HOST' ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
+      return isHostVoice ? VOICE_POOL[0].ids.elevenlabs : VOICE_POOL[8].ids.elevenlabs;
     }
     const pair = selectVoicePair(podcastId, metadata);
-    const entry = speaker === 'HOST' ? pair.host : pair.expert;
+    const entry = isHostVoice ? pair.host : pair.expert;
     return resolveVoiceId(entry, 'elevenlabs');
   }
 
