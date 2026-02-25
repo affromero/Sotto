@@ -74,8 +74,36 @@
 }
 
 .formatPillLocked {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: not-allowed;
+  filter: blur(0.5px);
+}
+
+.lockedPillWrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.lockedTooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-text-primary);
+  color: var(--color-background);
+  font: var(--text-caption);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  z-index: 10;
+}
+
+.lockedPillWrapper:hover .lockedTooltip {
+  opacity: 1;
 }
 
 .proBadge {
