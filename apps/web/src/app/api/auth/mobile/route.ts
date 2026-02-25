@@ -216,6 +216,15 @@ async function handleOAuthLogin(body: unknown) {
   }
 
   // Step 3: No Account, no User — create both (full mobile sign-up)
+
+  // Admins bypass waitlist; everyone else needs approval
+  if (!isAdminEmail(email)) {
+    const waitlistEntry = await prisma.waitlist.findUnique({ where: { email } });
+    if (!waitlistEntry || waitlistEntry.status !== 'APPROVED') {
+      return errorResponse('Your email is not on the approved waitlist. Join at sotto.fm', 403);
+    }
+  }
+
   const name = userName || profile.name || null;
   const handle = await generateUniqueHandle(email.split('@')[0]);
 
@@ -237,6 +246,28 @@ async function handleOAuthLogin(body: unknown) {
         },
       },
       select: USER_SELECT,
+    });
+
+    // Mark waitlist conversion + pre-associate twitter handle
+    const waitlistEntry = await prisma.waitlist.findUnique({
+      where: { email },
+      select: { twitterHandle: true },
+    });
+    if (waitlistEntry?.twitterHandle) {
+      const taken = await prisma.user.findUnique({
+        where: { twitterHandle: waitlistEntry.twitterHandle },
+        select: { id: true },
+      });
+      if (!taken) {
+        await prisma.user.update({
+          where: { id: newUser.id },
+          data: { twitterHandle: waitlistEntry.twitterHandle },
+        });
+      }
+    }
+    await prisma.waitlist.updateMany({
+      where: { email },
+      data: { signedUpAt: new Date() },
     });
 
     return issueTokenAndRespond(newUser);
