@@ -1,7 +1,8 @@
 'use client';
 
-import { useMemo, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { useScrollFollow } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -70,18 +71,31 @@ export function Teleprompter({
     [segments, currentTime]
   );
   const activeRef = useRef<HTMLDivElement>(null);
+  const { scrollContainerRef, isFollowing, reengage } = useScrollFollow();
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeIndex]);
+    if (isFollowing) {
+      activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [activeIndex, isFollowing]);
+
+  const handleClick = useCallback(
+    (startTime: number | null) => {
+      if (startTime !== null) {
+        reengage();
+        onSegmentClick?.(startTime);
+      }
+    },
+    [reengage, onSegmentClick]
+  );
 
   const prevSegment = activeIndex > 0 ? segments[activeIndex - 1] : null;
   const currentSegment = segments[activeIndex];
   const nextSegment = activeIndex < segments.length - 1 ? segments[activeIndex + 1] : null;
 
   return (
-    <div className={styles.root} aria-label="Teleprompter view">
+    <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>} className={styles.root} aria-label="Teleprompter view">
       <div className={styles.viewport}>
         {prevSegment && (
           <SegmentBlock
@@ -89,7 +103,7 @@ export function Teleprompter({
             speakers={speakers}
             references={references}
             className={`${styles.segment} ${styles.prev}`}
-            onClick={() => prevSegment.startTime !== null && onSegmentClick?.(prevSegment.startTime)}
+            onClick={() => handleClick(prevSegment.startTime)}
           />
         )}
 
@@ -99,7 +113,7 @@ export function Teleprompter({
             speakers={speakers}
             references={references}
             className={`${styles.segment} ${styles.active}`}
-            onClick={() => currentSegment.startTime !== null && onSegmentClick?.(currentSegment.startTime)}
+            onClick={() => handleClick(currentSegment.startTime)}
             innerRef={activeRef}
           />
         )}
@@ -110,7 +124,7 @@ export function Teleprompter({
             speakers={speakers}
             references={references}
             className={`${styles.segment} ${styles.next}`}
-            onClick={() => nextSegment.startTime !== null && onSegmentClick?.(nextSegment.startTime)}
+            onClick={() => handleClick(nextSegment.startTime)}
           />
         )}
       </div>
