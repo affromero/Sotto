@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
@@ -60,9 +61,21 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
+  const draftId = typeof body.draftId === 'string' ? body.draftId : undefined;
   const parsed = createPodcastSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  // Validate draft ownership if resuming from a draft
+  if (draftId) {
+    const draft = await prisma.podcast.findUnique({
+      where: { id: draftId },
+      select: { userId: true, status: true },
+    });
+    if (!draft || draft.userId !== authResult.userId || draft.status !== 'DRAFT') {
+      return NextResponse.json({ error: 'Invalid draft' }, { status: 400 });
+    }
   }
 
   // Block non-admins from using claude-code models
@@ -211,18 +224,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const podcast = await prisma.podcast.create({
-    data: {
-      userId: authResult.userId,
-      title: parsed.data.title,
-      topic: parsed.data.topic,
-      status: 'EXTRACTING',
-      ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
-      ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
-      aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
-      ...(isApiKeyAuth && { source: 'API' }),
-    },
-  });
+  const podcastData = {
+    title: parsed.data.title,
+    topic: parsed.data.topic,
+    status: 'EXTRACTING' as const,
+    ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
+    ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
+    aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
+    ...(isApiKeyAuth && { source: 'API' as const }),
+  };
+
+  const podcast = draftId
+    ? await prisma.podcast.update({
+        where: { id: draftId },
+        data: { ...podcastData, draftData: Prisma.DbNull },
+      })
+    : await prisma.podcast.create({
+        data: { ...podcastData, userId: authResult.userId },
+      });
 
   // Create PodcastVoice records from the voices array
   if (voiceEntries.length > 0) {
@@ -243,28 +262,40 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Create Discovery record from metadata
+  // Create or update Discovery record from metadata
   if (parsed.data.metadata) {
     const meta = parsed.data.metadata;
-    await prisma.discovery.create({
-      data: {
-        podcastId: podcast.id,
-        userId: authResult.userId,
-        topic: meta.topic,
-        depth: meta.depth,
-        audienceLevel: meta.audienceLevel,
-        audience: meta.audience,
-        focusAreas: meta.focusAreas ?? [],
-        tone: meta.tone,
-        durationTarget: meta.durationTarget
-          ? Math.min(meta.durationTarget, effectiveMaxDuration)
-          : undefined,
-        sourceUrl: meta.sourceUrl,
-        sourceContent: meta.sourceContent,
-        speakers: meta.speakers ?? undefined,
-      },
-    });
-  } else {
+    const discoveryData = {
+      topic: meta.topic,
+      depth: meta.depth,
+      audienceLevel: meta.audienceLevel,
+      audience: meta.audience,
+      focusAreas: meta.focusAreas ?? [],
+      tone: meta.tone,
+      durationTarget: meta.durationTarget
+        ? Math.min(meta.durationTarget, effectiveMaxDuration)
+        : undefined,
+      sourceUrl: meta.sourceUrl,
+      sourceContent: meta.sourceContent,
+      speakers: meta.speakers ?? undefined,
+    };
+
+    if (draftId) {
+      // Draft already has a Discovery record — update it
+      await prisma.discovery.updateMany({
+        where: { podcastId: podcast.id },
+        data: discoveryData,
+      });
+    } else {
+      await prisma.discovery.create({
+        data: {
+          ...discoveryData,
+          podcastId: podcast.id,
+          userId: authResult.userId,
+        },
+      });
+    }
+  } else if (!draftId) {
     // Create a minimal Discovery record so the pipeline can find it
     await prisma.discovery.create({
       data: {
