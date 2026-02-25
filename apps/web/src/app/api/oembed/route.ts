@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { absoluteProfileUrl } from '@/lib/urls';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const url = request.nextUrl.searchParams.get('url');
   if (!url) {
-    return NextResponse.json({ error: 'Missing url parameter' }, { status: 400 });
+    return errorResponse('Missing url parameter', 400);
   }
 
   // Parse podcast ID from URL: .../podcast/{id}
   const match = url.match(/\/podcast\/([a-zA-Z0-9_-]+)/);
   if (!match) {
-    return NextResponse.json({ error: 'Invalid podcast URL' }, { status: 400 });
+    return errorResponse('Invalid podcast URL', 400);
   }
 
   const podcastId = match[1];
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!podcast || podcast.status !== 'READY' || podcast.visibility === 'PRIVATE') {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';

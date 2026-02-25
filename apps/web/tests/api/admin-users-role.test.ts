@@ -44,7 +44,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -56,7 +56,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 when trying to change own role', async () => {
@@ -68,7 +68,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Cannot change your own role' });
+    expect(body).toMatchObject({ error: 'Cannot change your own role' });
   });
 
   it('returns 400 for invalid role', async () => {
@@ -107,6 +107,6 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'Failed to update user role' });
+    expect(body).toMatchObject({ error: 'Failed to update user role' });
   });
 });

@@ -2,17 +2,18 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const session = await auth();
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userRole = (session.user as Record<string, unknown>)?.role as string;
 
   if (userRole !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   try {
@@ -36,6 +37,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error exporting waitlist:', error);
-    return NextResponse.json({ error: 'Failed to export waitlist' }, { status: 500 });
+    return errorResponse('Failed to export waitlist', 500);
   }
 }

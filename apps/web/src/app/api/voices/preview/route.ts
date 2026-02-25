@@ -6,25 +6,23 @@ import { checkRateLimit } from '@/lib/redis';
 import { getProviderMeta } from '@/lib/providers/tts-registry';
 import { logUsage } from '@/lib/usage-logger';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const rateLimit = await checkRateLimit(`voice-preview:${session.user.id}`, 10, 60);
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded. Try again in a minute.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded. Try again in a minute.', 429);
   }
 
   const body = await request.json();
   const parsed = voicePreviewSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { voiceId, text } = parsed.data;

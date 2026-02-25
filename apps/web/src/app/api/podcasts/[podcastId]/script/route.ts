@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { updateScriptSchema } from '@/lib/validations';
+import { errorResponse } from '@/lib/api-response';
 import {
   cleanAndRenumberCitations,
   cleanAndRenumberMarkdown,
@@ -15,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -24,10 +25,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
   if (podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const script = await prisma.script.findUnique({
@@ -35,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!script) {
-    return NextResponse.json({ error: 'Script not found' }, { status: 404 });
+    return errorResponse('Script not found', 404);
   }
 
   const references = await prisma.reference.findMany({
@@ -54,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -63,29 +64,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
   if (podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
   if (podcast.status !== 'SCRIPT_READY') {
-    return NextResponse.json(
-      { error: 'Script can only be edited when status is SCRIPT_READY' },
-      { status: 400 }
-    );
+    return errorResponse('Script can only be edited when status is SCRIPT_READY', 400);
   }
 
   const body = await request.json();
   const parsed = updateScriptSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const script = await prisma.script.findUnique({
     where: { podcastId },
   });
   if (!script) {
-    return NextResponse.json({ error: 'Script not found' }, { status: 404 });
+    return errorResponse('Script not found', 404);
   }
 
   const oldTurns = script.turns as ScriptTurn[];

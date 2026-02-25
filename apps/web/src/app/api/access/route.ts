@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { checkRateLimit } from '@/lib/redis';
 
+import { errorResponse } from '@/lib/api-response';
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) {
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret || !process.env.SITE_PASSWORD) {
-    return NextResponse.json({ error: 'Password gate not configured' }, { status: 500 });
+    return errorResponse('Password gate not configured', 500);
   }
 
   // Rate limit: 3 attempts per 15 minutes per IP
@@ -61,13 +62,7 @@ export async function POST(request: NextRequest) {
   const { allowed, resetAt } = await checkRateLimit(`access:${ip}`, 3, 15 * 60);
   if (!allowed) {
     const retryAfter = Math.ceil((resetAt - Date.now()) / 1000);
-    return NextResponse.json(
-      { error: 'Too many attempts. Try again later.' },
-      {
-        status: 429,
-        headers: { 'Retry-After': retryAfter.toString() },
-      }
-    );
+    return errorResponse('Too many attempts. Try again later.', 429, undefined, { 'Retry-After': retryAfter.toString() });
   }
 
   const { password } = await request.json();
@@ -78,7 +73,7 @@ export async function POST(request: NextRequest) {
   const isValid = input.length === expected.length && crypto.timingSafeEqual(input, expected);
 
   if (!isValid) {
-    return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    return errorResponse('Invalid password', 401);
   }
 
   const token = createAccessToken(secret);

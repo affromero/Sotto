@@ -93,7 +93,7 @@ describe('POST /api/podcasts/[podcastId]/save', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 if session has no user id', async () => {
@@ -106,7 +106,7 @@ describe('POST /api/podcasts/[podcastId]/save', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 if podcast does not exist', async () => {
@@ -120,7 +120,7 @@ describe('POST /api/podcasts/[podcastId]/save', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns saved: true if already saved (idempotent)', async () => {
@@ -211,7 +211,7 @@ describe('DELETE /api/podcasts/[podcastId]/save', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 if session has no user id', async () => {
@@ -224,7 +224,7 @@ describe('DELETE /api/podcasts/[podcastId]/save', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns saved: false if save does not exist (idempotent)', async () => {

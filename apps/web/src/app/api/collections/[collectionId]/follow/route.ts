@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ collectionId: string }> };
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
@@ -9,7 +10,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -20,12 +21,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!collection) {
-    return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+    return errorResponse('Collection not found', 404);
   }
 
   // Can only follow public collections (or your own, though that's unusual)
   if (!collection.isPublic && collection.userId !== userId) {
-    return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+    return errorResponse('Collection not found', 404);
   }
 
   // Check if already following
@@ -58,7 +59,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;

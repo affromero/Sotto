@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 interface ProviderStats {
   ttsProvider: string;
   ratingCount: number;
@@ -44,10 +45,10 @@ interface RecentRating {
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
   if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return errorResponse('Admin access required', 403);
   }
 
   const { searchParams } = new URL(request.url);
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
 
   const validRanges = ['7d', '30d', '90d', 'all'];
   if (!validRanges.includes(range)) {
-    return NextResponse.json({ error: 'Invalid range' }, { status: 400 });
+    return errorResponse('Invalid range', 400);
   }
 
   const daysMap: Record<string, number | null> = {

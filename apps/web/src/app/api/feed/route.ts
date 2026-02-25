@@ -5,6 +5,7 @@ import { feedQuerySchema } from '@/lib/validations';
 import { searchPodcasts, getTrending } from '@/lib/recommendation-engine';
 import type { Prisma } from '@prisma/client';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/feed
  * Modes:
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
   if (mode === 'following') {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const followedIds = await prisma.follow.findMany({
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
   if (mode === 'remixes') {
     const parsed = feedQuerySchema.safeParse(searchParams);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+      return errorResponse(parsed.error.flatten(), 400);
     }
 
     const { page, limit } = parsed.data;
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
   // Default mode: full feed with filters (backward compatible)
   const parsed = feedQuerySchema.safeParse(searchParams);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const {

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 /**
  * Create a Stripe Checkout session for the Pro subscription.
@@ -10,17 +11,17 @@ import { logger } from '@/lib/logger';
  */
 export async function POST(request: NextRequest) {
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe not configured' }, { status: 503 });
+    return errorResponse('Stripe not configured', 503);
   }
 
   const priceId = process.env.STRIPE_PRO_PRICE_ID;
   if (!priceId) {
-    return NextResponse.json({ error: 'Pro price not configured' }, { status: 503 });
+    return errorResponse('Pro price not configured', 503);
   }
 
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -31,11 +32,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   if (user.plan === 'PRO') {
-    return NextResponse.json({ error: 'Already subscribed to Pro' }, { status: 400 });
+    return errorResponse('Already subscribed to Pro', 400);
   }
 
   let body: { successUrl?: string; cancelUrl?: string } = {};
@@ -85,6 +86,6 @@ export async function POST(request: NextRequest) {
       userId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 });
+    return errorResponse('Failed to create checkout session', 500);
   }
 }

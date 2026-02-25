@@ -9,6 +9,7 @@ import type { SttProviderId } from '@/lib/providers/stt-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { getAiKey, getByokKey, getByokExtraData } from '@/lib/byok';
 import { logUsage } from '@/lib/usage-logger';
+import { errorResponse } from '@/lib/api-response';
 import {
   PLAYHT_VOICE_POOL,
   CARTESIA_VOICE_POOL,
@@ -179,13 +180,13 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { type, provider, model, keySource } = parsed.data;
@@ -360,7 +361,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+    return errorResponse('Invalid type', 400);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     return NextResponse.json({

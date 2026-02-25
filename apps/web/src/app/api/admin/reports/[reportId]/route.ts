@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { resolveReportSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ reportId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -10,7 +11,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const report = await prisma.report.findUnique({
@@ -21,7 +22,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!report) {
-    return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    return errorResponse('Report not found', 404);
   }
 
   return NextResponse.json(report);
@@ -32,14 +33,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = resolveReportSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const report = await prisma.report.findUnique({
@@ -48,11 +49,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!report) {
-    return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    return errorResponse('Report not found', 404);
   }
 
   if (report.status.startsWith('RESOLVED')) {
-    return NextResponse.json({ error: 'Report already resolved' }, { status: 409 });
+    return errorResponse('Report already resolved', 409);
   }
 
   const updated = await prisma.report.update({

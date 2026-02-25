@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -254,7 +255,7 @@ export async function GET() {
   ]);
 
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   const exportData = {

@@ -99,7 +99,7 @@ describe('Twitter Settings API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data).toEqual({ error: 'Unauthorized' });
+      expect(data).toMatchObject({ error: 'Unauthorized' });
     });
 
     it('returns connected: false when no Twitter account linked', async () => {
@@ -243,7 +243,7 @@ describe('Twitter Settings API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data).toEqual({ error: 'Unauthorized' });
+      expect(data).toMatchObject({ error: 'Unauthorized' });
     });
 
     it('handles empty request body', async () => {
@@ -286,7 +286,7 @@ describe('Twitter Settings API', () => {
       const data = await response.json();
 
       expect(response.status).toBe(401);
-      expect(data).toEqual({ error: 'Unauthorized' });
+      expect(data).toMatchObject({ error: 'Unauthorized' });
     });
 
   });

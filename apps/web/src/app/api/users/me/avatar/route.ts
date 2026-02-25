@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { uploadFile, deleteFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -11,25 +12,22 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const formData = await request.formData();
     const file = formData.get('avatar') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      return errorResponse('No file provided', 400);
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.' },
-        { status: 400 }
-      );
+      return errorResponse('Invalid file type. Only JPEG, PNG, WebP, and GIF are allowed.', 400);
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File too large. Maximum size is 2MB.' }, { status: 400 });
+      return errorResponse('File too large. Maximum size is 2MB.', 400);
     }
 
     // Delete old avatar from R2 if one exists
@@ -63,6 +61,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to upload avatar';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

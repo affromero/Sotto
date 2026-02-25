@@ -5,6 +5,7 @@ import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/li
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
 
+import { errorResponse } from '@/lib/api-response';
 // Env var names for each platform-level AI provider key
 const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
   anthropic: 'ANTHROPIC_API_KEY',
@@ -20,7 +21,7 @@ const CLAUDE_CODE_MODELS = [
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const isAdmin = session.user.role === 'ADMIN';

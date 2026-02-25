@@ -3,6 +3,7 @@ import { subDays, subMonths, startOfDay } from 'date-fns';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { analyticsQuerySchema } from '@/lib/validations';
+import { errorResponse } from '@/lib/api-response';
 import {
   getCreatorOverview,
   getCreatorTopPodcasts,
@@ -35,19 +36,19 @@ function periodToDate(period: string): Date {
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id as string;
   const podcastCount = await prisma.podcast.count({ where: { userId, deletedAt: null } });
   if (podcastCount === 0) {
-    return NextResponse.json({ error: 'No podcasts found' }, { status: 403 });
+    return errorResponse('No podcasts found', 403);
   }
 
   const { searchParams } = new URL(request.url);
   const parsed = analyticsQuerySchema.safeParse({ period: searchParams.get('period') || '30d' });
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid period' }, { status: 400 });
+    return errorResponse('Invalid period', 400);
   }
 
   const since = periodToDate(parsed.data.period);

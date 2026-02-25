@@ -5,6 +5,7 @@ import { adminUpdateBadgeSchema } from '@/lib/validations';
 import { notificationQueue, addJob, JobType } from '@/lib/queue';
 import type { SendNotificationPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ podcastId: string }> }
@@ -12,13 +13,13 @@ export async function PATCH(
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userRole = (session.user as Record<string, unknown>)?.role as string;
 
   if (userRole !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const { podcastId } = await context.params;
@@ -26,7 +27,7 @@ export async function PATCH(
   const parsed = adminUpdateBadgeSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { isHumanContent, reason } = parsed.data;
@@ -37,7 +38,7 @@ export async function PATCH(
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   await prisma.$transaction(async (tx) => {

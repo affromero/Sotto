@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 const feedbackSchema = z.object({
   type: z.enum(['BUG', 'FEATURE_REQUEST', 'GENERAL', 'PRAISE', 'CONCERN']),
   rating: z.number().int().min(1).max(5).optional(),
@@ -18,7 +19,7 @@ export async function POST(request: NextRequest) {
   const parsed = feedbackSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const feedback = await prisma.feedback.create({
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const feedbacks = await prisma.feedback.findMany({

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 const addToQueueSchema = z.object({
   podcastId: z.string(),
   source: z.enum(['picks', 'explore', 'following', 'search']).default('explore'),
@@ -21,7 +22,7 @@ const QUEUE_MAX = 10;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const queue = await prisma.listeningQueue.findMany({
@@ -66,13 +67,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = addToQueueSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   // Check queue size
@@ -81,10 +82,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (currentCount >= QUEUE_MAX) {
-    return NextResponse.json(
-      { error: `Queue is full (max ${QUEUE_MAX}). Remove a podcast first.` },
-      { status: 409 }
-    );
+    return errorResponse(`Queue is full (max ${QUEUE_MAX}). Remove a podcast first.`, 409);
   }
 
   // Get next position
@@ -121,13 +119,13 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { searchParams } = request.nextUrl;
   const podcastId = searchParams.get('podcastId');
   if (!podcastId) {
-    return NextResponse.json({ error: 'podcastId required' }, { status: 400 });
+    return errorResponse('podcastId required', 400);
   }
 
   await prisma.listeningQueue.deleteMany({
@@ -143,13 +141,13 @@ export async function DELETE(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = reorderSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   await prisma.listeningQueue.updateMany({

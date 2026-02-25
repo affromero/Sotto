@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * DELETE /api/users/me/recommendations
  * Nuclear reset — clears all personalization data so the user starts fresh.
@@ -11,7 +12,7 @@ export async function DELETE() {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const userId = session.user.id;
@@ -26,6 +27,6 @@ export async function DELETE() {
     return NextResponse.json({ reset: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to reset recommendations';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

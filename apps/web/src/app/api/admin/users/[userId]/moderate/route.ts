@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { moderateUserSchema } from '@/lib/validations';
+import { errorResponse } from '@/lib/api-response';
 import {
   banUser,
   unbanUser,
@@ -17,21 +18,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   if (session.user.id === userId) {
-    return NextResponse.json(
-      { error: 'You cannot moderate yourself' },
-      { status: 400 }
-    );
+    return errorResponse('You cannot moderate yourself', 400);
   }
 
   const body = await request.json();
   const parsed = moderateUserSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { action, reason, durationDays } = parsed.data;
@@ -43,15 +41,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!targetUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   // Cannot moderate other admins
   if (targetUser.role === 'ADMIN') {
-    return NextResponse.json(
-      { error: 'Cannot moderate admin users' },
-      { status: 400 }
-    );
+    return errorResponse('Cannot moderate admin users', 400);
   }
 
   const base = { userId, moderatorId: session.user.id, reason };
@@ -73,7 +68,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await unsuspendUser(base);
       break;
     default:
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return errorResponse('Invalid action', 400);
   }
 
   return NextResponse.json({ success: true, action });

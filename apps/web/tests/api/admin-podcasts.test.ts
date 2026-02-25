@@ -79,7 +79,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -90,7 +90,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 404 when @sotto account not found', async () => {
@@ -114,7 +114,7 @@ describe('POST /api/admin/podcasts/create-as-sotto', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'title and topic are required' });
+    expect(body).toMatchObject({ error: 'title and topic are required' });
   });
 
   it('creates podcast owned by @sotto successfully', async () => {
@@ -154,7 +154,7 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -166,7 +166,7 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 404 when podcast not found', async () => {
@@ -179,7 +179,7 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 409 when podcast already deleted', async () => {
@@ -195,7 +195,7 @@ describe('DELETE /api/admin/podcasts/[podcastId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body).toEqual({ error: 'Podcast already deleted' });
+    expect(body).toMatchObject({ error: 'Podcast already deleted' });
   });
 
   it('soft-deletes podcast and unlinks forks', async () => {

@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Find the @sotto system user
@@ -15,17 +16,14 @@ export async function POST(request: NextRequest) {
   });
 
   if (!sottoUser) {
-    return NextResponse.json(
-      { error: '@sotto system account not found. Run prisma db seed.' },
-      { status: 404 }
-    );
+    return errorResponse('@sotto system account not found. Run prisma db seed.', 404);
   }
 
   const body = await request.json();
   const { title, topic } = body;
 
   if (!title || !topic) {
-    return NextResponse.json({ error: 'title and topic are required' }, { status: 400 });
+    return errorResponse('title and topic are required', 400);
   }
 
   // Create podcast owned by @sotto

@@ -191,7 +191,7 @@ describe('GET /api/voices', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
@@ -298,7 +298,7 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 403 when user reaches voice clone limit', async () => {
@@ -317,7 +317,7 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Maximum of 10 voice clones allowed' });
+    expect(body).toMatchObject({ error: 'Maximum of 10 voice clones allowed' });
   });
 
   it('returns 400 when name is missing', async () => {
@@ -369,7 +369,7 @@ describe('POST /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Audio file is required' });
+    expect(body).toMatchObject({ error: 'Audio file is required' });
   });
 
   it('successfully creates voice clone for authenticated user', async () => {
@@ -474,7 +474,7 @@ describe('DELETE /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when voiceCloneId is missing', async () => {
@@ -488,7 +488,7 @@ describe('DELETE /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'voiceCloneId is required' });
+    expect(body).toMatchObject({ error: 'voiceCloneId is required' });
   });
 
   it('returns 404 when voice clone does not exist', async () => {
@@ -503,7 +503,7 @@ describe('DELETE /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Voice clone not found' });
+    expect(body).toMatchObject({ error: 'Voice clone not found' });
   });
 
   it("returns 403 when user tries to delete another user's voice clone", async () => {
@@ -524,7 +524,7 @@ describe('DELETE /api/voices/clone', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('successfully deletes voice clone from ElevenLabs and database', async () => {
@@ -562,7 +562,7 @@ describe('POST /api/voices/preview', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 429 when rate limit is exceeded', async () => {
@@ -577,7 +577,7 @@ describe('POST /api/voices/preview', () => {
     const body = await response.json();
 
     expect(response.status).toBe(429);
-    expect(body).toEqual({ error: 'Rate limit exceeded. Try again in a minute.' });
+    expect(body).toMatchObject({ error: 'Rate limit exceeded. Try again in a minute.' });
   });
 
   it('returns 400 when voiceId is missing', async () => {

@@ -12,6 +12,7 @@ import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generatio
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 import type { SttProviderId } from '@sotto/shared';
 
 const MAX_AUDIO_SIZE = 100 * 1024 * 1024;
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
   const authResult = await authenticateRequest(request);
 
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = authResult.userId;
@@ -152,17 +153,11 @@ export async function POST(request: NextRequest) {
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 20 generations per hour.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
   }
   const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
   if (!daily.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 100 generations per day.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
   // Generation gate: BYOK or free tier
@@ -172,7 +167,7 @@ export async function POST(request: NextRequest) {
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   try {
@@ -189,7 +184,7 @@ export async function POST(request: NextRequest) {
     const draftId = fields.draftId || undefined;
 
     if (!audioFile) {
-      return NextResponse.json({ error: 'Missing required field: audio' }, { status: 400 });
+      return errorResponse('Missing required field: audio', 400);
     }
 
     const validation = importPodcastSchema.safeParse({
@@ -202,17 +197,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.format() },
-        { status: 400 }
-      );
+      return errorResponse('Validation failed', 400, { details: validation.error.format() });
     }
 
     if (audioFile.buffer.length > MAX_AUDIO_SIZE) {
-      return NextResponse.json(
-        { error: `Audio file too large: max ${MAX_AUDIO_SIZE / 1024 / 1024}MB` },
-        { status: 400 }
-      );
+      return errorResponse(`Audio file too large: max ${MAX_AUDIO_SIZE / 1024 / 1024}MB`, 400);
     }
 
     const fileExt = audioFile.filename.split('.').pop()?.toLowerCase();
@@ -220,13 +209,7 @@ export async function POST(request: NextRequest) {
       !ALLOWED_AUDIO_TYPES.includes(audioFile.mimeType) &&
       (!fileExt || !ALLOWED_AUDIO_EXTENSIONS.includes(fileExt))
     ) {
-      return NextResponse.json(
-        {
-          error: `Unsupported audio type: ${audioFile.mimeType}`,
-          allowed: ALLOWED_AUDIO_TYPES,
-        },
-        { status: 400 }
-      );
+      return errorResponse(`Unsupported audio type: ${audioFile.mimeType}`, 400, { allowed: ALLOWED_AUDIO_TYPES, });
     }
 
     const {
@@ -247,7 +230,7 @@ export async function POST(request: NextRequest) {
         select: { userId: true, status: true },
       });
       if (!draft || draft.userId !== userId || draft.status !== 'DRAFT') {
-        return NextResponse.json({ error: 'Invalid draft' }, { status: 400 });
+        return errorResponse('Invalid draft', 400);
       }
     }
 
@@ -296,13 +279,10 @@ export async function POST(request: NextRequest) {
     if (!sttApiKey && !transcriptText) {
       await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
       const provider = validatedSttProvider ?? 'openai';
-      return NextResponse.json(
-        {
-          error: `No API key available for speech-to-text provider "${provider}". Add a ${
-            { openai: 'OpenAI', groq: 'Groq', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider
-          } key in Settings → API Keys, or provide a transcript file.`,
-        },
-        { status: 400 }
+      const providerName = { openai: 'OpenAI', groq: 'Groq', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider;
+      return errorResponse(
+        `No API key available for speech-to-text provider "${provider}". Add a ${providerName} key in Settings → API Keys, or provide a transcript file.`,
+        400
       );
     }
 
@@ -327,10 +307,7 @@ export async function POST(request: NextRequest) {
       });
       if (!ok) {
         await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
-        return NextResponse.json(
-          { error: 'Free generations used.', code: 'free_tier_exhausted' },
-          { status: 403 }
-        );
+        return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
       }
     }
 
@@ -353,6 +330,6 @@ export async function POST(request: NextRequest) {
     });
 
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `Failed to import podcast: ${message}` }, { status: 500 });
+    return errorResponse(`Failed to import podcast: ${message}`, 500);
   }
 }

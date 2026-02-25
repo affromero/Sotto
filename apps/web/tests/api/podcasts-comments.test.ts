@@ -87,7 +87,7 @@ describe('GET /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 404 for private podcast when user is not owner', async () => {
@@ -100,7 +100,7 @@ describe('GET /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Not found' });
+    expect(body).toMatchObject({ error: 'Not found' });
   });
 
   it('returns 400 for invalid pagination params', async () => {
@@ -110,7 +110,7 @@ describe('GET /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid query parameters' });
+    expect(body).toMatchObject({ error: 'Invalid query parameters' });
   });
 
   it('returns paginated comments for public podcast', async () => {
@@ -174,7 +174,7 @@ describe('POST /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when content is missing', async () => {
@@ -211,7 +211,7 @@ describe('POST /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 404 when parent comment does not exist', async () => {
@@ -225,7 +225,7 @@ describe('POST /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Parent comment not found' });
+    expect(body).toMatchObject({ error: 'Parent comment not found' });
   });
 
   it('returns 404 when parent comment belongs to different podcast', async () => {
@@ -239,7 +239,7 @@ describe('POST /api/podcasts/[podcastId]/comments', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Parent comment not found' });
+    expect(body).toMatchObject({ error: 'Parent comment not found' });
   });
 
   it('creates top-level comment and returns 201', async () => {

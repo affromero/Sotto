@@ -5,11 +5,12 @@ import { LIMITS } from '@/lib/stripe';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(_request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const [aiKeys, ttsKeys, freeTier, user] = await Promise.all([
@@ -41,6 +42,6 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch subscription';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

@@ -3,10 +3,11 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { isValidHandleFormat } from '@/lib/handles';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const handles = await prisma.reservedHandle.findMany({
@@ -19,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
@@ -27,15 +28,12 @@ export async function POST(request: NextRequest) {
   const reason = body.reason as string | undefined;
 
   if (!handle || !isValidHandleFormat(handle)) {
-    return NextResponse.json(
-      { error: 'Invalid handle format (3-30 chars, lowercase alphanumeric + underscore)' },
-      { status: 400 }
-    );
+    return errorResponse('Invalid handle format (3-30 chars, lowercase alphanumeric + underscore)', 400);
   }
 
   const existing = await prisma.reservedHandle.findUnique({ where: { handle } });
   if (existing) {
-    return NextResponse.json({ error: 'Handle already reserved' }, { status: 409 });
+    return errorResponse('Handle already reserved', 409);
   }
 
   const reserved = await prisma.reservedHandle.create({
@@ -52,19 +50,19 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const handle = (body.handle as string)?.toLowerCase()?.trim();
 
   if (!handle) {
-    return NextResponse.json({ error: 'handle is required' }, { status: 400 });
+    return errorResponse('handle is required', 400);
   }
 
   const existing = await prisma.reservedHandle.findUnique({ where: { handle } });
   if (!existing) {
-    return NextResponse.json({ error: 'Handle not found' }, { status: 404 });
+    return errorResponse('Handle not found', 404);
   }
 
   await prisma.reservedHandle.delete({ where: { handle } });

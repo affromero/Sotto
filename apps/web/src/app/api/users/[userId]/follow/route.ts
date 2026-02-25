@@ -2,24 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { userId } = await params;
 
   if (session.user.id === userId) {
-    return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
+    return errorResponse('Cannot follow yourself', 400);
   }
 
   const targetUser = await prisma.user.findUnique({ where: { id: userId } });
   if (!targetUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   try {
@@ -60,7 +61,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { userId } = await params;

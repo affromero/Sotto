@@ -58,7 +58,7 @@ describe('GET /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 404 for private collection when user is not owner', async () => {
@@ -82,7 +82,7 @@ describe('GET /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns public collection with items for unauthenticated user', async () => {
@@ -179,7 +179,7 @@ describe('PATCH /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when collection does not exist', async () => {
@@ -192,7 +192,7 @@ describe('PATCH /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 403 when user does not own the collection', async () => {
@@ -205,7 +205,7 @@ describe('PATCH /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 for invalid JSON body', async () => {
@@ -264,7 +264,7 @@ describe('DELETE /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when collection does not exist', async () => {
@@ -277,7 +277,7 @@ describe('DELETE /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 403 when user does not own the collection', async () => {
@@ -290,7 +290,7 @@ describe('DELETE /api/collections/[collectionId]', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('deletes collection and returns success', async () => {

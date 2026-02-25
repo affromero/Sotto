@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ keyId: string }> };
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
@@ -9,7 +10,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const apiKey = await prisma.apiKey.findUnique({
@@ -18,15 +19,15 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!apiKey) {
-    return NextResponse.json({ error: 'API key not found' }, { status: 404 });
+    return errorResponse('API key not found', 404);
   }
 
   if (apiKey.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   if (apiKey.revokedAt) {
-    return NextResponse.json({ error: 'API key already revoked' }, { status: 400 });
+    return errorResponse('API key already revoked', 400);
   }
 
   await prisma.apiKey.update({

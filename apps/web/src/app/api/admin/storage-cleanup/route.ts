@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { listFiles, deleteFile } from '@/lib/r2';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 /**
  * POST /api/admin/storage-cleanup — One-time cleanup of orphaned R2 storage
@@ -14,10 +15,10 @@ import { logger } from '@/lib/logger';
 export async function POST() {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
   if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return errorResponse('Admin access required', 403);
   }
 
   let segmentsDeleted = 0;

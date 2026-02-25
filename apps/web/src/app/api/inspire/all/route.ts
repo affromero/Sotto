@@ -12,6 +12,7 @@ import {
 import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { getTrending } from '@/lib/recommendation-engine';
 import type { PodcastSummary } from '@/types/podcast';
+import { errorResponse } from '@/lib/api-response';
 import { logger } from '@/lib/logger';
 
 const inspireAllSchema = z.object({
@@ -98,19 +99,13 @@ function mapTrendingToPodcastSummary(
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse('Unauthorized', 401);
   }
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const validation = inspireAllSchema.safeParse(params);
   if (!validation.success) {
-    return new Response(JSON.stringify({ error: validation.error.errors[0].message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return errorResponse(validation.error.errors[0].message, 400);
   }
 
   const { section, timeRange, topic } = validation.data;
@@ -122,10 +117,7 @@ export async function GET(request: NextRequest) {
   if (section) {
     const rateLimit = await checkRateLimit(`inspire:${userId}`, 10, 3600);
     if (!rateLimit.allowed) {
-      return new Response(
-        JSON.stringify({ error: 'Rate limit exceeded. Try again later.', resetAt: rateLimit.resetAt }),
-        { status: 429, headers: { 'Content-Type': 'application/json' } }
-      );
+      return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rateLimit.resetAt });
     }
 
     if (section === 'forYou') {

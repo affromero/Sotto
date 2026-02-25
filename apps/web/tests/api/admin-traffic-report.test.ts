@@ -39,7 +39,7 @@ describe('GET /api/admin/traffic-report', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'ADMIN_REPORT_KEY not configured' });
+    expect(body).toMatchObject({ error: 'ADMIN_REPORT_KEY not configured' });
   });
 
   it('returns 401 when no authorization header is provided', async () => {
@@ -48,7 +48,7 @@ describe('GET /api/admin/traffic-report', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when bearer token is incorrect', async () => {
@@ -57,7 +57,7 @@ describe('GET /api/admin/traffic-report', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns traffic report with default 7-day period', async () => {

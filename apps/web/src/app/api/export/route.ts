@@ -4,6 +4,7 @@ import { dataExportQueue, addJob, JobType } from '@/lib/queue';
 import type { DataExportPayload } from '@/lib/queue';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 const exportSchema = z.object({
   exportType: z.enum([
     'playback_sessions',
@@ -25,17 +26,17 @@ const exportSchema = z.object({
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = exportSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const payload: DataExportPayload = parsed.data;

@@ -12,10 +12,11 @@ import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcasts = await prisma.podcast.findMany({
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authResult = await authenticateRequest(request);
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Detect API key auth (Bearer token) vs browser session
@@ -53,10 +54,7 @@ export async function POST(request: NextRequest) {
   if (isApiKeyAuth) {
     const rateLimit = await checkRateLimit(`api:create:${authResult.userId}`, 60, 60);
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', resetAt: rateLimit.resetAt },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded', 429, { resetAt: rateLimit.resetAt });
     }
   }
 
@@ -64,7 +62,7 @@ export async function POST(request: NextRequest) {
   const draftId = typeof body.draftId === 'string' ? body.draftId : undefined;
   const parsed = createPodcastSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   // Validate draft ownership if resuming from a draft
@@ -74,7 +72,7 @@ export async function POST(request: NextRequest) {
       select: { userId: true, status: true },
     });
     if (!draft || draft.userId !== authResult.userId || draft.status !== 'DRAFT') {
-      return NextResponse.json({ error: 'Invalid draft' }, { status: 400 });
+      return errorResponse('Invalid draft', 400);
     }
   }
 
@@ -83,7 +81,7 @@ export async function POST(request: NextRequest) {
     const { auth } = await import('@/lib/auth');
     const sess = await auth();
     if (sess?.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return errorResponse('Forbidden', 403);
     }
   }
 
@@ -95,17 +93,11 @@ export async function POST(request: NextRequest) {
   if (!isAdmin) {
     const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
     if (!hourly.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded: max 20 generations per hour.' },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
     }
     const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
     if (!daily.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded: max 100 generations per day.' },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
     }
   }
 
@@ -114,20 +106,14 @@ export async function POST(request: NextRequest) {
   if (!gate.allowed) {
     if (gate.reason === 'daily_limit_reached') {
       const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
-      return NextResponse.json(
-        {
-          error: `Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`,
-          code: gate.reason,
-          resetInSeconds: gate.resetInSeconds,
-        },
-        { status: 403 }
-      );
+      return errorResponse(`Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`, 403, { code: gate.reason,
+          resetInSeconds: gate.resetInSeconds, });
     }
     const msg =
       gate.reason === 'free_tier_exhausted'
         ? 'Generation limit reached. Add your own API keys or upgrade to Pro.'
         : 'No voice provider available. Add a TTS key or upgrade to Pro.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Get tier features for this user
@@ -138,19 +124,13 @@ export async function POST(request: NextRequest) {
 
   // Gate private and unlisted podcast creation
   if ((parsed.data.visibility === 'PRIVATE' || parsed.data.visibility === 'UNLISTED') && !tierFeatures.privateAllowed) {
-    return NextResponse.json(
-      { error: 'Private and unlisted podcasts require a Pro subscription.' },
-      { status: 403 }
-    );
+    return errorResponse('Private and unlisted podcasts require a Pro subscription.', 403);
   }
 
   // Speaker count validation — enforce tier cap
   const requestedSpeakers = parsed.data.metadata?.speakers;
   if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
-    return NextResponse.json(
-      { error: `Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.` },
-      { status: 403 }
-    );
+    return errorResponse(`Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.`, 403);
   }
 
   // Duration validation — enforce tier cap (before incrementing counter)
@@ -159,12 +139,7 @@ export async function POST(request: NextRequest) {
     : 9999;
   const durationTarget = parsed.data.metadata?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
-    return NextResponse.json(
-      {
-        error: `Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`,
-      },
-      { status: 400 }
-    );
+    return errorResponse(`Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`, 400, {  });
   }
 
   // Atomically increment daily free-tier counter BEFORE creating anything (avoids TOCTOU race)
@@ -178,10 +153,7 @@ export async function POST(request: NextRequest) {
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
     if (!ok) {
-      return NextResponse.json(
-        { error: 'Daily podcast limit reached.', code: 'daily_limit_reached' },
-        { status: 403 }
-      );
+      return errorResponse('Daily podcast limit reached.', 403, { code: 'daily_limit_reached' });
     }
     freeTierTtsProvider = selected.ttsProvider;
     freeTierTtsModel = selected.ttsModel;
@@ -216,10 +188,7 @@ export async function POST(request: NextRequest) {
         where: { stripePaymentIntent: piId },
       });
       if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== authResult.userId) {
-        return NextResponse.json(
-          { error: 'Invalid or unauthorized payment' },
-          { status: 400 }
-        );
+        return errorResponse('Invalid or unauthorized payment', 400);
       }
     }
   }

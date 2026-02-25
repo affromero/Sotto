@@ -59,7 +59,7 @@ describe('POST /api/billing/portal', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -69,7 +69,7 @@ describe('POST /api/billing/portal', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when no subscription record exists', async () => {
@@ -158,6 +158,6 @@ describe('POST /api/billing/portal', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'Failed to create portal session' });
+    expect(body).toMatchObject({ error: 'Failed to create portal session' });
   });
 });
