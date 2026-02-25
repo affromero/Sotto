@@ -7,7 +7,8 @@
 | `/` | `page.tsx` | No | Landing page |
 | `/@handle` | Rewrite → `profile/handle/[handle]` | No | Vanity profile URL |
 | `/auth/login` | `auth/login/page.tsx` | No | OAuth sign in |
-| `/auth/signup` | `auth/signup/page.tsx` | No | Create account |
+| `/auth/signup` | `auth/signup/page.tsx` | No | Create account (invite-only notice) |
+| `/auth/waitlisted` | `auth/waitlisted/page.tsx` | No | Waitlisted user landing (reason-based messages) |
 | `/dashboard` | `(dashboard)/dashboard/page.tsx` | Yes | My podcasts, usage |
 | `/settings` | `(dashboard)/settings/page.tsx` | Yes | Profile & preferences |
 | `/billing` | `(dashboard)/billing/page.tsx` | Yes | Keys & usage |
@@ -123,7 +124,7 @@
 | `/api/waitlist` | POST | No | Waitlist signup |
 | `/api/health` | GET | No | Health check |
 | `/api/feedback` | POST/GET | No | Feedback |
-| `/api/access` | GET/POST | No | Password gate |
+| `/api/admin/waitlist` | PATCH | ADMIN | Approve/reject waitlist entries |
 | `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, config, costs, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, traffic-report) |
 | `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 
