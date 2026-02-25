@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { auth } from '@/lib/auth';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
+import { isClaudeAvailable } from '@/lib/claude-code-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -163,6 +164,17 @@ export async function GET() {
     }
   } catch {
     checks.groq = { status: 'error', latencyMs: Date.now() - groqStart };
+  }
+
+  // --- Claude Code CLI (non-critical) ---
+  const claudeCodeStart = Date.now();
+  try {
+    const available = await isClaudeAvailable();
+    checks.claudeCode = available
+      ? { status: 'ok', latencyMs: Date.now() - claudeCodeStart }
+      : { status: 'not_installed' };
+  } catch {
+    checks.claudeCode = { status: 'error', latencyMs: Date.now() - claudeCodeStart };
   }
 
   // --- BullMQ Queues (non-critical, uses existing Redis) ---
