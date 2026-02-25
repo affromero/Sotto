@@ -1,0 +1,3 @@
+[submodule "packages/verification-standard"]
+	path = packages/verification-standard
+	url = https://github.com/SottoFM/reference-verification-standard.git
