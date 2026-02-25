@@ -45,6 +45,8 @@ RUN npm run build
 # ---- Stage 3: Production runner ----
 FROM node:22-alpine AS runner
 RUN apk add --no-cache libc6-compat openssl
+# Install Claude Code CLI so claude-code:* models can spawn the claude binary
+RUN npm install -g @anthropic-ai/claude-code
 
 ARG COMMIT_SHA=dev
 ENV NODE_ENV=production
