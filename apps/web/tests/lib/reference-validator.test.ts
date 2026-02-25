@@ -23,6 +23,9 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('@/lib/url-validator', () => ({
   validateUrl: vi.fn().mockResolvedValue(undefined),
+  safeFetch: vi.fn(async (url: string, init?: RequestInit) => {
+    return globalThis.fetch(url, init);
+  }),
   UrlValidationError: class UrlValidationError extends Error {
     constructor(message: string) {
       super(message);
@@ -162,7 +165,6 @@ describe('reference-validator', () => {
         'https://test.com/article',
         expect.objectContaining({
           method: 'HEAD',
-          redirect: 'follow',
           headers: { 'User-Agent': 'Sotto/1.0 (reference-validator)' },
         })
       );
