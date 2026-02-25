@@ -64,6 +64,9 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      # Tell the claude subprocess where to find ~/.claude regardless of the
+      # sotto system user's actual $HOME (which may be / on Alpine).
+      CLAUDE_HOME: /home/sotto
       DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:

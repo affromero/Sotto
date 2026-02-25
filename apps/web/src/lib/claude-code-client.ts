@@ -83,8 +83,11 @@ export async function executeClaudeCode(
 
   logger.info('claude-code: executing', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
-  // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
-  const { CLAUDECODE: _, ...cleanEnv } = process.env;
+  // Strip CLAUDECODE to prevent "cannot launch inside another session".
+  // Override HOME when CLAUDE_HOME is set so the CLI finds credentials in Docker containers
+  // where the process user's HOME may differ from where ~/.claude is mounted.
+  const { CLAUDECODE: _, ...baseEnv } = process.env;
+  const cleanEnv = process.env.CLAUDE_HOME ? { ...baseEnv, HOME: process.env.CLAUDE_HOME } : baseEnv;
 
   return new Promise((resolve, reject) => {
     const child = spawn('claude', args, {
@@ -156,8 +159,11 @@ export async function* streamClaudeCode(
 
   logger.info('claude-code: streaming', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
-  // Strip CLAUDECODE env var to prevent "cannot launch inside another session" errors
-  const { CLAUDECODE: _, ...cleanEnv } = process.env;
+  // Strip CLAUDECODE to prevent "cannot launch inside another session".
+  // Override HOME when CLAUDE_HOME is set so the CLI finds credentials in Docker containers
+  // where the process user's HOME may differ from where ~/.claude is mounted.
+  const { CLAUDECODE: _, ...baseEnv } = process.env;
+  const cleanEnv = process.env.CLAUDE_HOME ? { ...baseEnv, HOME: process.env.CLAUDE_HOME } : baseEnv;
 
   const child = spawn('claude', args, {
     stdio: ['pipe', 'pipe', 'pipe'],
