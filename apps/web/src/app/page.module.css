@@ -2684,6 +2684,108 @@
   color: var(--color-primary-hover);
 }
 
+/* --------------------------------------------------------------------------
+   VERIFICATION — Bayesian v2 additions
+   -------------------------------------------------------------------------- */
+
+/* "Bayesian v2" pill in section header */
+.verificationV2Row {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 20px;
+}
+
+.verificationV2Pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: rgba(30, 58, 95, 0.06);
+  border: 1px solid rgba(30, 58, 95, 0.18);
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #1E3A5F;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Card header: domain+thresholds left, arc right */
+.verificationCardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.verificationCardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.verificationThresholds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Bayesian threshold pill — muted variant */
+.verificationThresholdV2 {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px dashed var(--color-border-hover);
+  letter-spacing: 0.02em;
+}
+
+/* Prior confidence arc */
+.verificationPriorSvg {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.verificationPriorTrack {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 3;
+}
+
+.verificationPriorFill {
+  fill: none;
+  stroke-width: 3;
+  stroke-dasharray: 125.66;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.verificationPriorPct {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  fill: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.verificationPriorLbl {
+  font-family: var(--font-body);
+  font-size: 7.5px;
+  font-weight: 500;
+  fill: var(--color-text-tertiary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 /* ==========================================================================
    RESPONSIVE — TABLET (768px)
    ========================================================================== */
