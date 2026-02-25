@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Upload, FileAudio, FileText, X, AlertCircle, ChevronDown, Info } from 'lucide-react';
 import { SOURCE_PLATFORMS, SOURCE_PLATFORM_HELP } from '@sotto/shared';
 import type { SourcePlatformValue } from '@sotto/shared';
@@ -10,29 +10,42 @@ import styles from './ImportUploader.module.css';
 
 interface ImportUploaderProps {
   onImportStarted: (podcastId: string) => void;
+  draftId?: string;
+  initialImportData?: {
+    title?: string;
+    topic?: string;
+    sourcePlatform?: string;
+    isHumanContent?: boolean;
+    sttProvider?: string;
+  };
+  onDraftCreated?: (id: string) => void;
 }
 
 const MAX_AUDIO_SIZE = 100 * 1024 * 1024; // 100MB
 const ACCEPTED_AUDIO = 'audio/*';
 const ACCEPTED_TRANSCRIPT = '.srt,.vtt,.txt';
 
-export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
-  const [title, setTitle] = useState('');
-  const [topic, setTopic] = useState('');
+export function ImportUploader({ onImportStarted, draftId: initialDraftId, initialImportData, onDraftCreated }: ImportUploaderProps) {
+  const [title, setTitle] = useState(initialImportData?.title ?? '');
+  const [topic, setTopic] = useState(initialImportData?.topic ?? '');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcriptFile, setTranscriptFile] = useState<File | null>(null);
-  const [sourcePlatform, setSourcePlatform] = useState('');
+  const [sourcePlatform, setSourcePlatform] = useState(initialImportData?.sourcePlatform ?? '');
   const [customPlatform, setCustomPlatform] = useState('');
-  const [isHumanContent, setIsHumanContent] = useState(false);
-  const [sttProvider, setSttProvider] = useState<string | undefined>(undefined);
+  const [isHumanContent, setIsHumanContent] = useState(initialImportData?.isHumanContent ?? false);
+  const [sttProvider, setSttProvider] = useState<string | undefined>(initialImportData?.sttProvider);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
 
   const audioInputRef = useRef<HTMLInputElement>(null);
   const transcriptInputRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const draftIdRef = useRef<string | null>(initialDraftId ?? null);
+  const creatingDraftRef = useRef(false);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -88,6 +101,71 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
     }
   }, []);
 
+  // Create draft when audio + platform are set
+  const tryCreateDraft = useCallback(() => {
+    if (draftIdRef.current || creatingDraftRef.current || !audioFile || !sourcePlatform) return;
+    creatingDraftRef.current = true;
+    const resolvedPlatform = sourcePlatform === 'other' ? customPlatform.trim() : sourcePlatform;
+    fetch('/api/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tabMode: 'import',
+        importData: {
+          title: title.trim() || undefined,
+          topic: topic.trim() || undefined,
+          sourcePlatform: resolvedPlatform || undefined,
+          isHumanContent,
+          sttProvider,
+        },
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.id) {
+          draftIdRef.current = data.id;
+          setDraftId(data.id);
+          onDraftCreated?.(data.id);
+        }
+      })
+      .catch((err) => console.warn('[sotto] import draft save failed', err))
+      .finally(() => {
+        creatingDraftRef.current = false;
+      });
+  }, [audioFile, sourcePlatform, customPlatform, title, topic, isHumanContent, sttProvider, onDraftCreated]);
+
+  // Trigger draft creation when audio + platform are set
+  useEffect(() => {
+    if (audioFile && sourcePlatform) {
+      tryCreateDraft();
+    }
+  }, [audioFile, sourcePlatform, tryCreateDraft]);
+
+  // Debounced save of form changes to existing draft
+  useEffect(() => {
+    if (!draftId) return;
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    const resolvedPlatform = sourcePlatform === 'other' ? customPlatform.trim() : sourcePlatform;
+    draftSaveTimerRef.current = setTimeout(() => {
+      fetch(`/api/drafts/${draftId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftData: {
+            tabMode: 'import',
+            importData: {
+              title: title.trim() || undefined,
+              topic: topic.trim() || undefined,
+              sourcePlatform: resolvedPlatform || undefined,
+              isHumanContent,
+              sttProvider,
+            },
+          },
+        }),
+      }).catch((err) => console.warn('[sotto] import draft save failed', err));
+    }, 2000);
+  }, [draftId, title, topic, sourcePlatform, customPlatform, isHumanContent, sttProvider]);
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -123,6 +201,9 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
       }
       if (transcriptFile) {
         formData.append('transcript', transcriptFile);
+      }
+      if (draftIdRef.current) {
+        formData.append('draftId', draftIdRef.current);
       }
 
       const xhr = new XMLHttpRequest();
@@ -197,6 +278,13 @@ export function ImportUploader({ onImportStarted }: ImportUploaderProps) {
           >
             <X size={16} />
           </button>
+        </div>
+      )}
+
+      {initialImportData && !audioFile && (
+        <div className={styles.info} role="status">
+          <Info size={18} aria-hidden="true" />
+          <p>Re-select your audio file to continue where you left off.</p>
         </div>
       )}
 
