@@ -6,7 +6,6 @@ import {
   notificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { markPodcastFailed } from '@/lib/pipeline-resume';
 import {
   verifyUrl,
   verifyDoi,
@@ -204,31 +203,6 @@ export async function processReferenceValidation(
   }
 
   await job.updateProgress(65);
-
-  // Check if ALL references failed
-  const allFailed = references.every((ref) => {
-    const v = verdicts.get(ref.id);
-    return v?.status === 'REMOVED' || v?.status === 'FAILED';
-  });
-
-  if (allFailed) {
-    await markPodcastFailed(podcastId, {
-      failureReason: 'All references could not be verified. Please try again with a different topic.',
-      technicalError: `All ${references.length} references failed verification`,
-    });
-
-    await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
-      userId,
-      type: 'PODCAST_READY',
-      title: 'Podcast generation failed',
-      message: 'All references could not be verified. Please try again with a different topic.',
-      data: { podcastId },
-    });
-
-    logger.error('All references failed verification', { podcastId });
-    await job.updateProgress(100);
-    return;
-  }
 
   // Update Reference records
   for (const ref of references) {
