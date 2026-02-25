@@ -1,0 +1,214 @@
+.root {
+  padding: 0;
+}
+
+.title {
+  font: var(--text-h1);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-6);
+}
+
+.summary {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-4) var(--space-6);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  min-width: 100px;
+}
+
+.summaryCardFailed {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.summaryValue {
+  font: var(--text-h2);
+  color: var(--color-text-primary);
+}
+
+.summaryLabel {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.rowFailed {
+  background: rgba(220, 38, 38, 0.05);
+}
+
+.rowWaiting {
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.queueName {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.actionButton {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.actionButton:hover {
+  border-color: var(--color-border-hover);
+}
+
+.actionButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.actionButtonDanger {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.actionButtonDanger:hover {
+  border-color: #dc2626;
+}
+
+.failedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  width: 100%;
+}
+
+.failedJob {
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.failedJobHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.failedJobId {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.failedJobAttempts {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+}
+
+.retryButton {
+  margin-left: auto;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  opacity: 0.9;
+}
+
+.retryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.failedReason {
+  font: var(--text-body-sm);
+  color: #dc2626;
+  margin: 0 0 var(--space-1);
+  word-break: break-word;
+}
+
+.failedTime {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+}
+
+.emptyMessage {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  padding: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .summary {
+    flex-direction: column;
+  }
+
+  .summaryCard {
+    flex-direction: row;
+    justify-content: space-between;
+    min-width: 0;
+  }
+}

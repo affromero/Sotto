@@ -25,6 +25,8 @@ import {
   Target,
   Megaphone,
   FlaskConical,
+  HeartPulse,
+  ListTodo,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -88,6 +90,8 @@ const navGroups: NavGroup[] = [
       { href: '/admin/config', label: 'Config', icon: Settings },
       { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
       { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
+      { href: '/admin/health', label: 'System Health', icon: HeartPulse },
+      { href: '/admin/queues', label: 'Queues', icon: ListTodo },
     ],
   },
   {
