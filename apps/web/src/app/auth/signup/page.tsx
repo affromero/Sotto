@@ -8,7 +8,9 @@ export default function SignupPage() {
     <main className={styles.main}>
       <div className={styles.container}>
         <h1 className={styles.title}>Join Sotto</h1>
-        <p className={styles.subtitle}>Create your account and start learning through podcasts</p>
+        <p className={styles.subtitle}>
+          Sign-up is currently invite-only. <a href="/">Join the waitlist</a> to get access.
+        </p>
         <AuthButtons />
         <p className={styles.footer}>
           Already have an account? <a href="/auth/login">Sign in</a>
