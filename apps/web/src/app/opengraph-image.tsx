@@ -1,7 +1,7 @@
 import { ImageResponse } from 'next/og';
 
 export const runtime = 'nodejs';
-export const alt = 'Sotto — The Open Podcast Network';
+export const alt = 'Sotto — Where Podcasts Get Social';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -84,7 +84,7 @@ export default function OgImage() {
           }}
         />
         <span style={{ fontSize: 20, color: '#6B7280', letterSpacing: '0.05em' }}>
-          The Open Podcast Network
+          Where Podcasts Get Social
         </span>
       </div>
 
@@ -119,8 +119,7 @@ export default function OgImage() {
             maxWidth: '75%',
           }}
         >
-          Generate AI podcasts, import your own, or fork someone else&apos;s.
-          Ask questions mid-playback. Discover what others are learning.
+          AI or human — create, discover, interrupt, fork, and remix.
         </p>
       </div>
 
