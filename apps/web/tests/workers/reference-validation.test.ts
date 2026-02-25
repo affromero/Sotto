@@ -860,43 +860,41 @@ describe('processReferenceValidation', () => {
       );
     });
 
-    it('sets podcast status to FAILED when all references are removed', async () => {
+    it('strips all citation markers from the script when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+      expect(mockCleanAndRenumberCitations).toHaveBeenCalled();
+      expect(mockPrismaScriptUpdate).toHaveBeenCalled();
+    });
+
+    it('deletes all Reference rows when all references are removed', async () => {
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaReferenceDeleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'podcast-001' },
+          where: expect.objectContaining({ podcastId: 'podcast-001' }),
+        })
+      );
+    });
+
+    it('does not set podcast status to FAILED when all references are removed', async () => {
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaPodcastUpdate).not.toHaveBeenCalledWith(
+        expect.objectContaining({
           data: expect.objectContaining({ status: 'FAILED' }),
         })
       );
     });
 
-    it('sends failure notification when all references fail', async () => {
+    it('continues pipeline to audio generation when all references are removed', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockAddJob).toHaveBeenCalledWith({ name: 'notifications' }, 'send_notification', {
-        userId: 'user-001',
-        type: 'PODCAST_READY',
-        title: 'Podcast generation failed',
-        message: 'All references could not be verified. Please try again with a different topic.',
-        data: { podcastId: 'podcast-001' },
-      });
-    });
-
-    it('does not create segments when all references fail', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockPrismaSegmentCreate).not.toHaveBeenCalled();
-    });
-
-    it('does not queue audio generation when all references fail', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockAddJob).not.toHaveBeenCalledWith(
+      expect(mockAddJob).toHaveBeenCalledWith(
         expect.anything(),
         'generate_audio',
         expect.anything()
