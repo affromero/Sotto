@@ -18,6 +18,7 @@ export const metadata = { title: 'Dashboard' };
 
 const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
+    DRAFT: 'default',
     PENDING: 'default',
     DISCOVERING: 'info',
     EXTRACTING: 'info',
@@ -35,6 +36,7 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
   };
 
 const statusLabels: Record<PodcastStatus, string> = {
+  DRAFT: 'Draft',
   PENDING: 'Pending',
   DISCOVERING: 'Discovering',
   EXTRACTING: 'Extracting',

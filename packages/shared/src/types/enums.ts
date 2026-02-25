@@ -3,6 +3,7 @@
 export type UserRole = 'USER' | 'CREATOR' | 'ADMIN' | 'SYSTEM';
 
 export type PodcastStatus =
+  | 'DRAFT'
   | 'PENDING'
   | 'DISCOVERING'
   | 'EXTRACTING'
