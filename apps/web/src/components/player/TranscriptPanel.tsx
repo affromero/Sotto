@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
+import { useScrollFollow } from '@/lib/hooks/useScrollFollow';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { SegmentQuestionBadge } from '@/components/player/SegmentQuestionBadge';
 import { ClaimFlagButton } from '@/components/player/ClaimFlagButton';
@@ -32,18 +33,21 @@ export function TranscriptPanel({
   podcastId,
 }: TranscriptPanelProps) {
   const activeRef = useRef<HTMLDivElement>(null);
+  const { scrollContainerRef, isFollowing, reengage } = useScrollFollow();
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [currentTime]);
+    if (isFollowing) {
+      activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentTime, isFollowing]);
 
   const hasRefs = references.length > 0;
 
   return (
     <div className={styles.panel}>
       <h3 className={styles.heading}>Transcript</h3>
-      <div className={styles.segments}>
+      <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>} className={styles.segments}>
         {segments.map((segment) => {
           const active = isCurrentSegment(segment, currentTime);
           const qCount = questionCounts?.get(segment.order) ?? 0;
@@ -53,7 +57,12 @@ export function TranscriptPanel({
               key={segment.id}
               ref={active ? activeRef : undefined}
               className={`${styles.segment} ${active ? styles.active : ''}`}
-              onClick={() => segment.startTime !== null && onSegmentClick?.(segment.startTime)}
+              onClick={() => {
+                if (segment.startTime !== null) {
+                  reengage();
+                  onSegmentClick?.(segment.startTime);
+                }
+              }}
               role="button"
               tabIndex={0}
             >
