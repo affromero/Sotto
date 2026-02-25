@@ -1394,6 +1394,9 @@ export default function LandingPage() {
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
             <span className={styles.overline}>Open Verification Standard</span>
+            <div className={styles.verificationV2Row}>
+              <span className={styles.verificationV2Pill}>Bayesian v2</span>
+            </div>
             <h2 className={styles.h2}>Domain-aware. Claim-level. Open source.</h2>
             <p className={styles.bodyLg}>
               Every reference is scored by its domain &mdash; because news articles don&apos;t need
@@ -1402,6 +1405,7 @@ export default function LandingPage() {
           </div>
 
           <div className={`${styles.verificationGrid} ${styles.rev} ${styles.d1}`}>
+            {/* ACADEMIC */}
             <div
               className={styles.verificationCard}
               style={
@@ -1411,9 +1415,29 @@ export default function LandingPage() {
                 } as React.CSSProperties
               }
             >
-              <div className={styles.verificationCardHeader}>
-                <span className={styles.verificationDomain}>Academic</span>
-                <span className={styles.verificationThreshold}>&ge; 0.70</span>
+              <div className={styles.verificationCardHead}>
+                <div className={styles.verificationCardMeta}>
+                  <span className={styles.verificationDomain}>Academic</span>
+                  <div className={styles.verificationThresholds}>
+                    <span className={styles.verificationThreshold}>&ge; 0.70</span>
+                    <span className={styles.verificationThresholdV2}>Bayes &ge; 82%</span>
+                  </div>
+                </div>
+                <svg
+                  viewBox="0 0 52 52"
+                  className={styles.verificationPriorSvg}
+                  aria-label="72% Bayesian prior — starting confidence before any checks"
+                >
+                  <circle cx="26" cy="26" r="20" className={styles.verificationPriorTrack} />
+                  <circle
+                    cx="26" cy="26" r="20"
+                    className={styles.verificationPriorFill}
+                    style={{ stroke: '#1E3A5F', strokeDashoffset: 35.18 }}
+                    transform="rotate(-90 26 26)"
+                  />
+                  <text x="26" y="24" textAnchor="middle" dominantBaseline="central" className={styles.verificationPriorPct}>72%</text>
+                  <text x="26" y="36" textAnchor="middle" className={styles.verificationPriorLbl}>prior</text>
+                </svg>
               </div>
               <p className={styles.verificationDesc}>
                 Peer-reviewed papers, preprints, books. DOI and academic indexing carry most weight.
@@ -1450,6 +1474,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* NEWS */}
             <div
               className={styles.verificationCard}
               style={
@@ -1459,9 +1484,29 @@ export default function LandingPage() {
                 } as React.CSSProperties
               }
             >
-              <div className={styles.verificationCardHeader}>
-                <span className={styles.verificationDomain}>News</span>
-                <span className={styles.verificationThreshold}>&ge; 0.50</span>
+              <div className={styles.verificationCardHead}>
+                <div className={styles.verificationCardMeta}>
+                  <span className={styles.verificationDomain}>News</span>
+                  <div className={styles.verificationThresholds}>
+                    <span className={styles.verificationThreshold}>&ge; 0.50</span>
+                    <span className={styles.verificationThresholdV2}>Bayes &ge; 65%</span>
+                  </div>
+                </div>
+                <svg
+                  viewBox="0 0 52 52"
+                  className={styles.verificationPriorSvg}
+                  aria-label="75% Bayesian prior — starting confidence before any checks"
+                >
+                  <circle cx="26" cy="26" r="20" className={styles.verificationPriorTrack} />
+                  <circle
+                    cx="26" cy="26" r="20"
+                    className={styles.verificationPriorFill}
+                    style={{ stroke: '#D97706', strokeDashoffset: 31.42 }}
+                    transform="rotate(-90 26 26)"
+                  />
+                  <text x="26" y="24" textAnchor="middle" dominantBaseline="central" className={styles.verificationPriorPct}>75%</text>
+                  <text x="26" y="36" textAnchor="middle" className={styles.verificationPriorLbl}>prior</text>
+                </svg>
               </div>
               <p className={styles.verificationDesc}>
                 Established outlets &mdash; NYT, Reuters, BBC. AI judges outlet credibility and
@@ -1485,6 +1530,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* GOVERNMENT */}
             <div
               className={styles.verificationCard}
               style={
@@ -1494,9 +1540,29 @@ export default function LandingPage() {
                 } as React.CSSProperties
               }
             >
-              <div className={styles.verificationCardHeader}>
-                <span className={styles.verificationDomain}>Government</span>
-                <span className={styles.verificationThreshold}>&ge; 0.55</span>
+              <div className={styles.verificationCardHead}>
+                <div className={styles.verificationCardMeta}>
+                  <span className={styles.verificationDomain}>Government</span>
+                  <div className={styles.verificationThresholds}>
+                    <span className={styles.verificationThreshold}>&ge; 0.55</span>
+                    <span className={styles.verificationThresholdV2}>Bayes &ge; 72%</span>
+                  </div>
+                </div>
+                <svg
+                  viewBox="0 0 52 52"
+                  className={styles.verificationPriorSvg}
+                  aria-label="82% Bayesian prior — starting confidence before any checks"
+                >
+                  <circle cx="26" cy="26" r="20" className={styles.verificationPriorTrack} />
+                  <circle
+                    cx="26" cy="26" r="20"
+                    className={styles.verificationPriorFill}
+                    style={{ stroke: '#16A34A', strokeDashoffset: 22.62 }}
+                    transform="rotate(-90 26 26)"
+                  />
+                  <text x="26" y="24" textAnchor="middle" dominantBaseline="central" className={styles.verificationPriorPct}>82%</text>
+                  <text x="26" y="36" textAnchor="middle" className={styles.verificationPriorLbl}>prior</text>
+                </svg>
               </div>
               <p className={styles.verificationDesc}>
                 Official sources &mdash; .gov, WHO, UN. Verified against official domain patterns.
@@ -1519,6 +1585,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* GENERAL */}
             <div
               className={styles.verificationCard}
               style={
@@ -1528,9 +1595,29 @@ export default function LandingPage() {
                 } as React.CSSProperties
               }
             >
-              <div className={styles.verificationCardHeader}>
-                <span className={styles.verificationDomain}>General</span>
-                <span className={styles.verificationThreshold}>&ge; 0.55</span>
+              <div className={styles.verificationCardHead}>
+                <div className={styles.verificationCardMeta}>
+                  <span className={styles.verificationDomain}>General</span>
+                  <div className={styles.verificationThresholds}>
+                    <span className={styles.verificationThreshold}>&ge; 0.55</span>
+                    <span className={styles.verificationThresholdV2}>Bayes &ge; 68%</span>
+                  </div>
+                </div>
+                <svg
+                  viewBox="0 0 52 52"
+                  className={styles.verificationPriorSvg}
+                  aria-label="45% Bayesian prior — starting confidence before any checks"
+                >
+                  <circle cx="26" cy="26" r="20" className={styles.verificationPriorTrack} />
+                  <circle
+                    cx="26" cy="26" r="20"
+                    className={styles.verificationPriorFill}
+                    style={{ stroke: '#6B7280', strokeDashoffset: 69.11 }}
+                    transform="rotate(-90 26 26)"
+                  />
+                  <text x="26" y="24" textAnchor="middle" dominantBaseline="central" className={styles.verificationPriorPct}>45%</text>
+                  <text x="26" y="36" textAnchor="middle" className={styles.verificationPriorLbl}>prior</text>
+                </svg>
               </div>
               <p className={styles.verificationDesc}>
                 Wikipedia, blogs, videos. Higher AI scrutiny for unverifiable anonymous sources.
