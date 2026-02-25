@@ -45,6 +45,7 @@ function StatusBadge({ status }: { status: string }) {
     status === 'SCRIPTING' ||
     status === 'VERIFYING_SCRIPT' ||
     status === 'VALIDATING_REFERENCES' ||
+    status === 'SCRIPT_READY' ||
     status === 'GENERATING_AUDIO' ||
     status === 'STITCHING';
 

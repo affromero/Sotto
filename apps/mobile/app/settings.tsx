@@ -17,7 +17,7 @@ import { deleteToken } from '../lib/auth';
 
 interface KeyStatus {
   provider: string;
-  configured: boolean;
+  isValid: boolean;
 }
 
 export default function SettingsScreen() {
@@ -40,8 +40,8 @@ export default function SettingsScreen() {
     },
   });
 
-  const hasAiKey = aiKeys?.keys?.some((k) => k.configured) ?? false;
-  const hasTtsKey = ttsKeys?.keys?.some((k) => k.configured) ?? false;
+  const hasAiKey = aiKeys?.keys?.some((k) => k.isValid) ?? false;
+  const hasTtsKey = ttsKeys?.keys?.some((k) => k.isValid) ?? false;
   const allKeysConfigured = hasAiKey && hasTtsKey;
 
   const handleDeleteAccount = useCallback(() => {
