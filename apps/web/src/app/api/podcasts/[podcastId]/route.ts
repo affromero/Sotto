@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { updatePodcastSchema } from '@/lib/validations';
 import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
+import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -14,7 +15,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    include: {
+    select: {
+      ...PODCAST_PUBLIC_SELECT,
       user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: true } },
       segments: { orderBy: { order: 'asc' } },
@@ -109,7 +111,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ...updateData,
       ...(dismissSuggestion && { suggestedTitle: null, suggestedTopic: null }),
     },
-    include: {
+    select: {
+      ...PODCAST_PUBLIC_SELECT,
       user: { select: { id: true, name: true, image: true } },
       tags: { include: { tag: true } },
     },
