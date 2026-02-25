@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { createVoicePayment } from '@/lib/voice-pricing';
 
+import { errorResponse } from '@/lib/api-response';
 const paymentIntentSchema = z.object({
   voiceCharges: z.array(z.object({
     voiceCloneId: z.string().min(1),
@@ -17,13 +18,13 @@ const paymentIntentSchema = z.object({
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = paymentIntentSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
   const { voiceCharges } = parsed.data;
 

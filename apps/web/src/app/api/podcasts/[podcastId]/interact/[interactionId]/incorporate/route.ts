@@ -12,6 +12,7 @@ import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
@@ -19,7 +20,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -27,17 +28,11 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 20 generations per hour.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
   }
   const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
   if (!daily.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 100 generations per day.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
   // Fetch the interaction with podcast ownership check
@@ -49,12 +44,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!interaction || interaction.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Interaction not found' }, { status: 404 });
+    return errorResponse('Interaction not found', 404);
   }
 
   // Only the podcast owner can incorporate
   if (interaction.podcast.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Generation gate
@@ -64,7 +59,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Atomically increment free tier counter before any state mutations
@@ -75,34 +70,22 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
     if (!ok) {
-      return NextResponse.json(
-        { error: 'Free generations used.', code: 'free_tier_exhausted' },
-        { status: 403 }
-      );
+      return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
     }
   }
 
   if (interaction.podcast.source === 'IMPORT') {
-    return NextResponse.json(
-      { error: 'Incorporation not yet supported for imported podcasts' },
-      { status: 400 }
-    );
+    return errorResponse('Incorporation not yet supported for imported podcasts', 400);
   }
 
   // Interaction must be answered or resolved
   if (!['ANSWERED', 'RESOLVED'].includes(interaction.status)) {
-    return NextResponse.json(
-      { error: `Cannot incorporate interaction with status "${interaction.status}"` },
-      { status: 409 }
-    );
+    return errorResponse(`Cannot incorporate interaction with status "${interaction.status}"`, 409);
   }
 
   // Podcast must be in READY state
   if (interaction.podcast.status !== 'READY') {
-    return NextResponse.json(
-      { error: `Podcast is currently "${interaction.podcast.status}", must be READY` },
-      { status: 409 }
-    );
+    return errorResponse(`Podcast is currently "${interaction.podcast.status}", must be READY`, 409);
   }
 
   // Set interaction to INCORPORATING

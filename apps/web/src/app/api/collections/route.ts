@@ -3,12 +3,13 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createCollectionSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 export async function GET() {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const collections = await prisma.collection.findMany({
@@ -37,22 +38,19 @@ export async function POST(request: NextRequest) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return errorResponse('Invalid JSON', 400);
   }
 
   const parsed = createCollectionSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return errorResponse('Validation failed', 400, { details: parsed.error.flatten().fieldErrors });
   }
 
   const { name, description, isPublic } = parsed.data;

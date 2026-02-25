@@ -5,23 +5,24 @@ import { getRedisClient } from '@/lib/redis';
 import { sendMessage } from '@/lib/telegram';
 import { telegramConnectSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const code = request.nextUrl.searchParams.get('code');
   if (!code) {
-    return NextResponse.json({ error: 'Missing code parameter' }, { status: 400 });
+    return errorResponse('Missing code parameter', 400);
   }
 
   const redis = getRedisClient();
   const raw = await redis.get(`telegram:link:${code}`);
 
   if (!raw) {
-    return NextResponse.json({ error: 'Link code expired or invalid' }, { status: 404 });
+    return errorResponse('Link code expired or invalid', 404);
   }
 
   const linkData = JSON.parse(raw) as { telegramUserId: string; chatId: string; firstName: string };
@@ -35,13 +36,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = telegramConnectSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return errorResponse('Invalid request body', 400);
   }
 
   const { code } = parsed.data;
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
   const raw = await redis.get(`telegram:link:${code}`);
 
   if (!raw) {
-    return NextResponse.json({ error: 'Link code expired or invalid' }, { status: 404 });
+    return errorResponse('Link code expired or invalid', 404);
   }
 
   const linkData = JSON.parse(raw) as { telegramUserId: string; chatId: string; firstName: string };
@@ -71,10 +72,7 @@ export async function POST(request: NextRequest) {
       await redis.del(`telegram:link:${code}`);
       return NextResponse.json({ success: true, alreadyLinked: true });
     }
-    return NextResponse.json(
-      { error: 'This Telegram account is already linked to a different Sotto account' },
-      { status: 409 }
-    );
+    return errorResponse('This Telegram account is already linked to a different Sotto account', 409);
   }
 
   // Create Account record + enable Telegram on user

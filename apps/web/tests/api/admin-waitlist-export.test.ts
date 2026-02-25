@@ -29,7 +29,7 @@ describe('GET /api/admin/waitlist/export', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -39,7 +39,7 @@ describe('GET /api/admin/waitlist/export', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns CSV with waitlist entries', async () => {
@@ -80,6 +80,6 @@ describe('GET /api/admin/waitlist/export', () => {
     const body = await response.json();
 
     expect(response.status).toBe(500);
-    expect(body).toEqual({ error: 'Failed to export waitlist' });
+    expect(body).toMatchObject({ error: 'Failed to export waitlist' });
   });
 });

@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { manualTweet } from '@/lib/twitter-auto-tweet';
 import { manualTweetSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const limit = parseInt(request.nextUrl.searchParams.get('limit') || '20', 10);
@@ -31,13 +32,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = manualTweetSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -46,11 +47,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.status !== 'READY') {
-    return NextResponse.json({ error: 'Podcast must be READY to tweet' }, { status: 400 });
+    return errorResponse('Podcast must be READY to tweet', 400);
   }
 
   const id = await manualTweet(parsed.data.podcastId);

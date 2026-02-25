@@ -5,10 +5,11 @@ import { deleteClonedVoice } from '@/lib/elevenlabs';
 import { deleteFile } from '@/lib/r2';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const params = request.nextUrl.searchParams;
@@ -96,13 +97,13 @@ const adminVoiceActionSchema = z.object({
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = adminVoiceActionSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { voiceCloneId, action } = parsed.data;
@@ -119,7 +120,7 @@ export async function PATCH(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   let newStatus: string;
@@ -145,7 +146,7 @@ export async function PATCH(request: NextRequest) {
       newStatus = 'AWAITING_CHALLENGE';
       break;
     default:
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return errorResponse('Invalid action', 400);
   }
 
   await prisma.$transaction([

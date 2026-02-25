@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const adminId = await requireAdmin();
-  if (!adminId) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!adminId) return errorResponse('Forbidden', 403);
 
   const url = process.env.KITTENTTS_URL;
   if (!url) return NextResponse.json({ configured: false, status: 'unconfigured' });

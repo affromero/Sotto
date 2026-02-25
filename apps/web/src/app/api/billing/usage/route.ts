@@ -6,11 +6,12 @@ import { listByokProviders, listAiProviders, hasByokKey } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(_request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const [podcastCount, ttsKeys, aiKeys, freeTier, user, isByok] = await Promise.all([
@@ -53,6 +54,6 @@ export async function GET(_request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch usage';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

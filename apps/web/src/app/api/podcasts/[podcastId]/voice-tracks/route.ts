@@ -12,13 +12,14 @@ import { checkSuspension } from '@/lib/auth-guards';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const suspended = checkSuspension(session);
@@ -37,13 +38,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
   if (podcast.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
   if (podcast.status !== 'READY') {
-    return NextResponse.json({ error: 'Podcast must be in READY status' }, { status: 400 });
+    return errorResponse('Podcast must be in READY status', 400);
   }
 
   // Check tier features
@@ -51,10 +52,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const features = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, session.user.role);
 
   if (!features.voiceTracksEnabled) {
-    return NextResponse.json(
-      { error: 'Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.' },
-      { status: 403 }
-    );
+    return errorResponse('Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.', 403);
   }
 
   // Check track limit
@@ -62,34 +60,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { podcastId },
   });
   if (existingTrackCount >= features.maxVoiceTracks) {
-    return NextResponse.json(
-      { error: `Maximum ${features.maxVoiceTracks} voice tracks per podcast.` },
-      { status: 403 }
-    );
+    return errorResponse(`Maximum ${features.maxVoiceTracks} voice tracks per podcast.`, 403);
   }
 
   // Rate limits
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded: max 20 generations per hour.' }, { status: 429 });
+    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
   }
   const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
   if (!daily.allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded: max 100 generations per day.' }, { status: 429 });
+    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
   if (!gate.allowed) {
     const msg = gate.reason === 'free_tier_exhausted'
       ? 'Free generations used. Add your own API keys to continue.'
       : 'No voice provider available. Add a TTS key in Settings.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Parse body
   const body = await request.json().catch(() => ({}));
   const parsed = createVoiceTrackSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { name, ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
@@ -114,7 +109,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         where: { stripePaymentIntent: piId },
       });
       if (!purchase || purchase.status !== 'authorized' || purchase.buyerId !== userId) {
-        return NextResponse.json({ error: 'Invalid or unauthorized payment' }, { status: 400 });
+        return errorResponse('Invalid or unauthorized payment', 400);
       }
     }
   }
@@ -206,11 +201,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.visibility === 'PRIVATE' && podcast.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const isOwner = podcast.userId === userId;

@@ -5,6 +5,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { generateQuestions } from '@/lib/taste-quiz';
 import { tasteQuizQuerySchema, tasteQuizAnswerSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/taste-quiz?count=10
  * Generate fresh AI-powered quiz questions for the user.
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const userId = authed.userId;
@@ -21,16 +22,13 @@ export async function GET(request: NextRequest) {
     // Rate limit: 10 requests/hour (each triggers LLM generation)
     const rateLimit = await checkRateLimit(`taste-quiz:${userId}`, 10, 3600);
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Try again later.', resetAt: rateLimit.resetAt },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded. Try again later.', 429, { resetAt: rateLimit.resetAt });
     }
 
     const params = Object.fromEntries(request.nextUrl.searchParams);
     const validation = tasteQuizQuerySchema.safeParse(params);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+      return errorResponse(validation.error.errors[0].message, 400);
     }
 
     const { count } = validation.data;
@@ -39,7 +37,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ questions });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to generate questions';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }
 
@@ -51,14 +49,14 @@ export async function POST(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const userId = authed.userId;
     const body = await request.json();
     const validation = tasteQuizAnswerSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+      return errorResponse(validation.error.errors[0].message, 400);
     }
 
     const { answers } = validation.data;
@@ -122,7 +120,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ saved });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to save answers';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }
 
@@ -134,7 +132,7 @@ export async function DELETE(request: NextRequest) {
   try {
     const authed = await authenticateRequest(request);
     if (!authed) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const userId = authed.userId;
@@ -147,6 +145,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ reset: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to reset quiz';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

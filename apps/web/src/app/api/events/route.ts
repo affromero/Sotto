@@ -4,6 +4,7 @@ import { eventIngestionQueue, addJob, JobType } from '@/lib/queue';
 import { eventBatchSchema } from '@/lib/validations/events';
 import type { IngestEventsPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * POST /api/events
  * Accepts a batch of behavioral events for async ingestion.
@@ -15,12 +16,12 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return errorResponse('Invalid JSON', 400);
   }
 
   const parsed = eventBatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid event batch' }, { status: 400 });
+    return errorResponse('Invalid event batch', 400);
   }
 
   // Attach authenticated user ID if available (supplements client-side userId)

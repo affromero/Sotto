@@ -3,13 +3,14 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { setDefaultTrackSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -18,13 +19,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast || podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json().catch(() => ({}));
   const parsed = setDefaultTrackSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { voiceTrackId } = parsed.data;
@@ -37,11 +38,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!track || track.podcastId !== podcastId) {
-      return NextResponse.json({ error: 'Voice track not found' }, { status: 404 });
+      return errorResponse('Voice track not found', 404);
     }
 
     if (track.status !== 'READY') {
-      return NextResponse.json({ error: 'Only READY voice tracks can be set as default' }, { status: 400 });
+      return errorResponse('Only READY voice tracks can be set as default', 400);
     }
   }
 

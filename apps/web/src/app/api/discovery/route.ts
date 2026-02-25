@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest} from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { streamDiscoveryResponse, streamFallbackDiscoveryResponse, parseChips, parseMetadata, detectUrls } from '@/lib/discovery-agent';
 import { logUsage } from '@/lib/usage-logger';
@@ -9,13 +9,14 @@ import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 import { auth } from '@/lib/auth';
 import { checkSuspension } from '@/lib/auth-guards';
 
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Suspension check — only for session-based auth
@@ -34,14 +35,14 @@ export async function POST(request: NextRequest) {
   if (typeof model === 'string' && model.startsWith('claude-code:')) {
     const sess = await auth();
     if (sess?.user?.role !== 'ADMIN') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return errorResponse('Forbidden', 403);
     }
   }
 
   let userMessage: string | undefined = message ?? content;
 
   if (!userMessage) {
-    return NextResponse.json({ error: 'Message is required' }, { status: 400 });
+    return errorResponse('Message is required', 400);
   }
 
   // Get or create discovery

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { resolveClaimReportSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ claimReportId: string }> };
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
@@ -10,14 +11,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = resolveClaimReportSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const report = await prisma.claimReport.findUnique({
@@ -26,11 +27,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!report) {
-    return NextResponse.json({ error: 'Claim report not found' }, { status: 404 });
+    return errorResponse('Claim report not found', 404);
   }
 
   if (report.status.startsWith('RESOLVED') || report.status === 'DISMISSED') {
-    return NextResponse.json({ error: 'Claim report already resolved' }, { status: 409 });
+    return errorResponse('Claim report already resolved', 409);
   }
 
   const updated = await prisma.claimReport.update({

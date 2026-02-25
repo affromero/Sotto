@@ -60,7 +60,7 @@ describe('GET /api/handles/check', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'handle parameter is required' });
+    expect(body).toMatchObject({ error: 'handle parameter is required' });
   });
 
   it('returns available: true for a valid, unclaimed handle', async () => {
@@ -139,6 +139,6 @@ describe('GET /api/handles/check', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'handle parameter is required' });
+    expect(body).toMatchObject({ error: 'handle parameter is required' });
   });
 });

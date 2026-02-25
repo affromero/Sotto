@@ -65,7 +65,7 @@ describe('POST /api/onboarding/complete', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -75,7 +75,7 @@ describe('POST /api/onboarding/complete', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('marks onboarding complete and returns success', async () => {
@@ -102,7 +102,7 @@ describe('POST /api/onboarding/interests', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 for invalid request body', async () => {

@@ -7,6 +7,7 @@ import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/valida
 import { generateTagSlug } from '@/lib/slugify';
 import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 import { z } from 'zod';
 
 const updateUserSchema = z
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request);
     if (!authResult) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const user = await prisma.user.findUnique({
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return errorResponse('User not found', 404);
     }
 
     const [podcastCount, followerCount, followingCount] = await Promise.all([
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch user';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }
 
@@ -81,14 +82,14 @@ export async function PATCH(request: NextRequest) {
   try {
     const authResult = await authenticateRequest(request);
     if (!authResult) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const body = await request.json();
     const validation = updateUserSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+      return errorResponse(validation.error.errors[0].message, 400);
     }
 
     const { interests, customTags, handle, voicePreferences, ...data } = validation.data;
@@ -102,10 +103,7 @@ export async function PATCH(request: NextRequest) {
       if (currentUser?.handle !== handle) {
         const availability = await isHandleAvailable(handle);
         if (!availability.available) {
-          return NextResponse.json(
-            { error: availability.reason || 'Handle is not available' },
-            { status: 409 }
-          );
+          return errorResponse(availability.reason || 'Handle is not available', 409);
         }
       }
     }
@@ -224,7 +222,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update user';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }
 
@@ -232,16 +230,13 @@ export async function DELETE(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const body = await request.json();
     const validation = deleteAccountSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'You must send { "confirm": "DELETE" } to delete your account' },
-        { status: 400 }
-      );
+      return errorResponse('You must send { "confirm": "DELETE" } to delete your account', 400);
     }
 
     const userId = session.user.id;
@@ -309,6 +304,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete account';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

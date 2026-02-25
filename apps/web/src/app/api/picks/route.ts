@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getDailyPicks } from '@/lib/recommendation-engine';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/picks — Get daily picks for authenticated user.
  * POST /api/picks — Refresh picks (generates new batch).
@@ -9,7 +10,7 @@ import { getDailyPicks } from '@/lib/recommendation-engine';
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const result = await getDailyPicks(session.user.id);
@@ -19,7 +20,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   let body: { refreshBatch?: number } = {};

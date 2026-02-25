@@ -71,7 +71,7 @@ describe('POST /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when collection does not exist', async () => {
@@ -84,7 +84,7 @@ describe('POST /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 403 when user does not own the collection', async () => {
@@ -97,7 +97,7 @@ describe('POST /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 when podcastId is missing', async () => {
@@ -124,7 +124,7 @@ describe('POST /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('adds podcast to collection and returns 201', async () => {
@@ -180,7 +180,7 @@ describe('DELETE /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when collection does not exist', async () => {
@@ -193,7 +193,7 @@ describe('DELETE /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 403 when user does not own the collection', async () => {
@@ -206,7 +206,7 @@ describe('DELETE /api/collections/[collectionId]/items', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns removed: true when item does not exist (idempotent)', async () => {

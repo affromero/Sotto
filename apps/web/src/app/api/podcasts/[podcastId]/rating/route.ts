@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { podcastRatingSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 interface RouteContext {
   params: Promise<{ podcastId: string }>;
 }
@@ -13,7 +14,7 @@ interface RouteContext {
 export async function GET(_request: NextRequest, context: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { podcastId } = await context.params;
@@ -36,7 +37,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 export async function POST(request: NextRequest, context: RouteContext) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { podcastId } = await context.params;
@@ -47,17 +48,17 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Only the podcast creator can rate it' }, { status: 403 });
+    return errorResponse('Only the podcast creator can rate it', 403);
   }
 
   const body = await request.json();
   const parsed = podcastRatingSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid rating data', details: parsed.error.flatten() }, { status: 400 });
+    return errorResponse('Invalid rating data', 400, { details: parsed.error.flatten() });
   }
 
   const rating = await prisma.podcastRating.upsert({

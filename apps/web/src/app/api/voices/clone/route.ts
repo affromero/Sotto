@@ -11,10 +11,11 @@ import { logUsage } from '@/lib/usage-logger';
 import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Pro gate — voice cloning requires Pro
@@ -27,10 +28,7 @@ export async function POST(request: NextRequest) {
   ]);
   const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
   if (!tierFeatures.voiceCloningEnabled) {
-    return NextResponse.json(
-      { error: 'Voice cloning requires a Pro subscription.' },
-      { status: 403 }
-    );
+    return errorResponse('Voice cloning requires a Pro subscription.', 403);
   }
 
   const existingCount = await prisma.voiceClone.count({
@@ -38,10 +36,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (existingCount >= LIMITS.maxVoiceClones) {
-    return NextResponse.json(
-      { error: `Maximum of ${LIMITS.maxVoiceClones} voice clones allowed` },
-      { status: 403 }
-    );
+    return errorResponse(`Maximum of ${LIMITS.maxVoiceClones} voice clones allowed`, 403);
   }
 
   const formData = await request.formData();
@@ -52,11 +47,11 @@ export async function POST(request: NextRequest) {
 
   const parsed = cloneVoiceSchema.safeParse({ name, sourceType });
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   if (!audioFile) {
-    return NextResponse.json({ error: 'Audio file is required' }, { status: 400 });
+    return errorResponse('Audio file is required', 400);
   }
 
   const arrayBuffer = await audioFile.arrayBuffer();
@@ -67,10 +62,7 @@ export async function POST(request: NextRequest) {
   if (provider === 'fal') {
     const falKey = await getByokKey(session.user.id, 'fal');
     if (!falKey) {
-      return NextResponse.json(
-        { error: 'Fal API key required for voice cloning. Add it in Settings.' },
-        { status: 400 }
-      );
+      return errorResponse('Fal API key required for voice cloning. Add it in Settings.', 400);
     }
     const { embeddingUrl } = await cloneVoiceViaFal(falKey, audioBuffer);
     externalVoiceId = embeddingUrl;
@@ -116,14 +108,14 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const { voiceCloneId, requestable, description, priceInCents } = body;
 
   if (!voiceCloneId || typeof voiceCloneId !== 'string') {
-    return NextResponse.json({ error: 'voiceCloneId is required' }, { status: 400 });
+    return errorResponse('voiceCloneId is required', 400);
   }
 
   const hasRequestable = typeof requestable === 'boolean';
@@ -131,26 +123,17 @@ export async function PATCH(request: NextRequest) {
   const hasPrice = priceInCents !== undefined;
 
   if (!hasRequestable && !hasDescription && !hasPrice) {
-    return NextResponse.json(
-      { error: 'At least one of requestable, description, or priceInCents is required' },
-      { status: 400 }
-    );
+    return errorResponse('At least one of requestable, description, or priceInCents is required', 400);
   }
 
   if (hasDescription && description.length > 200) {
-    return NextResponse.json(
-      { error: 'Description must be 200 characters or less' },
-      { status: 400 }
-    );
+    return errorResponse('Description must be 200 characters or less', 400);
   }
 
   // Validate priceInCents range
   if (hasPrice && priceInCents !== null) {
     if (typeof priceInCents !== 'number' || !Number.isInteger(priceInCents) || priceInCents < 0 || priceInCents > 10000) {
-      return NextResponse.json(
-        { error: 'Price must be an integer between 0 and 10000 cents ($0-$100)' },
-        { status: 400 }
-      );
+      return errorResponse('Price must be an integer between 0 and 10000 cents ($0-$100)', 400);
     }
   }
 
@@ -159,11 +142,11 @@ export async function PATCH(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   if (voiceClone.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Setting a price requires Stripe onboarding
@@ -173,10 +156,7 @@ export async function PATCH(request: NextRequest) {
       select: { stripeOnboarded: true },
     });
     if (!user.stripeOnboarded) {
-      return NextResponse.json(
-        { error: 'Connect your Stripe account before setting a price' },
-        { status: 400 }
-      );
+      return errorResponse('Connect your Stripe account before setting a price', 400);
     }
   }
 
@@ -196,14 +176,14 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const { voiceCloneId } = body;
 
   if (!voiceCloneId || typeof voiceCloneId !== 'string') {
-    return NextResponse.json({ error: 'voiceCloneId is required' }, { status: 400 });
+    return errorResponse('voiceCloneId is required', 400);
   }
 
   const voiceClone = await prisma.voiceClone.findUnique({
@@ -211,11 +191,11 @@ export async function DELETE(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   if (voiceClone.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Only call ElevenLabs delete API for ElevenLabs voices

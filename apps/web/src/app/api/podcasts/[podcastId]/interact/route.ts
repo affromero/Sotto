@@ -9,6 +9,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
 import type { ProcessInteractionPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const suspended = checkSuspension(session);
@@ -25,10 +26,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Rate limit: 60/hour
   const hourly = await checkRateLimit(`interact:hour:${session.user.id}`, 60, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json(
-      { error: 'Rate limit exceeded: max 60 interactions per hour.' },
-      { status: 429 }
-    );
+    return errorResponse('Rate limit exceeded: max 60 interactions per hour.', 429);
   }
 
   // Check Q&A interaction limit based on tier
@@ -46,10 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       where: { userId: session.user.id, podcastId },
     });
     if (existingCount >= tierFeatures.maxQaInteractions) {
-      return NextResponse.json(
-        { error: `Q&A limit reached (${tierFeatures.maxQaInteractions} per podcast). Upgrade to Pro for unlimited Q&A.` },
-        { status: 403 }
-      );
+      return errorResponse(`Q&A limit reached (${tierFeatures.maxQaInteractions} per podcast). Upgrade to Pro for unlimited Q&A.`, 403);
     }
   }
 
@@ -59,14 +54,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   const body = await request.json();
   const parsed = interactionSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { question, timestamp } = parsed.data;

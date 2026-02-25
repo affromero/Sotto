@@ -3,10 +3,11 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { storeAiKey, removeAiKey, listAiProviders, validateAiKey } from '@/lib/byok';
 import { isValidAiProviderId } from '@/lib/providers/ai-registry';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const keys = await listAiProviders(authed.userId);
@@ -16,25 +17,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const { provider, apiKey } = body;
 
   if (!provider || !isValidAiProviderId(provider)) {
-    return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
+    return errorResponse('Invalid provider', 400);
   }
   if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10 || apiKey.length > 500) {
-    return NextResponse.json({ error: 'Invalid API key' }, { status: 400 });
+    return errorResponse('Invalid API key', 400);
   }
 
   const isValid = await validateAiKey(provider, apiKey);
   if (!isValid) {
-    return NextResponse.json(
-      { error: `Invalid ${provider} API key. Please check and try again.` },
-      { status: 422 }
-    );
+    return errorResponse(`Invalid ${provider} API key. Please check and try again.`, 422);
   }
 
   await storeAiKey(authed.userId, provider, apiKey);
@@ -44,7 +42,7 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   let provider: string | undefined;
@@ -52,11 +50,11 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     provider = body.provider;
   } catch {
-    return NextResponse.json({ error: 'Provider required' }, { status: 400 });
+    return errorResponse('Provider required', 400);
   }
 
   if (!provider || !isValidAiProviderId(provider)) {
-    return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
+    return errorResponse('Invalid provider', 400);
   }
 
   await removeAiKey(authed.userId, provider);

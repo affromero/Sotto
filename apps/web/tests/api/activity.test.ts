@@ -62,7 +62,7 @@ describe('GET /api/activity', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -72,7 +72,7 @@ describe('GET /api/activity', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 for invalid pagination params', async () => {
@@ -82,7 +82,7 @@ describe('GET /api/activity', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid query parameters' });
+    expect(body).toMatchObject({ error: 'Invalid query parameters' });
   });
 
   it('returns empty activities when user follows nobody', async () => {

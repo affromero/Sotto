@@ -9,6 +9,7 @@ import { getTwitterConfig } from '@/lib/twitter-config';
 import { trendGenerateSchema } from '@/lib/validations';
 import type { TwitterTweet, TrendTopic } from '@/types/twitter';
 
+import { errorResponse } from '@/lib/api-response';
 function engagementScore(tweet: TwitterTweet): number {
   const m = tweet.public_metrics;
   if (!m) return 0;
@@ -18,7 +19,7 @@ function engagementScore(tweet: TwitterTweet): number {
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const config = await getTwitterConfig();
@@ -49,13 +50,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = trendGenerateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const sottoUser = await prisma.user.findUnique({
@@ -64,10 +65,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!sottoUser) {
-    return NextResponse.json(
-      { error: '@sotto system account not found' },
-      { status: 404 }
-    );
+    return errorResponse('@sotto system account not found', 404);
   }
 
   const intent = await parseTweetIntent(parsed.data.tweetText);

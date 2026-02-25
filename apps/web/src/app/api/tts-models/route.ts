@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { listByokProviders } from '@/lib/byok';
 import { getProviderMeta, isValidProviderId, type TtsProviderId } from '@/lib/providers/tts-registry';
 
+import { errorResponse } from '@/lib/api-response';
 // Env var names for each platform-level TTS provider key
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
@@ -26,7 +27,7 @@ function modelsResponse(providerId: TtsProviderId) {
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const providerId = new URL(request.url).searchParams.get('provider');

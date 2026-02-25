@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; commentId: string }> };
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
@@ -9,7 +10,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -26,7 +27,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!comment || comment.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    return errorResponse('Comment not found', 404);
   }
 
   // Only the comment author or podcast owner can delete
@@ -34,7 +35,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const isPodcastOwner = comment.podcast.userId === userId;
 
   if (!isCommentAuthor && !isPodcastOwner) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   await prisma.$transaction(async (tx) => {

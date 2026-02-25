@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * DELETE /api/ideas/:ideaId
  * Remove a saved idea.
@@ -12,7 +13,7 @@ export async function DELETE(
 ) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { ideaId } = await params;
@@ -23,11 +24,11 @@ export async function DELETE(
   });
 
   if (!idea) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   if (idea.userId !== authed.userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   await prisma.savedIdea.delete({ where: { id: ideaId } });

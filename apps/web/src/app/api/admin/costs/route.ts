@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getCostBreakdown, getDailyCostTrend, checkCostThresholds } from '@/lib/cost-monitor';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/admin/costs — Provider cost breakdown dashboard (ADMIN only)
  *
@@ -12,10 +13,10 @@ import { getCostBreakdown, getDailyCostTrend, checkCostThresholds } from '@/lib/
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
   if (session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    return errorResponse('Admin access required', 403);
   }
 
   const { searchParams } = new URL(request.url);
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const validPeriods = ['24h', '7d', '30d', '90d'];
   if (!validPeriods.includes(period)) {
-    return NextResponse.json({ error: 'Invalid period' }, { status: 400 });
+    return errorResponse('Invalid period', 400);
   }
 
   const [breakdown, trend, warnings] = await Promise.all([

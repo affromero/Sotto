@@ -50,7 +50,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found or not ready' });
+    expect(body).toMatchObject({ error: 'Podcast not found or not ready' });
   });
 
   it('returns 404 when podcast status is not READY', async () => {
@@ -65,7 +65,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found or not ready' });
+    expect(body).toMatchObject({ error: 'Podcast not found or not ready' });
   });
 
   it('returns 404 when audioUrl is null', async () => {
@@ -80,7 +80,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found or not ready' });
+    expect(body).toMatchObject({ error: 'Podcast not found or not ready' });
   });
 
   it('returns 403 when podcast is private', async () => {
@@ -95,7 +95,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'This podcast is private' });
+    expect(body).toMatchObject({ error: 'This podcast is private' });
   });
 
   it('returns 502 when audio fetch fails', async () => {
@@ -111,7 +111,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(502);
-    expect(body).toEqual({ error: 'Audio file not available' });
+    expect(body).toMatchObject({ error: 'Audio file not available' });
   });
 
   it('returns 502 when fetch throws an error', async () => {
@@ -127,7 +127,7 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     const body = await response.json();
 
     expect(response.status).toBe(502);
-    expect(body).toEqual({ error: 'Failed to fetch audio' });
+    expect(body).toMatchObject({ error: 'Failed to fetch audio' });
   });
 
   it('streams audio with correct Content-Disposition header on success', async () => {

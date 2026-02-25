@@ -5,6 +5,7 @@ import { updatePodcastSchema } from '@/lib/validations';
 import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -27,13 +28,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   // Private podcasts require ownership
   if (podcast.visibility === 'PRIVATE') {
     if (!authResult || authResult.userId !== podcast.userId) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return errorResponse('Not found', 404);
     }
   }
 
@@ -63,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const authResult = await authenticateRequest(request);
 
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -72,18 +73,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.userId !== authResult.userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = updatePodcastSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { dismissSuggestion, ...updateData } = parsed.data;
@@ -98,10 +99,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     ]);
     const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
     if (!tierFeatures.privateAllowed) {
-      return NextResponse.json(
-        { error: 'Private and unlisted podcasts require a Pro subscription.' },
-        { status: 403 }
-      );
+      return errorResponse('Private and unlisted podcasts require a Pro subscription.', 403);
     }
   }
 
@@ -125,7 +123,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const authResult = await authenticateRequest(request);
 
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -134,11 +132,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.userId !== authResult.userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   await prismaUnfiltered.$transaction(async (tx) => {
