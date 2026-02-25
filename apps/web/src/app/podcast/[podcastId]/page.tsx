@@ -125,6 +125,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           doi: true,
           verificationStatus: true,
           verificationDetails: true,
+          contentDomain: true,
         },
       },
       forkedFrom: {
