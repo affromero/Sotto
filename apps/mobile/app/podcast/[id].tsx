@@ -410,7 +410,7 @@ export default function PodcastScreen() {
           const isDimmed = teleprompterEnabled && !isCurrent;
           const speakerPalette = colors.speakers;
           const allSpeakers: string[] = [];
-          for (const seg of segments) {
+          for (const seg of podcast.segments ?? []) {
             if (!allSpeakers.includes(seg.speaker)) allSpeakers.push(seg.speaker);
           }
           const speakerIdx = Math.max(0, allSpeakers.indexOf(item.speaker)) % speakerPalette.length;
