@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TranscriptPanel } from '@/components/player/TranscriptPanel';
 import { SegmentData } from '@/types/podcast';
@@ -152,5 +152,86 @@ describe('TranscriptPanel', () => {
     render(<TranscriptPanel segments={[]} currentTime={0} />);
     expect(screen.getByRole('heading', { name: 'Transcript' })).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  describe('scroll-follow', () => {
+    function mockScrollable(el: Element) {
+      Object.defineProperty(el, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: 300, configurable: true });
+      const original = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((target) => {
+        if (target === el) return { overflowY: 'auto' } as CSSStyleDeclaration;
+        return original(target);
+      });
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('pauses auto-scroll after wheel event on segments container', () => {
+      const { container, rerender } = render(
+        <TranscriptPanel segments={mockSegments} currentTime={0} />
+      );
+      const segments = container.querySelector('[class*="segments"]')!;
+      mockScrollable(segments);
+
+      act(() => {
+        segments.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      // Clear the mock to track new calls
+      (HTMLElement.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+
+      // Re-render with new currentTime — scrollIntoView should NOT be called
+      rerender(<TranscriptPanel segments={mockSegments} currentTime={6} />);
+      expect(HTMLElement.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('resumes auto-scroll after 3 seconds', () => {
+      const { container, rerender } = render(
+        <TranscriptPanel segments={mockSegments} currentTime={0} />
+      );
+      const segments = container.querySelector('[class*="segments"]')!;
+      mockScrollable(segments);
+
+      act(() => {
+        segments.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      (HTMLElement.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+      rerender(<TranscriptPanel segments={mockSegments} currentTime={6} />);
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it('segment click re-engages auto-scroll', () => {
+      const onSegmentClick = vi.fn();
+      const { container, rerender } = render(
+        <TranscriptPanel segments={mockSegments} currentTime={0} onSegmentClick={onSegmentClick} />
+      );
+      const segments = container.querySelector('[class*="segments"]')!;
+      mockScrollable(segments);
+
+      // Disengage
+      act(() => {
+        segments.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      // Click a segment to reengage
+      fireEvent.click(screen.getByText('Welcome to the podcast about quantum physics.'));
+
+      (HTMLElement.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+      rerender(<TranscriptPanel segments={mockSegments} currentTime={6} />);
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalled();
+    });
   });
 });

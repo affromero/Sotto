@@ -101,6 +101,7 @@ Client-side React hooks (`'use client'`).
 | `usePlaybackTelemetry` | Playback event tracking: heartbeats (30s), pause/seek/speed counts, abandon detection |
 | `useRotatingMessage` | Rotating sub-messages for generation progress: cycles through stage-specific pools every 9s, switches early→late after 2min |
 | `usePodcast` | Podcast detail fetcher: loading state, like/unlike, save/unsave, fork |
+| `useScrollFollow` | Auto-scroll follow with user-input detection (wheel/touch), scrollability guard, 3s debounce relock |
 
 ## Providers (`src/lib/providers/`)
 
