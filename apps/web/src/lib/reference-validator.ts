@@ -29,7 +29,7 @@ function extractFirstJsonObject(text: string): string {
 }
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
-import { validateUrl, UrlValidationError } from './url-validator';
+import { safeFetch } from './url-validator';
 
 export interface VerificationCheck {
   layer: 'url' | 'doi' | 'title_search' | 'ai';
@@ -158,22 +158,12 @@ export async function verifyUrl(ref: ReferenceInput): Promise<VerificationCheck>
   }
 
   try {
-    await validateUrl(ref.url);
-  } catch (err) {
-    if (err instanceof UrlValidationError) {
-      return { layer: 'url', passed: false, confidence: 0, detail: `SSRF blocked: ${err.message}` };
-    }
-    return { layer: 'url', passed: false, confidence: 0, detail: `URL validation failed: ${(err as Error).message}` };
-  }
-
-  try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const response = await fetch(ref.url, {
+    const response = await safeFetch(ref.url, {
       method: 'HEAD',
       signal: controller.signal,
-      redirect: 'follow',
       headers: { 'User-Agent': 'Sotto/1.0 (reference-validator)' },
     });
 
