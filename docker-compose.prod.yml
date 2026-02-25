@@ -57,16 +57,12 @@ services:
       - '127.0.0.1:3000:3000'
     volumes:
       - ./.pitch:/app/apps/web/.pitch:ro
-      # Mount host Claude CLI credentials so claude-code:* models work in Docker.
-      # Override CLAUDE_CREDENTIALS_PATH in .env if the host user isn't root.
-      - ${CLAUDE_CREDENTIALS_PATH:-/root/.claude}:/home/sotto/.claude:ro
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      # Tell the claude subprocess where to find ~/.claude regardless of the
-      # sotto system user's actual $HOME (which may be / on Alpine).
-      CLAUDE_HOME: /home/sotto
+      # CLAUDE_CODE_CREDENTIALS_JSON is pulled from Doppler at deploy time.
+      # The app writes it to /tmp/claude-runtime/.claude/ on first use.
       DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     depends_on:
@@ -95,17 +91,10 @@ services:
       dockerfile: apps/web/Dockerfile.workers
     container_name: sotto-prod-workers
     restart: unless-stopped
-    volumes:
-      # Mount host Claude CLI credentials so claude-code:* models work in Docker.
-      # Override CLAUDE_CREDENTIALS_PATH in .env if the host user isn't root.
-      - ${CLAUDE_CREDENTIALS_PATH:-/root/.claude}:/home/sotto/.claude:ro
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      # Tell the claude subprocess where to find ~/.claude regardless of the
-      # sotto system user's actual $HOME (which may be / on Alpine).
-      CLAUDE_HOME: /home/sotto
       DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       KITTENTTS_URL: http://kittentts:8000
