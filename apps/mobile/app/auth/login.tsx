@@ -243,7 +243,7 @@ export default function LoginScreen() {
         {/* Branding */}
         <View style={styles.brandSection}>
           <Text style={styles.logo}>Sotto</Text>
-          <Text style={styles.tagline}>The Open Podcast Network</Text>
+          <Text style={styles.tagline}>Where Podcasts Get Social</Text>
         </View>
 
         {IS_DEV ? (

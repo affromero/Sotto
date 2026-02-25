@@ -5,7 +5,7 @@ import styles from './page.module.css';
 export const metadata = {
   title: 'Join Us — Sotto',
   description:
-    'Help build the open podcast network. We\'re a small, remote-first team working on the future of how people share knowledge.',
+    'Help build the social podcast network. We\'re a small, remote-first team working on the future of how people share knowledge.',
 };
 
 export default function JoinPage() {
