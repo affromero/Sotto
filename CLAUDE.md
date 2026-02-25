@@ -29,7 +29,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network 
 
 ## Monorepo
 
-npm workspaces: `@sotto/web` (`apps/web/`), `@sotto/mobile` (`apps/mobile/`), `@sotto/shared` (`packages/shared/`).
+npm workspaces: `@sotto/web` (`apps/web/`), `@sotto/mobile` (`apps/mobile/`), `@sotto/shared` (`packages/shared/`), `@sottofm/verification-standard` (`packages/verification-standard/`).
 Root `package.json` proxies to `@sotto/web`. Each subdirectory has its own `CLAUDE.md`.
 
 ## Build Commands

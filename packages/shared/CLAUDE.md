@@ -9,7 +9,7 @@ src/
 ├── types/
 │   ├── enums.ts          # String union equivalents of Prisma enums
 │   ├── podcast.ts        # PodcastSummary, PodcastDetail, SegmentData, CreatePodcastRequest, AiModelOption, TtsOption, ScriptTurn, VoiceProfile
-│   ├── reference.ts      # ReferenceData, VerificationLayerResult
+│   ├── reference.ts      # ReferenceData (includes contentDomain: string | null), VerificationLayerResult
 │   ├── twitter.ts        # TweetParseResult, TwitterTweet, TweetMentionData
 │   ├── discovery.ts      # DiscoveryMessage, DiscoveryMetadata, DiscoveryState, InspireSection, NewsTimeRange, INSPIRE_SECTION_LABELS, NEWS_TIME_RANGE_LABELS
 │   ├── feed.ts           # FeedResponse, FeedSort, FeedFilters
