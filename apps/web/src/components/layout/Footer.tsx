@@ -15,7 +15,7 @@ export function Footer() {
             <a href="/create">Create</a>
             <a href="/changelog">Changelog</a>
             <a href="/developers">Developers</a>
-            <a href="/pricing">Pricing</a>
+            <a href="/feed">Feed</a>
           </div>
           <div>
             <h4>Community</h4>
