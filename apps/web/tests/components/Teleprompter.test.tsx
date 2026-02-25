@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Teleprompter } from '@/components/player/Teleprompter';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -133,5 +133,85 @@ describe('Teleprompter', () => {
       />
     );
     expect(screen.getByLabelText('Teleprompter view')).toBeInTheDocument();
+  });
+
+  describe('scroll-follow', () => {
+    function mockScrollable(el: Element) {
+      Object.defineProperty(el, 'scrollHeight', { value: 2000, configurable: true });
+      Object.defineProperty(el, 'clientHeight', { value: 300, configurable: true });
+      const original = window.getComputedStyle;
+      vi.spyOn(window, 'getComputedStyle').mockImplementation((target) => {
+        if (target === el) return { overflowY: 'auto' } as CSSStyleDeclaration;
+        return original(target);
+      });
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('pauses auto-scroll after wheel event on root container', () => {
+      const { rerender } = render(
+        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
+      );
+      const root = screen.getByLabelText('Teleprompter view');
+      mockScrollable(root);
+
+      act(() => {
+        root.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+
+      // Change currentTime to trigger activeIndex change (0→6 moves to segment 2)
+      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('resumes auto-scroll after 3 seconds', () => {
+      const { rerender } = render(
+        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
+      );
+      const root = screen.getByLabelText('Teleprompter view');
+      mockScrollable(root);
+
+      act(() => {
+        root.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+
+    it('segment click re-engages auto-scroll', () => {
+      const onSegmentClick = vi.fn();
+      const { rerender } = render(
+        <Teleprompter segments={mockSegments} references={[]} currentTime={6} onSegmentClick={onSegmentClick} />
+      );
+      const root = screen.getByLabelText('Teleprompter view');
+      mockScrollable(root);
+
+      // Disengage
+      act(() => {
+        root.dispatchEvent(new Event('wheel', { bubbles: true }));
+      });
+
+      // Click a segment to reengage
+      fireEvent.click(screen.getByText('Welcome to the show!'));
+
+      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={14} />);
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
   });
 });
