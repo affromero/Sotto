@@ -45,41 +45,34 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-const mockVerifyUrl = vi.fn().mockResolvedValue({
-  layer: 'url',
-  passed: true,
-  confidence: 0.6,
-  detail: 'URL returned 200',
-});
-const mockVerifyDoi = vi.fn().mockResolvedValue({
-  layer: 'doi',
-  passed: true,
-  confidence: 0.95,
-  detail: 'DOI verified: title similarity 100%',
-});
-const mockSearchTitle = vi.fn().mockResolvedValue({
-  layer: 'title_search',
-  passed: true,
-  confidence: 0.9,
-  detail: 'Title matched in OpenAlex (similarity 95%)',
-});
-const mockAiEvaluateReferences = vi.fn().mockResolvedValue(new Map());
-const mockComputeVerificationVerdict = vi.fn().mockReturnValue({
-  status: 'VERIFIED',
-  confidence: 0.8,
+// Mock the new reference-verification module (Phase 4: replaces individual layer mocks)
+const mockRunReferenceVerification = vi.fn().mockResolvedValue({
+  results: new Map([
+    [
+      'ref-001',
+      {
+        domain: 'ACADEMIC',
+        verdict: { status: 'VERIFIED', confidence: 0.85 },
+        score: 0.85,
+        checks: [
+          { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
+          { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified: title similarity 100%' },
+          { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched in OpenAlex (similarity 95%)' },
+          { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — Reference appears legitimate' },
+        ],
+      },
+    ],
+  ]),
+  rejectedRefIds: new Set<string>(),
 });
 
-const mockAssessSourceQuality = vi
-  .fn()
-  .mockReturnValue({ accepted: true, reason: 'Trusted source' });
+vi.mock('@/lib/reference-verification', () => ({
+  runReferenceVerification: (...args: unknown[]) => mockRunReferenceVerification(...args),
+}));
 
+// reference-validator is still imported for ReferenceInput type — keep a minimal mock
 vi.mock('@/lib/reference-validator', () => ({
-  verifyUrl: (...args: unknown[]) => mockVerifyUrl(...args),
-  verifyDoi: (...args: unknown[]) => mockVerifyDoi(...args),
-  searchTitle: (...args: unknown[]) => mockSearchTitle(...args),
-  aiEvaluateReferences: (...args: unknown[]) => mockAiEvaluateReferences(...args),
-  computeVerificationVerdict: (...args: unknown[]) => mockComputeVerificationVerdict(...args),
-  assessSourceQuality: (...args: unknown[]) => mockAssessSourceQuality(...args),
+  assessSourceQuality: vi.fn().mockReturnValue({ accepted: true, reason: 'Trusted source' }),
 }));
 
 const mockBuildRenumberMap = vi.fn().mockReturnValue(new Map());
@@ -192,45 +185,24 @@ describe('processReferenceValidation', () => {
       topic: 'Quantum Computing Basics',
     });
 
-    // Default: all checks pass
-    mockVerifyUrl.mockResolvedValue({
-      layer: 'url',
-      passed: true,
-      confidence: 0.6,
-      detail: 'URL returned 200',
-    });
-
-    mockVerifyDoi.mockResolvedValue({
-      layer: 'doi',
-      passed: true,
-      confidence: 0.95,
-      detail: 'DOI verified: title similarity 100%',
-    });
-
-    mockSearchTitle.mockResolvedValue({
-      layer: 'title_search',
-      passed: true,
-      confidence: 0.9,
-      detail: 'Title matched in OpenAlex (similarity 95%)',
-    });
-
-    mockAiEvaluateReferences.mockResolvedValue(
-      new Map([
+    mockRunReferenceVerification.mockResolvedValue({
+      results: new Map([
         [
           'ref-001',
           {
-            layer: 'ai',
-            passed: true,
-            confidence: 0.85,
-            detail: 'AI: REAL — Reference appears legitimate',
+            domain: 'ACADEMIC',
+            verdict: { status: 'VERIFIED', confidence: 0.85 },
+            score: 0.85,
+            checks: [
+              { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
+              { layer: 'doi', passed: true, confidence: 0.95, detail: 'DOI verified: title similarity 100%' },
+              { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched in OpenAlex (similarity 95%)' },
+              { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — Reference appears legitimate' },
+            ],
           },
         ],
-      ])
-    );
-
-    mockComputeVerificationVerdict.mockReturnValue({
-      status: 'VERIFIED',
-      confidence: 0.85,
+      ]),
+      rejectedRefIds: new Set<string>(),
     });
 
     mockPrismaSegmentCreate.mockImplementation(async ({ data }: { data: { order: number } }) => ({
@@ -312,97 +284,28 @@ describe('processReferenceValidation', () => {
     });
   });
 
-  describe('4-layer verification pipeline', () => {
-    it('runs URL verification for each reference', async () => {
-      mockPrismaReferenceFindMany.mockResolvedValue([
-        {
-          id: 'ref-001',
-          number: 1,
-          title: 'Paper A',
-          authors: ['Author A'],
-          year: 2023,
-          url: 'https://example.com/paper-a',
-          doi: null,
-          type: 'article',
-        },
-        {
-          id: 'ref-002',
-          number: 2,
-          title: 'Paper B',
-          authors: ['Author B'],
-          year: 2022,
-          url: 'https://example.com/paper-b',
-          doi: null,
-          type: 'article',
-        },
-      ]);
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL' }],
-        ])
-      );
-
+  describe('domain-aware verification pipeline', () => {
+    it('calls runReferenceVerification with refs, script turns, and topic', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockVerifyUrl).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'ref-001',
-          url: 'https://example.com/paper-a',
-        })
-      );
-
-      expect(mockVerifyUrl).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'ref-002',
-          url: 'https://example.com/paper-b',
-        })
-      );
-    });
-
-    it('runs DOI verification for each reference', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockVerifyDoi).toHaveBeenCalledWith(
-        expect.objectContaining({
-          doi: '10.1234/qc.2023.001',
-        })
-      );
-    });
-
-    it('runs title search for each reference', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockSearchTitle).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: 'Introduction to Quantum Computing',
-        })
-      );
-    });
-
-    it('runs AI evaluation after external checks', async () => {
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockAiEvaluateReferences).toHaveBeenCalledWith(
+      expect(mockRunReferenceVerification).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
             id: 'ref-001',
             title: 'Introduction to Quantum Computing',
           }),
         ]),
-        expect.any(Map),
+        expect.arrayContaining([
+          expect.objectContaining({ speaker: 'HOST' }),
+        ]),
         'Quantum Computing Basics',
         undefined,
         expect.any(String)
       );
     });
 
-    it('produces a verification verdict after running all layers', async () => {
+    it('produces a VERIFIED verdict and stores contentDomain on Reference', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
@@ -410,49 +313,157 @@ describe('processReferenceValidation', () => {
         where: { id: 'ref-001' },
         data: expect.objectContaining({
           verificationStatus: 'VERIFIED',
+          contentDomain: 'ACADEMIC',
         }),
       });
     });
 
-    it('proceeds with empty checks if all external APIs fail', async () => {
-      mockVerifyUrl.mockRejectedValue(new Error('Network error'));
-      mockVerifyDoi.mockRejectedValue(new Error('Network error'));
-      mockSearchTitle.mockRejectedValue(new Error('Network error'));
-
+    it('stores contentDomain in Reference record after validation', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockAiEvaluateReferences).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.any(Map),
-        expect.anything(),
-        undefined,
-        expect.any(String)
-      );
+      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
+        where: { id: 'ref-001' },
+        data: expect.objectContaining({
+          contentDomain: 'ACADEMIC',
+        }),
+      });
     });
 
-    it('continues without AI checks if AI evaluation fails', async () => {
-      mockAiEvaluateReferences.mockRejectedValue(new Error('Claude API error'));
+    it('classifies news reference as NEWS domain and verifies it', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        {
+          id: 'ref-news',
+          number: 1,
+          title: 'Breaking: Major Development',
+          authors: [],
+          year: 2024,
+          url: 'https://nytimes.com/article/breaking',
+          doi: null,
+          type: 'ARTICLE',
+        },
+      ]);
+
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          [
+            'ref-news',
+            {
+              domain: 'NEWS',
+              verdict: { status: 'VERIFIED', confidence: 0.76 },
+              score: 0.76,
+              checks: [
+                { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
+                { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — NYT article verified' },
+              ],
+            },
+          ],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
-      expect(mockComputeVerificationVerdict).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({ layer: 'url' }),
-          expect.objectContaining({ layer: 'doi' }),
-          expect.objectContaining({ layer: 'title_search' }),
-        ])
-      );
+      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
+        where: { id: 'ref-news' },
+        data: expect.objectContaining({
+          contentDomain: 'NEWS',
+          verificationStatus: 'VERIFIED',
+        }),
+      });
+    });
+
+    it('NEWS reference with live URL + AI passes verification (score > 0.50 threshold)', async () => {
+      // url = 0.35 × 0.6 = 0.21, ai = 0.65 × 0.85 = 0.5525, total = 0.76 > 0.50 threshold
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        {
+          id: 'ref-nyt',
+          number: 1,
+          title: 'Climate Summit Coverage',
+          authors: [],
+          year: 2024,
+          url: 'https://nytimes.com/climate',
+          doi: null,
+          type: 'ARTICLE',
+        },
+      ]);
+
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          [
+            'ref-nyt',
+            {
+              domain: 'NEWS',
+              verdict: { status: 'VERIFIED', confidence: 0.76 },
+              score: 0.76,
+              checks: [
+                { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
+                { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — credible outlet' },
+              ],
+            },
+          ],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
+        where: { id: 'ref-nyt' },
+        data: expect.objectContaining({ verificationStatus: 'VERIFIED' }),
+      });
+    });
+
+    it('ACADEMIC reference without DOI classified by arxiv.org URL pattern', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        {
+          id: 'ref-arxiv',
+          number: 1,
+          title: 'Attention Is All You Need',
+          authors: ['Vaswani et al.'],
+          year: 2017,
+          url: 'https://arxiv.org/abs/1706.03762',
+          doi: null,
+          type: 'PAPER',
+        },
+      ]);
+
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          [
+            'ref-arxiv',
+            {
+              domain: 'ACADEMIC',
+              verdict: { status: 'VERIFIED', confidence: 0.80 },
+              score: 0.80,
+              checks: [
+                { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
+                { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched' },
+                { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL' },
+              ],
+            },
+          ],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
+        where: { id: 'ref-arxiv' },
+        data: expect.objectContaining({
+          contentDomain: 'ACADEMIC',
+          verificationStatus: 'VERIFIED',
+        }),
+      });
     });
   });
 
   describe('verification verdicts and status updates', () => {
     it('updates reference status to VERIFIED when verdict is VERIFIED', async () => {
-      mockComputeVerificationVerdict.mockReturnValue({
-        status: 'VERIFIED',
-        confidence: 0.9,
-      });
-
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
@@ -466,120 +477,69 @@ describe('processReferenceValidation', () => {
 
     it('updates reference status to REMOVED when verdict is REMOVED', async () => {
       mockPrismaReferenceFindMany.mockResolvedValue([
-        {
-          id: 'ref-001',
-          number: 1,
-          title: 'Introduction to Quantum Computing',
-          authors: ['John Doe', 'Jane Smith'],
-          year: 2023,
-          url: 'https://example.com/paper',
-          doi: '10.1234/qc.2023.001',
-          type: 'article',
-        },
-        {
-          id: 'ref-002',
-          number: 2,
-          title: 'Another Paper',
-          authors: ['Other Author'],
-          year: 2022,
-          url: 'https://example.com/paper2',
-          doi: null,
-          type: 'article',
-        },
+        { id: 'ref-001', number: 1, title: 'Paper A', authors: ['Author A'], year: 2023, url: 'https://example.com/a', doi: null, type: 'article' },
+        { id: 'ref-002', number: 2, title: 'Paper B', authors: ['Author B'], year: 2022, url: 'https://example.com/b', doi: null, type: 'article' },
       ]);
 
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
-
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({
-          status: 'REMOVED',
-          confidence: 0.1,
-        })
-        .mockReturnValueOnce({
-          status: 'VERIFIED',
-          confidence: 0.8,
-        });
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0.1 }, score: 0.1, checks: [{ layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [{ layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
       expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
         where: { id: 'ref-001' },
-        data: expect.objectContaining({
-          verificationStatus: 'REMOVED',
-        }),
+        data: expect.objectContaining({ verificationStatus: 'REMOVED' }),
       });
     });
 
     it('updates reference status to FAILED when verdict is FAILED', async () => {
-      mockPrismaReferenceFindMany.mockResolvedValue([
-        {
-          id: 'ref-001',
-          number: 1,
-          title: 'Introduction to Quantum Computing',
-          authors: ['John Doe', 'Jane Smith'],
-          year: 2023,
-          url: 'https://example.com/paper',
-          doi: '10.1234/qc.2023.001',
-          type: 'article',
-        },
-        {
-          id: 'ref-002',
-          number: 2,
-          title: 'Another Paper',
-          authors: ['Other Author'],
-          year: 2022,
-          url: 'https://example.com/paper2',
-          doi: null,
-          type: 'article',
-        },
-      ]);
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
-
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({
-          status: 'FAILED',
-          confidence: 0,
-        })
-        .mockReturnValueOnce({
-          status: 'VERIFIED',
-          confidence: 0.8,
-        });
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'FAILED', confidence: 0 }, score: 0, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
       expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
         where: { id: 'ref-001' },
-        data: expect.objectContaining({
-          verificationStatus: 'FAILED',
-        }),
+        data: expect.objectContaining({ verificationStatus: 'FAILED' }),
       });
     });
 
     it('updates reference with replacement data when verdict is REPLACED', async () => {
-      mockComputeVerificationVerdict.mockReturnValue({
-        status: 'REPLACED',
-        confidence: 0.3,
-        replacement: {
-          title: 'Corrected Title',
-          authors: ['Corrected Author'],
-          year: 2024,
-          url: 'https://corrected.com/paper',
-          doi: '10.5678/corrected',
-          publisher: 'Nature',
-        },
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          [
+            'ref-001',
+            {
+              domain: 'ACADEMIC',
+              verdict: {
+                status: 'REPLACED',
+                confidence: 0.3,
+                replacement: {
+                  title: 'Corrected Title',
+                  authors: ['Corrected Author'],
+                  year: 2024,
+                  url: 'https://corrected.com/paper',
+                  doi: '10.5678/corrected',
+                  publisher: 'Nature',
+                },
+              },
+              score: 0.3,
+              checks: [],
+            },
+          ],
+        ]),
+        rejectedRefIds: new Set<string>(),
       });
 
       const job = createMockJob(defaultPayload);
@@ -621,66 +581,11 @@ describe('processReferenceValidation', () => {
     });
   });
 
-  describe('AI-only fallback mode', () => {
-    it('lowers verification threshold when only AI checks succeed', async () => {
-      mockVerifyUrl.mockRejectedValue(new Error('Timeout'));
-      mockVerifyDoi.mockRejectedValue(new Error('Timeout'));
-      mockSearchTitle.mockRejectedValue(new Error('Timeout'));
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          [
-            'ref-001',
-            {
-              layer: 'ai',
-              passed: true,
-              confidence: 0.4,
-              detail: 'AI: REAL',
-            },
-          ],
-        ])
-      );
-
-      mockComputeVerificationVerdict.mockReturnValue({
-        status: 'VERIFIED',
-        confidence: 0.4,
-      });
-
-      const job = createMockJob(defaultPayload);
-      await processReferenceValidation(job);
-
-      expect(mockPrismaReferenceUpdate).toHaveBeenCalledWith({
-        where: { id: 'ref-001' },
-        data: expect.objectContaining({
-          verificationStatus: 'VERIFIED',
-        }),
-      });
-    });
-  });
-
   describe('script cleaning when references are removed', () => {
     beforeEach(() => {
       mockPrismaReferenceFindMany.mockResolvedValue([
-        {
-          id: 'ref-001',
-          number: 1,
-          title: 'Paper A',
-          authors: [],
-          year: null,
-          url: null,
-          doi: null,
-          type: 'article',
-        },
-        {
-          id: 'ref-002',
-          number: 2,
-          title: 'Paper B',
-          authors: [],
-          year: null,
-          url: null,
-          doi: null,
-          type: 'article',
-        },
+        { id: 'ref-001', number: 1, title: 'Paper A', authors: [], year: null, url: null, doi: null, type: 'article' },
+        { id: 'ref-002', number: 2, title: 'Paper B', authors: [], year: null, url: null, doi: null, type: 'article' },
       ]);
 
       mockPrismaScriptFindUnique.mockResolvedValue({
@@ -693,16 +598,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('builds renumber map when references are removed', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
@@ -714,16 +616,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('cleans and renumbers citations in turns', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       mockBuildRenumberMap.mockReturnValue(new Map([[2, 1]]));
       mockCleanAndRenumberCitations.mockReturnValue([
@@ -744,16 +643,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('cleans and renumbers markdown', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       mockBuildRenumberMap.mockReturnValue(new Map([[2, 1]]));
       mockCleanAndRenumberMarkdown.mockReturnValue('# Transcript\n\n[1] Paper B');
@@ -769,16 +665,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('updates script with cleaned turns and markdown', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       const cleanedTurns = [
         { speaker: 'HOST', text: 'Introduction to the topic [1].' },
@@ -802,16 +695,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('renumbers remaining references in database', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       mockBuildRenumberMap.mockReturnValue(new Map([[2, 1]]));
 
@@ -825,16 +715,13 @@ describe('processReferenceValidation', () => {
     });
 
     it('deletes removed references from database', async () => {
-      mockComputeVerificationVerdict
-        .mockReturnValueOnce({ status: 'REMOVED', confidence: 0 })
-        .mockReturnValueOnce({ status: 'VERIFIED', confidence: 0.8 });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([
-          ['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }],
-          ['ref-002', { layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }],
-        ])
-      );
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
 
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
@@ -850,14 +737,12 @@ describe('processReferenceValidation', () => {
 
   describe('all references failed', () => {
     beforeEach(() => {
-      mockComputeVerificationVerdict.mockReturnValue({
-        status: 'REMOVED',
-        confidence: 0,
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+        ]),
+        rejectedRefIds: new Set<string>(),
       });
-
-      mockAiEvaluateReferences.mockResolvedValue(
-        new Map([['ref-001', { layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }]])
-      );
     });
 
     it('strips all citation markers from the script when all references are removed', async () => {

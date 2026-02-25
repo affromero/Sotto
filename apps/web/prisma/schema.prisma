@@ -1428,6 +1428,7 @@ model Reference {
   verificationStatus  VerificationStatus @default(PENDING)
   verificationDetails Json?
   originalTitle       String?            @db.Text
+  contentDomain       String?            // 'ACADEMIC' | 'NEWS' | 'GOVERNMENT' | 'GENERAL'
 
   podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 

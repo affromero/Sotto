@@ -29,6 +29,7 @@ const mockReferences: ReferenceData[] = [
     doi: null,
     verificationStatus: 'VERIFIED',
     verificationDetails: null,
+    contentDomain: null,
   },
 ];
 

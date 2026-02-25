@@ -22,6 +22,7 @@ describe('citation-parser', () => {
       publisher: null,
       doi: null,
       verificationDetails: null,
+      contentDomain: null,
     },
     {
       id: 'ref-2',
@@ -35,6 +36,7 @@ describe('citation-parser', () => {
       publisher: null,
       doi: null,
       verificationDetails: null,
+      contentDomain: null,
     },
     {
       id: 'ref-3',
@@ -48,6 +50,7 @@ describe('citation-parser', () => {
       publisher: null,
       doi: null,
       verificationDetails: null,
+      contentDomain: null,
     },
   ];
 

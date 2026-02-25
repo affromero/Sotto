@@ -1394,6 +1394,202 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== OPEN VERIFICATION STANDARD ====== */}
+      <section className={styles.section} aria-label="Open verification standard">
+        <div className={styles.inner}>
+          <div className={`${styles.centered} ${styles.rev}`}>
+            <span className={styles.overline}>Open Verification Standard</span>
+            <h2 className={styles.h2}>Domain-aware. Claim-level. Open source.</h2>
+            <p className={styles.bodyLg}>
+              Every reference is scored by its domain &mdash; because news articles don&apos;t need
+              DOIs, and Wikipedia isn&apos;t held to the same bar as Nature.
+            </p>
+          </div>
+
+          <div className={`${styles.verificationGrid} ${styles.rev} ${styles.d1}`}>
+            <div
+              className={styles.verificationCard}
+              style={
+                {
+                  '--verification-color': '#1E3A5F',
+                  '--verification-bg': 'rgba(30, 58, 95, 0.08)',
+                } as React.CSSProperties
+              }
+            >
+              <div className={styles.verificationCardHeader}>
+                <span className={styles.verificationDomain}>Academic</span>
+                <span className={styles.verificationThreshold}>&ge; 0.70</span>
+              </div>
+              <p className={styles.verificationDesc}>
+                Peer-reviewed papers, preprints, books. DOI and academic indexing carry most weight.
+              </p>
+              <div className={styles.verificationFormula}>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>DOI</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '45%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>45%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>Title search</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '30%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>30%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>URL</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '10%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>10%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>AI</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '15%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>15%</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={styles.verificationCard}
+              style={
+                {
+                  '--verification-color': '#D97706',
+                  '--verification-bg': 'rgba(217, 119, 6, 0.08)',
+                } as React.CSSProperties
+              }
+            >
+              <div className={styles.verificationCardHeader}>
+                <span className={styles.verificationDomain}>News</span>
+                <span className={styles.verificationThreshold}>&ge; 0.50</span>
+              </div>
+              <p className={styles.verificationDesc}>
+                Established outlets &mdash; NYT, Reuters, BBC. AI judges outlet credibility and
+                claim support.
+              </p>
+              <div className={styles.verificationFormula}>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>URL</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '35%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>35%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>AI</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '65%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>65%</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={styles.verificationCard}
+              style={
+                {
+                  '--verification-color': '#16A34A',
+                  '--verification-bg': 'rgba(22, 163, 74, 0.08)',
+                } as React.CSSProperties
+              }
+            >
+              <div className={styles.verificationCardHeader}>
+                <span className={styles.verificationDomain}>Government</span>
+                <span className={styles.verificationThreshold}>&ge; 0.55</span>
+              </div>
+              <p className={styles.verificationDesc}>
+                Official sources &mdash; .gov, WHO, UN. Verified against official domain patterns.
+              </p>
+              <div className={styles.verificationFormula}>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>URL</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '40%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>40%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>AI</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '60%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>60%</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className={styles.verificationCard}
+              style={
+                {
+                  '--verification-color': '#6B7280',
+                  '--verification-bg': 'rgba(107, 114, 128, 0.08)',
+                } as React.CSSProperties
+              }
+            >
+              <div className={styles.verificationCardHeader}>
+                <span className={styles.verificationDomain}>General</span>
+                <span className={styles.verificationThreshold}>&ge; 0.55</span>
+              </div>
+              <p className={styles.verificationDesc}>
+                Wikipedia, blogs, videos. Higher AI scrutiny for unverifiable anonymous sources.
+              </p>
+              <div className={styles.verificationFormula}>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>URL</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '30%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>30%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>Title search</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '10%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>10%</span>
+                </div>
+                <div className={styles.verificationFormulaRow}>
+                  <span className={styles.verificationFormulaLabel}>AI</span>
+                  <div className={styles.verificationFormulaBar}>
+                    <div className={styles.verificationFormulaFill} style={{ width: '60%' }} />
+                  </div>
+                  <span className={styles.verificationFormulaWeight}>60%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`${styles.verificationCallout} ${styles.rev} ${styles.d2}`}>
+            <span className={styles.verificationCalloutIcon} aria-hidden="true">
+              &#x1F50D;
+            </span>
+            <p className={styles.verificationCalloutText}>
+              <strong>Claim-level verification</strong> &mdash; AI reads the exact sentence that
+              cites each reference and checks whether the source actually supports the claim.
+            </p>
+          </div>
+
+          <p className={`${styles.verificationFooter} ${styles.rev} ${styles.d3}`}>
+            Scoring logic is open source &mdash;{' '}
+            <a
+              href="https://github.com/SottoFM/reference-verification-standard"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              view on GitHub
+            </a>
+            . Community improvements welcome.
+          </p>
+        </div>
+      </section>
+
       {/* ====== PRICING — FREE FOREVER + PRO + BYOK ====== */}
       <section className={styles.creatorSection} aria-label="Pricing">
         <div className={styles.creatorGlow} aria-hidden="true" />
