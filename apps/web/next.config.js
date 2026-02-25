@@ -8,7 +8,7 @@ const nextConfig = {
   experimental: {
     proxyClientMaxBodySize: '150mb',
   },
-  transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared'],
+  transpilePackages: ['next-auth', '@auth/prisma-adapter', '@auth/core', '@sotto/shared', '@sottofm/verification-standard'],
   turbopack: {
     root: path.resolve(__dirname, '../..'),
   },
