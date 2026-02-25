@@ -28,26 +28,57 @@ interface SharedVoice extends VoiceClone {
 export interface VoiceSelection {
   voices?: Array<{ speaker: string; voiceId: string }>;
   ttsProvider?: string;
+  speakers?: Array<{ name: string; description: string }>;
 }
 
 interface VoicePickerProps {
   onSelectionChange: (selection: VoiceSelection) => void;
   /** Speakers to assign voices to (from discovery metadata). Defaults to Host + Expert. */
   speakers?: Array<{ name: string; description: string }>;
+  /** Maximum speakers allowed by the user's tier (2 = FREE, 4 = PRO). */
+  maxSpeakers?: number;
 }
 
-const DEFAULT_SPEAKERS = [
-  { name: 'Host', description: 'The main host' },
-  { name: 'Expert', description: 'The subject expert' },
-];
+// Speaker presets use UPPERCASE names to match TTS provider convention.
+// Display labels are capitalized via CSS text-transform.
+const SPEAKER_PRESETS: Record<number, Array<{ name: string; description: string }>> = {
+  1: [
+    { name: 'HOST', description: 'Warm, engaging narrator who guides the listener through the topic with energy and clarity. Speaks in first person, uses rhetorical questions, personal anecdotes, and vivid storytelling.' },
+  ],
+  2: [
+    { name: 'HOST', description: 'Warm, curious, asks great questions, guides the conversation. Represents the listener. Reacts naturally — laughs, expresses surprise, interjects.' },
+    { name: 'EXPERT', description: 'Knowledgeable, vivid storyteller, uses analogies, examples, and occasionally humor. Explains complex topics in ways that create "aha" moments.' },
+  ],
+  3: [
+    { name: 'HOST', description: 'Warm, curious moderator who keeps the conversation flowing and asks clarifying questions.' },
+    { name: 'EXPERT', description: 'Deep domain knowledge, explains concepts clearly, backs claims with evidence and examples.' },
+    { name: 'GUEST', description: "Brings a fresh, opinionated real-world perspective that challenges or extends the Expert's view." },
+  ],
+  4: [
+    { name: 'HOST', description: 'Warm moderator who guides the discussion and ensures all voices are heard.' },
+    { name: 'EXPERT', description: 'Knowledgeable, data-driven, explains complex ideas with clarity and precision.' },
+    { name: 'GUEST', description: 'Practical real-world experience and a fresh perspective that enriches the discussion.' },
+    { name: 'SKEPTIC', description: 'Challenges assumptions, plays devil\'s advocate, asks the tough "but why?" questions.' },
+  ],
+};
 
-export function VoicePicker({ onSelectionChange, speakers = DEFAULT_SPEAKERS }: VoicePickerProps) {
+const FORMAT_LABELS: Record<number, string> = {
+  1: 'Solo',
+  2: 'Dialogue',
+  3: 'Panel',
+  4: 'Roundtable',
+};
+
+export function VoicePicker({ onSelectionChange, maxSpeakers = 2 }: VoicePickerProps) {
   const [poolVoices, setPoolVoices] = useState<VoiceProfile[]>([]);
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
   const [customMode, setCustomMode] = useState(false);
   const [voiceMap, setVoiceMap] = useState<Record<string, string>>({});
   const [loaded, setLoaded] = useState(false);
+  const [speakerCount, setSpeakerCount] = useState(Math.min(2, maxSpeakers));
+
+  const activeSpeakers = SPEAKER_PRESETS[speakerCount] ?? SPEAKER_PRESETS[2];
 
   useEffect(() => {
     async function load() {
@@ -70,20 +101,29 @@ export function VoicePicker({ onSelectionChange, speakers = DEFAULT_SPEAKERS }: 
 
   useEffect(() => {
     if (!customMode) {
-      onSelectionChange({});
+      onSelectionChange({ speakers: activeSpeakers });
       return;
     }
     const voices = Object.entries(voiceMap)
       .filter(([, voiceId]) => !!voiceId)
       .map(([speaker, voiceId]) => ({ speaker, voiceId }));
-    onSelectionChange({ voices: voices.length > 0 ? voices : undefined });
-  }, [customMode, voiceMap, onSelectionChange]);
+    onSelectionChange({
+      voices: voices.length > 0 ? voices : undefined,
+      speakers: activeSpeakers,
+    });
+  }, [customMode, voiceMap, activeSpeakers, onSelectionChange]);
 
   function handleToggleCustom() {
     setCustomMode((prev) => !prev);
     if (customMode) {
       setVoiceMap({});
     }
+  }
+
+  function handleSpeakerCountChange(count: number) {
+    if (count > maxSpeakers) return;
+    setSpeakerCount(count);
+    setVoiceMap({});
   }
 
   function handleSelectVoice(speaker: string, voiceId: string) {
@@ -99,6 +139,29 @@ export function VoicePicker({ onSelectionChange, speakers = DEFAULT_SPEAKERS }: 
         <p className={styles.subtitle}>
           Choose voices for your podcast or let Sotto auto-assign them.
         </p>
+      </div>
+
+      <div className={styles.formatRow}>
+        <span className={styles.formatLabel}>Format</span>
+        <div className={styles.formatPills}>
+          {([1, 2, 3, 4] as const).map((count) => {
+            const locked = count > maxSpeakers;
+            return (
+              <button
+                key={count}
+                type="button"
+                className={`${styles.formatPill} ${speakerCount === count ? styles.formatPillActive : ''} ${locked ? styles.formatPillLocked : ''}`}
+                onClick={() => handleSpeakerCountChange(count)}
+                disabled={locked}
+                aria-label={`${FORMAT_LABELS[count]}${locked ? ' (PRO)' : ''}`}
+                aria-pressed={speakerCount === count}
+              >
+                {FORMAT_LABELS[count]}
+                {locked && <span className={styles.proBadge}>PRO</span>}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {!customMode && (
@@ -150,7 +213,7 @@ export function VoicePicker({ onSelectionChange, speakers = DEFAULT_SPEAKERS }: 
         </div>
       )}
 
-      {customMode && speakers.map((speaker, i) => {
+      {customMode && activeSpeakers.map((speaker, i) => {
         const selectedVoiceId = voiceMap[speaker.name];
         const colorIdx = i % 4;
         return (

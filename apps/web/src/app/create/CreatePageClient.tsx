@@ -47,18 +47,19 @@ interface CreatePageClientProps {
   isByokUser?: boolean;
   isProUser?: boolean;
   maxDurationMinutes?: number;
+  maxSpeakers?: number;
   isAdmin?: boolean;
 }
 
-export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes, isAdmin }: CreatePageClientProps) {
+export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes, maxSpeakers, isAdmin }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} isAdmin={isAdmin} />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} maxSpeakers={maxSpeakers} isAdmin={isAdmin} />
     </Suspense>
   );
 }
 
-function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, isAdmin }: CreatePageClientProps) {
+function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, maxSpeakers, isAdmin }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
@@ -133,7 +134,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           body: JSON.stringify({
             title: metadata.topic,
             topic: metadata.topic,
-            metadata: { ...metadata, durationTarget },
+            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers },
             voices: voiceSelection.voices,
             ttsProvider,
             ttsModel,
@@ -450,7 +451,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {step === 'voice' && tabMode === 'create' && (
           <div className={styles.chatArea}>
-            <VoicePicker onSelectionChange={handleVoiceSelectionChange} />
+            <VoicePicker onSelectionChange={handleVoiceSelectionChange} maxSpeakers={maxSpeakers} />
             <TtsModelDropdown
               ttsProvider={ttsProvider}
               ttsModel={ttsModel}

@@ -888,15 +888,15 @@ describe('generateScript', () => {
       ).rejects.toThrow();
     });
 
-    it('throws when AI returns only one turn', async () => {
-      const singleTurn = {
-        turns: [{ speaker: 'HOST', text: 'Only one turn.' }],
+    it('throws when AI returns an empty turns array', async () => {
+      const emptyTurns = {
+        turns: [],
         soundCues: [],
         references: [],
       };
 
       mockGenerateResponse.mockResolvedValue({
-        content: JSON.stringify(singleTurn),
+        content: JSON.stringify(emptyTurns),
         inputTokens: 400,
         outputTokens: 300,
       });
@@ -911,6 +911,33 @@ describe('generateScript', () => {
           durationTarget: 10,
         })
       ).rejects.toThrow();
+    });
+
+    it('succeeds when AI returns a single-turn monologue', async () => {
+      const monologue = {
+        turns: [{ speaker: 'HOST', text: 'This is a solo monologue. '.repeat(100) }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(monologue),
+        inputTokens: 400,
+        outputTokens: 300,
+      });
+
+      const result = await generateScript({
+        topic: 'Solo Topic',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: [],
+        tone: 'professional',
+        durationTarget: 10,
+        speakers: [{ name: 'HOST', description: 'Solo narrator' }],
+      });
+
+      expect(result.turns).toHaveLength(1);
+      expect(result.turns[0].speaker).toBe('HOST');
     });
   });
 });

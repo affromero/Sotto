@@ -44,7 +44,7 @@ export const updateScriptSchema = z.object({
     speaker: z.string().min(1).max(50),
     text: z.string().min(1).max(10000),
     direction: z.string().optional(),
-  })).min(2),
+  })).min(1),
 });
 
 /**
@@ -530,7 +530,7 @@ export const generatedScriptSchema = z.object({
     speaker: z.string().min(1).max(50),
     text: z.string().min(1),
     direction: z.string().optional(),
-  })).min(2),
+  })).min(1),
   soundCues: z.array(z.object({
     type: z.enum(['intro', 'transition', 'outro', 'ambient']),
     prompt: z.string().min(1),

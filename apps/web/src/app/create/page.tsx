@@ -51,6 +51,7 @@ export default async function CreatePage() {
       isByokUser={gate.isByokUser}
       isProUser={gate.isProUser}
       maxDurationMinutes={maxDurationMinutes}
+      maxSpeakers={tierFeatures.maxSpeakers}
       isAdmin={isAdmin}
     />
   );
