@@ -131,6 +131,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Speaker count validation — enforce tier cap
+  const requestedSpeakers = parsed.data.metadata?.speakers;
+  if (requestedSpeakers && requestedSpeakers.length > tierFeatures.maxSpeakers) {
+    return NextResponse.json(
+      { error: `Speaker count (${requestedSpeakers.length}) exceeds your plan limit of ${tierFeatures.maxSpeakers}.` },
+      { status: 403 }
+    );
+  }
+
   // Duration validation — enforce tier cap (before incrementing counter)
   const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes)
     ? tierFeatures.maxDurationMinutes
@@ -252,6 +261,7 @@ export async function POST(request: NextRequest) {
           : undefined,
         sourceUrl: meta.sourceUrl,
         sourceContent: meta.sourceContent,
+        speakers: meta.speakers ?? undefined,
       },
     });
   } else {
