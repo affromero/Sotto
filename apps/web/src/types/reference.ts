@@ -18,4 +18,5 @@ export interface ReferenceData {
   doi: string | null;
   verificationStatus: VerificationStatus;
   verificationDetails: Record<string, unknown> | null;
+  contentDomain: string | null;
 }

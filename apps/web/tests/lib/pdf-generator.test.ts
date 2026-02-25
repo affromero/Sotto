@@ -95,6 +95,7 @@ describe('pdf-generator', () => {
           publisher: 'Nature',
           doi: '10.1038/nature12345',
           verificationDetails: null,
+          contentDomain: null,
         },
       ];
 
@@ -132,6 +133,7 @@ describe('pdf-generator', () => {
           publisher: null,
           doi: null,
           verificationDetails: null,
+          contentDomain: null,
         },
       ];
 
@@ -164,6 +166,7 @@ describe('pdf-generator', () => {
           publisher: null,
           doi: null,
           verificationDetails: null,
+          contentDomain: null,
         },
         {
           id: 'ref-1',
@@ -177,6 +180,7 @@ describe('pdf-generator', () => {
           publisher: null,
           doi: null,
           verificationDetails: null,
+          contentDomain: null,
         },
       ];
 

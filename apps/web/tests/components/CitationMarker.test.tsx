@@ -15,6 +15,7 @@ const mockRef: ReferenceData = {
   doi: '10.1234/test1',
   verificationStatus: 'VERIFIED',
   verificationDetails: null,
+  contentDomain: null,
 };
 
 const mockRefNoUrl: ReferenceData = {
@@ -29,6 +30,7 @@ const mockRefNoUrl: ReferenceData = {
   doi: null,
   verificationStatus: 'VERIFIED',
   verificationDetails: null,
+  contentDomain: null,
 };
 
 describe('CitationMarker', () => {
