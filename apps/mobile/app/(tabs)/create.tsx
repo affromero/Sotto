@@ -353,7 +353,7 @@ export default function CreateScreen() {
 
   const handleBack = useCallback(() => {
     if (step === 'voice') setStep('discovery');
-    else if (step === 'script-preview') setStep('scripting');
+    else if (step === 'script-preview') setStep('voice');
   }, [step]);
 
   // Discovery step content
@@ -642,7 +642,7 @@ export default function CreateScreen() {
         options={{
           title: STEP_TITLES[step],
           headerLeft:
-            step !== 'discovery'
+            step === 'voice' || step === 'script-preview'
               ? () => (
                   <Pressable
                     onPress={handleBack}

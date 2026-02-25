@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   Alert,
+  ActivityIndicator,
   StyleSheet,
   Dimensions,
 } from 'react-native';
@@ -202,7 +203,11 @@ export default function IdeasScreen() {
           />
         }
         ListEmptyComponent={
-          isLoading ? null : isError ? (
+          isLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : isError ? (
             <EmptyState
               title="Error"
               subtitle="Failed to load saved ideas"
@@ -228,6 +233,12 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: spacing.md,
     flexGrow: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
   },
   rowWrapper: {
     marginHorizontal: spacing.md,
