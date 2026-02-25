@@ -272,6 +272,49 @@ export const byokSchema = z.object({
 });
 
 /**
+ * Draft creation validation
+ */
+const draftMessageSchema = z.object({
+  role: z.enum(['user', 'assistant']),
+  content: z.string().min(1).max(50000),
+  chips: z.array(z.string()).optional(),
+});
+
+const draftMetadataSchema = z.object({
+  topic: z.string().optional(),
+  depth: z.string().optional(),
+  audienceLevel: z.string().optional(),
+  audience: z.string().optional(),
+  focusAreas: z.array(z.string()).optional(),
+  tone: z.string().optional(),
+  durationTarget: z.number().min(5).max(40).optional(),
+  ready: z.boolean().optional(),
+});
+
+export const createDraftSchema = z.object({
+  tabMode: z.enum(['create', 'import']),
+  messages: z.array(draftMessageSchema).optional(),
+  metadata: draftMetadataSchema.optional(),
+  importData: z.object({
+    title: z.string().max(200).optional(),
+    topic: z.string().max(5000).optional(),
+    sourcePlatform: z.string().max(50).optional(),
+    isHumanContent: z.boolean().optional(),
+    sttProvider: z.string().optional(),
+  }).optional(),
+});
+
+export const updateDraftSchema = z.object({
+  draftData: z.record(z.unknown()).optional(),
+  metadata: draftMetadataSchema.optional(),
+});
+
+export const appendDraftMessagesSchema = z.object({
+  messages: z.array(draftMessageSchema).min(1),
+  metadata: draftMetadataSchema.optional(),
+});
+
+/**
  * Import podcast validation
  */
 export const importPodcastSchema = z.object({

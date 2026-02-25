@@ -42,6 +42,22 @@ interface FreeTierInfo {
   ttsQuotas?: ProviderQuota[];
 }
 
+export interface DraftData {
+  id: string;
+  tabMode: 'create' | 'import';
+  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; chips: string[]; createdAt: string }>;
+  metadata: {
+    topic?: string;
+    depth?: string;
+    audienceLevel?: string;
+    audience?: string;
+    focusAreas?: string[];
+    tone?: string;
+    durationTarget?: number;
+  } | null;
+  draftData: Record<string, unknown> | null;
+}
+
 interface CreatePageClientProps {
   freeTier?: FreeTierInfo | null;
   isByokUser?: boolean;
@@ -49,32 +65,41 @@ interface CreatePageClientProps {
   maxDurationMinutes?: number;
   maxSpeakers?: number;
   isAdmin?: boolean;
+  draftData?: DraftData;
 }
 
-export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes, maxSpeakers, isAdmin }: CreatePageClientProps) {
+export function CreatePageClient({ freeTier, isByokUser, isProUser, maxDurationMinutes, maxSpeakers, isAdmin, draftData }: CreatePageClientProps) {
   return (
     <Suspense>
-      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} maxSpeakers={maxSpeakers} isAdmin={isAdmin} />
+      <CreatePageContent freeTier={freeTier} isByokUser={isByokUser} isProUser={isProUser} maxDurationMinutes={maxDurationMinutes} maxSpeakers={maxSpeakers} isAdmin={isAdmin} draftData={draftData} />
     </Suspense>
   );
 }
 
-function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, maxSpeakers, isAdmin }: CreatePageClientProps) {
+function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes: maxDurationProp, maxSpeakers, isAdmin, draftData }: CreatePageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const createAsSotto = searchParams.get('as') === 'sotto';
 
-  const [tabMode, setTabMode] = useState<TabMode>('create');
+  const [tabMode, setTabMode] = useState<TabMode>(draftData?.tabMode ?? 'create');
   const [step, setStep] = useState<Step>('discovery');
   const [importStep, setImportStep] = useState<ImportStep>('upload');
   const [importingPodcastId, setImportingPodcastId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [voiceSelection, setVoiceSelection] = useState<VoiceSelection>({});
-  const [ttsProvider, setTtsProvider] = useState<string | undefined>();
-  const [aiModel, setAiModel] = useState<string | undefined>();
-  const [ttsModel, setTtsModel] = useState<string | undefined>();
+  const [ttsProvider, setTtsProvider] = useState<string | undefined>(
+    (draftData?.draftData?.ttsProvider as string) ?? undefined
+  );
+  const [aiModel, setAiModel] = useState<string | undefined>(
+    (draftData?.draftData?.aiModel as string) ?? undefined
+  );
+  const [ttsModel, setTtsModel] = useState<string | undefined>(
+    (draftData?.draftData?.ttsModel as string) ?? undefined
+  );
   const maxDuration = maxDurationProp ?? FREE_TIER_MAX_DURATION_MINUTES;
-  const [durationTarget, setDurationTarget] = useState(Math.min(10, maxDuration));
+  const [durationTarget, setDurationTarget] = useState(
+    draftData?.metadata?.durationTarget ?? Math.min(10, maxDuration)
+  );
   const [error, setError] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
@@ -82,6 +107,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const [pipelineStatus, setPipelineStatus] = useState<string>('PENDING');
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [voiceCharges, setVoiceCharges] = useState<VoiceChargeItem[]>([]);
+  const [draftId, setDraftId] = useState<string | null>(draftData?.id ?? null);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-populate topic from URL query parameter (e.g., from Saved Ideas page)
   useEffect(() => {
@@ -94,6 +121,28 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const handleInspireTopic = useCallback((topic: string) => {
     setInitialTopic(topic);
   }, []);
+
+  const handleDraftCreated = useCallback((id: string) => {
+    setDraftId(id);
+  }, []);
+
+  // Debounced save of voice/config to draft
+  const saveDraftConfig = useCallback((id: string, data: Record<string, unknown>) => {
+    if (draftSaveTimerRef.current) clearTimeout(draftSaveTimerRef.current);
+    draftSaveTimerRef.current = setTimeout(() => {
+      fetch(`/api/drafts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draftData: data }),
+      }).catch((err) => console.warn('[sotto] draft config save failed', err));
+    }, 2000);
+  }, []);
+
+  // Auto-save config changes when draftId is set
+  useEffect(() => {
+    if (!draftId) return;
+    saveDraftConfig(draftId, { tabMode, ttsProvider, ttsModel, aiModel, durationTarget });
+  }, [draftId, tabMode, ttsProvider, ttsModel, aiModel, durationTarget, saveDraftConfig]);
 
   const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
     setMetadata(meta);
@@ -140,6 +189,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
             ttsModel,
             aiModel,
             ...(paymentIntentIds ? { paymentIntentIds } : {}),
+            ...(draftId ? { draftId } : {}),
           }),
         });
       }
@@ -164,7 +214,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setStep('voice');
     }
-  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, createAsSotto]);
+  }, [metadata, voiceSelection, ttsProvider, ttsModel, aiModel, durationTarget, createAsSotto, draftId]);
 
   const handleGenerate = useCallback(async () => {
     await createPodcast();
@@ -430,13 +480,33 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
               aiModel={aiModel}
               onAiModelChange={setAiModel}
               isByokUser={isByokUser}
+              initialDraftId={draftData?.id}
+              initialMessages={draftData?.tabMode === 'create' ? draftData.messages : undefined}
+              onDraftCreated={handleDraftCreated}
             />
           </div>
         )}
 
         {tabMode === 'import' && (
           <div className={styles.chatArea}>
-            {importStep === 'upload' && <ImportUploader onImportStarted={handleImportStarted} />}
+            {importStep === 'upload' && (
+              <ImportUploader
+                onImportStarted={handleImportStarted}
+                draftId={draftData?.tabMode === 'import' ? draftData.id : undefined}
+                initialImportData={
+                  draftData?.tabMode === 'import' && draftData.draftData?.importData
+                    ? (draftData.draftData.importData as {
+                        title?: string;
+                        topic?: string;
+                        sourcePlatform?: string;
+                        isHumanContent?: boolean;
+                        sttProvider?: string;
+                      })
+                    : undefined
+                }
+                onDraftCreated={handleDraftCreated}
+              />
+            )}
             {importStep === 'importing' && importingPodcastId && (
               <ImportProgress podcastId={importingPodcastId} isAdmin={isAdmin} />
             )}

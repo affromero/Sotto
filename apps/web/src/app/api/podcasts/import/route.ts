@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Readable } from 'stream';
 import busboy from 'busboy';
+import { Prisma } from '@prisma/client';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
@@ -185,6 +186,7 @@ export async function POST(request: NextRequest) {
     const sttModelField = fields.sttModel || undefined;
     const audioFile = files.audio || null;
     const transcriptFile = files.transcript || null;
+    const draftId = fields.draftId || undefined;
 
     if (!audioFile) {
       return NextResponse.json({ error: 'Missing required field: audio' }, { status: 400 });
@@ -238,20 +240,37 @@ export async function POST(request: NextRequest) {
     const validatedTopic = validation.data.topic || '';
     const generateMetadata = !validation.data.title;
 
-    const podcast = await prisma.podcast.create({
-      data: {
-        userId,
-        title: validatedTitle,
-        topic: validatedTopic,
-        status: 'IMPORTING',
-        source: 'IMPORT',
-        isHumanContent,
-        sourcePlatform: validatedSourcePlatform,
-        sttProvider: validatedSttProvider,
-        sttModel: validatedSttModel,
-        visibility: gate.isProUser ? 'PRIVATE' : 'PUBLIC',
-      },
-    });
+    // Validate draft ownership if resuming from a draft
+    if (draftId) {
+      const draft = await prisma.podcast.findUnique({
+        where: { id: draftId },
+        select: { userId: true, status: true },
+      });
+      if (!draft || draft.userId !== userId || draft.status !== 'DRAFT') {
+        return NextResponse.json({ error: 'Invalid draft' }, { status: 400 });
+      }
+    }
+
+    const importData = {
+      title: validatedTitle,
+      topic: validatedTopic,
+      status: 'IMPORTING' as const,
+      source: 'IMPORT' as const,
+      isHumanContent,
+      sourcePlatform: validatedSourcePlatform,
+      sttProvider: validatedSttProvider,
+      sttModel: validatedSttModel,
+      visibility: gate.isProUser ? ('PRIVATE' as const) : ('PUBLIC' as const),
+    };
+
+    const podcast = draftId
+      ? await prisma.podcast.update({
+          where: { id: draftId },
+          data: { ...importData, draftData: Prisma.DbNull },
+        })
+      : await prisma.podcast.create({
+          data: { ...importData, userId },
+        });
 
     const ext = fileExt || 'mp3';
     const audioKey = `imports/${podcast.id}/original.${ext}`;
