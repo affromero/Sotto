@@ -1585,45 +1585,32 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== PRICING — FREE FOREVER + PRO + BYOK ====== */}
-      <section className={styles.creatorSection} aria-label="Pricing">
+      {/* ====== EARLY ACCESS PRICING ====== */}
+      <section className={styles.creatorSection} aria-label="Early access">
         <div className={styles.creatorGlow} aria-hidden="true" />
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
-            <span className={styles.overlineLight}>Simple, honest pricing</span>
+            <span className={styles.overlineLight}>Early access</span>
             <h2 className={styles.h2Light}>
-              1 podcast every day,
+              Free during
               <br />
-              free forever.
+              early access.
             </h2>
             <p className={styles.bodyLgLight}>
-              Start free — platform AI and voices included, no card needed. Upgrade to Pro for
-              unlimited generation, better AI, voice tracks, and creator analytics. Or bring your
-              own API keys for unlimited generation at cost price.
+              Everything is free for early members — no limits, no card required.
+              Generate podcasts with platform AI and voices, or bring your own API keys.
+              We&apos;ll introduce plans later, and early members will be grandfathered in.
             </p>
-            <div className={styles.landingProCta}>
-              <a href="/pricing" className={styles.landingProCtaPrimary}>
-                See all plans
-              </a>
-              <a href="/auth/signup" className={styles.landingProCtaSecondary}>
-                Start free
-              </a>
-            </div>
           </div>
           <div className={`${styles.creatorStats} ${styles.creatorStatsCentered}`}>
             <div className={styles.creatorStat}>
               <span className={styles.creatorStatNum}>$0</span>
-              <span className={styles.creatorStatLabel}>Free tier, forever</span>
-            </div>
-            <div className={styles.creatorStatDivider} aria-hidden="true" />
-            <div className={styles.creatorStat}>
-              <span className={styles.creatorStatNum}>$12</span>
-              <span className={styles.creatorStatLabel}>Pro / month</span>
+              <span className={styles.creatorStatLabel}>Early access</span>
             </div>
             <div className={styles.creatorStatDivider} aria-hidden="true" />
             <div className={styles.creatorStat}>
               <span className={styles.creatorStatNum}>BYOK</span>
-              <span className={styles.creatorStatLabel}>Unlimited at cost</span>
+              <span className={styles.creatorStatLabel}>Bring your own keys</span>
             </div>
           </div>
           <div className={`${styles.byokProviders} ${styles.rev}`}>
@@ -1718,7 +1705,7 @@ export default function LandingPage() {
               <h4>Product</h4>
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
-              <a href="/pricing">Pricing</a>
+              <Link href="/feed">Feed</Link>
             </div>
             <div>
               <h4>Company</h4>
