@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { paginationSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -15,7 +16,7 @@ export async function GET(
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    return errorResponse('Invalid query parameters', 400);
   }
 
   const { page, limit } = parsed.data;
@@ -27,7 +28,7 @@ export async function GET(
   });
 
   if (!targetUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   const [activities, total] = await Promise.all([

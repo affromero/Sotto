@@ -4,6 +4,7 @@ import { listByokProviders } from '@/lib/byok';
 import { getAllProviderMeta, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 
+import { errorResponse } from '@/lib/api-response';
 const QUALITY_BADGES: Record<string, string> = {
   standard: 'Standard',
   premium: 'Premium',
@@ -27,7 +28,7 @@ interface TtsOption {
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const isAdmin = session.user.role === 'ADMIN';

@@ -69,7 +69,7 @@ describe('GET /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -79,7 +79,7 @@ describe('GET /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns handles list when admin', async () => {
@@ -111,7 +111,7 @@ describe('POST /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -122,7 +122,7 @@ describe('POST /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 for invalid handle format', async () => {
@@ -147,7 +147,7 @@ describe('POST /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(409);
-    expect(body).toEqual({ error: 'Handle already reserved' });
+    expect(body).toMatchObject({ error: 'Handle already reserved' });
   });
 
   it('creates reserved handle successfully', async () => {
@@ -179,7 +179,7 @@ describe('DELETE /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 when handle is missing', async () => {
@@ -190,7 +190,7 @@ describe('DELETE /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'handle is required' });
+    expect(body).toMatchObject({ error: 'handle is required' });
   });
 
   it('returns 404 when handle not found', async () => {
@@ -202,7 +202,7 @@ describe('DELETE /api/admin/handles', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Handle not found' });
+    expect(body).toMatchObject({ error: 'Handle not found' });
   });
 
   it('deletes handle successfully', async () => {

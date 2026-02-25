@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
 
+import { errorResponse } from '@/lib/api-response';
 const PITCH_DIR = path.join(process.cwd(), '.pitch');
 
 async function verifyPitchCookie(value: string, secret: string): Promise<boolean> {
@@ -58,7 +59,7 @@ export async function GET(
 ) {
   const authenticated = await authenticate(request);
   if (!authenticated) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const segments = (await params).path;
@@ -70,7 +71,7 @@ export async function GET(
       const content = await readFile(manifestPath, 'utf-8');
       return NextResponse.json(JSON.parse(content));
     } catch {
-      return NextResponse.json({ error: 'No pitch builds found' }, { status: 404 });
+      return errorResponse('No pitch builds found', 404);
     }
   }
 
@@ -79,16 +80,16 @@ export async function GET(
     const [version, filename] = segments;
 
     if (!isValidSegment(version) || !isValidSegment(filename)) {
-      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+      return errorResponse('Invalid path', 400);
     }
 
     if (!filename.endsWith('.html')) {
-      return NextResponse.json({ error: 'Only HTML files are served' }, { status: 400 });
+      return errorResponse('Only HTML files are served', 400);
     }
 
     // Additional date format validation for version
     if (!/^\d{4}-\d{2}-\d{2}$/.test(version)) {
-      return NextResponse.json({ error: 'Invalid version format' }, { status: 400 });
+      return errorResponse('Invalid version format', 400);
     }
 
     try {
@@ -97,7 +98,7 @@ export async function GET(
       // Ensure resolved path is within PITCH_DIR
       const resolved = path.resolve(filePath);
       if (!resolved.startsWith(path.resolve(PITCH_DIR))) {
-        return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+        return errorResponse('Invalid path', 400);
       }
 
       const content = await readFile(filePath, 'utf-8');
@@ -108,9 +109,9 @@ export async function GET(
         },
       });
     } catch {
-      return NextResponse.json({ error: 'Document not found' }, { status: 404 });
+      return errorResponse('Document not found', 404);
     }
   }
 
-  return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  return errorResponse('Invalid path', 400);
 }

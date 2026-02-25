@@ -1,7 +1,8 @@
 import { handlers } from '@/lib/auth';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest} from 'next/server';
 import { checkRateLimit } from '@/lib/redis';
 
+import { errorResponse } from '@/lib/api-response';
 export const GET = handlers.GET;
 
 export async function POST(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function POST(request: NextRequest) {
   const ip = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
   const { allowed } = await checkRateLimit(`auth:nextauth:${ip}`, 20, 15 * 60);
   if (!allowed) {
-    return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
+    return errorResponse('Too many attempts', 429);
   }
   return handlers.POST(request);
 }

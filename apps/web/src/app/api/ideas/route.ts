@@ -3,6 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { savedIdeaSchema, paginationSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/ideas
  * List user's saved ideas, newest first, paginated.
@@ -10,13 +11,13 @@ import { savedIdeaSchema, paginationSchema } from '@/lib/validations';
 export async function GET(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const validation = paginationSchema.safeParse(params);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+    return errorResponse(validation.error.errors[0].message, 400);
   }
 
   const { page, limit } = validation.data;
@@ -56,13 +57,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const validation = savedIdeaSchema.safeParse(body);
   if (!validation.success) {
-    return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+    return errorResponse(validation.error.errors[0].message, 400);
   }
 
   const { questionId, question, tagSlugs, category } = validation.data;

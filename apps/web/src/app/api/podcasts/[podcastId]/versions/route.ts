@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -17,12 +18,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   // Only owner can see versions of private podcasts
   if (podcast.visibility === 'PRIVATE' && podcast.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const versions = await prisma.podcastVersion.findMany({

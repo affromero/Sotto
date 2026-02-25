@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -29,7 +30,7 @@ export async function GET(
   });
 
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return errorResponse('User not found', 404);
   }
 
   let isFollowing = false;

@@ -4,10 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { twitterSettingsSchema } from '@/lib/validations';
 import type { TwitterSettingsData } from '@/types/twitter';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(): Promise<NextResponse> {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const user = await prisma.user.findUniqueOrThrow({
@@ -47,16 +48,13 @@ export async function GET(): Promise<NextResponse> {
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const parsed = twitterSettingsSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid request', details: parsed.error.flatten() },
-      { status: 400 }
-    );
+    return errorResponse('Invalid request', 400, { details: parsed.error.flatten() });
   }
 
   const {
@@ -116,7 +114,7 @@ export async function PATCH(request: NextRequest): Promise<NextResponse> {
 export async function DELETE(): Promise<NextResponse> {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Remove Twitter account link and clear settings

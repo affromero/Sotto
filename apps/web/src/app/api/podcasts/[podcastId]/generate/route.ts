@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
+import { errorResponse } from '@/lib/api-response';
 import {
   contentExtractionQueue,
   scriptGenerationQueue,
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const authResult = await authenticateRequest(request);
 
   if (!authResult) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Admin bypass: skip rate limit, generation gate, and ownership checks
@@ -51,17 +52,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!isAdmin) {
     const hourly = await checkRateLimit(`generate:hour:${authResult.userId}`, 20, 3600);
     if (!hourly.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded: max 20 generations per hour.' },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
     }
     const daily = await checkRateLimit(`generate:day:${authResult.userId}`, 100, 86400);
     if (!daily.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded: max 100 generations per day.' },
-        { status: 429 }
-      );
+      return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
     }
   }
 
@@ -74,7 +69,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       gate.reason === 'free_tier_exhausted'
         ? 'Free generations used. Add your own API keys to continue.'
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -95,11 +90,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   if (podcast.userId !== authResult.userId && !isAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   if (
@@ -107,10 +102,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     podcast.status !== 'DISCOVERING' &&
     podcast.status !== 'FAILED'
   ) {
-    return NextResponse.json(
-      { error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate' },
-      { status: 400 }
-    );
+    return errorResponse('Podcast must be in PENDING, DISCOVERING, or FAILED status to generate', 400);
   }
 
   // Duration validation — use tier features for duration cap
@@ -436,7 +428,7 @@ async function startImport(
   }
 ): Promise<NextResponse> {
   if (!podcast.importedAudioKey) {
-    return NextResponse.json({ error: 'No audio key for import' }, { status: 400 });
+    return errorResponse('No audio key for import', 400);
   }
 
   // Resolve STT key — try groq first, then openai, then elevenlabs

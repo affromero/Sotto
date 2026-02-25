@@ -3,10 +3,11 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { paginationSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { searchParams } = request.nextUrl;
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    return errorResponse('Invalid query parameters', 400);
   }
 
   const { page, limit } = parsed.data;

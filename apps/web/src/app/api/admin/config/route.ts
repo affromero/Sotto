@@ -3,10 +3,11 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { getFreeTierConfig, setFreeTierConfig } from '@/lib/free-tier-config';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const config = await getFreeTierConfig();
@@ -34,13 +35,13 @@ const updateConfigSchema = z.object({
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = updateConfigSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   // Validate allocation quota sums against generationLimit
@@ -50,16 +51,10 @@ export async function PATCH(request: NextRequest) {
     const ttsSum = parsed.data.ttsAllocations?.reduce((sum, a) => sum + a.quota, 0) ?? 0;
 
     if (aiSum > 0 && aiSum > generationLimit) {
-      return NextResponse.json(
-        { error: `AI allocation quotas (${aiSum}) exceed generation limit (${generationLimit})` },
-        { status: 400 }
-      );
+      return errorResponse(`AI allocation quotas (${aiSum}) exceed generation limit (${generationLimit})`, 400);
     }
     if (ttsSum > 0 && ttsSum > generationLimit) {
-      return NextResponse.json(
-        { error: `TTS allocation quotas (${ttsSum}) exceed generation limit (${generationLimit})` },
-        { status: 400 }
-      );
+      return errorResponse(`TTS allocation quotas (${ttsSum}) exceed generation limit (${generationLimit})`, 400);
     }
   }
 

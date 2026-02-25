@@ -85,7 +85,7 @@ describe('GET /api/billing/usage', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -95,7 +95,7 @@ describe('GET /api/billing/usage', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns usage stats for BYOK user', async () => {

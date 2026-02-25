@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { updateVoiceRequestSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -10,7 +11,7 @@ interface RouteParams {
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { id } = await params;
@@ -18,7 +19,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const body = await request.json();
   const parsed = updateVoiceRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 });
+    return errorResponse(parsed.error.errors[0].message, 400);
   }
 
   const { status: newStatus } = parsed.data;
@@ -32,12 +33,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!voiceRequest) {
-    return NextResponse.json({ error: 'Voice request not found' }, { status: 404 });
+    return errorResponse('Voice request not found', 404);
   }
 
   // Only the voice owner can update
   if (voiceRequest.voiceOwnerId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Validate state transitions
@@ -48,10 +49,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const allowed = validTransitions[voiceRequest.status] || [];
   if (!allowed.includes(newStatus)) {
-    return NextResponse.json(
-      { error: `Cannot change status from ${voiceRequest.status} to ${newStatus}` },
-      { status: 400 }
-    );
+    return errorResponse(`Cannot change status from ${voiceRequest.status} to ${newStatus}`, 400);
   }
 
   const updated = await prisma.voiceRequest.update({

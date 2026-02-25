@@ -147,7 +147,7 @@ describe('GET /api/admin/twitter/config', () => {
     mockAuth.mockResolvedValue(null);
     const response = await getConfig();
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ error: 'Forbidden' });
+    expect(await response.json()).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when not admin', async () => {

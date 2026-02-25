@@ -45,7 +45,7 @@ describe('GET /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -55,7 +55,7 @@ describe('GET /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns config when user is admin', async () => {
@@ -89,7 +89,7 @@ describe('PATCH /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 403 when user is not admin', async () => {
@@ -100,7 +100,7 @@ describe('PATCH /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 for invalid body', async () => {

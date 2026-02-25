@@ -51,7 +51,7 @@ describe('GET /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns list of AI keys', async () => {
@@ -79,7 +79,7 @@ describe('POST /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when provider is invalid', async () => {
@@ -90,7 +90,7 @@ describe('POST /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid provider' });
+    expect(body).toMatchObject({ error: 'Invalid provider' });
   });
 
   it('returns 400 when apiKey is too short', async () => {
@@ -101,7 +101,7 @@ describe('POST /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid API key' });
+    expect(body).toMatchObject({ error: 'Invalid API key' });
   });
 
   it('returns 422 when key validation fails', async () => {
@@ -142,7 +142,7 @@ describe('DELETE /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when no body provided', async () => {
@@ -154,7 +154,7 @@ describe('DELETE /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Provider required' });
+    expect(body).toMatchObject({ error: 'Provider required' });
   });
 
   it('returns 400 when provider is invalid', async () => {
@@ -165,7 +165,7 @@ describe('DELETE /api/settings/ai-keys', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid provider' });
+    expect(body).toMatchObject({ error: 'Invalid provider' });
   });
 
   it('removes key and returns success', async () => {

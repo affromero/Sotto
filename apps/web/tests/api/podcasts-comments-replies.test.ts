@@ -43,7 +43,7 @@ describe('GET /api/podcasts/[podcastId]/comments/[commentId]/replies', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body).toEqual({ error: 'Invalid query parameters' });
+    expect(body).toMatchObject({ error: 'Invalid query parameters' });
   });
 
   it('returns 404 when parent comment does not exist', async () => {
@@ -55,7 +55,7 @@ describe('GET /api/podcasts/[podcastId]/comments/[commentId]/replies', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Comment not found' });
+    expect(body).toMatchObject({ error: 'Comment not found' });
   });
 
   it('returns 404 when parent comment belongs to different podcast', async () => {
@@ -67,7 +67,7 @@ describe('GET /api/podcasts/[podcastId]/comments/[commentId]/replies', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Comment not found' });
+    expect(body).toMatchObject({ error: 'Comment not found' });
   });
 
   it('returns empty list when comment has no replies', async () => {

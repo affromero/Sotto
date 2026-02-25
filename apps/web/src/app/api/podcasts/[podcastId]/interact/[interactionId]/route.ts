@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
@@ -9,7 +10,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const interaction = await prisma.interaction.findUnique({
@@ -30,7 +31,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!interaction) {
-    return NextResponse.json({ error: 'Interaction not found' }, { status: 404 });
+    return errorResponse('Interaction not found', 404);
   }
 
   const isOwner = interaction.userId === session.user.id;
@@ -38,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const isPublic = interaction.podcast.visibility === 'PUBLIC';
 
   if (!isOwner && !isPodcastOwner && !isPublic) {
-    return NextResponse.json({ error: 'Interaction not found' }, { status: 404 });
+    return errorResponse('Interaction not found', 404);
   }
 
   const { userId: _u, podcast: _p, ...safeInteraction } = interaction;

@@ -4,13 +4,14 @@ import { prisma } from '@/lib/prisma';
 import { hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userId = session.user.id;
@@ -22,10 +23,10 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
   if (podcast.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   // Gate: Pro or BYOK only
@@ -38,13 +39,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
 
   if (!features.analyticsEnabled && !isPrivileged) {
-    return NextResponse.json(
-      {
-        error: 'Analytics are a Pro feature. Upgrade to Pro to access creator analytics.',
-        code: 'pro_required',
-      },
-      { status: 403 }
-    );
+    return errorResponse('Analytics are a Pro feature. Upgrade to Pro to access creator analytics.', 403, { code: 'pro_required', });
   }
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);

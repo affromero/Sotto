@@ -3,13 +3,14 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { appendDraftMessagesSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ draftId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { draftId } = await params;
@@ -20,17 +21,17 @@ export async function POST(
   });
 
   if (!podcast || podcast.userId !== session.user.id || podcast.status !== 'DRAFT') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   if (!podcast.discovery) {
-    return NextResponse.json({ error: 'No discovery record' }, { status: 400 });
+    return errorResponse('No discovery record', 400);
   }
 
   const body = await request.json();
   const parsed = appendDraftMessagesSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { messages, metadata } = parsed.data;

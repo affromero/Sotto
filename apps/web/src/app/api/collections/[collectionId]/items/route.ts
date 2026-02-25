@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { collectionItemSchema } from '@/lib/validations';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 import { Prisma } from '@prisma/client';
 
 type RouteParams = { params: Promise<{ collectionId: string }> };
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const collection = await prisma.collection.findUnique({
@@ -21,26 +22,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!collection) {
-    return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+    return errorResponse('Collection not found', 404);
   }
 
   if (collection.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return errorResponse('Invalid JSON', 400);
   }
 
   const parsed = collectionItemSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return errorResponse('Validation failed', 400, { details: parsed.error.flatten().fieldErrors });
   }
 
   const { podcastId } = parsed.data;
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   try {
@@ -90,7 +88,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const collection = await prisma.collection.findUnique({
@@ -99,26 +97,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!collection) {
-    return NextResponse.json({ error: 'Collection not found' }, { status: 404 });
+    return errorResponse('Collection not found', 404);
   }
 
   if (collection.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    return errorResponse('Invalid JSON', 400);
   }
 
   const parsed = collectionItemSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Validation failed', details: parsed.error.flatten().fieldErrors },
-      { status: 400 }
-    );
+    return errorResponse('Validation failed', 400, { details: parsed.error.flatten().fieldErrors });
   }
 
   const { podcastId } = parsed.data;

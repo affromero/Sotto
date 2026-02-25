@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ entryId: string }> };
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const { entryId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   // Fetch entry and verify voice clone ownership
@@ -21,11 +22,11 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!entry) {
-    return NextResponse.json({ error: 'Allowlist entry not found' }, { status: 404 });
+    return errorResponse('Allowlist entry not found', 404);
   }
 
   if (entry.voiceClone.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   await prisma.voiceAllowlist.delete({

@@ -6,6 +6,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { addJob, notificationQueue, JobType } from '@/lib/queue';
 import type { SendNotificationPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -13,22 +14,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const rateLimit = await checkRateLimit(`claim:${session.user.id}`, 20, 3600);
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Too many claim reports. Please try again later.' },
-      { status: 429 }
-    );
+    return errorResponse('Too many claim reports. Please try again later.', 429);
   }
 
   const body = await request.json();
   const parsed = createClaimReportSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { turnIndex, turnText, description } = parsed.data;
@@ -39,7 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   try {
@@ -66,10 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ id: claimReport.id, status: claimReport.status }, { status: 201 });
   } catch (err) {
     if ((err as { code?: string }).code === 'P2002') {
-      return NextResponse.json(
-        { error: 'You have already flagged this claim.' },
-        { status: 409 }
-      );
+      return errorResponse('You have already flagged this claim.', 409);
     }
     throw err;
   }
@@ -80,7 +75,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const session = await auth();
 
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -89,12 +84,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast) {
-    return NextResponse.json({ error: 'Podcast not found' }, { status: 404 });
+    return errorResponse('Podcast not found', 404);
   }
 
   const isOwnerOrAdmin = podcast.userId === session.user.id || session.user.role === 'ADMIN';
   if (!isOwnerOrAdmin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const claims = await prisma.claimReport.findMany({

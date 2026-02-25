@@ -31,14 +31,8 @@ vi.mock('@/lib/api-keys', () => ({
   generateApiKey: () => mockGenerateApiKey(),
 }));
 
-const mockLogger = {
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
-  debug: vi.fn(),
-};
 vi.mock('@/lib/logger', () => ({
-  logger: mockLogger,
+  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
 import { GET, POST } from '@/app/api/keys/route';

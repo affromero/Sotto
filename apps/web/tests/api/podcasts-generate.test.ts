@@ -178,7 +178,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(data).toEqual({ error: 'Unauthorized' });
+    expect(data).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast does not exist', async () => {
@@ -191,7 +191,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Podcast not found' });
+    expect(data).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 403 when user does not own podcast', async () => {
@@ -209,7 +209,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(403);
-    expect(data).toEqual({ error: 'Forbidden' });
+    expect(data).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 when podcast is in READY status', async () => {
@@ -227,7 +227,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data).toEqual({
+    expect(data).toMatchObject({
       error: 'Podcast must be in PENDING, DISCOVERING, or FAILED status to generate',
     });
   });

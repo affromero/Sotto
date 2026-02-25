@@ -65,7 +65,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -75,7 +75,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast not found', async () => {
@@ -86,7 +86,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 403 when user does not own the podcast', async () => {
@@ -97,7 +97,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     const body = await response.json();
 
     expect(response.status).toBe(403);
-    expect(body).toEqual({ error: 'Forbidden' });
+    expect(body).toMatchObject({ error: 'Forbidden' });
   });
 
   it('returns 400 when status is not SCRIPT_READY', async () => {
@@ -120,7 +120,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Script not found' });
+    expect(body).toMatchObject({ error: 'Script not found' });
   });
 
   it('creates segments, queues audio, and transitions to GENERATING_AUDIO', async () => {

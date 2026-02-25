@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/saved — User's saved (bookmarked) podcasts.
  */
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const saves = await prisma.save.findMany({

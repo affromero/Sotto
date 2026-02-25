@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/podcasts/[podcastId]/quality
  * Returns computed quality score from PodcastFeature.
@@ -32,7 +33,7 @@ export async function GET(
   });
 
   if (!feature) {
-    return NextResponse.json({ error: 'No quality data available yet' }, { status: 404 });
+    return errorResponse('No quality data available yet', 404);
   }
 
   // Compute composite quality score

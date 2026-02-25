@@ -65,7 +65,7 @@ describe('GET /api/podcasts/[podcastId]/questions', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns 404 for private podcast when user is not the owner', async () => {
@@ -76,7 +76,7 @@ describe('GET /api/podcasts/[podcastId]/questions', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('allows owner to view questions on private podcast', async () => {

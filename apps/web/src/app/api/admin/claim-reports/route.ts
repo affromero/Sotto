@@ -3,11 +3,12 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const session = await auth();
 
   if (!session?.user?.id || session.user.role !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const { searchParams } = new URL(request.url);

@@ -63,7 +63,7 @@ describe('GET /api/billing/subscription', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session has no user id', async () => {
@@ -73,7 +73,7 @@ describe('GET /api/billing/subscription', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns subscription info with BYOK keys and free tier status', async () => {

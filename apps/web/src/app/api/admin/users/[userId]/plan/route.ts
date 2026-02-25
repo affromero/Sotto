@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 const updatePlanSchema = z.object({
   plan: z.enum(['FREE', 'PRO']),
 });
@@ -14,13 +15,13 @@ export async function PATCH(
   const session = await auth();
 
   if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const userRole = (session.user as Record<string, unknown>)?.role as string;
 
   if (userRole !== 'ADMIN') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const { userId } = await context.params;
@@ -43,12 +44,9 @@ export async function PATCH(
     return NextResponse.json(updatedUser);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Invalid request', details: error.errors },
-        { status: 400 }
-      );
+      return errorResponse('Invalid request', 400, { details: error.errors });
     }
 
-    return NextResponse.json({ error: 'Failed to update user plan' }, { status: 500 });
+    return errorResponse('Failed to update user plan', 500);
   }
 }

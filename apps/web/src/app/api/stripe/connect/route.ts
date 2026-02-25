@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { stripe } from '@/lib/stripe';
 
+import { errorResponse } from '@/lib/api-response';
 /**
  * POST: Create Stripe Connect Express account + onboarding link.
  * GET: Check onboarding status and return dashboard URL.
@@ -11,11 +12,11 @@ import { stripe } from '@/lib/stripe';
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 503 });
+    return errorResponse('Stripe is not configured', 503);
   }
 
   const user = await prisma.user.findUniqueOrThrow({
@@ -59,11 +60,11 @@ export async function POST() {
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   if (!stripe) {
-    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 503 });
+    return errorResponse('Stripe is not configured', 503);
   }
 
   const user = await prisma.user.findUniqueOrThrow({

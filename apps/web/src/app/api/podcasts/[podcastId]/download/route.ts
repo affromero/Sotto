@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -17,11 +18,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast || podcast.status !== 'READY' || !podcast.audioUrl) {
-    return NextResponse.json({ error: 'Podcast not found or not ready' }, { status: 404 });
+    return errorResponse('Podcast not found or not ready', 404);
   }
 
   if (podcast.visibility === 'PRIVATE') {
-    return NextResponse.json({ error: 'This podcast is private' }, { status: 403 });
+    return errorResponse('This podcast is private', 403);
   }
 
   // Support ?track=<voiceTrackId> to download a specific voice track
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!track || track.podcastId !== podcastId || track.status !== 'READY' || !track.audioUrl) {
-      return NextResponse.json({ error: 'Voice track not found or not ready' }, { status: 404 });
+      return errorResponse('Voice track not found or not ready', 404);
     }
 
     audioUrl = track.audioUrl;
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const audioResponse = await fetch(audioUrl);
     if (!audioResponse.ok || !audioResponse.body) {
-      return NextResponse.json({ error: 'Audio file not available' }, { status: 502 });
+      return errorResponse('Audio file not available', 502);
     }
 
     const sanitizedTitle = (podcast.title + titleSuffix).replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'podcast';
@@ -59,6 +60,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
   } catch {
-    return NextResponse.json({ error: 'Failed to fetch audio' }, { status: 502 });
+    return errorResponse('Failed to fetch audio', 502);
   }
 }

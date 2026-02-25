@@ -4,32 +4,33 @@ import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { validateUrl, UrlValidationError } from '@/lib/url-validator';
 import { logger } from '@/lib/logger';
+import { errorResponse } from '@/lib/api-response';
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const body = await request.json();
   const { url } = body;
 
   if (!url || typeof url !== 'string') {
-    return NextResponse.json({ error: 'url is required' }, { status: 400 });
+    return errorResponse('url is required', 400);
   }
 
   try {
     await validateUrl(url);
   } catch (err) {
     if (err instanceof UrlValidationError) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      return errorResponse(err.message, 400);
     }
     throw err;
   }
 
   const { allowed } = await checkRateLimit(`url-extract:${session.user.id}`, 10, 60);
   if (!allowed) {
-    return NextResponse.json({ error: 'Rate limited' }, { status: 429 });
+    return errorResponse('Rate limited', 429);
   }
 
   try {
@@ -44,9 +45,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     logger.error('Discovery extract failed', { url, error: (err as Error).message });
-    return NextResponse.json(
-      { error: 'Failed to extract content from URL' },
-      { status: 422 }
-    );
+    return errorResponse('Failed to extract content from URL', 422);
   }
 }

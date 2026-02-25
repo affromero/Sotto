@@ -46,7 +46,7 @@ describe('GET /api/settings/byok', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns list of BYOK providers', async () => {
@@ -74,7 +74,7 @@ describe('POST /api/settings/byok', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 400 when provider is invalid', async () => {
@@ -133,7 +133,7 @@ describe('DELETE /api/settings/byok', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('defaults to elevenlabs when no body provided', async () => {

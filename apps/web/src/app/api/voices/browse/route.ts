@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { voiceBrowseQuerySchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const session = await auth();
   const currentUserId = session?.user?.id ?? null;
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   const params = Object.fromEntries(request.nextUrl.searchParams);
   const parsed = voiceBrowseQuerySchema.safeParse(params);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { search, sort, pricing, page, limit } = parsed.data;

@@ -4,18 +4,19 @@ import { prisma } from '@/lib/prisma';
 import { onboardingInterestsSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
 
+import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse('Unauthorized', 401);
     }
 
     const body = await request.json();
     const validation = onboardingInterestsSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json({ error: validation.error.errors[0].message }, { status: 400 });
+      return errorResponse(validation.error.errors[0].message, 400);
     }
 
     const { tagIds, customTags } = validation.data;
@@ -23,10 +24,7 @@ export async function POST(request: NextRequest) {
 
     // Enforce combined limit of 20
     if (tagIds.length + customTags.length > 20) {
-      return NextResponse.json(
-        { error: 'Maximum 20 interests allowed (predefined + custom combined)' },
-        { status: 400 }
-      );
+      return errorResponse('Maximum 20 interests allowed (predefined + custom combined)', 400);
     }
 
     // Verify all tag IDs exist and are sub-tags (have a parentId)
@@ -37,15 +35,12 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingTags.length !== tagIds.length) {
-        return NextResponse.json({ error: 'One or more tag IDs are invalid' }, { status: 400 });
+        return errorResponse('One or more tag IDs are invalid', 400);
       }
 
       const topLevelTags = existingTags.filter((t) => !t.parentId);
       if (topLevelTags.length > 0) {
-        return NextResponse.json(
-          { error: 'Only sub-interest tags can be selected, not top-level categories' },
-          { status: 400 }
-        );
+        return errorResponse('Only sub-interest tags can be selected, not top-level categories', 400);
       }
     }
 
@@ -63,18 +58,12 @@ export async function POST(request: NextRequest) {
       for (const ct of customTags) {
         const parentId = parentMap.get(ct.parentSlug);
         if (!parentId) {
-          return NextResponse.json(
-            { error: `Unknown parent category: ${ct.parentSlug}` },
-            { status: 400 }
-          );
+          return errorResponse(`Unknown parent category: ${ct.parentSlug}`, 400);
         }
 
         const slug = generateTagSlug(ct.name);
         if (!slug) {
-          return NextResponse.json(
-            { error: `Invalid custom interest name: ${ct.name}` },
-            { status: 400 }
-          );
+          return errorResponse(`Invalid custom interest name: ${ct.name}`, 400);
         }
 
         const tag = await prisma.tag.upsert({
@@ -117,6 +106,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to save interests';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return errorResponse(message, 500);
   }
 }

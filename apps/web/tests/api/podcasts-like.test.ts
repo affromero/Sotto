@@ -57,7 +57,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
@@ -69,7 +69,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when podcast does not exist', async () => {
@@ -82,7 +82,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Podcast not found' });
+    expect(body).toMatchObject({ error: 'Podcast not found' });
   });
 
   it('returns liked: true without creating duplicate when already liked', async () => {
@@ -151,7 +151,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
@@ -163,7 +163,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns liked: false without deleting when like does not exist', async () => {

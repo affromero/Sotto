@@ -3,10 +3,11 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const matches = await prisma.voiceSimilarityMatch.findMany({
@@ -44,13 +45,13 @@ const resolveMatchSchema = z.object({
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const body = await request.json();
   const parsed = resolveMatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { matchId, resolution } = parsed.data;
@@ -61,7 +62,7 @@ export async function PATCH(request: NextRequest) {
   });
 
   if (!match) {
-    return NextResponse.json({ error: 'Match not found' }, { status: 404 });
+    return errorResponse('Match not found', 404);
   }
 
   await prisma.voiceSimilarityMatch.update({

@@ -101,7 +101,7 @@ describe('GET /api/users/me', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns current user data when authenticated', async () => {
@@ -149,7 +149,7 @@ describe('GET /api/users/me', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'User not found' });
+    expect(body).toMatchObject({ error: 'User not found' });
   });
 
 });
@@ -167,7 +167,7 @@ describe('PATCH /api/users/me', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('updates user name successfully', async () => {

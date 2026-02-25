@@ -3,13 +3,14 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { updateDraftSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ draftId: string }> },
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { draftId } = await params;
@@ -26,7 +27,7 @@ export async function GET(
   });
 
   if (!podcast || podcast.userId !== session.user.id || podcast.status !== 'DRAFT') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   return NextResponse.json({
@@ -65,7 +66,7 @@ export async function PATCH(
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { draftId } = await params;
@@ -76,13 +77,13 @@ export async function PATCH(
   });
 
   if (!podcast || podcast.userId !== session.user.id || podcast.status !== 'DRAFT') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   const body = await request.json();
   const parsed = updateDraftSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { draftData, metadata } = parsed.data;
@@ -125,7 +126,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { draftId } = await params;
@@ -136,7 +137,7 @@ export async function DELETE(
   });
 
   if (!podcast || podcast.userId !== session.user.id || podcast.status !== 'DRAFT') {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return errorResponse('Not found', 404);
   }
 
   await prisma.podcast.delete({ where: { id: draftId } });

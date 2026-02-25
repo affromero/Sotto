@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
+import { errorResponse } from '@/lib/api-response';
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ notificationId: string }> }
 ) {
   const authed = await authenticateRequest(request);
   if (!authed) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const { notificationId } = await params;
@@ -18,11 +19,11 @@ export async function PATCH(
   });
 
   if (!notification) {
-    return NextResponse.json({ error: 'Notification not found' }, { status: 404 });
+    return errorResponse('Notification not found', 404);
   }
 
   if (notification.userId !== authed.userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const updated = await prisma.notification.update({

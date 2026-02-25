@@ -5,15 +5,16 @@ import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
 import { voiceVerifyChallengeSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const voiceCloneId = request.nextUrl.searchParams.get('voiceCloneId');
   if (!voiceCloneId) {
-    return NextResponse.json({ error: 'voiceCloneId is required' }, { status: 400 });
+    return errorResponse('voiceCloneId is required', 400);
   }
 
   const voiceClone = await prisma.voiceClone.findUnique({
@@ -22,11 +23,11 @@ export async function GET(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   if (voiceClone.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   if (voiceClone.verificationStatus !== 'AWAITING_CHALLENGE') {
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const formData = await request.formData();
@@ -59,11 +60,11 @@ export async function POST(request: NextRequest) {
 
   const parsed = voiceVerifyChallengeSchema.safeParse({ voiceCloneId });
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return errorResponse(parsed.error.flatten(), 400);
   }
 
   if (!audio) {
-    return NextResponse.json({ error: 'Audio recording is required' }, { status: 400 });
+    return errorResponse('Audio recording is required', 400);
   }
 
   const voiceClone = await prisma.voiceClone.findUnique({
@@ -72,18 +73,15 @@ export async function POST(request: NextRequest) {
   });
 
   if (!voiceClone) {
-    return NextResponse.json({ error: 'Voice clone not found' }, { status: 404 });
+    return errorResponse('Voice clone not found', 404);
   }
 
   if (voiceClone.userId !== session.user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   if (voiceClone.verificationStatus !== 'AWAITING_CHALLENGE') {
-    return NextResponse.json(
-      { error: 'Voice is not awaiting challenge' },
-      { status: 409 }
-    );
+    return errorResponse('Voice is not awaiting challenge', 409);
   }
 
   const challenge = await prisma.voiceVerificationChallenge.findFirst({
@@ -92,11 +90,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (!challenge) {
-    return NextResponse.json({ error: 'No active challenge found' }, { status: 409 });
+    return errorResponse('No active challenge found', 409);
   }
 
   if (new Date() > challenge.expiresAt) {
-    return NextResponse.json({ error: 'Challenge has expired' }, { status: 410 });
+    return errorResponse('Challenge has expired', 410);
   }
 
   const arrayBuffer = await audio.arrayBuffer();

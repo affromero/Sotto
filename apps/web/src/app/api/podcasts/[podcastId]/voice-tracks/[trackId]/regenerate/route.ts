@@ -7,13 +7,14 @@ import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; trackId: string }> };
 
 export async function POST(_request: NextRequest, { params }: RouteParams) {
   const { podcastId, trackId } = await params;
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return errorResponse('Unauthorized', 401);
   }
 
   const suspended = checkSuspension(session);
@@ -31,7 +32,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!podcast || podcast.userId !== userId) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return errorResponse('Forbidden', 403);
   }
 
   const voiceTrack = await prisma.voiceTrack.findUnique({
@@ -40,21 +41,21 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   });
 
   if (!voiceTrack || voiceTrack.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Voice track not found' }, { status: 404 });
+    return errorResponse('Voice track not found', 404);
   }
 
   if (voiceTrack.status !== 'STALE' && voiceTrack.status !== 'FAILED') {
-    return NextResponse.json({ error: 'Only STALE or FAILED voice tracks can be regenerated' }, { status: 400 });
+    return errorResponse('Only STALE or FAILED voice tracks can be regenerated', 400);
   }
 
   // Rate limits
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded: max 20 generations per hour.' }, { status: 429 });
+    return errorResponse('Rate limit exceeded: max 20 generations per hour.', 429);
   }
   const daily = await checkRateLimit(`generate:day:${userId}`, 100, 86400);
   if (!daily.allowed) {
-    return NextResponse.json({ error: 'Rate limit exceeded: max 100 generations per day.' }, { status: 429 });
+    return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
   const gate = await checkGenerationGate(userId);
@@ -62,7 +63,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     const msg = gate.reason === 'free_tier_exhausted'
       ? 'Free generations used. Add your own API keys to continue.'
       : 'No voice provider available. Add a TTS key in Settings.';
-    return NextResponse.json({ error: msg, code: gate.reason }, { status: 403 });
+    return errorResponse(msg, 403, { code: gate.reason });
   }
 
   // Sync voice track segments with current podcast segments

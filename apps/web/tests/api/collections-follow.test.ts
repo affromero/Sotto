@@ -48,7 +48,7 @@ describe('POST /api/collections/[collectionId]/follow', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns 404 when collection does not exist', async () => {
@@ -61,7 +61,7 @@ describe('POST /api/collections/[collectionId]/follow', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns 404 for private collection when user is not owner', async () => {
@@ -74,7 +74,7 @@ describe('POST /api/collections/[collectionId]/follow', () => {
     const body = await response.json();
 
     expect(response.status).toBe(404);
-    expect(body).toEqual({ error: 'Collection not found' });
+    expect(body).toMatchObject({ error: 'Collection not found' });
   });
 
   it('returns following: true without creating duplicate when already following', async () => {
@@ -127,7 +127,7 @@ describe('DELETE /api/collections/[collectionId]/follow', () => {
     const body = await response.json();
 
     expect(response.status).toBe(401);
-    expect(body).toEqual({ error: 'Unauthorized' });
+    expect(body).toMatchObject({ error: 'Unauthorized' });
   });
 
   it('returns following: false when not following (idempotent)', async () => {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { paginationSchema } from '@/lib/validations';
 
+import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; commentId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -14,7 +15,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    return errorResponse('Invalid query parameters', 400);
   }
 
   const { page, limit } = parsed.data;
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   });
 
   if (!parent || parent.podcastId !== podcastId) {
-    return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+    return errorResponse('Comment not found', 404);
   }
 
   const [items, total] = await Promise.all([
