@@ -546,9 +546,17 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           </div>
         )}
 
-        {step === 'scripting' && (
+        {(step === 'scripting' || step === 'generating') && (
           <div className={styles.chatArea}>
             <GenerationProgress status={pipelineStatus} topic={metadata?.topic} />
+            <p className={styles.leaveNotice}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              You can safely leave this page — your podcast keeps generating in the background. Find it in your dashboard when it&apos;s ready.
+            </p>
           </div>
         )}
 
@@ -559,12 +567,6 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
               onApprove={handleScriptApprove}
               onRegenerate={handleScriptRegenerate}
             />
-          </div>
-        )}
-
-        {step === 'generating' && (
-          <div className={styles.chatArea}>
-            <GenerationProgress status={pipelineStatus} topic={metadata?.topic} />
           </div>
         )}
       </div>
