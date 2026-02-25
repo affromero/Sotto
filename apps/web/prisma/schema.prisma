@@ -1267,14 +1267,26 @@ model PlaybackSession {
 
 // ============ WAITLIST ============
 
+enum WaitlistStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Waitlist {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  source       String?  // "hero", "footer", "cta" — where they signed up
-  unsubscribed Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  id            String         @id @default(cuid())
+  email         String         @unique
+  twitterHandle String?
+  source        String?
+  status        WaitlistStatus @default(PENDING)
+  unsubscribed  Boolean        @default(false)
+  approvedAt    DateTime?
+  approvedBy    String?
+  signedUpAt    DateTime?
+  createdAt     DateTime       @default(now())
 
   @@index([createdAt])
+  @@index([status])
 }
 
 // ============ API KEYS ============
