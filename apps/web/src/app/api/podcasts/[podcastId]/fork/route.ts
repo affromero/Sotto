@@ -9,7 +9,7 @@ import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import { checkRateLimit } from '@/lib/redis';
 import { getTierFeatures } from '@/lib/tier-features';
-import { checkSuspension } from '@/lib/auth-guards';
+import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
@@ -66,6 +66,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
+
+  const adminId = await requireAdmin();
+  const isAdmin = adminId !== null;
 
   // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
   let freeTierTtsProvider: string | undefined;
@@ -209,7 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         durationTarget: Math.min(
           sourcePodcast.discovery?.durationTarget || 10,
           (() => {
-            const tf = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+            const tf = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined);
             return isFinite(tf.maxDurationMinutes) ? tf.maxDurationMinutes : 9999;
           })()
         ),

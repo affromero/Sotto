@@ -100,6 +100,7 @@ vi.mock('@/lib/free-tier-provider-selector', () => ({
 // Mock auth-guards
 vi.mock('@/lib/auth-guards', () => ({
   checkSuspension: vi.fn().mockReturnValue(null),
+  requireAdmin: vi.fn().mockResolvedValue(null),
 }));
 
 // Mock stripe
