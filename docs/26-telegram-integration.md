@@ -60,7 +60,7 @@ Send these commands to @BotFather:
 ```
 /setabouttext
 ```
-> The open podcast network — sotto.fm
+> Where podcasts get social — sotto.fm
 
 ```
 /setuserpic

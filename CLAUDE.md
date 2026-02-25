@@ -1,10 +1,10 @@
 # CLAUDE.md — Sotto
 
-> **Sotto** — The Open Podcast Network. Generate AI podcasts from any topic, interrupt to ask questions, fork & remix, import existing content, and share knowledge with the world.
+> **Sotto** — Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.
 
 ## What is Sotto?
 
-Sotto (from "sotto voce" — soft voice in Italian) is the open podcast network where:
+Sotto (from "sotto voce" — soft voice in Italian) is the social podcast network where:
 
 1. Users chat with AI → AI generates a 2-voice conversational podcast
 2. Users **interrupt mid-playback** to ask questions → AI answers in context

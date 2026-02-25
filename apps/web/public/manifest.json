@@ -1,7 +1,7 @@
 {
-  "name": "Sotto — The Open Podcast Network",
+  "name": "Sotto — Where Podcasts Get Social",
   "short_name": "Sotto",
-  "description": "Generate AI podcasts, interrupt to ask questions, share knowledge.",
+  "description": "Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FEFCF8",

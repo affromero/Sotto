@@ -1,7 +1,7 @@
 {
   "name": "@sotto/mcp",
   "version": "0.1.0",
-  "description": "MCP server for Sotto — the open podcast network",
+  "description": "MCP server for Sotto — where podcasts get social",
   "type": "module",
   "bin": {
     "sotto-mcp": "./dist/index.js"

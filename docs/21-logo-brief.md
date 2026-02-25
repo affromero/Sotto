@@ -12,7 +12,7 @@
 
 Sotto is an AI-powered podcast platform where users describe a topic through natural conversation, and the platform generates a personalized two-voice podcast they can listen to anywhere. The core innovation: listeners can **interrupt mid-playback** to ask questions, get contextual answers, and optionally update the podcast with those clarifications for all future listeners.
 
-Think of it as "the open podcast network."
+Think of it as "where podcasts get social."
 
 ### 1.2 Name Etymology
 
@@ -159,7 +159,7 @@ Logo mark for a podcast app called "Sotto" (meaning "soft voice" in Italian). Tw
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo: a stylized human ear drawn in a single continuous golden amber (#D97706) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical — organic and inviting. White background. The concept is "the open podcast network." Suitable as an app icon. --ar 1:1 --style raw --v 6.1
+Minimalist logo: a stylized human ear drawn in a single continuous golden amber (#D97706) line, where the inner spiral transitions into a small speech bubble. Clean, warm, editorial illustration style. Not anatomical or medical — organic and inviting. White background. The concept is "where podcasts get social." Suitable as an app icon. --ar 1:1 --style raw --v 6.1
 ```
 
 ```
@@ -239,7 +239,7 @@ Minimalist logo design for "Sotto," a podcast platform. Abstract audio waveform 
 **Direction B — Listening Ear**:
 
 ```
-Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous golden amber #D97706 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is the open podcast network.
+Minimalist logo for "Sotto." A stylized human ear drawn in a single continuous golden amber #D97706 line. The inner spiral of the ear transitions into a small speech bubble. Organic and warm editorial illustration style, not anatomical. White background, flat design. The concept is where podcasts get social.
 ```
 
 **Direction C — Intimate Conversation**:
@@ -571,7 +571,7 @@ When reviewing logo concepts, score each on these dimensions:
 | Item                   | Value                                             |
 | ---------------------- | ------------------------------------------------- |
 | **Brand name**         | Sotto                                             |
-| **Tagline**            | The Open Podcast Network                          |
+| **Tagline**            | Where Podcasts Get Social                         |
 | **Origin**             | Italian: "sotto voce" = soft voice, intimate tone |
 | **Product**            | AI-generated interactive podcasts with Q&A        |
 | **Primary color**      | Golden Amber `#D97706`                            |
