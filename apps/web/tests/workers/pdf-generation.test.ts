@@ -281,6 +281,7 @@ describe('processPdfGeneration', () => {
             doi: '10.1234/doi5678',
             verificationStatus: 'VERIFIED',
             verificationDetails: { source: 'crossref', confidence: 0.95 },
+            contentDomain: null,
           },
         ],
       });
@@ -302,6 +303,7 @@ describe('processPdfGeneration', () => {
               doi: '10.1234/doi5678',
               verificationStatus: 'VERIFIED',
               verificationDetails: { source: 'crossref', confidence: 0.95 },
+              contentDomain: null,
             },
           ],
         })
