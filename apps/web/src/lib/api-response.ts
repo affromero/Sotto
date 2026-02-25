@@ -49,6 +49,12 @@ export function errorResponse(
       status: String(status),
       ...meta,
     });
+  } else if (status >= 400 && status !== 401 && status !== 404) {
+    logger.warn(`[${requestId}] Client error`, {
+      status: String(status),
+      error: typeof error === 'string' ? error : 'object',
+      ...meta,
+    });
   }
 
   return NextResponse.json(body, {
