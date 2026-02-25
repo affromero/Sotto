@@ -2,7 +2,7 @@
 ; Sotto Financial Ledger
 ; ============================================================
 ;
-; The Open Podcast Network — AI podcast generation platform
+; Where podcasts get social — AI podcast generation platform
 ; https://sotto.fm
 ;
 ; Validate:  uv run bean-check ledger/main.beancount

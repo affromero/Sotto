@@ -6,7 +6,7 @@
     "apps/*",
     "packages/*"
   ],
-  "description": "The Open Podcast Network. Generate AI podcasts from any topic, interrupt to ask questions, and share knowledge with the world.",
+  "description": "Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",

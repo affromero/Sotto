@@ -178,7 +178,7 @@ Go to App Store Connect → My Apps → Sotto → App Store tab:
 
 **App Information**:
 - Name: `Sotto`
-- Subtitle: `The Open Podcast Network`
+- Subtitle: `Where Podcasts Get Social`
 - Primary category: Education
 - Secondary category: News
 - Age rating: 12+ (AI-generated content)

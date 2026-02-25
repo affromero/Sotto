@@ -910,7 +910,7 @@ export default function RootLayout() {
 
 **Name**: Sotto - Interactive AI Podcasts
 
-**Subtitle**: The Open Podcast Network
+**Subtitle**: Where Podcasts Get Social
 
 **Description**:
 
@@ -977,7 +977,7 @@ Caption: "Build your podcast library and follow creators"
 [0:12] Tap "Ask a Question" → "Why is espresso so bitter?"
 [0:14] AI answers in context
 [0:16] Tap "Share" → share sheet appears
-[0:18] Closing shot: "The Open Podcast Network"
+[0:18] Closing shot: "Where Podcasts Get Social"
 [0:20] Download on the App Store
 ```
 
