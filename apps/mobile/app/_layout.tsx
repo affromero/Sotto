@@ -18,6 +18,7 @@ import {
 import { colors } from '@sotto/shared';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
 import { api, onAuthRevoked } from '../lib/api';
+import { registerForPushNotifications } from '../lib/notifications';
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,8 @@ function useProtectedRoute() {
       const dest = pendingPostAuthRoute.current ?? '/(tabs)';
       pendingPostAuthRoute.current = null;
       router.replace(dest as Parameters<typeof router.replace>[0]);
+      // Register push notification token after successful auth
+      registerForPushNotifications().catch(() => {});
     });
     return () => { unsubRevoke(); unsubSuccess(); };
   }, [router]);
@@ -87,6 +90,7 @@ function useProtectedRoute() {
         if (stillValid) {
           const inAuthGroup = segments[0] === 'auth';
           if (inAuthGroup) router.replace('/(tabs)');
+          registerForPushNotifications().catch(() => {});
         }
         // If !stillValid: onAuthRevoked already queued router.replace('/auth/login')
       }
