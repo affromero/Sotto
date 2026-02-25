@@ -147,18 +147,20 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2 }: VoicePickerP
           {([1, 2, 3, 4] as const).map((count) => {
             const locked = count > maxSpeakers;
             return (
-              <button
-                key={count}
-                type="button"
-                className={`${styles.formatPill} ${speakerCount === count ? styles.formatPillActive : ''} ${locked ? styles.formatPillLocked : ''}`}
-                onClick={() => handleSpeakerCountChange(count)}
-                disabled={locked}
-                aria-label={`${FORMAT_LABELS[count]}${locked ? ' (PRO)' : ''}`}
-                aria-pressed={speakerCount === count}
-              >
-                {FORMAT_LABELS[count]}
-                {locked && <span className={styles.proBadge}>PRO</span>}
-              </button>
+              <span key={count} className={locked ? styles.lockedPillWrapper : undefined}>
+                <button
+                  type="button"
+                  className={`${styles.formatPill} ${speakerCount === count ? styles.formatPillActive : ''} ${locked ? styles.formatPillLocked : ''}`}
+                  onClick={() => handleSpeakerCountChange(count)}
+                  disabled={locked}
+                  aria-label={`${FORMAT_LABELS[count]}${locked ? ' — upgrade to Pro to unlock' : ''}`}
+                  aria-pressed={speakerCount === count}
+                >
+                  {FORMAT_LABELS[count]}
+                  {locked && <span className={styles.proBadge}>PRO</span>}
+                </button>
+                {locked && <span className={styles.lockedTooltip}>Upgrade to Pro to unlock {FORMAT_LABELS[count]} format</span>}
+              </span>
             );
           })}
         </div>

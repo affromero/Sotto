@@ -36,7 +36,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   ]);
 
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
-  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts);
+  const features = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
 
   if (!features.analyticsEnabled && !isPrivileged) {
     return errorResponse('Analytics are a Pro feature. Upgrade to Pro to access creator analytics.', 403, { code: 'pro_required', });

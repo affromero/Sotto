@@ -106,7 +106,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // Duration validation — use tier features for duration cap
-  const tierFeatures = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser);
+  const tierFeatures = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined);
   const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes) ? tierFeatures.maxDurationMinutes : 9999;
   const durationTarget = podcast.discovery?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
