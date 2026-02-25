@@ -243,3 +243,42 @@
   font-style: italic;
   text-align: center;
 }
+
+.disclaimerLink {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.disclaimerLink:hover {
+  text-decoration: underline;
+}
+
+.domainBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.domainAcademic {
+  background-color: #1E3A5F;
+}
+
+.domainNews {
+  background-color: #D97706;
+}
+
+.domainGovernment {
+  background-color: #16A34A;
+}
+
+.domainGeneral {
+  background-color: #6B7280;
+}

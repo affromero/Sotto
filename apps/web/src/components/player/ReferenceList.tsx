@@ -17,6 +17,22 @@ const TYPE_LABELS: Record<string, string> = {
   REPORT: 'Report',
 };
 
+const DOMAIN_LABELS: Record<string, string> = {
+  ACADEMIC: 'Academic',
+  NEWS: 'News',
+  GOVERNMENT: 'Gov',
+  GENERAL: 'General',
+};
+
+function DomainBadge({ domain }: { domain: string | null }) {
+  if (!domain || !DOMAIN_LABELS[domain]) return null;
+  return (
+    <span className={`${styles.domainBadge} ${styles[`domain${domain.charAt(0) + domain.slice(1).toLowerCase()}`]}`}>
+      {DOMAIN_LABELS[domain]}
+    </span>
+  );
+}
+
 const LAYER_LABELS: Record<string, string> = {
   url_check: 'URL Check',
   crossref: 'CrossRef',
@@ -139,6 +155,7 @@ export function ReferenceList({ references }: ReferenceListProps) {
                   <div className={styles.refBody}>
                     <span className={styles.titleRow}>
                       <span className={styles.title}>{ref.title}</span>
+                      <DomainBadge domain={ref.contentDomain} />
                       <VerificationBadge status={ref.verificationStatus} />
                       {hasDetails && (
                         <button
@@ -192,7 +209,16 @@ export function ReferenceList({ references }: ReferenceListProps) {
             })}
           </ol>
           <p className={styles.disclaimer}>
-            All references verified against CrossRef, OpenAlex, and DOI registries.
+            References verified using the{' '}
+            <a
+              href="https://github.com/SottoFM/reference-verification-standard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.disclaimerLink}
+            >
+              Sotto Open Verification Standard
+            </a>{' '}
+            — domain-aware scoring for academic, news, government, and general sources.
           </p>
         </div>
       )}
