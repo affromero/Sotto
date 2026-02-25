@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
@@ -189,6 +189,14 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   });
 
   if (!podcast) {
+    notFound();
+  }
+
+  // Redirect drafts to the create page (owner only)
+  if (podcast.status === 'DRAFT') {
+    if (podcast.userId === userId) {
+      redirect(`/create?draftId=${podcastId}`);
+    }
     notFound();
   }
 

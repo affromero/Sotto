@@ -42,6 +42,7 @@ export enum JobType {
   VERIFY_VOICE = 'verify_voice',
   GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
   STITCH_VOICE_TRACK = 'stitch_voice_track',
+  CLEANUP_DRAFTS = 'cleanup_drafts',
 }
 
 /**
@@ -627,3 +628,4 @@ export const announcementQueue = createQueue('announcements', { attempts: 2 });
 export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2 });
 export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
 export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
+export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1 });
