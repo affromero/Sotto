@@ -1,4 +1,6 @@
 import { spawn } from 'child_process';
+import { mkdirSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { logger } from './logger';
 
 /**
@@ -26,6 +28,46 @@ export function isClaudeAvailable(): Promise<boolean> {
       resolve(false);
     });
   });
+}
+
+/**
+ * Prepare a writable HOME directory for the claude subprocess.
+ *
+ * The claude CLI needs a writable ~/.claude directory to store session data
+ * (todos, debug logs, history). Volume-mounted host credentials are often
+ * root-owned and read-only, which causes permission errors at runtime.
+ *
+ * Strategy (in priority order):
+ *  1. CLAUDE_CODE_CREDENTIALS_JSON env var → write to /tmp/claude-runtime/.claude/
+ *  2. CLAUDE_HOME env var → use as-is (legacy volume mount)
+ *  3. Fall back to process HOME
+ *
+ * Result is cached — the writable dir persists for the container lifetime.
+ */
+let _claudeHome: string | null | undefined = undefined;
+function ensureClaudeHome(): string | undefined {
+  if (_claudeHome !== undefined) return _claudeHome ?? undefined;
+
+  const credsJson = process.env.CLAUDE_CODE_CREDENTIALS_JSON;
+  if (credsJson) {
+    try {
+      const runtimeDir = '/tmp/claude-runtime';
+      const claudeDir = join(runtimeDir, '.claude');
+      mkdirSync(claudeDir, { recursive: true });
+      writeFileSync(join(claudeDir, '.credentials.json'), credsJson, { mode: 0o600 });
+      _claudeHome = runtimeDir;
+      logger.info('claude-code: initialized writable home from CLAUDE_CODE_CREDENTIALS_JSON', { dir: runtimeDir });
+      return runtimeDir;
+    } catch (err) {
+      logger.warn('claude-code: failed to write credentials to /tmp', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Fall back to CLAUDE_HOME (volume-mount approach)
+  _claudeHome = process.env.CLAUDE_HOME ?? null;
+  return _claudeHome ?? undefined;
 }
 
 interface ClaudeCodeResponse {
@@ -84,10 +126,11 @@ export async function executeClaudeCode(
   logger.info('claude-code: executing', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
   // Strip CLAUDECODE to prevent "cannot launch inside another session".
-  // Override HOME when CLAUDE_HOME is set so the CLI finds credentials in Docker containers
-  // where the process user's HOME may differ from where ~/.claude is mounted.
+  // Set HOME to the writable claude runtime dir (created from CLAUDE_CODE_CREDENTIALS_JSON
+  // or falling back to CLAUDE_HOME) so the CLI can read credentials and write session data.
   const { CLAUDECODE: _, ...baseEnv } = process.env;
-  const cleanEnv = process.env.CLAUDE_HOME ? { ...baseEnv, HOME: process.env.CLAUDE_HOME } : baseEnv;
+  const claudeHome = ensureClaudeHome();
+  const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
 
   return new Promise((resolve, reject) => {
     const child = spawn('claude', args, {
@@ -160,10 +203,11 @@ export async function* streamClaudeCode(
   logger.info('claude-code: streaming', { model, promptLength: String(prompt.length), webSearch: String(!!opts?.useWebSearch) });
 
   // Strip CLAUDECODE to prevent "cannot launch inside another session".
-  // Override HOME when CLAUDE_HOME is set so the CLI finds credentials in Docker containers
-  // where the process user's HOME may differ from where ~/.claude is mounted.
+  // Set HOME to the writable claude runtime dir so the CLI can read credentials
+  // and write session data without hitting read-only or permission errors.
   const { CLAUDECODE: _, ...baseEnv } = process.env;
-  const cleanEnv = process.env.CLAUDE_HOME ? { ...baseEnv, HOME: process.env.CLAUDE_HOME } : baseEnv;
+  const claudeHome = ensureClaudeHome();
+  const cleanEnv = claudeHome ? { ...baseEnv, HOME: claudeHome } : baseEnv;
 
   const child = spawn('claude', args, {
     stdio: ['pipe', 'pipe', 'pipe'],
