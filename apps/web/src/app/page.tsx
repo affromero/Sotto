@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
@@ -24,6 +24,11 @@ export default function LandingPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [navSolid, setNavSolid] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistTwitter, setWaitlistTwitter] = useState('');
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistError, setWaitlistError] = useState('');
   const pageRef = useRef<HTMLDivElement>(null);
   const activeRipples = useRef(0);
 
@@ -86,6 +91,32 @@ export default function LandingPage() {
       }
     };
   }, [handlePageClick]);
+
+  async function handleWaitlistSubmit(e: FormEvent, source: string) {
+    e.preventDefault();
+    setWaitlistError('');
+    setWaitlistLoading(true);
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: waitlistEmail,
+          twitterHandle: waitlistTwitter || undefined,
+          source,
+        }),
+      });
+      if (res.ok) {
+        setWaitlistSubmitted(true);
+      } else {
+        setWaitlistError('Something went wrong. Please try again.');
+      }
+    } catch {
+      setWaitlistError('Something went wrong. Please try again.');
+    } finally {
+      setWaitlistLoading(false);
+    }
+  }
 
   return (
     <div ref={pageRef} className={styles.page}>
@@ -154,14 +185,50 @@ export default function LandingPage() {
             Generate AI podcasts, import your own, or fork someone else&apos;s. Ask questions
             mid-playback. Discover what others are learning on the social feed.
           </p>
-          <div className={styles.heroCtas}>
-            <Link href="/feed" className={styles.btnPrimary}>
-              Explore the Feed
-            </Link>
-            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <div className={styles.heroCtas}>
+              <Link href="/feed" className={styles.btnPrimary}>
+                Explore the Feed
+              </Link>
+              <Link href="/dashboard" className={styles.btnGhost}>
+                Dashboard
+              </Link>
+            </div>
+          ) : waitlistSubmitted ? (
+            <div className={styles.waitlistSuccess}>
+              You&apos;re on the list! We&apos;ll email you when your spot is ready.
+            </div>
+          ) : (
+            <div className={styles.waitlistFormWrap}>
+              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'hero')}>
+                <input
+                  className={styles.waitlistInput}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  required
+                  aria-label="Email address"
+                />
+                <input
+                  className={styles.waitlistInput}
+                  type="text"
+                  placeholder="@twitter (optional)"
+                  value={waitlistTwitter}
+                  onChange={(e) => setWaitlistTwitter(e.target.value)}
+                  aria-label="Twitter handle"
+                />
+                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
+                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
+                </button>
+              </form>
+              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
+              <div className={styles.waitlistLinks}>
+                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
+                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
+              </div>
+            </div>
+          )}
         </div>
         <div className={styles.heroWave} aria-hidden="true">
           {Array.from({ length: 64 }, (_, i) => (
@@ -1584,14 +1651,50 @@ export default function LandingPage() {
             Generate AI podcasts, import your own, or fork someone else&apos;s. Join the open podcast
             network.
           </p>
-          <div className={styles.heroCtas}>
-            <Link href="/feed" className={styles.btnPrimary}>
-              Explore the Feed
-            </Link>
-            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <div className={styles.heroCtas}>
+              <Link href="/feed" className={styles.btnPrimary}>
+                Explore the Feed
+              </Link>
+              <Link href="/dashboard" className={styles.btnGhost}>
+                Dashboard
+              </Link>
+            </div>
+          ) : waitlistSubmitted ? (
+            <div className={styles.waitlistSuccess}>
+              You&apos;re on the list! We&apos;ll email you when your spot is ready.
+            </div>
+          ) : (
+            <div className={styles.waitlistFormWrap}>
+              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'cta')}>
+                <input
+                  className={styles.waitlistInput}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  required
+                  aria-label="Email address"
+                />
+                <input
+                  className={styles.waitlistInput}
+                  type="text"
+                  placeholder="@twitter (optional)"
+                  value={waitlistTwitter}
+                  onChange={(e) => setWaitlistTwitter(e.target.value)}
+                  aria-label="Twitter handle"
+                />
+                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
+                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
+                </button>
+              </form>
+              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
+              <div className={styles.waitlistLinks}>
+                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
+                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
