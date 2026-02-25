@@ -195,16 +195,32 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns 400 when turns has fewer than 2 items', async () => {
+  it('returns 400 when turns is empty', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
 
     const response = await PATCH(
-      createPatchRequest({ turns: [{ speaker: 'HOST', text: 'Solo' }] }),
+      createPatchRequest({ turns: [] }),
       await createParams('pod-1'),
     );
 
     expect(response.status).toBe(400);
+  });
+
+  it('accepts a single-turn monologue script', async () => {
+    const monologueTurn = [{ speaker: 'HOST', text: 'Solo monologue turn.' }];
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+    mockScriptFindUnique.mockResolvedValue({ turns: monologueTurn, version: 1 });
+    mockReferenceFindMany.mockResolvedValue([]);
+    mockScriptUpdate.mockResolvedValue({ turns: monologueTurn, version: 2 });
+
+    const response = await PATCH(
+      createPatchRequest({ turns: monologueTurn }),
+      await createParams('pod-1'),
+    );
+
+    expect(response.status).toBe(200);
   });
 
   it('returns 404 when script not found during update', async () => {

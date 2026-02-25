@@ -272,17 +272,28 @@ export async function generateScript(params: {
   const speakerCount = speakers.length;
   const speakerSection = speakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
+  const voiceDeliveryGuidelines = speakerCount === 1
+    ? `## Monologue Guidelines:
+- Write a compelling solo narrative — the HOST speaks directly to the listener
+- Address the listener using "you" and rhetorical questions: "Have you ever wondered...?", "Here's what most people miss..."
+- Use first-person storytelling: personal examples, vivid metaphors, concrete anecdotes
+- Vary pace: short punchy sentences for emphasis, longer sentences for explanation and flow
+- Insert brief reflective pauses using stage directions like (pause) at key dramatic moments
+- Build tension and payoffs: plant a question early, deliver the satisfying answer later
+- NEVER reference a co-host, "we", or another speaker — this is fully solo`
+    : `## Voice & Delivery Guidelines:
+- Write dialogue that sounds like a REAL conversation, not a lecture
+- Include natural speech patterns: "So here's the thing...", "Wait, really?", "That's fascinating because..."
+- Let speakers occasionally overlap in energy — the HOST can finish the EXPERT's thought, or react mid-explanation
+- Build tension and payoffs: set up interesting questions, then deliver satisfying answers
+- Use the "cliffhanger" technique between segments: end a thought with intrigue before the next turn picks it up`;
+
   const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive ${speakerCount}-voice podcast scripts that listeners can't stop playing.
 
 ## Speakers:
 ${speakerSection}
 
-## Voice & Delivery Guidelines:
-- Write dialogue that sounds like a REAL conversation, not a lecture
-- Include natural speech patterns: "So here's the thing...", "Wait, really?", "That's fascinating because..."
-- Let speakers occasionally overlap in energy — the HOST can finish the EXPERT's thought, or react mid-explanation
-- Build tension and payoffs: set up interesting questions, then deliver satisfying answers
-- Use the "cliffhanger" technique between segments: end a thought with intrigue before the next turn picks it up
+${voiceDeliveryGuidelines}
 
 ## Audio Expression Tags:
 For richer vocal expression, embed inline audio tags in the turn TEXT:
