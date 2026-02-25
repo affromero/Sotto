@@ -159,7 +159,17 @@ export const voicePreviewSchema = z.object({
  */
 export const waitlistSchema = z.object({
   email: z.string().email().max(200),
+  twitterHandle: z.string().max(50).optional()
+    .transform(val => val ? val.replace(/^@/, '').trim() : undefined),
   source: z.string().max(50).optional(),
+});
+
+/**
+ * Admin waitlist action validation (approve/reject)
+ */
+export const adminWaitlistActionSchema = z.object({
+  id: z.string(),
+  status: z.enum(['APPROVED', 'REJECTED']),
 });
 
 /**

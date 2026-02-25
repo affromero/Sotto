@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import styles from './page.module.css';
-import accessStyles from './access.module.css';
 
 const VOICE_TRAITS = [
   { trait: 'Warm narrator', accent: 'American', icon: '\u266A' },
@@ -23,27 +22,15 @@ const MAX_RIPPLES = 3;
 
 export default function LandingPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [accessState, setAccessState] = useState<'checking' | 'gated' | 'granted'>('checking');
-  const [password, setPassword] = useState('');
-  const [accessError, setAccessError] = useState('');
-  const [accessLoading, setAccessLoading] = useState(false);
   const [navSolid, setNavSolid] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistTwitter, setWaitlistTwitter] = useState('');
+  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [waitlistError, setWaitlistError] = useState('');
   const pageRef = useRef<HTMLDivElement>(null);
   const activeRipples = useRef(0);
-
-  useEffect(() => {
-    fetch('/api/access')
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.gated || data.hasAccess) {
-          setAccessState('granted');
-        } else {
-          setAccessState('gated');
-        }
-      })
-      .catch(() => setAccessState('granted'));
-  }, []);
 
   const handlePageClick = useCallback((e: MouseEvent) => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -75,8 +62,6 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (accessState !== 'granted') return;
-
     const onScroll = () => setNavSolid(window.scrollY > 60);
     window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -105,58 +90,32 @@ export default function LandingPage() {
         pageEl.removeEventListener('click', handlePageClick);
       }
     };
-  }, [handlePageClick, accessState]);
+  }, [handlePageClick]);
 
-  async function handleAccessSubmit(e: FormEvent) {
+  async function handleWaitlistSubmit(e: FormEvent, source: string) {
     e.preventDefault();
-    setAccessError('');
-    setAccessLoading(true);
+    setWaitlistError('');
+    setWaitlistLoading(true);
     try {
-      const res = await fetch('/api/access', {
+      const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({
+          email: waitlistEmail,
+          twitterHandle: waitlistTwitter || undefined,
+          source,
+        }),
       });
       if (res.ok) {
-        setAccessState('granted');
+        setWaitlistSubmitted(true);
       } else {
-        setAccessError('Wrong password. Ask the team for access.');
+        setWaitlistError('Something went wrong. Please try again.');
       }
     } catch {
-      setAccessError('Something went wrong. Try again.');
+      setWaitlistError('Something went wrong. Please try again.');
     } finally {
-      setAccessLoading(false);
+      setWaitlistLoading(false);
     }
-  }
-
-  if (accessState === 'checking') {
-    return null;
-  }
-
-  if (accessState === 'gated') {
-    return (
-      <main className={accessStyles.main}>
-        <div className={accessStyles.container}>
-          <h1 className={accessStyles.logo}>Sotto</h1>
-          <p className={accessStyles.subtitle}>Early access</p>
-          <form className={accessStyles.form} onSubmit={handleAccessSubmit}>
-            <input
-              className={accessStyles.input}
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoFocus
-              required
-            />
-            <button className={accessStyles.button} type="submit" disabled={accessLoading}>
-              {accessLoading ? 'Checking...' : 'Enter'}
-            </button>
-            {accessError && <p className={accessStyles.error}>{accessError}</p>}
-          </form>
-        </div>
-      </main>
-    );
   }
 
   return (
@@ -226,14 +185,50 @@ export default function LandingPage() {
             Generate AI podcasts, import your own, or fork someone else&apos;s. Ask questions
             mid-playback. Discover what others are learning on the social feed.
           </p>
-          <div className={styles.heroCtas}>
-            <Link href="/feed" className={styles.btnPrimary}>
-              Explore the Feed
-            </Link>
-            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <div className={styles.heroCtas}>
+              <Link href="/feed" className={styles.btnPrimary}>
+                Explore the Feed
+              </Link>
+              <Link href="/dashboard" className={styles.btnGhost}>
+                Dashboard
+              </Link>
+            </div>
+          ) : waitlistSubmitted ? (
+            <div className={styles.waitlistSuccess}>
+              You&apos;re on the list! We&apos;ll email you when your spot is ready.
+            </div>
+          ) : (
+            <div className={styles.waitlistFormWrap}>
+              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'hero')}>
+                <input
+                  className={styles.waitlistInput}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  required
+                  aria-label="Email address"
+                />
+                <input
+                  className={styles.waitlistInput}
+                  type="text"
+                  placeholder="@twitter (optional)"
+                  value={waitlistTwitter}
+                  onChange={(e) => setWaitlistTwitter(e.target.value)}
+                  aria-label="Twitter handle"
+                />
+                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
+                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
+                </button>
+              </form>
+              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
+              <div className={styles.waitlistLinks}>
+                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
+                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
+              </div>
+            </div>
+          )}
         </div>
         <div className={styles.heroWave} aria-hidden="true">
           {Array.from({ length: 64 }, (_, i) => (
@@ -1590,45 +1585,32 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== PRICING — FREE FOREVER + PRO + BYOK ====== */}
-      <section className={styles.creatorSection} aria-label="Pricing">
+      {/* ====== EARLY ACCESS PRICING ====== */}
+      <section className={styles.creatorSection} aria-label="Early access">
         <div className={styles.creatorGlow} aria-hidden="true" />
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
-            <span className={styles.overlineLight}>Simple, honest pricing</span>
+            <span className={styles.overlineLight}>Early access</span>
             <h2 className={styles.h2Light}>
-              1 podcast every day,
+              Free during
               <br />
-              free forever.
+              early access.
             </h2>
             <p className={styles.bodyLgLight}>
-              Start free — platform AI and voices included, no card needed. Upgrade to Pro for
-              unlimited generation, better AI, voice tracks, and creator analytics. Or bring your
-              own API keys for unlimited generation at cost price.
+              Everything is free for early members — no limits, no card required.
+              Generate podcasts with platform AI and voices, or bring your own API keys.
+              We&apos;ll introduce plans later, and early members will be grandfathered in.
             </p>
-            <div className={styles.landingProCta}>
-              <a href="/pricing" className={styles.landingProCtaPrimary}>
-                See all plans
-              </a>
-              <a href="/auth/signup" className={styles.landingProCtaSecondary}>
-                Start free
-              </a>
-            </div>
           </div>
           <div className={`${styles.creatorStats} ${styles.creatorStatsCentered}`}>
             <div className={styles.creatorStat}>
               <span className={styles.creatorStatNum}>$0</span>
-              <span className={styles.creatorStatLabel}>Free tier, forever</span>
-            </div>
-            <div className={styles.creatorStatDivider} aria-hidden="true" />
-            <div className={styles.creatorStat}>
-              <span className={styles.creatorStatNum}>$12</span>
-              <span className={styles.creatorStatLabel}>Pro / month</span>
+              <span className={styles.creatorStatLabel}>Early access</span>
             </div>
             <div className={styles.creatorStatDivider} aria-hidden="true" />
             <div className={styles.creatorStat}>
               <span className={styles.creatorStatNum}>BYOK</span>
-              <span className={styles.creatorStatLabel}>Unlimited at cost</span>
+              <span className={styles.creatorStatLabel}>Bring your own keys</span>
             </div>
           </div>
           <div className={`${styles.byokProviders} ${styles.rev}`}>
@@ -1656,14 +1638,50 @@ export default function LandingPage() {
             Generate AI podcasts, import your own, or fork someone else&apos;s. Join the open podcast
             network.
           </p>
-          <div className={styles.heroCtas}>
-            <Link href="/feed" className={styles.btnPrimary}>
-              Explore the Feed
-            </Link>
-            <Link href={isAuthenticated ? '/dashboard' : '/auth/login'} className={styles.btnGhost}>
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Link>
-          </div>
+          {isAuthenticated ? (
+            <div className={styles.heroCtas}>
+              <Link href="/feed" className={styles.btnPrimary}>
+                Explore the Feed
+              </Link>
+              <Link href="/dashboard" className={styles.btnGhost}>
+                Dashboard
+              </Link>
+            </div>
+          ) : waitlistSubmitted ? (
+            <div className={styles.waitlistSuccess}>
+              You&apos;re on the list! We&apos;ll email you when your spot is ready.
+            </div>
+          ) : (
+            <div className={styles.waitlistFormWrap}>
+              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'cta')}>
+                <input
+                  className={styles.waitlistInput}
+                  type="email"
+                  placeholder="your@email.com"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  required
+                  aria-label="Email address"
+                />
+                <input
+                  className={styles.waitlistInput}
+                  type="text"
+                  placeholder="@twitter (optional)"
+                  value={waitlistTwitter}
+                  onChange={(e) => setWaitlistTwitter(e.target.value)}
+                  aria-label="Twitter handle"
+                />
+                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
+                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
+                </button>
+              </form>
+              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
+              <div className={styles.waitlistLinks}>
+                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
+                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1687,7 +1705,7 @@ export default function LandingPage() {
               <h4>Product</h4>
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
-              <a href="/pricing">Pricing</a>
+              <Link href="/feed">Feed</Link>
             </div>
             <div>
               <h4>Company</h4>

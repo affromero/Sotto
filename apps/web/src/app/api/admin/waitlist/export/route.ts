@@ -22,9 +22,17 @@ export async function GET() {
     });
 
     const csv = [
-      'Email,Source,Signed Up',
+      'Email,Twitter,Source,Status,Signed Up,Approved At,Converted At',
       ...entries.map((entry) =>
-        [entry.email, entry.source ?? 'unknown', new Date(entry.createdAt).toISOString()].join(',')
+        [
+          entry.email,
+          entry.twitterHandle ?? '',
+          entry.source ?? 'unknown',
+          entry.status,
+          new Date(entry.createdAt).toISOString(),
+          entry.approvedAt ? new Date(entry.approvedAt).toISOString() : '',
+          entry.signedUpAt ? new Date(entry.signedUpAt).toISOString() : '',
+        ].join(',')
       ),
     ].join('\n');
 

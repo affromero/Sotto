@@ -3416,3 +3416,117 @@
   color: white;
   border-color: rgba(255, 255, 255, 0.6);
 }
+
+/* ==========================================================================
+   WAITLIST FORM (hero + CTA sections)
+   ========================================================================== */
+
+.waitlistFormWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+.waitlistForm {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 520px;
+  width: 100%;
+}
+
+.waitlistInput {
+  flex: 1;
+  min-width: 180px;
+  height: 48px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+  color: #fff;
+  font-size: 15px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.waitlistInput::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.waitlistInput:focus {
+  border-color: var(--color-primary);
+}
+
+.waitlistSubmit {
+  height: 48px;
+  padding: 0 24px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    transform var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+  white-space: nowrap;
+}
+
+.waitlistSubmit:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.waitlistSubmit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.waitlistSuccess {
+  padding: 16px 24px;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.3);
+  border-radius: var(--radius-lg);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  animation: heroFadeIn 0.5s ease both;
+}
+
+.waitlistError {
+  color: #ef4444;
+  font-size: 13px;
+  margin: 0;
+}
+
+.waitlistLinks {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.waitlistLink {
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.waitlistLink:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (max-width: 600px) {
+  .waitlistForm {
+    flex-direction: column;
+  }
+
+  .waitlistInput {
+    min-width: 0;
+  }
+}

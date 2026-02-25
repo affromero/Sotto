@@ -219,7 +219,6 @@ export async function GET() {
     'DATABASE_URL',
     'REDIS_URL',
     'NEXTAUTH_SECRET',
-    'SITE_PASSWORD',
     'PITCH_PASSWORD',
     'ANTHROPIC_API_KEY',
     'OPENAI_API_KEY',

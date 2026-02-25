@@ -59,11 +59,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   events: {
     async createUser({ user }) {
-      if (user.email && user.name) {
-        const { buildWelcomeEmail } = await import('./email-templates');
-        const { sendEmail } = await import('./email');
-        const { subject, html } = buildWelcomeEmail(user.name);
-        await sendEmail({ to: user.email, subject, html });
+      if (user.email) {
+        const entry = await prisma.waitlist.findUnique({
+          where: { email: user.email },
+          select: { twitterHandle: true },
+        });
+
+        // Pre-associate Twitter handle from waitlist (if not taken)
+        if (entry?.twitterHandle) {
+          const taken = await prisma.user.findUnique({
+            where: { twitterHandle: entry.twitterHandle },
+            select: { id: true },
+          });
+          if (!taken) {
+            await prisma.user.update({
+              where: { id: user.id! },
+              data: { twitterHandle: entry.twitterHandle },
+            });
+          }
+        }
+
+        // Mark waitlist conversion
+        await prisma.waitlist.updateMany({
+          where: { email: user.email },
+          data: { signedUpAt: new Date() },
+        });
+
+        // Welcome email
+        if (user.name) {
+          const { buildWelcomeEmail } = await import('./email-templates');
+          const { sendEmail } = await import('./email');
+          const { subject, html } = buildWelcomeEmail(user.name);
+          await sendEmail({ to: user.email, subject, html });
+        }
       }
     },
     async linkAccount({ user, account, profile }) {
@@ -83,6 +111,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
+    async signIn({ user, profile }) {
+      const email = profile?.email ?? user?.email;
+      if (!email) return '/auth/waitlisted?reason=no-email';
+
+      // Existing users can always sign in
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
+      if (existingUser) return true;
+
+      // Admins bypass waitlist
+      if (isAdminEmail(email)) return true;
+
+      // New user — check waitlist
+      const entry = await prisma.waitlist.findUnique({ where: { email } });
+      if (!entry) return '/auth/waitlisted?reason=not-on-list';
+      if (entry.status !== 'APPROVED') return '/auth/waitlisted?reason=pending';
+      return true;
+    },
     async session({ session, token }) {
       if (session.user && token.sub) {
         if (token.impersonateUserId) {
