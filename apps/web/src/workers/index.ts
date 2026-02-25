@@ -5,6 +5,7 @@ import {
   keyValidationQueue,
   twitterTrendPollQueue,
   emailDigestQueue,
+  draftCleanupQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -38,6 +39,7 @@ import { processEmailDigest } from './email-digest.worker';
 import { processVoiceVerification } from './voice-verification.worker';
 import { processVoiceTrackAudio } from './voice-track-audio.worker';
 import { processVoiceTrackStitching } from './voice-track-stitching.worker';
+import { processDraftCleanup } from './draft-cleanup.worker';
 
 logger.info('Starting Sotto workers...');
 
@@ -71,6 +73,7 @@ const workers = [
   createWorker('voice-verification', processVoiceVerification, { concurrency: 2 }),
   createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
   createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
+  createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -131,6 +134,12 @@ emailDigestQueue
   .add(JobType.SEND_EMAIL_DIGEST, {}, { repeat: { pattern: '0 10 * * 0' } })
   .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
   .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
+
+// Schedule draft cleanup every 24 hours (delete drafts >30 days old)
+draftCleanupQueue
+  .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
+  .then(() => logger.info('Draft cleanup scheduled', { intervalMs: '86400000' }))
+  .catch((err) => logger.error('Failed to schedule draft cleanup', { error: err.message }));
 
 // Schedule BYOK key re-validation every 24 hours
 keyValidationQueue

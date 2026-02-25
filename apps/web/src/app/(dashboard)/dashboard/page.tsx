@@ -61,6 +61,17 @@ function formatDate(date: Date): string {
   });
 }
 
+function formatRelativeTime(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return '--:--';
   const mins = Math.floor(seconds / 60);
@@ -300,13 +311,13 @@ export default async function DashboardPage() {
               return (
                 <div key={podcast.id} className={`${styles.cardWrapper} dashboardCardWrapper`} role="listitem">
                   <Link
-                    href={`/podcast/${podcast.id}`}
+                    href={podcast.status === 'DRAFT' ? `/create?draftId=${podcast.id}` : `/podcast/${podcast.id}`}
                     className={styles.miniGradientCard}
                     style={gradientVars}
                     aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
                   >
                     <div
-                      className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''}`}
+                      className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''} ${podcast.status === 'DRAFT' ? styles.miniGradientDraft : ''}`}
                     >
                       <div className={styles.miniGradientBadge}>
                         <Badge variant={statusVariants[podcast.status]}>
@@ -319,12 +330,21 @@ export default async function DashboardPage() {
                       <p className={styles.miniGradientTopic}>{podcast.topic}</p>
                       <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={tierFeatures.privateAllowed} />
                       <div className={styles.miniGradientMeta}>
-                        <span>{formatDuration(podcast.duration)}</span>
-                        <span>{formatDate(podcast.createdAt)}</span>
-                        {podcast.playCount > 0 && (
-                          <span>{podcast.playCount.toLocaleString()} plays</span>
+                        {podcast.status === 'DRAFT' ? (
+                          <span>Started {formatRelativeTime(podcast.createdAt)}</span>
+                        ) : (
+                          <>
+                            <span>{formatDuration(podcast.duration)}</span>
+                            <span>{formatDate(podcast.createdAt)}</span>
+                            {podcast.playCount > 0 && (
+                              <span>{podcast.playCount.toLocaleString()} plays</span>
+                            )}
+                          </>
                         )}
                       </div>
+                      {podcast.status === 'DRAFT' && (
+                        <span className={styles.draftHint}>Tap to continue</span>
+                      )}
                       {podcast.status === 'FAILED' && (
                         <>
                           {isAdmin && podcast.failureReason && (
