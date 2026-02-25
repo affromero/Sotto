@@ -489,7 +489,24 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
         {tabMode === 'import' && (
           <div className={styles.chatArea}>
-            {importStep === 'upload' && <ImportUploader onImportStarted={handleImportStarted} />}
+            {importStep === 'upload' && (
+              <ImportUploader
+                onImportStarted={handleImportStarted}
+                draftId={draftData?.tabMode === 'import' ? draftData.id : undefined}
+                initialImportData={
+                  draftData?.tabMode === 'import' && draftData.draftData?.importData
+                    ? (draftData.draftData.importData as {
+                        title?: string;
+                        topic?: string;
+                        sourcePlatform?: string;
+                        isHumanContent?: boolean;
+                        sttProvider?: string;
+                      })
+                    : undefined
+                }
+                onDraftCreated={handleDraftCreated}
+              />
+            )}
             {importStep === 'importing' && importingPodcastId && (
               <ImportProgress podcastId={importingPodcastId} isAdmin={isAdmin} />
             )}
