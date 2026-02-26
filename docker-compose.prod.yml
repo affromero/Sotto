@@ -70,6 +70,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kittentts:
+        condition: service_started
     healthcheck:
       test:
         ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://localhost:3000/api/health']
@@ -97,7 +99,6 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      KITTENTTS_URL: http://kittentts:8000
     depends_on:
       postgres:
         condition: service_healthy
