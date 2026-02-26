@@ -47,8 +47,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+const mockGetActiveReferralCount = vi.fn().mockResolvedValue(0);
 vi.mock('@/lib/referrals', () => ({
   getReferralBonus: (count: number) => Math.min(count, 5),
+  getActiveReferralCount: (...args: unknown[]) => mockGetActiveReferralCount(...args),
 }));
 
 // ---- Import under test ----
@@ -79,6 +81,7 @@ describe('checkGenerationGate', () => {
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
+    mockGetActiveReferralCount.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -88,7 +91,7 @@ describe('checkGenerationGate', () => {
   it('allows BYOK users without checking the daily counter', async () => {
     mockHasByokKey.mockResolvedValue(true);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
 
     const result = await checkGenerationGate('user-1');
 
@@ -100,7 +103,7 @@ describe('checkGenerationGate', () => {
   it('allows PRO users without checking the daily counter', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 100, role: 'USER', plan: 'PRO', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 100, role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
 
     const result = await checkGenerationGate('user-1');
 
@@ -112,7 +115,7 @@ describe('checkGenerationGate', () => {
   it('allows admin users regardless of daily counter', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 999, role: 'ADMIN', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 999, role: 'ADMIN', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('999');
 
     const result = await checkGenerationGate('admin-1');
@@ -124,7 +127,7 @@ describe('checkGenerationGate', () => {
   it('blocks free-tier users when Redis daily counter equals the limit', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 5, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 5, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('1'); // dailyUsed === dailyLimit (1)
     mockRedisTtl.mockResolvedValue(3600);
 
@@ -139,7 +142,7 @@ describe('checkGenerationGate', () => {
   it('allows free-tier users when daily counter is below the limit', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('0'); // dailyUsed = 0 < dailyLimit (1)
     mockRedisTtl.mockResolvedValue(-1);
 
@@ -158,7 +161,7 @@ describe('checkGenerationGate', () => {
 
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
 
     const result = await checkGenerationGate('user-1');
 
@@ -169,7 +172,7 @@ describe('checkGenerationGate', () => {
   it('uses 86400 as resetInSeconds when Redis key has no TTL', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('1');
     mockRedisTtl.mockResolvedValue(-1); // no TTL set yet
 
@@ -183,7 +186,7 @@ describe('checkGenerationGate', () => {
   it('allows free-tier users with dailyGenerationOverride=0 (unlimited)', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 100, role: 'USER', plan: 'FREE', dailyGenerationOverride: 0, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 100, role: 'USER', plan: 'FREE', dailyGenerationOverride: 0 });
     mockRedisGet.mockResolvedValue('999');
 
     const result = await checkGenerationGate('user-1');
@@ -197,7 +200,7 @@ describe('checkGenerationGate', () => {
   it('uses custom dailyGenerationOverride instead of global config', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: 5, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: 5 });
     mockRedisGet.mockResolvedValue('3'); // 3 < 5 custom limit
     mockRedisTtl.mockResolvedValue(-1);
 
@@ -212,7 +215,7 @@ describe('checkGenerationGate', () => {
   it('blocks when custom dailyGenerationOverride is exceeded', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER', plan: 'FREE', dailyGenerationOverride: 5, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 10, role: 'USER', plan: 'FREE', dailyGenerationOverride: 5 });
     mockRedisGet.mockResolvedValue('5'); // 5 >= 5 custom limit
     mockRedisTtl.mockResolvedValue(7200);
 
@@ -228,7 +231,8 @@ describe('checkGenerationGate', () => {
   it('adds referral bonus to daily limit for free users', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 3 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockGetActiveReferralCount.mockResolvedValue(3);
     mockRedisGet.mockResolvedValue('2'); // 2 < 4 (1 base + 3 referral bonus)
     mockRedisTtl.mockResolvedValue(-1);
 
@@ -241,7 +245,8 @@ describe('checkGenerationGate', () => {
   it('caps referral bonus at 5', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 20 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockGetActiveReferralCount.mockResolvedValue(20);
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
 
@@ -254,7 +259,7 @@ describe('checkGenerationGate', () => {
   it('falls through to global config when dailyGenerationOverride is null', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('1'); // 1 >= 1 global limit
     mockRedisTtl.mockResolvedValue(3600);
 
@@ -324,6 +329,7 @@ describe('getFreeTierStatus', () => {
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
+    mockGetActiveReferralCount.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -333,7 +339,7 @@ describe('getFreeTierStatus', () => {
   it('returns basic status including daily Redis fields', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('0');
 
     const result = await getFreeTierStatus('user-1');
@@ -357,7 +363,7 @@ describe('getFreeTierStatus', () => {
     };
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 1, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockFreeProviderUsageFindMany.mockResolvedValue([
       { category: 'tts', provider: 'elevenlabs', used: 1 },
     ]);
@@ -376,7 +382,7 @@ describe('getFreeTierStatus', () => {
     };
     mockHasByokKey.mockResolvedValue(true);
     mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
 
     const result = await getFreeTierStatus('user-1');
 
@@ -392,7 +398,7 @@ describe('getFreeTierStatus', () => {
     };
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(config);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'PRO', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'PRO', dailyGenerationOverride: null });
 
     const result = await getFreeTierStatus('user-1');
 
@@ -404,7 +410,7 @@ describe('getFreeTierStatus', () => {
   it('includes resetInSeconds when Redis TTL is set', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
     mockRedisGet.mockResolvedValue('1');
     mockRedisTtl.mockResolvedValue(7200);
 
@@ -418,7 +424,7 @@ describe('getFreeTierStatus', () => {
   it('uses custom dailyGenerationOverride in status', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: 10, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: 10 });
     mockRedisGet.mockResolvedValue('3');
 
     const result = await getFreeTierStatus('user-1');
@@ -430,7 +436,7 @@ describe('getFreeTierStatus', () => {
   it('returns Infinity dailyRemaining for unlimited override', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig);
-    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: 0, referralCount: 0 });
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: 0 });
     mockRedisGet.mockResolvedValue('50');
 
     const result = await getFreeTierStatus('user-1');

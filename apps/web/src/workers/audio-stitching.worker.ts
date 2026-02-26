@@ -19,6 +19,7 @@ import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { capturePodcastPayments } from '@/lib/voice-pricing';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
+import { verifyReferral } from '@/lib/referrals';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -324,13 +325,22 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       data: { podcastId },
     });
 
-    // 10a. Auto-generate transcript
+    // 10a. Verify referral (grants referrer bonus if this is the user's first READY podcast)
+    await verifyReferral(podcast.userId).catch((err) => {
+      logger.warn('Failed to verify referral', {
+        userId: podcast.userId,
+        podcastId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+
+    // 10c. Auto-generate transcript
     await addJob(pdfGenerationQueue, JobType.GENERATE_PDF, {
       podcastId,
       userId: podcast.userId,
     });
 
-    // 10b. If this podcast has a pending trend auto-tweet, queue it
+    // 10d. If this podcast has a pending trend auto-tweet, queue it
     const pendingAutoTweet = await prisma.twitterAutoTweet.findFirst({
       where: { podcastId, trigger: 'trend', status: 'pending' },
     });
