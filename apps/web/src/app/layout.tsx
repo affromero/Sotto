@@ -24,6 +24,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://sotto.fm'),
   title: {
     default: 'Sotto — Create. Fork. Share.',
     template: '%s | Sotto',
@@ -31,6 +32,9 @@ export const metadata: Metadata = {
   description:
     'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
   keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Sotto — Where Podcasts Get Social',
     description:
@@ -39,10 +43,10 @@ export const metadata: Metadata = {
     locale: 'en_US',
     siteName: 'Sotto',
     url: 'https://sotto.fm',
-    images: [{ url: 'https://sotto.fm/icon-512.png', width: 512, height: 512, alt: 'Sotto' }],
   },
   twitter: {
     card: 'summary_large_image',
+    site: '@SottoFM',
     title: 'Sotto — Create. Fork. Share.',
     description: 'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
   },
