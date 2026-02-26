@@ -15,8 +15,8 @@ export interface ExtractedContent {
   publishedDate: string | null;
   /** Word count of extracted text */
   wordCount: number;
-  /** Source type: html, pdf, youtube */
-  sourceType: 'html' | 'pdf' | 'youtube';
+  /** Source type: html, pdf, youtube, video */
+  sourceType: 'html' | 'pdf' | 'youtube' | 'video';
   /** Which extraction method succeeded */
-  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript';
+  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core';
 }
