@@ -130,6 +130,9 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
           status: 'EXTRACTING',
           source: 'TWITTER',
           sourceTweetId: tweet.id,
+          aiModel: config.defaultAiModel ?? undefined,
+          ttsProvider: config.defaultTtsProvider ?? undefined,
+          ttsModel: config.defaultTtsModel ?? undefined,
           voices: {
             createMany: {
               data: [

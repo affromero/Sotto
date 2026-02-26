@@ -18,7 +18,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 // ---- Import under test ----
-import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
+import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 // ---- Tests ----
@@ -585,5 +585,84 @@ describe('parseThreadIntent', () => {
       expect.any(Array),
       expect.objectContaining({ apiKeyOverride: 'user-api-key-123' })
     );
+  });
+});
+
+// ---- resolveModelFromTweet ----
+
+describe('resolveModelFromTweet', () => {
+  const baseParsed: TweetParseResult = {
+    topic: 'Test',
+    title: 'Test',
+    depth: 'standard',
+    audienceLevel: 'beginner',
+    tone: 'casual',
+    focusAreas: [],
+  };
+
+  it('returns nulls when no model is requested', () => {
+    const result = resolveModelFromTweet(baseParsed);
+    expect(result.aiModel).toBeNull();
+    expect(result.ttsProvider).toBeNull();
+  });
+
+  it('resolves "opus" to claude-opus-4-6', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAiModel: 'opus' });
+    expect(result.aiModel).toBe('claude-opus-4-6');
+  });
+
+  it('resolves "sonnet" to claude-sonnet-4-6', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAiModel: 'sonnet' });
+    expect(result.aiModel).toBe('claude-sonnet-4-6');
+  });
+
+  it('resolves "haiku" to claude-haiku-4-5-20251001', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAiModel: 'haiku' });
+    expect(result.aiModel).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('resolves "gpt-5" to gpt-5', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAiModel: 'gpt-5' });
+    expect(result.aiModel).toBe('gpt-5');
+  });
+
+  it('resolves "elevenlabs" to elevenlabs TTS provider', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsProvider: 'elevenlabs' });
+    expect(result.ttsProvider).toBe('elevenlabs');
+  });
+
+  it('resolves "11labs" to elevenlabs', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsProvider: '11labs' });
+    expect(result.ttsProvider).toBe('elevenlabs');
+  });
+
+  it('resolves "openai voice" to openai TTS', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsProvider: 'openai voice' });
+    expect(result.ttsProvider).toBe('openai');
+  });
+
+  it('resolves "hume" to hume TTS', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsProvider: 'hume' });
+    expect(result.ttsProvider).toBe('hume');
+  });
+
+  it('returns null for unrecognized model names', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAiModel: 'banana-model-9000' });
+    expect(result.aiModel).toBeNull();
+  });
+
+  it('returns null for unrecognized TTS providers', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsProvider: 'unknown-tts' });
+    expect(result.ttsProvider).toBeNull();
+  });
+
+  it('resolves both AI and TTS simultaneously', () => {
+    const result = resolveModelFromTweet({
+      ...baseParsed,
+      requestedAiModel: 'opus',
+      requestedTtsProvider: 'elevenlabs',
+    });
+    expect(result.aiModel).toBe('claude-opus-4-6');
+    expect(result.ttsProvider).toBe('elevenlabs');
   });
 });

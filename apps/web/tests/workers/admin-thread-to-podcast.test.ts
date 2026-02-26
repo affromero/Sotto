@@ -65,6 +65,14 @@ vi.mock('@/lib/twitter-utils', () => ({
   getVerifiedParticipants: (...args: unknown[]) => mockGetVerifiedParticipants(...args),
 }));
 
+vi.mock('@/lib/twitter-config', () => ({
+  getTwitterConfig: vi.fn().mockResolvedValue({
+    defaultAiModel: null,
+    defaultTtsProvider: null,
+    defaultTtsModel: null,
+  }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

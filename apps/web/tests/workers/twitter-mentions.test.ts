@@ -45,20 +45,25 @@ const mockGetMentions = vi.fn();
 const mockGetTweet = vi.fn();
 const mockGetThread = vi.fn();
 const mockReplyToTweet = vi.fn();
+const mockSendDirectMessage = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/twitter', () => ({
   getMentions: (...args: unknown[]) => mockGetMentions(...args),
   getTweet: (...args: unknown[]) => mockGetTweet(...args),
   getThread: (...args: unknown[]) => mockGetThread(...args),
   replyToTweet: (...args: unknown[]) => mockReplyToTweet(...args),
+  sendDirectMessage: (...args: unknown[]) => mockSendDirectMessage(...args),
 }));
 
 const mockParseTweetIntent = vi.fn();
 const mockParseThreadIntent = vi.fn();
 
+const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null });
+
 vi.mock('@/lib/tweet-parser', () => ({
   parseTweetIntent: (...args: unknown[]) => mockParseTweetIntent(...args),
   parseThreadIntent: (...args: unknown[]) => mockParseThreadIntent(...args),
+  resolveModelFromTweet: (...args: unknown[]) => mockResolveModelFromTweet(...args),
 }));
 
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
@@ -76,9 +81,11 @@ vi.mock('@/lib/free-tier-config', () => ({
 }));
 
 const mockGetAiKey = vi.fn().mockResolvedValue(null);
+const mockHasByokKey = vi.fn().mockResolvedValue(false);
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
 }));
 
 const mockSelectVoicePair = vi.fn();
@@ -95,6 +102,10 @@ vi.mock('@/lib/queue', () => ({
   JobType: {
     EXTRACT_CONTENT: 'EXTRACT_CONTENT',
   },
+}));
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getModelRequiredPlan: vi.fn().mockReturnValue('FREE'),
 }));
 
 vi.mock('@/lib/logger', () => ({

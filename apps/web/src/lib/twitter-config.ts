@@ -11,6 +11,9 @@ const DEFAULTS: TwitterConfigData = {
   maxTrendPodcastsPerDay: 3,
   trendSearchQueries: ['AI', 'science', 'technology'],
   tweetTemplate: 'New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}',
+  defaultAiModel: null,
+  defaultTtsProvider: null,
+  defaultTtsModel: null,
 };
 
 /**
@@ -45,6 +48,9 @@ export async function getTwitterConfig(): Promise<TwitterConfigData> {
     maxTrendPodcastsPerDay: row.maxTrendPodcastsPerDay,
     trendSearchQueries: row.trendSearchQueries,
     tweetTemplate: row.tweetTemplate,
+    defaultAiModel: row.defaultAiModel,
+    defaultTtsProvider: row.defaultTtsProvider,
+    defaultTtsModel: row.defaultTtsModel,
   };
 }
 
@@ -75,6 +81,9 @@ export async function setTwitterConfig(
         trendSearchQueries: data.trendSearchQueries,
       }),
       ...(data.tweetTemplate !== undefined && { tweetTemplate: data.tweetTemplate }),
+      ...(data.defaultAiModel !== undefined && { defaultAiModel: data.defaultAiModel }),
+      ...(data.defaultTtsProvider !== undefined && { defaultTtsProvider: data.defaultTtsProvider }),
+      ...(data.defaultTtsModel !== undefined && { defaultTtsModel: data.defaultTtsModel }),
       updatedBy: adminId,
     },
     create: {
@@ -88,6 +97,9 @@ export async function setTwitterConfig(
       maxTrendPodcastsPerDay: data.maxTrendPodcastsPerDay ?? DEFAULTS.maxTrendPodcastsPerDay,
       trendSearchQueries: data.trendSearchQueries ?? DEFAULTS.trendSearchQueries,
       tweetTemplate: data.tweetTemplate ?? DEFAULTS.tweetTemplate,
+      defaultAiModel: data.defaultAiModel ?? DEFAULTS.defaultAiModel,
+      defaultTtsProvider: data.defaultTtsProvider ?? DEFAULTS.defaultTtsProvider,
+      defaultTtsModel: data.defaultTtsModel ?? DEFAULTS.defaultTtsModel,
       updatedBy: adminId,
     },
   });
