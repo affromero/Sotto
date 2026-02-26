@@ -8,7 +8,10 @@ import { CreatePageClient } from './CreatePageClient';
 import type { DraftData } from './CreatePageClient';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Create a Podcast' };
+export const metadata = {
+  title: 'Create a Podcast',
+  robots: { index: false, follow: false },
+};
 
 export default async function CreatePage({
   searchParams,

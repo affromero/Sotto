@@ -1,7 +1,10 @@
 import { AuthButtons } from '../AuthButtons';
 import styles from './page.module.css';
 
-export const metadata = { title: 'Sign In' };
+export const metadata = {
+  title: 'Sign In',
+  robots: { index: false, follow: false },
+};
 
 export default function LoginPage() {
   return (
