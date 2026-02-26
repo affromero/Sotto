@@ -17,6 +17,8 @@ export interface AiModelOption {
   id: string;
   displayName: string;
   tier: 'fast' | 'balanced' | 'best' | 'max';
+  /** Minimum plan required to use this model on platform credits (BYOK bypasses). */
+  requiredPlan: 'FREE' | 'PRO';
 }
 
 export interface AiProviderMeta {
@@ -38,9 +40,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast' },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', tier: 'balanced' },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', tier: 'best' },
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -73,9 +75,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', tier: 'fast' },
-      { id: 'gpt-5', displayName: 'GPT-5', tier: 'balanced' },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', tier: 'best' },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'gpt-5', displayName: 'GPT-5', tier: 'balanced', requiredPlan: 'PRO' },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -98,8 +100,8 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'llama-3.3-70b-versatile',
     getApiKeyUrl: 'https://console.groq.com/keys',
     models: [
-      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', tier: 'fast' },
-      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', tier: 'best' },
+      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
@@ -122,9 +124,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'opus',
     getApiKeyUrl: '',
     models: [
-      { id: 'haiku', displayName: 'Haiku', tier: 'fast' },
-      { id: 'sonnet', displayName: 'Sonnet', tier: 'balanced' },
-      { id: 'opus', displayName: 'Opus', tier: 'best' },
+      { id: 'haiku', displayName: 'Haiku', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'sonnet', displayName: 'Sonnet', tier: 'balanced', requiredPlan: 'PRO' },
+      { id: 'opus', displayName: 'Opus', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [],
@@ -266,6 +268,18 @@ export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
       description: AI_CLIENT_DESCRIPTIONS[p.id].description,
       badge: AI_CLIENT_DESCRIPTIONS[p.id].badge,
     }));
+}
+
+/**
+ * Look up the minimum plan required for a model ID.
+ * Returns null if the model is not found in any provider.
+ */
+export function getModelRequiredPlan(modelId: string): 'FREE' | 'PRO' | null {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.requiredPlan;
+  }
+  return null;
 }
 
 export async function validateAiProviderCredentials(
