@@ -35,11 +35,13 @@ function isPublicRoute(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip static files
+  // Skip static files and SEO routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
-    pathname.startsWith('/fonts')
+    pathname.startsWith('/fonts') ||
+    pathname === '/sitemap.xml' ||
+    pathname === '/robots.txt'
   ) {
     return NextResponse.next();
   }
