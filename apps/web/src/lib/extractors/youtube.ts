@@ -51,7 +51,7 @@ function getClient() {
       groqApiKey: process.env.GROQ_API_KEY ?? null,
       openaiApiKey: process.env.OPENAI_API_KEY ?? null,
       ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
-      onProgress: (event) => {
+      onProgress: (event: { kind: string }) => {
         logger.debug('YouTube extraction progress', { kind: event.kind });
       },
     });
