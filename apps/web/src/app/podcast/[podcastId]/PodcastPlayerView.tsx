@@ -619,20 +619,22 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
 
       {/* Stats & Actions */}
       <div className={styles.actionsRow}>
-        <div className={styles.statsRow}>
-          <span className={styles.stat}>
-            <Play size={16} aria-hidden="true" />
-            {formatCount(podcast.playCount)}
-          </span>
-          <span className={styles.stat}>
-            <Heart size={16} aria-hidden="true" />
-            {formatCount(likeCount)}
-          </span>
-          <span className={styles.stat}>
-            <GitFork size={16} aria-hidden="true" />
-            {formatCount(podcast.forkCount)}
-          </span>
-        </div>
+        {isOwner && (
+          <div className={styles.statsRow}>
+            <span className={styles.stat}>
+              <Play size={16} aria-hidden="true" />
+              {formatCount(podcast.playCount)}
+            </span>
+            <span className={styles.stat}>
+              <Heart size={16} aria-hidden="true" />
+              {formatCount(likeCount)}
+            </span>
+            <span className={styles.stat}>
+              <GitFork size={16} aria-hidden="true" />
+              {formatCount(podcast.forkCount)}
+            </span>
+          </div>
+        )}
 
         <div className={styles.actionButtons}>
           {/* Primary actions — always visible */}

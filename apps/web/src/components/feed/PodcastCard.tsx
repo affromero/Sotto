@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { Badge } from '@/components/ui/Badge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
@@ -71,6 +72,8 @@ export function PodcastCard({
 }: PodcastCardProps) {
   const router = useRouter();
   const track = useTrack();
+  const { user } = useAuth();
+  const isOwner = user?.id === podcast.user.id;
   const mountTimeRef = useRef(0);
   const duration = formatDuration(podcast.duration);
   const gradient = getPodcastGradient(podcast.id);
@@ -134,10 +137,12 @@ export function PodcastCard({
             <span className={styles.compactCreator}>
               {podcast.user.name || 'Anonymous'}
             </span>
-            <span className={styles.compactStat}>
-              <Play size={10} aria-hidden="true" />
-              {formatCount(podcast.playCount)}
-            </span>
+            {isOwner && (
+              <span className={styles.compactStat}>
+                <Play size={10} aria-hidden="true" />
+                {formatCount(podcast.playCount)}
+              </span>
+            )}
           </div>
         </div>
 
@@ -180,20 +185,22 @@ export function PodcastCard({
             <MetadataBadges podcast={podcast} categories={['ai', 'tts', 'language']} compact />
           )}
 
-          <div className={styles.stats}>
-            <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
-              <Play size={14} aria-hidden="true" />
-              <span>{formatCount(podcast.playCount)}</span>
-            </span>
-            <span className={styles.stat} aria-label={`${podcast.likeCount} likes`}>
-              <Heart size={14} aria-hidden="true" />
-              <span>{formatCount(podcast.likeCount)}</span>
-            </span>
-            <span className={styles.stat} aria-label={`${podcast.forkCount} forks`}>
-              <GitFork size={14} aria-hidden="true" />
-              <span>{formatCount(podcast.forkCount)}</span>
-            </span>
-          </div>
+          {isOwner && (
+            <div className={styles.stats}>
+              <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
+                <Play size={14} aria-hidden="true" />
+                <span>{formatCount(podcast.playCount)}</span>
+              </span>
+              <span className={styles.stat} aria-label={`${podcast.likeCount} likes`}>
+                <Heart size={14} aria-hidden="true" />
+                <span>{formatCount(podcast.likeCount)}</span>
+              </span>
+              <span className={styles.stat} aria-label={`${podcast.forkCount} forks`}>
+                <GitFork size={14} aria-hidden="true" />
+                <span>{formatCount(podcast.forkCount)}</span>
+              </span>
+            </div>
+          )}
 
           {podcast.tags.length > 0 && (
             <div className={styles.tags} aria-label="Tags">

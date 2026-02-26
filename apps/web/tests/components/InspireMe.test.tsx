@@ -14,6 +14,10 @@ vi.mock('@/lib/podcast-gradient', () => ({
   getPodcastGradient: () => ({ from: '#000', to: '#fff', angle: '135deg' }),
 }));
 
+vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({ user: null, isAuthenticated: false, isLoading: false }),
+}));
+
 import { InspireMe } from '@/components/discovery/InspireMe';
 
 const mockAllResponse = {
