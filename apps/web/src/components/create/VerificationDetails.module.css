@@ -1,0 +1,209 @@
+/* Verification Details — expandable failure breakdown */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-md);
+  background: var(--color-error-lighter);
+  border: 1px solid var(--color-error-light);
+  border-radius: var(--radius-lg);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.headerIcon {
+  flex-shrink: 0;
+  color: var(--color-error);
+  margin-top: 1px;
+}
+
+.headerText {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.loading {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+}
+
+/* Summary bar */
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.summaryBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+}
+
+.summaryItem {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.summaryPassed {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.summaryFailed {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+/* Expandable sections */
+
+.section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  transition: background var(--transition-fast);
+}
+
+.sectionHeader:hover {
+  background: var(--color-surface-hover);
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.sectionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 var(--spacing-xs);
+  font: var(--text-caption);
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  color: var(--color-text-inverse);
+}
+
+.unsupported .sectionCount {
+  background: var(--color-error);
+}
+
+.unreliable .sectionCount {
+  background: var(--color-warning);
+}
+
+.misattributed .sectionCount {
+  background: var(--color-accent);
+}
+
+.chevron {
+  transition: transform var(--transition-fast);
+  color: var(--color-text-tertiary);
+}
+
+.chevronOpen {
+  transition: transform var(--transition-fast);
+  transform: rotate(180deg);
+  color: var(--color-text-tertiary);
+}
+
+/* Claim list */
+
+.claimList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.claimItem {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.claimItem:last-child {
+  border-bottom: none;
+}
+
+.claimText {
+  margin: 0;
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  font-style: italic;
+}
+
+.claimMeta {
+  margin: 2px 0 0;
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+}
+
+.claimSpeaker {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Suggestion */
+
+.suggestion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-error-light);
+}
+
+.suggestionLabel {
+  margin: 0;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.suggestionChip {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+  background: var(--color-primary-lighter);
+  border: 1px solid var(--color-primary-light);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.suggestionChip:hover {
+  background: var(--color-primary-light);
+}
