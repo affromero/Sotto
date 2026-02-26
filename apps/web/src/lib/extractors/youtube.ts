@@ -1,4 +1,3 @@
-import { createLinkPreviewClient } from '@steipete/summarize-core';
 import { logger } from '../logger';
 import type { ExtractedContent } from './types';
 
@@ -43,10 +42,13 @@ export function extractVideoId(url: string): string | null {
   }
 }
 
-let clientInstance: ReturnType<typeof createLinkPreviewClient> | null = null;
+// Lazy-loaded to avoid crashing CJS workers — the package only exports ESM
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let clientInstance: any = null;
 
-function getClient() {
+async function getClient() {
   if (!clientInstance) {
+    const { createLinkPreviewClient } = await import('@steipete/summarize-core');
     clientInstance = createLinkPreviewClient({
       groqApiKey: process.env.GROQ_API_KEY ?? null,
       openaiApiKey: process.env.OPENAI_API_KEY ?? null,
@@ -77,7 +79,7 @@ export async function extractYouTubeContent(url: string): Promise<ExtractedConte
   }
 
   try {
-    const client = getClient();
+    const client = await getClient();
     const result = await client.fetchLinkContent(url, {
       youtubeTranscript: 'auto',
       maxCharacters: MAX_CONTENT_LENGTH,
