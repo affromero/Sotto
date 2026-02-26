@@ -58,6 +58,17 @@ export default function SupportPage() {
                 </p>
               </div>
             </div>
+            <div className={styles.contactItem}>
+              <span className={styles.contactIcon} aria-hidden="true">&#128994;</span>
+              <div>
+                <strong>System Status</strong>
+                <p>
+                  Check if Sotto is up and running on our{' '}
+                  <a href="https://stats.uptimerobot.com/jft3J7XAG9" target="_blank" rel="noopener noreferrer">status page</a>.
+                  View uptime history and current service health.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 

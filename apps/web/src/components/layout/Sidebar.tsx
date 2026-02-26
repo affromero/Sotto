@@ -11,6 +11,7 @@ import {
   Mic,
   Bookmark,
   Shield,
+  Activity,
 } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
 import styles from './Sidebar.module.css';
@@ -90,6 +91,18 @@ export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = fa
             );
           })}
         </nav>
+
+        <div className={styles.statusLink}>
+          <a
+            href="https://stats.uptimerobot.com/jft3J7XAG9"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.statusLinkAnchor}
+          >
+            <Activity size={16} aria-hidden="true" />
+            System Status
+          </a>
+        </div>
 
         {role === 'ADMIN' && (
           <div className={styles.adminLink}>
