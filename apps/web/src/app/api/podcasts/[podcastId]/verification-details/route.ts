@@ -65,18 +65,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     },
   });
 
-  // feasibilitySuggestion will be populated by the topic assessor (Phase 2).
-  // For now we read it via raw SQL to avoid Prisma schema dependency.
-  let feasibilitySuggestion: string | null = null;
-  try {
-    const rows = await prisma.$queryRawUnsafe<Array<{ feasibilitySuggestion: string | null }>>(
-      `SELECT "feasibilitySuggestion" FROM "Discovery" WHERE "podcastId" = $1 LIMIT 1`,
-      podcastId,
-    );
-    feasibilitySuggestion = rows[0]?.feasibilitySuggestion ?? null;
-  } catch {
-    // Column doesn't exist yet — return null
-  }
+  const discovery = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { feasibilitySuggestion: true },
+  });
+  const feasibilitySuggestion = discovery?.feasibilitySuggestion ?? null;
 
   if (!script || !script.verificationClaims) {
     return NextResponse.json({

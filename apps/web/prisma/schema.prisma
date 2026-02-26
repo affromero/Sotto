@@ -267,6 +267,7 @@ model Podcast {
   ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
+  verificationMode String  @default("standard") // standard, relaxed
   sttProvider     String? // null = auto; 'openai' | 'groq' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
   sttModel        String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language        String?  // ISO 639-1, e.g. 'en', 'es', 'ja'
@@ -403,6 +404,11 @@ model Discovery {
   sourceUrl      String?
   sourceContent  String?  @db.Text
   sourceMetadata Json?
+
+  // Verification & feasibility
+  verificationMode      String  @default("standard") // standard, relaxed
+  feasibilityVerdict    String? // proceed, warn, reject
+  feasibilitySuggestion String? @db.Text
 
   // Relations
   podcast  Podcast            @relation(fields: [podcastId], references: [id], onDelete: Cascade)
