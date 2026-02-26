@@ -2,6 +2,8 @@ import { generateResponse } from './claude';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { getAllAiProviderMeta } from './providers/ai-registry';
+import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 const SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
@@ -18,6 +20,7 @@ Rules:
 - Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
 - Infer durationTarget in minutes: short tweet or quick_overview → 5, detailed or deep_dive → 15, default → 10
 - Strip @sottofm mention and any Twitter handles from the topic
+- If the user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). If not mentioned, set to null.
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with ONLY valid JSON matching this shape:
@@ -30,7 +33,9 @@ Respond with ONLY valid JSON matching this shape:
   "focusAreas": ["string array of specific subtopics"],
   "audience": "general" | "kids" | "mature",
   "durationTarget": 5 | 10 | 15,
-  "sourceUrl": "string | null — URL if found in tweet"
+  "sourceUrl": "string | null — URL if found in tweet",
+  "requestedAiModel": "string | null — AI model name if user specified one",
+  "requestedTtsProvider": "string | null — TTS/audio provider name if user specified one"
 }`;
 
 /**
@@ -111,6 +116,7 @@ Rules:
 - Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
 - Infer durationTarget in minutes: short threads → 10, long detailed threads → 15, default → 15
 - Strip @sottofm and other handles from the topic
+- If the tagging user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). Only look at the tagging user's tweet, not the thread content. If not mentioned, set to null.
 ${INPUT_SANITIZATION_INSTRUCTIONS}
 
 Respond with ONLY valid JSON matching this shape:
@@ -127,7 +133,9 @@ Respond with ONLY valid JSON matching this shape:
   "sourceUrls": ["all URLs found in thread"],
   "isDebate": true | false,
   "isSelfAuthored": true | false,
-  "viewpoints": ["@alice argues X because Y", "@bob counters with Z"]
+  "viewpoints": ["@alice argues X because Y", "@bob counters with Z"],
+  "requestedAiModel": "string | null — AI model name if user specified one",
+  "requestedTtsProvider": "string | null — TTS/audio provider name if user specified one"
 }`;
 
 function formatThreadForParsing(thread: ThreadData): string {
@@ -204,4 +212,112 @@ ${threadText}`;
   }
 
   return parsed;
+}
+
+/**
+ * Map fuzzy model/provider names from tweets to actual registry IDs.
+ * Returns { aiModel, ttsProvider } with null for unrecognized names.
+ *
+ * This only affects the podcast generation pipeline (script + audio),
+ * NOT the tweet parser itself (which always uses Claude).
+ */
+export function resolveModelFromTweet(parsed: TweetParseResult): {
+  aiModel: string | null;
+  ttsProvider: string | null;
+} {
+  let aiModel: string | null = null;
+  let ttsProvider: string | null = null;
+
+  if (parsed.requestedAiModel) {
+    aiModel = resolveAiModel(parsed.requestedAiModel);
+  }
+  if (parsed.requestedTtsProvider) {
+    ttsProvider = resolveTtsProvider(parsed.requestedTtsProvider);
+  }
+
+  return { aiModel, ttsProvider };
+}
+
+const AI_MODEL_ALIASES: Record<string, string> = {
+  // Anthropic
+  opus: 'claude-opus-4-6',
+  'claude opus': 'claude-opus-4-6',
+  sonnet: 'claude-sonnet-4-6',
+  'claude sonnet': 'claude-sonnet-4-6',
+  haiku: 'claude-haiku-4-5-20251001',
+  'claude haiku': 'claude-haiku-4-5-20251001',
+  claude: 'claude-sonnet-4-6',
+  // OpenAI
+  'gpt-5': 'gpt-5',
+  'gpt5': 'gpt-5',
+  'gpt-5-mini': 'gpt-5-mini',
+  'gpt-5.2': 'gpt-5.2',
+  chatgpt: 'gpt-5',
+  openai: 'gpt-5',
+  // Groq / Llama
+  llama: 'llama-3.3-70b-versatile',
+  groq: 'llama-3.3-70b-versatile',
+};
+
+function resolveAiModel(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  // Direct alias match
+  if (AI_MODEL_ALIASES[normalized]) return AI_MODEL_ALIASES[normalized];
+
+  // Check against actual registry model IDs
+  for (const provider of getAllAiProviderMeta()) {
+    for (const model of provider.models) {
+      if (model.id === normalized || model.displayName.toLowerCase() === normalized) {
+        return model.id;
+      }
+    }
+  }
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, modelId] of Object.entries(AI_MODEL_ALIASES)) {
+    if (normalized.includes(alias)) return modelId;
+  }
+
+  logger.info('Unrecognized AI model from tweet', { raw });
+  return null;
+}
+
+const TTS_PROVIDER_ALIASES: Record<string, string> = {
+  elevenlabs: 'elevenlabs',
+  'eleven labs': 'elevenlabs',
+  '11labs': 'elevenlabs',
+  openai: 'openai',
+  'openai tts': 'openai',
+  'openai voice': 'openai',
+  playht: 'playht',
+  'play.ht': 'playht',
+  'play ht': 'playht',
+  cartesia: 'cartesia',
+  hume: 'hume',
+  'hume ai': 'hume',
+  fal: 'fal',
+  replicate: 'replicate',
+};
+
+function resolveTtsProvider(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  // Direct alias match
+  if (TTS_PROVIDER_ALIASES[normalized]) return TTS_PROVIDER_ALIASES[normalized];
+
+  // Check against actual registry provider IDs
+  for (const provider of getAllProviderMeta()) {
+    if (provider.id === normalized || provider.displayName.toLowerCase() === normalized) {
+      return provider.id;
+    }
+  }
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, providerId] of Object.entries(TTS_PROVIDER_ALIASES)) {
+    if (normalized.includes(alias)) return providerId;
+  }
+
+  logger.info('Unrecognized TTS provider from tweet', { raw });
+  return null;
 }
