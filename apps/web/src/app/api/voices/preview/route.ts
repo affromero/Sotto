@@ -3,8 +3,10 @@ import { auth } from '@/lib/auth';
 import { generateSpeech } from '@/lib/elevenlabs';
 import { voicePreviewSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
-import { getProviderMeta } from '@/lib/providers/tts-registry';
+import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { logUsage } from '@/lib/usage-logger';
+import { getByokKey } from '@/lib/byok';
+import { createTtsProviderAsync } from '@/lib/providers/tts';
 
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
@@ -25,13 +27,35 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { voiceId, text } = parsed.data;
+  const { voiceId, text, provider } = parsed.data;
 
-  const audioBuffer = await generateSpeech({ text, voiceId });
+  let audioBuffer: Buffer;
+  const providerName: TtsProviderId = (provider || 'elevenlabs') as TtsProviderId;
 
-  const meta = getProviderMeta('elevenlabs');
+  if (provider && provider !== 'elevenlabs') {
+    // Multi-provider preview: use BYOK key or platform key
+    const ttsProviderId = provider as TtsProviderId;
+    const byokKey = await getByokKey(session.user.id, ttsProviderId);
+    const platformKey = provider === 'hume' ? process.env.HUME_API_KEY
+      : provider === 'cartesia' ? process.env.CARTESIA_API_KEY
+      : provider === 'playht' ? process.env.PLAYHT_API_KEY
+      : undefined;
+    const apiKey = byokKey || platformKey;
+
+    if (!apiKey) {
+      return errorResponse(`No ${provider} API key available`, 400);
+    }
+
+    const ttsProvider = await createTtsProviderAsync(ttsProviderId, apiKey);
+    audioBuffer = await ttsProvider.generateSpeech({ text, voiceId });
+  } else {
+    // Default: ElevenLabs
+    audioBuffer = await generateSpeech({ text, voiceId });
+  }
+
+  const meta = getProviderMeta(providerName);
   logUsage({
-    service: 'elevenlabs',
+    service: providerName,
     category: 'voice_preview',
     inputTokens: text.length,
     totalCost: (text.length / 1000) * meta.platformCostPerKChar,
