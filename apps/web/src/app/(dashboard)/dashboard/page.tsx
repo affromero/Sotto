@@ -8,6 +8,7 @@ import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
 import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
+import { ReferralSharePrompt } from '@/components/referral/ReferralSharePrompt';
 import { Shield } from 'lucide-react';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import type { PodcastStatus } from '@prisma/client';
@@ -96,6 +97,7 @@ export default async function DashboardPage() {
       where: { id: userId },
       select: {
         name: true,
+        handle: true,
         role: true,
         _count: {
           select: {
@@ -191,8 +193,10 @@ export default async function DashboardPage() {
   const tierFeatures = getTierFeatures(plan, freeTier.isByokUser, userRole);
 
   const displayName = user?.name || 'there';
+  const userHandle = user?.handle;
   const isAdmin = userRole === 'ADMIN';
   const isCreatorOrAdmin = userRole === 'CREATOR' || isAdmin;
+  const readyPodcastCount = podcasts.filter((p) => p.status === 'READY').length;
   const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
   const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
   const totalLikes = podcasts.reduce((sum, p) => sum + p.likeCount, 0);
@@ -215,6 +219,10 @@ export default async function DashboardPage() {
           resetInSeconds={freeTier.resetInSeconds}
           email={session?.user?.email ?? undefined}
         />
+      )}
+
+      {userHandle && readyPodcastCount > 0 && (
+        <ReferralSharePrompt handle={userHandle} hasFirstReadyPodcast={readyPodcastCount >= 1} />
       )}
 
       <section className={styles.header}>

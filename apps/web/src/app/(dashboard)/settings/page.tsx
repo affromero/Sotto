@@ -4,6 +4,7 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { getReferralBonus, getActiveReferralCount } from '@/lib/referrals';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -18,7 +19,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referralCount] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referredUsers] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -69,13 +70,19 @@ export default async function SettingsPage() {
     listByokProviders(userId),
     listAiProviders(userId),
     prisma.tasteQuizAnswer.count({ where: { userId } }),
-    prisma.user.count({ where: { referredById: userId } }),
+    prisma.user.findMany({
+      where: { referredById: userId },
+      select: { name: true, handle: true, image: true, createdAt: true, referralVerified: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
   ]);
 
   if (!user) return null;
 
   const connectedProviders = accounts.map((a) => a.provider);
   const selectedInterestTagIds = userInterests.map((i) => i.tagId);
+  const activeReferralCount = await getActiveReferralCount(userId);
 
   // Sort categories by the order defined in ONBOARDING_TAG_SLUGS
   const slugOrder = new Map(ONBOARDING_TAG_SLUGS.map((s, i) => [s, i]));
@@ -114,7 +121,8 @@ export default async function SettingsPage() {
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
         quizAnswerCount={quizAnswerCount}
-        referralCount={referralCount}
+        referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString(), verified: u.referralVerified }))}
+        referralBonus={getReferralBonus(activeReferralCount)}
       />
     </main>
   );

@@ -193,6 +193,13 @@ export interface VoicesSection {
   requestsByStatus: Array<{ status: string; count: number }>;
 }
 
+export interface ReferralsSection {
+  totalAttributed: number;
+  totalVerified: number;
+  verifiedInPeriod: number;
+  conversionRate: number;
+}
+
 export interface TrafficReport {
   meta: TrafficReportMeta;
   traffic: TrafficSection;
@@ -213,6 +220,7 @@ export interface TrafficReport {
   recommendations: RecommendationsSection;
   collections: CollectionsSection;
   voices: VoicesSection;
+  referrals: ReferralsSection;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +356,11 @@ export async function buildTrafficReport(
     voicesBySourceType,
     voicesRequestable,
     voiceRequestsByStatus,
+
+    // === Referrals (3) ===
+    referralAttributed,
+    referralVerified,
+    referralVerifiedInPeriod,
   ] = await Promise.all([
     // -----------------------------------------------------------------------
     // Traffic
@@ -829,6 +842,13 @@ export async function buildTrafficReport(
       by: ['status'],
       _count: true,
     }),
+
+    // -----------------------------------------------------------------------
+    // Referrals
+    // -----------------------------------------------------------------------
+    prisma.user.count({ where: { referredById: { not: null } } }),
+    prisma.user.count({ where: { referralVerified: true } }),
+    prisma.user.count({ where: { referralVerified: true, referralVerifiedAt: { gte: since } } }),
   ]);
 
   // =========================================================================
@@ -1152,6 +1172,13 @@ export async function buildTrafficReport(
         status: r.status,
         count: r._count,
       })),
+    },
+
+    referrals: {
+      totalAttributed: referralAttributed,
+      totalVerified: referralVerified,
+      verifiedInPeriod: referralVerifiedInPeriod,
+      conversionRate: referralAttributed > 0 ? referralVerified / referralAttributed : 0,
     },
   };
 }
