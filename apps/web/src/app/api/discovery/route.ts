@@ -5,8 +5,9 @@ import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
-import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
+import { getAllAiProviderMeta, getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
+import { isModelAllowedForUser } from '@/lib/tier-features';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
@@ -70,6 +71,24 @@ export async function POST(request: NextRequest) {
   const aiKey = modelProvider
     ? (await getAiKey(authed.userId, modelProvider)) ?? (await getAiKey(authed.userId))
     : await getAiKey(authed.userId);
+
+  // Model plan gating — block expensive models for free non-BYOK users
+  if (typeof model === 'string' && !model.startsWith('claude-code:')) {
+    const requiredPlan = getModelRequiredPlan(model);
+    if (requiredPlan) {
+      const session = await auth();
+      const role = session?.user?.role;
+      const isByok = !!aiKey;
+      const user = await prisma.user.findUnique({
+        where: { id: authed.userId },
+        select: { plan: true },
+      });
+      const userPlan = user?.plan ?? 'FREE';
+      if (!isModelAllowedForUser(requiredPlan, userPlan as 'FREE' | 'PRO', isByok, role)) {
+        return errorResponse('This model requires a Pro subscription.', 403, { code: 'model_requires_pro' });
+      }
+    }
+  }
 
   // Inline URL extraction: detect URLs in the latest message and inject context
   const detectedUrls = detectUrls(userMessage);
