@@ -27,6 +27,7 @@ import {
   FlaskConical,
   HeartPulse,
   ListTodo,
+  Globe,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -80,6 +81,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/pipeline', label: 'Pipeline', icon: Activity },
       { href: '/admin/retention', label: 'Retention', icon: TrendingUp },
       { href: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+      { href: '/admin/analytics/live', label: 'Live Map', icon: Globe },
     ],
   },
   {
