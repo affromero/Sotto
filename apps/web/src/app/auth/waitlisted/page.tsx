@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import styles from './page.module.css';
 
-export const metadata = { title: 'Waitlisted' };
+export const metadata = {
+  title: 'Waitlisted',
+  robots: { index: false, follow: false },
+};
 
 interface PageProps {
   searchParams: Promise<{ reason?: string }>;

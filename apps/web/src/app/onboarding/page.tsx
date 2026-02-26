@@ -12,7 +12,10 @@ import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
-export const metadata = { title: 'Welcome to Sotto' };
+export const metadata = {
+  title: 'Welcome to Sotto',
+  robots: { index: false, follow: false },
+};
 
 interface OnboardingPageProps {
   searchParams: Promise<{ step?: string; reason?: string }>;
