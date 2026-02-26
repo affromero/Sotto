@@ -57,6 +57,9 @@ interface SettingsFormProps {
   configuredAiProviders: Array<{ provider: string; isValid: boolean }>;
   aiProviderMeta: AiProviderClientMeta[];
   ttsProviderMeta: TtsProviderClientMeta[];
+  initialPreferredAiModel: string | null;
+  initialPreferredTtsProvider: string | null;
+  initialPreferredTtsModel: string | null;
   isTwitterProviderAvailable: boolean;
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
@@ -91,6 +94,9 @@ export function SettingsForm({
   configuredAiProviders,
   aiProviderMeta,
   ttsProviderMeta,
+  initialPreferredAiModel,
+  initialPreferredTtsProvider,
+  initialPreferredTtsModel,
   initialEmailNotifications,
   initialPushNotifications,
   isTwitterProviderAvailable,
@@ -160,6 +166,27 @@ export function SettingsForm({
   const [twitterSaving, setTwitterSaving] = useState(false);
   const [twitterSaved, setTwitterSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+
+  // Twitter model preference state
+  const [preferredAiModel, setPreferredAiModel] = useState(initialPreferredAiModel ?? '');
+  const [preferredTtsOption, setPreferredTtsOption] = useState(
+    initialPreferredTtsProvider && initialPreferredTtsModel
+      ? `${initialPreferredTtsProvider}:${initialPreferredTtsModel}`
+      : ''
+  );
+  const [aiModelOptions, setAiModelOptions] = useState<Array<{ id: string; displayName: string; tier: string; group?: string }>>([]);
+  const [ttsOptions, setTtsOptions] = useState<Array<{ id: string; displayName: string; badge?: string; group?: string }>>([]);
+
+  useEffect(() => {
+    if (!isTwitterConnected) return;
+    Promise.all([
+      fetch('/api/ai-models').then((r) => r.ok ? r.json() : null),
+      fetch('/api/tts-options').then((r) => r.ok ? r.json() : null),
+    ]).then(([aiData, ttsData]) => {
+      if (aiData?.models) setAiModelOptions(aiData.models);
+      if (ttsData?.options) setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
+    });
+  }, [isTwitterConnected]);
 
   // Taste quiz state
   const [quizCount, setQuizCount] = useState(quizAnswerCount);
@@ -244,6 +271,9 @@ export function SettingsForm({
         body: JSON.stringify({
           twitterEnabled,
           voicePreferences: voicePrefs,
+          preferredAiModel: preferredAiModel || null,
+          preferredTtsProvider: preferredTtsOption ? preferredTtsOption.split(':')[0] : null,
+          preferredTtsModel: preferredTtsOption ? preferredTtsOption.split(':').slice(1).join(':') : null,
         }),
       });
       if (response.ok) {
@@ -732,6 +762,58 @@ export function SettingsForm({
                   voiceClones={voiceClones}
                 />
               ))}
+
+              {(aiModelOptions.length > 0 || ttsOptions.length > 0) && (
+                <>
+                  <p className={styles.twitterModelHint}>
+                    Override the default AI and voice models for your Twitter-generated podcasts.
+                  </p>
+
+                  {aiModelOptions.length > 0 && (
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="twitterAiModel" className={styles.fieldLabel}>
+                        AI Model
+                      </label>
+                      <select
+                        id="twitterAiModel"
+                        className={styles.twitterSelect}
+                        value={preferredAiModel}
+                        onChange={(e) => setPreferredAiModel(e.target.value)}
+                        aria-label="Preferred AI model for Twitter podcasts"
+                      >
+                        <option value="">System default</option>
+                        {aiModelOptions.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.displayName}{m.group ? ` (${m.group})` : ''} — {m.tier}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {ttsOptions.length > 0 && (
+                    <div className={styles.fieldGroup}>
+                      <label htmlFor="twitterTtsOption" className={styles.fieldLabel}>
+                        Voice Model
+                      </label>
+                      <select
+                        id="twitterTtsOption"
+                        className={styles.twitterSelect}
+                        value={preferredTtsOption}
+                        onChange={(e) => setPreferredTtsOption(e.target.value)}
+                        aria-label="Preferred voice model for Twitter podcasts"
+                      >
+                        <option value="">System default</option>
+                        {ttsOptions.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.displayName}{o.badge ? ` — ${o.badge}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className={styles.formActions}>
                 <Button

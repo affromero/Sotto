@@ -33,6 +33,9 @@ export default async function SettingsPage() {
         twitterEnabled: true,
         voicePreferences: { select: { speaker: true, voiceId: true } },
         preferredLanguage: true,
+        preferredAiModel: true,
+        preferredTtsProvider: true,
+        preferredTtsModel: true,
         emailNotifications: true,
         pushNotifications: true,
       },
@@ -110,6 +113,9 @@ export default async function SettingsPage() {
         twitterEnabled={user.twitterEnabled}
         voicePreferences={user.voicePreferences}
         preferredLanguage={user.preferredLanguage}
+        initialPreferredAiModel={user.preferredAiModel}
+        initialPreferredTtsProvider={user.preferredTtsProvider}
+        initialPreferredTtsModel={user.preferredTtsModel}
         voiceClones={voiceClones}
         interestCategories={categories}
         selectedInterestTagIds={selectedInterestTagIds}
