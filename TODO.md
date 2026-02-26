@@ -437,11 +437,10 @@ Comprehensive tests to add for full coverage across the app.
 
 ## 29. TTS Provider Expansion (Future)
 
-Currently ElevenLabs and OpenAI run as platform-managed providers. PlayHT, Cartesia, and Hume are BYOK-only. This section tracks expanding platform support and adding open source self-hosted models.
+Currently ElevenLabs and OpenAI run as platform-managed providers. Cartesia and Hume are BYOK-only. This section tracks expanding platform support and adding open source self-hosted models.
 
 ### Commercial providers — add as platform (non-BYOK) options
 
-- [ ] **PlayHT** — obtain platform API key, negotiate volume pricing, add `PLAYHT_API_KEY` env var
 - [ ] **Cartesia (Sonic 2)** — obtain platform API key, very fast inference, add `CARTESIA_API_KEY` env var
 - [ ] **Hume AI (EEVC)** — obtain platform API key, emotionally expressive, add `HUME_API_KEY` env var
 - [ ] Update `resolveTtsProvider()` platform fallback chain to include new providers

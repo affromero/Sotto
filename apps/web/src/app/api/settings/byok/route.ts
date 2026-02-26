@@ -26,14 +26,14 @@ export async function POST(request: NextRequest) {
     return errorResponse('Invalid request', 400, { details: parsed.error.flatten() });
   }
 
-  const { provider, apiKey, userId } = parsed.data;
+  const { provider, apiKey } = parsed.data;
 
-  const isValid = await validateByokKey(provider, { apiKey, userId });
+  const isValid = await validateByokKey(provider, { apiKey });
   if (!isValid) {
     return errorResponse(`Invalid ${provider} credentials. Please check and try again.`, 422);
   }
 
-  await storeByokKey(authed.userId, provider, { apiKey, userId });
+  await storeByokKey(authed.userId, provider, { apiKey });
   return NextResponse.json({ success: true });
 }
 
@@ -51,12 +51,12 @@ export async function DELETE(request: NextRequest) {
     // No body — legacy behavior removes elevenlabs
   }
 
-  const validProviders = ['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate'];
+  const validProviders = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate'];
   const targetProvider = provider && validProviders.includes(provider) ? provider : 'elevenlabs';
 
   await removeByokKey(
     authed.userId,
-    targetProvider as 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate'
+    targetProvider as 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate'
   );
   return NextResponse.json({ success: true });
 }

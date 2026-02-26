@@ -78,7 +78,6 @@ These are the TTS providers actually integrated in Sotto's codebase (resolved vi
 | **ElevenLabs** | Scale ($330/mo)  | ~$0.17            | **$2.55**                            | ★★★★★         | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)                      |
 | **OpenAI**     | TTS-1            | $0.015            | **$0.23**                            | ★★★★          | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)         |
 | **OpenAI**     | TTS-1-HD         | $0.030            | **$0.45**                            | ★★★★½         | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing)         |
-| **PlayHT**     | Professional     | $0.02-0.24        | **$0.30-$3.60**                      | ★★★★          | [play.ht/pricing](https://play.ht/pricing/)                                     |
 | **Cartesia**   | Sonic            | ~$0.05            | **$0.75**                            | ★★★★          | [cartesia.ai/pricing](https://cartesia.ai/pricing)                              |
 | **Hume**       | Octave           | ~$0.05            | **$0.75**                            | ★★★★★         | [hume.ai/pricing](https://www.hume.ai/pricing)                                  |
 
@@ -88,7 +87,6 @@ These are the TTS providers actually integrated in Sotto's codebase (resolved vi
 | ---------- | ------------------- | ------------------- |
 | ElevenLabs | 10K chars/month     | ~0.7 podcasts/month |
 | OpenAI TTS | No free tier        | —                   |
-| PlayHT     | Trial credits       | ~1-2 podcasts       |
 | Cartesia   | Trial credits       | ~1-2 podcasts       |
 | Hume       | Trial credits       | ~1-2 podcasts       |
 
@@ -159,7 +157,6 @@ With the free BYOK model, Sotto's platform costs are near-zero (~$0.002/podcast 
 | Claude Haiku 4.5   | OpenAI       | $0.076   | $0.23    | **$0.31**         |
 | Claude Haiku 4.5   | Cartesia     | $0.076   | $0.75    | **$0.83**         |
 | Claude Haiku 4.5   | Hume Octave  | $0.076   | $0.75    | **$0.83**         |
-| Claude Haiku 4.5   | PlayHT       | $0.076   | $0.30    | **$0.38**         |
 | GPT-4o-mini        | OpenAI       | $0.005   | $0.23    | **$0.24**         |
 
 ### Sotto's Platform Cost Per Podcast
@@ -222,14 +219,14 @@ The voice marketplace lets voice clone owners sell access on a per-podcast basis
 
 ## 7. Provider Selection Decision Matrix (Integrated Providers Only)
 
-| Criteria           | Weight | ElevenLabs | OpenAI TTS | PlayHT | Cartesia | Hume   |
-| ------------------ | ------ | ---------- | ---------- | ------ | -------- | ------ |
-| Voice quality      | 30%    | 10         | 8          | 8      | 8        | 9      |
-| Cost               | 25%    | 3          | 9          | 7      | 7        | 7      |
-| API simplicity     | 15%    | 9          | 10         | 7      | 8        | 7      |
-| Voice variety      | 15%    | 10         | 6          | 8      | 7        | 8      |
-| Emotion control    | 15%    | 7          | 4          | 6      | 6        | 10     |
-| **Weighted Score** |        | **7.30**   | **7.45**   | **7.15** | **7.15** | **8.00** |
+| Criteria           | Weight | ElevenLabs | OpenAI TTS | Cartesia | Hume   |
+| ------------------ | ------ | ---------- | ---------- | -------- | ------ |
+| Voice quality      | 30%    | 10         | 8          | 8        | 9      |
+| Cost               | 25%    | 3          | 9          | 7        | 7      |
+| API simplicity     | 15%    | 9          | 10         | 8        | 7      |
+| Voice variety      | 15%    | 10         | 6          | 7        | 8      |
+| Emotion control    | 15%    | 7          | 4          | 6        | 10     |
+| **Weighted Score** |        | **7.30**   | **7.45**   | **7.15** | **8.00** |
 
 **Best overall quality: ElevenLabs** — widest voice library, voice cloning, proven at scale.
 **Best budget option: OpenAI TTS** — simple API, low cost, good enough for most use cases.

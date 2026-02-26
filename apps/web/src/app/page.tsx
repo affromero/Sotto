@@ -1521,7 +1521,6 @@ export default function LandingPage() {
               <span className={styles.byokProviderPill}>Anthropic</span>
               <span className={styles.byokProviderPill}>OpenAI</span>
               <span className={styles.byokProviderPill}>ElevenLabs</span>
-              <span className={styles.byokProviderPill}>PlayHT</span>
               <span className={styles.byokProviderPill}>Cartesia</span>
               <span className={styles.byokProviderPill}>Hume</span>
             </div>

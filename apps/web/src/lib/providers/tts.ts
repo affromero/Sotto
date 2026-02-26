@@ -51,11 +51,6 @@ async function importOpenAI() {
   return OpenAITtsProvider;
 }
 
-async function importPlayHT() {
-  const { PlayHTProvider } = await import('./tts/playht.provider');
-  return PlayHTProvider;
-}
-
 async function importCartesia() {
   const { CartesiaProvider } = await import('./tts/cartesia.provider');
   return CartesiaProvider;
@@ -178,7 +173,7 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
 export async function createTtsProviderAsync(
   providerId: TtsProviderId,
   apiKey?: string,
-  extraData?: Record<string, string>,
+  _extraData?: Record<string, string>,
   model?: string
 ): Promise<TtsProvider> {
   switch (providerId) {
@@ -189,12 +184,6 @@ export async function createTtsProviderAsync(
     case 'openai': {
       const Cls = await importOpenAI();
       return new Cls(apiKey, model);
-    }
-    case 'playht': {
-      if (!apiKey) throw new Error('PlayHT requires an API key');
-      if (!extraData?.userId) throw new Error('PlayHT requires a userId in extraData');
-      const Cls = await importPlayHT();
-      return new Cls(apiKey, extraData.userId, model);
     }
     case 'cartesia': {
       if (!apiKey) throw new Error('Cartesia requires an API key');

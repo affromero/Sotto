@@ -16,7 +16,6 @@ import { PrismaClient } from '@prisma/client';
 const PROVIDER_RATES: Record<string, number> = {
   elevenlabs: 0.17,
   openai: 0.015,
-  playht: 0.2,
   cartesia: 0.15,
   hume: 0.25,
 };

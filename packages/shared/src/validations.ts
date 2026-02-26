@@ -10,7 +10,7 @@ export const createPodcastSchema = z.object({
     speaker: z.string().min(1).max(50),
     voiceId: z.string().optional(),
   })).optional(),
-  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
+  ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   aiModel: z.string().optional(),
   ttsModel: z.string().optional(),
   visibility: z.enum(['PUBLIC', 'UNLISTED', 'PRIVATE']).optional(),
