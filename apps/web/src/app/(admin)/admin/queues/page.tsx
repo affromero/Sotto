@@ -24,7 +24,7 @@ export default async function QueuesPage() {
       const [waiting, active, completed, failed, delayed] = await Promise.all([
         redis.llen(`bull:${name}:wait`),
         redis.llen(`bull:${name}:active`),
-        redis.get(`bull:${name}:completed`).then((v) => parseInt(v || '0', 10)),
+        redis.zcard(`bull:${name}:completed`),
         redis.zcard(`bull:${name}:failed`),
         redis.zcard(`bull:${name}:delayed`),
       ]);
