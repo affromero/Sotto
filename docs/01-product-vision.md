@@ -36,7 +36,7 @@ Sotto addresses all three problems through a single product with three core capa
 
 ### 2.1 AI-Powered Podcast Generation
 
-Users describe what they want to learn through a natural chat conversation with Sotto's AI agent. The agent asks targeted questions with tappable chip suggestions (depth, audience level, focus area, tone, duration) and extracts structured metadata. This metadata feeds into a Claude-powered script generator that produces a two-voice conversational podcast script. Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) converts each segment to audio with distinct, expressive voices (one Host, one Expert), and FFmpeg stitches them into a normalized final episode.
+Users describe what they want to learn through a natural chat conversation with Sotto's AI agent. The agent asks targeted questions with tappable chip suggestions (depth, audience level, focus area, tone, duration) and extracts structured metadata. This metadata feeds into a Claude-powered script generator that produces a two-voice conversational podcast script. Multi-provider TTS (ElevenLabs, OpenAI, Cartesia, Hume) converts each segment to audio with distinct, expressive voices (one Host, one Expert), and FFmpeg stitches them into a normalized final episode.
 
 The result: a personalized 5-30 minute podcast on any topic, tailored to the listener's exact background and interests, ready in 2-3 minutes.
 
@@ -260,7 +260,7 @@ Sotto's two-voice format (Host + Expert) is deliberately designed to exploit the
 
 Voice carries information that text cannot: warmth, enthusiasm, hesitation, emphasis, humor, gravity. When an Expert says "and this is where it gets really interesting..." with genuine excitement in their voice, the listener leans in. When a Host says "wait, hold on, I'm not sure I follow..." with authentic confusion, the listener feels validated in their own confusion.
 
-Modern TTS technology (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume) is now advanced enough to convey these emotional nuances. Sotto's script generator includes delivery directions (laughing, excited, thoughtful, leaning in) that translate into TTS parameters, producing audio that feels like a real conversation rather than a text-to-speech readout.
+Modern TTS technology (ElevenLabs, OpenAI, Cartesia, Hume) is now advanced enough to convey these emotional nuances. Sotto's script generator includes delivery directions (laughing, excited, thoughtful, leaning in) that translate into TTS parameters, producing audio that feels like a real conversation rather than a text-to-speech readout.
 
 This emotional dimension is why podcasts have higher completion rates than articles, why podcast advertising commands premium CPMs, and why podcast listeners report stronger parasocial relationships with hosts than with any other content creator type.
 

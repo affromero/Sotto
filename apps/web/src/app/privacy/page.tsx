@@ -41,7 +41,7 @@ export default function PrivacyPage() {
           <h3>BYOK Keys</h3>
           <p>
             You provide your own API keys for AI providers (Anthropic, OpenAI) and TTS
-            providers (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate).
+            providers (ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate).
             Your keys are encrypted using <strong>AES-256-GCM</strong> before storage
             and are never logged, shared, or used for any purpose other than processing
             your requests. API calls made with your keys are sent directly to the
@@ -154,7 +154,7 @@ export default function PrivacyPage() {
               transcription for imported podcasts
             </li>
             <li>
-              <strong>TTS Providers</strong> (ElevenLabs, OpenAI, PlayHT, Cartesia,
+              <strong>TTS Providers</strong> (ElevenLabs, OpenAI, Cartesia,
               Hume, Fal.ai, Replicate) — audio generation and voice cloning
             </li>
             <li>

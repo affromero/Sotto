@@ -170,7 +170,7 @@ This discovery feeds into the Claude system prompt as structured context, produc
 | Requirement | Details |
 |-------------|---------|
 | AI key      | Anthropic or OpenAI — required for generation, Q&A, discovery chat |
-| TTS key     | ElevenLabs, OpenAI, PlayHT, Cartesia, or Hume — required for audio generation |
+| TTS key     | ElevenLabs, OpenAI, Cartesia, or Hume — required for audio generation |
 | All features | Unlimited — voice clones, downloads, private podcasts, collections, analytics, PDF export |
 
 Keys are encrypted with AES-256-GCM (`BYOK_ENCRYPTION_KEY`) and stored in `UserAiKey` / `UserTtsKey` models.
@@ -224,7 +224,7 @@ Full SaaS scaffolding at `~/Code/Sotto/` — project structure, database schema,
 | Auth          | NextAuth.js v5 (email, Google, GitHub, Twitter, Apple Sign In)                    |
 | Queue         | Redis 7 + BullMQ (23 worker types)                                                |
 | AI            | Anthropic/OpenAI (swappable via `AI_PROVIDER` env var)                            |
-| Audio         | Multi-provider TTS (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)                  |
+| Audio         | Multi-provider TTS (ElevenLabs, OpenAI, Cartesia, Hume)                           |
 | Stitching     | FFmpeg (segment concatenation + normalization)                                    |
 | Storage       | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER`                  |
 | Search        | PostgreSQL full-text search                                                       |

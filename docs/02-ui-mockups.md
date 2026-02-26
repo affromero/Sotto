@@ -668,7 +668,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |  |                                                          ||
 |  |  1. Sign up for free                                     ||
 |  |  2. Add your AI key (Anthropic or OpenAI)                ||
-|  |  3. Add your TTS key (ElevenLabs, OpenAI, PlayHT,       ||
+|  |  3. Add your TTS key (ElevenLabs, OpenAI,               ||
 |  |     Cartesia, or Hume)                                   ||
 |  |  4. Start creating — unlimited podcasts, Q&A,            ||
 |  |     voice clones, downloads, everything                  ||
@@ -849,7 +849,6 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 |          |  +------------------------------------------------+|
 |          |  |  ElevenLabs  ✓ Configured    [Update] [Remove] ||
 |          |  |  OpenAI      ○ Not configured         [Add Key]||
-|          |  |  PlayHT      ○ Not configured         [Add Key]||
 |          |  |  Cartesia    ○ Not configured         [Add Key]||
 |          |  |  Hume        ○ Not configured         [Add Key]||
 |          |  +------------------------------------------------+|
@@ -876,7 +875,7 @@ The top area is a 16:9 aspect ratio block with a gradient background derived fro
 
 **AI Keys section**: Card listing supported AI providers (Anthropic, OpenAI). Each row shows provider name, configuration status (green checkmark if configured, gray circle if not), and action buttons. Configured keys show "Update" and "Remove" buttons. Unconfigured keys show "Add Key" button that opens a modal with a masked input field. Keys are encrypted with AES-256-GCM via the BYOK system.
 
-**TTS Keys section**: Same pattern as AI Keys but for all 5 TTS providers (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). At least one TTS key is required for audio generation.
+**TTS Keys section**: Same pattern as AI Keys but for all 4 TTS providers (ElevenLabs, OpenAI, Cartesia, Hume). At least one TTS key is required for audio generation.
 
 **Usage Stats**: Card showing generation activity this month. Displays podcast count, interaction count, and total audio duration generated. No limits — purely informational.
 

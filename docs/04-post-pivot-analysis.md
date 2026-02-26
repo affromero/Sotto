@@ -79,7 +79,7 @@ ElevenLabs ($11B) shipped GenFM. Google ships NotebookLM. OpenAI, Hume, and ever
 ### What stays the same
 
 - Social feed, fork, remix, import, citation verification, interactive Q&A
-- Multi-provider TTS architecture (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)
+- Multi-provider TTS architecture (ElevenLabs, OpenAI, Cartesia, Hume)
 - 16-voice diversity pool, sound effects, production quality
 - Twitter bot (@sottofm), Telegram bot, admin dashboard, team features
 

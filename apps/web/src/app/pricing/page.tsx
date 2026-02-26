@@ -56,7 +56,7 @@ export default function PricingPage() {
             <p className={styles.sectionText}>
               Want to use your own AI and TTS providers? Sotto supports BYOK
               (Bring Your Own Keys) — connect your accounts with Anthropic,
-              OpenAI, Groq, ElevenLabs, PlayHT, Cartesia, Hume, Fal, or
+              OpenAI, Groq, ElevenLabs, Cartesia, Hume, Fal, or
               Replicate. We encrypt your keys with AES-256-GCM and only decrypt
               them in-memory during your request.
             </p>
@@ -78,7 +78,6 @@ export default function PricingPage() {
                 <ul className={styles.providerList}>
                   <li>ElevenLabs</li>
                   <li>OpenAI TTS</li>
-                  <li>PlayHT</li>
                   <li>Cartesia</li>
                   <li>Hume</li>
                   <li>Fal</li>

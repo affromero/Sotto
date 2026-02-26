@@ -7,11 +7,10 @@ import { createSttProvider } from '@/lib/providers/stt';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { SttProviderId } from '@/lib/providers/stt-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
-import { getAiKey, getByokKey, getByokExtraData } from '@/lib/byok';
+import { getAiKey, getByokKey } from '@/lib/byok';
 import { logUsage } from '@/lib/usage-logger';
 import { errorResponse } from '@/lib/api-response';
 import {
-  PLAYHT_VOICE_POOL,
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
@@ -28,7 +27,6 @@ const requestSchema = z.object({
 const TTS_TEST_VOICES: Record<string, string> = {
   elevenlabs: '21m00Tcm4TlvDq8ikWAM', // Rachel — stable free voice
   openai: 'alloy',
-  playht: PLAYHT_VOICE_POOL[0].id,
   cartesia: CARTESIA_VOICE_POOL[0].id,
   hume: HUME_VOICE_POOL[0].id,
   fal: FAL_VOICE_POOL[0].id,
@@ -45,13 +43,6 @@ function getTtsPlatformKey(provider: string): {
       return { apiKey: process.env.ELEVENLABS_API_KEY };
     case 'openai':
       return { apiKey: process.env.OPENAI_API_KEY };
-    case 'playht':
-      return {
-        apiKey: process.env.PLAYHT_API_KEY,
-        extraData: process.env.PLAYHT_USER_ID
-          ? { userId: process.env.PLAYHT_USER_ID }
-          : undefined,
-      };
     case 'cartesia':
       return { apiKey: process.env.CARTESIA_API_KEY };
     case 'hume':
@@ -258,10 +249,6 @@ export async function POST(request: NextRequest) {
             });
           }
           apiKey = key;
-          if (provider === 'playht') {
-            const extra = await getByokExtraData(adminId, provider as TtsProviderId);
-            if (extra) extraData = extra;
-          }
         }
       } else {
         const platformData = getTtsPlatformKey(provider);
@@ -270,14 +257,6 @@ export async function POST(request: NextRequest) {
 
         if (provider === 'kittentts') {
           if (!process.env.KITTENTTS_URL) {
-            return NextResponse.json({
-              success: false,
-              latencyMs: Date.now() - start,
-              error: 'Platform API key not configured (check .env)',
-            });
-          }
-        } else if (provider === 'playht') {
-          if (!apiKey || !extraData?.userId) {
             return NextResponse.json({
               success: false,
               latencyMs: Date.now() - start,

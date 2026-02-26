@@ -23,7 +23,7 @@ const providerAllocationSchema = z.object({
 const updateConfigSchema = z.object({
   aiProvider: z.enum(['anthropic', 'openai']).optional(),
   aiModel: z.string().min(1).optional(),
-  ttsProvider: z.enum(['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
+  ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   ttsModel: z.string().min(1).optional(),
   sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().min(1).optional(),
