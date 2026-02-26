@@ -6,6 +6,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
+import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
@@ -334,8 +335,24 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     isSaved,
   };
 
+  const showJsonLd =
+    podcast.visibility === 'PUBLIC' &&
+    podcast.status === 'READY' &&
+    resolvedAudioUrl;
+
   return (
     <main className={styles.main}>
+      {showJsonLd && (
+        <PodcastJsonLd
+          id={podcast.id}
+          title={podcast.title}
+          topic={podcast.topic}
+          createdAt={podcast.createdAt.toISOString()}
+          duration={podcast.duration}
+          audioUrl={resolvedAudioUrl}
+          creator={{ name: podcast.user.name, handle: podcast.user.handle }}
+        />
+      )}
       <div className={styles.container}>
         <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
       </div>
