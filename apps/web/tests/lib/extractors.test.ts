@@ -2,6 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { extractContent } from '@/lib/extractors';
 import { extractHtmlContent } from '@/lib/extractors/html';
 
+// Mock summarize-core to avoid real network calls from YouTube extractor
+vi.mock('@steipete/summarize-core', () => ({
+  createLinkPreviewClient: () => ({
+    fetchLinkContent: vi.fn().mockResolvedValue({
+      content: '',
+      title: null,
+      description: null,
+      siteName: 'YouTube',
+      transcriptSource: null,
+      transcriptionProvider: null,
+      wordCount: 0,
+    }),
+  }),
+}));
+
 // Mock logger to avoid noise
 vi.mock('@/lib/logger', () => ({
   logger: {
@@ -298,7 +313,7 @@ describe('extractors', () => {
       const result = await extractContent('https://www.youtube.com/watch?v=test123');
 
       expect(result.sourceType).toBe('youtube');
-      expect(result.extractionMethod).toBe('youtube-transcript');
+      expect(result.extractionMethod).toBe('summarize-core');
     });
   });
 });
