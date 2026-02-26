@@ -54,6 +54,7 @@
     ]
   },
   "devDependencies": {
+    "@types/geoip-lite": "^1.4.4",
     "lint-staged": "^16.2.7",
     "next-auth": "^5.0.0-beta.30",
     "prettier": "^3.8.1",
@@ -61,7 +62,8 @@
     "sort-package-json": "^3.6.1"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.2"
+    "@prisma/client": "^6.19.2",
+    "geoip-lite": "^1.4.10"
   },
   "overrides": {
     "react-native-reanimated": "4.1.1",
