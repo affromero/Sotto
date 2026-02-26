@@ -11,6 +11,7 @@ interface TtsOptionsResponse {
     displayName: string;
     badge?: string;
     group?: string;
+    hint?: string;
   }>;
   readOnly: boolean;
 }
@@ -48,6 +49,7 @@ export function TtsModelDropdown({ ttsProvider, ttsModel, onChange }: TtsModelDr
           displayName: o.displayName,
           badge: o.badge,
           group: o.group,
+          hint: o.hint,
         }));
         setOptions(mapped);
         setReadOnly(data.readOnly ?? false);
