@@ -54,9 +54,11 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     }),
     prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { aiModel: true },
+      select: { aiModel: true, verificationMode: true },
     }),
   ]);
+
+  const verificationMode = podcastRecord.verificationMode;
 
   // Model priority: user's choice > provider default > free tier admin config
   let model = podcastRecord.aiModel ?? undefined;
@@ -104,6 +106,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     apiKeyOverride: aiKey?.apiKey,
     model,
     previousClaims: previousClaims.length > 0 ? previousClaims : undefined,
+    verificationMode,
   });
 
   await job.updateProgress(50);
