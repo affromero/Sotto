@@ -14,7 +14,7 @@ Sotto uses a four-role system stored on the `User` model. All features are avail
 ### Key Design Decisions
 
 - **No subscription tiers.** All users get the same features. Revenue comes from the voice marketplace (Stripe Connect), not subscriptions.
-- **BYOK model.** Users bring their own API keys for AI providers (Anthropic/OpenAI) and TTS providers (ElevenLabs, OpenAI, PlayHT, Cartesia, Hume). Keys are encrypted with AES-256-GCM.
+- **BYOK model.** Users bring their own API keys for AI providers (Anthropic/OpenAI) and TTS providers (ElevenLabs, OpenAI, Cartesia, Hume). Keys are encrypted with AES-256-GCM.
 - **ADMIN bypasses BYOK requirements.** Admin users can use platform-level API keys when configured.
 - **Roles never auto-downgrade.** Once granted, a role persists unless manually changed by an admin.
 - **SYSTEM role** is for automated actions (e.g., system-generated podcasts, internal operations). It is never assigned to real users.
@@ -26,7 +26,7 @@ Instead of subscription tiers with credit limits, all users access all features 
 | Requirement | Details |
 |-------------|---------|
 | **AI key**  | Anthropic or OpenAI — required for discovery chat, script generation, Q&A |
-| **TTS key** | ElevenLabs, OpenAI, PlayHT, Cartesia, or Hume — required for audio generation |
+| **TTS key** | ElevenLabs, OpenAI, Cartesia, or Hume — required for audio generation |
 | **Features** | Unlimited — voice clones, downloads, private podcasts, collections, analytics, PDF export, everything |
 
 **Rate limits** (abuse prevention only): 20 generations/hour, 100/day per user. 60 interactions/hour.

@@ -219,7 +219,7 @@ audio-generation.worker.ts
     |-- Resolve TTS provider via resolveTtsProvider():
     |   - Check user's BYOK TTS key (UserTtsKey)
     |   - Fall back to platform TTS key if no BYOK
-    |   - Supports: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume
+    |   - Supports: ElevenLabs, OpenAI, Cartesia, Hume
     |
     |-- Process segments in parallel (concurrency: 15)
     |   For each segment:
@@ -505,7 +505,7 @@ User ──< Podcast ──< Segment
   |
   |──< Follow (follower/following, self-referential through User)
   |──< UserAiKey (BYOK: Anthropic, OpenAI — AES-256-GCM encrypted)
-  |──< UserTtsKey (BYOK: ElevenLabs, OpenAI, PlayHT, Cartesia, Hume)
+  |──< UserTtsKey (BYOK: ElevenLabs, OpenAI, Cartesia, Hume)
   |──< VoiceClone ──< VoicePurchase
   |──< Collection ──< CollectionItem
   |──< Activity
@@ -529,7 +529,7 @@ User ──< Podcast ──< Segment
 | **Reference**        | `id` (cuid) | podcastId, number, title, authors, year, url, type, verificationStatus                                                        | podcastId                                                   |
 | **Interaction**      | `id` (cuid) | podcastId, userId, status, question, timestamp, answer, helpful, segmentOrder, visibility (PUBLIC/PRIVATE), upvoteCount       | podcastId, userId, status                                   |
 | **UserAiKey**        | `id` (cuid) | userId, provider (ANTHROPIC/OPENAI), encryptedKey, isValid — `@@unique([userId, provider])`                                   | userId                                                      |
-| **UserTtsKey**       | `id` (cuid) | userId, provider (ELEVENLABS/OPENAI/PLAYHT/CARTESIA/HUME), encryptedKey, isValid — `@@unique([userId, provider])`             | userId                                                      |
+| **UserTtsKey**       | `id` (cuid) | userId, provider (ELEVENLABS/OPENAI/CARTESIA/HUME/FAL/REPLICATE), encryptedKey, isValid — `@@unique([userId, provider])`      | userId                                                      |
 | **VoiceClone**       | `id` (cuid) | userId, name, provider, externalVoiceId, priceInCents                                                                         | userId                                                      |
 | **VoicePurchase**    | `id` (cuid) | buyerId, voiceCloneId, podcastId, amountCents, platformFeeCents, status (authorized/captured/cancelled/refunded)              | buyerId, voiceCloneId                                       |
 | **FreeTierConfig**   | `id` (cuid) | aiProvider, aiModel, ttsProvider, generationLimit — singleton row                                                              |                                                             |

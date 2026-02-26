@@ -113,10 +113,10 @@ Modular provider architecture — swap external services via env vars.
 | `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` + `resolveAiProvider()`, `canResolveAi()` | `AI_PROVIDER` |
 | `ai-registry.ts` | `AiProviderMeta` | Declarative AI provider metadata: validation functions for Anthropic + OpenAI keys | — |
 | `claude-code.ts` | `AIProvider` | `ClaudeCodeProvider` (standalone) | `AI_PROVIDER` |
-| `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `PlayHTProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
+| `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
 | `tts-registry.ts` | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities, models | — |
-| `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (PlayHT, Cartesia, Hume, Fal/Replicate) with curated voices + deterministic hash selection | — |
-| `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `playht`, `cartesia`, `hume`, `fal`, `replicate` | Various TTS APIs |
+| `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (Cartesia, Hume, Fal/Replicate) with curated voices + deterministic hash selection | — |
+| `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `cartesia`, `hume`, `fal`, `replicate` | Various TTS APIs |
 | `stt.ts` | `SttProvider` | OpenAI Whisper (`WhisperProvider`), Groq, ElevenLabs STT + `resolveSttProvider()` | `STT_PROVIDER` |
 | `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, Groq, ElevenLabs | — |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
