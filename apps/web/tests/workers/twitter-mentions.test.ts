@@ -45,12 +45,14 @@ const mockGetMentions = vi.fn();
 const mockGetTweet = vi.fn();
 const mockGetThread = vi.fn();
 const mockReplyToTweet = vi.fn();
+const mockSendDirectMessage = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/twitter', () => ({
   getMentions: (...args: unknown[]) => mockGetMentions(...args),
   getTweet: (...args: unknown[]) => mockGetTweet(...args),
   getThread: (...args: unknown[]) => mockGetThread(...args),
   replyToTweet: (...args: unknown[]) => mockReplyToTweet(...args),
+  sendDirectMessage: (...args: unknown[]) => mockSendDirectMessage(...args),
 }));
 
 const mockParseTweetIntent = vi.fn();

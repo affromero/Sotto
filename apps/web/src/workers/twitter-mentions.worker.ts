@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
-import { getMentions, getTweet, getThread, replyToTweet } from '@/lib/twitter';
+import { getMentions, getTweet, getThread, replyToTweet, sendDirectMessage } from '@/lib/twitter';
 import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
@@ -327,14 +327,21 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     }
 
     // 13. Notify user if their requested model couldn't be used
+    //     Try DM first (private, less noisy), fall back to polite reply
     if (modelWarning) {
-      try {
-        await replyToTweet(tweet.id, modelWarning);
-      } catch (replyErr) {
-        logger.warn('Failed to send model warning reply', {
-          tweetId: tweet.id,
-          error: replyErr instanceof Error ? replyErr.message : String(replyErr),
-        });
+      const dmSent = await sendDirectMessage(tweet.author_id, modelWarning);
+      if (!dmSent) {
+        try {
+          await replyToTweet(
+            tweet.id,
+            `We'd love to use ${parsed.requestedAiModel || parsed.requestedTtsProvider} for you! To unlock premium models, add your API keys at ${SOTTO_APP_URL}/settings/api`
+          );
+        } catch (replyErr) {
+          logger.warn('Failed to send model warning reply', {
+            tweetId: tweet.id,
+            error: replyErr instanceof Error ? replyErr.message : String(replyErr),
+          });
+        }
       }
     }
 
