@@ -2,6 +2,7 @@ import styles from './page.module.css';
 
 export const metadata = {
   title: 'Account Banned — Sotto',
+  robots: { index: false, follow: false },
 };
 
 export default function BannedPage() {

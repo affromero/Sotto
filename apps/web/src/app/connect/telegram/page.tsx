@@ -4,7 +4,10 @@ import { getRedisClient } from '@/lib/redis';
 import { ConnectForm } from './ConnectForm';
 import styles from './page.module.css';
 
-export const metadata = { title: 'Connect Telegram' };
+export const metadata = {
+  title: 'Connect Telegram',
+  robots: { index: false, follow: false },
+};
 
 interface Props {
   searchParams: Promise<{ code?: string }>;

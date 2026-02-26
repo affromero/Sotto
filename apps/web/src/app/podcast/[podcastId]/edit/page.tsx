@@ -11,7 +11,10 @@ interface EditPodcastPageProps {
   params: Promise<{ podcastId: string }>;
 }
 
-export const metadata = { title: 'Edit Podcast' };
+export const metadata = {
+  title: 'Edit Podcast',
+  robots: { index: false, follow: false },
+};
 
 export default async function EditPodcastPage({ params }: EditPodcastPageProps) {
   const { podcastId } = await params;
