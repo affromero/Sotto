@@ -1,6 +1,7 @@
 import { getHealthData } from '@/lib/health';
 import { HealthDashboard } from './HealthDashboard';
 
+export const dynamic = 'force-dynamic';
 export const metadata = { title: 'System Health — Sotto Admin' };
 
 export default async function HealthPage() {
