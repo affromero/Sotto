@@ -152,6 +152,7 @@ export const voiceVerifyChallengeSchema = z.object({
 export const voicePreviewSchema = z.object({
   voiceId: z.string().min(1),
   text: z.string().min(1).max(500),
+  provider: z.enum(['elevenlabs', 'hume', 'cartesia', 'playht', 'openai']).optional(),
 });
 
 /**
