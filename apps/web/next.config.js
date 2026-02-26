@@ -86,13 +86,29 @@ const nextConfig = {
       "form-action 'self'",
     ].join('; ');
 
+    const permissionsPolicy = [
+      'camera=()',
+      'microphone=(self)',
+      'geolocation=()',
+      'payment=()',
+      'usb=()',
+      'autoplay=(self)',
+      'fullscreen=(self)',
+      'picture-in-picture=(self)',
+      'screen-wake-lock=(self)',
+      'interest-cohort=()',
+      'browsing-topics=()',
+      'run-ad-auction=()',
+      'join-ad-interest-group=()',
+    ].join(', ');
+
+    // Order matters: when multiple patterns match, last entry's values win
+    // for duplicate header keys. So: API → catch-all → embed (most specific last).
     return [
       {
-        source: '/podcast/:podcastId/embed',
+        source: '/api/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: embedCsp },
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, nosnippet' },
         ],
       },
       {
@@ -102,6 +118,17 @@ const nextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: permissionsPolicy },
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+        ],
+      },
+      {
+        source: '/podcast/:podcastId/embed',
+        headers: [
+          { key: 'Content-Security-Policy', value: embedCsp },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: permissionsPolicy },
         ],
       },
     ];
