@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getTweet, getThread } from '@/lib/twitter';
 import { parseThreadIntent, parseTweetIntent } from '@/lib/tweet-parser';
+import { getTwitterConfig } from '@/lib/twitter-config';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
@@ -99,7 +100,10 @@ export async function processAdminThreadToPodcast(
     throw new Error('@sotto system account not found. Run prisma db seed.');
   }
 
-  // 7. Create podcast as @sotto
+  // 7. Read admin-configured model defaults
+  const twitterConfig = await getTwitterConfig();
+
+  // 8. Create podcast as @sotto
   const voicePair = selectVoicePair(tweetId);
 
   const tone = parsed.isDebate ? 'socratic' : parsed.tone;
@@ -118,6 +122,9 @@ export async function processAdminThreadToPodcast(
       status: 'EXTRACTING',
       source: 'TWITTER',
       sourceTweetId: tweetId,
+      aiModel: twitterConfig.defaultAiModel ?? undefined,
+      ttsProvider: twitterConfig.defaultTtsProvider ?? undefined,
+      ttsModel: twitterConfig.defaultTtsModel ?? undefined,
       voices: {
         createMany: {
           data: [

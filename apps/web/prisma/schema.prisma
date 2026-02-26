@@ -1686,6 +1686,9 @@ model TwitterConfig {
   maxTrendPodcastsPerDay  Int      @default(3)
   trendSearchQueries      String[] @default(["AI", "science", "technology"])
   tweetTemplate           String   @default("New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}")
+  defaultAiModel          String?
+  defaultTtsProvider      String?
+  defaultTtsModel         String?
   updatedAt               DateTime @updatedAt
   updatedBy               String?
 }

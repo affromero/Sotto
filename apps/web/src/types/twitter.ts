@@ -14,6 +14,8 @@ export interface TweetParseResult {
   isDebate?: boolean;
   viewpoints?: string[];
   isSelfAuthored?: boolean;
+  requestedAiModel?: string;
+  requestedTtsProvider?: string;
 }
 
 export interface TwitterMediaVariant {
@@ -133,6 +135,9 @@ export interface TwitterConfigData {
   maxTrendPodcastsPerDay: number;
   trendSearchQueries: string[];
   tweetTemplate: string;
+  defaultAiModel: string | null;
+  defaultTtsProvider: string | null;
+  defaultTtsModel: string | null;
 }
 
 export type AutoTweetTrigger = 'threshold' | 'manual' | 'trend';
