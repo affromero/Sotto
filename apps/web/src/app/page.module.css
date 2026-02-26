@@ -1426,7 +1426,7 @@
   padding: 18px 20px;
 }
 
-.forkCardContent h4 {
+.forkCardTitle {
   font-family: var(--font-heading);
   font-size: 17px;
   font-weight: 400;
@@ -2243,7 +2243,7 @@
   gap: 6px;
 }
 
-.footerCols h4 {
+.footerHeading {
   font: var(--text-caption);
   color: var(--color-text-tertiary);
   text-transform: uppercase;
