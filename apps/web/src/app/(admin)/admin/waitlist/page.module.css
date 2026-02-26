@@ -115,6 +115,16 @@
   font: var(--text-body-sm);
 }
 
+.wishlistCell {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  font: var(--text-body-sm);
+  cursor: default;
+}
+
 .dateCell {
   color: var(--color-text-secondary);
   white-space: nowrap;
