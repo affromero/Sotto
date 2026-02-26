@@ -84,7 +84,7 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
 
   if (existing) {
     await sendMessage(chatId,
-      'Your Telegram account is already connected!\nSend me any topic or URL to save it as a podcast idea.'
+      'Your Telegram account is already connected!\nSend me any topic or URL — including YouTube and video links — to save it as a podcast idea.'
     );
     return;
   }
@@ -114,7 +114,7 @@ async function handleStart(msg: TelegramMessagePayload): Promise<void> {
 async function handleHelp(chatId: string): Promise<void> {
   await sendMessage(chatId,
     `*Sotto Bot* — Your podcast companion\n\n` +
-    `Send me any topic or URL and I'll save it as a podcast idea.\n` +
+    `Send me any topic or URL — including YouTube and video links — and I'll save it as a podcast idea.\n` +
     `Open Sotto to generate your podcast whenever you're ready!\n\n` +
     `*Commands:*\n` +
     `/start — Link your Sotto account\n` +

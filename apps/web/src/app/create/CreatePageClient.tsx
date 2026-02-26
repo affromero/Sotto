@@ -353,7 +353,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
         : 'Upload an existing audio file to share on Sotto';
     }
     if (step === 'discovery') {
-      return 'Tell Sotto what you want to learn. We will craft a conversational podcast just for you.';
+      return 'Tell Sotto what you want to learn, or paste any URL — articles, YouTube videos, and more.';
     }
     if (step === 'voice') {
       return 'Pick voices for your Host and Expert, or use auto-assign.';
