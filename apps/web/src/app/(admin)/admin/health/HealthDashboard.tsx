@@ -48,7 +48,7 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
 
   // Parse queue data from the checks.queues.detail JSON
   const queueData: Record<string, { waiting: number; active: number; failed: number }> | null =
-    data.checks.queues?.detail ? (() => { try { return JSON.parse(data.checks.queues.detail); } catch { return null; } })() : null;
+    data.checks?.queues?.detail ? (() => { try { return JSON.parse(data.checks.queues.detail); } catch { return null; } })() : null;
 
   return (
     <div className={styles.root}>
@@ -77,7 +77,7 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Services</h2>
         <div className={styles.grid}>
-          {Object.entries(data.checks)
+          {Object.entries(data.checks ?? {})
             .filter(([key]) => key !== 'queues')
             .map(([key, check]) => (
               <ServiceCard key={key} name={key} check={check} />
@@ -116,7 +116,7 @@ export function HealthDashboard({ initialData }: { initialData: HealthData }) {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>OAuth Providers</h2>
         <div className={styles.grid}>
-          {Object.entries(data.oauth).map(([provider, configured]) => (
+          {Object.entries(data.oauth ?? {}).map(([provider, configured]) => (
             <div key={provider} className={styles.serviceCard}>
               <div className={styles.serviceHeader}>
                 <StatusDot status={configured ? 'ok' : 'not_configured'} />

@@ -7,11 +7,11 @@ export type CheckResult = { status: string; latencyMs?: number; detail?: string 
 
 export interface HealthData {
   status: 'healthy' | 'degraded';
-  version: string;
   timestamp: string;
-  checks: Record<string, CheckResult>;
-  oauth: Record<string, boolean>;
-  vapid: boolean;
+  version?: string;
+  checks?: Record<string, CheckResult>;
+  oauth?: Record<string, boolean>;
+  vapid?: boolean;
   env?: Record<string, boolean>;
 }
 
@@ -31,11 +31,9 @@ const HEALTH_QUEUE_NAMES = [
 ];
 
 export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
-  const checks: Record<string, CheckResult> = {};
   let healthy = true;
 
-  // --- Run all external checks in parallel with Promise.allSettled ---
-
+  // --- Always check DB + Redis (determines healthy/degraded for all callers) ---
   const dbCheck = async () => {
     const start = Date.now();
     try {
@@ -173,20 +171,43 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     }
   };
 
-  const results = await Promise.allSettled([
-    dbCheck(), redisCheck(), r2Check(), anthropicCheck(),
-    openaiCheck(), elevenlabsCheck(), groqCheck(), claudeCodeCheck(), queueCheck(),
-  ]);
-
-  for (const result of results) {
+  // Non-admin: only run DB + Redis, return minimal response
+  const coreResults = await Promise.allSettled([dbCheck(), redisCheck()]);
+  for (const result of coreResults) {
     if (result.status === 'fulfilled') {
-      const { key, result: checkResult, critical } = result.value as { key: string; result: CheckResult; critical?: boolean };
-      checks[key] = checkResult;
+      const { critical, result: checkResult } = result.value as { key: string; result: CheckResult; critical?: boolean };
       if (critical && checkResult.status === 'error') healthy = false;
     }
   }
 
-  // OAuth providers (sync - just env var checks)
+  if (!isAdmin) {
+    return {
+      status: healthy ? 'healthy' : 'degraded',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // Admin: run all remaining checks in parallel
+  const checks: Record<string, CheckResult> = {};
+  for (const result of coreResults) {
+    if (result.status === 'fulfilled') {
+      const { key, result: checkResult } = result.value as { key: string; result: CheckResult };
+      checks[key] = checkResult;
+    }
+  }
+
+  const adminResults = await Promise.allSettled([
+    r2Check(), anthropicCheck(), openaiCheck(), elevenlabsCheck(),
+    groqCheck(), claudeCodeCheck(), queueCheck(),
+  ]);
+
+  for (const result of adminResults) {
+    if (result.status === 'fulfilled') {
+      const { key, result: checkResult } = result.value as { key: string; result: CheckResult };
+      checks[key] = checkResult;
+    }
+  }
+
   const oauth: Record<string, boolean> = {
     google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
     github: !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET),
@@ -196,28 +217,23 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
 
   const vapid = !!(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 
-  const data: HealthData = {
+  const envKeys = [
+    'DATABASE_URL', 'REDIS_URL', 'NEXTAUTH_SECRET', 'PITCH_PASSWORD',
+    'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'GROQ_API_KEY',
+    'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
+  ];
+  const env: Record<string, boolean> = {};
+  for (const key of envKeys) {
+    env[key] = !!process.env[key];
+  }
+
+  return {
     status: healthy ? 'healthy' : 'degraded',
     version: process.env.COMMIT_SHA || 'dev',
     timestamp: new Date().toISOString(),
     checks,
     oauth,
     vapid,
+    env,
   };
-
-  // Admin-only: env var configuration
-  if (isAdmin) {
-    const envKeys = [
-      'DATABASE_URL', 'REDIS_URL', 'NEXTAUTH_SECRET', 'PITCH_PASSWORD',
-      'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'GROQ_API_KEY',
-      'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
-    ];
-    const env: Record<string, boolean> = {};
-    for (const key of envKeys) {
-      env[key] = !!process.env[key];
-    }
-    data.env = env;
-  }
-
-  return data;
 }
