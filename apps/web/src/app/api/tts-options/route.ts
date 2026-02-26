@@ -15,7 +15,6 @@ const QUALITY_BADGES: Record<string, string> = {
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   openai: 'OPENAI_API_KEY',
-  playht: 'PLAYHT_API_KEY',
   cartesia: 'CARTESIA_API_KEY',
   hume: 'HUME_API_KEY',
   fal: 'FAL_KEY',
@@ -23,11 +22,7 @@ const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   kittentts: 'KITTENTTS_URL',
 };
 
-// PlayHT requires both API key and user ID
 function hasPlatformKey(providerId: TtsProviderId): boolean {
-  if (providerId === 'playht') {
-    return !!(process.env.PLAYHT_API_KEY && process.env.PLAYHT_USER_ID);
-  }
   if (providerId === 'kittentts') {
     return !!process.env.KITTENTTS_URL;
   }
