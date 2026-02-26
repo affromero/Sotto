@@ -194,6 +194,8 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const verificationMode = parsed.data.metadata?.verificationMode ?? 'standard';
+
   const podcastData = {
     title: parsed.data.title,
     topic: parsed.data.topic,
@@ -201,6 +203,7 @@ export async function POST(request: NextRequest) {
     ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
     ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
     aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
+    verificationMode,
     ...(isApiKeyAuth && { source: 'API' as const }),
   };
 
@@ -248,6 +251,7 @@ export async function POST(request: NextRequest) {
       sourceUrl: meta.sourceUrl,
       sourceContent: meta.sourceContent,
       speakers: meta.speakers ?? undefined,
+      verificationMode,
     };
 
     if (draftId) {

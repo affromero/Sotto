@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Shield } from 'lucide-react';
 import { DiscoveryChat } from '@/components/discovery/DiscoveryChat';
 import { InspireMe } from '@/components/discovery/InspireMe';
+import { VerificationDetails } from '@/components/create/VerificationDetails';
 import { VoicePicker, type VoiceSelection } from '@/components/discovery/VoicePicker';
 import { TtsModelDropdown } from '@/components/create/TtsModelDropdown';
 import { DurationSelector } from '@/components/create/DurationSelector';
@@ -101,6 +102,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
     draftData?.metadata?.durationTarget ?? Math.min(10, maxDuration)
   );
   const [error, setError] = useState<string | null>(null);
+  const [failedPodcastId, setFailedPodcastId] = useState<string | null>(null);
   const [inspireMeOpen, setInspireMeOpen] = useState(false);
   const [initialTopic, setInitialTopic] = useState<string | undefined>();
   const [podcastId, setPodcastId] = useState<string | null>(null);
@@ -163,6 +165,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
     setStep('scripting');
     setError(null);
+    setFailedPodcastId(null);
 
     try {
       let response: Response;
@@ -245,6 +248,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
         } else if (data.status === 'FAILED') {
           scriptingPollRef.current = false;
           setError(data.failureReason || 'Script generation failed. Please try again.');
+          setFailedPodcastId(podcastId);
           setStep('voice');
         }
       } catch {
@@ -278,6 +282,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
         } else if (data.status === 'FAILED') {
           generatingPollRef.current = false;
           setError(data.failureReason || 'Audio generation failed. Please try again.');
+          setFailedPodcastId(podcastId);
           setStep('script-preview');
         }
       } catch {
@@ -304,6 +309,14 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const handleImportStarted = useCallback((id: string) => {
     setImportingPodcastId(id);
     setImportStep('importing');
+  }, []);
+
+  const handleRetrySuggestion = useCallback((suggestion: string) => {
+    setError(null);
+    setFailedPodcastId(null);
+    setStep('discovery');
+    setInitialTopic(suggestion);
+    setMetadata(null);
   }, []);
 
   const handleTabChange = useCallback((mode: TabMode) => {
@@ -395,7 +408,15 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           </div>
         </header>
 
-        {error && (
+        {error && failedPodcastId && (
+          <VerificationDetails
+            podcastId={failedPodcastId}
+            failureReason={error}
+            onRetrySuggestion={handleRetrySuggestion}
+          />
+        )}
+
+        {error && !failedPodcastId && (
           <div className={styles.error} role="alert">
             <div className={styles.errorContent}>
               <p>{error}</p>
@@ -408,7 +429,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
             </div>
             <button
               className={styles.errorDismiss}
-              onClick={() => setError(null)}
+              onClick={() => { setError(null); setFailedPodcastId(null); }}
               aria-label="Dismiss error"
               type="button"
             >

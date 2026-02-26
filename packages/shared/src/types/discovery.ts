@@ -6,6 +6,8 @@ export interface DiscoveryMessage {
   createdAt: string;
 }
 
+export type VerificationMode = 'standard' | 'relaxed';
+
 export interface DiscoveryMetadata {
   topic: string;
   depth: 'eli5' | 'quick_overview' | 'standard' | 'deep_dive';
@@ -15,6 +17,7 @@ export interface DiscoveryMetadata {
   tone: 'casual' | 'professional' | 'socratic';
   durationTarget: number;
   speakers?: Array<{ name: string; description: string }>;
+  verificationMode?: VerificationMode;
   ready: boolean;
 }
 
