@@ -14,6 +14,8 @@ export interface TweetParseResult {
   isDebate?: boolean;
   viewpoints?: string[];
   isSelfAuthored?: boolean;
+  requestedAiModel?: string;
+  requestedTtsProvider?: string;
 }
 
 export interface TwitterMediaVariant {
