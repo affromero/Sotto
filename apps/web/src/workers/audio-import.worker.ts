@@ -13,6 +13,7 @@ import { detectLanguage } from '@/lib/language-detect';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { logUsage } from '@/lib/usage-logger';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
+import { generateFingerprint, findDuplicates } from '@/lib/audio-fingerprint';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
@@ -108,6 +109,18 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       normalizedPath,
     ]);
     await job.updateProgress(20);
+
+    // Generate audio fingerprint for duplicate detection
+    logger.info('Generating audio fingerprint', { podcastId });
+    let fingerprintData: { fingerprint: number[]; duration: number } | null = null;
+    try {
+      fingerprintData = await generateFingerprint(normalizedPath);
+    } catch (err) {
+      logger.warn('Failed to generate audio fingerprint — continuing without duplicate check', {
+        podcastId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     const duration = await getAudioDuration(normalizedPath);
     const fileSize = (await import('fs/promises')).stat(normalizedPath).then((s) => s.size);
@@ -341,6 +354,95 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
             create: { podcastId, tagId: tag.id },
           });
         }
+      }
+    }
+
+    // Store audio fingerprint and check for duplicates
+    if (fingerprintData) {
+      await prisma.audioFingerprint.upsert({
+        where: { podcastId },
+        update: { fingerprint: fingerprintData.fingerprint, duration: fingerprintData.duration },
+        create: { podcastId, fingerprint: fingerprintData.fingerprint, duration: fingerprintData.duration },
+      });
+
+      const duplicates = await findDuplicates(fingerprintData.fingerprint, fingerprintData.duration, podcastId);
+      if (duplicates.length > 0) {
+        logger.info('Duplicate matches found for import', {
+          podcastId,
+          matchCount: String(duplicates.length),
+          topSimilarity: duplicates[0].similarity.toFixed(4),
+        });
+
+        // Create DuplicateMatch records
+        for (const dup of duplicates) {
+          await prisma.duplicateMatch.upsert({
+            where: {
+              sourcePodcastId_matchedPodcastId: {
+                sourcePodcastId: podcastId,
+                matchedPodcastId: dup.podcastId,
+              },
+            },
+            update: { similarity: dup.similarity },
+            create: {
+              sourcePodcastId: podcastId,
+              matchedPodcastId: dup.podcastId,
+              similarity: dup.similarity,
+            },
+          });
+        }
+
+        // Set status to DUPLICATE_REVIEW instead of READY
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: {
+            status: 'DUPLICATE_REVIEW',
+            audioUrl,
+            duration,
+            fileSize: await fileSize,
+            currentVersion: podcastVersion.version,
+            language: detectedLanguage ?? undefined,
+          },
+        });
+
+        // Notify user their import is under review
+        await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
+          userId,
+          type: 'PODCAST_READY',
+          title: 'Import Under Review',
+          message: 'Your imported podcast matched existing content and is under review.',
+          data: { podcastId },
+        });
+
+        // Clean up the original imported audio file from R2
+        deleteFile(audioKey).catch((err) => {
+          logger.warn('Failed to delete imported audio from R2', {
+            podcastId,
+            audioKey,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+
+        // Update segment start times
+        const dupCumulativeTime = segments.reduce<number[]>((acc, seg, i) => {
+          const prevTime =
+            i === 0
+              ? 0
+              : acc[i - 1] + (segments[i - 1].endTime ?? 0) - (segments[i - 1].startTime ?? 0);
+          return [...acc, seg.startTime ?? prevTime];
+        }, []);
+
+        await Promise.all(
+          dbSegments.map((seg, i) =>
+            prisma.segment.update({
+              where: { id: seg.id },
+              data: { startTime: dupCumulativeTime[i] ?? 0 },
+            })
+          )
+        );
+
+        await job.updateProgress(100);
+        logger.info('Audio import flagged for duplicate review', { podcastId });
+        return;
       }
     }
 

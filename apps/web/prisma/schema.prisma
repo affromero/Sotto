@@ -341,6 +341,9 @@ model Podcast {
   claimReports     ClaimReport[]
   voiceTracks      VoiceTrack[]
   defaultVoiceTrackId String?
+  audioFingerprint  AudioFingerprint?
+  duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
+  duplicateMatches  DuplicateMatch[] @relation("DuplicateMatch")
 
   @@index([userId])
   @@index([status])
@@ -367,6 +370,7 @@ enum PodcastStatus {
   FAILED
   IMPORTING
   TRANSCRIBING
+  DUPLICATE_REVIEW
 }
 
 enum PodcastVisibility {
@@ -1852,4 +1856,43 @@ model VoiceTrackSegment {
 
   @@unique([voiceTrackId, segmentId])
   @@index([voiceTrackId])
+}
+
+// ============ AUDIO FINGERPRINTING & DUPLICATE DETECTION ============
+
+model AudioFingerprint {
+  id          String   @id @default(cuid())
+  podcastId   String   @unique
+  fingerprint Int[]
+  duration    Int      // seconds
+  createdAt   DateTime @default(now())
+
+  podcast Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+
+  @@index([duration])
+}
+
+enum DuplicateMatchStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model DuplicateMatch {
+  id               String               @id @default(cuid())
+  sourcePodcastId  String
+  matchedPodcastId String
+  similarity       Float
+  status           DuplicateMatchStatus  @default(PENDING)
+  reviewedBy       String?
+  resolution       String?              @db.Text
+  reviewedAt       DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  sourcePodcast  Podcast @relation("DuplicateSource", fields: [sourcePodcastId], references: [id], onDelete: Cascade)
+  matchedPodcast Podcast @relation("DuplicateMatch", fields: [matchedPodcastId], references: [id], onDelete: Cascade)
+
+  @@unique([sourcePodcastId, matchedPodcastId])
+  @@index([status])
 }

@@ -18,6 +18,7 @@ import { LIMITS } from '@/lib/stripe';
 import { type SoundCue } from '@/lib/script-generator';
 import { logger } from '@/lib/logger';
 import { capturePodcastPayments } from '@/lib/voice-pricing';
+import { generateFingerprint } from '@/lib/audio-fingerprint';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -194,6 +195,21 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     const { readFile } = await import('fs/promises');
     const finalAudio = await readFile(outputPath);
     const audioUrl = await uploadPodcastAudio(podcastId, finalAudio);
+
+    // Store audio fingerprint for future duplicate detection
+    try {
+      const fp = await generateFingerprint(outputPath);
+      await prisma.audioFingerprint.upsert({
+        where: { podcastId },
+        update: { fingerprint: fp.fingerprint, duration: fp.duration },
+        create: { podcastId, fingerprint: fp.fingerprint, duration: fp.duration },
+      });
+    } catch (err) {
+      logger.warn('Failed to store audio fingerprint', {
+        podcastId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     await job.updateProgress(90);
 

@@ -17,7 +17,8 @@ export type PodcastStatus =
   | 'UPDATING'
   | 'FAILED'
   | 'IMPORTING'
-  | 'TRANSCRIBING';
+  | 'TRANSCRIBING'
+  | 'DUPLICATE_REVIEW';
 
 export type PodcastVisibility = 'PUBLIC' | 'UNLISTED' | 'PRIVATE';
 
