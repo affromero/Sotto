@@ -97,22 +97,29 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
 
 export function buildWaitlistApprovalEmail(email: string): { subject: string; html: string } {
   return {
-    subject: 'You\'re in! Create your Sotto account',
+    subject: 'Your early access to Sotto is ready',
     html: `${HEADER}
       <div style="padding:16px 32px 32px;">
         <h2 style="font-family:'DM Serif Display',Georgia,serif; font-size:20px; color:#1A1A1A; margin:0 0 12px;">
-          Your spot is ready
+          You&apos;ve been selected
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          You&apos;ve been approved to join Sotto &mdash; where podcasts get social.
-          AI or human, create, discover, interrupt, fork, and remix.
+          We&apos;re opening Sotto to a small group of early members, and you made the cut.
+          Your account is ready &mdash; claim it before your invitation expires.
         </p>
-        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
-          Click below to create your account and start exploring.
-        </p>
-        <a href="${APP_URL}/auth/signup" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:10px 24px; border-radius:8px; text-decoration:none;">
-          Create Your Account
+        <a href="${APP_URL}/auth/signup" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none; margin:0 0 24px;">
+          Claim Your Spot
         </a>
+        <div style="background:#FEFCF8; border:1px solid #f3f4f6; border-radius:8px; padding:16px; margin-top:24px;">
+          <p style="font-size:13px; line-height:1.6; color:#6B7280; margin:0 0 8px;">
+            <strong style="color:#1A1A1A;">Quick tip:</strong> Tag
+            <a href="https://x.com/sottofm" style="color:#D97706; text-decoration:none; font-weight:600;">@sottofm</a>
+            on X with any topic and our bot will turn it into a podcast for you &mdash; no login needed.
+          </p>
+          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0;">
+            Try it: <em>&ldquo;@sottofm explain how black holes emit radiation&rdquo;</em>
+          </p>
+        </div>
       </div>
     ${footer(email)}`,
   };
