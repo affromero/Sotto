@@ -62,7 +62,6 @@ interface PodcastPlayerViewProps {
   isAuthenticated: boolean;
   currentUserId?: string;
   canMakePrivate?: boolean;
-  canDownload?: boolean;
 }
 
 type ViewMode = 'transcript' | 'teleprompter';
@@ -132,7 +131,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, canDownload }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
@@ -670,9 +669,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           <ShareMenu
             podcastId={podcast.id}
             podcastTitle={podcast.title}
-            audioUrl={podcast.audioUrl}
             isPublic={podcast.visibility === 'PUBLIC'}
-            canDownload={canDownload}
             triggerClassName={styles.actionBtn}
           />
 
