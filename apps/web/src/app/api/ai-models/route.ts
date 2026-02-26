@@ -4,6 +4,7 @@ import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
+import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 // Env var names for each platform-level AI provider key
@@ -13,9 +14,9 @@ const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
 };
 
 const CLAUDE_CODE_MODELS = [
-  { id: 'claude-code:haiku', displayName: 'Haiku 4.5', tier: 'fast', isDefault: false, group: 'Claude Code (Local)' },
-  { id: 'claude-code:sonnet', displayName: 'Sonnet 4.6', tier: 'balanced', isDefault: false, group: 'Claude Code (Local)' },
-  { id: 'claude-code:opus', displayName: 'Opus 4.6', tier: 'best', isDefault: false, group: 'Claude Code (Local)' },
+  { id: 'claude-code:haiku', displayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' as const, isDefault: false, group: 'Claude Code (Local)' },
+  { id: 'claude-code:sonnet', displayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' as const, isDefault: false, group: 'Claude Code (Local)' },
+  { id: 'claude-code:opus', displayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO' as const, isDefault: false, group: 'Claude Code (Local)' },
 ];
 
 export async function GET() {
@@ -25,15 +26,18 @@ export async function GET() {
   }
 
   const isAdmin = session.user.role === 'ADMIN';
-  const [aiKeys, claudeAvailable] = await Promise.all([
+  const [aiKeys, claudeAvailable, user] = await Promise.all([
     listAiProviders(session.user.id),
     isAdmin ? isClaudeAvailable() : Promise.resolve(false),
+    prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } }),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];
+  const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
+  const isByok = validKeys.length > 0;
 
   // No BYOK AI key
-  if (validKeys.length === 0) {
+  if (!isByok) {
     const config = await getFreeTierConfig();
 
     // Admins see all platform-configured API providers (from env vars) + Claude Code local
@@ -45,7 +49,8 @@ export async function GET() {
             id: m.id,
             displayName: m.displayName,
             tier: m.tier,
-            isDefault: m.id === config.aiModel && config.aiProvider === p.id,
+            requiredPlan: m.requiredPlan,
+            isDefault: false,
             group: `${p.displayName} (API)`,
           }))
         );
@@ -53,18 +58,34 @@ export async function GET() {
       return NextResponse.json({
         provider: config.aiProvider,
         readOnly: false,
+        userPlan: 'PRO',
+        isByok: false,
         models: [...platformModels, ...claudeCodeModels],
       });
     }
 
-    // Non-admins: single free-tier model, read-only
-    const provider = getAiProviderMeta(config.aiProvider);
-    const freeTierModel = provider.models.find((m) => m.id === config.aiModel);
-    const models = freeTierModel
-      ? [{ id: freeTierModel.id, displayName: freeTierModel.displayName, tier: freeTierModel.tier, isDefault: true }]
-      : [];
+    // Free/Pro non-BYOK: show all platform models so users see what's available
+    // Pro models are locked for free users (client handles disabling via requiredPlan + userPlan)
+    const platformModels = getAllAiProviderMeta()
+      .filter((p) => p.id !== 'groq' && p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
+      .flatMap((p) =>
+        p.models.map((m) => ({
+          id: m.id,
+          displayName: m.displayName,
+          tier: m.tier,
+          requiredPlan: m.requiredPlan,
+          isDefault: false,
+          group: `${p.displayName} (API)`,
+        }))
+      );
 
-    return NextResponse.json({ provider: provider.id, readOnly: true, models });
+    return NextResponse.json({
+      provider: config.aiProvider,
+      readOnly: false,
+      userPlan,
+      isByok: false,
+      models: platformModels,
+    });
   }
 
   // BYOK keys present — show models for every valid provider, grouped by provider name
@@ -82,7 +103,8 @@ export async function GET() {
       id: m.id,
       displayName: m.displayName,
       tier: m.tier,
-      isDefault: m.id === defaultProvider.defaultModel && key.provider === uniqueKeys[0].provider,
+      requiredPlan: m.requiredPlan,
+      isDefault: false,
       group: `${p.displayName} (API)`,
     }));
   });
@@ -90,6 +112,8 @@ export async function GET() {
   return NextResponse.json({
     provider: defaultProvider.id,
     readOnly: false,
+    userPlan,
+    isByok: true,
     models: isAdmin ? [...byokModels, ...claudeCodeModels] : byokModels,
   });
 }
