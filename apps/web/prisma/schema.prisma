@@ -263,7 +263,7 @@ model Podcast {
   fileSize           Int?    // bytes
 
   // Voice selection
-  ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate'
   ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
   aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
@@ -1521,7 +1521,7 @@ enum VoiceRequestStatus {
 model UserTtsKey {
   id           String    @id @default(cuid())
   userId       String
-  provider     String    // 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume'
+  provider     String    // 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate'
   encryptedKey String    @db.Text
   extraData    String?   @db.Text // encrypted JSON for multi-field auth (e.g. PlayHT userId)
   isValid      Boolean   @default(true)
