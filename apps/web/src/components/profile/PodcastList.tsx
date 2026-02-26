@@ -1,3 +1,6 @@
+'use client';
+
+import { useAuth } from '@/lib/hooks/useAuth';
 import { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastList.module.css';
 
@@ -47,6 +50,8 @@ export function PodcastList({
   loading = false,
   emptyMessage = 'No podcasts yet',
 }: PodcastListProps) {
+  const { user } = useAuth();
+
   if (loading) {
     return (
       <div className={styles.root} role="status" aria-label="Loading podcasts">
@@ -91,26 +96,30 @@ export function PodcastList({
               <span className={styles.duration}>
                 {formatDuration(podcast.duration)}
               </span>
-              <span className={styles.separator} aria-hidden="true">
-                ·
-              </span>
-              <span className={styles.stat} title="Plays">
-                {formatStat(podcast.playCount)} plays
-              </span>
-              <span className={styles.separator} aria-hidden="true">
-                ·
-              </span>
-              <span className={styles.stat} title="Likes">
-                {formatStat(podcast.likeCount)} likes
-              </span>
-              {podcast.forkCount > 0 && (
+              {user?.id === podcast.user.id && (
                 <>
                   <span className={styles.separator} aria-hidden="true">
                     ·
                   </span>
-                  <span className={styles.stat} title="Forks">
-                    {formatStat(podcast.forkCount)} forks
+                  <span className={styles.stat} title="Plays">
+                    {formatStat(podcast.playCount)} plays
                   </span>
+                  <span className={styles.separator} aria-hidden="true">
+                    ·
+                  </span>
+                  <span className={styles.stat} title="Likes">
+                    {formatStat(podcast.likeCount)} likes
+                  </span>
+                  {podcast.forkCount > 0 && (
+                    <>
+                      <span className={styles.separator} aria-hidden="true">
+                        ·
+                      </span>
+                      <span className={styles.stat} title="Forks">
+                        {formatStat(podcast.forkCount)} forks
+                      </span>
+                    </>
+                  )}
                 </>
               )}
               <span className={styles.separator} aria-hidden="true">
