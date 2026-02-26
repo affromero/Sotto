@@ -250,6 +250,7 @@ export async function POST(request: NextRequest) {
               focusAreas: rawMeta.focus_areas,
               tone: rawMeta.tone,
               durationTarget: rawMeta.duration_target,
+              ...(rawMeta.verification_mode ? { verificationMode: rawMeta.verification_mode } : {}),
               ready: rawMeta.ready,
             }
           : null;
