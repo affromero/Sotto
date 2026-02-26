@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getTierFeatures } from '@/lib/tier-features';
+import { hasByokKey } from '@/lib/byok';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
+
+  const session = await auth();
+  if (!session?.user?.id) {
+    return errorResponse('Download requires a Pro subscription.', 403);
+  }
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
@@ -14,6 +22,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       audioUrl: true,
       status: true,
       visibility: true,
+      userId: true,
     },
   });
 
@@ -23,6 +32,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   if (podcast.visibility === 'PRIVATE') {
     return errorResponse('This podcast is private', 403);
+  }
+
+  // Owner can always download their own podcasts
+  const isOwner = podcast.userId === session.user.id;
+  if (!isOwner) {
+    const [user, isByok] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: session.user.id },
+        select: { plan: true, role: true },
+      }),
+      hasByokKey(session.user.id),
+    ]);
+    const features = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
+    if (!features.downloadAllowed) {
+      return errorResponse('Download requires a Pro subscription.', 403);
+    }
   }
 
   // Support ?track=<voiceTrackId> to download a specific voice track

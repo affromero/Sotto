@@ -21,6 +21,7 @@ export interface TierFeatures {
   webSearchEnabled: boolean;
   maxQaInteractions: number;
   privateAllowed: boolean;
+  downloadAllowed: boolean;
   priorityQueue: boolean;
   analyticsEnabled: boolean;
   voiceTracksEnabled: boolean;
@@ -35,6 +36,7 @@ const FREE_FEATURES: TierFeatures = {
   webSearchEnabled: true,
   maxQaInteractions: 3,
   privateAllowed: false,
+  downloadAllowed: false,
   priorityQueue: false,
   analyticsEnabled: false,
   voiceTracksEnabled: false,
@@ -49,6 +51,7 @@ const PRO_FEATURES: TierFeatures = {
   webSearchEnabled: true,
   maxQaInteractions: Infinity,
   privateAllowed: true,
+  downloadAllowed: true,
   priorityQueue: true,
   analyticsEnabled: true,
   voiceTracksEnabled: true,
