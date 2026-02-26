@@ -330,7 +330,7 @@ Sotto uses a BYOK model — all generation features are free when users provide 
 | Key Type | Supported Providers | Stored In |
 |----------|-------------------|-----------|
 | AI key | Anthropic, OpenAI | `UserAiKey` model |
-| TTS key | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume | `UserTtsKey` model |
+| TTS key | ElevenLabs, OpenAI, Cartesia, Hume | `UserTtsKey` model |
 
 **Free tier fallback**: The `FreeTierConfig` singleton controls platform-provided AI/TTS for users without their own keys. Admin-configurable at `/admin`.
 
@@ -603,7 +603,7 @@ Before sharing with beta users, test every core flow:
 - [ ] Can add Anthropic API key in settings
 - [ ] Can add OpenAI API key in settings
 - [ ] Can add ElevenLabs API key in settings
-- [ ] Can add PlayHT / Cartesia / Hume API key
+- [ ] Can add Cartesia / Hume API key
 - [ ] Keys are encrypted (verify in DB — no plaintext)
 - [ ] Key validation worker runs (24h cycle)
 - [ ] Generation works with user's own keys

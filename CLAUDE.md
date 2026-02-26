@@ -22,7 +22,7 @@ Sotto (from "sotto voce" — soft voice in Italian) is the social podcast networ
 | Auth | NextAuth.js v5 (Google, GitHub, Apple; Twitter for linking only) |
 | Queue | Redis 7 + BullMQ (25 worker types) |
 | AI | Anthropic Claude — swappable via `AI_PROVIDER` |
-| Audio | ElevenLabs, OpenAI, PlayHT, Cartesia, Hume, Fal, Replicate (multi-provider TTS) |
+| Audio | ElevenLabs, OpenAI, Cartesia, Hume, Fal, Replicate (multi-provider TTS) |
 | Storage | Cloudflare R2 (S3-compatible) — swappable via `STORAGE_PROVIDER` |
 | BYOK | Users bring own LLM + TTS keys — all features free |
 | Hosting | Hetzner VPS (Docker Compose + Caddy), GitHub Actions deploy |
