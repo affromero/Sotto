@@ -7,8 +7,8 @@ interface WaitlistState {
   setEmail: (v: string) => void;
   twitter: string;
   setTwitter: (v: string) => void;
-  feedback: string;
-  setFeedback: (v: string) => void;
+  wishlist: string;
+  setWishlist: (v: string) => void;
   submitted: boolean;
   loading: boolean;
   error: string;
@@ -26,7 +26,7 @@ export function useWaitlist() {
 export function WaitlistProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState('');
   const [twitter, setTwitter] = useState('');
-  const [feedback, setFeedback] = useState('');
+  const [wishlist, setWishlist] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +42,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({
           email,
           twitterHandle: twitter || undefined,
-          feedback: feedback || undefined,
+          wishlist: wishlist || undefined,
           source,
         }),
       });
@@ -56,11 +56,11 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [email, twitter, feedback]);
+  }, [email, twitter, wishlist]);
 
   return (
     <WaitlistContext.Provider
-      value={{ email, setEmail, twitter, setTwitter, feedback, setFeedback, submitted, loading, error, handleSubmit }}
+      value={{ email, setEmail, twitter, setTwitter, wishlist, setWishlist, submitted, loading, error, handleSubmit }}
     >
       {children}
     </WaitlistContext.Provider>

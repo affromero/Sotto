@@ -97,6 +97,7 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
               <th>Email</th>
               <th>Twitter</th>
               <th>Source</th>
+              <th>Wishlist</th>
               <th>Status</th>
               <th>Signed Up</th>
               <th>Converted</th>
@@ -112,6 +113,9 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
                 </td>
                 <td>
                   <span className={styles.badge}>{entry.source ?? 'unknown'}</span>
+                </td>
+                <td className={styles.wishlistCell} title={entry.wishlist ?? ''}>
+                  {entry.wishlist ?? ''}
                 </td>
                 <td>
                   <span className={styles[`status${entry.status.charAt(0) + entry.status.slice(1).toLowerCase()}`]}>
