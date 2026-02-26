@@ -150,18 +150,23 @@ export const CARTESIA_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Hume AI voices — description-based voice system
+// Hume AI voices — curated subset from Hume's 160+ voice library (Octave 2)
+// IDs are Hume voice UUIDs, used with voice: { id } in the API
 // ---------------------------------------------------------------------------
 
 export const HUME_VOICE_POOL: ProviderVoice[] = [
-  { id: 'ITO', name: 'Ito', gender: 'female', character: 'warm narrator' },
-  { id: 'KORA', name: 'Kora', gender: 'female', character: 'polished professional' },
-  { id: 'DACHER', name: 'Dacher', gender: 'male', character: 'authoritative expert' },
-  { id: 'AURA', name: 'Aura', gender: 'female', character: 'enthusiastic explainer' },
-  { id: 'FINN', name: 'Finn', gender: 'male', character: 'friendly conversationalist' },
-  { id: 'STELLA', name: 'Stella', gender: 'female', character: 'engaging storyteller' },
-  { id: 'ORBIT', name: 'Orbit', gender: 'male', character: 'confident presenter' },
-  { id: 'SUNNY', name: 'Sunny', gender: 'female', character: 'casual and curious' },
+  { id: 'ee96fb5f-ec1a-4f41-a9ba-6d119e64c8fd', name: 'Vince Douglas', gender: 'male', character: 'confident presenter' },
+  { id: 'b201d214-914c-4d0a-b8e4-54adfc14a0dd', name: 'Inspiring Woman', gender: 'female', character: 'warm narrator' },
+  { id: '01854384-4e4e-48d4-90d1-b22f760a58b5', name: 'Male Podcaster', gender: 'male', character: 'authoritative expert' },
+  { id: '33045fd9-8010-43f6-b6b0-da3fbf326c29', name: 'Casual Podcast Host', gender: 'female', character: 'friendly conversationalist' },
+  { id: '176a55b1-4468-4736-8878-db82729667c1', name: 'Nature Documentary Narrator', gender: 'male', character: 'polished professional' },
+  { id: 'f3f69312-095c-4ec3-8e50-6961c676e898', name: 'Cool Journalist', gender: 'female', character: 'engaging storyteller' },
+  { id: '99d2cb9c-9011-4ead-8734-641656d3df66', name: 'Comforting Male Conversationalist', gender: 'male', character: 'warm narrator' },
+  { id: 'd6fd5cc2-53e6-4e80-ba83-93972682386a', name: 'Demure Conversationalist', gender: 'female', character: 'polished professional' },
+  { id: '15f594d3-0683-4585-b799-ce12e939a0e2', name: 'Brooding Intellectual Man', gender: 'male', character: 'articulate intellectual' },
+  { id: '8a7dd58c-0cda-4073-9ce6-654184695e99', name: 'Warm American Female', gender: 'female', character: 'enthusiastic explainer' },
+  { id: 'fcd2297b-44dd-4115-97af-a13297afb8cb', name: 'Classical Film Actor', gender: 'male', character: 'engaging storyteller' },
+  { id: 'f042c0be-b7cc-4a59-bea2-65f23e12c710', name: 'Donovan Sinclair', gender: 'male', character: 'casual and curious' },
 ];
 
 // ---------------------------------------------------------------------------

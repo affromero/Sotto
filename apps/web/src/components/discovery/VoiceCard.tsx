@@ -9,6 +9,7 @@ interface VoiceCardProps {
   isSelected: boolean;
   disabled?: boolean;
   onSelect: () => void;
+  provider?: string;
 }
 
 export function VoiceCard({
@@ -19,6 +20,7 @@ export function VoiceCard({
   isSelected,
   disabled = false,
   onSelect,
+  provider,
 }: VoiceCardProps) {
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -41,6 +43,7 @@ export function VoiceCard({
         body: JSON.stringify({
           voiceId,
           text: 'Welcome to Sotto. Let me tell you something fascinating today.',
+          ...(provider ? { provider } : {}),
         }),
       });
 

@@ -38,7 +38,7 @@ export class HumeProvider implements TtsProvider {
         utterances: [
           {
             text: params.text,
-            voice: { name: params.voiceId },
+            voice: { id: params.voiceId },
             speed: 1,
           },
         ],
