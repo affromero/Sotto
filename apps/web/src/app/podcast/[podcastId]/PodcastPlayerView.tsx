@@ -83,6 +83,7 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     FAILED: 'error',
     IMPORTING: 'info',
     TRANSCRIBING: 'info',
+    DUPLICATE_REVIEW: 'warning',
   };
 
 function formatDate(dateString: string): string {
@@ -669,7 +670,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           <ShareMenu
             podcastId={podcast.id}
             podcastTitle={podcast.title}
-            audioUrl={podcast.audioUrl}
             isPublic={podcast.visibility === 'PUBLIC'}
             triggerClassName={styles.actionBtn}
           />

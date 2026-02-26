@@ -37,7 +37,7 @@ export const SOURCE_PLATFORM_HELP: Partial<Record<SourcePlatformValue, string>> 
 
 export interface ImportProgress {
   podcastId: string;
-  status: 'IMPORTING' | 'TRANSCRIBING' | 'READY' | 'FAILED';
+  status: 'IMPORTING' | 'TRANSCRIBING' | 'DUPLICATE_REVIEW' | 'READY' | 'FAILED';
   progress: number;
   message?: string;
 }

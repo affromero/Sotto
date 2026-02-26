@@ -28,6 +28,7 @@ import {
   HeartPulse,
   ListTodo,
   Globe,
+  Scale,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -37,6 +38,7 @@ import styles from './AdminShell.module.css';
 
 interface AdminShellProps {
   pendingReportCount?: number;
+  pendingDuplicateCount?: number;
   children: React.ReactNode;
 }
 
@@ -64,6 +66,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/users', label: 'Users', icon: Users },
       { href: '/admin/podcasts', label: 'Podcasts', icon: Radio },
       { href: '/admin/moderation', label: 'Moderation', icon: Shield },
+      { href: '/admin/duplicates', label: 'Duplicates', icon: Scale },
     ],
   },
   {
@@ -123,7 +126,7 @@ function getInitialExpanded(pathname: string): Record<string, boolean> {
   return expanded;
 }
 
-export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
+export function AdminShell({ pendingReportCount, pendingDuplicateCount, children }: AdminShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expanded, setExpanded] = useState(() => getInitialExpanded(pathname));
@@ -190,9 +193,18 @@ export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
                     {group.items.map(({ href, label, icon: Icon }) => {
                       const isActive = pathname === href;
                       const showBadge =
-                        href === '/admin/moderation' &&
-                        pendingReportCount !== undefined &&
-                        pendingReportCount > 0;
+                        (href === '/admin/moderation' &&
+                          pendingReportCount !== undefined &&
+                          pendingReportCount > 0) ||
+                        (href === '/admin/duplicates' &&
+                          pendingDuplicateCount !== undefined &&
+                          pendingDuplicateCount > 0);
+                      const badgeCount =
+                        href === '/admin/moderation'
+                          ? pendingReportCount
+                          : href === '/admin/duplicates'
+                            ? pendingDuplicateCount
+                            : 0;
                       return (
                         <Link
                           key={href}
@@ -204,8 +216,8 @@ export function AdminShell({ pendingReportCount, children }: AdminShellProps) {
                           <Icon className={styles.navIcon} aria-hidden="true" />
                           {label}
                           {showBadge && (
-                            <span className={styles.navBadge} aria-label={`${pendingReportCount} pending reports`}>
-                              {pendingReportCount}
+                            <span className={styles.navBadge} aria-label={`${badgeCount} pending`}>
+                              {badgeCount}
                             </span>
                           )}
                         </Link>
