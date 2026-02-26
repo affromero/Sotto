@@ -133,6 +133,9 @@ export interface TwitterConfigData {
   maxTrendPodcastsPerDay: number;
   trendSearchQueries: string[];
   tweetTemplate: string;
+  defaultAiModel: string | null;
+  defaultTtsProvider: string | null;
+  defaultTtsModel: string | null;
 }
 
 export type AutoTweetTrigger = 'threshold' | 'manual' | 'trend';
