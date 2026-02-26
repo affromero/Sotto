@@ -6,6 +6,7 @@ import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { generateQuestions } from '@/lib/taste-quiz';
+import { attributeReferral } from '@/lib/referrals';
 import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
 import { QuizStep } from './QuizStep';
 import { KeySetupForm } from './KeySetupForm';
@@ -31,23 +32,14 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
   const params = await searchParams;
   const step = params.step;
 
-  // Attribute referral from cookie (fire-and-forget)
+  // Attribute referral from cookie (fire-and-forget, notifies referrer)
   const cookieStore = await cookies();
   const refHandle = cookieStore.get('sotto_ref')?.value;
   if (refHandle) {
-    prisma.user.findUnique({ where: { id: userId }, select: { referredById: true } })
-      .then(async (u) => {
-        if (u && !u.referredById) {
-          const referrer = await prisma.user.findFirst({
-            where: { handle: refHandle },
-            select: { id: true },
-          });
-          if (referrer && referrer.id !== userId) {
-            await prisma.user.update({
-              where: { id: userId },
-              data: { referredById: referrer.id },
-            });
-          }
+    attributeReferral(userId, refHandle)
+      .then((attributed) => {
+        if (attributed) {
+          cookieStore.delete('sotto_ref');
         }
       })
       .catch(() => {});
