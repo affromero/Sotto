@@ -14,6 +14,11 @@ vi.mock('@/lib/podcast-gradient', () => ({
   getPodcastGradient: () => ({ from: '#000', to: '#fff', angle: '135deg' }),
 }));
 
+const mockUseAuth = vi.fn(() => ({ user: { id: 'user-1' }, isAuthenticated: true, isLoading: false }));
+vi.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 import { PodcastCard } from '@/components/feed/PodcastCard';
 import type { PodcastSummary } from '@/types/podcast';
 
@@ -190,5 +195,13 @@ describe('PodcastCard', () => {
     render(<PodcastCard podcast={podcastAnon} />);
     const fallbacks = screen.getAllByText('U');
     expect(fallbacks.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('hides stats for non-owners', () => {
+    mockUseAuth.mockReturnValueOnce({ user: { id: 'other-user' }, isAuthenticated: true, isLoading: false });
+    render(<PodcastCard podcast={mockPodcast} />);
+    expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ListMusic, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { profileUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './CollectionDetail.module.css';
@@ -76,6 +77,7 @@ export function CollectionDetail({
   const [items, setItems] = useState(initialItems);
   const [podcastCount, setPodcastCount] = useState(initialPodcastCount);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const { user: currentUser } = useAuth();
 
   const handleFollow = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -201,10 +203,14 @@ export function CollectionDetail({
                       ·
                     </span>
                     <span>{formatDuration(item.duration)}</span>
-                    <span className={styles.itemSep} aria-hidden="true">
-                      ·
-                    </span>
-                    <span>{formatCount(item.playCount)} plays</span>
+                    {currentUser?.id === item.user.id && (
+                      <>
+                        <span className={styles.itemSep} aria-hidden="true">
+                          ·
+                        </span>
+                        <span>{formatCount(item.playCount)} plays</span>
+                      </>
+                    )}
                     {item.tags.length > 0 && (
                       <>
                         <span className={styles.itemSep} aria-hidden="true">
