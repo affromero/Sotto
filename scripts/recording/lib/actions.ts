@@ -26,30 +26,30 @@ export async function smoothScroll(
   distance: number,
   duration: number = 800
 ): Promise<void> {
-  await page.evaluate(
-    ({ dist, dur }) => {
-      return new Promise<void>((resolve) => {
-        const start = performance.now();
-        const startY = window.scrollY;
-        function easeInOutCubic(t: number): number {
-          return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  // Use string-based evaluate to avoid tsx __name injection in browser context
+  await page.evaluate(`
+    new Promise((resolve) => {
+      var dist = ${distance};
+      var dur = ${duration};
+      var start = performance.now();
+      var startY = window.scrollY;
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+      function step(now) {
+        var elapsed = now - start;
+        var progress = Math.min(elapsed / dur, 1);
+        var eased = easeInOutCubic(progress);
+        window.scrollTo(0, startY + dist * eased);
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        } else {
+          resolve();
         }
-        function step(now: number) {
-          const elapsed = now - start;
-          const progress = Math.min(elapsed / dur, 1);
-          const eased = easeInOutCubic(progress);
-          window.scrollTo(0, startY + dist * eased);
-          if (progress < 1) {
-            requestAnimationFrame(step);
-          } else {
-            resolve();
-          }
-        }
-        requestAnimationFrame(step);
-      });
-    },
-    { dist: distance, dur: duration }
-  );
+      }
+      requestAnimationFrame(step);
+    })
+  `);
 }
 
 /**

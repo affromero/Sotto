@@ -83,7 +83,7 @@ echo ""
 # ── Step 2.5: Capture screen recordings (optional) ────────────────
 echo "=== Step 2.5: Capture screen recordings ==="
 if command -v npx &> /dev/null && command -v ffmpeg &> /dev/null; then
-  npx tsx scripts/recording/index.ts || echo "  Warning: recordings failed (non-fatal)"
+  NODE_PATH=apps/web/node_modules npx tsx scripts/recording/index.ts || echo "  Warning: recordings failed (non-fatal)"
 else
   echo "  Skipping (npx or ffmpeg not available)"
 fi
