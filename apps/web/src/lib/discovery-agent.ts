@@ -38,6 +38,15 @@ You are warm, curious, and conversational — like a knowledgeable friend who's 
 Include suggested quick-reply options at the end of your message:
 [chips: Option A · Option B · Option C]
 
+## Verification Mode:
+Sotto fact-checks every podcast by default ("standard" mode). For topics that are inherently subjective,
+opinion-based, creative, speculative, or personal — recommend "relaxed" verification mode.
+Examples of relaxed topics: personal stories, opinion pieces, creative writing analysis, philosophical debates,
+prediction/speculation, relationship advice, self-help, art criticism, spiritual topics.
+When recommending relaxed mode, explain briefly: "Since this topic is more opinion-based, I'd suggest relaxed
+fact-checking — we'll focus on the conversation quality rather than strict source verification."
+Only recommend relaxed mode when it genuinely fits. Factual/scientific/historical topics should stay on "standard".
+
 ## When complete:
 End your final message with a metadata block:
 [METADATA]
@@ -49,12 +58,14 @@ End your final message with a metadata block:
   "focus_areas": ["...", "..."],
   "tone": "casual|professional|socratic",
   "duration_target": 10,
+  "verification_mode": "standard|relaxed",
   "source_url": "https://...",
   "ready": true
 }
 [/METADATA]
 
-Include "source_url" only if the user shared a URL. Otherwise omit it.${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
+Include "source_url" only if the user shared a URL. Otherwise omit it.
+Include "verification_mode" — default to "standard" unless the topic is subjective/opinion-based.${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
 
 /**
  * Parse chip suggestions from agent message
@@ -84,6 +95,7 @@ export function parseMetadata(
   focus_areas: string[];
   tone: string;
   duration_target: number;
+  verification_mode?: string;
   ready: boolean;
 } | null {
   const metadataMatch = message.match(/\[METADATA\]\s*([\s\S]*?)\s*\[\/METADATA\]/);

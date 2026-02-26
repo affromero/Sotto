@@ -485,6 +485,20 @@
   margin-top: var(--spacing-lg);
 }
 
+.verificationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font: var(--text-caption);
+  font-weight: 500;
+  color: var(--color-warning);
+  background: var(--color-warning-lighter, #fffbeb);
+  border: 1px solid var(--color-warning-light, #fde68a);
+  border-radius: var(--radius-full);
+}
+
 .badgeSection {
   display: flex;
   justify-content: center;

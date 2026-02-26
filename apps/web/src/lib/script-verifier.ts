@@ -185,7 +185,8 @@ function buildVerdict(
   maxDurationMinutes: number | undefined,
   turns: ScriptTurn[],
   aiFeedback: string,
-  tokenUsage: { inputTokens: number; outputTokens: number; model: string }
+  tokenUsage: { inputTokens: number; outputTokens: number; model: string },
+  verificationMode?: string
 ): VerificationVerdict {
   const commonKnowledgeClaims = claims.filter((c) => c.isCommonKnowledge);
   const sourcingRequired = claims.filter((c) => !c.isCommonKnowledge);
@@ -223,16 +224,21 @@ function buildVerdict(
       ? 1
       : (sourcingRequired.length - unsupportedClaims.length - unreliableSourceClaims.length - misattributedClaims.length) /
         sourcingRequired.length;
-  const threshold = DEPTH_THRESHOLDS[depth] || 0.8;
 
-  const refQuality = assessReferenceQuality(references, depth);
+  const isRelaxed = verificationMode === 'relaxed';
+  // Relaxed mode uses ELI5-level thresholds and doesn't hard-fail on unreliable sources
+  const effectiveDepth = isRelaxed ? 'eli5' : depth;
+  const threshold = DEPTH_THRESHOLDS[effectiveDepth] || 0.8;
 
-  const passed =
-    score >= threshold &&
-    unreliableSourceClaims.length === 0 &&
-    misattributedClaims.length === 0 &&
-    refQuality.countPassed &&
-    refQuality.ratioPassed;
+  const refQuality = assessReferenceQuality(references, isRelaxed ? 'eli5' : depth);
+
+  const passed = isRelaxed
+    ? score >= threshold && refQuality.countPassed
+    : score >= threshold &&
+      unreliableSourceClaims.length === 0 &&
+      misattributedClaims.length === 0 &&
+      refQuality.countPassed &&
+      refQuality.ratioPassed;
 
   // Strip any PASS:/FAIL: prefix the AI may have written (instruction removed, but AI is non-deterministic)
   const cleanAiFeedback = aiFeedback.replace(/^(PASS|FAIL):\s*/i, '');
@@ -468,6 +474,7 @@ export async function verifyScript(params: {
   apiKeyOverride?: string;
   model?: string;
   previousClaims?: ClaimAnalysis[];
+  verificationMode?: string;
 }): Promise<VerificationVerdict> {
   const {
     topic,
@@ -504,7 +511,7 @@ export async function verifyScript(params: {
         inputTokens: 0,
         outputTokens: 0,
         model: params.model || 'skipped',
-      });
+      }, params.verificationMode);
     }
 
     const turnsText = turns.map((t, i) => `[Turn ${i}] ${t.speaker}: ${t.text}`).join('\n\n');
@@ -581,7 +588,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       inputTokens: response.inputTokens,
       outputTokens: response.outputTokens,
       model: response.model,
-    });
+    }, params.verificationMode);
   }
 
   // Full verification path (attempt 1 or no previous claims)
@@ -650,7 +657,7 @@ Analyze every factual claim. Return JSON only.`;
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
     model: response.model,
-  });
+  }, params.verificationMode);
 }
 
 function extractDomain(url: string): string {
