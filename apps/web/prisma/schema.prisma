@@ -149,9 +149,10 @@ model User {
   claimReports        ClaimReport[]      @relation("ClaimReporter")
 
   // Referrals
-  referredById String?
-  referredBy   User?   @relation("Referrals", fields: [referredById], references: [id])
-  referrals    User[]  @relation("Referrals")
+  referredById  String?
+  referredBy    User?   @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals     User[]  @relation("Referrals")
+  referralCount Int     @default(0)
 
   // Stripe Connect (voice monetization)
   stripeAccountId  String?
@@ -821,6 +822,7 @@ enum NotificationType {
   VOICE_OWNERSHIP_ALERT
   CLAIM_REPORT_ON_YOUR_PODCAST
   PIPELINE_FAILURE
+  REFERRAL_SIGNUP
 }
 
 // ============ MODERATION ============

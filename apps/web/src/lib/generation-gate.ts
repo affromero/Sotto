@@ -3,6 +3,7 @@ import { hasByokKey } from './byok';
 import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
 import { getRedisClient } from './redis';
 import { logger } from './logger';
+import { getReferralBonus } from './referrals';
 
 export interface ProviderQuotaStatus {
   provider: string;
@@ -79,7 +80,7 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
+      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true, referralCount: true },
     }),
   ]);
 
@@ -87,9 +88,10 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const isProUser = user.plan === 'PRO';
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
-  // Effective daily limit: per-user override takes precedence over global config
-  const effectiveDailyLimit =
+  // Effective daily limit: per-user override takes precedence, then add referral bonus
+  const baseLimit =
     user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+  const effectiveDailyLimit = baseLimit + getReferralBonus(user.referralCount);
 
   const baseResult = {
     freeGenerationsUsed: user.freeGenerationsUsed,
@@ -230,7 +232,7 @@ export async function getFreeTierStatus(userId: string): Promise<{
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
+      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true, referralCount: true },
     }),
     getDailyCount(userId),
   ]);
@@ -239,8 +241,9 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
   const isProUser = user.plan === 'PRO';
 
-  const effectiveDailyLimit =
+  const baseLimit =
     user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+  const effectiveDailyLimit = baseLimit + getReferralBonus(user.referralCount);
 
   const base = {
     freeGenerationsUsed: user.freeGenerationsUsed,
