@@ -1,3 +1,5 @@
+import { createLinkPreviewClient } from '@steipete/summarize-core';
+import { logger } from '../logger';
 import type { ExtractedContent } from './types';
 
 const YOUTUBE_PATTERNS = [
@@ -41,6 +43,22 @@ export function extractVideoId(url: string): string | null {
   }
 }
 
+let clientInstance: ReturnType<typeof createLinkPreviewClient> | null = null;
+
+function getClient() {
+  if (!clientInstance) {
+    clientInstance = createLinkPreviewClient({
+      groqApiKey: process.env.GROQ_API_KEY ?? null,
+      openaiApiKey: process.env.OPENAI_API_KEY ?? null,
+      ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
+      onProgress: (event) => {
+        logger.debug('YouTube extraction progress', { kind: event.kind });
+      },
+    });
+  }
+  return clientInstance;
+}
+
 export async function extractYouTubeContent(url: string): Promise<ExtractedContent> {
   const videoId = extractVideoId(url);
   if (!videoId) {
@@ -54,34 +72,65 @@ export async function extractYouTubeContent(url: string): Promise<ExtractedConte
       publishedDate: null,
       wordCount: 0,
       sourceType: 'youtube',
-      extractionMethod: 'youtube-transcript',
+      extractionMethod: 'summarize-core',
     };
   }
 
-  const { YoutubeTranscript } = await import('youtube-transcript');
-
   try {
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    const text = transcript
-      .map((entry: { text: string }) => entry.text)
-      .join(' ')
-      .substring(0, MAX_CONTENT_LENGTH);
+    const client = getClient();
+    const result = await client.fetchLinkContent(url, {
+      youtubeTranscript: 'auto',
+      maxCharacters: MAX_CONTENT_LENGTH,
+      format: 'text',
+    });
 
+    const text = result.content.substring(0, MAX_CONTENT_LENGTH);
     const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+    if (!text || wordCount === 0) {
+      logger.warn('YouTube extraction returned empty content', {
+        url,
+        transcriptSource: result.transcriptSource ?? 'none',
+      });
+      return {
+        text: '',
+        markdown: '',
+        title: result.title,
+        description: 'No transcript available for this video',
+        siteName: 'YouTube',
+        author: null,
+        publishedDate: null,
+        wordCount: 0,
+        sourceType: 'youtube',
+        extractionMethod: 'summarize-core',
+      };
+    }
+
+    logger.info('YouTube content extracted', {
+      url,
+      wordCount: String(wordCount),
+      transcriptSource: result.transcriptSource ?? 'unknown',
+      transcriptionProvider: result.transcriptionProvider ?? 'none',
+    });
 
     return {
       text,
       markdown: text,
-      title: null,
-      description: null,
-      siteName: 'YouTube',
+      title: result.title,
+      description: result.description,
+      siteName: result.siteName ?? 'YouTube',
       author: null,
       publishedDate: null,
       wordCount,
       sourceType: 'youtube',
-      extractionMethod: 'youtube-transcript',
+      extractionMethod: 'summarize-core',
     };
-  } catch {
+  } catch (err) {
+    logger.error('YouTube extraction failed', {
+      url,
+      error: err instanceof Error ? err.message : String(err),
+    });
+
     return {
       text: '',
       markdown: '',
@@ -92,7 +141,7 @@ export async function extractYouTubeContent(url: string): Promise<ExtractedConte
       publishedDate: null,
       wordCount: 0,
       sourceType: 'youtube',
-      extractionMethod: 'youtube-transcript',
+      extractionMethod: 'summarize-core',
     };
   }
 }

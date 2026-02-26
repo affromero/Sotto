@@ -1,5 +1,5 @@
 import { logger } from './logger';
-import type { TwitterTweet, ThreadTweet, ThreadData } from '@/types/twitter';
+import type { TwitterTweet, TwitterMedia, TwitterMentionsResult, ThreadTweet, ThreadData } from '@/types/twitter';
 
 function getEnv(key: string): string | undefined {
   return process.env[key];
@@ -122,7 +122,7 @@ async function generateOAuthHeader(
  * Fetch recent mentions of the @sottofm bot account.
  * Uses Twitter API v2 GET /2/users/:id/mentions
  */
-export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
+export async function getMentions(sinceId?: string): Promise<TwitterMentionsResult> {
   const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
   const userId = getEnv('TWITTER_SOTTO_USER_ID');
 
@@ -133,11 +133,13 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
   }
 
   if (!canMakeRequest('mentions')) {
-    return [];
+    return { tweets: [], mediaByKey: new Map() };
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics,attachments',
+    expansions: 'attachments.media_keys',
+    'media.fields': 'type,variants,duration_ms,preview_image_url,alt_text',
     max_results: '100',
   });
 
@@ -160,17 +162,22 @@ export async function getMentions(sinceId?: string): Promise<TwitterTweet[]> {
   const data = await response.json();
 
   if (!data.data) {
-    return [];
+    return { tweets: [], mediaByKey: new Map() };
   }
 
-  logger.info('Fetched Twitter mentions', { count: String(data.data.length) });
-  return data.data as TwitterTweet[];
+  const mediaByKey = parseMediaIncludes(data.includes);
+
+  logger.info('Fetched Twitter mentions', {
+    count: String(data.data.length),
+    mediaKeys: String(mediaByKey.size),
+  });
+  return { tweets: data.data as TwitterTweet[], mediaByKey };
 }
 
 /**
  * Fetch a single tweet by ID (e.g. parent tweet for reply context).
  */
-export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
+export async function getTweet(tweetId: string): Promise<{ tweet: TwitterTweet; mediaByKey: Map<string, TwitterMedia> } | null> {
   const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
 
   if (!bearerToken) {
@@ -182,7 +189,9 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
   }
 
   const params = new URLSearchParams({
-    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics',
+    'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics,attachments',
+    expansions: 'attachments.media_keys',
+    'media.fields': 'type,variants,duration_ms,preview_image_url,alt_text',
   });
 
   const url = `${TWITTER_API_BASE}/tweets/${tweetId}?${params}`;
@@ -201,7 +210,24 @@ export async function getTweet(tweetId: string): Promise<TwitterTweet | null> {
   }
 
   const data = await response.json();
-  return (data.data as TwitterTweet) ?? null;
+  const tweet = (data.data as TwitterTweet) ?? null;
+  if (!tweet) return null;
+
+  const mediaByKey = parseMediaIncludes(data.includes);
+  return { tweet, mediaByKey };
+}
+
+/**
+ * Parse media includes from a Twitter API v2 response into a lookup map.
+ */
+function parseMediaIncludes(includes?: { media?: TwitterMedia[] }): Map<string, TwitterMedia> {
+  const map = new Map<string, TwitterMedia>();
+  if (includes?.media) {
+    for (const media of includes.media) {
+      map.set(media.media_key, media);
+    }
+  }
+  return map;
 }
 
 /**
@@ -322,9 +348,9 @@ export async function getThread(conversationId: string): Promise<ThreadData | nu
   let quotedFetchCount = 0;
   for (const quotedId of quotedTweetIds) {
     if (quotedFetchCount >= QUOTED_TWEET_FETCH_LIMIT) break;
-    const quoted = await getTweet(quotedId);
-    if (quoted) {
-      quotedTweets.push(quoted);
+    const quotedResult = await getTweet(quotedId);
+    if (quotedResult) {
+      quotedTweets.push(quotedResult.tweet);
     }
     quotedFetchCount++;
   }

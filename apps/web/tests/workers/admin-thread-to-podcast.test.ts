@@ -115,12 +115,12 @@ describe('processAdminThreadToPodcast', () => {
 
   describe('URL parsing', () => {
     it('parses x.com tweet URLs', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '12345',
         text: 'Test tweet',
         author_id: 'author-1',
         conversation_id: '12345',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
 
       const job = createMockJob({
@@ -133,12 +133,12 @@ describe('processAdminThreadToPodcast', () => {
     });
 
     it('parses twitter.com tweet URLs', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '67890',
         text: 'Test tweet',
         author_id: 'author-1',
         conversation_id: '67890',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
 
       const job = createMockJob({
@@ -162,12 +162,12 @@ describe('processAdminThreadToPodcast', () => {
 
   describe('single tweet processing', () => {
     it('creates podcast from a single tweet (no thread)', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '111',
         text: 'Single tweet about AI',
         author_id: 'author-1',
         conversation_id: '111',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue({ rootTweet: {}, replies: [], isSelfAuthored: false });
 
       const job = createMockJob({
@@ -192,13 +192,13 @@ describe('processAdminThreadToPodcast', () => {
 
   describe('thread processing', () => {
     it('uses parseThreadIntent when thread has 2+ replies', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '222',
         text: 'Thread starter',
         author_id: 'author-1',
         conversation_id: '222',
         created_at: '2025-01-01T00:00:00Z',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue({
         rootTweet: { text: 'Thread starter', authorUsername: 'user1' },
         replies: [
@@ -219,13 +219,13 @@ describe('processAdminThreadToPodcast', () => {
     });
 
     it('sets longer duration for thread podcasts (15 vs 10 minutes)', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '333',
         text: 'Thread starter',
         author_id: 'author-1',
         conversation_id: '333',
         created_at: '2025-01-01T00:00:00Z',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue({
         rootTweet: { text: 'Thread starter', authorUsername: 'user1' },
         replies: [
@@ -266,12 +266,12 @@ describe('processAdminThreadToPodcast', () => {
     });
 
     it('throws when @sotto user is missing', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '444',
         text: 'Test',
         author_id: 'a1',
         conversation_id: '444',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
       mockPrismaUserFindUnique.mockResolvedValue(null);
 
@@ -301,12 +301,12 @@ describe('processAdminThreadToPodcast', () => {
         durationTarget: 5,
       };
 
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '700',
         text: 'AI safety and alignment discussion',
         author_id: 'author-1',
         conversation_id: '700',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
       // First call: parseTweetIntent(tweet.text) → content
       // Second call: parseTweetIntent(message) → overrides
@@ -351,13 +351,13 @@ describe('processAdminThreadToPodcast', () => {
         tone: 'casual',
       };
 
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '800',
         text: 'Thread starter about quantum',
         author_id: 'author-1',
         conversation_id: '800',
         created_at: '2025-01-01T00:00:00Z',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue({
         rootTweet: { text: 'Thread starter about quantum', authorUsername: 'user1' },
         replies: [
@@ -399,12 +399,12 @@ describe('processAdminThreadToPodcast', () => {
 
   describe('pipeline kick-off', () => {
     it('enqueues content extraction job after podcast creation', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '555',
         text: 'Test tweet for pipeline',
         author_id: 'author-1',
         conversation_id: '555',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
 
       const job = createMockJob({
@@ -424,12 +424,12 @@ describe('processAdminThreadToPodcast', () => {
     });
 
     it('updates job progress through all stages', async () => {
-      mockGetTweet.mockResolvedValue({
+      mockGetTweet.mockResolvedValue({ tweet: {
         id: '666',
         text: 'Progress test',
         author_id: 'a1',
         conversation_id: '666',
-      });
+      }, mediaByKey: new Map() });
       mockGetThread.mockResolvedValue(null);
 
       const job = createMockJob({

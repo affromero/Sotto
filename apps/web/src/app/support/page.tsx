@@ -95,6 +95,15 @@ export default function SupportPage() {
               </p>
             </div>
             <div className={styles.faqItem}>
+              <h3>What content can I use to create a podcast?</h3>
+              <p>
+                You can create a podcast from any topic, article URL, or YouTube video.
+                Sotto automatically extracts transcripts from YouTube — even from videos
+                without captions. If you tweet a video at @sottofm, we&apos;ll transcribe
+                the video and use it as source material too.
+              </p>
+            </div>
+            <div className={styles.faqItem}>
               <h3>Can I delete my account?</h3>
               <p>
                 Yes. Go to your profile settings and select &quot;Delete Account&quot;. This
