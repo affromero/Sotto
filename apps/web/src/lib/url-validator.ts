@@ -104,3 +104,38 @@ export async function validateUrl(url: string): Promise<void> {
     throw new UrlValidationError(`DNS resolution failed for ${hostname}`);
   }
 }
+
+const MAX_REDIRECTS = 5;
+
+/**
+ * Fetch a URL with SSRF-safe redirect handling.
+ * Validates the initial URL and every redirect hop against private IP ranges.
+ * Uses redirect: 'manual' to intercept and re-validate each Location header.
+ */
+export async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+  await validateUrl(url);
+
+  let currentUrl = url;
+  for (let hops = 0; hops <= MAX_REDIRECTS; hops++) {
+    const response = await fetch(currentUrl, {
+      ...init,
+      redirect: 'manual',
+    });
+
+    if (response.status < 300 || response.status >= 400) {
+      return response;
+    }
+
+    const location = response.headers.get('location');
+    if (!location) {
+      return response;
+    }
+
+    // Resolve relative redirects against the current URL
+    const resolved = new URL(location, currentUrl).href;
+    await validateUrl(resolved);
+    currentUrl = resolved;
+  }
+
+  throw new UrlValidationError(`Too many redirects (max ${MAX_REDIRECTS})`);
+}
