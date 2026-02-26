@@ -1,0 +1,6 @@
+/* Live Analytics Page */
+
+.container { composes: container from '../../admin.module.css'; }
+.header { composes: header from '../../admin.module.css'; }
+.title { composes: title from '../../admin.module.css'; }
+.subtitle { composes: subtitle from '../../admin.module.css'; }
