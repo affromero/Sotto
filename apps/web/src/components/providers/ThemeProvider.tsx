@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 
 type Theme = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
@@ -31,7 +30,6 @@ function isLightOnlyRoute(pathname: string): boolean {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { status } = useSession();
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'system';
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
@@ -51,10 +49,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const resolvedTheme = useMemo<ResolvedTheme>(() => {
-    const forcedLight = isLightOnlyRoute(pathname) || status === 'unauthenticated';
-    if (forcedLight) return 'light';
+    if (isLightOnlyRoute(pathname)) return 'light';
     return theme === 'system' ? systemTheme : theme;
-  }, [theme, systemTheme, pathname, status]);
+  }, [theme, systemTheme, pathname]);
 
   // Sync to DOM
   useEffect(() => {
