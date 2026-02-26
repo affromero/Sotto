@@ -69,16 +69,14 @@ async function ensureSilentAudio(assetsDir: string): Promise<string> {
 // Chain: curves → colorbalance → eq → vignette → unsharp
 
 const WARM_AMBER_FILTER = [
-  // Warm tone shift: lift shadows, push reds warm, pull blues cool
-  "curves=master='0/0 0.05/0.08 0.5/0.52 1/1':red='0/0 0.5/0.53 1/1':blue='0/0 0.5/0.46 1/1'",
-  // Subtle color balance — amber push
-  'colorbalance=rs=0.06:gs=0.02:bs=-0.04:rm=0.04:gm=0.01:bm=-0.03',
-  // Slight brightness/contrast/saturation boost
-  'eq=brightness=0.03:contrast=1.05:saturation=1.08',
-  // Gentle vignette
-  'vignette=PI/6:a=1.2',
-  // Light sharpening
-  'unsharp=3:3:0.3:3:3:0.0',
+  // Fade in from black over 0.5s (hides VP8 codec warmup pixelation)
+  'fade=in:st=0:d=0.5',
+  // Very subtle warm shift — preserve the app's natural look
+  "curves=red='0/0 0.5/0.51 1/1':blue='0/0 0.5/0.49 1/1'",
+  // Slight contrast + saturation lift
+  'eq=contrast=1.03:saturation=1.04',
+  // Light sharpening for crisp UI text
+  'unsharp=3:3:0.4:3:3:0.0',
 ].join(',');
 
 // ── Grade Pipeline ────────────────────────────────────────────────
@@ -94,7 +92,8 @@ async function gradeToMp4(
     '-vf', WARM_AMBER_FILTER,
     '-c:v', 'libx264',
     '-preset', 'slow',
-    '-crf', '18',
+    '-crf', '15',
+    '-g', '30',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac',
     '-b:a', '128k',

@@ -2,7 +2,7 @@
 /**
  * Sotto Screen Recording Pipeline
  *
- * Records 5 key product flows via Playwright, then color-grades with FFmpeg.
+ * Records key product flows via Playwright, then color-grades with FFmpeg.
  *
  * Prerequisites:
  *   - App running at APP_URL (default http://localhost:3000)
@@ -34,6 +34,8 @@ import chatCreation from './flows/02-chat-creation';
 import playerInterrupt from './flows/03-player-interrupt';
 import forkFlow from './flows/04-fork-flow';
 import scriptReview from './flows/05-script-review';
+import landingPage from './flows/06-landing-page';
+import verificationGithub from './flows/07-verification-github';
 
 const APP_URL = process.env.APP_URL || 'http://localhost:3000';
 const OUTPUT_DIR = '/tmp/pitch-recordings';
@@ -47,6 +49,8 @@ const ALL_FLOWS: FlowScenario[] = [
   playerInterrupt,
   forkFlow,
   scriptReview,
+  landingPage,
+  verificationGithub,
 ];
 
 async function main() {
@@ -64,19 +68,32 @@ async function main() {
   // ── Connect to database ─────────────────────────────────────────
   const prisma = new PrismaClient();
   try {
-    const demoUser = await prisma.user.findUnique({ where: { email: 'demo@sotto.fm' } });
-    if (!demoUser) throw new Error('Demo user not found — run seed:demo first');
+    // Use the real admin account for recordings, fallback to seeded demo user
+    const demoUser =
+      await prisma.user.findFirst({ where: { email: 'andres2912@gmail.com' } }) ??
+      await prisma.user.findUnique({ where: { email: 'demo@sotto.fm' } });
+    if (!demoUser) throw new Error('No admin or demo user found — run seed:demo first');
 
-    // Find key podcasts
+    // Find key podcasts (by title, regardless of owner)
     const cryptoPodcast = await prisma.podcast.findFirst({
-      where: { userId: demoUser.id, title: 'The Hidden History of Cryptography' },
+      where: { title: 'The Hidden History of Cryptography' },
     });
     const scriptReadyPodcast = await prisma.podcast.findFirst({
-      where: { userId: demoUser.id, status: 'SCRIPT_READY' },
+      where: { status: 'SCRIPT_READY' },
     });
 
     if (!cryptoPodcast) throw new Error('Cryptography podcast not found — run seed:demo first');
     if (!scriptReadyPodcast) throw new Error('SCRIPT_READY podcast not found — run seed:demo first');
+
+    // Reassign podcasts to the recording user so their profile shows in recordings
+    if (cryptoPodcast.userId !== demoUser.id) {
+      await prisma.podcast.update({ where: { id: cryptoPodcast.id }, data: { userId: demoUser.id } });
+      console.log(`  Reassigned cryptography podcast to ${demoUser.email}`);
+    }
+    if (scriptReadyPodcast.userId !== demoUser.id) {
+      await prisma.podcast.update({ where: { id: scriptReadyPodcast.id }, data: { userId: demoUser.id } });
+      console.log(`  Reassigned script-ready podcast to ${demoUser.email}`);
+    }
 
     console.log(`Demo user:         ${demoUser.id}`);
     console.log(`Crypto podcast:    ${cryptoPodcast.id}`);
@@ -88,7 +105,7 @@ async function main() {
 
     // ── Create session tokens ───────────────────────────────────────
     const tokens: Record<string, string> = {
-      demo: await createSessionToken(demoUser.id, demoUser.role, demoUser.name || 'Alex Rivera'),
+      demo: await createSessionToken(demoUser.id, demoUser.role, demoUser.name || 'Demo User'),
       viewer: await createSessionToken(viewerUser.id, viewerUser.role, viewerUser.name || 'Maria Chen'),
     };
 

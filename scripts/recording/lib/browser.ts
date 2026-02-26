@@ -73,7 +73,7 @@ export async function createRecordingContext(
     deviceScaleFactor: 2,
     recordVideo: {
       dir: videoDir,
-      size: { width: viewport.width * 2, height: viewport.height * 2 },
+      size: { width: viewport.width, height: viewport.height },
     },
   });
 

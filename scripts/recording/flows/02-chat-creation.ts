@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { humanType, waitAndSettle, humanClick } from '../lib/actions';
+import { humanType, waitAndSettle, humanClick, injectCursor, zoomToElement, zoomReset } from '../lib/actions';
 import { interceptDiscovery, clearDiscoveryIntercept } from '../lib/interceptors';
 import type { FlowScenario, FlowContext } from '../lib/types';
 import type { DiscoveryMetadata } from '@sotto/shared';
@@ -34,23 +34,23 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
     metadata: INITIAL_METADATA,
   });
 
-  // Navigate to create page
   await page.goto(`${ctx.appUrl}/create`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitAndSettle(page, 'input[aria-label="Chat message input"]');
+  await injectCursor(page);
 
-  // Type the topic
+  // Zoom into the chat input
+  await zoomToElement(page, 'input[aria-label="Chat message input"]', 1.5);
   await humanType(
     page,
     'input[aria-label="Chat message input"]',
     'The psychology of decision making — why we make irrational choices'
   );
-  await page.waitForTimeout(300);
-
-  // Submit by pressing Enter
+  await page.waitForTimeout(200);
   await page.keyboard.press('Enter');
+  await zoomReset(page);
 
   // Wait for AI response to appear + chips
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
 
   // Clear the first intercept, set up the second with ready: true
   await clearDiscoveryIntercept(page);
@@ -64,19 +64,24 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
     metadata: READY_METADATA,
   });
 
-  // Click "Cognitive Biases" chip
+  // Zoom into chips area, click "Cognitive Biases"
+  await zoomToElement(page, 'button:has-text("Cognitive Biases")', 1.6);
   await humanClick(page, 'button:has-text("Cognitive Biases")');
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(800);
+  await zoomReset(page);
+  await page.waitForTimeout(1000);
 
-  // The "Generate Podcast" button should now appear (metadata.ready === true)
+  // Zoom into generate button
+  await zoomToElement(page, 'button[aria-label="Generate your podcast"]', 1.6);
   await humanClick(page, 'button[aria-label="Generate your podcast"]');
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1200);
+  await zoomReset(page);
 }
 
 const chatCreation: FlowScenario = {
   name: '02-chat-creation',
   description: 'Chat with AI to create a podcast — type topic, get suggestions, generate',
-  viewport: { width: 1440, height: 900 },
+  viewport: { width: 1920, height: 1080 },
   auth: 'demo',
   run,
 };
