@@ -9,6 +9,7 @@ const mockPrismaDiscoveryUpdate = vi.fn().mockResolvedValue({
 });
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ source: 'WEB' });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -18,6 +19,7 @@ vi.mock('@/lib/prisma', () => {
     },
     podcast: {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -57,6 +59,38 @@ vi.mock('@/lib/logger', () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock('@/lib/topic-assessor', () => ({
+  assessTopicFeasibility: vi.fn().mockResolvedValue({
+    verdict: 'proceed',
+    reason: 'Topic is feasible',
+    suggestion: null,
+    inputTokens: 0,
+    outputTokens: 0,
+    model: 'test',
+  }),
+}));
+
+vi.mock('@/lib/pipeline-resume', () => ({
+  markPodcastFailed: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/free-tier-config', () => ({
+  getFreeTierConfig: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-sonnet-4-20250514',
+    ttsProvider: 'elevenlabs',
+    maxFreeGenerations: 3,
+  }),
 }));
 
 // ---- Import under test ----
