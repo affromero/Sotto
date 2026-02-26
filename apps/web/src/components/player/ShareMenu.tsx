@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Share2, Link2, Code, Download } from 'lucide-react';
+import { Share2, Link2, Code } from 'lucide-react';
 import { Toast } from '@/components/ui/Toast';
 import { EmbedCodeModal } from '@/components/player/EmbedCodeModal';
 import styles from './ShareMenu.module.css';
@@ -9,12 +9,11 @@ import styles from './ShareMenu.module.css';
 interface ShareMenuProps {
   podcastId: string;
   podcastTitle: string;
-  audioUrl: string | null;
   isPublic: boolean;
   triggerClassName?: string;
 }
 
-export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, triggerClassName }: ShareMenuProps) {
+export function ShareMenu({ podcastId, podcastTitle, isPublic, triggerClassName }: ShareMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -65,12 +64,6 @@ export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, trigger
     setShowEmbed(true);
   }, []);
 
-  const handleDownload = useCallback(() => {
-    if (!audioUrl) return;
-    window.open(`/api/podcasts/${podcastId}/download`, '_blank');
-    setIsOpen(false);
-  }, [podcastId, audioUrl]);
-
   return (
     <div className={styles.container} ref={containerRef}>
       <button
@@ -116,17 +109,6 @@ export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, trigger
             <button className={styles.menuItem} onClick={handleEmbed} role="menuitem" type="button">
               <Code size={16} className={styles.menuItemIcon} />
               Embed
-            </button>
-          )}
-          {audioUrl && (
-            <button
-              className={styles.menuItem}
-              onClick={handleDownload}
-              role="menuitem"
-              type="button"
-            >
-              <Download size={16} className={styles.menuItemIcon} />
-              Download MP3
             </button>
           )}
         </div>

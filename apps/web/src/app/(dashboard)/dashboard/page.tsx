@@ -33,6 +33,7 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     FAILED: 'error',
     IMPORTING: 'info',
     TRANSCRIBING: 'info',
+    DUPLICATE_REVIEW: 'warning',
   };
 
 const statusLabels: Record<PodcastStatus, string> = {
@@ -51,6 +52,7 @@ const statusLabels: Record<PodcastStatus, string> = {
   FAILED: 'Failed',
   IMPORTING: 'Importing...',
   TRANSCRIBING: 'Transcribing...',
+  DUPLICATE_REVIEW: 'Under Review',
 };
 
 function formatDate(date: Date): string {
