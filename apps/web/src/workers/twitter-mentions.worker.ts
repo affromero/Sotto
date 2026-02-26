@@ -3,10 +3,11 @@ import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } f
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, getThread, replyToTweet } from '@/lib/twitter';
-import { parseTweetIntent, parseThreadIntent } from '@/lib/tweet-parser';
-import { getAiKey } from '@/lib/byok';
+import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
+import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
@@ -194,6 +195,33 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       }
     }
 
+    // 7c. Resolve user-requested model preferences from tweet
+    const tweetModels = resolveModelFromTweet(parsed);
+    let effectiveAiModel = user.preferredAiModel ?? undefined;
+    let effectiveTtsProvider = user.preferredTtsProvider ?? undefined;
+    let effectiveTtsModel = user.preferredTtsModel ?? undefined;
+    let modelWarning: string | null = null;
+
+    if (tweetModels.aiModel) {
+      const requiredPlan = getModelRequiredPlan(tweetModels.aiModel);
+      const userPlan = await prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { plan: true },
+      });
+      const isByok = await hasByokKey(userId);
+
+      if (requiredPlan === 'PRO' && userPlan.plan !== 'PRO' && !isByok) {
+        modelWarning = `You asked for ${parsed.requestedAiModel} but it requires a Pro plan or BYOK key. Using your default model instead. Set up your API keys at ${SOTTO_APP_URL}/settings/api`;
+      } else {
+        effectiveAiModel = tweetModels.aiModel;
+      }
+    }
+
+    if (tweetModels.ttsProvider) {
+      effectiveTtsProvider = tweetModels.ttsProvider;
+      effectiveTtsModel = undefined; // use provider default
+    }
+
     await prisma.tweetMention.update({
       where: { id: mention.id },
       data: { parsedTopic: parsed.topic, status: 'GENERATING' },
@@ -245,9 +273,9 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
             ],
           },
         },
-        ttsProvider: user.preferredTtsProvider ?? undefined,
-        ttsModel: user.preferredTtsModel ?? undefined,
-        aiModel: user.preferredAiModel ?? undefined,
+        ttsProvider: effectiveTtsProvider,
+        ttsModel: effectiveTtsModel,
+        aiModel: effectiveAiModel,
         visibility: 'PUBLIC',
         discovery: {
           create: {
@@ -298,11 +326,25 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       });
     }
 
+    // 13. Notify user if their requested model couldn't be used
+    if (modelWarning) {
+      try {
+        await replyToTweet(tweet.id, modelWarning);
+      } catch (replyErr) {
+        logger.warn('Failed to send model warning reply', {
+          tweetId: tweet.id,
+          error: replyErr instanceof Error ? replyErr.message : String(replyErr),
+        });
+      }
+    }
+
     logger.info('Twitter mention processed — podcast created', {
       tweetId: tweet.id,
       podcastId: podcast.id,
       topic: parsed.topic,
       isThread: String(!!isThreadPodcast),
+      requestedAiModel: parsed.requestedAiModel ?? 'none',
+      requestedTtsProvider: parsed.requestedTtsProvider ?? 'none',
     });
   } catch (err) {
     await prisma.tweetMention.update({
