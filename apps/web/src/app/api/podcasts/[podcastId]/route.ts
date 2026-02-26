@@ -5,6 +5,7 @@ import { updatePodcastSchema } from '@/lib/validations';
 import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
 import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
+import { resolveAudioUrl } from '@/lib/r2';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -58,7 +59,24 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     isSaved = !!save;
   }
 
-  return NextResponse.json({ ...podcast, isLiked, isSaved });
+  // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
+  const [resolvedAudioUrl, resolvedSegments] = await Promise.all([
+    resolveAudioUrl(podcast.audioUrl, podcast.visibility),
+    Promise.all(
+      podcast.segments.map(async (s) => ({
+        ...s,
+        audioUrl: await resolveAudioUrl(s.audioUrl, podcast.visibility),
+      }))
+    ),
+  ]);
+
+  return NextResponse.json({
+    ...podcast,
+    audioUrl: resolvedAudioUrl,
+    segments: resolvedSegments,
+    isLiked,
+    isSaved,
+  });
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {

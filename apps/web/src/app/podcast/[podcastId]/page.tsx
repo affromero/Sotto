@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
+import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import styles from './page.module.css';
@@ -19,6 +20,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       title: true,
       topic: true,
       audioUrl: true,
+      visibility: true,
       defaultVoiceTrackId: true,
       voiceTracks: { where: { status: 'READY' }, select: { id: true, audioUrl: true } },
       user: { select: { name: true } },
@@ -41,6 +43,7 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
       url: podcastUrl,
       siteName: 'Sotto',
       ...(() => {
+        if (podcast.visibility !== 'PUBLIC') return {};
         const defaultTrack = podcast.defaultVoiceTrackId
           ? podcast.voiceTracks.find(t => t.id === podcast.defaultVoiceTrackId)
           : null;
@@ -231,13 +234,56 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
   }
 
+  const visibility = podcast.visibility;
+
+  // Resolve audio URLs: presigned for PRIVATE/UNLISTED, public CDN for PUBLIC
+  const [resolvedAudioUrl, resolvedSegments, resolvedVersions, resolvedVoiceTracks] =
+    await Promise.all([
+      resolveAudioUrl(podcast.audioUrl, visibility),
+      Promise.all(
+        podcast.segments.map(async (s) => ({
+          ...s,
+          audioUrl: await resolveAudioUrl(s.audioUrl, visibility),
+          startTime: s.startTime,
+          duration: s.duration,
+        }))
+      ),
+      Promise.all(
+        podcast.versions.map(async (v) => ({
+          id: v.id,
+          version: v.version,
+          audioUrl: (await resolveAudioUrl(v.audioUrl, visibility)) ?? v.audioUrl,
+          duration: v.duration,
+          changeType: v.changeType,
+          changeSummary: v.changeSummary,
+          interactionId: v.interactionId,
+          createdAt: v.createdAt.toISOString(),
+        }))
+      ),
+      Promise.all(
+        (isOwner
+          ? podcast.voiceTracks
+          : podcast.voiceTracks.filter((t) => t.status === 'READY')
+        ).map(async (t) => ({
+          id: t.id,
+          name: t.name,
+          status: t.status,
+          audioUrl: await resolveAudioUrl(t.audioUrl, visibility),
+          duration: t.duration,
+          ttsProvider: t.ttsProvider,
+          failureReason: t.failureReason,
+          voices: t.voices,
+        }))
+      ),
+    ]);
+
   const podcastData = {
     id: podcast.id,
     title: podcast.title,
     topic: podcast.topic,
     status: podcast.status,
-    visibility: podcast.visibility,
-    audioUrl: podcast.audioUrl,
+    visibility,
+    audioUrl: resolvedAudioUrl,
     duration: podcast.duration,
     playCount: podcast.playCount,
     likeCount: podcast.likeCount,
@@ -258,11 +304,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     failureReason: podcast.failureReason,
     currentVersion: podcast.currentVersion,
     user: podcast.user,
-    segments: podcast.segments.map((s) => ({
-      ...s,
-      startTime: s.startTime,
-      duration: s.duration,
-    })),
+    segments: resolvedSegments,
     interactions: podcast.interactions,
     references: podcast.references.map((r) => ({
       ...r,
@@ -284,29 +326,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       createdAt: f.createdAt.toISOString(),
       user: f.user,
     })),
-    versions: podcast.versions.map((v) => ({
-      id: v.id,
-      version: v.version,
-      audioUrl: v.audioUrl,
-      duration: v.duration,
-      changeType: v.changeType,
-      changeSummary: v.changeSummary,
-      interactionId: v.interactionId,
-      createdAt: v.createdAt.toISOString(),
-    })),
-    voiceTracks: (isOwner
-      ? podcast.voiceTracks
-      : podcast.voiceTracks.filter(t => t.status === 'READY')
-    ).map(t => ({
-      id: t.id,
-      name: t.name,
-      status: t.status,
-      audioUrl: t.audioUrl,
-      duration: t.duration,
-      ttsProvider: t.ttsProvider,
-      failureReason: t.failureReason,
-      voices: t.voices,
-    })),
+    versions: resolvedVersions,
+    voiceTracks: resolvedVoiceTracks,
     defaultVoiceTrackId: podcast.defaultVoiceTrackId,
     isLiked,
     isSaved,
