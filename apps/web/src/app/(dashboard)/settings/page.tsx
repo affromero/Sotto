@@ -4,6 +4,7 @@ import { ONBOARDING_TAG_SLUGS } from '@/lib/tag-icons';
 import { listByokProviders, listAiProviders } from '@/lib/byok';
 import { getAllAiProviderClientMeta } from '@/lib/providers/ai-registry';
 import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
+import { getReferralBonus } from '@/lib/referrals';
 import { SettingsForm } from './SettingsForm';
 import styles from './page.module.css';
 
@@ -18,7 +19,7 @@ export default async function SettingsPage() {
     return null;
   }
 
-  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referralCount] = await Promise.all([
+  const [user, accounts, voiceClones, userInterests, categories, byokKeys, aiKeys, quizAnswerCount, referredUsers] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -69,7 +70,12 @@ export default async function SettingsPage() {
     listByokProviders(userId),
     listAiProviders(userId),
     prisma.tasteQuizAnswer.count({ where: { userId } }),
-    prisma.user.count({ where: { referredById: userId } }),
+    prisma.user.findMany({
+      where: { referredById: userId },
+      select: { name: true, handle: true, image: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
   ]);
 
   if (!user) return null;
@@ -114,7 +120,8 @@ export default async function SettingsPage() {
         initialEmailNotifications={user.emailNotifications}
         initialPushNotifications={user.pushNotifications}
         quizAnswerCount={quizAnswerCount}
-        referralCount={referralCount}
+        referredUsers={referredUsers.map((u) => ({ name: u.name, handle: u.handle, image: u.image, joinedAt: u.createdAt.toISOString() }))}
+        referralBonus={getReferralBonus(referredUsers.length)}
       />
     </main>
   );

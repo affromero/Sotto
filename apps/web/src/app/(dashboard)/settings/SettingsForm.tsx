@@ -61,7 +61,8 @@ interface SettingsFormProps {
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
   quizAnswerCount: number;
-  referralCount: number;
+  referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string }>;
+  referralBonus: number;
 }
 
 const providerLabels: Record<string, string> = {
@@ -94,7 +95,8 @@ export function SettingsForm({
   initialPushNotifications,
   isTwitterProviderAvailable,
   quizAnswerCount,
-  referralCount,
+  referredUsers,
+  referralBonus,
 }: SettingsFormProps) {
   const [name, setName] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
@@ -811,9 +813,15 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Referrals</h2>
           <p className={styles.sectionDescription}>
-            Share your referral link to invite friends. You&apos;ve referred{' '}
-            <strong>{referralCount}</strong> {referralCount === 1 ? 'person' : 'people'} so far.
+            Invite friends, get more podcasts. Each referral earns you +1 daily generation (up to +5).
           </p>
+
+          {referralBonus > 0 && (
+            <div className={styles.referralBonus}>
+              +{referralBonus} bonus daily {referralBonus === 1 ? 'generation' : 'generations'} earned
+            </div>
+          )}
+
           <div className={styles.referralRow}>
             <Input
               value={`sotto.fm/ref/${handle}`}
@@ -828,6 +836,39 @@ export function SettingsForm({
               Copy
             </Button>
           </div>
+
+          {referredUsers.length > 0 && (
+            <div className={styles.referralList}>
+              <h3 className={styles.referralListTitle}>
+                {referredUsers.length} {referredUsers.length === 1 ? 'person' : 'people'} joined via your link
+              </h3>
+              <ul className={styles.referralUsers}>
+                {referredUsers.map((user) => (
+                  <li key={user.handle ?? user.joinedAt} className={styles.referralUser}>
+                    {user.image ? (
+                      <Image
+                        src={user.image}
+                        alt=""
+                        width={28}
+                        height={28}
+                        className={styles.referralAvatar}
+                      />
+                    ) : (
+                      <span className={styles.referralAvatarFallback}>
+                        {(user.name || user.handle || '?')[0].toUpperCase()}
+                      </span>
+                    )}
+                    <span className={styles.referralName}>
+                      {user.name || `@${user.handle}`}
+                    </span>
+                    <span className={styles.referralDate}>
+                      {new Date(user.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
