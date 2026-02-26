@@ -17,7 +17,15 @@ interface LiveData {
 
 interface WorldHeatmapProps {
   initialData: LiveData;
+  range?: string;
 }
+
+const RANGE_LABELS: Record<string, string> = {
+  '15m': 'Active Now',
+  '1h': 'Last Hour',
+  '1d': 'Last 24 Hours',
+  '7d': 'Last 7 Days',
+};
 
 const POLL_INTERVAL_MS = 30_000;
 
@@ -41,14 +49,14 @@ function countryFlag(code: string): string {
   return String.fromCodePoint(code.charCodeAt(0) + offset, code.charCodeAt(1) + offset);
 }
 
-export function WorldHeatmap({ initialData }: WorldHeatmapProps) {
+export function WorldHeatmap({ initialData, range = '15m' }: WorldHeatmapProps) {
   const [data, setData] = useState<LiveData>(initialData);
   const [hoveredCountry, setHoveredCountry] = useState<CountryCount | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const fetchLive = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/analytics/live');
+      const res = await fetch(`/api/admin/analytics/live?range=${range}`);
       if (res.ok) {
         const json = await res.json();
         setData(json);
@@ -57,7 +65,7 @@ export function WorldHeatmap({ initialData }: WorldHeatmapProps) {
     } catch {
       // Silently retry on next interval
     }
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     const interval = setInterval(fetchLive, POLL_INTERVAL_MS);
@@ -139,7 +147,7 @@ export function WorldHeatmap({ initialData }: WorldHeatmapProps) {
 
       <div className={styles.sidebar}>
         <div className={styles.totalCard}>
-          <span className={styles.totalLabel}>Active Now</span>
+          <span className={styles.totalLabel}>{RANGE_LABELS[range] ?? 'Active Now'}</span>
           <span className={styles.totalValue}>{data.totalActive.toLocaleString()}</span>
           <span className={styles.totalMeta}>
             Updated {lastUpdated.toLocaleTimeString()}

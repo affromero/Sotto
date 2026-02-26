@@ -1,6 +1,10 @@
 /* Live Analytics Page */
 
 .container { composes: container from '../../admin.module.css'; }
+.headerRow { composes: headerRow from '../../admin.module.css'; }
 .header { composes: header from '../../admin.module.css'; }
 .title { composes: title from '../../admin.module.css'; }
 .subtitle { composes: subtitle from '../../admin.module.css'; }
+.rangeNav { composes: rangeNav from '../../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../../admin.module.css'; }
