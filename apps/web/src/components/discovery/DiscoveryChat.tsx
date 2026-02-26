@@ -24,7 +24,7 @@ const GREETING: DiscoveryMessage = {
   id: 'greeting',
   role: 'assistant',
   content:
-    "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore?",
+    "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore? You can also paste a URL — articles, YouTube videos, and more.",
   chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
   createdAt: new Date(0).toISOString(),
 };
@@ -240,7 +240,7 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, on
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Describe your podcast idea..."
+          placeholder="Describe a topic or paste a URL (articles, YouTube, videos)..."
           disabled={isLoading}
           aria-label="Chat message input"
           autoComplete="off"

@@ -102,7 +102,7 @@ export default function LandingPage() {
               <h3>Import Any Podcast</h3>
               <p>
                 Send straight from NotebookLM with our Chrome extension — one click, no download.
-                Or import from Spotify, Apple Podcasts, YouTube, or any audio file. Sotto adds
+                Or import from Spotify, Apple Podcasts, YouTube videos, or any audio file. Sotto adds
                 transcripts, social features, and interactive Q&amp;A on top.
               </p>
             </article>
@@ -824,7 +824,7 @@ export default function LandingPage() {
             <h2 className={styles.h2Light}>Tweet it. Message it. Done.</h2>
             <p className={styles.bodyLgLight}>
               Tag <strong>@sottofm</strong> on X or message <strong>@SottoFMBot</strong> on
-              Telegram to save a topic or URL as a podcast idea — then open Sotto to generate.
+              Telegram to save a topic, URL, or video as a podcast idea — then open Sotto to generate.
             </p>
           </div>
 
@@ -1123,7 +1123,7 @@ export default function LandingPage() {
                   >
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
-                  Save any topic or URL on the go
+                  Save any topic, URL, or video on the go
                 </div>
                 <div className={styles.tgFeature}>
                   <svg
@@ -1172,7 +1172,7 @@ export default function LandingPage() {
               <div className={styles.stepContent}>
                 <h3>Create or import</h3>
                 <p>
-                  Chat with Sotto to generate a multi-voice podcast from any topic. Or import from
+                  Chat with Sotto to generate a multi-voice podcast from any topic or video. Or import from
                   NotebookLM with our Chrome extension, Spotify, Apple Podcasts, YouTube — any
                   audio file works.
                 </p>
