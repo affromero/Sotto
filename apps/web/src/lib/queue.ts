@@ -629,3 +629,36 @@ export const voiceVerificationQueue = createQueue('voice-verification', { attemp
 export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
 export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
 export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1 });
+
+/** All queue names — single source of truth for admin and health endpoints */
+export const ALL_QUEUE_NAMES = [
+  'content-extraction',
+  'script-generation',
+  'script-verification',
+  'reference-validation',
+  'audio-generation',
+  'audio-stitching',
+  'interactions',
+  'segment-regeneration',
+  'notifications',
+  'pdf-generation',
+  'twitter-mentions',
+  'twitter-reply',
+  'event-ingestion',
+  'audio-import',
+  'feature-computation',
+  'data-export',
+  'key-validation',
+  'telegram-bot',
+  'telegram-reply',
+  'twitter-auto-tweet',
+  'twitter-trend-poll',
+  'admin-thread-to-podcast',
+  'content-moderation',
+  'email-digest',
+  'announcements',
+  'voice-verification',
+  'voice-track-audio',
+  'voice-track-stitching',
+  'draft-cleanup',
+] as const;
