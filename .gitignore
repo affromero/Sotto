@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+/app.json
 
 # Next.js
 .next/
