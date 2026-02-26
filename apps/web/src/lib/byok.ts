@@ -71,7 +71,7 @@ export function decryptApiKey(encoded: string): string {
 
 export interface ByokCredentials {
   apiKey: string;
-  userId?: string; // PlayHT requires this
+  userId?: string;
 }
 
 export interface ByokKeyInfo {
@@ -149,7 +149,7 @@ export async function getByokKey(userId: string, provider?: TtsProviderId): Prom
 }
 
 /**
- * Retrieve the extra credentials (e.g. PlayHT userId) for a provider.
+ * Retrieve the extra credentials for a provider.
  */
 export async function getByokExtraData(
   userId: string,

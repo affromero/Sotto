@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'kittentts';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'kittentts';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -94,42 +94,6 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
         try {
           const res = await fetch('https://api.openai.com/v1/models', {
             headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
-    },
-  },
-
-  playht: {
-    id: 'playht',
-    displayName: 'PlayHT',
-    getApiKeyUrl: 'https://play.ht/studio/api-access',
-    supportsSfx: false,
-    supportsVoiceCloning: true,
-    supportsStreaming: true,
-    maxSegmentChars: 5000,
-    defaultModel: 'premium',
-    models: [
-      { id: 'premium', displayName: 'Premium', tier: 'premium' },
-    ],
-    supportsAudioTags: false,
-    qualityTier: 'premium',
-    platformCostPerKChar: 0.2,
-    auth: {
-      fields: [
-        { key: 'apiKey', label: 'API Key', placeholder: 'Your PlayHT API key' },
-        { key: 'userId', label: 'User ID', placeholder: 'Your PlayHT User ID' },
-      ],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.play.ht/api/v2/voices', {
-            headers: {
-              Authorization: `Bearer ${creds.apiKey}`,
-              'X-USER-ID': creds.userId || '',
-            },
           });
           return res.ok;
         } catch {

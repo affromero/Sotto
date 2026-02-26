@@ -41,7 +41,6 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
     switch (providerId) {
       case 'elevenlabs': return !!process.env.ELEVENLABS_API_KEY;
       case 'openai': return !!process.env.OPENAI_API_KEY;
-      case 'playht': return !!(process.env.PLAYHT_API_KEY && process.env.PLAYHT_USER_ID);
       case 'cartesia': return !!process.env.CARTESIA_API_KEY;
       case 'hume': return !!process.env.HUME_API_KEY;
       case 'fal': return !!process.env.FAL_KEY;

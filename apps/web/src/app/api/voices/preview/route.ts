@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
     const byokKey = await getByokKey(session.user.id, ttsProviderId);
     const platformKey = provider === 'hume' ? process.env.HUME_API_KEY
       : provider === 'cartesia' ? process.env.CARTESIA_API_KEY
-      : provider === 'playht' ? process.env.PLAYHT_API_KEY
       : undefined;
     const apiKey = byokKey || platformKey;
 

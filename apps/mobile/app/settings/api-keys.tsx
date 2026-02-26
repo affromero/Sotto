@@ -30,7 +30,6 @@ const AI_PROVIDERS = [
 const TTS_PROVIDERS = [
   { id: 'elevenlabs', name: 'ElevenLabs', qualityTier: 'Premium' },
   { id: 'openai', name: 'OpenAI TTS', qualityTier: 'Standard' },
-  { id: 'playht', name: 'PlayHT', hasUserId: true, qualityTier: 'Premium' },
   { id: 'cartesia', name: 'Cartesia', qualityTier: 'Premium' },
   { id: 'hume', name: 'Hume', qualityTier: 'Ultra' },
   { id: 'fal', name: 'Fal (Qwen3-TTS)', qualityTier: 'Premium' },
@@ -52,27 +51,20 @@ function ProviderRow({
   isValid: boolean;
   isConfigured: boolean;
   qualityTier?: string;
-  hasUserId?: boolean;
   endpoint: string;
   onMutated: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [apiKey, setApiKey] = useState('');
-  const [userId, setUserId] = useState('');
   const [error, setError] = useState('');
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload: Record<string, string> = { provider: providerId, apiKey };
-      if (hasUserId && userId) {
-        payload.userId = userId;
-      }
-      await api.post(`/settings/${endpoint}`, payload);
+      await api.post(`/settings/${endpoint}`, { provider: providerId, apiKey });
     },
     onSuccess: () => {
       setExpanded(false);
       setApiKey('');
-      setUserId('');
       setError('');
       onMutated();
     },
@@ -173,17 +165,6 @@ function ProviderRow({
             autoCapitalize="none"
             autoCorrect={false}
           />
-          {hasUserId && (
-            <TextInput
-              style={[styles.keyInput, styles.keyInputExtra]}
-              value={userId}
-              onChangeText={setUserId}
-              placeholder="User ID (required for PlayHT)"
-              placeholderTextColor={colors.textTertiary}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          )}
           {error !== '' && (
             <Text style={styles.errorText}>{error}</Text>
           )}
@@ -304,7 +285,6 @@ export default function ApiKeysScreen() {
                         isConfigured={status.isConfigured}
                         isValid={status.isValid}
                         qualityTier={p.qualityTier}
-                        hasUserId={'hasUserId' in p ? p.hasUserId : undefined}
                         endpoint="byok"
                         onMutated={handleMutated}
                       />

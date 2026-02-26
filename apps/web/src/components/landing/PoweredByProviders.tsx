@@ -11,7 +11,6 @@ interface ProviderEntry {
 const VOICE_PROVIDERS: ProviderEntry[] = [
   { name: 'ElevenLabs', brand: '#1A1A2E' },
   { name: 'OpenAI', brand: '#10A37F' },
-  { name: 'PlayHT', brand: '#6C3AED' },
   { name: 'Cartesia', brand: '#38BDF8' },
   { name: 'Hume', brand: '#FF6B35' },
 ];
