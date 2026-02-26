@@ -26,10 +26,11 @@ export async function processAdminThreadToPodcast(
   await job.updateProgress(10);
 
   // 2. Fetch the tweet to get conversation_id
-  const tweet = await getTweet(tweetId);
-  if (!tweet) {
+  const tweetResult = await getTweet(tweetId);
+  if (!tweetResult) {
     throw new Error(`Tweet not found: ${tweetId}`);
   }
+  const tweet = tweetResult.tweet;
 
   await job.updateProgress(20);
 

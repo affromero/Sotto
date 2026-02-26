@@ -11,7 +11,7 @@ import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { logger } from '@/lib/logger';
-import type { TwitterTweet, TweetParseResult, ThreadData } from '@/types/twitter';
+import type { TwitterTweet, TwitterMedia, TweetParseResult, ThreadData } from '@/types/twitter';
 import type { ParticipantCredential } from '@/lib/credential-lookup';
 
 const REDIS_CURSOR_KEY = 'twitter:last_processed_tweet_id';
@@ -22,7 +22,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
   const redis = getRedisClient();
 
   const sinceId = await redis.get(REDIS_CURSOR_KEY);
-  const mentions = await getMentions(sinceId ?? undefined);
+  const { tweets: mentions, mediaByKey } = await getMentions(sinceId ?? undefined);
 
   if (mentions.length === 0) {
     return;
@@ -35,7 +35,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
 
   for (const tweet of sorted) {
     try {
-      await processSingleMention(tweet);
+      await processSingleMention(tweet, mediaByKey);
     } catch (err) {
       logger.error('Error processing tweet mention', {
         tweetId: tweet.id,
@@ -52,7 +52,7 @@ export async function processTwitterMentions(job: Job<PollTwitterMentionsPayload
   logger.info('Twitter mentions poll complete', { processed: String(sorted.length) });
 }
 
-async function processSingleMention(tweet: TwitterTweet): Promise<void> {
+async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMedia>): Promise<void> {
   // 1. Dedup: skip if we already have this tweet
   const existing = await prisma.tweetMention.findUnique({
     where: { tweetId: tweet.id },
@@ -173,9 +173,9 @@ async function processSingleMention(tweet: TwitterTweet): Promise<void> {
       let parentText: string | undefined;
       const parentTweetId = getParentTweetId(tweet);
       if (parentTweetId) {
-        const parentTweet = await getTweet(parentTweetId);
-        if (parentTweet) {
-          parentText = parentTweet.text;
+        const parentResult = await getTweet(parentTweetId);
+        if (parentResult) {
+          parentText = parentResult.tweet.text;
         }
       }
       parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);

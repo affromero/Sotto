@@ -74,7 +74,8 @@ describe('twitter', () => {
 
       const result = await getMentions();
 
-      expect(result).toEqual(mockTweets);
+      expect(result.tweets).toEqual(mockTweets);
+      expect(result.mediaByKey).toBeInstanceOf(Map);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/users/123456789/mentions'),
         expect.objectContaining({
@@ -107,7 +108,8 @@ describe('twitter', () => {
 
       const result = await getMentions();
 
-      expect(result).toEqual([]);
+      expect(result.tweets).toEqual([]);
+      expect(result.mediaByKey).toBeInstanceOf(Map);
     });
 
     it('throws error on API error response', async () => {
@@ -160,7 +162,8 @@ describe('twitter', () => {
       // This call should be blocked by rate limit
       const result = await getMentions();
 
-      expect(result).toEqual([]);
+      expect(result.tweets).toEqual([]);
+      expect(result.mediaByKey).toBeInstanceOf(Map);
       expect(mockFetch).not.toHaveBeenCalled();
 
       // Reset rate limit for subsequent tests by making a successful call with good limits
@@ -187,6 +190,9 @@ describe('twitter', () => {
       expect(url).toContain('created_at');
       expect(url).toContain('conversation_id');
       expect(url).toContain('entities');
+      expect(url).toContain('attachments');
+      expect(url).toContain('expansions=attachments.media_keys');
+      expect(url).toContain('media.fields=');
     });
   });
 
@@ -207,7 +213,8 @@ describe('twitter', () => {
 
       const result = await getTweet('tweet-123');
 
-      expect(result).toEqual(mockTweet);
+      expect(result?.tweet).toEqual(mockTweet);
+      expect(result?.mediaByKey).toBeInstanceOf(Map);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/tweets/tweet-123'),
         expect.objectContaining({
@@ -883,7 +890,7 @@ describe('twitter', () => {
 
       const result = await getMentions();
 
-      expect(result).toEqual([]);
+      expect(result.tweets).toEqual([]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
