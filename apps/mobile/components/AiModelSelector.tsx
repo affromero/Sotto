@@ -20,12 +20,15 @@ interface AiModel {
   displayName: string;
   provider: string;
   tier: string;
+  requiredPlan: 'FREE' | 'PRO';
   isDefault: boolean;
 }
 
 interface AiModelsResponse {
   models: AiModel[];
   readOnly: boolean;
+  userPlan?: 'FREE' | 'PRO';
+  isByok?: boolean;
 }
 
 export function AiModelSelector({ value, onChange }: AiModelSelectorProps) {
@@ -49,13 +52,19 @@ export function AiModelSelector({ value, onChange }: AiModelSelectorProps) {
 
   if (!data?.models?.length) return null;
 
+  const userPlan = data.userPlan ?? 'FREE';
+  const isByok = data.isByok ?? false;
+  const isLocked = (m: AiModel) =>
+    m.requiredPlan === 'PRO' && userPlan === 'FREE' && !isByok;
+
   const options = [
     { id: AUTO_ID, label: 'Auto (recommended)' },
     ...data.models.map((m) => ({
       id: m.id,
       label: m.displayName,
-      badge: m.tier,
+      badge: isLocked(m) ? 'Pro' : m.tier,
       group: m.provider,
+      disabled: isLocked(m),
     })),
   ];
 
