@@ -83,6 +83,7 @@ const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 
     FAILED: 'error',
     IMPORTING: 'info',
     TRANSCRIBING: 'info',
+    DUPLICATE_REVIEW: 'warning',
   };
 
 function formatDate(dateString: string): string {

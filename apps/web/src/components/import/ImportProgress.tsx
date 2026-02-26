@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Upload, FileAudio, CheckCircle, XCircle, Loader2, Shield } from 'lucide-react';
+import { Upload, FileAudio, CheckCircle, XCircle, Loader2, Shield, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { MetadataSuggestion } from './MetadataSuggestion';
 import type { Podcast } from '@prisma/client';
@@ -61,7 +61,7 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
     const poll = async () => {
       const data = await fetchPodcast();
       if (!mounted) return;
-      if (data?.status === 'READY' || data?.status === 'FAILED') {
+      if (data?.status === 'READY' || data?.status === 'FAILED' || data?.status === 'DUPLICATE_REVIEW') {
         if (intervalId) clearInterval(intervalId);
       }
     };
@@ -151,17 +151,26 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
 
   const isFailed = podcast.status === 'FAILED';
   const isReady = podcast.status === 'READY';
+  const isUnderReview = podcast.status === 'DUPLICATE_REVIEW';
 
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <h2 className={styles.title}>{isReady ? 'Import Complete!' : 'Importing Podcast'}</h2>
+        <h2 className={styles.title}>
+          {isUnderReview
+            ? 'Import Under Review'
+            : isReady
+              ? 'Import Complete!'
+              : 'Importing Podcast'}
+        </h2>
         <p className={styles.subtitle}>
           {isFailed
             ? 'Something went wrong during import'
-            : isReady
-              ? 'Your podcast is ready to listen'
-              : 'Please wait while we process your audio file'}
+            : isUnderReview
+              ? 'Your podcast matched existing content and is being reviewed'
+              : isReady
+                ? 'Your podcast is ready to listen'
+                : 'Please wait while we process your audio file'}
         </p>
 
         <div className={styles.steps}>
@@ -223,6 +232,21 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
             >
               Start Over
             </Button>
+          </div>
+        )}
+
+        {isUnderReview && (
+          <div className={styles.failedSection}>
+            <Clock size={32} className={styles.loadingSpinner} style={{ animation: 'none', color: '#D97706' }} />
+            <p className={styles.failedMessage}>
+              Your imported podcast matched existing content on Sotto and has been flagged for admin review.
+              You will be notified once the review is complete.
+            </p>
+            <Link href="/dashboard" className={styles.listenLink}>
+              <Button variant="secondary" size="medium">
+                Back to Dashboard
+              </Button>
+            </Link>
           </div>
         )}
 
