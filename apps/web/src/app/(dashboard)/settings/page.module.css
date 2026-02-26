@@ -375,6 +375,17 @@
   margin-bottom: var(--spacing-md);
 }
 
+.referralBonus {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  margin-bottom: var(--spacing-md);
+}
+
 .referralRow {
   display: flex;
   gap: var(--spacing-sm);
@@ -383,6 +394,71 @@
 
 .referralRow input {
   flex: 1;
+}
+
+.referralList {
+  margin-top: var(--spacing-lg);
+}
+
+.referralListTitle {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-sm);
+}
+
+.referralUsers {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.referralUser {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) 0;
+}
+
+.referralAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.referralAvatarFallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: var(--text-body-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.referralName {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.referralDate {
+  font: var(--text-body-xs);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 
 /* Danger Zone */
