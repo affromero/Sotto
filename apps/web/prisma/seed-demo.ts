@@ -748,10 +748,159 @@ async function main() {
   }
   console.log(`  Created ${followPairs.length} follow relationships`);
 
+  // ── 9. Comments on Cryptography podcast ───────────────────────
+  const cryptoPodcast = podcasts[0];
+  if (cryptoPodcast) {
+    const commentAuthors = [
+      { user: createdUsers[0], content: 'The Enigma section was fascinating. I had no idea Turing\'s work saved that many lives.' },
+      { user: createdUsers[1], content: 'Would love a deep dive on post-quantum cryptography!' },
+      { user: createdUsers[2], content: 'Shared this with my CS class. Great explanation of RSA.' },
+    ];
+    for (const c of commentAuthors) {
+      await prisma.comment.create({
+        data: {
+          podcastId: cryptoPodcast.id,
+          userId: c.user.id,
+          content: c.content,
+        },
+      }).catch(() => {}); // ignore if already exists
+    }
+    console.log('  Created 3 comments on Cryptography podcast');
+  }
+
+  // ── 10. Likes on top 3 podcasts ──────────────────────────────
+  const likeUsers = createdUsers.slice(0, 5);
+  const likePodcasts = podcasts.slice(0, 3);
+  for (const podcast of likePodcasts) {
+    for (const user of likeUsers) {
+      await prisma.like.create({
+        data: { podcastId: podcast.id, userId: user.id },
+      }).catch(() => {}); // ignore @@unique constraint
+    }
+  }
+  console.log(`  Created likes from ${likeUsers.length} users on ${likePodcasts.length} podcasts`);
+
+  // ── 11. Set audioUrl on Cryptography podcast ──────────────────
+  if (cryptoPodcast) {
+    await prisma.podcast.update({
+      where: { id: cryptoPodcast.id },
+      data: { audioUrl: '/demo-audio.mp3' },
+    });
+    console.log('  Set audioUrl on Cryptography podcast');
+  }
+
+  // ── 12. SCRIPT_READY podcast — "The Psychology of Decision Making" ──
+  const scriptReadyTurns = [
+    { speaker: 'HOST', text: 'Welcome to Sotto. Today we\'re exploring something that affects every single decision you make — the psychology behind why we choose what we choose.' },
+    { speaker: 'EXPERT', text: 'And spoiler alert — most of those choices aren\'t nearly as rational as we think they are. Our brains use mental shortcuts called heuristics that often lead us astray.' },
+    { speaker: 'HOST', text: 'Let\'s start with one of the most famous: the anchoring effect.' },
+    { speaker: 'EXPERT', text: 'Anchoring is when the first piece of information you encounter disproportionately influences your judgment. In experiments, even random numbers can anchor people\'s estimates of completely unrelated quantities.' },
+    { speaker: 'HOST', text: 'That explains why retail stores show the "original price" crossed out next to the sale price.' },
+    { speaker: 'EXPERT', text: 'Exactly. The anchor makes the sale price feel like a bargain, even if it\'s still overpriced. Daniel Kahneman and Amos Tversky demonstrated this beautifully in their Nobel Prize-winning research.' },
+    { speaker: 'HOST', text: 'What about loss aversion? I\'ve heard we feel losses more intensely than gains.' },
+    { speaker: 'EXPERT', text: 'Roughly twice as intensely, according to prospect theory. Losing $100 feels about as bad as gaining $200 feels good. This asymmetry drives everything from investment behavior to why people stay in bad relationships.' },
+    { speaker: 'HOST', text: 'And then there\'s the paradox of choice — the idea that more options can actually make us less happy.' },
+    { speaker: 'EXPERT', text: 'Barry Schwartz showed that when faced with too many options, people either freeze and choose nothing, or they choose but feel less satisfied — always wondering if another option would have been better. It\'s the tyranny of abundance.' },
+  ];
+
+  const scriptReadyMarkdown = scriptReadyTurns
+    .map((t) => `**${t.speaker}:** ${t.text}`)
+    .join('\n\n');
+
+  let scriptReadyPodcast = await prisma.podcast.findFirst({
+    where: { title: 'The Psychology of Decision Making', userId: demoUser.id },
+  });
+
+  if (scriptReadyPodcast) {
+    scriptReadyPodcast = await prisma.podcast.update({
+      where: { id: scriptReadyPodcast.id },
+      data: {
+        status: 'SCRIPT_READY',
+        visibility: 'PUBLIC',
+        topic: 'Why we make irrational choices — anchoring, loss aversion, the paradox of choice, and the cognitive biases that shape our decisions.',
+      },
+    });
+  } else {
+    scriptReadyPodcast = await prisma.podcast.create({
+      data: {
+        userId: demoUser.id,
+        title: 'The Psychology of Decision Making',
+        topic: 'Why we make irrational choices — anchoring, loss aversion, the paradox of choice, and the cognitive biases that shape our decisions.',
+        status: 'SCRIPT_READY',
+        visibility: 'PUBLIC',
+        playCount: 0,
+        likeCount: 0,
+        forkCount: 0,
+        duration: 0,
+      },
+    });
+  }
+
+  // Upsert Script record
+  await prisma.script.upsert({
+    where: { podcastId: scriptReadyPodcast.id },
+    update: { turns: scriptReadyTurns, markdown: scriptReadyMarkdown },
+    create: {
+      podcastId: scriptReadyPodcast.id,
+      turns: scriptReadyTurns,
+      markdown: scriptReadyMarkdown,
+    },
+  });
+
+  // Tag it
+  if (tagMap['philosophy']) {
+    await prisma.podcastTag.create({
+      data: { podcastId: scriptReadyPodcast.id, tagId: tagMap['philosophy'] },
+    }).catch(() => {});
+  }
+  if (tagMap['science']) {
+    await prisma.podcastTag.create({
+      data: { podcastId: scriptReadyPodcast.id, tagId: tagMap['science'] },
+    }).catch(() => {});
+  }
+
+  console.log(`  Created SCRIPT_READY podcast: ${scriptReadyPodcast.id}`);
+
+  // ── 13. Activity entries ──────────────────────────────────────
+  const activityEntries = [
+    {
+      userId: demoUser.id,
+      type: 'PODCAST_CREATED',
+      targetId: cryptoPodcast?.id,
+      targetType: 'podcast',
+      metadata: { title: 'The Hidden History of Cryptography' },
+    },
+    {
+      userId: demoUser.id,
+      type: 'PODCAST_CREATED',
+      targetId: podcasts[1]?.id,
+      targetType: 'podcast',
+      metadata: { title: 'Understanding Quantum Computing' },
+    },
+    {
+      userId: createdUsers[0].id,
+      type: 'USER_FOLLOWED',
+      targetId: demoUser.id,
+      targetType: 'user',
+      metadata: { name: 'Alex Rivera' },
+    },
+    {
+      userId: demoUser.id,
+      type: 'PODCAST_CREATED',
+      targetId: scriptReadyPodcast.id,
+      targetType: 'podcast',
+      metadata: { title: 'The Psychology of Decision Making' },
+    },
+  ];
+  for (const entry of activityEntries) {
+    await prisma.activity.create({ data: entry }).catch(() => {});
+  }
+  console.log(`  Created ${activityEntries.length} activity entries`);
+
   console.log('\nDemo data seeded successfully!');
   console.log(`  Demo user:  ${demoUser.email} (${demoUser.id})`);
   console.log(`  Admin user: ${adminUser.email} (${adminUser.id})`);
-  console.log(`  Podcasts:   ${podcasts.length}`);
+  console.log(`  Podcasts:   ${podcasts.length + 1} (including SCRIPT_READY)`);
 }
 
 main()
