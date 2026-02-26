@@ -13,13 +13,16 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { email, twitterHandle, source } = parsed.data;
+  const { email, twitterHandle, source, wishlist } = parsed.data;
 
   // Upsert: if email already exists, just return success (no error to user)
   const entry = await prisma.waitlist.upsert({
     where: { email },
-    create: { email, twitterHandle, source },
-    update: { ...(twitterHandle ? { twitterHandle } : {}) },
+    create: { email, twitterHandle, source, wishlist },
+    update: {
+      ...(twitterHandle ? { twitterHandle } : {}),
+      ...(wishlist ? { wishlist } : {}),
+    },
   });
 
   // Send welcome email for new signups (fire-and-forget)
