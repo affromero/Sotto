@@ -41,6 +41,7 @@ export interface TrafficSection {
   avgPagesPerSession: number;
   topPages: Array<{ url: string; count: number }>;
   referrers: Array<{ referrer: string; count: number }>;
+  countries: Array<{ country: string; count: number }>;
   devices: Array<{ type: string; count: number }>;
   dailyVisitors: Array<{ day: string; count: number }>;
 }
@@ -230,11 +231,12 @@ export async function buildTrafficReport(
   const terminalStatuses = ['READY', 'FAILED'] as const;
 
   const [
-    // === Traffic (7) ===
+    // === Traffic (8) ===
     pageViews,
     uniqueVisitors,
     topPages,
     referrers,
+    countries,
     devices,
     dailyVisitors,
     avgPages,
@@ -368,6 +370,13 @@ export async function buildTrafficReport(
       where: { startedAt: { gte: since }, referrer: { not: null } },
       _count: true,
       orderBy: { _count: { referrer: 'desc' } },
+      take: 15,
+    }),
+    prisma.userSession.groupBy({
+      by: ['country'],
+      where: { startedAt: { gte: since }, country: { not: null } },
+      _count: true,
+      orderBy: { _count: { country: 'desc' } },
       take: 15,
     }),
     prisma.userSession.groupBy({
@@ -868,6 +877,10 @@ export async function buildTrafficReport(
       referrers: referrers.map((r) => ({
         referrer: r.referrer ?? 'Direct',
         count: r._count,
+      })),
+      countries: countries.map((c) => ({
+        country: c.country ?? 'Unknown',
+        count: c._count,
       })),
       devices: devices.map((d) => ({
         type: d.deviceType ?? 'Unknown',
