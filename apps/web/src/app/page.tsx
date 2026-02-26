@@ -4,6 +4,7 @@ import { LandingNav } from '@/components/landing/LandingNav';
 import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
 import { AuthCTA } from '@/components/landing/AuthCTA';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
+import { JsonLd } from '@/components/landing/JsonLd';
 import styles from './page.module.css';
 
 const VOICE_TRAITS = [
@@ -21,6 +22,7 @@ export default function LandingPage() {
   return (
     <WaitlistProvider>
     <LandingShell revealClassName={styles.rev} visibleClassName={styles.vis}>
+      <JsonLd />
       <LandingNav />
 
       {/* ====== HERO ====== */}
