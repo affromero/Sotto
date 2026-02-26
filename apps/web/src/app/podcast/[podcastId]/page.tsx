@@ -7,6 +7,7 @@ import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
 import { PodcastJsonLd } from '@/components/player/PodcastJsonLd';
+import { JoinCTA } from '@/components/referral/JoinCTA';
 import styles from './page.module.css';
 
 interface PodcastPageProps {
@@ -355,6 +356,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       )}
       <div className={styles.container}>
         <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
+        {!userId && podcast.visibility === 'PUBLIC' && (
+          <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
+        )}
       </div>
     </main>
   );

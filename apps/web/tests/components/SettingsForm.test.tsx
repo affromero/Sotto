@@ -39,7 +39,8 @@ const defaultProps = {
   ttsProviderMeta: [],
   isTwitterProviderAvailable: false,
   quizAnswerCount: 0,
-  referralCount: 0,
+  referredUsers: [],
+  referralBonus: 0,
   initialEmailNotifications: true,
   initialPushNotifications: true,
 };

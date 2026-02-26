@@ -86,7 +86,8 @@ export type NotificationType =
   | 'VOICE_OWNERSHIP_ALERT'
   | 'VOICE_TRACK_FAILED'
   | 'VOICE_TRACK_READY'
-  | 'PIPELINE_FAILURE';
+  | 'PIPELINE_FAILURE'
+  | 'REFERRAL_SIGNUP';
 
 export type ReportReason =
   | 'HARASSMENT'

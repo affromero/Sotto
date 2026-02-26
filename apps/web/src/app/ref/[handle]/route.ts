@@ -13,6 +13,7 @@ export async function GET(
   });
 
   const response = NextResponse.redirect(new URL('/auth/signup', request.url));
+  response.headers.set('Cache-Control', 'private, no-store');
 
   if (user) {
     response.cookies.set('sotto_ref', handle.toLowerCase(), {

@@ -47,6 +47,12 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+const mockGetActiveReferralCount = vi.fn().mockResolvedValue(0);
+vi.mock('@/lib/referrals', () => ({
+  getReferralBonus: (count: number) => Math.min(count, 5),
+  getActiveReferralCount: (...args: unknown[]) => mockGetActiveReferralCount(...args),
+}));
+
 // ---- Import under test ----
 import { checkGenerationGate, tryIncrementFreeGeneration, getFreeTierStatus } from '@/lib/generation-gate';
 
@@ -75,6 +81,7 @@ describe('checkGenerationGate', () => {
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
+    mockGetActiveReferralCount.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -221,6 +228,34 @@ describe('checkGenerationGate', () => {
     expect(result.resetInSeconds).toBe(7200);
   });
 
+  it('adds referral bonus to daily limit for free users', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 2, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockGetActiveReferralCount.mockResolvedValue(3);
+    mockRedisGet.mockResolvedValue('2'); // 2 < 4 (1 base + 3 referral bonus)
+    mockRedisTtl.mockResolvedValue(-1);
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(true);
+    expect(result.dailyLimit).toBe(4); // 1 base + 3 referral bonus
+  });
+
+  it('caps referral bonus at 5', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockGetActiveReferralCount.mockResolvedValue(20);
+    mockRedisGet.mockResolvedValue('0');
+    mockRedisTtl.mockResolvedValue(-1);
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(true);
+    expect(result.dailyLimit).toBe(6); // 1 base + 5 cap
+  });
+
   it('falls through to global config when dailyGenerationOverride is null', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
@@ -294,6 +329,7 @@ describe('getFreeTierStatus', () => {
     process.env = { ...ORIGINAL_ENV, ELEVENLABS_API_KEY: 'test-key' };
     mockRedisGet.mockResolvedValue('0');
     mockRedisTtl.mockResolvedValue(-1);
+    mockGetActiveReferralCount.mockResolvedValue(0);
   });
 
   afterEach(() => {

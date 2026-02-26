@@ -3,6 +3,7 @@ import { hasByokKey } from './byok';
 import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
 import { getRedisClient } from './redis';
 import { logger } from './logger';
+import { getReferralBonus, getActiveReferralCount } from './referrals';
 
 export interface ProviderQuotaStatus {
   provider: string;
@@ -87,9 +88,15 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const isProUser = user.plan === 'PRO';
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
 
-  // Effective daily limit: per-user override takes precedence over global config
-  const effectiveDailyLimit =
+  const baseLimit =
     user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+
+  // Only compute referral bonus for free users (BYOK/PRO/Admin bypass early below)
+  const referralBonus =
+    isByokUser || isProUser || isPrivileged
+      ? 0
+      : getReferralBonus(await getActiveReferralCount(userId));
+  const effectiveDailyLimit = baseLimit + referralBonus;
 
   const baseResult = {
     freeGenerationsUsed: user.freeGenerationsUsed,
@@ -239,8 +246,14 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const isPrivileged = user.role === 'ADMIN' || user.role === 'SYSTEM';
   const isProUser = user.plan === 'PRO';
 
-  const effectiveDailyLimit =
+  const baseLimit =
     user.dailyGenerationOverride !== null ? user.dailyGenerationOverride : config.dailyGenerationLimit;
+
+  const referralBonus =
+    isByokUser || isPrivileged || isProUser
+      ? 0
+      : getReferralBonus(await getActiveReferralCount(userId));
+  const effectiveDailyLimit = baseLimit + referralBonus;
 
   const base = {
     freeGenerationsUsed: user.freeGenerationsUsed,
