@@ -36,6 +36,9 @@ describe('getTwitterConfig', () => {
       maxTrendPodcastsPerDay: 5,
       trendSearchQueries: ['AI', 'crypto'],
       tweetTemplate: 'Check out: {{title}}',
+      defaultAiModel: 'claude-sonnet-4-6',
+      defaultTtsProvider: 'elevenlabs',
+      defaultTtsModel: 'eleven_v3',
       updatedAt: new Date(),
       updatedBy: null,
     };
@@ -53,6 +56,9 @@ describe('getTwitterConfig', () => {
       maxTrendPodcastsPerDay: 5,
       trendSearchQueries: ['AI', 'crypto'],
       tweetTemplate: 'Check out: {{title}}',
+      defaultAiModel: 'claude-sonnet-4-6',
+      defaultTtsProvider: 'elevenlabs',
+      defaultTtsModel: 'eleven_v3',
     });
   });
 
@@ -67,6 +73,9 @@ describe('getTwitterConfig', () => {
       maxTrendPodcastsPerDay: 3,
       trendSearchQueries: ['AI', 'science', 'technology'],
       tweetTemplate: 'New on Sotto: {{title}}\n\n{{topic}}\n\nListen: {{url}}',
+      defaultAiModel: null,
+      defaultTtsProvider: null,
+      defaultTtsModel: null,
     });
 
     await getTwitterConfig();
@@ -96,6 +105,9 @@ describe('getTwitterConfig', () => {
       maxTrendPodcastsPerDay: 3,
       trendSearchQueries: [],
       tweetTemplate: 'test',
+      defaultAiModel: null,
+      defaultTtsProvider: null,
+      defaultTtsModel: null,
       updatedAt: new Date(),
       updatedBy: 'admin-123',
     });

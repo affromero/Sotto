@@ -515,6 +515,9 @@ export const twitterConfigUpdateSchema = z.object({
   maxTrendPodcastsPerDay: z.number().int().min(1).max(20).optional(),
   trendSearchQueries: z.array(z.string().min(1).max(100)).min(1).max(20).optional(),
   tweetTemplate: z.string().min(10).max(500).optional(),
+  defaultAiModel: z.string().max(100).nullable().optional(),
+  defaultTtsProvider: z.string().max(100).nullable().optional(),
+  defaultTtsModel: z.string().max(100).nullable().optional(),
 });
 
 /**
