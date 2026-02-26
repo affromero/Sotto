@@ -478,6 +478,62 @@ export async function postTweet(text: string): Promise<string> {
 }
 
 /**
+ * Send a direct message to a Twitter user.
+ * Uses Twitter API v2 POST /2/dm_conversations/with/:participant_id/messages.
+ * Requires Pro tier API access — fails gracefully if unavailable.
+ * Returns the DM event ID on success, or null if DMs are unsupported/blocked.
+ */
+export async function sendDirectMessage(
+  participantId: string,
+  text: string
+): Promise<string | null> {
+  const url = `${TWITTER_API_BASE}/dm_conversations/with/${participantId}/messages`;
+  const body = JSON.stringify({ text });
+
+  const authHeader = await generateOAuthHeader('POST', url);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+
+    if (response.status === 403 || response.status === 401) {
+      logger.info('DM not available — user may have DMs closed or API tier insufficient', {
+        participantId,
+        status: String(response.status),
+      });
+      return null;
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.warn('Failed to send DM', {
+        participantId,
+        status: String(response.status),
+        error: errorText,
+      });
+      return null;
+    }
+
+    const data = await response.json();
+    const eventId = data.data?.dm_event_id as string;
+    logger.info('Sent DM', { participantId, eventId });
+    return eventId;
+  } catch (err) {
+    logger.warn('DM send error', {
+      participantId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
  * Search for popular recent tweets matching a query.
  * Uses Twitter API v2 GET /2/tweets/search/recent with relevancy sorting.
  */
