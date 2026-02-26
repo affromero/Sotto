@@ -1,9 +1,10 @@
-'use client';
-
-import { useEffect, useState, useCallback, useRef, FormEvent } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { LandingShell } from '@/components/landing/LandingShell';
+import { LandingNav } from '@/components/landing/LandingNav';
+import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
+import { AuthCTA } from '@/components/landing/AuthCTA';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
+import { JsonLd } from '@/components/landing/JsonLd';
 import styles from './page.module.css';
 
 const VOICE_TRAITS = [
@@ -17,156 +18,12 @@ const VOICE_TRAITS = [
   { trait: 'Warm & approachable', accent: 'Australian', icon: '\u2B50' },
 ];
 
-const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
-const MAX_RIPPLES = 3;
-
 export default function LandingPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const [navSolid, setNavSolid] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [waitlistEmail, setWaitlistEmail] = useState('');
-  const [waitlistTwitter, setWaitlistTwitter] = useState('');
-  const [waitlistSubmitted, setWaitlistSubmitted] = useState(false);
-  const [waitlistLoading, setWaitlistLoading] = useState(false);
-  const [waitlistError, setWaitlistError] = useState('');
-  const pageRef = useRef<HTMLDivElement>(null);
-  const activeRipples = useRef(0);
-
-  const handlePageClick = useCallback((e: MouseEvent) => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    if ((e.target as HTMLElement).closest(INTERACTIVE_SELECTOR)) return;
-    if (activeRipples.current >= MAX_RIPPLES) return;
-
-    const container = pageRef.current;
-    if (!container) return;
-
-    const ripple = document.createElement('div');
-    ripple.className = styles.ripple;
-    ripple.setAttribute('aria-hidden', 'true');
-    ripple.style.setProperty('--ripple-x', `${e.pageX}px`);
-    ripple.style.setProperty('--ripple-y', `${e.pageY}px`);
-
-    activeRipples.current += 1;
-    container.appendChild(ripple);
-
-    let removed = false;
-    const cleanup = () => {
-      if (removed) return;
-      removed = true;
-      ripple.remove();
-      activeRipples.current -= 1;
-    };
-
-    ripple.addEventListener('animationend', cleanup, { once: true });
-    setTimeout(cleanup, 2500);
-  }, []);
-
-  useEffect(() => {
-    const onScroll = () => setNavSolid(window.scrollY > 60);
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add(styles.vis);
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
-    );
-    document.querySelectorAll(`.${styles.rev}`).forEach((el) => observer.observe(el));
-
-    const pageEl = pageRef.current;
-    if (pageEl) {
-      pageEl.addEventListener('click', handlePageClick);
-    }
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      observer.disconnect();
-      if (pageEl) {
-        pageEl.removeEventListener('click', handlePageClick);
-      }
-    };
-  }, [handlePageClick]);
-
-  async function handleWaitlistSubmit(e: FormEvent, source: string) {
-    e.preventDefault();
-    setWaitlistError('');
-    setWaitlistLoading(true);
-    try {
-      const res = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: waitlistEmail,
-          twitterHandle: waitlistTwitter || undefined,
-          source,
-        }),
-      });
-      if (res.ok) {
-        setWaitlistSubmitted(true);
-      } else {
-        setWaitlistError('Something went wrong. Please try again.');
-      }
-    } catch {
-      setWaitlistError('Something went wrong. Please try again.');
-    } finally {
-      setWaitlistLoading(false);
-    }
-  }
-
   return (
-    <div ref={pageRef} className={styles.page}>
-      {/* ====== NAV ====== */}
-      <nav
-        className={`${styles.nav} ${navSolid ? styles.navSolid : ''}`}
-        role="navigation"
-        aria-label="Main"
-      >
-        <div className={styles.navInner}>
-          <Link href="/" className={styles.navLogo} aria-label="Sotto home">
-            Sotto
-          </Link>
-          <div className={`${styles.navLinks} ${menuOpen ? styles.navLinksOpen : ''}`}>
-            <a href="#features" onClick={() => setMenuOpen(false)}>
-              Features
-            </a>
-            <Link href="/voices" onClick={() => setMenuOpen(false)}>
-              Voices
-            </Link>
-          </div>
-          <div className={styles.navRight}>
-            <Link href="/feed" className={styles.navCta}>
-              Explore Feed
-            </Link>
-            {!authLoading && (
-              isAuthenticated ? (
-                <Link href="/dashboard" className={styles.navSign}>
-                  Dashboard
-                </Link>
-              ) : (
-                <Link href="/auth/login" className={styles.navSign}>
-                  Sign In
-                </Link>
-              )
-            )}
-            <button
-              type="button"
-              className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ''}`}
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              aria-expanded={menuOpen}
-            >
-              <span />
-              <span />
-              <span />
-            </button>
-          </div>
-        </div>
-      </nav>
+    <WaitlistProvider>
+    <LandingShell revealClassName={styles.rev} visibleClassName={styles.vis}>
+      <JsonLd />
+      <LandingNav />
 
       {/* ====== HERO ====== */}
       <section className={styles.hero} aria-label="Introduction">
@@ -185,50 +42,7 @@ export default function LandingPage() {
             AI or human &mdash; create, discover, interrupt, fork, and remix.
             The social podcast network.
           </p>
-          {isAuthenticated ? (
-            <div className={styles.heroCtas}>
-              <Link href="/feed" className={styles.btnPrimary}>
-                Explore the Feed
-              </Link>
-              <Link href="/dashboard" className={styles.btnGhost}>
-                Dashboard
-              </Link>
-            </div>
-          ) : waitlistSubmitted ? (
-            <div className={styles.waitlistSuccess}>
-              You&apos;re on the list! We&apos;ll email you when your spot is ready.
-            </div>
-          ) : (
-            <div className={styles.waitlistFormWrap}>
-              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'hero')}>
-                <input
-                  className={styles.waitlistInput}
-                  type="email"
-                  placeholder="your@email.com"
-                  value={waitlistEmail}
-                  onChange={(e) => setWaitlistEmail(e.target.value)}
-                  required
-                  aria-label="Email address"
-                />
-                <input
-                  className={styles.waitlistInput}
-                  type="text"
-                  placeholder="@twitter (optional)"
-                  value={waitlistTwitter}
-                  onChange={(e) => setWaitlistTwitter(e.target.value)}
-                  aria-label="Twitter handle"
-                />
-                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
-                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
-                </button>
-              </form>
-              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
-              <div className={styles.waitlistLinks}>
-                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
-                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
-              </div>
-            </div>
-          )}
+          <AuthCTA source="hero" />
         </div>
         <div className={styles.heroWave} aria-hidden="true">
           {Array.from({ length: 64 }, (_, i) => (
@@ -240,6 +54,7 @@ export default function LandingPage() {
       {/* ====== PILLARS ====== */}
       <section className={styles.section} id="features" aria-label="Key features">
         <div className={styles.inner}>
+          <h2 className={styles.srOnly}>Key Features</h2>
           <div className={styles.pillars}>
             <article className={`${styles.pillar} ${styles.rev}`}>
               <div className={styles.pIcon}>
@@ -802,7 +617,7 @@ export default function LandingPage() {
                 <div className={styles.forkOriginal}>
                   <div className={styles.forkCardLabel}>Original</div>
                   <div className={styles.forkCardContent}>
-                    <h4>How CRISPR Is Changing Medicine</h4>
+                    <p className={styles.forkCardTitle}>How CRISPR Is Changing Medicine</p>
                     <p className={styles.forkCardMeta}>by Dr. Sarah K. · 8 min · 342 listens</p>
                     <div className={styles.forkCardTags}>
                       <span>Biology</span>
@@ -834,7 +649,7 @@ export default function LandingPage() {
                     Your remix
                   </div>
                   <div className={styles.forkCardContent}>
-                    <h4>CRISPR for Cancer: The Ethical Debate</h4>
+                    <p className={styles.forkCardTitle}>CRISPR for Cancer: The Ethical Debate</p>
                     <p className={styles.forkCardMeta}>
                       Narrowed focus · Your voice · Updated sources
                     </p>
@@ -1719,55 +1534,12 @@ export default function LandingPage() {
         <div className={styles.ctaGlow} aria-hidden="true" />
         <div className={`${styles.ctaContent} ${styles.rev}`}>
           <h2 className={styles.ctaTitle}>
-            Create. Fork. <em>Share.</em>
+            Start creating <em>today.</em>
           </h2>
           <p className={styles.ctaSub}>
             AI or human &mdash; create, discover, interrupt, fork, and remix.
           </p>
-          {isAuthenticated ? (
-            <div className={styles.heroCtas}>
-              <Link href="/feed" className={styles.btnPrimary}>
-                Explore the Feed
-              </Link>
-              <Link href="/dashboard" className={styles.btnGhost}>
-                Dashboard
-              </Link>
-            </div>
-          ) : waitlistSubmitted ? (
-            <div className={styles.waitlistSuccess}>
-              You&apos;re on the list! We&apos;ll email you when your spot is ready.
-            </div>
-          ) : (
-            <div className={styles.waitlistFormWrap}>
-              <form className={styles.waitlistForm} onSubmit={(e) => handleWaitlistSubmit(e, 'cta')}>
-                <input
-                  className={styles.waitlistInput}
-                  type="email"
-                  placeholder="your@email.com"
-                  value={waitlistEmail}
-                  onChange={(e) => setWaitlistEmail(e.target.value)}
-                  required
-                  aria-label="Email address"
-                />
-                <input
-                  className={styles.waitlistInput}
-                  type="text"
-                  placeholder="@twitter (optional)"
-                  value={waitlistTwitter}
-                  onChange={(e) => setWaitlistTwitter(e.target.value)}
-                  aria-label="Twitter handle"
-                />
-                <button className={styles.waitlistSubmit} type="submit" disabled={waitlistLoading}>
-                  {waitlistLoading ? 'Joining...' : 'Join the Waitlist'}
-                </button>
-              </form>
-              {waitlistError && <p className={styles.waitlistError}>{waitlistError}</p>}
-              <div className={styles.waitlistLinks}>
-                <Link href="/feed" className={styles.waitlistLink}>Explore the Feed</Link>
-                <Link href="/auth/login" className={styles.waitlistLink}>Sign In</Link>
-              </div>
-            </div>
-          )}
+          <AuthCTA source="cta" />
         </div>
       </section>
 
@@ -1788,20 +1560,20 @@ export default function LandingPage() {
           </div>
           <div className={styles.footerCols}>
             <div>
-              <h4>Product</h4>
+              <strong className={styles.footerHeading}>Product</strong>
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
             </div>
             <div>
-              <h4>Company</h4>
-              <a href="/feedback" className={styles.footerFeedback}>
+              <strong className={styles.footerHeading}>Company</strong>
+              <Link href="/feedback" className={styles.footerFeedback}>
                 Share Feedback
-              </a>
-              <a href="/about">About</a>
-              <a href="/privacy">Privacy</a>
-              <a href="/terms">Terms</a>
-              <a href="/join">Join Us</a>
+              </Link>
+              <Link href="/about">About</Link>
+              <Link href="/privacy">Privacy</Link>
+              <Link href="/terms">Terms</Link>
+              <Link href="/join">Join Us</Link>
             </div>
           </div>
         </div>
@@ -1809,6 +1581,7 @@ export default function LandingPage() {
           &copy; {new Date().getFullYear()} Sotto. All rights reserved.
         </div>
       </footer>
-    </div>
+    </LandingShell>
+    </WaitlistProvider>
   );
 }

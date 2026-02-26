@@ -3,12 +3,6 @@
    Design System: "Warm Intimacy" — dark hero, cream body, amber accents
    ========================================================================== */
 
-.page {
-  position: relative;
-  overflow-x: hidden;
-  background: var(--color-background);
-}
-
 /* ==========================================================================
    SCROLL REVEAL ANIMATION
    ========================================================================== */
@@ -34,184 +28,6 @@
 }
 .d3 {
   transition-delay: 360ms;
-}
-
-/* ==========================================================================
-   NAV
-   ========================================================================== */
-
-.nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: var(--z-sticky);
-  transition:
-    background var(--transition-base),
-    box-shadow var(--transition-base),
-    border-color var(--transition-base);
-  border-bottom: 1px solid transparent;
-}
-
-.navSolid {
-  background: var(--color-surface);
-  border-bottom-color: var(--color-border);
-  box-shadow: var(--shadow-sm);
-}
-
-.navInner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: var(--max-content-width);
-  margin: 0 auto;
-  padding: 0 var(--spacing-lg);
-  height: 64px;
-}
-
-.navLogo {
-  font-family: var(--font-heading);
-  font-size: 24px;
-  color: var(--color-text-inverse);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-  letter-spacing: -0.5px;
-  flex: 1;
-}
-
-.navSolid .navLogo {
-  color: var(--color-primary);
-}
-
-.navLinks {
-  display: flex;
-  gap: 32px;
-}
-
-.navLinks a {
-  font-size: 14px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-  letter-spacing: 0.01em;
-}
-
-.navLinks a:hover {
-  color: #fff;
-}
-
-.navSolid .navLinks a {
-  color: var(--color-text-secondary);
-}
-
-.navSolid .navLinks a:hover {
-  color: var(--color-text-primary);
-}
-
-.navRight {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  justify-content: flex-end;
-}
-
-.navSign {
-  display: inline-flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
-  text-decoration: none;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-lg);
-  transition:
-    color var(--transition-fast),
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.navSign:hover {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.navSolid .navSign {
-  color: var(--color-text-secondary);
-  border-color: var(--color-border);
-}
-
-.navSolid .navSign:hover {
-  color: var(--color-text-primary);
-  border-color: var(--color-text-tertiary);
-  background: var(--color-surface-hover);
-}
-
-.navCta {
-  display: inline-flex;
-  align-items: center;
-  height: 36px;
-  padding: 0 16px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: var(--radius-lg);
-  text-decoration: none;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast);
-}
-
-.navCta:hover {
-  background: var(--color-primary-hover);
-  color: #fff;
-  transform: translateY(-1px);
-}
-
-/* Hamburger */
-.burger {
-  display: none;
-  flex-direction: column;
-  justify-content: center;
-  gap: 5px;
-  width: 36px;
-  height: 36px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 6px;
-}
-
-.burger span {
-  display: block;
-  width: 100%;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 2px;
-  transition:
-    transform var(--transition-base),
-    opacity var(--transition-fast);
-}
-
-.navSolid .burger span {
-  background: var(--color-text-primary);
-}
-
-.burgerOpen span:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
-}
-
-.burgerOpen span:nth-child(2) {
-  opacity: 0;
-}
-
-.burgerOpen span:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
 }
 
 /* ==========================================================================
@@ -387,66 +203,6 @@
     transform: scale(1);
     opacity: 1;
   }
-}
-
-.heroCtas {
-  display: flex;
-  gap: 14px;
-  justify-content: center;
-  flex-wrap: wrap;
-  animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
-}
-
-/* ==========================================================================
-   BUTTONS
-   ========================================================================== */
-
-.btnPrimary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 52px;
-  padding: 0 28px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  border-radius: var(--radius-lg);
-  text-decoration: none;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
-}
-
-.btnPrimary:hover {
-  background: var(--color-primary-hover);
-  color: #fff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4);
-}
-
-.btnGhost {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 52px;
-  padding: 0 28px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 16px;
-  font-weight: 500;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  text-decoration: none;
-  transition: all var(--transition-fast);
-}
-
-.btnGhost:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.35);
-  color: #fff;
 }
 
 /* ==========================================================================
@@ -1670,7 +1426,7 @@
   padding: 18px 20px;
 }
 
-.forkCardContent h4 {
+.forkCardTitle {
   font-family: var(--font-heading);
   font-size: 17px;
   font-weight: 400;
@@ -2487,7 +2243,7 @@
   gap: 6px;
 }
 
-.footerCols h4 {
+.footerHeading {
   font: var(--text-caption);
   color: var(--color-text-tertiary);
   text-transform: uppercase;
@@ -2873,44 +2629,6 @@
 }
 
 @media (max-width: 768px) {
-  /* Nav */
-  .navLinks {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    flex-direction: column;
-    background: var(--color-surface);
-    padding: 12px var(--spacing-lg) 20px;
-    border-bottom: 1px solid var(--color-border);
-    box-shadow: var(--shadow-lg);
-    gap: 4px;
-  }
-
-  .navLinksOpen {
-    display: flex;
-  }
-
-  .navLinks a {
-    color: var(--color-text-primary);
-    padding: 10px 0;
-    font-size: 15px;
-  }
-
-  .navSign,
-  .navCta {
-    display: none;
-  }
-
-  .burger {
-    display: flex;
-  }
-
-  .navSolid .navLinks {
-    background: var(--color-surface);
-  }
-
   /* Hero */
   .hero {
     padding-top: 80px;
@@ -2938,10 +2656,6 @@
     padding: 7px 14px;
   }
 
-  .heroCtas {
-    flex-direction: column;
-    align-items: center;
-  }
 
   .btnPrimary,
   .btnGhost {
@@ -3163,51 +2877,6 @@
   }
 }
 
-/* ==========================================================================
-   CLICK RIPPLE EFFECT
-   ========================================================================== */
-
-.ripple {
-  position: absolute;
-  left: var(--ripple-x);
-  top: var(--ripple-y);
-  width: 0;
-  height: 0;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 1;
-  transform: translate(-50%, -50%);
-  animation: rippleExpand 2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  will-change: width, height, opacity, box-shadow;
-}
-
-@keyframes rippleExpand {
-  0% {
-    width: 0;
-    height: 0;
-    opacity: 1;
-    box-shadow:
-      0 0 0 0 rgba(217, 119, 6, 0.35),
-      0 0 0 0 rgba(217, 119, 6, 0.2),
-      0 0 0 0 rgba(217, 119, 6, 0.1);
-  }
-  50% {
-    opacity: 0.6;
-    box-shadow:
-      0 0 0 0 rgba(217, 119, 6, 0.18),
-      0 0 0 14px rgba(217, 119, 6, 0.12),
-      0 0 0 28px rgba(217, 119, 6, 0.06);
-  }
-  100% {
-    width: 500px;
-    height: 500px;
-    opacity: 0;
-    box-shadow:
-      0 0 0 0 rgba(217, 119, 6, 0),
-      0 0 0 20px rgba(217, 119, 6, 0),
-      0 0 0 40px rgba(217, 119, 6, 0);
-  }
-}
 
 /* ==========================================================================
    PREFERS REDUCED MOTION
@@ -3224,7 +2893,6 @@
   .badge,
   .heroTitle,
   .heroSub,
-  .heroCtas,
   .heroWave {
     animation: none;
     opacity: 1;
@@ -3319,120 +2987,6 @@
   white-space: nowrap;
 }
 
-.heroWaitlist {
-  animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.waitlistForm {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-}
-
-.waitlistFormLight {
-  /* Light variant needs no override — used for cream/white sections */
-}
-
-.waitlistInput {
-  flex: 1;
-  height: 52px;
-  padding: 0 18px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--radius-lg);
-  color: #fff;
-  font-size: 15px;
-  outline: none;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast);
-}
-
-.waitlistInput::placeholder {
-  color: rgba(255, 255, 255, 0.4);
-}
-
-.waitlistInput:focus {
-  border-color: var(--color-primary);
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.waitlistInputLight {
-  background: var(--color-background);
-  border-color: var(--color-border);
-  color: var(--color-text-primary);
-}
-
-.waitlistInputLight::placeholder {
-  color: var(--color-text-tertiary);
-}
-
-.waitlistInputLight:focus {
-  border-color: var(--color-primary);
-  background: var(--color-surface);
-}
-
-.waitlistBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 52px;
-  padding: 0 24px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  border-radius: var(--radius-lg);
-  border: none;
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
-}
-
-.waitlistBtn:hover {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(217, 119, 6, 0.4);
-}
-
-.waitlistBtn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.waitlistSuccess {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 20px;
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  border-radius: var(--radius-lg);
-  color: #34d399;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.waitlistSuccessLight {
-  color: var(--color-success);
-  background: rgba(16, 185, 129, 0.06);
-  border-color: rgba(16, 185, 129, 0.2);
-}
-
-.waitlistError {
-  width: 100%;
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #f87171;
-}
-
 /* Footer feedback link emphasis */
 .footerFeedback {
   font-weight: 600;
@@ -3443,192 +2997,4 @@
   color: var(--color-primary-hover) !important;
 }
 
-/* ==========================================================================
-   WAITLIST — RESPONSIVE
-   ========================================================================== */
 
-@media (max-width: 768px) {
-  .waitlistForm {
-    flex-direction: column;
-  }
-
-  .waitlistBtn {
-    width: 100%;
-  }
-}
-
-@media (max-width: 400px) {
-  .waitlistInput {
-    height: 48px;
-    font-size: 14px;
-  }
-
-  .waitlistBtn {
-    height: 48px;
-    font-size: 14px;
-  }
-}
-
-/* ==========================================================================
-   LANDING PRO CTA
-   ========================================================================== */
-
-.landingProCta {
-  display: flex;
-  gap: var(--spacing-md);
-  flex-wrap: wrap;
-  justify-content: center;
-  margin-top: var(--spacing-lg);
-}
-
-.landingProCtaPrimary {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.75rem 1.75rem;
-  background: var(--color-primary);
-  color: white;
-  border-radius: var(--radius-md);
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: opacity var(--transition-fast);
-}
-
-.landingProCtaPrimary:hover {
-  opacity: 0.9;
-}
-
-.landingProCtaSecondary {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.75rem 1.75rem;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: var(--radius-md);
-  font-size: 1rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition:
-    color var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.landingProCtaSecondary:hover {
-  color: white;
-  border-color: rgba(255, 255, 255, 0.6);
-}
-
-/* ==========================================================================
-   WAITLIST FORM (hero + CTA sections)
-   ========================================================================== */
-
-.waitlistFormWrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  animation: heroFadeIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
-}
-
-.waitlistForm {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 520px;
-  width: 100%;
-}
-
-.waitlistInput {
-  flex: 1;
-  min-width: 180px;
-  height: 48px;
-  padding: 0 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-lg);
-  color: #fff;
-  font-size: 15px;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-
-.waitlistInput::placeholder {
-  color: rgba(255, 255, 255, 0.45);
-}
-
-.waitlistInput:focus {
-  border-color: var(--color-primary);
-}
-
-.waitlistSubmit {
-  height: 48px;
-  padding: 0 24px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    transform var(--transition-fast);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
-  white-space: nowrap;
-}
-
-.waitlistSubmit:hover:not(:disabled) {
-  background: var(--color-primary-hover);
-  transform: translateY(-1px);
-}
-
-.waitlistSubmit:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.waitlistSuccess {
-  padding: 16px 24px;
-  background: rgba(217, 119, 6, 0.12);
-  border: 1px solid rgba(217, 119, 6, 0.3);
-  border-radius: var(--radius-lg);
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 15px;
-  font-weight: 500;
-  text-align: center;
-  animation: heroFadeIn 0.5s ease both;
-}
-
-.waitlistError {
-  color: #ef4444;
-  font-size: 13px;
-  margin: 0;
-}
-
-.waitlistLinks {
-  display: flex;
-  gap: 16px;
-  font-size: 13px;
-}
-
-.waitlistLink {
-  color: rgba(255, 255, 255, 0.55);
-  text-decoration: none;
-  transition: color var(--transition-fast);
-}
-
-.waitlistLink:hover {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-@media (max-width: 600px) {
-  .waitlistForm {
-    flex-direction: column;
-  }
-
-  .waitlistInput {
-    min-width: 0;
-  }
-}
