@@ -8,10 +8,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticPages = [
     '', '/feed', '/voices', '/about', '/join', '/terms',
-    '/privacy', '/changelog', '/developers', '/support', '/pricing',
+    '/privacy', '/changelog', '/developers', '/support', '/pricing', '/feedback',
   ].map((path) => ({
     url: `${baseUrl}${path}`,
-    lastModified: new Date('2025-01-01'),
+    lastModified: new Date(),
     changeFrequency: 'weekly' as const,
     priority: path === '' ? 1.0 : 0.8,
   }));
@@ -30,11 +30,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
-  const users = await prisma.user.findMany({
-    where: { handle: { not: null } },
-    select: { handle: true, updatedAt: true },
-    take: 5000,
-  });
+  const [users, collections] = await Promise.all([
+    prisma.user.findMany({
+      where: { handle: { not: null } },
+      select: { handle: true, updatedAt: true },
+      take: 5000,
+    }),
+    prisma.collection.findMany({
+      where: { isPublic: true },
+      select: { id: true, updatedAt: true },
+      take: 5000,
+    }),
+  ]);
 
   const profilePages = users.map((u) => ({
     url: `${baseUrl}/@${u.handle}`,
@@ -43,5 +50,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticPages, ...podcastPages, ...profilePages];
+  const collectionPages = collections.map((c) => ({
+    url: `${baseUrl}/collections/${c.id}`,
+    lastModified: c.updatedAt,
+    changeFrequency: 'weekly' as const,
+    priority: 0.5,
+  }));
+
+  return [...staticPages, ...podcastPages, ...profilePages, ...collectionPages];
 }

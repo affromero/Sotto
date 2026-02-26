@@ -20,7 +20,10 @@ interface PageProps {
   searchParams: Promise<{ range?: string }>;
 }
 
-export const metadata = { title: 'Podcast Analytics' };
+export const metadata = {
+  title: 'Podcast Analytics',
+  robots: { index: false, follow: false },
+};
 
 function formatHours(hours: number): string {
   if (hours < 1) return `${Math.round(hours * 60)}m`;
