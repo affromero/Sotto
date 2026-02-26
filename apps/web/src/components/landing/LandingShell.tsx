@@ -73,8 +73,8 @@ export function LandingShell({ children, revealClassName, visibleClassName }: La
   }, [handleClick, revealClassName, visibleClassName]);
 
   return (
-    <div ref={shellRef} className={styles.shell}>
+    <main ref={shellRef} className={styles.shell}>
       {children}
-    </div>
+    </main>
   );
 }

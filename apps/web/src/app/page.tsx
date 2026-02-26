@@ -54,6 +54,7 @@ export default function LandingPage() {
       {/* ====== PILLARS ====== */}
       <section className={styles.section} id="features" aria-label="Key features">
         <div className={styles.inner}>
+          <h2 className={styles.srOnly}>Key Features</h2>
           <div className={styles.pillars}>
             <article className={`${styles.pillar} ${styles.rev}`}>
               <div className={styles.pIcon}>
@@ -616,7 +617,7 @@ export default function LandingPage() {
                 <div className={styles.forkOriginal}>
                   <div className={styles.forkCardLabel}>Original</div>
                   <div className={styles.forkCardContent}>
-                    <h4>How CRISPR Is Changing Medicine</h4>
+                    <p className={styles.forkCardTitle}>How CRISPR Is Changing Medicine</p>
                     <p className={styles.forkCardMeta}>by Dr. Sarah K. · 8 min · 342 listens</p>
                     <div className={styles.forkCardTags}>
                       <span>Biology</span>
@@ -648,7 +649,7 @@ export default function LandingPage() {
                     Your remix
                   </div>
                   <div className={styles.forkCardContent}>
-                    <h4>CRISPR for Cancer: The Ethical Debate</h4>
+                    <p className={styles.forkCardTitle}>CRISPR for Cancer: The Ethical Debate</p>
                     <p className={styles.forkCardMeta}>
                       Narrowed focus · Your voice · Updated sources
                     </p>
@@ -1533,7 +1534,7 @@ export default function LandingPage() {
         <div className={styles.ctaGlow} aria-hidden="true" />
         <div className={`${styles.ctaContent} ${styles.rev}`}>
           <h2 className={styles.ctaTitle}>
-            Create. Fork. <em>Share.</em>
+            Start creating <em>today.</em>
           </h2>
           <p className={styles.ctaSub}>
             AI or human &mdash; create, discover, interrupt, fork, and remix.
@@ -1559,13 +1560,13 @@ export default function LandingPage() {
           </div>
           <div className={styles.footerCols}>
             <div>
-              <h4>Product</h4>
+              <strong className={styles.footerHeading}>Product</strong>
               <a href="#features">Features</a>
               <Link href="/voices">Voices</Link>
               <Link href="/feed">Feed</Link>
             </div>
             <div>
-              <h4>Company</h4>
+              <strong className={styles.footerHeading}>Company</strong>
               <a href="/feedback" className={styles.footerFeedback}>
                 Share Feedback
               </a>
