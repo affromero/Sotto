@@ -15,6 +15,7 @@
     "dev:web": "doppler run -- npm run dev:web --workspace=@sotto/web",
     "dev:workers": "doppler run -- npm run dev:workers --workspace=@sotto/web",
     "record": "NODE_PATH=apps/web/node_modules doppler run -- npx tsx scripts/recording/index.ts",
+    "narrate": "NODE_PATH=apps/web/node_modules doppler run -- npx tsx scripts/recording/narrate.ts",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "lint": "npm run lint --workspace=@sotto/web",
