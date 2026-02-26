@@ -53,13 +53,13 @@ async function main() {
 
   const voiceovers = [];
   for (const narration of ALL_NARRATIONS) {
-    const videoPath = path.join(GRADED_DIR, `${narration.flowName}.mp4`);
+    const videoPath = path.join(GRADED_DIR, `${narration.sourceFlowName}.mp4`);
     if (!fs.existsSync(videoPath)) {
-      console.log(`  Skipping ${narration.flowName} — no graded MP4 found`);
+      console.log(`  Skipping ${narration.flowName} — no graded MP4 (${narration.sourceFlowName})`);
       continue;
     }
 
-    console.log(`  Generating voiceover for ${narration.flowName}...`);
+    console.log(`  Generating voiceover for ${narration.flowName} (source: ${narration.sourceFlowName})...`);
     const voiceover = await generateFlowVoiceover(narration, VOICEOVER_DIR, apiKey);
     voiceovers.push(voiceover);
     console.log(`  Done: ${voiceover.segments.length} segments\n`);
@@ -70,7 +70,9 @@ async function main() {
 
   const results = [];
   for (const voiceover of voiceovers) {
-    const videoPath = path.join(GRADED_DIR, `${voiceover.flowName}.mp4`);
+    const narration = ALL_NARRATIONS.find((n) => n.flowName === voiceover.flowName);
+    const sourceFlowName = narration?.sourceFlowName ?? voiceover.flowName;
+    const videoPath = path.join(GRADED_DIR, `${sourceFlowName}.mp4`);
 
     console.log(`  Compositing ${voiceover.flowName}...`);
     const result = await compositeNarratedVideo({

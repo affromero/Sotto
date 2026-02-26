@@ -18,17 +18,52 @@ export interface NarrationSegment {
 }
 
 export interface FlowNarration {
+  /** Output name (determines narrated file name) */
   flowName: string;
+  /** Source graded MP4 name (may differ from flowName after reordering) */
+  sourceFlowName: string;
   /** Total video duration in seconds (from ffprobe) */
   videoDuration: number;
   segments: NarrationSegment[];
 }
 
-// ── Flow 01: Feed Browsing (8.28s) ───────────────────────────────
+// ── 01: Landing Page (12.56s) — the hook ─────────────────────────
+// Windows: 0.0→2.5 (2.5s), 2.5→5.0 (2.5s), 5.0→7.5 (2.5s), 7.5→10.0 (2.5s), 10.0→12.56 (2.56s)
+
+const landingPage: FlowNarration = {
+  flowName: '01-landing-page',
+  sourceFlowName: '06-landing-page',
+  videoDuration: 12.56,
+  segments: [
+    { startAt: 0.0, text: 'Sotto. Where podcasts get social.' },
+    { startAt: 2.5, text: 'Create from any topic.' },
+    { startAt: 5.0, text: 'Interrupt to ask questions.' },
+    { startAt: 7.5, text: 'Fork and remix.' },
+    { startAt: 10.0, text: 'Bring your own keys.' },
+  ],
+};
+
+// ── 02: Verification GitHub (10.80s) — trust & credibility ───────
+// Windows: 0.0→3.0 (3.0s), 3.0→5.5 (2.5s), 5.5→8.5 (3.0s), 8.5→10.8 (2.3s)
+
+const verificationGithub: FlowNarration = {
+  flowName: '02-verification-github',
+  sourceFlowName: '07-verification-github',
+  videoDuration: 10.8,
+  segments: [
+    { startAt: 0.0, text: 'Open source verification.' },
+    { startAt: 3.0, text: 'Every claim gets a trust score.' },
+    { startAt: 5.5, text: 'Bayesian scoring. Fully auditable.' },
+    { startAt: 8.5, text: 'Trust, built in the open.' },
+  ],
+};
+
+// ── 03: Feed Browsing (8.28s) ────────────────────────────────────
 // Windows: 0→2.3 (2.3s), 2.3→5.0 (2.7s), 5.0→6.8 (1.8s), 6.8→8.28 (1.5s)
 
 const feedBrowsing: FlowNarration = {
-  flowName: '01-feed-browsing',
+  flowName: '03-feed-browsing',
+  sourceFlowName: '01-feed-browsing',
   videoDuration: 8.28,
   segments: [
     { startAt: 0.0, text: 'The Sotto feed.' },
@@ -38,11 +73,12 @@ const feedBrowsing: FlowNarration = {
   ],
 };
 
-// ── Flow 02: Chat Creation (13.76s) ──────────────────────────────
+// ── 04: Chat Creation (13.76s) ───────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→7.0 (3.5s), 7.0→10.5 (3.5s), 10.5→13.76 (3.26s)
 
 const chatCreation: FlowNarration = {
-  flowName: '02-chat-creation',
+  flowName: '04-chat-creation',
+  sourceFlowName: '02-chat-creation',
   videoDuration: 13.76,
   segments: [
     { startAt: 0.3, text: 'Start with a topic.' },
@@ -52,11 +88,12 @@ const chatCreation: FlowNarration = {
   ],
 };
 
-// ── Flow 03: Player Interrupt (20.68s) ───────────────────────────
+// ── 05: Player Interrupt (20.68s) ────────────────────────────────
 // Windows: 0.3→4.0 (3.7s), 4.0→7.0 (3.0s), 7.0→11.0 (4.0s), 11.0→15.0 (4.0s), 15.0→18.5 (3.5s), 18.5→20.68 (2.18s)
 
 const playerInterrupt: FlowNarration = {
-  flowName: '03-player-interrupt',
+  flowName: '05-player-interrupt',
+  sourceFlowName: '03-player-interrupt',
   videoDuration: 20.68,
   segments: [
     { startAt: 0.3, text: 'Press play on any podcast.' },
@@ -68,11 +105,12 @@ const playerInterrupt: FlowNarration = {
   ],
 };
 
-// ── Flow 04: Fork Flow (10.28s) ──────────────────────────────────
+// ── 06: Fork Flow (10.28s) ───────────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.28 (3.78s)
 
 const forkFlow: FlowNarration = {
-  flowName: '04-fork-flow',
+  flowName: '06-fork-flow',
+  sourceFlowName: '04-fork-flow',
   videoDuration: 10.28,
   segments: [
     { startAt: 0.3, text: 'Fork any podcast.' },
@@ -81,11 +119,12 @@ const forkFlow: FlowNarration = {
   ],
 };
 
-// ── Flow 05: Script Review (10.36s) ──────────────────────────────
+// ── 07: Script Review (10.36s) ───────────────────────────────────
 // Windows: 0.3→3.5 (3.2s), 3.5→6.5 (3.0s), 6.5→10.36 (3.86s)
 
 const scriptReview: FlowNarration = {
-  flowName: '05-script-review',
+  flowName: '07-script-review',
+  sourceFlowName: '05-script-review',
   videoDuration: 10.36,
   segments: [
     { startAt: 0.3, text: 'Review every word first.' },
@@ -94,43 +133,14 @@ const scriptReview: FlowNarration = {
   ],
 };
 
-// ── Flow 06: Landing Page (12.56s) ───────────────────────────────
-// Windows: 0.0→2.5 (2.5s), 2.5→5.0 (2.5s), 5.0→7.5 (2.5s), 7.5→10.0 (2.5s), 10.0→12.56 (2.56s)
-
-const landingPage: FlowNarration = {
-  flowName: '06-landing-page',
-  videoDuration: 12.56,
-  segments: [
-    { startAt: 0.0, text: 'Sotto. Podcasts, reimagined.' },
-    { startAt: 2.5, text: 'Create from any topic.' },
-    { startAt: 5.0, text: 'Interrupt to ask questions.' },
-    { startAt: 7.5, text: 'Fork and remix.' },
-    { startAt: 10.0, text: 'Bring your own keys.' },
-  ],
-};
-
-// ── Flow 07: Verification GitHub (10.80s) ────────────────────────
-// Windows: 0.0→3.0 (3.0s), 3.0→5.5 (2.5s), 5.5→8.5 (3.0s), 8.5→10.8 (2.3s)
-
-const verificationGithub: FlowNarration = {
-  flowName: '07-verification-github',
-  videoDuration: 10.8,
-  segments: [
-    { startAt: 0.0, text: 'Open source verification.' },
-    { startAt: 3.0, text: 'Every claim gets a trust score.' },
-    { startAt: 5.5, text: 'Bayesian scoring. Fully auditable.' },
-    { startAt: 8.5, text: 'Trust, built in the open.' },
-  ],
-};
-
-// ── Export all ────────────────────────────────────────────────────
+// ── Export all (presentation order) ──────────────────────────────
 
 export const ALL_NARRATIONS: FlowNarration[] = [
+  landingPage,
+  verificationGithub,
   feedBrowsing,
   chatCreation,
   playerInterrupt,
   forkFlow,
   scriptReview,
-  landingPage,
-  verificationGithub,
 ];
