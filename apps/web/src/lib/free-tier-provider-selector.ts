@@ -9,7 +9,6 @@ const AI_TIER_RANK: Record<string, number> = { best: 0, balanced: 1, fast: 2 };
 const TTS_PLATFORM_KEY_ENVS: Record<string, string> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   openai: 'OPENAI_API_KEY',
-  playht: 'PLAYHT_API_KEY',
   cartesia: 'CARTESIA_API_KEY',
   hume: 'HUME_API_KEY',
   fal: 'FAL_KEY',

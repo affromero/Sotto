@@ -16,7 +16,7 @@ describe('classifyError', () => {
   });
 
   it('classifies fetch-based 429 as rate_limited', () => {
-    expect(classifyError('PlayHT API error (429): Too Many Requests')).toBe('rate_limited');
+    expect(classifyError('Cartesia API error (429): Too Many Requests')).toBe('rate_limited');
   });
 
   it('classifies fetch-based 500 as provider_error', () => {

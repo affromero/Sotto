@@ -8,7 +8,6 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
 export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
   elevenlabs: { label: 'ElevenLabs', shortLabel: 'ElevenLabs' },
   openai: { label: 'OpenAI TTS', shortLabel: 'OpenAI' },
-  playht: { label: 'PlayHT', shortLabel: 'PlayHT' },
   cartesia: { label: 'Cartesia', shortLabel: 'Cartesia' },
   hume: { label: 'Hume AI', shortLabel: 'Hume' },
   fal: { label: 'Fal (Qwen3-TTS)', shortLabel: 'Fal' },

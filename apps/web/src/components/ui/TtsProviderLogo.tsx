@@ -4,7 +4,7 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'playht' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'anthropic' | 'groq' | 'together' | 'deepgram' | 'assemblyai';
+  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'anthropic' | 'groq' | 'together' | 'deepgram' | 'assemblyai';
   size?: number;
   className?: string;
 }
@@ -39,13 +39,6 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
             stroke="#fff"
             strokeWidth="1.2"
           />
-        </svg>
-      );
-    case 'playht':
-      return (
-        <svg {...props}>
-          <rect width="24" height="24" rx="4" fill="#6C3AED" />
-          <path d="M9 6v12l8-6-8-6z" fill="#fff" />
         </svg>
       );
     case 'cartesia':
@@ -147,7 +140,6 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
 const PROVIDER_NAMES: Record<string, string> = {
   elevenlabs: 'ElevenLabs',
   openai: 'OpenAI',
-  playht: 'PlayHT',
   cartesia: 'Cartesia',
   hume: 'Hume AI',
   fal: 'Fal',
@@ -169,7 +161,7 @@ export function TtsProviderLogoRow({
   size?: number;
   className?: string;
 }) {
-  const providers = ['elevenlabs', 'openai', 'playht', 'cartesia', 'hume', 'fal', 'replicate'] as const;
+  const providers = ['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate'] as const;
   return (
     <div
       className={className}

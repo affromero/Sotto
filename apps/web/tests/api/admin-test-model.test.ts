@@ -34,7 +34,6 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-voices', () => ({
-  PLAYHT_VOICE_POOL: [{ id: 'playht-test-voice', name: 'Jennifer', gender: 'female', character: 'warm' }],
   CARTESIA_VOICE_POOL: [{ id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' }],
   HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
@@ -64,8 +63,6 @@ describe('POST /api/admin/test-model', () => {
     // Clear provider env vars so tests start from a known state
     vi.stubEnv('ELEVENLABS_API_KEY', '');
     vi.stubEnv('OPENAI_API_KEY', '');
-    vi.stubEnv('PLAYHT_API_KEY', '');
-    vi.stubEnv('PLAYHT_USER_ID', '');
     vi.stubEnv('CARTESIA_API_KEY', '');
     vi.stubEnv('HUME_API_KEY', '');
     vi.stubEnv('FAL_KEY', '');
@@ -226,38 +223,6 @@ describe('POST /api/admin/test-model', () => {
       expect(body.error).toBe('Platform API key not configured (check .env)');
     });
 
-    it('returns failure for PlayHT when the API key is missing', async () => {
-      vi.stubEnv('PLAYHT_USER_ID', 'user-123');
-      // PLAYHT_API_KEY is '' from beforeEach
-
-      const res = await POST(createRequest({ type: 'tts', provider: 'playht', model: 'premium' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('returns failure for PlayHT when userId is missing', async () => {
-      vi.stubEnv('PLAYHT_API_KEY', 'playht-key');
-      // PLAYHT_USER_ID is '' from beforeEach
-
-      const res = await POST(createRequest({ type: 'tts', provider: 'playht', model: 'premium' }));
-      const body = await res.json();
-
-      expect(body.success).toBe(false);
-      expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('passes PlayHT userId as extraData', async () => {
-      vi.stubEnv('PLAYHT_API_KEY', 'playht-key');
-      vi.stubEnv('PLAYHT_USER_ID', 'user-xyz');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
-
-      await POST(createRequest({ type: 'tts', provider: 'playht', model: 'premium' }));
-
-      expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith('playht', 'playht-key', { userId: 'user-xyz' }, 'premium');
-    });
-
     it('returns failure for KittenTTS when KITTENTTS_URL is not set', async () => {
       const res = await POST(createRequest({ type: 'tts', provider: 'kittentts', model: 'kitten-tts-mini-0.8' }));
       const body = await res.json();
@@ -393,22 +358,6 @@ describe('POST /api/admin/test-model', () => {
         );
       });
 
-      it('fetches extraData for PlayHT BYOK', async () => {
-        mockGetByokKey.mockResolvedValue('playht-byok-key');
-        mockGetByokExtraData.mockResolvedValue({ userId: 'playht-user-byok' });
-        mockGenerateSpeech.mockResolvedValue(Buffer.from('audio'));
-
-        await POST(createRequest({ type: 'tts', provider: 'playht', model: 'premium', keySource: 'byok' }));
-
-        expect(mockGetByokKey).toHaveBeenCalledWith('admin-1', 'playht');
-        expect(mockGetByokExtraData).toHaveBeenCalledWith('admin-1', 'playht');
-        expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith(
-          'playht',
-          'playht-byok-key',
-          { userId: 'playht-user-byok' },
-          'premium'
-        );
-      });
 
       it('returns failure when BYOK TTS key is not found', async () => {
         mockGetByokKey.mockResolvedValue(null);

@@ -113,19 +113,6 @@ describe('TTS Providers', () => {
     });
   });
 
-  describe('PlayHT', () => {
-    // BYOK-only — smoke test env vars
-    const hasPlayHT = !!(process.env.PLAYHT_API_KEY && process.env.PLAYHT_USER_ID);
-    it.skipIf(!hasPlayHT)('validates credentials', async () => {
-      const { validateProviderCredentials } = await import('@/lib/providers/tts-registry');
-      const valid = await validateProviderCredentials('playht', {
-        apiKey: process.env.PLAYHT_API_KEY!,
-        userId: process.env.PLAYHT_USER_ID!,
-      });
-      expect(valid).toBe(true);
-    });
-  });
-
   describe('Cartesia', () => {
     // BYOK-only — smoke test env vars
     it.skipIf(!process.env.CARTESIA_API_KEY)('validates credentials', async () => {
