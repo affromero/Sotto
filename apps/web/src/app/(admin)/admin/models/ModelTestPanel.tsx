@@ -21,6 +21,7 @@ interface TestResult {
   response?: string;
   audioData?: string;
   transcript?: string;
+  ttsSource?: string;
   error?: string;
 }
 
@@ -34,6 +35,7 @@ interface TestResponse {
   response?: string;
   audioData?: string;
   transcript?: string;
+  ttsSource?: string;
   error?: string;
 }
 
@@ -77,7 +79,14 @@ function ResultCell({ provider, result }: { provider: TestableProvider; result: 
       return <span className={styles.responseText}>{result.response}</span>;
     }
     if (provider.category === 'stt') {
-      return <span className={styles.responseText}>{result.transcript ?? '(silence — API reachable)'}</span>;
+      return (
+        <span className={styles.responseText}>
+          {result.transcript || '(empty transcript)'}
+          {result.ttsSource && (
+            <span className={styles.ttsSourceLabel}> via {result.ttsSource}</span>
+          )}
+        </span>
+      );
     }
   }
   return null;
@@ -216,6 +225,7 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kitten
           response: data.response,
           audioData: data.audioData,
           transcript: data.transcript,
+          ttsSource: data.ttsSource,
           error: data.error,
         });
       } catch (err) {
@@ -243,6 +253,7 @@ export function ModelTestPanel({ aiProviders, ttsProviders, sttProviders, kitten
               response: data.response,
               audioData: data.audioData,
               transcript: data.transcript,
+              ttsSource: data.ttsSource,
               error: data.error,
             });
           })
