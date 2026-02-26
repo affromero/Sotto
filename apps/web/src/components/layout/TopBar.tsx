@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { ThemeToggle } from './ThemeToggle';
 import styles from './TopBar.module.css';
 
 interface TopBarUser {
@@ -31,6 +32,7 @@ export function TopBar({ user }: TopBarProps) {
         <Link href="/create">Create</Link>
       </nav>
       <div className={styles.actions}>
+        <ThemeToggle />
         {user ? (
           <Link
             href="/dashboard"
