@@ -4,7 +4,7 @@ export interface FlowScenario {
   name: string;
   description: string;
   viewport: { width: number; height: number };
-  auth: 'none' | 'demo' | 'admin';
+  auth: 'none' | 'demo' | 'admin' | 'viewer';
   run: (page: Page, ctx: FlowContext) => Promise<void>;
 }
 

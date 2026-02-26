@@ -82,9 +82,14 @@ async function main() {
     console.log(`Crypto podcast:    ${cryptoPodcast.id}`);
     console.log(`ScriptReady:       ${scriptReadyPodcast.id}\n`);
 
+    // Find a non-owner user for fork flow
+    const viewerUser = await prisma.user.findUnique({ where: { email: 'maria.chen@example.com' } });
+    if (!viewerUser) throw new Error('Viewer user (Maria Chen) not found — run seed:demo first');
+
     // ── Create session tokens ───────────────────────────────────────
     const tokens: Record<string, string> = {
       demo: await createSessionToken(demoUser.id, demoUser.role, demoUser.name || 'Alex Rivera'),
+      viewer: await createSessionToken(viewerUser.id, viewerUser.role, viewerUser.name || 'Maria Chen'),
     };
 
     const ctx: FlowContext = {

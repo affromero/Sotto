@@ -62,7 +62,7 @@ export async function launchBrowser(): Promise<Browser> {
 export async function createRecordingContext(
   browser: Browser,
   viewport: { width: number; height: number },
-  auth: 'none' | 'demo' | 'admin',
+  auth: 'none' | 'demo' | 'admin' | 'viewer',
   tokens: Record<string, string>,
   videoDir: string
 ): Promise<BrowserContext> {

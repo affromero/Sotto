@@ -3,26 +3,36 @@ import { smoothScroll, humanClick, waitAndSettle } from '../lib/actions';
 import type { FlowScenario, FlowContext } from '../lib/types';
 
 async function run(page: Page, ctx: FlowContext): Promise<void> {
-  // Navigate to feed
-  await page.goto(`${ctx.appUrl}/feed`, { waitUntil: 'networkidle', timeout: 30000 });
-  await waitAndSettle(page, 'nav[aria-label="Filter by tag"]');
+  // Navigate to feed (domcontentloaded — feed may poll/stream)
+  await page.goto(`${ctx.appUrl}/feed`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // Wait for podcast cards to render
+  await page.locator('article').first().waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForTimeout(2000);
 
   // Scroll down to reveal more cards
   await smoothScroll(page, 400, 1000);
   await page.waitForTimeout(800);
 
-  // Click "Technology" tag chip
-  await humanClick(page, 'nav[aria-label="Filter by tag"] button:has-text("Technology")');
-  await page.waitForTimeout(1200);
+  // Click "Technology" tag chip (non-fatal if tags didn't render)
+  const techTag = page.locator('button:has-text("Technology")').first();
+  if (await techTag.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await humanClick(page, 'button:has-text("Technology")');
+    await page.waitForTimeout(1200);
+  }
 
-  // Click "Popular" sort pill
-  await humanClick(page, 'div[aria-label="Sort order"] button:has-text("Popular")');
-  await page.waitForTimeout(1000);
+  // Click "Popular" sort pill (non-fatal)
+  const popularPill = page.locator('button:has-text("Popular")').first();
+  if (await popularPill.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await humanClick(page, 'button:has-text("Popular")');
+    await page.waitForTimeout(1000);
+  }
 
   // Hover over the first PodcastCard to reveal fork button
   const firstCard = page.locator('[class*="card"]').first();
-  await firstCard.hover();
-  await page.waitForTimeout(1500);
+  if (await firstCard.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await firstCard.hover();
+    await page.waitForTimeout(1500);
+  }
 
   // Scroll back up
   await smoothScroll(page, -400, 800);

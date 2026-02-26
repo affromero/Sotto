@@ -18,7 +18,7 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
 
   // Navigate to podcast player
   await page.goto(`${ctx.appUrl}/podcast/${cryptoPodcast.id}`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
   await page.waitForTimeout(1000);
@@ -27,18 +27,14 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
   await humanClick(page, 'button[aria-label="Fork & remix this podcast"]');
 
   // Wait for ForkRemixModal to open (step 1)
-  await waitAndSettle(page, '[class*="modal"], [role="dialog"]');
+  await page.getByRole('dialog').waitFor({ state: 'visible', timeout: 10000 });
 
-  // Type a remix note into the topic/remix field
-  const remixInput = page.locator('textarea, input[type="text"]').last();
-  await remixInput.click();
+  // Type a remix note into the remix note textarea within the modal
+  const modal = page.getByRole('dialog');
+  const textarea = modal.locator('textarea').first();
+  await textarea.click();
   await page.waitForTimeout(200);
-
-  await humanType(
-    page,
-    'textarea:last-of-type, [class*="modal"] textarea',
-    'Exploring the same topic from a behavioral economics angle'
-  );
+  await textarea.pressSequentially('Exploring the same topic from a behavioral economics angle', { delay: 80 });
   await page.waitForTimeout(500);
 
   // Click "Next" to go to step 2
@@ -54,7 +50,7 @@ const forkFlow: FlowScenario = {
   name: '04-fork-flow',
   description: 'Fork/remix a podcast — open modal, fill remix note, confirm',
   viewport: { width: 1440, height: 900 },
-  auth: 'demo',
+  auth: 'viewer',
   run,
 };
 

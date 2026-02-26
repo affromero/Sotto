@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { smoothScroll, waitAndSettle, humanClick } from '../lib/actions';
+import { smoothScroll } from '../lib/actions';
 import { interceptScriptApprove } from '../lib/interceptors';
 import type { FlowScenario, FlowContext } from '../lib/types';
 
@@ -12,12 +12,15 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
 
   // Navigate to the SCRIPT_READY podcast page (as owner)
   await page.goto(`${ctx.appUrl}/podcast/${scriptReadyPodcast.id}`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
 
-  // Wait for the script preview section to render
-  await waitAndSettle(page, '[class*="script"], [class*="Script"]', 1500);
+  // Wait for the approve button to render (confirms SCRIPT_READY state loaded)
+  // Two matching buttons exist (mobile + desktop), so use .first()
+  const approveBtn = page.getByRole('button', { name: 'Approve & Generate Audio' }).first();
+  await approveBtn.waitFor({ state: 'visible', timeout: 15000 });
+  await page.waitForTimeout(2000);
 
   // Scroll through the script turns
   await smoothScroll(page, 300, 1000);
@@ -31,7 +34,9 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
   await page.waitForTimeout(500);
 
   // Click "Approve & Generate Audio"
-  await humanClick(page, 'button:has-text("Approve & Generate Audio")');
+  await approveBtn.hover();
+  await page.waitForTimeout(200);
+  await approveBtn.click();
   await page.waitForTimeout(2000);
 }
 

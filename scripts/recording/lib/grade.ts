@@ -141,7 +141,7 @@ async function gradeToWebm(input: string, output: string): Promise<void> {
 async function gradeToGif(input: string, output: string): Promise<void> {
   // Two-pass palette generation for high-quality GIF
   const palettePath = `${output}.palette.png`;
-  const scaleAndGrade = `fps=15,scale=960:-1:flags=lanczos,${WARM_AMBER_FILTER}`;
+  const scaleAndGrade = `fps=12,scale=480:-1:flags=lanczos,${WARM_AMBER_FILTER}`;
 
   await runFFmpeg([
     '-i', input,

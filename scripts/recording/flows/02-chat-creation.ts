@@ -35,7 +35,7 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
   });
 
   // Navigate to create page
-  await page.goto(`${ctx.appUrl}/create`, { waitUntil: 'networkidle', timeout: 30000 });
+  await page.goto(`${ctx.appUrl}/create`, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await waitAndSettle(page, 'input[aria-label="Chat message input"]');
 
   // Type the topic

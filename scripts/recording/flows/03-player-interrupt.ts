@@ -21,7 +21,7 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
 
   // Navigate to podcast player
   await page.goto(`${ctx.appUrl}/podcast/${cryptoPodcast.id}`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
 
@@ -45,14 +45,12 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
   );
   await page.waitForTimeout(500);
 
-  // Click submit (the "Ask" button)
-  const submitBtn = page.locator(
-    'section[aria-label="Ask a question about this podcast"] button[type="submit"]'
-  );
+  // Click submit (the "Ask" button — not type="submit", just a styled button)
+  const submitBtn = page.locator('section[aria-label="Ask a question about this podcast"] button:has-text("Ask")');
   await submitBtn.click();
 
   // Wait for the answer to appear (polling mock returns ANSWERED after ~2s)
-  await waitAndSettle(page, '[class*="answerSection"], [class*="answerText"]', 4000);
+  await page.locator('[class*="answerText"]').first().waitFor({ state: 'visible', timeout: 15000 });
   await page.waitForTimeout(2000);
 }
 
