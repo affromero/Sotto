@@ -102,6 +102,7 @@
 | `/api/voices/preview` | POST | Yes | Preview voice |
 | `/api/voices/allowlist` | GET/POST/DELETE | Yes | Voice allowlist |
 | `/api/voices/browse` | GET | Opt | Browse voices |
+| `/api/voices/hume` | GET | Yes | Browse Hume AI voice library (BYOK or platform key) |
 | `/api/voices/request` | GET/POST/PATCH | Yes | Voice requests |
 | `/api/tts-providers` | GET | Yes | TTS providers + BYOK |
 | `/api/tts-options` | GET | Yes | TTS provider:model list |
