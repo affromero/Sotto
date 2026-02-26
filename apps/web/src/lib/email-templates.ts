@@ -114,10 +114,13 @@ export function buildWaitlistApprovalEmail(email: string): { subject: string; ht
           <p style="font-size:13px; line-height:1.6; color:#6B7280; margin:0 0 8px;">
             <strong style="color:#1A1A1A;">Quick tip:</strong> Tag
             <a href="https://x.com/sottofm" style="color:#D97706; text-decoration:none; font-weight:600;">@sottofm</a>
-            on X with any topic and our bot will turn it into a podcast for you &mdash; no login needed.
+            on X with any topic and our bot will turn it into a podcast for you.
+          </p>
+          <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0 0 8px;">
+            Try it: <em>&ldquo;@sottofm explain how black holes emit radiation&rdquo;</em>
           </p>
           <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:0;">
-            Try it: <em>&ldquo;@sottofm explain how black holes emit radiation&rdquo;</em>
+            Just <a href="${APP_URL}/settings" style="color:#D97706; text-decoration:none;">link your X account</a> in settings after signing up.
           </p>
         </div>
       </div>
