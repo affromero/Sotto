@@ -25,7 +25,7 @@ All shared business logic and external service integrations live here.
 | `script-generator.ts` | 2-voice podcast script generation with `[N]` citations + revision with feedback (fact-checker + user) | Uses `claude.ts` |
 | `script-verifier.ts` | Claude-based "teacher" agent: extracts claims, evaluates sourcing, enforces duration limits | Uses `claude.ts` |
 | `reference-validator.ts` | Source quality pre-filter (`assessSourceQuality`), URL HEAD, CrossRef DOI, OpenAlex title-search layers. Used by `reference-verification/` pipeline. | fetch, `claude.ts` |
-| `reference-verification/` | Domain-aware verification pipeline: `classifyReference()` → applicable layers → AI batch call → `computeDomainAwareScore()`. Exports `runReferenceVerification()`. | `@sottofm/verification-standard`, `claude.ts` |
+| `reference-verification/` | Domain-aware verification pipeline: `classifyReference()` → applicable layers → AI batch call → `computeBayesianScore()`. Exports `runReferenceVerification()`. | `@sottofm/verification-standard`, `claude.ts` |
 | `script-updater.ts` | Citation cleanup + renumbering when references are removed after verification | Pure utility |
 | `segment-creator.ts` | Shared utility: create Segment records from script turns and queue audio generation jobs (used by reference-validation, script approve endpoint) | Uses `prisma.ts`, `queue.ts` |
 | `citation-parser.tsx` | Parse `[N]` citation markers in text → React CitationMarker components | React |

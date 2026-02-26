@@ -136,6 +136,8 @@ export async function processReferenceValidation(
         confidence: c.confidence,
         detail: c.detail,
       })),
+      posterior: result.score,
+      logOddsContributions: result.logOddsContributions,
       verifiedAt: new Date().toISOString(),
     };
 

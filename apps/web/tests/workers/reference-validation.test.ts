@@ -60,6 +60,7 @@ const mockRunReferenceVerification = vi.fn().mockResolvedValue({
           { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched in OpenAlex (similarity 95%)' },
           { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — Reference appears legitimate' },
         ],
+        logOddsContributions: { doi: 1.5, title_search: 0.8, url: 0.2, ai: 0.6 },
       },
     ],
   ]),
@@ -199,6 +200,7 @@ describe('processReferenceValidation', () => {
               { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched in OpenAlex (similarity 95%)' },
               { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — Reference appears legitimate' },
             ],
+            logOddsContributions: { doi: 1.5, title_search: 0.8, url: 0.2, ai: 0.6 },
           },
         ],
       ]),
@@ -356,6 +358,7 @@ describe('processReferenceValidation', () => {
                 { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
                 { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — NYT article verified' },
               ],
+              logOddsContributions: { url: 0.3, ai: 0.9 },
             },
           ],
         ]),
@@ -401,6 +404,7 @@ describe('processReferenceValidation', () => {
                 { layer: 'url', passed: true, confidence: 0.6, detail: 'URL returned 200' },
                 { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL — credible outlet' },
               ],
+              logOddsContributions: { url: 0.3, ai: 0.9 },
             },
           ],
         ]),
@@ -443,6 +447,7 @@ describe('processReferenceValidation', () => {
                 { layer: 'title_search', passed: true, confidence: 0.9, detail: 'Title matched' },
                 { layer: 'ai', passed: true, confidence: 0.85, detail: 'AI: REAL' },
               ],
+              logOddsContributions: { url: 0.2, title_search: 0.7, ai: 0.6 },
             },
           ],
         ]),
@@ -483,8 +488,8 @@ describe('processReferenceValidation', () => {
 
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0.1 }, score: 0.1, checks: [{ layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [{ layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0.1 }, score: 0.1, checks: [{ layer: 'ai', passed: false, confidence: 0, detail: 'AI: FAKE' }], logOddsContributions: { ai: -1.2 } }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [{ layer: 'ai', passed: true, confidence: 0.8, detail: 'AI: REAL' }], logOddsContributions: { ai: 0.9 } }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -501,7 +506,7 @@ describe('processReferenceValidation', () => {
     it('updates reference status to FAILED when verdict is FAILED', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'FAILED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'FAILED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -536,6 +541,7 @@ describe('processReferenceValidation', () => {
               },
               score: 0.3,
               checks: [],
+              logOddsContributions: {},
             },
           ],
         ]),
@@ -560,7 +566,7 @@ describe('processReferenceValidation', () => {
       });
     });
 
-    it('stores verification details with all checks', async () => {
+    it('stores verification details with all checks and Bayesian scoring data', async () => {
       const job = createMockJob(defaultPayload);
       await processReferenceValidation(job);
 
@@ -574,6 +580,8 @@ describe('processReferenceValidation', () => {
               expect.objectContaining({ layer: 'title_search' }),
               expect.objectContaining({ layer: 'ai' }),
             ]),
+            posterior: 0.85,
+            logOddsContributions: { doi: 1.5, title_search: 0.8, url: 0.2, ai: 0.6 },
             verifiedAt: expect.any(String),
           }),
         }),
@@ -600,8 +608,8 @@ describe('processReferenceValidation', () => {
     it('builds renumber map when references are removed', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -618,8 +626,8 @@ describe('processReferenceValidation', () => {
     it('cleans and renumbers citations in turns', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -645,8 +653,8 @@ describe('processReferenceValidation', () => {
     it('cleans and renumbers markdown', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -667,8 +675,8 @@ describe('processReferenceValidation', () => {
     it('updates script with cleaned turns and markdown', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -697,8 +705,8 @@ describe('processReferenceValidation', () => {
     it('renumbers remaining references in database', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -717,8 +725,8 @@ describe('processReferenceValidation', () => {
     it('deletes removed references from database', async () => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
-          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
+          ['ref-002', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
@@ -739,7 +747,7 @@ describe('processReferenceValidation', () => {
     beforeEach(() => {
       mockRunReferenceVerification.mockResolvedValue({
         results: new Map([
-          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [] }],
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'REMOVED', confidence: 0 }, score: 0, checks: [], logOddsContributions: {} }],
         ]),
         rejectedRefIds: new Set<string>(),
       });
