@@ -32,7 +32,7 @@ export const SOURCE_PLATFORM_HELP: Partial<Record<SourcePlatformValue, string>> 
   apple_podcasts:
     'In Apple Podcasts on Mac, right-click a downloaded episode and select "Show in Finder". The file is stored as an M4A.',
   youtube:
-    'Use a trusted YouTube-to-MP3 converter to extract the audio track from the video URL.',
+    'Paste any YouTube URL when creating a podcast — Sotto extracts the audio automatically. Or upload the audio file here.',
 };
 
 export interface ImportProgress {

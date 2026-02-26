@@ -16,6 +16,21 @@ export interface TweetParseResult {
   isSelfAuthored?: boolean;
 }
 
+export interface TwitterMediaVariant {
+  bit_rate?: number;
+  content_type: string;
+  url: string;
+}
+
+export interface TwitterMedia {
+  media_key: string;
+  type: 'video' | 'animated_gif' | 'photo';
+  duration_ms?: number;
+  variants?: TwitterMediaVariant[];
+  preview_image_url?: string;
+  alt_text?: string;
+}
+
 export interface TwitterTweet {
   id: string;
   text: string;
@@ -27,6 +42,9 @@ export interface TwitterTweet {
   }>;
   created_at: string;
   conversation_id?: string;
+  attachments?: {
+    media_keys?: string[];
+  };
   entities?: {
     urls?: Array<{
       start: number;
@@ -43,6 +61,11 @@ export interface TwitterTweet {
     quote_count: number;
     impression_count?: number;
   };
+}
+
+export interface TwitterMentionsResult {
+  tweets: TwitterTweet[];
+  mediaByKey: Map<string, TwitterMedia>;
 }
 
 export interface ThreadTweet {
