@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { VoiceCard } from './VoiceCard';
 import { HumeVoiceBrowser } from './HumeVoiceBrowser';
 import styles from './VoicePicker.module.css';
@@ -82,6 +82,15 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
   const [speakerCount, setSpeakerCount] = useState(Math.min(2, maxSpeakers));
 
   const activeSpeakers = SPEAKER_PRESETS[speakerCount] ?? SPEAKER_PRESETS[2];
+  const prevProviderRef = useRef(ttsProvider);
+
+  // Clear voice selections when TTS provider changes (voice IDs are provider-specific)
+  useEffect(() => {
+    if (prevProviderRef.current !== ttsProvider) {
+      prevProviderRef.current = ttsProvider;
+      setVoiceMap({});
+    }
+  }, [ttsProvider]);
 
   useEffect(() => {
     async function load() {

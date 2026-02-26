@@ -15,14 +15,32 @@ const QUALITY_BADGES: Record<string, string> = {
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
   openai: 'OPENAI_API_KEY',
+  playht: 'PLAYHT_API_KEY',
+  cartesia: 'CARTESIA_API_KEY',
+  hume: 'HUME_API_KEY',
+  fal: 'FAL_KEY',
+  replicate: 'REPLICATE_API_TOKEN',
   kittentts: 'KITTENTTS_URL',
 };
+
+// PlayHT requires both API key and user ID
+function hasPlatformKey(providerId: TtsProviderId): boolean {
+  if (providerId === 'playht') {
+    return !!(process.env.PLAYHT_API_KEY && process.env.PLAYHT_USER_ID);
+  }
+  if (providerId === 'kittentts') {
+    return !!process.env.KITTENTTS_URL;
+  }
+  const envVar = PLATFORM_TTS_ENV[providerId];
+  return envVar ? !!process.env[envVar] : false;
+}
 
 interface TtsOption {
   id: string;
   displayName: string;
   badge?: string;
   group?: string;
+  hint?: string;
 }
 
 export async function GET() {
@@ -40,12 +58,11 @@ export async function GET() {
     // Admins see all platform-configured TTS providers (from env vars)
     if (isAdmin) {
       const options: TtsOption[] = [
-        { id: 'auto', displayName: 'Auto', badge: 'Best available' },
+        { id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' },
       ];
 
       for (const meta of getAllProviderMeta()) {
-        const envVar = PLATFORM_TTS_ENV[meta.id];
-        if (!envVar || !process.env[envVar]) continue;
+        if (!hasPlatformKey(meta.id)) continue;
 
         for (const model of meta.models) {
           options.push({
@@ -81,7 +98,7 @@ export async function GET() {
 
   // BYOK keys present — show models for every valid provider
   const options: TtsOption[] = [
-    { id: 'auto', displayName: 'Auto', badge: 'Best available' },
+    { id: 'auto', displayName: 'Auto', badge: 'Best available', hint: 'Picks the best voice and provider based on your podcast\u2019s topic, tone, and speakers' },
   ];
 
   for (const providerId of validProviderIds) {

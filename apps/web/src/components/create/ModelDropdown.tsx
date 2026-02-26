@@ -9,6 +9,7 @@ export interface ModelOption {
   displayName: string;
   badge?: string;
   group?: string;
+  hint?: string;
   unavailable?: boolean;
 }
 
@@ -125,11 +126,14 @@ export function ModelDropdown({
                       aria-selected={opt.id === (value ?? options[0]?.id)}
                       className={`${styles.option} ${
                         opt.id === (value ?? options[0]?.id) ? styles.optionActive : ''
-                      } ${opt.unavailable ? styles.optionUnavailable : ''}`}
+                      } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
                       onClick={() => handleSelect(opt)}
                       disabled={opt.unavailable}
                     >
-                      <span className={styles.optionName}>{opt.displayName}</span>
+                      <div className={styles.optionContent}>
+                        <span className={styles.optionName}>{opt.displayName}</span>
+                        {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
+                      </div>
                       {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
                       {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
                     </button>
@@ -144,11 +148,14 @@ export function ModelDropdown({
                   aria-selected={opt.id === (value ?? options[0]?.id)}
                   className={`${styles.option} ${
                     opt.id === (value ?? options[0]?.id) ? styles.optionActive : ''
-                  } ${opt.unavailable ? styles.optionUnavailable : ''}`}
+                  } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
                   onClick={() => handleSelect(opt)}
                   disabled={opt.unavailable}
                 >
-                  <span className={styles.optionName}>{opt.displayName}</span>
+                  <div className={styles.optionContent}>
+                    <span className={styles.optionName}>{opt.displayName}</span>
+                    {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
+                  </div>
                   {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
                   {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
                 </button>
