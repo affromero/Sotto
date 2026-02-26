@@ -162,6 +162,7 @@ export const waitlistSchema = z.object({
   twitterHandle: z.string().max(50).optional()
     .transform(val => val ? val.replace(/^@/, '').trim() : undefined),
   source: z.string().max(50).optional(),
+  feedback: z.string().max(500).optional(),
 });
 
 /**
