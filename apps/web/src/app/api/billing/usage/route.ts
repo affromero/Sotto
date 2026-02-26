@@ -46,7 +46,6 @@ export async function GET(_request: NextRequest) {
       limits: {
         maxDurationMinutes: isFinite(features.maxDurationMinutes) ? features.maxDurationMinutes : 9999,
         maxVoiceClones: LIMITS.maxVoiceClones,
-        canDownload: features.downloadAllowed,
         canMakePrivate: features.privateAllowed,
         canExportPdf: LIMITS.canExportPdf,
         hasPremiumSfx: LIMITS.hasPremiumSfx,
