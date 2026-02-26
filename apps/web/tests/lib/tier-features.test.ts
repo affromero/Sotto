@@ -29,6 +29,10 @@ describe('getTierFeatures', () => {
       expect(features.privateAllowed).toBe(false);
     });
 
+    it('blocks downloads', () => {
+      expect(features.downloadAllowed).toBe(false);
+    });
+
     it('gives no priority queue', () => {
       expect(features.priorityQueue).toBe(false);
     });
@@ -63,6 +67,7 @@ describe('getTierFeatures', () => {
       expect(features.webSearchEnabled).toBe(true);
       expect(features.maxQaInteractions).toBe(3);
       expect(features.privateAllowed).toBe(false);
+      expect(features.downloadAllowed).toBe(false);
       expect(features.priorityQueue).toBe(false);
       expect(features.analyticsEnabled).toBe(false);
       expect(features.voiceTracksEnabled).toBe(false);
@@ -96,6 +101,10 @@ describe('getTierFeatures', () => {
 
     it('allows private podcasts', () => {
       expect(features.privateAllowed).toBe(true);
+    });
+
+    it('allows downloads', () => {
+      expect(features.downloadAllowed).toBe(true);
     });
 
     it('gives priority queue', () => {
@@ -136,6 +145,7 @@ describe('getTierFeatures', () => {
       expect(features.webSearchEnabled).toBe(true);
       expect(features.maxQaInteractions).toBe(Infinity);
       expect(features.privateAllowed).toBe(true);
+      expect(features.downloadAllowed).toBe(true);
       expect(features.priorityQueue).toBe(true);
       expect(features.analyticsEnabled).toBe(true);
       expect(features.voiceTracksEnabled).toBe(true);
@@ -151,6 +161,7 @@ describe('getTierFeatures', () => {
       webSearchEnabled: true,
       maxQaInteractions: Infinity,
       privateAllowed: true,
+      downloadAllowed: true,
       priorityQueue: true,
       analyticsEnabled: true,
       voiceTracksEnabled: true,

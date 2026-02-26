@@ -11,10 +11,11 @@ interface ShareMenuProps {
   podcastTitle: string;
   audioUrl: string | null;
   isPublic: boolean;
+  canDownload?: boolean;
   triggerClassName?: string;
 }
 
-export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, triggerClassName }: ShareMenuProps) {
+export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, canDownload, triggerClassName }: ShareMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -118,7 +119,7 @@ export function ShareMenu({ podcastId, podcastTitle, audioUrl, isPublic, trigger
               Embed
             </button>
           )}
-          {audioUrl && (
+          {audioUrl && canDownload && (
             <button
               className={styles.menuItem}
               onClick={handleDownload}

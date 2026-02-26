@@ -99,7 +99,6 @@ vi.mock('@/lib/stripe', () => ({
   LIMITS: {
     maxDurationMinutes: 30,
     maxVoiceClones: 10,
-    canDownload: true,
     canMakePrivate: true,
     canExportPdf: true,
     hasPremiumSfx: true,
@@ -108,7 +107,6 @@ vi.mock('@/lib/stripe', () => ({
     FREE: {
       maxDurationMinutes: 30,
       maxVoiceClones: 10,
-      canDownload: true,
       canMakePrivate: true,
       canExportPdf: true,
       hasPremiumSfx: true,

@@ -1,17 +1,29 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { NextRequest } from 'next/server';
 
+const mockAuth = vi.fn();
 const mockPodcastFindUnique = vi.fn();
+const mockUserFindUniqueOrThrow = vi.fn();
+const mockHasByokKey = vi.fn();
 const mockFetch = vi.fn();
+
+vi.mock('@/lib/auth', () => ({ auth: (...args: unknown[]) => mockAuth(...args) }));
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
     },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/byok', () => ({
+  hasByokKey: (...args: unknown[]) => mockHasByokKey(...args),
+}));
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -33,6 +45,24 @@ async function createParams(podcastId: string) {
   return { params: Promise.resolve({ podcastId }) };
 }
 
+function mockProSession(userId = 'user-1') {
+  mockAuth.mockResolvedValue({ user: { id: userId, role: 'USER' } });
+  mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+  mockHasByokKey.mockResolvedValue(false);
+}
+
+function mockFreeSession(userId = 'user-1') {
+  mockAuth.mockResolvedValue({ user: { id: userId, role: 'USER' } });
+  mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
+  mockHasByokKey.mockResolvedValue(false);
+}
+
+function mockAdminSession(userId = 'admin-1') {
+  mockAuth.mockResolvedValue({ user: { id: userId, role: 'ADMIN' } });
+  mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'ADMIN' });
+  mockHasByokKey.mockResolvedValue(false);
+}
+
 describe('GET /api/podcasts/[podcastId]/download', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -43,7 +73,88 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('returns 403 when not authenticated', async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const response = await GET(createRequest(), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toMatchObject({ error: 'Download requires a Pro subscription.' });
+  });
+
+  it('returns 403 when free-tier user tries to download', async () => {
+    mockFreeSession('user-2');
+    mockPodcastFindUnique.mockResolvedValue({
+      title: 'Test Podcast',
+      audioUrl: 'https://example.com/audio.mp3',
+      status: 'READY',
+      visibility: 'PUBLIC',
+      userId: 'user-1',
+    });
+
+    const response = await GET(createRequest(), await createParams('pod-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(body).toMatchObject({ error: 'Download requires a Pro subscription.' });
+  });
+
+  it('allows owner to download even on free tier', async () => {
+    mockFreeSession('user-1');
+    mockPodcastFindUnique.mockResolvedValue({
+      title: 'My Podcast',
+      audioUrl: 'https://example.com/audio.mp3',
+      status: 'READY',
+      visibility: 'PUBLIC',
+      userId: 'user-1',
+    });
+    const mockBody = new ReadableStream();
+    mockFetch.mockResolvedValue({ ok: true, body: mockBody });
+
+    const response = await GET(createRequest(), await createParams('pod-1'));
+
+    expect(response.status).toBe(200);
+    // Should NOT look up user tier since owner bypass kicks in
+    expect(mockUserFindUniqueOrThrow).not.toHaveBeenCalled();
+  });
+
+  it('allows pro user to download others podcasts', async () => {
+    mockProSession('user-2');
+    mockPodcastFindUnique.mockResolvedValue({
+      title: 'Test Podcast',
+      audioUrl: 'https://example.com/audio.mp3',
+      status: 'READY',
+      visibility: 'PUBLIC',
+      userId: 'user-1',
+    });
+    const mockBody = new ReadableStream();
+    mockFetch.mockResolvedValue({ ok: true, body: mockBody });
+
+    const response = await GET(createRequest(), await createParams('pod-1'));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('allows admin to download on free tier', async () => {
+    mockAdminSession('admin-1');
+    mockPodcastFindUnique.mockResolvedValue({
+      title: 'Test Podcast',
+      audioUrl: 'https://example.com/audio.mp3',
+      status: 'READY',
+      visibility: 'PUBLIC',
+      userId: 'user-1',
+    });
+    const mockBody = new ReadableStream();
+    mockFetch.mockResolvedValue({ ok: true, body: mockBody });
+
+    const response = await GET(createRequest(), await createParams('pod-1'));
+
+    expect(response.status).toBe(200);
+  });
+
   it('returns 404 when podcast not found', async () => {
+    mockProSession();
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const response = await GET(createRequest(), await createParams('pod-1'));
@@ -54,11 +165,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('returns 404 when podcast status is not READY', async () => {
+    mockProSession();
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test Podcast',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'SCRIPTING',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
 
     const response = await GET(createRequest(), await createParams('pod-1'));
@@ -69,11 +182,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('returns 404 when audioUrl is null', async () => {
+    mockProSession();
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test Podcast',
       audioUrl: null,
       status: 'READY',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
 
     const response = await GET(createRequest(), await createParams('pod-1'));
@@ -84,11 +199,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('returns 403 when podcast is private', async () => {
+    mockProSession();
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test Podcast',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'READY',
       visibility: 'PRIVATE',
+      userId: 'user-1',
     });
 
     const response = await GET(createRequest(), await createParams('pod-1'));
@@ -99,11 +216,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('returns 502 when audio fetch fails', async () => {
+    mockProSession('user-1');
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test Podcast',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'READY',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
     mockFetch.mockResolvedValue({ ok: false, body: null });
 
@@ -115,11 +234,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('returns 502 when fetch throws an error', async () => {
+    mockProSession('user-1');
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test Podcast',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'READY',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
     mockFetch.mockRejectedValue(new Error('Network error'));
 
@@ -131,11 +252,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('streams audio with correct Content-Disposition header on success', async () => {
+    mockProSession('user-1');
     mockPodcastFindUnique.mockResolvedValue({
       title: 'My Great Podcast!',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'READY',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
     const mockBody = new ReadableStream();
     mockFetch.mockResolvedValue({ ok: true, body: mockBody });
@@ -149,11 +272,13 @@ describe('GET /api/podcasts/[podcastId]/download', () => {
   });
 
   it('sanitizes special characters in filename', async () => {
+    mockProSession('user-1');
     mockPodcastFindUnique.mockResolvedValue({
       title: 'Test <script>alert("xss")</script>',
       audioUrl: 'https://example.com/audio.mp3',
       status: 'READY',
       visibility: 'PUBLIC',
+      userId: 'user-1',
     });
     const mockBody = new ReadableStream();
     mockFetch.mockResolvedValue({ ok: true, body: mockBody });

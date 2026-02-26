@@ -9,7 +9,6 @@ export const FREE_TIER_MAX_DURATION_MINUTES = 5;
 export const LIMITS = {
   maxDurationMinutes: 40,
   maxVoiceClones: 10,
-  canDownload: true,
   canMakePrivate: true,
   canExportPdf: true,
   hasPremiumSfx: true,

@@ -228,10 +228,17 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isOwner = userId === podcast.userId;
   const isAdmin = session?.user?.role === 'ADMIN';
   let canMakePrivate: boolean | undefined;
-  if (isOwner && userId) {
+  let canDownload = isOwner; // owners can always download their own podcasts
+  if (userId) {
     const freeTier = await getFreeTierStatus(userId);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
-    canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
+    const features = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined);
+    if (isOwner) {
+      canMakePrivate = features.privateAllowed;
+    }
+    if (features.downloadAllowed) {
+      canDownload = true;
+    }
   }
 
   const visibility = podcast.visibility;
@@ -337,7 +344,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   return (
     <main className={styles.main}>
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} canDownload={canDownload} />
       </div>
     </main>
   );
