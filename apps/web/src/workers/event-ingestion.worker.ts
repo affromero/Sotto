@@ -1,8 +1,31 @@
 import { Job } from 'bullmq';
+import { createHash } from 'crypto';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
 import type { IngestEventsPayload } from '@/lib/queue';
+
+/** Lazy-load geoip-lite to avoid top-level fs.readFileSync at import time. */
+let geoipLoaded = false;
+let geoipLookup: ((ip: string) => { country?: string } | null) | null = null;
+
+function lookupCountry(ip: string): string | null {
+  if (!geoipLoaded) {
+    geoipLoaded = true;
+    try {
+      const geoip = require('geoip-lite');
+      geoipLookup = geoip.lookup.bind(geoip);
+    } catch {
+      logger.warn('geoip-lite not available — country lookup disabled');
+    }
+  }
+  if (!geoipLookup) return null;
+  return geoipLookup(ip)?.country ?? null;
+}
+
+function hashIp(ip: string): string {
+  return createHash('sha256').update(ip).digest('hex');
+}
 
 /**
  * Event ingestion worker.
@@ -14,11 +37,15 @@ import type { IngestEventsPayload } from '@/lib/queue';
 export async function processEventIngestion(
   job: Job<IngestEventsPayload>
 ): Promise<{ processed: number }> {
-  const { events } = job.data;
+  const { events, ip } = job.data;
 
   if (!events || events.length === 0) {
     return { processed: 0 };
   }
+
+  // Derive country + ipHash from the raw IP (raw IP is never stored)
+  const country = ip ? lookupCountry(ip) : null;
+  const ipHash = ip ? hashIp(ip) : null;
 
   await job.updateProgress(10);
 
@@ -40,12 +67,16 @@ export async function processEventIngestion(
           userId: ctx.userId,
           deviceType: ctx.deviceType,
           userAgent: ctx.userAgent?.slice(0, 512),
+          ipHash,
+          country,
           referrer: ctx.referrer,
           pageCount: 1,
         },
         update: {
           lastSeenAt: new Date(),
           userId: ctx.userId || undefined,
+          ipHash: ipHash || undefined,
+          country: country || undefined,
           pageCount: {
             increment:
               events.filter(

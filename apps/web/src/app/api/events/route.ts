@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
     payload: event.payload as Record<string, unknown> & { eventType: string },
   }));
 
-  const payload: IngestEventsPayload = { events };
+  // Extract client IP for geo lookup in the worker (never stored raw)
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  const ip = forwardedFor?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || undefined;
+
+  const payload: IngestEventsPayload = { ip, events };
   await addJob(eventIngestionQueue, JobType.INGEST_EVENTS, payload);
 
   return NextResponse.json({ accepted: events.length }, { status: 202 });
