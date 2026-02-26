@@ -126,7 +126,11 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
 
   const handleDraftCreated = useCallback((id: string) => {
     setDraftId(id);
-  }, []);
+    // Persist draftId in URL so the conversation survives navigation
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('draftId', id);
+    router.replace(`/create?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
 
   // Debounced save of voice/config to draft
   const saveDraftConfig = useCallback((id: string, data: Record<string, unknown>) => {
