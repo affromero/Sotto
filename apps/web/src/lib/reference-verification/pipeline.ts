@@ -1,6 +1,6 @@
 import {
   classifyReference,
-  computeDomainAwareScore,
+  computeBayesianScore,
   type ContentDomain,
   type LayerResult,
 } from '@sottofm/verification-standard';
@@ -53,6 +53,7 @@ export interface VerificationResult {
   verdict: VerificationVerdict;
   score: number;
   checks: VerificationCheck[];
+  logOddsContributions: Record<string, number>;
 }
 
 export async function runReferenceVerification(
@@ -168,30 +169,30 @@ export async function runReferenceVerification(
     const domain = domainMap.get(ref.id)!;
     const checks = allChecks.get(ref.id) ?? [];
 
-    // Convert VerificationCheck[] → LayerResult[] for computeDomainAwareScore
+    // Convert VerificationCheck[] → LayerResult[] for Bayesian scoring
     const layerResults: LayerResult[] = checks.map((c) => ({
       layerId: c.layer as LayerResult['layerId'],
       passed: c.passed,
       confidence: c.confidence,
     }));
 
-    const { score, verdict: rawVerdict } = computeDomainAwareScore(domain, layerResults);
+    const { posterior, verdict: rawVerdict, logOddsContributions } = computeBayesianScore(domain, layerResults);
 
     let verdict: VerificationVerdict;
 
     if (rawVerdict === 'VERIFIED') {
-      verdict = { status: 'VERIFIED', confidence: score };
+      verdict = { status: 'VERIFIED', confidence: posterior };
     } else {
       // Check for a replacement suggestion from any layer
       const replacement = findBestReplacement(checks);
       if (replacement) {
-        verdict = { status: 'REPLACED', confidence: score, replacement };
+        verdict = { status: 'REPLACED', confidence: posterior, replacement };
       } else {
-        verdict = { status: 'REMOVED', confidence: score };
+        verdict = { status: 'REMOVED', confidence: posterior };
       }
     }
 
-    results.set(ref.id, { domain, verdict, score, checks });
+    results.set(ref.id, { domain, verdict, score: posterior, checks, logOddsContributions });
   }
 
   return { results, rejectedRefIds };
