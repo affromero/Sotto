@@ -154,6 +154,7 @@ export interface ImportAudioPayload {
 }
 
 export interface IngestEventsPayload {
+  ip?: string;
   events: Array<{
     context: {
       sessionId: string;
