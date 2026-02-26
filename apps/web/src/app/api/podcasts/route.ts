@@ -7,7 +7,8 @@ import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
-import { getTierFeatures, getJobPriority } from '@/lib/tier-features';
+import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
+import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import type { ExtractContentPayload } from '@/lib/queue';
@@ -122,6 +123,14 @@ export async function POST(request: NextRequest) {
     gate.isByokUser,
     isAdmin ? 'ADMIN' : undefined
   );
+
+  // Model plan gating — block expensive models for free non-BYOK users
+  if (parsed.data.aiModel) {
+    const requiredPlan = getModelRequiredPlan(parsed.data.aiModel);
+    if (requiredPlan && !isModelAllowedForUser(requiredPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
+      return errorResponse('This model requires a Pro subscription.', 403, { code: 'model_requires_pro' });
+    }
+  }
 
   // Gate private and unlisted podcast creation
   if ((parsed.data.visibility === 'PRIVATE' || parsed.data.visibility === 'UNLISTED') && !tierFeatures.privateAllowed) {

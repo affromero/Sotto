@@ -78,6 +78,23 @@ export function getTierFeatures(plan: 'FREE' | 'PRO', isByok: boolean, role?: st
 }
 
 /**
+ * Check whether a user is allowed to use a given AI model on platform credits.
+ * BYOK users and privileged roles (ADMIN, SYSTEM) bypass all restrictions.
+ * Free non-BYOK users can only use models with requiredPlan === 'FREE'.
+ */
+export function isModelAllowedForUser(
+  requiredPlan: 'FREE' | 'PRO',
+  userPlan: 'FREE' | 'PRO',
+  isByok: boolean,
+  role?: string,
+): boolean {
+  if (PRIVILEGED_ROLES.has(role ?? '')) return true;
+  if (isByok) return true;
+  if (userPlan === 'PRO') return true;
+  return requiredPlan === 'FREE';
+}
+
+/**
  * BullMQ job priority for a given tier.
  * Lower = higher priority. Only Pro and privileged roles get priority.
  */

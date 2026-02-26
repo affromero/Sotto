@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getTierFeatures, getJobPriority, type TierFeatures } from '@/lib/tier-features';
+import { getTierFeatures, getJobPriority, isModelAllowedForUser, type TierFeatures } from '@/lib/tier-features';
 
 describe('getTierFeatures', () => {
   describe('FREE + no BYOK', () => {
@@ -184,6 +184,36 @@ describe('getTierFeatures', () => {
       const features = getTierFeatures('FREE', false);
       expect(features.privateAllowed).toBe(false);
     });
+  });
+});
+
+describe('isModelAllowedForUser', () => {
+  it('blocks free non-BYOK users from PRO models', () => {
+    expect(isModelAllowedForUser('PRO', 'FREE', false)).toBe(false);
+  });
+
+  it('allows free non-BYOK users to use FREE models', () => {
+    expect(isModelAllowedForUser('FREE', 'FREE', false)).toBe(true);
+  });
+
+  it('allows free BYOK users to use PRO models', () => {
+    expect(isModelAllowedForUser('PRO', 'FREE', true)).toBe(true);
+  });
+
+  it('allows PRO users to use PRO models', () => {
+    expect(isModelAllowedForUser('PRO', 'PRO', false)).toBe(true);
+  });
+
+  it('allows ADMIN to use any model regardless of plan', () => {
+    expect(isModelAllowedForUser('PRO', 'FREE', false, 'ADMIN')).toBe(true);
+  });
+
+  it('allows SYSTEM role to use any model', () => {
+    expect(isModelAllowedForUser('PRO', 'FREE', false, 'SYSTEM')).toBe(true);
+  });
+
+  it('regular USER role on free plan is blocked from PRO models', () => {
+    expect(isModelAllowedForUser('PRO', 'FREE', false, 'USER')).toBe(false);
   });
 });
 
