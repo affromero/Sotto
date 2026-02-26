@@ -5,15 +5,17 @@ import { AnalyticsSection } from './AnalyticsSection';
 import { AutoTweetSection } from './AutoTweetSection';
 import { TrendsSection } from './TrendsSection';
 import { ThreadSection } from './ThreadSection';
+import { SettingsSection } from './SettingsSection';
 import styles from './TwitterDashboard.module.css';
 
-type TabId = 'analytics' | 'auto-tweet' | 'trends' | 'thread';
+type TabId = 'analytics' | 'auto-tweet' | 'trends' | 'thread' | 'settings';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'auto-tweet', label: 'Auto-Tweet' },
   { id: 'trends', label: 'Trends' },
   { id: 'thread', label: 'Thread → Podcast' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 export function TwitterDashboard() {
@@ -48,6 +50,9 @@ export function TwitterDashboard() {
         </div>
         <div role="tabpanel" hidden={activeTab !== 'thread'}>
           <ThreadSection />
+        </div>
+        <div role="tabpanel" hidden={activeTab !== 'settings'}>
+          <SettingsSection />
         </div>
       </div>
     </div>
