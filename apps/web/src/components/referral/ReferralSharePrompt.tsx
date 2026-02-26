@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import styles from './ReferralSharePrompt.module.css';
@@ -12,19 +12,16 @@ interface ReferralSharePromptProps {
 
 const DISMISSED_KEY = 'sotto_referral_prompt_dismissed';
 
+function isDismissed(): boolean {
+  if (typeof window === 'undefined') return true;
+  return !!localStorage.getItem(DISMISSED_KEY);
+}
+
 export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSharePromptProps) {
-  const [visible, setVisible] = useState(false);
+  const [dismissed, setDismissed] = useState(isDismissed);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!hasFirstReadyPodcast) return;
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
-    if (!dismissed) {
-      setVisible(true);
-    }
-  }, [hasFirstReadyPodcast]);
-
-  if (!visible) return null;
+  if (!hasFirstReadyPodcast || dismissed) return null;
 
   const referralUrl = `https://sotto.fm/ref/${handle}`;
   const twitterText = encodeURIComponent('I just created my first podcast on @SottoFM — where podcasts get social. Check it out:');
@@ -32,7 +29,7 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, '1');
-    setVisible(false);
+    setDismissed(true);
   }
 
   function copyLink() {
@@ -53,7 +50,7 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
       <div className={styles.content}>
         <h3 className={styles.title}>Share Sotto, earn more podcasts</h3>
         <p className={styles.description}>
-          Each friend who joins earns you +1 daily generation (up to +5).
+          Each friend who creates their first podcast earns you +1 daily generation for 7 days (up to +5).
         </p>
 
         <div className={styles.actions}>

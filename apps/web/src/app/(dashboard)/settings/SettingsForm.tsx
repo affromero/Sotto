@@ -61,7 +61,7 @@ interface SettingsFormProps {
   initialEmailNotifications: boolean;
   initialPushNotifications: boolean;
   quizAnswerCount: number;
-  referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string }>;
+  referredUsers: Array<{ name: string | null; handle: string | null; image: string | null; joinedAt: string; verified: boolean }>;
   referralBonus: number;
 }
 
@@ -813,7 +813,7 @@ export function SettingsForm({
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Referrals</h2>
           <p className={styles.sectionDescription}>
-            Invite friends, get more podcasts. Each referral earns you +1 daily generation (up to +5).
+            Invite friends, get more podcasts. Each verified referral earns you +1 daily generation for 7 days (up to +5).
           </p>
 
           {referralBonus > 0 && (
@@ -861,6 +861,9 @@ export function SettingsForm({
                     <span className={styles.referralName}>
                       {user.name || `@${user.handle}`}
                     </span>
+                    <Badge variant={user.verified ? 'success' : 'default'}>
+                      {user.verified ? 'Verified' : 'Pending'}
+                    </Badge>
                     <span className={styles.referralDate}>
                       {new Date(user.joinedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </span>
