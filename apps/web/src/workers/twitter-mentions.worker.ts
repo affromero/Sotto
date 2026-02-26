@@ -10,6 +10,7 @@ import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
+import { extractTwitterVideoTranscript } from '@/lib/twitter-video';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet, TwitterMedia, TweetParseResult, ThreadData } from '@/types/twitter';
 import type { ParticipantCredential } from '@/lib/credential-lookup';
@@ -212,9 +213,20 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       ? [...parsed.focusAreas, ...parsed.viewpoints]
       : parsed.focusAreas;
     const durationTarget = parsed.durationTarget ?? (isThreadPodcast ? 15 : 10);
-    const sourceText = isThreadPodcast && threadData
+    let sourceText = isThreadPodcast && threadData
       ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
       : undefined;
+
+    // 9b. Extract video transcript if tweet has video attachments
+    const videoTranscript = await extractTwitterVideoTranscript(tweet, mediaByKey);
+    if (videoTranscript) {
+      logger.info('Appending video transcript to source text', {
+        tweetId: tweet.id,
+        transcriptLength: String(videoTranscript.length),
+      });
+      const videoSection = `\n\n---\n\n## Video Transcript\n\n${videoTranscript}`;
+      sourceText = sourceText ? `${sourceText}${videoSection}` : videoSection;
+    }
 
     // 10. Create Podcast + Discovery records
     const podcast = await prisma.podcast.create({
