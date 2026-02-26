@@ -246,6 +246,13 @@
   overflow: hidden;
 }
 
+.ttsSourceLabel {
+  font-style: normal;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  margin-left: 4px;
+}
+
 .errorText {
   font: var(--text-body-sm);
   color: var(--color-error, #dc2626);
