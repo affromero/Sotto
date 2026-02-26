@@ -77,28 +77,38 @@ function getSttPlatformKey(provider: string): string | undefined {
   }
 }
 
-/** Minimal WAV: 44-byte header + 0.1s of silence (8 kHz, 16-bit, mono) */
-function createSilenceWav(): Buffer {
-  const sampleRate = 8000;
-  const numSamples = 800; // 0.1s × 8000 Hz
-  const dataSize = numSamples * 2; // 16-bit = 2 bytes/sample
-  const buf = Buffer.alloc(44 + dataSize);
+/**
+ * Generate real "Hello" audio from the first available TTS provider.
+ * Tries providers in order: cheapest/fastest first.
+ * Returns null if no TTS provider is available.
+ */
+const TTS_PROBE_ORDER: TtsProviderId[] = [
+  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate',
+];
 
-  buf.write('RIFF', 0, 'ascii');
-  buf.writeUInt32LE(36 + dataSize, 4);
-  buf.write('WAVE', 8, 'ascii');
-  buf.write('fmt ', 12, 'ascii');
-  buf.writeUInt32LE(16, 16); // fmt chunk size
-  buf.writeUInt16LE(1, 20); // PCM
-  buf.writeUInt16LE(1, 22); // mono
-  buf.writeUInt32LE(sampleRate, 24);
-  buf.writeUInt32LE(sampleRate * 2, 28); // byte rate
-  buf.writeUInt16LE(2, 32); // block align
-  buf.writeUInt16LE(16, 34); // bits per sample
-  buf.write('data', 36, 'ascii');
-  buf.writeUInt32LE(dataSize, 40);
-  // Remaining bytes are zero (silence)
-  return buf;
+async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {
+  for (const id of TTS_PROBE_ORDER) {
+    const { apiKey, extraData } = getTtsPlatformKey(id);
+    // Check if provider has required credentials
+    if (id === 'kittentts') {
+      if (!process.env.KITTENTTS_URL) continue;
+    } else if (!apiKey) {
+      continue;
+    }
+
+    try {
+      const tts = await createTtsProviderAsync(id, apiKey, extraData);
+      const voiceId = TTS_TEST_VOICES[id] ?? 'alloy';
+      const audio = await withTimeout(
+        tts.generateSpeech({ text: 'Hello.', voiceId }),
+        5_000,
+      );
+      return { audio, provider: id };
+    } catch {
+      // Provider failed — try next
+    }
+  }
+  return null;
 }
 
 /** Detect audio MIME type from buffer magic bytes. */
@@ -331,12 +341,26 @@ export async function POST(request: NextRequest) {
       }
 
       const sttProvider = createSttProvider(provider as SttProviderId, sttKey!, model);
-      const wavBuffer = createSilenceWav();
-      const result = await withTimeout(sttProvider.transcribe(wavBuffer), 15_000);
+
+      // Generate real "Hello" audio from the first available TTS provider
+      const testAudio = await generateTestAudio();
+      const audioBuffer = testAudio?.audio;
+      const ttsSource = testAudio?.provider;
+
+      if (!audioBuffer) {
+        return NextResponse.json({
+          success: false,
+          latencyMs: Date.now() - start,
+          error: 'No TTS provider available to generate test audio',
+        });
+      }
+
+      const result = await withTimeout(sttProvider.transcribe(audioBuffer), 15_000);
       return NextResponse.json({
         success: true,
         latencyMs: Date.now() - start,
-        transcript: result.text || '(silence — API reachable)',
+        transcript: result.text || '(empty transcript)',
+        ttsSource,
       });
     }
 
