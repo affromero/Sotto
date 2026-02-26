@@ -2,7 +2,7 @@ import { Readability } from '@mozilla/readability';
 import { JSDOM } from 'jsdom';
 import * as cheerio from 'cheerio';
 import { logger } from '../logger';
-import { validateUrl } from '../url-validator';
+import { safeFetch } from '../url-validator';
 import type { ExtractedContent } from './types';
 
 const MAX_CONTENT_LENGTH = 50000;
@@ -89,13 +89,11 @@ export async function extractHtmlContent(url: string): Promise<ExtractedContent>
 }
 
 async function fetchHtml(url: string): Promise<string> {
-  await validateUrl(url);
-
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -103,7 +101,6 @@ async function fetchHtml(url: string): Promise<string> {
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
       },
-      redirect: 'follow',
     });
 
     if (!response.ok) {

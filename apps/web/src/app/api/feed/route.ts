@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { feedQuerySchema } from '@/lib/validations';
 import { searchPodcasts, getTrending } from '@/lib/recommendation-engine';
+import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import type { Prisma } from '@prisma/client';
 
 import { errorResponse } from '@/lib/api-response';
@@ -68,7 +69,8 @@ export async function GET(request: NextRequest) {
       where: followingWhere,
       orderBy: { createdAt: 'desc' },
       take: 20,
-      include: {
+      select: {
+        ...PODCAST_PUBLIC_SELECT,
         user: { select: { id: true, name: true, image: true, role: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
       },
@@ -110,7 +112,8 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
-        include: {
+        select: {
+          ...PODCAST_PUBLIC_SELECT,
           user: { select: { id: true, name: true, image: true, role: true } },
           tags: { include: { tag: true } },
           forkedFrom: { select: { id: true, title: true } },
@@ -221,7 +224,8 @@ export async function GET(request: NextRequest) {
       orderBy,
       skip,
       take: limit,
-      include: {
+      select: {
+        ...PODCAST_PUBLIC_SELECT,
         user: { select: { id: true, name: true, image: true, role: true } },
         tags: { include: { tag: true } },
         forkedFrom: { select: { id: true, title: true } },
