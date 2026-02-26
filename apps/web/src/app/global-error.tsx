@@ -1,0 +1,49 @@
+'use client';
+
+import { useEffect } from 'react';
+import * as Sentry from '@sentry/nextjs';
+import styles from './global-error.module.css';
+
+export default function GlobalError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  useEffect(() => {
+    Sentry.captureException(error);
+  }, [error]);
+
+  return (
+    <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('sotto-theme')||'system';if(t==='system'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme='light'}})()`,
+          }}
+        />
+      </head>
+      <body className={styles.body}>
+        <main className={styles.root}>
+          <div className={styles.icon} aria-hidden="true">
+            &#x26A0;&#xFE0F;
+          </div>
+          <h1 className={styles.title}>Something went wrong</h1>
+          <p className={styles.description}>
+            An unexpected error occurred. You can try again or head back to the
+            feed.
+          </p>
+          <div className={styles.actions}>
+            <button className={styles.retry} onClick={reset}>
+              Try Again
+            </button>
+            <a href="/feed" className={styles.back}>
+              Back to Feed
+            </a>
+          </div>
+        </main>
+      </body>
+    </html>
+  );
+}

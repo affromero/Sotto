@@ -22,6 +22,7 @@ const PUBLIC_ROUTES = new Set([
   '/connect/telegram',
   '/changelog',
   '/developers',
+  '/api/monitoring',
 ]);
 const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed', '/api/waitlist', '/api/telegram', '/ref'];
 
