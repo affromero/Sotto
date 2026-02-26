@@ -9,7 +9,7 @@ interface PageProps {
 async function getAnalytics(days: number) {
   const since = subDays(startOfDay(new Date()), days);
 
-  const [totalPageViews, uniqueSessions, topPages, referrers, devices, dailyVisitors, avgPages] =
+  const [totalPageViews, uniqueSessions, topPages, referrers, countries, devices, dailyVisitors, avgPages] =
     await Promise.all([
       prisma.behavioralEvent.count({
         where: { eventType: 'page.view', createdAt: { gte: since } },
@@ -29,6 +29,13 @@ async function getAnalytics(days: number) {
         where: { startedAt: { gte: since }, referrer: { not: null } },
         _count: true,
         orderBy: { _count: { referrer: 'desc' } },
+        take: 15,
+      }),
+      prisma.userSession.groupBy({
+        by: ['country'],
+        where: { startedAt: { gte: since }, country: { not: null } },
+        _count: true,
+        orderBy: { _count: { country: 'desc' } },
         take: 15,
       }),
       prisma.userSession.groupBy({
@@ -61,6 +68,10 @@ async function getAnalytics(days: number) {
       referrer: r.referrer ?? 'Direct',
       count: r._count,
     })),
+    countries: countries.map((c) => ({
+      code: c.country ?? 'Unknown',
+      count: c._count,
+    })),
     devices: devices.map((d) => ({
       type: d.deviceType ?? 'Unknown',
       count: d._count,
@@ -78,6 +89,12 @@ function extractDomain(url: string): string {
   } catch {
     return url;
   }
+}
+
+function countryFlag(code: string): string {
+  if (code.length !== 2) return '';
+  const offset = 0x1f1e6 - 65;
+  return String.fromCodePoint(code.charCodeAt(0) + offset, code.charCodeAt(1) + offset);
 }
 
 export default async function AdminAnalyticsPage({ searchParams }: PageProps) {
@@ -212,6 +229,31 @@ export default async function AdminAnalyticsPage({ searchParams }: PageProps) {
           )}
         </section>
       </div>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Top Countries</h2>
+        {stats.countries.length === 0 ? (
+          <p className={styles.empty}>No country data yet.</p>
+        ) : (
+          <div className={styles.countryGrid}>
+            {stats.countries.map((c) => {
+              const maxCount = stats.countries[0]?.count ?? 1;
+              const pct = (c.count / maxCount) * 100;
+              return (
+                <div key={c.code} className={styles.countryRow}>
+                  <span className={styles.countryLabel}>
+                    {countryFlag(c.code)} {c.code}
+                  </span>
+                  <div className={styles.countryBarTrack}>
+                    <div className={styles.countryBarFill} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={styles.countryCount}>{c.count.toLocaleString()}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Device Breakdown</h2>
