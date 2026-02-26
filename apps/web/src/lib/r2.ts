@@ -82,6 +82,32 @@ export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<st
 }
 
 /**
+ * Extract the R2 object key from a public URL or pass through raw keys.
+ */
+export function extractR2Key(urlOrKey: string): string {
+  if (R2_PUBLIC_URL && urlOrKey.startsWith(R2_PUBLIC_URL)) {
+    return urlOrKey.slice(R2_PUBLIC_URL.length + 1);
+  }
+  return urlOrKey;
+}
+
+/**
+ * Resolve an audio URL based on podcast visibility.
+ * PUBLIC → return the CDN URL as-is.
+ * PRIVATE/UNLISTED → return a presigned URL (1hr TTL).
+ * null → return null.
+ */
+export async function resolveAudioUrl(
+  audioUrl: string | null,
+  visibility: string
+): Promise<string | null> {
+  if (!audioUrl) return null;
+  if (visibility === 'PUBLIC') return audioUrl;
+  const key = extractR2Key(audioUrl);
+  return getPresignedUrl(key);
+}
+
+/**
  * Download a file from R2 by its public URL or key
  */
 export async function downloadFile(urlOrKey: string): Promise<Buffer> {
@@ -89,11 +115,7 @@ export async function downloadFile(urlOrKey: string): Promise<Buffer> {
     throw new Error('R2 storage not configured — set R2_* environment variables');
   }
 
-  // If it's a full URL, extract the key
-  const key =
-    R2_PUBLIC_URL && urlOrKey.startsWith(R2_PUBLIC_URL)
-      ? urlOrKey.slice(R2_PUBLIC_URL.length + 1)
-      : urlOrKey;
+  const key = extractR2Key(urlOrKey);
 
   const response = await s3Client.send(
     new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })
@@ -121,10 +143,7 @@ export async function deleteFile(urlOrKey: string): Promise<void> {
     throw new Error('R2 storage not configured');
   }
 
-  const key =
-    R2_PUBLIC_URL && urlOrKey.startsWith(R2_PUBLIC_URL)
-      ? urlOrKey.slice(R2_PUBLIC_URL.length + 1)
-      : urlOrKey;
+  const key = extractR2Key(urlOrKey);
 
   await s3Client.send(
     new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })

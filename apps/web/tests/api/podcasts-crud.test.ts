@@ -113,6 +113,10 @@ vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('@/lib/r2', () => ({
+  resolveAudioUrl: vi.fn(async (url: string | null) => url),
+}));
+
 vi.mock('@/lib/auth-guards', () => ({
   checkSuspension: vi.fn().mockReturnValue(null),
   requireAdmin: vi.fn().mockReturnValue(null),

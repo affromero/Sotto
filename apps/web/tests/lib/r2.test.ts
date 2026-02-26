@@ -18,6 +18,8 @@ import {
   getPresignedUrl,
   downloadFile,
   deleteFile,
+  extractR2Key,
+  resolveAudioUrl,
 } from '@/lib/r2';
 
 // Mock AWS SDK and presigner
@@ -380,5 +382,53 @@ describe('r2.ts', () => {
       await expect(deleteFile('test/file.mp3')).rejects.toThrow('Access denied');
     });
 
+  });
+
+  describe('extractR2Key', () => {
+    it('extracts key from public URL', () => {
+      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      expect(extractR2Key(url)).toBe('podcasts/abc/audio.mp3');
+    });
+
+    it('passes through raw keys unchanged', () => {
+      const key = 'podcasts/abc/audio.mp3';
+      expect(extractR2Key(key)).toBe('podcasts/abc/audio.mp3');
+    });
+  });
+
+  describe('resolveAudioUrl', () => {
+    it('returns public URL as-is for PUBLIC visibility', async () => {
+      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const result = await resolveAudioUrl(url, 'PUBLIC');
+      expect(result).toBe(url);
+    });
+
+    it('returns presigned URL for PRIVATE visibility', async () => {
+      (getSignedUrl as Mock).mockResolvedValue(
+        'https://signed.example.com/podcasts/abc/audio.mp3?X-Amz-Signature=xyz'
+      );
+
+      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const result = await resolveAudioUrl(url, 'PRIVATE');
+
+      expect(result).toBe('https://signed.example.com/podcasts/abc/audio.mp3?X-Amz-Signature=xyz');
+      expect(getSignedUrl).toHaveBeenCalled();
+    });
+
+    it('returns presigned URL for UNLISTED visibility', async () => {
+      (getSignedUrl as Mock).mockResolvedValue(
+        'https://signed.example.com/file.mp3?sig=abc'
+      );
+
+      const url = 'https://cdn.example.com/podcasts/abc/audio.mp3';
+      const result = await resolveAudioUrl(url, 'UNLISTED');
+
+      expect(result).toContain('sig=abc');
+    });
+
+    it('returns null for null input', async () => {
+      const result = await resolveAudioUrl(null, 'PRIVATE');
+      expect(result).toBeNull();
+    });
   });
 });
