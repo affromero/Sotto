@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { humanType, waitAndSettle, humanClick } from '../lib/actions';
+import { humanType, waitAndSettle, humanClick, injectCursor, zoomToElement, zoomReset } from '../lib/actions';
 import { interceptInteract } from '../lib/interceptors';
 import type { FlowScenario, FlowContext } from '../lib/types';
 
@@ -16,48 +16,58 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
       "this encryption. However, we're still decades away from quantum computers powerful enough " +
       "to pose a real threat. The Bitcoin community is already researching quantum-resistant " +
       "signature schemes as a precaution.",
-    answerDelay: 2000,
+    answerDelay: 1500,
   });
 
-  // Navigate to podcast player
   await page.goto(`${ctx.appUrl}/podcast/${cryptoPodcast.id}`, {
     waitUntil: 'domcontentloaded',
     timeout: 30000,
   });
 
-  // Wait for the player to mount
-  await waitAndSettle(page, 'button[aria-label="Play"]', 1000);
+  await waitAndSettle(page, 'button[aria-label="Play"]', 500);
+  await injectCursor(page);
 
-  // Click play
+  // Zoom into the play button, click it
+  await zoomToElement(page, 'button[aria-label="Play"]', 1.6);
   await humanClick(page, 'button[aria-label="Play"]');
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(800);
+  await zoomReset(page);
 
-  // Click "Ask a Question" button
+  // Wait and verify player is in playing state (pause button visible = playing)
+  await page.locator('button[aria-label="Pause"]').waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  await page.waitForTimeout(2000);
+
+  // Zoom to "Ask a Question" button
+  await zoomToElement(page, 'button[aria-label="Ask a question"]', 1.5);
   await humanClick(page, 'button[aria-label="Ask a question"]');
-  await waitAndSettle(page, 'section[aria-label="Ask a question about this podcast"]');
+  await page.waitForTimeout(400);
+  await zoomReset(page);
+  await waitAndSettle(page, 'section[aria-label="Ask a question about this podcast"]', 300);
 
-  // Type the question
+  // Zoom into the question panel, type the question
+  await zoomToElement(page, 'section[aria-label="Ask a question about this podcast"]', 1.4);
   const textareaSelector = 'section[aria-label="Ask a question about this podcast"] textarea';
   await humanType(
     page,
     textareaSelector,
     'Could quantum computers break Bitcoin\'s encryption too?'
   );
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
 
-  // Click submit (the "Ask" button — not type="submit", just a styled button)
   const submitBtn = page.locator('section[aria-label="Ask a question about this podcast"] button:has-text("Ask")');
   await submitBtn.click();
 
-  // Wait for the answer to appear (polling mock returns ANSWERED after ~2s)
+  // Wait for the answer, stay zoomed so it's readable
   await page.locator('[class*="answerText"]').first().waitFor({ state: 'visible', timeout: 15000 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1500);
+  await zoomReset(page);
+  await page.waitForTimeout(500);
 }
 
 const playerInterrupt: FlowScenario = {
   name: '03-player-interrupt',
   description: 'Play podcast, interrupt with a question, get AI answer',
-  viewport: { width: 1440, height: 900 },
+  viewport: { width: 1920, height: 1080 },
   auth: 'demo',
   run,
 };

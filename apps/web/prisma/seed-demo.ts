@@ -10,17 +10,17 @@ async function main() {
   const demoUser = await prisma.user.upsert({
     where: { email: 'demo@sotto.fm' },
     update: {
-      name: 'Alex Rivera',
+      name: 'Nico Valerio',
       role: 'CREATOR',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
-      image: 'https://api.dicebear.com/9.x/notionists/svg?seed=alex&backgroundColor=D97706',
+      image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
     create: {
       email: 'demo@sotto.fm',
-      name: 'Alex Rivera',
+      name: 'Nico Valerio',
       role: 'CREATOR',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
-      image: 'https://api.dicebear.com/9.x/notionists/svg?seed=alex&backgroundColor=D97706',
+      image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
   });
   console.log(`  Demo user: ${demoUser.id} (${demoUser.email})`);
@@ -882,7 +882,7 @@ async function main() {
       type: 'USER_FOLLOWED',
       targetId: demoUser.id,
       targetType: 'user',
-      metadata: { name: 'Alex Rivera' },
+      metadata: { name: 'Nico Valerio' },
     },
     {
       userId: demoUser.id,

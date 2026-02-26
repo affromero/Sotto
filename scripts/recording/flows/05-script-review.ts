@@ -1,5 +1,5 @@
 import type { Page } from 'playwright';
-import { smoothScroll } from '../lib/actions';
+import { smoothScroll, injectCursor, zoomToElement, zoomReset } from '../lib/actions';
 import { interceptScriptApprove } from '../lib/interceptors';
 import type { FlowScenario, FlowContext } from '../lib/types';
 
@@ -20,30 +20,37 @@ async function run(page: Page, ctx: FlowContext): Promise<void> {
   // Two matching buttons exist (mobile + desktop), so use .first()
   const approveBtn = page.getByRole('button', { name: 'Approve & Generate Audio' }).first();
   await approveBtn.waitFor({ state: 'visible', timeout: 15000 });
-  await page.waitForTimeout(2000);
-
-  // Scroll through the script turns
-  await smoothScroll(page, 300, 1000);
+  await injectCursor(page);
   await page.waitForTimeout(1000);
 
-  await smoothScroll(page, 300, 1000);
-  await page.waitForTimeout(1500);
+  // Scroll through the script — zoom in to show turn detail
+  await smoothScroll(page, 300, 600);
+  await page.waitForTimeout(300);
+  await zoomToElement(page, '[class*="turn"], [class*="Turn"], main', 1.4);
+  await page.waitForTimeout(1000);
+  await zoomReset(page);
 
-  // Scroll back up to the approve button
-  await smoothScroll(page, -200, 600);
-  await page.waitForTimeout(500);
+  await smoothScroll(page, 300, 600);
+  await page.waitForTimeout(800);
 
-  // Click "Approve & Generate Audio"
+  // Scroll back up to approve button
+  await smoothScroll(page, -200, 400);
+  await page.waitForTimeout(300);
+
+  // Zoom into approve button
+  await zoomToElement(page, 'button:has-text("Approve & Generate Audio")', 1.5);
   await approveBtn.hover();
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(150);
   await approveBtn.click();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1200);
+  await zoomReset(page);
+  await page.waitForTimeout(500);
 }
 
 const scriptReview: FlowScenario = {
   name: '05-script-review',
   description: 'Review SCRIPT_READY podcast — scroll turns, approve to generate audio',
-  viewport: { width: 1440, height: 900 },
+  viewport: { width: 1920, height: 1080 },
   auth: 'demo',
   run,
 };
