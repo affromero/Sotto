@@ -162,6 +162,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [playerInView, setPlayerInView] = useState(true);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [questionsRefreshTrigger, setQuestionsRefreshTrigger] = useState(0);
   const [lineageData, setLineageData] = useState<{
@@ -177,16 +178,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }>;
   } | null>(null);
 
-  // Check if owner has already rated this podcast
+  // Check if user has already rated this podcast
   useEffect(() => {
-    if (!isOwner || liveStatus !== 'READY') return;
+    if (!isAuthenticated || liveStatus !== 'READY') return;
     fetch(`/api/podcasts/${podcast.id}/rating`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.rating) setHasRated(true);
       })
       .catch(() => {});
-  }, [isOwner, liveStatus, podcast.id]);
+  }, [isAuthenticated, liveStatus, podcast.id]);
 
   // Fetch knowledge gaps for owner
   useEffect(() => {
@@ -421,10 +422,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   return (
     <>
     <PlayerBridge
-      onTimeUpdate={setCurrentTime}
+      onTimeUpdate={(time) => {
+        setCurrentTime(time);
+        if (podcast.duration && podcast.duration > 0) {
+          completionPercentRef.current = Math.min((time / podcast.duration) * 100, 100);
+        }
+      }}
       seekRef={seekRef}
       onComplete={() => {
-        if (isOwner && !hasRated) setShowRatingPrompt(true);
+        if (isAuthenticated && !hasRated) setShowRatingPrompt(true);
       }}
     />
     <div className={styles.playerView}>
@@ -610,6 +616,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {showRatingPrompt && !hasRated && (
         <PostListenRating
           podcastId={podcast.id}
+          isOwner={isOwner}
+          completionPercent={completionPercentRef.current}
           onDismiss={() => {
             setShowRatingPrompt(false);
             setHasRated(true);
