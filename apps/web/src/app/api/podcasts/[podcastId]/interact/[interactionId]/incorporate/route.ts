@@ -5,6 +5,7 @@ import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
 import { generateResponse } from '@/lib/claude';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
+import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { getAiKey } from '@/lib/byok';
 import { getLanguageLabel } from '@sotto/shared';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
@@ -134,7 +135,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const podcastLanguage = interaction.podcast.language || 'en';
   const languageLabel = getLanguageLabel(podcastLanguage) || 'English';
 
-  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the ${activeSpeaker} speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text. Write in ${languageLabel}.${CONTENT_SAFETY_INSTRUCTIONS}`;
+  const systemPrompt = `You are a podcast script writer for Sotto. A listener asked a question during playback and the AI answered it. Now you need to write a natural-sounding segment that incorporates this Q&A into the podcast flow. Write as the ${activeSpeaker} speaker, keeping the same conversational tone. Keep it concise (2-4 sentences). Do NOT include speaker labels or prefixes — just the text. Write in ${languageLabel}.${VOICE_REALISM_SHORT}${CONTENT_SAFETY_INSTRUCTIONS}`;
 
   const response = await generateResponse(systemPrompt, [
     {
