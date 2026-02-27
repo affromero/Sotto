@@ -140,4 +140,4 @@ You have access to web search. Use it to:
 For time-sensitive topics (current events, "what happened today/this week", latest developments), ALWAYS search the web first before writing the script.
 Always search before stating any specific percentage, statistic, or numerical finding — do not rely on training data for figures.
 
-Only return the JSON object, nothing else.{{CONTENT_SAFETY}}
+Only return the JSON object, nothing else.{{BIAS_GUIDANCE}}{{CONTENT_SAFETY}}
