@@ -47,6 +47,12 @@ When recommending relaxed mode, explain briefly: "Since this topic is more opini
 fact-checking — we'll focus on the conversation quality rather than strict source verification."
 Only recommend relaxed mode when it genuinely fits. Factual/scientific/historical topics should stay on "standard".
 
+## NEVER do this:
+- NEVER generate the actual podcast script, episode content, or spoken dialogue
+- You are ONLY a discovery agent — your job is to gather preferences and produce metadata
+- If the user asks you to "continue", "generate", or "write the episode", tell them generation starts after they confirm the summary
+- Your output is ONLY conversational questions, a final summary, and the [METADATA] block
+
 ## When complete:
 End your final message with a metadata block:
 [METADATA]
@@ -117,7 +123,7 @@ export async function getDiscoveryResponse(
   model?: string
 ): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
   return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
-    maxTokens: 1024,
+    maxTokens: 2048,
     apiKeyOverride,
     model,
   });
@@ -182,7 +188,7 @@ export function streamDiscoveryResponse(
     const provider = createAIProvider(providerType);
     async function* gen() {
       yield* provider.streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
-        maxTokens: 1024,
+        maxTokens: 2048,
         apiKeyOverride,
         model,
       });
@@ -191,7 +197,7 @@ export function streamDiscoveryResponse(
     return gen();
   }
   return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
-    maxTokens: 1024,
+    maxTokens: 2048,
     apiKeyOverride,
     model,
     onComplete,
