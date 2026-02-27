@@ -76,7 +76,7 @@ vi.mock('@/lib/providers/tts/openai.provider', () => ({
 }));
 
 // Mock the underlying service modules to prevent initialization errors
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   generateResponse: vi
     .fn()
     .mockResolvedValue({ content: 'test', inputTokens: 10, outputTokens: 20 }),

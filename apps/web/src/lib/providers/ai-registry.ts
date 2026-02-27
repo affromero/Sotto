@@ -271,6 +271,70 @@ export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
 }
 
 /**
+ * Look up which provider owns a model ID.
+ * e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic', 'llama-3.3-70b-versatile' → 'groq'
+ * Returns null if the model is not found in any provider.
+ */
+export function getProviderForModel(modelId: string): AiProviderId | null {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    if (provider.models.some((m) => m.id === modelId)) {
+      return provider.id;
+    }
+  }
+  return null;
+}
+
+/**
+ * Resolve the AI model and its owning provider, keeping them in sync.
+ *
+ * Priority:
+ * 1. podcast.aiModel (user's explicit choice) → look up provider from registry
+ * 2. BYOK key → provider default model
+ * 3. Free tier admin config → aiAllocations[0] or aiModel
+ *
+ * Returns both `model` and `provider` so callers never mismatch them.
+ */
+export async function resolveAiModelAndProvider(opts: {
+  podcastAiModel?: string | null;
+  aiKey?: { provider: string; apiKey: string } | null;
+}): Promise<{ model: string; provider: string }> {
+  const { getFreeTierConfig } = await import('../free-tier-config');
+
+  // 1. Podcast-level model override
+  if (opts.podcastAiModel) {
+    const owner = getProviderForModel(opts.podcastAiModel);
+    return {
+      model: opts.podcastAiModel,
+      provider: owner ?? opts.aiKey?.provider ?? 'anthropic',
+    };
+  }
+
+  // 2. BYOK key → provider's default model
+  if (opts.aiKey) {
+    const providerId = opts.aiKey.provider as AiProviderId;
+    if (isValidAiProviderId(providerId)) {
+      return {
+        model: getAiProviderMeta(providerId).defaultModel,
+        provider: providerId,
+      };
+    }
+  }
+
+  // 3. Free tier config
+  const config = await getFreeTierConfig();
+  if (config.aiAllocations.length > 0) {
+    return {
+      model: config.aiAllocations[0].model,
+      provider: config.aiAllocations[0].provider,
+    };
+  }
+  return {
+    model: config.aiModel,
+    provider: config.aiProvider,
+  };
+}
+
+/**
  * Look up the minimum plan required for a model ID.
  * Returns null if the model is not found in any provider.
  */

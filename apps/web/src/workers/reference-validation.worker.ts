@@ -15,9 +15,8 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getTierFeatures } from '@/lib/tier-features';
-import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 
 export async function processReferenceValidation(
@@ -45,17 +44,11 @@ export async function processReferenceValidation(
     }),
   ]);
 
-  // Model priority: user's choice > provider default > free tier admin config
-  let model = podcast?.aiModel ?? undefined;
-  if (!model && aiKey) {
-    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
-  }
-  if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
-  }
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model } = await resolveAiModelAndProvider({
+    podcastAiModel: podcast?.aiModel,
+    aiKey,
+  });
 
   if (!script) {
     throw new Error(`Script not found for podcast ${podcastId}`);

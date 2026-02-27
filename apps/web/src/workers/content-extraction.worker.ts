@@ -7,7 +7,7 @@ import { assessTopicFeasibility } from '@/lib/topic-assessor';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
@@ -90,13 +90,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       logger.info('Running topic feasibility check', { podcastId });
 
       const aiKey = useAdminCredits ? null : await getAiKey(userId);
-      let model: string | undefined;
-      if (!model) {
-        const config = await getFreeTierConfig();
-        model = config.aiAllocations.length > 0
-          ? config.aiAllocations[0].model
-          : config.aiModel;
-      }
+      const { model } = await resolveAiModelAndProvider({ aiKey });
 
       const assessment = await assessTopicFeasibility({
         topic: discoveryMeta.topic,

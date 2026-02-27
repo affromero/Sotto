@@ -1,10 +1,35 @@
-import { generateResponse } from './claude';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { getAllAiProviderMeta } from './providers/ai-registry';
+import { createAIProvider, resolveAiProvider, type AIProvider, type ContentPart } from './providers/ai';
 import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
+
+export interface ParseOptions {
+  userId?: string;
+  apiKeyOverride?: string;
+  imageUrls?: string[];
+}
+
+async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string }> {
+  if (opts?.userId) {
+    try {
+      const resolved = await resolveAiProvider(opts.userId);
+      return {
+        provider: createAIProvider(resolved.provider),
+        providerName: resolved.provider,
+      };
+    } catch {
+      // Fall through to defaults
+    }
+  }
+  if (opts?.apiKeyOverride) {
+    return { provider: createAIProvider('anthropic'), providerName: 'anthropic' };
+  }
+  const defaultProvider = process.env.AI_PROVIDER || 'anthropic';
+  return { provider: createAIProvider(defaultProvider), providerName: defaultProvider };
+}
 
 const SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
 Users tag @sottofm on Twitter to request podcast generation. Extract structured metadata from their tweet.
@@ -19,6 +44,7 @@ Rules:
 - If the tweet contains a URL, extract it as sourceUrl
 - Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
 - Infer durationTarget in minutes: short tweet or quick_overview → 5, detailed or deep_dive → 15, default → 10
+- If the tweet includes image(s), analyze them to understand the topic. An image-only tweet (or one with minimal text like just "@sottofm") should still produce a valid topic from the visual content.
 - Strip @sottofm mention and any Twitter handles from the topic
 - If the user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). If not mentioned, set to null.
 ${INPUT_SANITIZATION_INSTRUCTIONS}
@@ -40,26 +66,43 @@ Respond with ONLY valid JSON matching this shape:
 
 /**
  * Parse a tweet mentioning @sottofm into structured podcast generation metadata.
- * Uses a lightweight Claude call (512 max tokens) for fast extraction.
+ * Uses the user's configured AI provider (or platform default) for fast extraction.
  */
 export async function parseTweetIntent(
   tweetText: string,
   parentTweetText?: string,
-  apiKeyOverride?: string
+  opts?: ParseOptions
 ): Promise<TweetParseResult> {
-  let userMessage = `Tweet: "${tweetText}"`;
+  let textMessage = `Tweet: "${tweetText}"`;
   if (parentTweetText) {
-    userMessage += `\n\nThis tweet is a reply to: "${parentTweetText}"`;
+    textMessage += `\n\nThis tweet is a reply to: "${parentTweetText}"`;
   }
 
-  const response = await generateResponse(
+  // Build multimodal content when images are attached
+  const content: string | ContentPart[] = opts?.imageUrls?.length
+    ? [
+        { type: 'text' as const, text: textMessage },
+        ...opts.imageUrls.map((url) => ({ type: 'image_url' as const, url })),
+      ]
+    : textMessage;
+
+  const { provider, providerName } = await getProviderForParsing(opts);
+
+  if (opts?.imageUrls?.length && providerName === 'groq') {
+    logger.warn('Images attached but provider does not support vision — images will be ignored', {
+      provider: providerName,
+      imageCount: String(opts.imageUrls.length),
+    });
+  }
+
+  const response = await provider.generateResponse(
     SYSTEM_PROMPT,
-    [{ role: 'user', content: userMessage }],
-    { maxTokens: 512, apiKeyOverride }
+    [{ role: 'user', content }],
+    { maxTokens: 512, apiKeyOverride: opts?.apiKeyOverride }
   );
 
   logUsage({
-    service: 'anthropic',
+    service: providerName,
     model: response.model,
     category: 'tweet_parse',
     inputTokens: response.inputTokens,
@@ -67,21 +110,21 @@ export async function parseTweetIntent(
   });
 
   logger.info('Tweet intent parsed', {
+    provider: providerName,
     inputTokens: String(response.inputTokens),
     outputTokens: String(response.outputTokens),
   });
 
   let parsed: TweetParseResult;
   try {
-    // Claude may wrap JSON in markdown code fences — strip them
     const cleaned = response.content
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')
       .trim();
     parsed = JSON.parse(cleaned) as TweetParseResult;
   } catch {
-    logger.error('Failed to parse Claude JSON response', { raw: response.content });
-    throw new Error('Failed to parse tweet intent — Claude returned invalid JSON');
+    logger.error('Failed to parse LLM JSON response', { raw: response.content });
+    throw new Error('Failed to parse tweet intent — LLM returned invalid JSON');
   }
 
   if (!parsed.topic || !parsed.title) {
@@ -164,7 +207,7 @@ function formatThreadForParsing(thread: ThreadData): string {
 export async function parseThreadIntent(
   mentionTweet: ThreadTweet,
   thread: ThreadData,
-  apiKeyOverride?: string
+  opts?: ParseOptions
 ): Promise<TweetParseResult> {
   const threadText = formatThreadForParsing(thread);
   const threadType = thread.isSelfAuthored ? 'self-authored' : 'discussion';
@@ -174,14 +217,15 @@ Thread (${thread.tweetCount} tweets, ${thread.participantCount} participants, ty
 
 ${threadText}`;
 
-  const response = await generateResponse(
+  const { provider, providerName } = await getProviderForParsing(opts);
+  const response = await provider.generateResponse(
     THREAD_SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 1024, apiKeyOverride }
+    { maxTokens: 1024, apiKeyOverride: opts?.apiKeyOverride }
   );
 
   logUsage({
-    service: 'anthropic',
+    service: providerName,
     model: response.model,
     category: 'tweet_parse',
     inputTokens: response.inputTokens,
@@ -190,6 +234,7 @@ ${threadText}`;
   });
 
   logger.info('Thread intent parsed', {
+    provider: providerName,
     inputTokens: String(response.inputTokens),
     outputTokens: String(response.outputTokens),
     tweetCount: String(thread.tweetCount),
@@ -203,8 +248,8 @@ ${threadText}`;
       .trim();
     parsed = JSON.parse(cleaned) as TweetParseResult;
   } catch {
-    logger.error('Failed to parse Claude thread JSON response', { raw: response.content });
-    throw new Error('Failed to parse thread intent — Claude returned invalid JSON');
+    logger.error('Failed to parse LLM thread JSON response', { raw: response.content });
+    throw new Error('Failed to parse thread intent — LLM returned invalid JSON');
   }
 
   if (!parsed.topic || !parsed.title) {
@@ -219,7 +264,7 @@ ${threadText}`;
  * Returns { aiModel, ttsProvider } with null for unrecognized names.
  *
  * This only affects the podcast generation pipeline (script + audio),
- * NOT the tweet parser itself (which always uses Claude).
+ * NOT the tweet parser itself (which uses the user's configured AI provider).
  */
 export function resolveModelFromTweet(parsed: TweetParseResult): {
   aiModel: string | null;

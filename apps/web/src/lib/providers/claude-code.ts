@@ -1,5 +1,11 @@
-import type { AIProvider, AIOptions, AIResponse, ChatMessage } from './ai';
+import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
 import { executeClaudeCode, streamClaudeCode, serializeMessages } from '../claude-code-client';
+
+/** Extract plain text from ChatMessage content (string or ContentPart[]). */
+function textOf(content: ChatMessage['content']): string {
+  if (typeof content === 'string') return content;
+  return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
+}
 
 /**
  * Claude Code CLI provider — routes AI calls through `claude -p`.
@@ -12,7 +18,8 @@ export class ClaudeCodeProvider implements AIProvider {
     opts?: AIOptions
   ): Promise<AIResponse> {
     const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
-    const result = await executeClaudeCode(system, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    const result = await executeClaudeCode(system, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: opts?.useWebSearch,
     });
@@ -24,7 +31,8 @@ export class ClaudeCodeProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): AsyncGenerator<string> {
-    yield* streamClaudeCode(system, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
+    yield* streamClaudeCode(system, serializeMessages(textMessages), {
       model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
       useWebSearch: opts?.useWebSearch,
     });

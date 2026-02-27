@@ -1,4 +1,4 @@
-import { generateResponse, streamResponse } from './claude';
+import { generateResponse, streamResponse } from './llm';
 import { createAIProvider } from './providers/ai';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 export { detectUrls } from './detect-urls';

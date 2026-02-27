@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './llm';
 import { logger } from './logger';
 import { logUsage } from './usage-logger';
 

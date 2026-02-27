@@ -12,7 +12,7 @@ All shared business logic and external service integrations live here.
 | `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/CREATOR/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
 | `admin-emails.ts` | Admin email list loader from `config/admins.json`, `isAdminEmail()` check | Filesystem |
 | `auth-guards.ts` | Suspension check for write-path API routes (`checkSuspension()`) | Pure utility |
-| `claude.ts` | Anthropic Claude client (streaming + non-streaming), provider-aware (`AI_PROVIDER`) | Anthropic API / Claude CLI |
+| `llm.ts` | Anthropic LLM client (streaming + non-streaming), with auto-routing guardrail for non-Anthropic models | Anthropic API / Claude CLI |
 | `claude-code-client.ts` | Claude Code CLI wrapper (`claude -p`): serialize messages, execute, stream | Claude CLI (`claude`) |
 | `elevenlabs.ts` | ElevenLabs TTS client, voice ID mapping | ElevenLabs API |
 | `fal-voice-clone.ts` | Fal.ai voice cloning via Qwen3-TTS: upload audio to R2, call clone-voice endpoint, return speaker embedding URL | Fal API + R2 |
@@ -20,12 +20,12 @@ All shared business logic and external service integrations live here.
 | `voice-pricing.ts` | Voice marketplace pricing: `computeVoiceCharges()`, `createVoicePayment()`, `captureVoicePayment()`, `cancelVoicePayment()`, `capturePodcastPayments()`, `cancelPodcastPayments()`, `checkFreeAccess()` | Uses `prisma.ts`, `stripe.ts` |
 | `r2.ts` | Cloudflare R2 file storage (upload, download, presign) | AWS S3 SDK → R2 |
 | `duration.ts` | Centralized duration constants (WPM, chars/sec, tolerance) & helpers (word↔minute, bounds, estimation) | Pure utility |
-| `discovery-agent.ts` | Chat-based discovery: system prompt, chip parsing, metadata extraction | Uses `claude.ts` |
+| `discovery-agent.ts` | Chat-based discovery: system prompt, chip parsing, metadata extraction | Uses `llm.ts` |
 | `feedback-formatter.ts` | Format user feedback (general, per-turn, highlights) into prompt string for script revision | Pure utility |
-| `script-generator.ts` | 2-voice podcast script generation with `[N]` citations + revision with feedback (fact-checker + user) | Uses `claude.ts` |
-| `script-verifier.ts` | Claude-based "teacher" agent: extracts claims, evaluates sourcing, enforces duration limits | Uses `claude.ts` |
-| `reference-validator.ts` | Source quality pre-filter (`assessSourceQuality`), URL HEAD, CrossRef DOI, OpenAlex title-search layers. Used by `reference-verification/` pipeline. | fetch, `claude.ts` |
-| `reference-verification/` | Domain-aware verification pipeline: `classifyReference()` → applicable layers → AI batch call → `computeBayesianScore()`. Exports `runReferenceVerification()`. | `@sottofm/verification-standard`, `claude.ts` |
+| `script-generator.ts` | 2-voice podcast script generation with `[N]` citations + revision with feedback (fact-checker + user) | Uses `llm.ts` |
+| `script-verifier.ts` | Claude-based "teacher" agent: extracts claims, evaluates sourcing, enforces duration limits | Uses `llm.ts` |
+| `reference-validator.ts` | Source quality pre-filter (`assessSourceQuality`), URL HEAD, CrossRef DOI, OpenAlex title-search layers. Used by `reference-verification/` pipeline. | fetch, `llm.ts` |
+| `reference-verification/` | Domain-aware verification pipeline: `classifyReference()` → applicable layers → AI batch call → `computeBayesianScore()`. Exports `runReferenceVerification()`. | `@sottofm/verification-standard`, `llm.ts` |
 | `script-updater.ts` | Citation cleanup + renumbering when references are removed after verification | Pure utility |
 | `segment-creator.ts` | Shared utility: create Segment records from script turns and queue audio generation jobs (used by reference-validation, script approve endpoint) | Uses `prisma.ts`, `queue.ts` |
 | `citation-parser.tsx` | Parse `[N]` citation markers in text → React CitationMarker components | React |
@@ -45,12 +45,12 @@ All shared business logic and external service integrations live here.
 | `logger.ts` | Structured logging with levels (debug/info/warn/error) | Console |
 | `notifications.ts` | In-app notification helpers | Uses `prisma.ts` |
 | `twitter.ts` | Twitter API v2 client (mentions, tweets, replies, OAuth 1.0a) | Twitter API v2 |
-| `tweet-parser.ts` | Claude-based tweet intent extraction (topic, title, depth, tone) | Uses `claude.ts` |
+| `tweet-parser.ts` | Claude-based tweet intent extraction (topic, title, depth, tone) | Uses `llm.ts` |
 | `twitter-utils.ts` | Thread source text formatting (engagement-aware, credential-aware) | Pure utility |
-| `credential-lookup.ts` | Verified participant credential lookup via Claude + web search | Uses `claude.ts` |
+| `credential-lookup.ts` | Verified participant credential lookup via Claude + web search | Uses `llm.ts` |
 | `telegram.ts` | Telegram Bot API client (send messages, get updates, inline keyboards, webhook management) | Telegram Bot API |
 | `telegram-handler.ts` | Telegram update router: /start (account linking), /help, save-for-later (any text/URL → PodcastIdea), legacy callback query fallback | Uses `prisma.ts`, `telegram.ts`, `discovery-agent.ts`, `byok.ts` |
-| `telegram-parser.ts` | Claude-based Telegram message intent extraction (topic, title, depth, tone, sourceUrl) | Uses `claude.ts` |
+| `telegram-parser.ts` | Claude-based Telegram message intent extraction (topic, title, depth, tone, sourceUrl) | Uses `llm.ts` |
 | `voice-pool.ts` | Unified voice pool: 16 curated voices with per-provider IDs, deterministic `selectVoicePair(podcastId)` hash, `resolveVoiceId()`, `findByVoiceId()` | Pure utility |
 | `pipeline-resume.ts` | Smart resume: `markPodcastFailed(podcastId)` records `failedAtStatus`, `determineResumePoint(podcastId)` inspects existing data (Script, Segments, References) and returns the optimal pipeline restart step | Uses `prisma.ts` |
 | `api-keys.ts` | API key generation, hashing, validation | crypto |
@@ -75,7 +75,7 @@ All shared business logic and external service integrations live here.
 | `detect-urls.ts` | URL detection in message strings (client-safe, no server dependencies) | Pure utility |
 | `embeddings.ts` | Embedding provider abstraction (384-dim): stub hash-based for dev, swap to `text-embedding-3-small` | Pure utility (swappable) |
 | `event-buffer.ts` | Client-side behavioral event buffer: 5s flush / 50-event cap, `sendBeacon` on unload | `'use client'` |
-| `import-metadata-generator.ts` | Claude-based title + topic generation from imported audio transcripts | Uses `claude.ts` |
+| `import-metadata-generator.ts` | Claude-based title + topic generation from imported audio transcripts | Uses `llm.ts` |
 | `language-detect.ts` | Language detection via franc-min → ISO 639-1 code | franc-min |
 | `moderation.ts` | OpenAI Moderation API client: per-category thresholds, Redis caching (10min TTL) | OpenAI Moderation API, `redis.ts` |
 | `user-moderation.ts` | Admin user moderation actions: warn, suspend, ban, unban, unsuspend, remove content | Uses `prisma.ts` |
@@ -84,7 +84,7 @@ All shared business logic and external service integrations live here.
 | `slugify.ts` | URL-safe tag slug generator: `generateTagSlug(name)` (50 char cap) | Pure utility |
 | `theme-script.ts` | Inline dark mode init script (`THEME_INIT_SCRIPT`) — prevents flash on page load | Pure utility |
 | `topic-tagger.ts` | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI) | Pure utility |
-| `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `claude.ts` |
+| `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `llm.ts` |
 | `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
 | `tts-text-cleaner.ts` | TTS text preprocessor: strips `[SFX:]`, citations, delivery directions; preserves audio tags for ElevenLabs | Pure utility |

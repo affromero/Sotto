@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from '@/lib/claude';
+import { generateResponse, WEB_SEARCH_TOOL } from '@/lib/llm';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 import type { ContentDomain } from '@sottofm/verification-standard';

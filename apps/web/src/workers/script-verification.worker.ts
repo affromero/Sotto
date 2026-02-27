@@ -20,8 +20,7 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
-import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 
@@ -60,17 +59,11 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   const verificationMode = podcastRecord.verificationMode;
 
-  // Model priority: user's choice > provider default > free tier admin config
-  let model = podcastRecord.aiModel ?? undefined;
-  if (!model && aiKey) {
-    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
-  }
-  if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
-  }
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: podcastRecord.aiModel,
+    aiKey,
+  });
 
   const requestedDuration = discovery.durationTarget || 10;
   const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
@@ -112,7 +105,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   await job.updateProgress(50);
 
   await logUsage({
-    service: 'anthropic',
+    service: provider,
     model: verdict.model,
     category: 'script_verification',
     inputTokens: verdict.inputTokens,
@@ -174,7 +167,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       });
 
       await logUsage({
-        service: 'anthropic',
+        service: provider,
         model: adjusted.model,
         category: 'script_generation',
         inputTokens: adjusted.inputTokens,
@@ -353,7 +346,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   await job.updateProgress(80);
 
   await logUsage({
-    service: 'anthropic',
+    service: provider,
     model: revised.model,
     category: 'script_generation',
     inputTokens: revised.inputTokens,
