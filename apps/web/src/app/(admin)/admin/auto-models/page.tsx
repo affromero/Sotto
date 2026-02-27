@@ -63,7 +63,6 @@ export default async function AutoModelsPage() {
         <ul>
           <li>Handle screening &mdash; classifying usernames as names, offensive, or OK</li>
           <li>Credential lookup &mdash; verifying participant credentials via web search</li>
-          <li>LLM fallback &mdash; when no model is explicitly selected (e.g. workers, system tasks)</li>
         </ul>
       </div>
     </div>
