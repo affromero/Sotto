@@ -2,14 +2,19 @@ import type { TtsProviderId } from './providers/tts-registry';
 
 /**
  * Known inline audio tags that ElevenLabs v3 can render as vocal reactions.
- * Other providers don't support these, so they get stripped.
+ * Cartesia Sonic 3 supports [laughter] natively; other providers strip these.
  */
 const AUDIO_TAG_PATTERN = /\[(laughs?|chuckles?|sighs?|whispers?|gasps?|clears throat|excited)\]/gi;
+
+/** Providers that handle audio tags natively (ElevenLabs keeps as-is, Cartesia converts) */
+const AUDIO_TAG_PROVIDERS = new Set<string>(['elevenlabs', 'cartesia']);
 
 /**
  * Strip non-speech markers from text before sending to TTS.
  * Removes: [SFX: ...] markers, (delivery directions), [N] citation markers.
- * Conditionally strips audio tags for non-ElevenLabs providers.
+ * ElevenLabs: keeps audio tags as-is (native support).
+ * Cartesia Sonic 3: converts [laughs]/[chuckles] → [laughter] (native marker).
+ * Others: strips all audio tags.
  */
 export function cleanTextForTts(
   text: string,
@@ -27,8 +32,17 @@ export function cleanTextForTts(
     // Remove citation markers like [1], [2, 3], [1, 2, 3]
     .replace(/\[\d+(?:,\s*\d+)*\]/g, '');
 
-  // Strip audio tags for non-ElevenLabs providers (they can't render them)
-  if (options?.providerId !== 'elevenlabs') {
+  const providerId = options?.providerId;
+
+  if (providerId === 'cartesia') {
+    // Cartesia Sonic 3: convert laugh/chuckle tags to native [laughter], strip the rest
+    cleaned = cleaned.replace(AUDIO_TAG_PATTERN, (match) => {
+      const tag = match.slice(1, -1).toLowerCase();
+      if (tag.startsWith('laugh') || tag.startsWith('chuckle')) return '[laughter]';
+      return '';
+    });
+  } else if (!providerId || !AUDIO_TAG_PROVIDERS.has(providerId)) {
+    // Non-supported providers: strip all audio tags
     cleaned = cleaned.replace(AUDIO_TAG_PATTERN, '');
   }
 

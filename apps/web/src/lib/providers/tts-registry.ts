@@ -111,21 +111,23 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: true,
     maxSegmentChars: 5000,
-    defaultModel: 'sonic-2',
+    defaultModel: 'sonic-3',
     models: [
-      { id: 'sonic-2', displayName: 'Sonic 2', tier: 'premium' },
+      { id: 'sonic-3', displayName: 'Sonic 3', tier: 'premium' },
+      { id: 'sonic-turbo', displayName: 'Sonic Turbo', tier: 'standard' },
+      { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium' },
     ],
-    supportsAudioTags: false,
+    supportsAudioTags: true,
     qualityTier: 'premium',
-    platformCostPerKChar: 0.15,
+    platformCostPerKChar: 0.04,
     auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your Cartesia API key' }],
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk_car_...' }],
       validate: async (creds) => {
         try {
-          const res = await fetch('https://api.cartesia.ai/voices', {
+          const res = await fetch('https://api.cartesia.ai/voices?limit=1', {
             headers: {
               'X-API-Key': creds.apiKey,
-              'Cartesia-Version': '2024-06-10',
+              'Cartesia-Version': '2025-04-16',
             },
           });
           return res.ok;

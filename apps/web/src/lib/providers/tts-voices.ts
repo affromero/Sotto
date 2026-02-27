@@ -19,67 +19,27 @@ export interface ProviderVoice {
 // Cartesia voices — curated subset of Cartesia's voice library
 // ---------------------------------------------------------------------------
 
+// Verified against Cartesia API (2025-04-16). 16 voices: 8 male, 8 female.
+// Previous pool had 7/10 deleted voice IDs — fully rebuilt with confirmed UUIDs.
 export const CARTESIA_VOICE_POOL: ProviderVoice[] = [
-  {
-    id: 'a0e99841-438c-4a64-b679-ae501e7d6091',
-    name: 'Barbershop Man',
-    gender: 'male',
-    character: 'warm narrator',
-  },
-  {
-    id: '79a125e8-cd45-4c13-8a67-188112f4dd22',
-    name: 'British Lady',
-    gender: 'female',
-    character: 'polished professional',
-  },
-  {
-    id: '87748186-23bb-4571-8b6c-95265081c5b3',
-    name: 'Confident Man',
-    gender: 'male',
-    character: 'confident presenter',
-  },
-  {
-    id: '694f9389-aac1-45b6-b726-9d9369183238',
-    name: 'Friendly Sidekick',
-    gender: 'female',
-    character: 'friendly conversationalist',
-  },
-  {
-    id: 'f9836c6e-a0bd-460e-9d3c-f7299fa60f94',
-    name: 'Wise Guide',
-    gender: 'male',
-    character: 'authoritative expert',
-  },
-  {
-    id: 'b7d50908-b17c-442d-ad8d-7c56a2ec603f',
-    name: 'Calm Lady',
-    gender: 'female',
-    character: 'calm and authoritative',
-  },
-  {
-    id: '638efaaa-4d0c-442e-b701-3fae16aad012',
-    name: 'Young Narrator',
-    gender: 'male',
-    character: 'upbeat storyteller',
-  },
-  {
-    id: '248be419-c632-4f23-adf1-5324ed7dbf1d',
-    name: 'Enthusiastic Woman',
-    gender: 'female',
-    character: 'enthusiastic explainer',
-  },
-  {
-    id: 'c45bc5ec-dc68-4feb-8829-6e6b2748095d',
-    name: 'Thoughtful Man',
-    gender: 'male',
-    character: 'articulate intellectual',
-  },
-  {
-    id: 'e3827ec5-697a-4b7c-9c82-4a5e3c63c5e4',
-    name: 'Lively Narrator',
-    gender: 'female',
-    character: 'engaging storyteller',
-  },
+  // Male voices
+  { id: '98a34ef2-2140-4c28-9c71-663dc4dd7022', name: 'Clyde', gender: 'male', character: 'warm narrator' },
+  { id: '228fca29-3a0a-435c-8728-5cb483251068', name: 'Kiefer', gender: 'male', character: 'authoritative expert' },
+  { id: '79f8b5fb-2cc8-479a-80df-29f7a7cf1a3e', name: 'Theo', gender: 'male', character: 'confident presenter' },
+  { id: 'c961b81c-a935-4c17-bfb3-ba2239de8c2f', name: 'Kyle', gender: 'male', character: 'friendly conversationalist' },
+  { id: '5ee9feff-1265-424a-9d7f-8e4d431a12c7', name: 'Ronald', gender: 'male', character: 'articulate intellectual' },
+  { id: '0ad65e7f-006c-47cf-bd31-52279d487913', name: 'Rupert', gender: 'male', character: 'warm mentor' },
+  { id: '565510e8-6b45-45de-8758-13588fbaec73', name: 'Ray', gender: 'male', character: 'casual and curious' },
+  { id: '5cad89c9-d88a-4832-89fb-55f2f16d13d3', name: 'Brandon', gender: 'male', character: 'polished professional' },
+  // Female voices
+  { id: 'a33f7a4c-100f-41cf-a1fd-5822e8fc253f', name: 'Lauren', gender: 'female', character: 'engaging storyteller' },
+  { id: '6ccbfb76-1fc6-48f7-b71d-91ac6298247b', name: 'Tessa', gender: 'female', character: 'friendly conversationalist' },
+  { id: '26403c37-80c1-4a1a-8692-540551ca2ae5', name: 'Marian', gender: 'female', character: 'polished professional' },
+  { id: '62ae83ad-4f6a-430b-af41-a9bede9286ca', name: 'Gemma', gender: 'female', character: 'authoritative expert' },
+  { id: 'e07c00bc-4134-4eae-9ea4-1a55fb45746b', name: 'Brooke', gender: 'female', character: 'warm narrator' },
+  { id: 'a7b8d8fa-f6e5-4908-900e-0c11d1d82519', name: 'Joanie', gender: 'female', character: 'enthusiastic explainer' },
+  { id: '2f251ac3-89a9-4a77-a452-704b474ccd01', name: 'Lucy', gender: 'female', character: 'calm and authoritative' },
+  { id: 'f786b574-daa5-4673-aa0c-cbe3e8534c02', name: 'Katie', gender: 'female', character: 'upbeat storyteller' },
 ];
 
 // ---------------------------------------------------------------------------
