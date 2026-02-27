@@ -84,13 +84,8 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-sonnet-4-20250514',
-    ttsProvider: 'elevenlabs',
-    maxFreeGenerations: 3,
-  }),
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-20250514', provider: 'anthropic' }),
 }));
 
 // ---- Import under test ----

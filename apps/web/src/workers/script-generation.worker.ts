@@ -4,8 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
-import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { getTierFeatures } from '@/lib/tier-features';
@@ -56,17 +55,11 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     select: { aiModel: true },
   });
 
-  // Model priority: user's choice > provider default > free tier admin config
-  let model = podcast.aiModel ?? undefined;
-  if (!model && aiKey) {
-    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
-  }
-  if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
-  }
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: podcast.aiModel,
+    aiKey,
+  });
 
   // Get discovery metadata
   const discovery = await prisma.discovery.findUniqueOrThrow({
@@ -241,16 +234,11 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   }
 
   // Route to script verification (handles both with and without references)
-  // Resolve the actual AI provider used
-  const resolvedAiProvider = model?.startsWith('claude-code:')
-    ? 'claude-code'
-    : aiKey?.provider ?? (await getFreeTierConfig()).aiProvider;
-
   await prisma.podcast.update({
     where: { id: podcastId },
     data: {
       status: 'VERIFYING_SCRIPT',
-      aiProvider: resolvedAiProvider,
+      aiProvider: model.startsWith('claude-code:') ? 'claude-code' : provider,
       aiModel: model,
       language: detectedLanguage ?? undefined,
     },
@@ -270,7 +258,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Log API usage
   await logUsage({
-    service: resolvedAiProvider === 'openai' ? 'openai' : 'anthropic',
+    service: provider,
     model: model ?? result.model,
     category: 'script_generation',
     inputTokens: result.inputTokens,

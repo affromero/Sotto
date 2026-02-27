@@ -1,4 +1,4 @@
-import { generateResponse } from './claude';
+import { generateResponse } from './llm';
 import { logger } from './logger';
 
 export type FeasibilityVerdict = 'proceed' | 'warn' | 'reject';

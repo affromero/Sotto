@@ -97,13 +97,8 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
-const mockGetFreeTierConfig = vi.fn();
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
-}));
-
 vi.mock('@/lib/providers/ai-registry', () => ({
-  getAiProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'claude-sonnet-4-6' }),
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' }),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -208,12 +203,12 @@ describe('processScriptVerification', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
     mockVerifyScript.mockResolvedValue(passedVerdict);
     mockGenerateScriptWithFeedback.mockResolvedValue(revisedScriptResult);
-    mockGetFreeTierConfig.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] });
   });
 
   describe('model resolution', () => {
-    it('uses podcast-level aiModel when set', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-opus-4-6-20251101', source: 'WEB' });
+    it('uses model from resolveAiModelAndProvider', async () => {
+      const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
+      vi.mocked(resolveAiModelAndProvider).mockResolvedValueOnce({ model: 'claude-opus-4-6-20251101', provider: 'anthropic' });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
@@ -223,15 +218,15 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('falls back to free tier config when no podcast aiModel and no BYOK key', async () => {
-      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
-      mockGetFreeTierConfig.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] });
+    it('passes podcastAiModel and aiKey to resolveAiModelAndProvider', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', source: 'WEB' });
+      const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
-      expect(mockVerifyScript).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+      expect(resolveAiModelAndProvider).toHaveBeenCalledWith(
+        expect.objectContaining({ podcastAiModel: 'claude-haiku-4-5-20251001' })
       );
     });
   });

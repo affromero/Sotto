@@ -82,12 +82,29 @@ export async function generateResponse(
     return { ...result, model: options.model };
   }
 
+  // Guardrail: auto-route non-Anthropic models to the correct provider.
+  // Prevents e.g. 'gpt-5-mini' being sent to the Anthropic API.
+  if (options?.model) {
+    const { getProviderForModel } = await import('./providers/ai-registry');
+    const ownerProvider = getProviderForModel(options.model);
+    if (ownerProvider && ownerProvider !== 'anthropic') {
+      const { createAIProvider } = await import('./providers/ai');
+      const ai = createAIProvider(ownerProvider);
+      return ai.generateResponse(systemPrompt, messages, {
+        maxTokens: options.maxTokens,
+        model: options.model,
+        apiKeyOverride: options.apiKeyOverride,
+        skipModeration: options.skipModeration,
+      });
+    }
+  }
+
   const activeClient = options?.apiKeyOverride
     ? new Anthropic({ apiKey: options.apiKeyOverride })
     : client;
 
   if (!activeClient) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
+    throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
   const resolvedModel = options?.model || 'claude-sonnet-4-6';
@@ -165,12 +182,29 @@ export async function* streamResponse(
     return;
   }
 
+  // Guardrail: auto-route non-Anthropic models to the correct provider.
+  if (options?.model) {
+    const { getProviderForModel } = await import('./providers/ai-registry');
+    const ownerProvider = getProviderForModel(options.model);
+    if (ownerProvider && ownerProvider !== 'anthropic') {
+      const { createAIProvider } = await import('./providers/ai');
+      const ai = createAIProvider(ownerProvider);
+      yield* ai.streamResponse(systemPrompt, messages, {
+        maxTokens: options.maxTokens,
+        model: options.model,
+        apiKeyOverride: options.apiKeyOverride,
+        skipModeration: options.skipModeration,
+      });
+      return;
+    }
+  }
+
   const activeClient = options?.apiKeyOverride
     ? new Anthropic({ apiKey: options.apiKeyOverride })
     : client;
 
   if (!activeClient) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
+    throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
   const streamModel = options?.model || 'claude-sonnet-4-6';

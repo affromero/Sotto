@@ -1,15 +1,14 @@
 import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generateResponse } from '@/lib/claude';
+import { generateResponse } from '@/lib/llm';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
 import { getTierFeatures } from '@/lib/tier-features';
-import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { CHARS_PER_SECOND } from '@/lib/duration';
 import { logger } from '@/lib/logger';
@@ -49,17 +48,11 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     }
   }
 
-  // Model priority: user's choice > provider default > free tier admin config
-  let model = podcast?.aiModel ?? undefined;
-  if (!model && aiKey) {
-    model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
-  }
-  if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
-  }
+  // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
+  const { model, provider } = await resolveAiModelAndProvider({
+    podcastAiModel: podcast?.aiModel,
+    aiKey,
+  });
 
   // Get podcast script context
   const script = await prisma.script.findUnique({ where: { podcastId } });
@@ -160,7 +153,7 @@ Answer concisely and helpfully, using the podcast context. Keep answers under 20
   });
 
   await logUsage({
-    service: 'anthropic',
+    service: provider,
     model: response.model,
     category: 'interaction',
     inputTokens: response.inputTokens,

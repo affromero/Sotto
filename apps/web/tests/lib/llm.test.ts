@@ -62,7 +62,7 @@ describe('claude', () => {
 
   describe('generateResponse', () => {
     it('generates a non-streaming response with default options', async () => {
-      const { generateResponse } = await import('@/lib/claude');
+      const { generateResponse } = await import('@/lib/llm');
 
       const mockResponse = {
         content: [
@@ -92,7 +92,7 @@ describe('claude', () => {
     });
 
     it('returns empty content when response has no text block', async () => {
-      const { generateResponse } = await import('@/lib/claude');
+      const { generateResponse } = await import('@/lib/llm');
 
       const mockResponse = {
         content: [
@@ -121,7 +121,7 @@ describe('claude', () => {
     });
 
     it('extracts text from first text block when multiple blocks exist', async () => {
-      const { generateResponse } = await import('@/lib/claude');
+      const { generateResponse } = await import('@/lib/llm');
 
       const mockResponse = {
         content: [
@@ -153,15 +153,15 @@ describe('claude', () => {
       delete process.env.ANTHROPIC_API_KEY;
       vi.resetModules();
 
-      const { generateResponse } = await import('@/lib/claude');
+      const { generateResponse } = await import('@/lib/llm');
 
       await expect(
         generateResponse('System prompt', [{ role: 'user', content: 'Test' }])
-      ).rejects.toThrow('Claude client not initialized — set ANTHROPIC_API_KEY');
+      ).rejects.toThrow('LLM client not initialized — set ANTHROPIC_API_KEY');
     });
 
     it('propagates API errors from Anthropic SDK', async () => {
-      const { generateResponse } = await import('@/lib/claude');
+      const { generateResponse } = await import('@/lib/llm');
 
       const apiError = new Error('Rate limit exceeded');
       mockMessagesCreate.mockRejectedValue(apiError);
@@ -172,7 +172,7 @@ describe('claude', () => {
     });
 
     it('accepts tools option without error', async () => {
-      const { generateResponse, WEB_SEARCH_TOOL } = await import('@/lib/claude');
+      const { generateResponse, WEB_SEARCH_TOOL } = await import('@/lib/llm');
 
       mockMessagesCreate.mockResolvedValue({
         content: [{ type: 'text' as const, text: 'Response with tools' }],
@@ -189,7 +189,7 @@ describe('claude', () => {
 
   describe('streamResponse', () => {
     it('streams text deltas from Claude', async () => {
-      const { streamResponse } = await import('@/lib/claude');
+      const { streamResponse } = await import('@/lib/llm');
 
       const mockEvents = [
         {
@@ -234,7 +234,7 @@ describe('claude', () => {
     });
 
     it('ignores non-text-delta events', async () => {
-      const { streamResponse } = await import('@/lib/claude');
+      const { streamResponse } = await import('@/lib/llm');
 
       const mockEvents = [
         {
@@ -276,7 +276,7 @@ describe('claude', () => {
     });
 
     it('handles empty stream gracefully', async () => {
-      const { streamResponse } = await import('@/lib/claude');
+      const { streamResponse } = await import('@/lib/llm');
 
       async function* mockGenerator() {
         // Empty generator
@@ -298,17 +298,17 @@ describe('claude', () => {
       delete process.env.ANTHROPIC_API_KEY;
       vi.resetModules();
 
-      const { streamResponse } = await import('@/lib/claude');
+      const { streamResponse } = await import('@/lib/llm');
 
       const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }]);
 
       await expect(generator.next()).rejects.toThrow(
-        'Claude client not initialized — set ANTHROPIC_API_KEY'
+        'LLM client not initialized — set ANTHROPIC_API_KEY'
       );
     });
 
     it('propagates streaming errors from Anthropic SDK', async () => {
-      const { streamResponse } = await import('@/lib/claude');
+      const { streamResponse } = await import('@/lib/llm');
 
       async function* errorGenerator() {
         throw new Error('Stream interrupted');
@@ -322,7 +322,7 @@ describe('claude', () => {
     });
 
     it('streams text when tools option is provided', async () => {
-      const { streamResponse, WEB_SEARCH_TOOL } = await import('@/lib/claude');
+      const { streamResponse, WEB_SEARCH_TOOL } = await import('@/lib/llm');
 
       async function* mockGenerator() {
         yield {
