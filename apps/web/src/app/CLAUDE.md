@@ -28,7 +28,7 @@
 | `/connect/telegram` | `connect/telegram/page.tsx` | Yes | Link Telegram account |
 | `/pitch` | `pitch/page.tsx` | Password | Investor pitch deck |
 | Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned` | No | Public info pages |
-| `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 17 admin pages (overview, users, podcasts, revenue, costs, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, config, twitter, inspire, ratings, announcements, models) |
+| `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 18 admin pages (overview, users, podcasts, revenue, costs, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, config, twitter, inspire, ratings, quality, announcements, models) |
 | `not-found` / `error` | `not-found.tsx` / `error.tsx` | No | 404 + error boundary |
 | `sitemap.xml` | `sitemap.ts` | No | Dynamic sitemap |
 
@@ -63,7 +63,7 @@
 | `/api/podcasts/[id]/comments` | GET/POST | Mixed | Threaded comments |
 | `/api/podcasts/[id]/comments/[cid]` | DELETE | Yes | Delete comment |
 | `/api/podcasts/[id]/comments/[cid]/replies` | GET | No | Comment replies |
-| `/api/podcasts/[id]/rating` | GET/POST | Yes | Creator rating |
+| `/api/podcasts/[id]/rating` | GET/POST | Yes | Podcast rating (creator + listener) |
 | `/api/podcasts/[id]/claims` | POST/GET | Yes | Flag/list inaccurate claims |
 | `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
 | `/api/feed` | GET | No | Public feed (search/filter/sort) |
