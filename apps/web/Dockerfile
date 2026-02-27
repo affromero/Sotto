@@ -75,6 +75,9 @@ COPY --from=builder --chown=sotto:sotto /app/apps/web/.next/static ./apps/web/.n
 # Copy speaker recognition model
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
 
+# Copy prompt templates (loaded at runtime by prompt-loader.ts)
+COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
+
 # Copy accounting ledger for expenses dashboard
 COPY --chown=sotto:sotto accounting/ledger ./accounting/ledger/
 

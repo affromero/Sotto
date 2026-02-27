@@ -1,5 +1,5 @@
-import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
+import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { createAIProvider, resolveAiProvider, type AIProvider } from './providers/ai';
 import type { TelegramParseResult } from '@/types/telegram';
@@ -28,31 +28,7 @@ async function getProviderForParsing(opts?: TelegramParseOptions): Promise<{ pro
   return { provider: createAIProvider(defaultProvider), providerName: defaultProvider };
 }
 
-const SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
-Users send messages to the @SottoFMBot on Telegram to request podcast generation. Extract structured metadata from their message.
-
-Rules:
-- Extract the core topic they want a podcast about
-- Generate a concise, engaging title (max 80 chars)
-- Infer depth from cues: "eli5" or "explain like I'm 5" → eli5, short messages → quick_overview, detailed requests → deep_dive, default → standard
-- Infer audience from language complexity: jargon-heavy → expert, plain language → beginner, default → intermediate
-- Infer tone from message style: emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
-- Extract focus areas if the user mentions specific subtopics
-- If the message contains a URL, extract it as sourceUrl
-- Set isComplete to true ONLY if the message provides enough detail to generate a podcast directly (clear topic + at least some specificity). Set to false if the topic is too vague (e.g., just "AI" or "science") and would benefit from a discovery conversation.
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with ONLY valid JSON matching this shape:
-{
-  "topic": "string — the core topic",
-  "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
-  "audienceLevel": "beginner" | "intermediate" | "expert",
-  "tone": "casual" | "professional" | "socratic",
-  "focusAreas": ["string array of specific subtopics"],
-  "sourceUrl": "string | null — URL if found in message",
-  "isComplete": true | false
-}`;
+const SYSTEM_PROMPT = loadPrompt('social/telegram-parser.md');
 
 /**
  * Parse a Telegram message into structured podcast generation metadata.
