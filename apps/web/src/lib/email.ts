@@ -20,13 +20,17 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
   }
 
   try {
-    await resend.emails.send({
+    const { data, error } = await resend.emails.send({
       from: DEFAULT_FROM,
       to,
       subject,
       html,
     });
-    logger.info('Email sent', { to, subject });
+    if (error) {
+      logger.error('Resend API error', { to, subject, error });
+      return false;
+    }
+    logger.info('Email sent', { to, subject, id: data?.id });
     return true;
   } catch (err) {
     logger.error('Failed to send email', {
