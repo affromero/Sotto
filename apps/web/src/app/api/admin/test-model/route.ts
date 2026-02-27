@@ -100,7 +100,7 @@ async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } 
       const tts = await createTtsProviderAsync(id, apiKey, extraData);
       const voiceId = TTS_TEST_VOICES[id] ?? 'alloy';
       const audio = await withTimeout(
-        tts.generateSpeech({ text: 'Hello.', voiceId }),
+        tts.generateSpeech({ text: 'Sotto — where podcasts get social.', voiceId }),
         5_000,
       );
       return { audio, provider: id };
@@ -291,7 +291,7 @@ export async function POST(request: NextRequest) {
       );
 
       const audioBuffer = await withTimeout(
-        ttsProvider.generateSpeech({ text: 'Hello.', voiceId }),
+        ttsProvider.generateSpeech({ text: 'Sotto — where podcasts get social.', voiceId }),
         15_000
       );
 
