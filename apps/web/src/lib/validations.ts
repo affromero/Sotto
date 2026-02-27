@@ -164,6 +164,8 @@ export const waitlistSchema = z.object({
     .transform(val => val ? val.replace(/^@/, '').trim() : undefined),
   source: z.string().max(50).optional(),
   wishlist: z.string().max(500).optional(),
+  referralCode: z.string().max(50).optional()
+    .transform(val => val ? val.replace(/^@/, '').trim().toLowerCase() : undefined),
 });
 
 /**

@@ -1294,6 +1294,7 @@ model Waitlist {
   twitterHandle String?
   source        String?
   wishlist      String?
+  referralCode  String?
   status        WaitlistStatus @default(PENDING)
   unsubscribed  Boolean        @default(false)
   approvedAt    DateTime?
