@@ -54,7 +54,7 @@
 
 /* Sizes */
 .small {
-  height: 36px;
+  height: 40px;
   padding: 0 var(--spacing-md);
   font-size: var(--font-size-sm);
 }
