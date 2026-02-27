@@ -73,6 +73,13 @@ describe('GET /api/admin/ratings', () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     const mockByProvider = [{ ttsProvider: 'elevenlabs', ratingCount: 5 }];
     const mockByAi = [{ aiProvider: 'anthropic', aiModel: 'claude', ratingCount: 3 }];
+    const mockByStt = [{ sttProvider: 'openai', sttModel: 'whisper-1', ratingCount: 2 }];
+    const mockByTopicTts = [{ tagName: 'Tech', provider: 'elevenlabs', ratingCount: 3, avgScore: 4.2 }];
+    const mockByTopicAi = [{ tagName: 'Tech', provider: 'anthropic', ratingCount: 3, avgScore: 4.0 }];
+    const mockSourceBreakdown = [
+      { isCreator: true, ratingCount: 7, avgOverallSatisfaction: 4.5 },
+      { isCreator: false, ratingCount: 3, avgOverallSatisfaction: 4.0 },
+    ];
     const mockAverages = {
       _avg: {
         voiceNaturalness: 4.5,
@@ -89,15 +96,20 @@ describe('GET /api/admin/ratings', () => {
         conversationFlow: 4,
         overallSatisfaction: 5,
         comment: 'Great',
+        isCreator: true,
         createdAt: new Date('2026-01-01'),
-        podcast: { id: 'pod-1', title: 'Test', ttsProvider: 'elevenlabs', aiProvider: 'anthropic', aiModel: 'claude' },
+        podcast: { id: 'pod-1', title: 'Test', ttsProvider: 'elevenlabs', aiProvider: 'anthropic', aiModel: 'claude', sttProvider: 'openai' },
       },
     ];
 
-    // $queryRaw is called twice (byProvider, byAi)
+    // $queryRaw is called 6 times: byProvider, byAi, byStt, byTopicTts, byTopicAi, sourceBreakdown
     mockQueryRaw
       .mockResolvedValueOnce(mockByProvider)
-      .mockResolvedValueOnce(mockByAi);
+      .mockResolvedValueOnce(mockByAi)
+      .mockResolvedValueOnce(mockByStt)
+      .mockResolvedValueOnce(mockByTopicTts)
+      .mockResolvedValueOnce(mockByTopicAi)
+      .mockResolvedValueOnce(mockSourceBreakdown);
     mockPodcastRatingAggregate.mockResolvedValue(mockAverages);
     mockPodcastRatingFindMany.mockResolvedValue(mockRecent);
     mockPodcastRatingCount.mockResolvedValue(10);
@@ -111,6 +123,10 @@ describe('GET /api/admin/ratings', () => {
     expect(body.overallAverages).toEqual(mockAverages._avg);
     expect(body.byProvider).toEqual(mockByProvider);
     expect(body.byAi).toEqual(mockByAi);
+    expect(body.byStt).toEqual(mockByStt);
+    expect(body.byTopicTts).toEqual(mockByTopicTts);
+    expect(body.byTopicAi).toEqual(mockByTopicAi);
+    expect(body.sourceBreakdown).toEqual(mockSourceBreakdown);
   });
 
   it('accepts valid range parameter', async () => {

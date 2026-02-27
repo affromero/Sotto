@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
+
 interface ProviderStats {
   ttsProvider: string;
   ratingCount: number;
@@ -17,27 +18,32 @@ interface AiStats {
   aiModel: string;
   ratingCount: number;
   avgContentAccuracy: number;
+  avgConversationFlow: number;
+  avgOverallSatisfaction: number;
 }
 
-interface RecentRating {
-  id: string;
-  voiceNaturalness: number;
-  contentAccuracy: number;
-  conversationFlow: number;
-  overallSatisfaction: number;
-  comment: string | null;
-  createdAt: Date;
-  podcast: {
-    id: string;
-    title: string;
-    ttsProvider: string | null;
-    aiProvider: string | null;
-    aiModel: string | null;
-  };
+interface SttStats {
+  sttProvider: string;
+  sttModel: string;
+  ratingCount: number;
+  avgOverallSatisfaction: number;
+}
+
+interface TopicProviderStats {
+  tagName: string;
+  provider: string;
+  ratingCount: number;
+  avgScore: number;
+}
+
+interface SourceBreakdown {
+  isCreator: boolean;
+  ratingCount: number;
+  avgOverallSatisfaction: number;
 }
 
 /**
- * GET /api/admin/ratings — Aggregate ratings by TTS provider (ADMIN only)
+ * GET /api/admin/ratings — Aggregate ratings by provider (ADMIN only)
  *
  * Query params:
  *   range: '7d' | '30d' | '90d' | 'all' (default: '30d')
@@ -68,8 +74,18 @@ export async function GET(request: NextRequest) {
   const days = daysMap[range];
   const since = days ? new Date(Date.now() - days * 24 * 60 * 60 * 1000) : new Date(0);
 
-  const [byProvider, byAi, overallAverages, recentRatings, totalCount] = await Promise.all([
-    // Group by TTS provider
+  const [
+    byProvider,
+    byAi,
+    byStt,
+    byTopicTts,
+    byTopicAi,
+    sourceBreakdown,
+    overallAverages,
+    recentRatings,
+    totalCount,
+  ] = await Promise.all([
+    // TTS provider breakdown
     prisma.$queryRaw<ProviderStats[]>`
       SELECT
         p."ttsProvider",
@@ -85,18 +101,85 @@ export async function GET(request: NextRequest) {
       ORDER BY "ratingCount" DESC
     `,
 
-    // Group by AI provider + model
+    // AI provider + model breakdown (all dimensions)
     prisma.$queryRaw<AiStats[]>`
       SELECT
         p."aiProvider",
         p."aiModel",
         COUNT(*)::int AS "ratingCount",
-        AVG(r."contentAccuracy")::float AS "avgContentAccuracy"
+        AVG(r."contentAccuracy")::float AS "avgContentAccuracy",
+        AVG(r."conversationFlow")::float AS "avgConversationFlow",
+        AVG(r."overallSatisfaction")::float AS "avgOverallSatisfaction"
       FROM "PodcastRating" r
       JOIN "Podcast" p ON r."podcastId" = p.id
       WHERE p."aiProvider" IS NOT NULL AND p."deletedAt" IS NULL AND r."createdAt" >= ${since}
       GROUP BY p."aiProvider", p."aiModel"
       ORDER BY "ratingCount" DESC
+    `,
+
+    // STT provider + model breakdown
+    prisma.$queryRaw<SttStats[]>`
+      SELECT
+        p."sttProvider",
+        p."sttModel",
+        COUNT(*)::int AS "ratingCount",
+        AVG(r."overallSatisfaction")::float AS "avgOverallSatisfaction"
+      FROM "PodcastRating" r
+      JOIN "Podcast" p ON r."podcastId" = p.id
+      WHERE p."sttProvider" IS NOT NULL AND p."deletedAt" IS NULL AND r."createdAt" >= ${since}
+      GROUP BY p."sttProvider", p."sttModel"
+      ORDER BY "ratingCount" DESC
+    `,
+
+    // Topic × TTS (parent tags only, min 2 ratings)
+    prisma.$queryRaw<TopicProviderStats[]>`
+      SELECT
+        t.name AS "tagName",
+        p."ttsProvider" AS "provider",
+        COUNT(*)::int AS "ratingCount",
+        AVG(r."voiceNaturalness")::float AS "avgScore"
+      FROM "PodcastRating" r
+      JOIN "Podcast" p ON r."podcastId" = p.id
+      JOIN "PodcastTag" pt ON p.id = pt."podcastId"
+      JOIN "Tag" t ON pt."tagId" = t.id
+      WHERE p."ttsProvider" IS NOT NULL
+        AND t."parentId" IS NULL
+        AND p."deletedAt" IS NULL
+        AND r."createdAt" >= ${since}
+      GROUP BY t.name, p."ttsProvider"
+      HAVING COUNT(*) >= 2
+      ORDER BY t.name, "avgScore" DESC
+    `,
+
+    // Topic × AI (parent tags only, min 2 ratings)
+    prisma.$queryRaw<TopicProviderStats[]>`
+      SELECT
+        t.name AS "tagName",
+        p."aiProvider" AS "provider",
+        COUNT(*)::int AS "ratingCount",
+        AVG(r."contentAccuracy")::float AS "avgScore"
+      FROM "PodcastRating" r
+      JOIN "Podcast" p ON r."podcastId" = p.id
+      JOIN "PodcastTag" pt ON p.id = pt."podcastId"
+      JOIN "Tag" t ON pt."tagId" = t.id
+      WHERE p."aiProvider" IS NOT NULL
+        AND t."parentId" IS NULL
+        AND p."deletedAt" IS NULL
+        AND r."createdAt" >= ${since}
+      GROUP BY t.name, p."aiProvider"
+      HAVING COUNT(*) >= 2
+      ORDER BY t.name, "avgScore" DESC
+    `,
+
+    // Creator vs listener breakdown
+    prisma.$queryRaw<SourceBreakdown[]>`
+      SELECT
+        r."isCreator",
+        COUNT(*)::int AS "ratingCount",
+        AVG(r."overallSatisfaction")::float AS "avgOverallSatisfaction"
+      FROM "PodcastRating" r
+      WHERE r."createdAt" >= ${since}
+      GROUP BY r."isCreator"
     `,
 
     // Overall averages
@@ -122,6 +205,7 @@ export async function GET(request: NextRequest) {
         conversationFlow: true,
         overallSatisfaction: true,
         comment: true,
+        isCreator: true,
         createdAt: true,
         podcast: {
           select: {
@@ -130,10 +214,11 @@ export async function GET(request: NextRequest) {
             ttsProvider: true,
             aiProvider: true,
             aiModel: true,
+            sttProvider: true,
           },
         },
       },
-    }) as Promise<RecentRating[]>,
+    }),
 
     // Total count
     prisma.podcastRating.count({
@@ -147,6 +232,10 @@ export async function GET(request: NextRequest) {
     overallAverages: overallAverages._avg,
     byProvider,
     byAi,
+    byStt,
+    byTopicTts,
+    byTopicAi,
+    sourceBreakdown,
     recentRatings,
   });
 }

@@ -7,6 +7,8 @@ import styles from './PostListenRating.module.css';
 interface PostListenRatingProps {
   podcastId: string;
   onDismiss: () => void;
+  isOwner?: boolean;
+  completionPercent?: number;
 }
 
 const DIMENSIONS = [
@@ -18,7 +20,7 @@ const DIMENSIONS = [
 
 type DimensionKey = (typeof DIMENSIONS)[number]['key'];
 
-export function PostListenRating({ podcastId, onDismiss }: PostListenRatingProps) {
+export function PostListenRating({ podcastId, onDismiss, isOwner, completionPercent }: PostListenRatingProps) {
   const [ratings, setRatings] = useState<Record<DimensionKey, number>>({
     voiceNaturalness: 0,
     contentAccuracy: 0,
@@ -42,6 +44,7 @@ export function PostListenRating({ podcastId, onDismiss }: PostListenRatingProps
         body: JSON.stringify({
           ...ratings,
           ...(comment.trim() ? { comment: comment.trim() } : {}),
+          ...(completionPercent != null ? { completionPercent: Math.round(completionPercent * 10) / 10 } : {}),
         }),
       });
 
@@ -65,8 +68,8 @@ export function PostListenRating({ podcastId, onDismiss }: PostListenRatingProps
   }
 
   return (
-    <div className={styles.root} role="region" aria-label="Rate your podcast">
-      <h3 className={styles.title}>How was your podcast?</h3>
+    <div className={styles.root} role="region" aria-label="Rate this podcast">
+      <h3 className={styles.title}>{isOwner ? 'How was your podcast?' : 'How was this podcast?'}</h3>
 
       <div className={styles.dimensions}>
         {DIMENSIONS.map((dim) => (
