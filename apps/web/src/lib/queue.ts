@@ -8,7 +8,7 @@ import { markTtsKeyInvalid, markAiKeyInvalid } from './byok';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
 import type { SttProviderId } from '@sotto/shared';
-import { sendEmail } from './email';
+import { sendMessage as sendTelegram, isTelegramBotConfigured } from './telegram';
 
 /**
  * Job types for the Sotto queue system
@@ -417,6 +417,12 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       // Skip already-terminal states
       if (podcast.status === 'READY' || podcast.status === 'FAILED' || podcast.status === 'SCRIPT_READY' || podcast.status === 'DRAFT') return;
 
+      // Only notify + mark failed on terminal failures (all retries exhausted).
+      // Non-terminal retries are logged as PipelineEvents above but don't alert.
+      const maxAttempts = job?.opts?.attempts ?? 3;
+      const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+      if (!isTerminal) return;
+
       // Determine provider label and attempt key invalidation
       let failureReason = userMessage(errorKind, 'the provider');
 
@@ -489,12 +495,12 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         });
       }
 
-      // Notify all admins: in-app bell + email
+      // Notify all admins: in-app bell + Telegram
       const podcastLabel = podcast.title || podcastId;
       const techError = args.failedReason || 'Unknown error';
       const adminUsers = await prisma.user.findMany({
         where: { role: 'ADMIN' },
-        select: { id: true, email: true },
+        select: { id: true, telegramChatId: true },
       });
       const adminMessage = `[${queueName}] ${podcastLabel} — ${errorKind}`;
       for (const admin of adminUsers) {
@@ -510,23 +516,17 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             logger.warn('Failed to queue admin pipeline-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
           });
         }
-        // Email alert
-        if (admin.email) {
-          sendEmail({
-            to: admin.email,
-            subject: `[Sotto] Pipeline failure: ${queueName}`,
-            html: [
-              `<h2>Pipeline Failure</h2>`,
-              `<p><strong>Queue:</strong> ${queueName}</p>`,
-              `<p><strong>Podcast:</strong> ${podcastLabel}</p>`,
-              `<p><strong>Podcast ID:</strong> ${podcastId}</p>`,
-              `<p><strong>User ID:</strong> ${podcast.userId}</p>`,
-              `<p><strong>Error classification:</strong> ${errorKind}</p>`,
-              `<p><strong>Technical error:</strong></p>`,
-              `<pre>${techError}</pre>`,
-            ].join('\n'),
-          }).catch((err: unknown) => {
-            logger.warn('Failed to send admin pipeline-failure email', { adminEmail: admin.email, error: err instanceof Error ? err.message : String(err) });
+        // Telegram alert
+        if (admin.telegramChatId && isTelegramBotConfigured()) {
+          const telegramText = [
+            `🚨 *Pipeline Failure*`,
+            `*Queue:* ${queueName}`,
+            `*Podcast:* ${podcastLabel}`,
+            `*Error:* ${errorKind}`,
+            `\`${techError.substring(0, 500)}\``,
+          ].join('\n');
+          sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
+            logger.warn('Failed to send admin pipeline-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
           });
         }
       }
@@ -557,12 +557,13 @@ export async function addJob<T>(
   queue: Queue,
   jobType: JobType,
   payload: T,
-  options?: { priority?: number; delay?: number; attempts?: number }
+  options?: { priority?: number; delay?: number; attempts?: number; jobId?: string }
 ): Promise<Job<T>> {
   const job = await queue.add(jobType, payload, {
     priority: options?.priority,
     delay: options?.delay,
     attempts: options?.attempts,
+    jobId: options?.jobId,
   });
 
   logger.info(`Job added to queue: ${queue.name}`, { jobId: job.id, jobType });
