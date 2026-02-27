@@ -125,6 +125,8 @@ export async function processAdminThreadToPodcast(
       aiModel: twitterConfig.defaultAiModel ?? undefined,
       ttsProvider: twitterConfig.defaultTtsProvider ?? undefined,
       ttsModel: twitterConfig.defaultTtsModel ?? undefined,
+      aiAutoResolved: true,
+      ttsAutoResolved: true,
       voices: {
         createMany: {
           data: [

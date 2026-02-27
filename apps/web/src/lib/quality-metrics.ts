@@ -282,3 +282,93 @@ export async function getOverallQualityScore(since: Date): Promise<OverallQualit
     topRatedModel: topModelLabel,
   };
 }
+
+export interface AutoResolutionRow {
+  providerType: 'ai' | 'tts';
+  resolvedProvider: string;
+  resolvedModel: string | null;
+  autoCount: number;
+  explicitCount: number;
+}
+
+export interface AutoResolutionStats {
+  rows: AutoResolutionRow[];
+  aiAutoPercent: number;
+  ttsAutoPercent: number;
+}
+
+export async function getAutoResolutionStats(since: Date): Promise<AutoResolutionStats> {
+  const [aiRows, ttsRows, summary] = await Promise.all([
+    prisma.$queryRaw<Array<{ provider: string; model: string | null; autoCount: bigint; explicitCount: bigint }>>`
+      SELECT
+        p."aiProvider" AS provider,
+        p."aiModel" AS model,
+        COUNT(*) FILTER (WHERE p."aiAutoResolved" = true)::bigint AS "autoCount",
+        COUNT(*) FILTER (WHERE p."aiAutoResolved" = false)::bigint AS "explicitCount"
+      FROM "Podcast" p
+      WHERE p."aiProvider" IS NOT NULL
+        AND p."deletedAt" IS NULL
+        AND p.status NOT IN ('FAILED', 'DRAFT')
+        AND p."createdAt" >= ${since}
+      GROUP BY p."aiProvider", p."aiModel"
+      ORDER BY "autoCount" DESC
+    `,
+    prisma.$queryRaw<Array<{ provider: string; model: string | null; autoCount: bigint; explicitCount: bigint }>>`
+      SELECT
+        p."ttsProvider" AS provider,
+        p."ttsModel" AS model,
+        COUNT(*) FILTER (WHERE p."ttsAutoResolved" = true)::bigint AS "autoCount",
+        COUNT(*) FILTER (WHERE p."ttsAutoResolved" = false)::bigint AS "explicitCount"
+      FROM "Podcast" p
+      WHERE p."ttsProvider" IS NOT NULL
+        AND p."deletedAt" IS NULL
+        AND p.status NOT IN ('FAILED', 'DRAFT')
+        AND p."createdAt" >= ${since}
+      GROUP BY p."ttsProvider", p."ttsModel"
+      ORDER BY "autoCount" DESC
+    `,
+    prisma.$queryRaw<[{
+      aiTotal: bigint;
+      aiAuto: bigint;
+      ttsTotal: bigint;
+      ttsAuto: bigint;
+    }]>`
+      SELECT
+        COUNT(*) FILTER (WHERE p."aiProvider" IS NOT NULL)::bigint AS "aiTotal",
+        COUNT(*) FILTER (WHERE p."aiAutoResolved" = true)::bigint AS "aiAuto",
+        COUNT(*) FILTER (WHERE p."ttsProvider" IS NOT NULL)::bigint AS "ttsTotal",
+        COUNT(*) FILTER (WHERE p."ttsAutoResolved" = true)::bigint AS "ttsAuto"
+      FROM "Podcast" p
+      WHERE p."deletedAt" IS NULL
+        AND p.status NOT IN ('FAILED', 'DRAFT')
+        AND p."createdAt" >= ${since}
+    `,
+  ]);
+
+  const rows: AutoResolutionRow[] = [
+    ...aiRows.map((r) => ({
+      providerType: 'ai' as const,
+      resolvedProvider: r.provider,
+      resolvedModel: r.model,
+      autoCount: Number(r.autoCount),
+      explicitCount: Number(r.explicitCount),
+    })),
+    ...ttsRows.map((r) => ({
+      providerType: 'tts' as const,
+      resolvedProvider: r.provider,
+      resolvedModel: r.model,
+      autoCount: Number(r.autoCount),
+      explicitCount: Number(r.explicitCount),
+    })),
+  ];
+
+  const s = summary[0];
+  const aiTotal = Number(s.aiTotal);
+  const ttsTotal = Number(s.ttsTotal);
+
+  return {
+    rows,
+    aiAutoPercent: aiTotal > 0 ? Math.round((Number(s.aiAuto) / aiTotal) * 100) : 0,
+    ttsAutoPercent: ttsTotal > 0 ? Math.round((Number(s.ttsAuto) / ttsTotal) * 100) : 0,
+  };
+}
