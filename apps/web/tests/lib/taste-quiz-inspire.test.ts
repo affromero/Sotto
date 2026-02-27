@@ -271,13 +271,15 @@ describe('generateNewsQuestions', () => {
     delete process.env.ANTHROPIC_API_KEY;
 
     const ai = createMockAI(JSON.stringify([
-      { text: 'News from newsletters', tagSlugs: ['science'], category: 'science' },
+      { text: 'News from newsletters', tagSlugs: ['science'], category: 'science', sourceUrl: 'https://a.com', sourceName: 'Reuters' },
     ]));
     mockCreateAIProvider.mockReturnValue(ai);
 
     const result = await generateNewsQuestions('user-1', 1);
 
     expect(result).toHaveLength(1);
+    expect(result[0].sourceUrl).toBe('https://a.com');
+    expect(result[0].sourceName).toBe('Reuters');
     expect(mockFetchNewsletterArticles).toHaveBeenCalledWith('1w');
     expect(mockFormatArticlesForPrompt).toHaveBeenCalledWith(mockArticles);
   });
