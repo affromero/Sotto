@@ -71,6 +71,8 @@ export const TTS_MODEL_DISPLAY: Record<string, string> = {
   eleven_v3: 'v3',
   eleven_multilingual_v2: 'v2',
   'tts-1-hd': 'HD',
+  'sonic-3': 'Sonic 3',
+  'sonic-turbo': 'Sonic Turbo',
   'sonic-2': 'Sonic 2',
   premium: 'Premium',
   octave: 'Octave',
