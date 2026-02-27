@@ -41,6 +41,8 @@ export async function GET(request: NextRequest) {
     aiModel: p.aiModel,
     ttsProvider: p.ttsProvider,
     language: p.language,
+    aiAutoResolved: p.aiAutoResolved,
+    ttsAutoResolved: p.ttsAutoResolved,
     forkedFromId: p.forkedFromId,
     user: p.user,
     tags: p.tags.map((pt) => pt.tag),

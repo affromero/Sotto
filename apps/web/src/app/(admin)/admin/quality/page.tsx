@@ -5,6 +5,7 @@ import {
   getModelUsageDistribution,
   getBestModelByTopic,
   getRatingVolumeTrend,
+  getAutoResolutionStats,
 } from '@/lib/quality-metrics';
 import styles from './page.module.css';
 
@@ -28,18 +29,21 @@ export default async function QualityAnalyticsPage({ searchParams }: PageProps) 
     return subDays(today, days);
   })();
 
-  const [hero, trend, modelUsage, bestByTopic, volume] = await Promise.all([
+  const [hero, trend, modelUsage, bestByTopic, volume, autoRes] = await Promise.all([
     getOverallQualityScore(since),
     getQualityTrend(since),
     getModelUsageDistribution(since),
     getBestModelByTopic(since),
     getRatingVolumeTrend(since),
+    getAutoResolutionStats(since),
   ]);
 
   const ttsModels = modelUsage.filter((m) => m.providerType === 'tts');
   const aiModels = modelUsage.filter((m) => m.providerType === 'ai');
   const maxTtsCount = Math.max(...ttsModels.map((m) => m.podcastCount), 1);
   const maxAiCount = Math.max(...aiModels.map((m) => m.podcastCount), 1);
+  const autoResAi = autoRes.rows.filter((r) => r.providerType === 'ai');
+  const autoResTts = autoRes.rows.filter((r) => r.providerType === 'tts');
   const maxTrendOverall = Math.max(...trend.map((t) => t.avgOverall), 5);
   const maxVolume = Math.max(...volume.map((v) => v.creatorCount + v.listenerCount), 1);
 
@@ -171,6 +175,77 @@ export default async function QualityAnalyticsPage({ searchParams }: PageProps) 
                     </span>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Auto-Resolution */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Auto-Resolution</h2>
+        <div className={styles.heroGrid} style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>AI Auto</span>
+            <span className={styles.cardValue}>{autoRes.aiAutoPercent}%</span>
+          </div>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>TTS Auto</span>
+            <span className={styles.cardValue}>{autoRes.ttsAutoPercent}%</span>
+          </div>
+        </div>
+        <div className={styles.columns}>
+          {autoResAi.length > 0 && (
+            <div>
+              <h3 className={styles.subSectionTitle}>AI Auto-Resolution</h3>
+              <div className={styles.hBarContainer}>
+                {autoResAi.map((r) => {
+                  const total = r.autoCount + r.explicitCount;
+                  const maxCount = Math.max(...autoResAi.map((x) => x.autoCount + x.explicitCount), 1);
+                  return (
+                    <div key={`${r.resolvedProvider}-${r.resolvedModel}`} className={styles.hBarRow}>
+                      <span className={styles.hBarLabel}>
+                        {r.resolvedProvider}{r.resolvedModel ? ` / ${r.resolvedModel}` : ''}
+                      </span>
+                      <div className={styles.hBarTrack}>
+                        <div
+                          className={styles.hBarFillAccent}
+                          style={{ width: `${(total / maxCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className={styles.hBarValue}>
+                        {r.autoCount} auto / {r.explicitCount} explicit
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {autoResTts.length > 0 && (
+            <div>
+              <h3 className={styles.subSectionTitle}>TTS Auto-Resolution</h3>
+              <div className={styles.hBarContainer}>
+                {autoResTts.map((r) => {
+                  const total = r.autoCount + r.explicitCount;
+                  const maxCount = Math.max(...autoResTts.map((x) => x.autoCount + x.explicitCount), 1);
+                  return (
+                    <div key={`${r.resolvedProvider}-${r.resolvedModel}`} className={styles.hBarRow}>
+                      <span className={styles.hBarLabel}>
+                        {r.resolvedProvider}{r.resolvedModel ? ` / ${r.resolvedModel}` : ''}
+                      </span>
+                      <div className={styles.hBarTrack}>
+                        <div
+                          className={styles.hBarFill}
+                          style={{ width: `${(total / maxCount) * 100}%` }}
+                        />
+                      </div>
+                      <span className={styles.hBarValue}>
+                        {r.autoCount} auto / {r.explicitCount} explicit
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
