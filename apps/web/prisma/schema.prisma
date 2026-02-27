@@ -271,6 +271,8 @@ model Podcast {
   aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
   verificationMode String  @default("standard") // standard, relaxed
+  aiAutoResolved  Boolean @default(false)
+  ttsAutoResolved Boolean @default(false)
   sttProvider     String? // null = auto; 'openai' | 'groq' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
   sttModel        String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language        String?  // ISO 639-1, e.g. 'en', 'es', 'ja'
