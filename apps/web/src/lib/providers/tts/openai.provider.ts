@@ -1,16 +1,37 @@
 /**
- * OpenAI TTS provider — standard voice generation (90% cheaper).
+ * OpenAI TTS provider — standard voice generation.
  * Extracted from ../tts.ts for the multi-provider architecture.
+ *
+ * Expression support:
+ *   - gpt-4o-mini-tts: `instructions` field for natural-language delivery control
+ *     (accent, emotion, pacing, tone, whispering, character impressions)
+ *   - tts-1 / tts-1-hd: no expression controls beyond voice selection
+ *   - gpt-4o-mini-tts does NOT support `speed` param — use instructions for pacing
+ *   - No SSML or audio tag support on any model
+ *   - Pin to gpt-4o-mini-tts-2025-03-20 for reliable instruction following
+ *     (the 2025-12-15 snapshot has degraded instruction adherence)
+ *
+ * @tts-research-date 2026-02-27 — gpt-4o-mini-tts instructions, model snapshots, voices
  */
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { selectVoicePair, resolveVoiceId, findByVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
+import { mapDirectionToExpression } from '../../tts-expression-mapper';
 
-const OPENAI_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'] as const;
+/** All voices available across OpenAI TTS models */
+const OPENAI_VOICES = [
+  // Available on all models
+  'alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer',
+  // Additional voices on gpt-4o-mini-tts
+  'ash', 'ballad', 'coral', 'sage', 'verse',
+] as const;
 
 // Speakers at even indices (HOST, GUEST) → host voice slot; odd (EXPERT, SKEPTIC) → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
 type OpenAIVoice = (typeof OPENAI_VOICES)[number];
+
+/** Models that support the `instructions` parameter */
+const INSTRUCTION_MODELS = new Set(['gpt-4o-mini-tts', 'gpt-4o-mini-tts-2025-03-20', 'gpt-4o-mini-tts-2025-12-15']);
 
 export class OpenAITtsProvider implements TtsProvider {
   readonly providerId: TtsProviderId = 'openai';
@@ -42,12 +63,25 @@ export class OpenAITtsProvider implements TtsProvider {
       ? (openaiVoice as OpenAIVoice)
       : 'alloy';
 
-    const response = await client.audio.speech.create({
+    // Build request — add instructions for gpt-4o-mini-tts models
+    const supportsInstructions = INSTRUCTION_MODELS.has(this.model);
+    const createParams: Record<string, unknown> = {
       model: this.model,
       voice,
       input: params.text,
       response_format: 'mp3',
-    });
+    };
+
+    if (supportsInstructions) {
+      const expression = mapDirectionToExpression(params.direction, params.speaker, 'openai');
+      if (expression.openai?.instructions) {
+        createParams.instructions = expression.openai.instructions;
+      }
+    }
+
+    const response = await client.audio.speech.create(
+      createParams as Parameters<typeof client.audio.speech.create>[0]
+    );
 
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
