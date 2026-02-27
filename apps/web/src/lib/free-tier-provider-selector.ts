@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
+import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
 import { getProviderMeta, compareQuality, type TtsProviderId } from './providers/tts-registry';
 import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
 
@@ -28,20 +29,23 @@ export interface SelectedFreeTierProviders {
  * Select the best available free tier providers for a user.
  *
  * When per-provider allocations are configured, picks the highest-quality
- * provider with remaining quota. Falls back to legacy single-provider config
+ * provider with remaining quota. Falls back to auto model config
  * when no allocations exist.
  */
 export async function selectFreeTierProviders(userId: string): Promise<SelectedFreeTierProviders> {
-  const config = await getFreeTierConfig();
+  const [config, autoFree] = await Promise.all([
+    getFreeTierConfig(),
+    resolveAutoModel('FREE'),
+  ]);
 
-  // No allocations → legacy single-provider mode
+  // No allocations → use auto model config for providers, config for quotas
   if (config.ttsAllocations.length === 0 && config.aiAllocations.length === 0) {
     return {
-      aiProvider: config.aiProvider,
-      aiModel: config.aiModel,
+      aiProvider: autoFree.aiProvider,
+      aiModel: autoFree.aiModel,
       aiQuota: config.generationLimit,
-      ttsProvider: config.ttsProvider,
-      ttsModel: config.ttsModel,
+      ttsProvider: autoFree.ttsProvider,
+      ttsModel: autoFree.ttsModel,
       ttsQuota: config.generationLimit,
     };
   }
@@ -54,10 +58,10 @@ export async function selectFreeTierProviders(userId: string): Promise<SelectedF
   const usageMap = new Map(usageRows.map((r) => [`${r.category}:${r.provider}`, r.used]));
 
   // Select TTS provider: filter to remaining quota, sort by quality tier (highest first)
-  const selectedTts = selectTtsProvider(config.ttsAllocations, usageMap, config);
+  const selectedTts = selectTtsProvider(config.ttsAllocations, usageMap, config, autoFree);
 
   // Select AI provider: filter to remaining quota, sort by model tier (best first)
-  const selectedAi = selectAiProvider(config.aiAllocations, usageMap, config);
+  const selectedAi = selectAiProvider(config.aiAllocations, usageMap, config, autoFree);
 
   return {
     aiProvider: selectedAi.provider,
@@ -72,10 +76,11 @@ export async function selectFreeTierProviders(userId: string): Promise<SelectedF
 function selectTtsProvider(
   allocations: ProviderAllocation[],
   usageMap: Map<string, number>,
-  config: { ttsProvider: string; ttsModel: string; generationLimit: number }
+  config: { generationLimit: number },
+  autoFree: PlanModelConfig
 ): { provider: string; model: string; quota: number } {
   if (allocations.length === 0) {
-    return { provider: config.ttsProvider, model: config.ttsModel, quota: config.generationLimit };
+    return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.generationLimit };
   }
 
   // Filter to allocations with remaining quota AND a platform API key available
@@ -101,17 +106,18 @@ function selectTtsProvider(
     return { provider: available[0].provider, model: available[0].model, quota: available[0].quota };
   }
 
-  // All allocations exhausted — fall back to legacy
-  return { provider: config.ttsProvider, model: config.ttsModel, quota: config.generationLimit };
+  // All allocations exhausted — fall back to auto model config
+  return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.generationLimit };
 }
 
 function selectAiProvider(
   allocations: ProviderAllocation[],
   usageMap: Map<string, number>,
-  config: { aiProvider: string; aiModel: string; generationLimit: number }
+  config: { generationLimit: number },
+  autoFree: PlanModelConfig
 ): { provider: string; model: string; quota: number } {
   if (allocations.length === 0) {
-    return { provider: config.aiProvider, model: config.aiModel, quota: config.generationLimit };
+    return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.generationLimit };
   }
 
   // Filter to allocations with remaining quota
@@ -131,8 +137,8 @@ function selectAiProvider(
     return { provider: available[0].provider, model: available[0].model, quota: available[0].quota };
   }
 
-  // All allocations exhausted — fall back to legacy
-  return { provider: config.aiProvider, model: config.aiModel, quota: config.generationLimit };
+  // All allocations exhausted — fall back to auto model config
+  return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.generationLimit };
 }
 
 function getModelTier(provider: string, modelId: string): string {

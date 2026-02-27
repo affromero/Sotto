@@ -30,7 +30,7 @@ export async function processReferenceValidation(
   const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
-  const [references, script, podcast] = await Promise.all([
+  const [references, script, podcast, userPlanRecord] = await Promise.all([
     prisma.reference.findMany({
       where: { podcastId },
       orderBy: { number: 'asc' },
@@ -42,12 +42,14 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { topic: true, aiModel: true },
     }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model } = await resolveAiModelAndProvider({
     podcastAiModel: podcast?.aiModel,
     aiKey,
+    plan: userPlanRecord.plan as 'FREE' | 'PRO',
   });
 
   if (!script) {

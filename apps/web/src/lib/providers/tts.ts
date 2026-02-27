@@ -11,6 +11,7 @@ import type { TtsProviderId } from './tts-registry';
 import { getProviderMeta, compareQuality } from './tts-registry';
 import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
 import { getFreeTierConfig } from '../free-tier-config';
+import { resolveAutoModel } from '../auto-model-config';
 
 export interface SpeechParams {
   text: string;
@@ -265,6 +266,7 @@ export async function resolveTtsProvider(context: {
   podcastId: string;
   requestedProvider?: TtsProviderId | 'auto' | null;
   requestedModel?: string | null;
+  plan?: 'FREE' | 'PRO';
 }): Promise<ResolvedProvider> {
   const { userId, requestedProvider, requestedModel } = context;
 
@@ -349,18 +351,12 @@ export async function resolveTtsProvider(context: {
     };
   }
 
-  // Fallback: admin-configured free tier TTS provider + model
-  const config = await getFreeTierConfig();
-  const fallbackProvider = config.ttsAllocations.length > 0
-    ? (config.ttsAllocations[0].provider as TtsProviderId)
-    : config.ttsProvider;
-  const fallbackModel = config.ttsAllocations.length > 0
-    ? config.ttsAllocations[0].model
-    : config.ttsModel;
+  // Fallback: auto model config for the user's plan tier
+  const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
   return {
-    provider: createTtsProvider(fallbackProvider, undefined, fallbackModel),
+    provider: createTtsProvider(autoConfig.ttsProvider as TtsProviderId, undefined, autoConfig.ttsModel),
     source: 'platform',
-    providerId: fallbackProvider,
+    providerId: autoConfig.ttsProvider as TtsProviderId,
   };
 }
 

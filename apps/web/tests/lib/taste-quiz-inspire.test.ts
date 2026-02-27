@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockTagFindMany = vi.fn();
 const mockUserInterestFindMany = vi.fn();
 const mockTasteQuizAnswerFindMany = vi.fn();
-const mockGetFreeTierConfig = vi.fn();
+const mockResolveAutoModel = vi.fn();
 const mockCreateAIProvider = vi.fn();
 const mockResolveAiProvider = vi.fn();
 
@@ -22,8 +22,8 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 vi.mock('@/lib/providers/ai', () => ({
@@ -65,7 +65,14 @@ const mockCategories = [
 function setupDefaultMocks() {
   mockTagFindMany.mockResolvedValue(mockCategories);
   mockTasteQuizAnswerFindMany.mockResolvedValue([]);
-  mockGetFreeTierConfig.mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku' });
+  mockResolveAutoModel.mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  });
   mockUserInterestFindMany.mockResolvedValue([]);
   mockUserFindUnique.mockResolvedValue({ plan: 'FREE' });
   // Default: no BYOK key, falls through to createAIProvider

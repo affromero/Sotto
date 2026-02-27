@@ -80,7 +80,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
       ttsModel: true,
       voices: { select: { speaker: true, voiceId: true } },
       podcast: {
-        select: { userId: true },
+        select: { userId: true, user: { select: { plan: true } } },
       },
     },
   });
@@ -94,6 +94,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     podcastId,
     requestedProvider: (voiceTrack.ttsProvider as TtsProviderId | null) ?? undefined,
     requestedModel: voiceTrack.ttsModel,
+    plan: voiceTrack.podcast.user.plan as 'FREE' | 'PRO',
   });
 
   const ttsModelId = provider.getModelId();

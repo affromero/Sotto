@@ -120,6 +120,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     podcastId,
     requestedProvider: (ttsProvider as TtsProviderId | null) ?? undefined,
     requestedModel: ttsModel,
+    plan: gate.isProUser ? 'PRO' : 'FREE',
   });
 
   // Create voice track, voice assignments, and segments in a transaction

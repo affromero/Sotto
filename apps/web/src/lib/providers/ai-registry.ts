@@ -297,8 +297,9 @@ export function getProviderForModel(modelId: string): AiProviderId | null {
 export async function resolveAiModelAndProvider(opts: {
   podcastAiModel?: string | null;
   aiKey?: { provider: string; apiKey: string } | null;
+  plan?: 'FREE' | 'PRO';
 }): Promise<{ model: string; provider: string }> {
-  const { getFreeTierConfig } = await import('../free-tier-config');
+  const { resolveAutoModel } = await import('../auto-model-config');
 
   // 1. Podcast-level model override
   if (opts.podcastAiModel) {
@@ -320,17 +321,11 @@ export async function resolveAiModelAndProvider(opts: {
     }
   }
 
-  // 3. Free tier config
-  const config = await getFreeTierConfig();
-  if (config.aiAllocations.length > 0) {
-    return {
-      model: config.aiAllocations[0].model,
-      provider: config.aiAllocations[0].provider,
-    };
-  }
+  // 3. Auto model config (plan-aware)
+  const autoConfig = await resolveAutoModel(opts.plan ?? 'FREE');
   return {
-    model: config.aiModel,
-    provider: config.aiProvider,
+    model: autoConfig.aiModel,
+    provider: autoConfig.aiProvider,
   };
 }
 
