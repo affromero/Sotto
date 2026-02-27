@@ -1,86 +1,48 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getFreeTierStatus } from '@/lib/generation-gate';
-import { getTierFeatures } from '@/lib/tier-features';
-import { Badge } from '@/components/ui/Badge';
-import { FreeTierBanner } from '@/components/ui/FreeTierBanner';
-import { PodcastCard } from '@/components/feed/PodcastCard';
-import { DeletePodcastButton } from '@/components/ui/DeletePodcastButton';
-import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
-import { ReferralSharePrompt } from '@/components/referral/ReferralSharePrompt';
-import { Shield } from 'lucide-react';
-import { getPodcastGradient } from '@/lib/podcast-gradient';
-import { podcastUrl } from '@/lib/urls';
-import type { PodcastStatus } from '@prisma/client';
+import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
+import { DashboardStats } from './DashboardStats';
+import { MyPodcastsSection } from './MyPodcastsSection';
+import { TrendingToForkSection } from './TrendingToForkSection';
 import styles from './page.module.css';
 
 export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Dashboard' };
 
-const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
-  {
-    DRAFT: 'default',
-    PENDING: 'default',
-    DISCOVERING: 'info',
-    EXTRACTING: 'info',
-    SCRIPTING: 'info',
-    VERIFYING_SCRIPT: 'info',
-    VALIDATING_REFERENCES: 'info',
-    SCRIPT_READY: 'info',
-    GENERATING_AUDIO: 'info',
-    STITCHING: 'info',
-    READY: 'success',
-    UPDATING: 'warning',
-    FAILED: 'error',
-    IMPORTING: 'info',
-    TRANSCRIBING: 'info',
-    DUPLICATE_REVIEW: 'warning',
-  };
-
-const statusLabels: Record<PodcastStatus, string> = {
-  DRAFT: 'Draft',
-  PENDING: 'Pending',
-  DISCOVERING: 'Discovering',
-  EXTRACTING: 'Extracting',
-  SCRIPTING: 'Scripting',
-  VERIFYING_SCRIPT: 'Fact-Checking',
-  VALIDATING_REFERENCES: 'Verifying',
-  SCRIPT_READY: 'Script Ready',
-  GENERATING_AUDIO: 'Generating',
-  STITCHING: 'Stitching',
-  READY: 'Ready',
-  UPDATING: 'Updating',
-  FAILED: 'Failed',
-  IMPORTING: 'Importing...',
-  TRANSCRIBING: 'Transcribing...',
-  DUPLICATE_REVIEW: 'Under Review',
-};
-
-function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+function StatsSkeleton() {
+  return (
+    <div className={styles.stats} aria-hidden="true">
+      <div className={styles.statCard} style={{ height: 80, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+    </div>
+  );
 }
 
-function formatRelativeTime(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function PodcastsSkeleton() {
+  return (
+    <div className={styles.podcastsSection} aria-hidden="true">
+      <div style={{ width: 160, height: 28, background: 'var(--color-border)', borderRadius: 'var(--radius-md)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div className={styles.podcastGrid}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{ height: 160, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 100}ms` }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return '--:--';
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+function TrendingSkeleton() {
+  return (
+    <div className={styles.trendingSection} aria-hidden="true">
+      <div style={{ width: 200, height: 28, background: 'var(--color-border)', borderRadius: 'var(--radius-md)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div className={styles.trendingScroll}>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className={styles.trendingCardWrapper} style={{ height: 180, background: 'var(--color-border)', borderRadius: 'var(--radius-xl)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 100}ms` }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default async function DashboardPage() {
@@ -93,141 +55,15 @@ export default async function DashboardPage() {
 
   const userRole = ((session?.user as Record<string, unknown>)?.role as string) ?? 'USER';
 
-  const [user, podcasts, trendingToFork, freeTier] = await Promise.all([
-    prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        name: true,
-        handle: true,
-        role: true,
-        _count: {
-          select: {
-            followers: true,
-          },
-        },
-      },
-    }),
-    prisma.podcast.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        topic: true,
-        status: true,
-        duration: true,
-        playCount: true,
-        forkCount: true,
-        likeCount: true,
-        createdAt: true,
-        audioUrl: true,
-        source: true,
-        sourcePlatform: true,
-        isHumanContent: true,
-        visibility: true,
-        forkedFromId: true,
-        failureReason: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            handle: true,
-            role: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        },
-      },
-    }),
-    prisma.podcast.findMany({
-      where: {
-        status: 'READY',
-        visibility: 'PUBLIC',
-        userId: { not: userId },
-      },
-      orderBy: { forkCount: 'desc' },
-      take: 6,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        topic: true,
-        status: true,
-        visibility: true,
-        audioUrl: true,
-        duration: true,
-        playCount: true,
-        forkCount: true,
-        likeCount: true,
-        createdAt: true,
-        source: true,
-        sourcePlatform: true,
-        isHumanContent: true,
-        forkedFromId: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            handle: true,
-            role: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: {
-              select: { id: true, name: true, slug: true },
-            },
-          },
-        },
-      },
-    }),
-    getFreeTierStatus(userId),
-  ]);
-
-  const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
-  const tierFeatures = getTierFeatures(plan, freeTier.isByokUser, userRole);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true },
+  });
 
   const displayName = user?.name || 'there';
-  const userHandle = user?.handle;
-  const isAdmin = userRole === 'ADMIN';
-  const isCreatorOrAdmin = userRole === 'CREATOR' || isAdmin;
-  const readyPodcastCount = podcasts.filter((p) => p.status === 'READY').length;
-  const totalListens = podcasts.reduce((sum, p) => sum + p.playCount, 0);
-  const totalForks = podcasts.reduce((sum, p) => sum + p.forkCount, 0);
-  const totalLikes = podcasts.reduce((sum, p) => sum + p.likeCount, 0);
-  const followerCount = user?._count?.followers ?? 0;
-
-  const serializedTrending = trendingToFork.map((p) => ({
-    ...p,
-    createdAt: p.createdAt.toISOString(),
-    tags: p.tags.map((pt) => pt.tag),
-  }));
 
   return (
     <main className={styles.main}>
-      {userRole !== 'ADMIN' && userRole !== 'SYSTEM' && (
-        <FreeTierBanner
-          dailyUsed={freeTier.dailyUsed}
-          dailyLimit={freeTier.dailyLimit}
-          isByokUser={freeTier.isByokUser}
-          isProUser={freeTier.isProUser}
-          resetInSeconds={freeTier.resetInSeconds}
-          email={session?.user?.email ?? undefined}
-        />
-      )}
-
-      {userHandle && readyPodcastCount > 0 && (
-        <ReferralSharePrompt handle={userHandle} hasFirstReadyPodcast={readyPodcastCount >= 1} />
-      )}
-
       <section className={styles.header}>
         <h1 className={styles.greeting}>Welcome back, {displayName}</h1>
         <Link href="/create" className={styles.createButton}>
@@ -249,159 +85,23 @@ export default async function DashboardPage() {
         </Link>
       </section>
 
-      <section className={styles.stats} aria-label="Usage statistics">
-        <div className={`${styles.statCard} ${styles.statPodcasts}`}>
-          <span className={styles.statLabel}>Total Podcasts</span>
-          <span className={styles.statValue}>{podcasts.length}</span>
-        </div>
-      </section>
+      <SectionErrorBoundary sectionName="Stats">
+        <Suspense fallback={<StatsSkeleton />}>
+          <DashboardStats userId={userId} userEmail={session?.user?.email} userRole={userRole} />
+        </Suspense>
+      </SectionErrorBoundary>
 
-      {isCreatorOrAdmin && (
-        <section className={styles.creatorStats} aria-label="Creator statistics">
-          <h2 className={styles.creatorStatsTitle}>Creator Stats</h2>
-          <div className={styles.creatorStatsGrid}>
-            <div className={`${styles.creatorStatCard} ${styles.statListens}`}>
-              <span className={styles.statLabel}>Total Listens</span>
-              <span className={styles.statValue}>{totalListens.toLocaleString()}</span>
-            </div>
-            <div className={`${styles.creatorStatCard} ${styles.statFollowers}`}>
-              <span className={styles.statLabel}>Followers</span>
-              <span className={styles.statValue}>{followerCount.toLocaleString()}</span>
-            </div>
-            <div className={`${styles.creatorStatCard} ${styles.statForks}`}>
-              <span className={styles.statLabel}>Forks</span>
-              <span className={styles.statValue}>{totalForks.toLocaleString()}</span>
-            </div>
-            <div className={`${styles.creatorStatCard} ${styles.statLikes}`}>
-              <span className={styles.statLabel}>Likes</span>
-              <span className={styles.statValue}>{totalLikes.toLocaleString()}</span>
-            </div>
-          </div>
-        </section>
-      )}
+      <SectionErrorBoundary sectionName="My Podcasts">
+        <Suspense fallback={<PodcastsSkeleton />}>
+          <MyPodcastsSection userId={userId} userRole={userRole} />
+        </Suspense>
+      </SectionErrorBoundary>
 
-      <section className={styles.podcastsSection}>
-        <h2 className={styles.sectionTitle}>My Podcasts</h2>
-
-        {podcasts.length === 0 ? (
-          <div className={styles.emptyState}>
-            <div className={styles.emptyIcon} aria-hidden="true">
-              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-                <circle
-                  cx="32"
-                  cy="32"
-                  r="28"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                />
-                <path
-                  d="M26 24L40 32L26 40V24Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
-            <h3 className={styles.emptyTitle}>Create your first podcast</h3>
-            <p className={styles.emptyText}>
-              Chat with Sotto about any topic and generate a custom podcast in minutes.
-            </p>
-            <Link href="/create" className={styles.emptyCta}>
-              Get Started
-            </Link>
-          </div>
-        ) : (
-          <div className={styles.podcastGrid} role="list" aria-label="Your podcasts">
-            {podcasts.map((podcast) => {
-              const gradient = getPodcastGradient(podcast.id);
-              const gradientVars = {
-                '--cover-from': gradient.from,
-                '--cover-to': gradient.to,
-                '--cover-angle': gradient.angle,
-              } as React.CSSProperties;
-
-              return (
-                <div key={podcast.id} className={`${styles.cardWrapper} dashboardCardWrapper`} role="listitem">
-                  <Link
-                    href={podcast.status === 'DRAFT' ? `/create?draftId=${podcast.id}` : podcastUrl(podcast, podcast.user.handle)}
-                    className={styles.miniGradientCard}
-                    style={gradientVars}
-                    aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
-                  >
-                    <div
-                      className={`${styles.miniGradientCover} ${podcast.status === 'FAILED' ? styles.miniGradientFailed : ''} ${podcast.status === 'DRAFT' ? styles.miniGradientDraft : ''}`}
-                    >
-                      <div className={styles.miniGradientBadge}>
-                        <Badge variant={statusVariants[podcast.status]}>
-                          {statusLabels[podcast.status]}
-                        </Badge>
-                      </div>
-                      <h3 className={styles.miniGradientTitle}>{podcast.title}</h3>
-                    </div>
-                    <div className={styles.miniGradientBody}>
-                      <p className={styles.miniGradientTopic}>{podcast.topic}</p>
-                      <VisibilityToggle podcastId={podcast.id} visibility={podcast.visibility} canMakePrivate={tierFeatures.privateAllowed} />
-                      <div className={styles.miniGradientMeta}>
-                        {podcast.status === 'DRAFT' ? (
-                          <span>Started {formatRelativeTime(podcast.createdAt)}</span>
-                        ) : (
-                          <>
-                            <span>{formatDuration(podcast.duration)}</span>
-                            <span>{formatDate(podcast.createdAt)}</span>
-                            {podcast.playCount > 0 && (
-                              <span>{podcast.playCount.toLocaleString()} plays</span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      {podcast.status === 'DRAFT' && (
-                        <span className={styles.draftHint}>Tap to continue</span>
-                      )}
-                      {podcast.status === 'FAILED' && (
-                        <>
-                          {isAdmin && podcast.failureReason && (
-                            <p className={styles.failureReason}>{podcast.failureReason}</p>
-                          )}
-                          <span className={styles.retryHint}>Tap to retry</span>
-                        </>
-                      )}
-                    </div>
-                  </Link>
-                  {podcast.status === 'FAILED' && isAdmin && (
-                    <Link
-                      href={`/admin/podcasts?search=${podcast.id}`}
-                      className={styles.adminLink}
-                    >
-                      <Shield size={12} />
-                      Admin Panel
-                    </Link>
-                  )}
-                  <DeletePodcastButton podcastId={podcast.id} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {serializedTrending.length > 0 && (
-        <section className={styles.trendingSection} aria-label="Trending podcasts to fork">
-          <div className={styles.trendingSectionHeader}>
-            <h2 className={styles.sectionTitle}>Trending to Fork</h2>
-            <Link href="/feed?sort=most_forked" className={styles.seeAllLink}>
-              See all
-            </Link>
-          </div>
-          <div className={styles.trendingScroll}>
-            {serializedTrending.map((p) => (
-              <div key={p.id} className={styles.trendingCardWrapper}>
-                <PodcastCard podcast={p} variant="compact" />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <SectionErrorBoundary sectionName="Trending to Fork">
+        <Suspense fallback={<TrendingSkeleton />}>
+          <TrendingToForkSection userId={userId} />
+        </Suspense>
+      </SectionErrorBoundary>
     </main>
   );
 }

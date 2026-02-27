@@ -1,6 +1,61 @@
 .root {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  max-width: var(--max-content-width);
+}
+
+.bone {
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.header {
+  width: 200px;
+  height: 28px;
+}
+
+/* Stat cards grid */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--spacing-md);
+}
+
+.statCard {
+  height: 100px;
+  border-radius: var(--radius-xl);
+}
+
+/* Table placeholder */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.tableRow {
+  height: 20px;
+  border-radius: var(--radius-sm);
+}
+
+/* Staggered animation delays */
+.delay1 { animation-delay: 100ms; }
+.delay2 { animation-delay: 200ms; }
+.delay3 { animation-delay: 300ms; }
+.delay4 { animation-delay: 400ms; }
+
+@media (max-width: 899px) {
+  .statsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

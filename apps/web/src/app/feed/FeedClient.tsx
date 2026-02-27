@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/feed/SearchBar';
 import { TagFilter } from '@/components/feed/TagFilter';
 import { FilterPanel, type AdvancedFilters } from '@/components/feed/FilterPanel';
@@ -42,23 +43,57 @@ const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
   { value: 'most_forked', label: 'Most Forked' },
 ];
 
+const SORT_VALID = new Set<SortOption>(['recent', 'popular', 'trending', 'most_forked']);
+const MODE_VALID = new Set<ModeOption>(['all', 'remixes']);
+const TAB_VALID = new Set<FeedTab>(['discover', 'activity']);
+const SEARCH_MODE_VALID = new Set<SearchMode>(['podcasts', 'people']);
+
 export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, tags, isAuthenticated, currentUserId }: FeedClientProps) {
-  const [activeTab, setActiveTab] = useState<FeedTab>('discover');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTag, setActiveTag] = useState<string | undefined>(undefined);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Read initial state from URL params
+  const initialTab = TAB_VALID.has(searchParams.get('tab') as FeedTab) ? (searchParams.get('tab') as FeedTab) : 'discover';
+  const initialSort = SORT_VALID.has(searchParams.get('sort') as SortOption) ? (searchParams.get('sort') as SortOption) : 'recent';
+  const initialMode = MODE_VALID.has(searchParams.get('mode') as ModeOption) ? (searchParams.get('mode') as ModeOption) : 'all';
+  const initialSearchMode = SEARCH_MODE_VALID.has(searchParams.get('search') as SearchMode) ? (searchParams.get('search') as SearchMode) : 'podcasts';
+
+  const [activeTab, setActiveTab] = useState<FeedTab>(initialTab);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') ?? '');
+  const [activeTag, setActiveTag] = useState<string | undefined>(searchParams.get('tag') ?? undefined);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>({});
   const [podcasts, setPodcasts] = useState(initialPodcasts);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(initialPodcasts.length >= 24);
-  const [sort, setSort] = useState<SortOption>('recent');
-  const [mode, setMode] = useState<ModeOption>('all');
+  const [sort, setSort] = useState<SortOption>(initialSort);
+  const [mode, setMode] = useState<ModeOption>(initialMode);
 
   // People search state
-  const [searchMode, setSearchMode] = useState<SearchMode>('podcasts');
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialSearchMode);
   const [userResults, setUserResults] = useState<UserDiscoveryResult[]>([]);
   const [userLoading, setUserLoading] = useState(false);
   const [userHasMore, setUserHasMore] = useState(false);
   const [userPage, setUserPage] = useState(1);
+
+  // Sync state to URL (omit default values for clean URLs)
+  const syncUrl = useCallback((overrides: Record<string, string | undefined>) => {
+    const params = new URLSearchParams();
+    const state: Record<string, string | undefined> = {
+      tab: activeTab !== 'discover' ? activeTab : undefined,
+      q: searchQuery || undefined,
+      tag: activeTag,
+      sort: sort !== 'recent' ? sort : undefined,
+      mode: mode !== 'all' ? mode : undefined,
+      search: searchMode !== 'podcasts' ? searchMode : undefined,
+      ...overrides,
+    };
+    for (const [key, value] of Object.entries(state)) {
+      if (value) params.set(key, value);
+    }
+    const qs = params.toString();
+    router.replace(`/feed${qs ? `?${qs}` : ''}`, { scroll: false });
+  }, [activeTab, searchQuery, activeTag, sort, mode, searchMode, router]);
 
   const fetchPodcasts = useCallback(
     async (
@@ -154,8 +189,13 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
           fetchPodcasts(value, activeTag, advancedFilters, sort, mode);
         }
       }
+      // Debounce URL update for search input
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = setTimeout(() => {
+        syncUrl({ q: value || undefined });
+      }, 300);
     },
-    [activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers, searchMode]
+    [activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers, searchMode, syncUrl]
   );
 
   const handleSearchModeChange = useCallback(
@@ -166,16 +206,18 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
       } else if (newMode === 'podcasts') {
         fetchPodcasts(searchQuery, activeTag, advancedFilters, sort, mode);
       }
+      syncUrl({ search: newMode !== 'podcasts' ? newMode : undefined });
     },
-    [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers]
+    [searchQuery, activeTag, advancedFilters, sort, mode, fetchPodcasts, fetchUsers, syncUrl]
   );
 
   const handleTagSelect = useCallback(
     (slug: string | undefined) => {
       setActiveTag(slug);
       fetchPodcasts(searchQuery, slug, advancedFilters, sort, mode);
+      syncUrl({ tag: slug });
     },
-    [searchQuery, advancedFilters, sort, mode, fetchPodcasts]
+    [searchQuery, advancedFilters, sort, mode, fetchPodcasts, syncUrl]
   );
 
   const handleFiltersChange = useCallback(
@@ -190,16 +232,18 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
     (newSort: SortOption) => {
       setSort(newSort);
       fetchPodcasts(searchQuery, activeTag, advancedFilters, newSort, mode);
+      syncUrl({ sort: newSort !== 'recent' ? newSort : undefined });
     },
-    [searchQuery, activeTag, advancedFilters, mode, fetchPodcasts]
+    [searchQuery, activeTag, advancedFilters, mode, fetchPodcasts, syncUrl]
   );
 
   const handleModeChange = useCallback(
     (newMode: ModeOption) => {
       setMode(newMode);
       fetchPodcasts(searchQuery, activeTag, advancedFilters, sort, newMode);
+      syncUrl({ mode: newMode !== 'all' ? newMode : undefined });
     },
-    [searchQuery, activeTag, advancedFilters, sort, fetchPodcasts]
+    [searchQuery, activeTag, advancedFilters, sort, fetchPodcasts, syncUrl]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -228,7 +272,7 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
         <div className={styles.feedTabs} role="tablist" aria-label="Feed tabs">
           <button
             className={`${styles.feedTab} ${activeTab === 'discover' ? styles.feedTabActive : ''}`}
-            onClick={() => setActiveTab('discover')}
+            onClick={() => { setActiveTab('discover'); syncUrl({ tab: undefined }); }}
             role="tab"
             aria-selected={activeTab === 'discover'}
             aria-controls="feed-discover-panel"
@@ -239,7 +283,7 @@ export function FeedClient({ initialPodcasts, heroPodcasts, trendingPodcasts, ta
           </button>
           <button
             className={`${styles.feedTab} ${activeTab === 'activity' ? styles.feedTabActive : ''}`}
-            onClick={() => setActiveTab('activity')}
+            onClick={() => { setActiveTab('activity'); syncUrl({ tab: 'activity' }); }}
             role="tab"
             aria-selected={activeTab === 'activity'}
             aria-controls="feed-activity-panel"

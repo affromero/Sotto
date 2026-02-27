@@ -50,7 +50,7 @@
   font-weight: 500;
   color: var(--color-text-secondary);
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
   transition: color var(--transition-fast);
 }
 
@@ -67,7 +67,7 @@
   font-weight: 600;
   color: var(--color-text-inverse);
   cursor: pointer;
-  min-height: 36px;
+  min-height: 44px;
   transition: opacity var(--transition-fast), background var(--transition-fast);
 }
 
@@ -80,10 +80,3 @@
   cursor: default;
 }
 
-@media (max-width: 599px) {
-  .cancelBtn,
-  .submitBtn {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}

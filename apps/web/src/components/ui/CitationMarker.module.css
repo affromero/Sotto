@@ -4,6 +4,7 @@
 }
 
 .marker {
+  position: relative;
   display: inline;
   background: none;
   border: none;
@@ -15,6 +16,16 @@
   line-height: 1;
   padding: 0 1px;
   transition: color var(--transition-fast);
+}
+
+.marker::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
 }
 
 .marker:hover {
