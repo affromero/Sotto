@@ -65,8 +65,8 @@ export function cleanTextForTts(
         /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly)$/i;
       return directions.test(inner.trim()) ? '' : `(${inner})`;
     })
-    // Remove citation markers like [1], [2, 3], [1, 2, 3]
-    .replace(/\[\d+(?:,\s*\d+)*\]/g, '');
+    // Remove citation markers like [1], [2, 3], [1, 2, 3] — also consume leading space
+    .replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '');
 
   const providerId = options?.providerId;
 
