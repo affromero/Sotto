@@ -6,6 +6,8 @@ import { EventProvider } from '@/components/providers/EventProvider';
 import { AudioPlayerProvider } from '@/components/providers/AudioPlayerProvider';
 import { PageViewTracker } from '@/components/providers/PageViewTracker';
 import { GlobalMiniPlayer } from '@/components/player/GlobalMiniPlayer';
+import { ToastProvider } from '@/components/providers/ToastProvider';
+import { CommandPalette } from '@/components/ui/CommandPalette';
 import { ImpersonationBanner } from '@/components/layout/ImpersonationBanner';
 import { THEME_INIT_SCRIPT } from '@/lib/theme-script';
 import '@/styles/globals.css';
@@ -65,13 +67,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <SessionProvider>
           <ImpersonationBanner />
           <ThemeProvider>
-            <EventProvider>
-              <AudioPlayerProvider>
-                <PageViewTracker />
-                {children}
-                <GlobalMiniPlayer />
-              </AudioPlayerProvider>
-            </EventProvider>
+            <ToastProvider>
+              <EventProvider>
+                <AudioPlayerProvider>
+                  <PageViewTracker />
+                  {children}
+                  <GlobalMiniPlayer />
+                  <CommandPalette />
+                </AudioPlayerProvider>
+              </EventProvider>
+            </ToastProvider>
           </ThemeProvider>
         </SessionProvider>
       </body>

@@ -1,6 +1,91 @@
 .root {
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  max-width: var(--max-content-width);
+}
+
+.bone {
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Tag filter pills row */
+.pillsRow {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.pill {
+  width: 60px;
+  height: 32px;
+  border-radius: var(--radius-full);
+}
+
+/* Card grid */
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.cardCover {
+  height: 140px;
+  border-radius: var(--radius-md);
+}
+
+.cardMeta {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 80vh;
+  gap: var(--spacing-sm);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.statBar {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  flex: 1;
+}
+
+.statBarShort {
+  height: 12px;
+  width: 40%;
+  border-radius: var(--radius-sm);
+}
+
+/* Staggered animation delays */
+.delay1 { animation-delay: 100ms; }
+.delay2 { animation-delay: 200ms; }
+.delay3 { animation-delay: 300ms; }
+.delay4 { animation-delay: 400ms; }
+
+@media (max-width: 899px) {
+  .cardGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 599px) {
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
 }

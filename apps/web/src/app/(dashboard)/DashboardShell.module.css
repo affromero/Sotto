@@ -54,6 +54,13 @@
   max-width: var(--max-content-width);
   width: 100%;
   margin: 0 auto;
+  animation: slideUp 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
 }
 
 /* Desktop: sidebar visible, hide menu button */

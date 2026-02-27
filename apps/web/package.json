@@ -40,6 +40,7 @@
     "bullmq": "^5.67.0",
     "busboy": "^1.6.0",
     "cheerio": "^1.2.0",
+    "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "franc-min": "^6.2.0",
     "ioredis": "5.9.2",
