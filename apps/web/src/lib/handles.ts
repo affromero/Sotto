@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { generateResponse } from './claude';
+import { generateResponse } from './llm';
 import { cache } from './redis';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';

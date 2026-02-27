@@ -127,25 +127,13 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({
-  aiProvider: 'anthropic',
-  aiModel: 'claude-haiku-4-5-20251001',
-  ttsProvider: 'openai',
-  generationLimit: 3,
-});
-
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
-}));
-
-const mockGetAiProviderMeta = vi.fn().mockReturnValue({
-  id: 'anthropic',
-  displayName: 'Anthropic (Claude)',
-  defaultModel: 'claude-sonnet-4-6',
+const mockResolveAiModelAndProvider = vi.fn().mockResolvedValue({
+  model: 'claude-haiku-4-5-20251001',
+  provider: 'anthropic',
 });
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  getAiProviderMeta: (...args: unknown[]) => mockGetAiProviderMeta(...args),
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -226,18 +214,10 @@ describe('processScriptGeneration', () => {
     }));
     mockAddJob.mockResolvedValue({ id: 'job-1' });
 
-    // Reset free tier / AI provider mocks
-    mockGetFreeTierConfig.mockResolvedValue({
-      aiProvider: 'anthropic',
-      aiModel: 'claude-haiku-4-5-20251001',
-      ttsProvider: 'openai',
-      generationLimit: 3,
-      aiAllocations: [],
-    });
-    mockGetAiProviderMeta.mockReturnValue({
-      id: 'anthropic',
-      displayName: 'Anthropic (Claude)',
-      defaultModel: 'claude-sonnet-4-6',
+    // Reset model resolution mock
+    mockResolveAiModelAndProvider.mockResolvedValue({
+      model: 'claude-haiku-4-5-20251001',
+      provider: 'anthropic',
     });
   });
 

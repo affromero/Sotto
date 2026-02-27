@@ -7,7 +7,7 @@
  * Layer 4: Claude AI Evaluation
  */
 
-import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './llm';
 
 /** Extract the first complete JSON object from a string that may contain surrounding text. */
 function extractFirstJsonObject(text: string): string {

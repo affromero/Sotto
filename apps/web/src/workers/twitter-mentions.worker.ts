@@ -169,7 +169,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
         createdAt: tweet.created_at,
       };
-      parsed = await parseThreadIntent(mentionAsThreadTweet, threadData, aiKey?.apiKey);
+      parsed = await parseThreadIntent(mentionAsThreadTweet, threadData, { userId, apiKeyOverride: aiKey?.apiKey });
     } else {
       // Single-tweet path: existing behavior
       let parentText: string | undefined;
@@ -180,7 +180,8 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
           parentText = parentResult.tweet.text;
         }
       }
-      parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
+      const imageUrls = extractPhotoUrls(tweet, mediaByKey);
+      parsed = await parseTweetIntent(tweet.text, parentText, { userId, apiKeyOverride: aiKey?.apiKey, imageUrls });
     }
 
     // 7b. Look up credentials for verified thread participants
@@ -400,5 +401,20 @@ function getParentTweetId(tweet: TwitterTweet): string | undefined {
   }
   const repliedTo = tweet.referenced_tweets.find((r) => r.type === 'replied_to');
   return repliedTo?.id;
+}
+
+function extractPhotoUrls(tweet: TwitterTweet, mediaByKey: Map<string, TwitterMedia>): string[] {
+  const mediaKeys = tweet.attachments?.media_keys;
+  if (!mediaKeys) return [];
+
+  const urls: string[] = [];
+  for (const key of mediaKeys) {
+    const media = mediaByKey.get(key);
+    if (media?.type === 'photo') {
+      const photoUrl = media.url ?? media.preview_image_url;
+      if (photoUrl) urls.push(photoUrl);
+    }
+  }
+  return urls;
 }
 

@@ -4,8 +4,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGenerateResponse = vi.fn();
 
-vi.mock('@/lib/claude', () => ({
+const mockProvider = {
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  streamResponse: vi.fn(),
+};
+
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: vi.fn(() => mockProvider),
+  resolveAiProvider: vi.fn(async () => ({ provider: 'anthropic', source: 'platform' })),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: vi.fn(),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -46,6 +56,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(mockResult),
         inputTokens: 100,
         outputTokens: 150,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent(
@@ -71,6 +82,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(mockResult),
         inputTokens: 120,
         outputTokens: 180,
+        model: 'test-model',
       });
 
       const tweetText = '@sottofm can you elaborate on this?';
@@ -99,6 +111,7 @@ describe('parseTweetIntent', () => {
         content: '```json\n' + JSON.stringify(mockResult) + '\n```',
         inputTokens: 80,
         outputTokens: 120,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent('@sottofm blockchain basics');
@@ -122,6 +135,7 @@ describe('parseTweetIntent', () => {
         content: '```\n' + JSON.stringify(mockResult) + '\n```',
         inputTokens: 90,
         outputTokens: 130,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent('@sottofm machine learning intro');
@@ -145,6 +159,7 @@ describe('parseTweetIntent', () => {
         content: '```json\n  ' + JSON.stringify(mockResult) + '  \n```',
         inputTokens: 95,
         outputTokens: 140,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent('@sottofm mars mission details');
@@ -154,16 +169,17 @@ describe('parseTweetIntent', () => {
   });
 
   describe('error handling', () => {
-    it('throws on invalid JSON from Claude', async () => {
+    it('throws on invalid JSON from LLM', async () => {
       mockGenerateResponse.mockResolvedValue({
         content: 'This is not valid JSON { broken',
         inputTokens: 50,
         outputTokens: 10,
+        model: 'test-model',
       });
 
       await expect(
         parseTweetIntent('@sottofm some topic')
-      ).rejects.toThrow('Failed to parse tweet intent — Claude returned invalid JSON');
+      ).rejects.toThrow('Failed to parse tweet intent — LLM returned invalid JSON');
     });
 
     it('throws when topic is missing from parsed result', async () => {
@@ -179,6 +195,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(invalidResult),
         inputTokens: 60,
         outputTokens: 80,
+        model: 'test-model',
       });
 
       await expect(
@@ -199,6 +216,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(invalidResult),
         inputTokens: 60,
         outputTokens: 80,
+        model: 'test-model',
       });
 
       await expect(
@@ -218,6 +236,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(invalidResult),
         inputTokens: 60,
         outputTokens: 80,
+        model: 'test-model',
       });
 
       await expect(
@@ -244,6 +263,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(mockResult),
         inputTokens: 110,
         outputTokens: 160,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent(
@@ -269,6 +289,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(mockResult),
         inputTokens: 85,
         outputTokens: 125,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent(
@@ -294,6 +315,7 @@ describe('parseTweetIntent', () => {
         content: JSON.stringify(mockResult),
         inputTokens: 130,
         outputTokens: 200,
+        model: 'test-model',
       });
 
       const result = await parseTweetIntent(
@@ -400,6 +422,7 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify(mockResult),
       inputTokens: 300,
       outputTokens: 400,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
@@ -430,6 +453,7 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify(mockResult),
       inputTokens: 200,
       outputTokens: 300,
+      model: 'test-model',
     });
 
     const thread = createMockThread({
@@ -486,6 +510,7 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify(mockResult),
       inputTokens: 100,
       outputTokens: 150,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
@@ -500,18 +525,19 @@ describe('parseThreadIntent', () => {
     );
   });
 
-  it('throws on invalid JSON from Claude', async () => {
+  it('throws on invalid JSON from LLM', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: 'Not valid JSON',
       inputTokens: 50,
       outputTokens: 10,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
     const mention = createMockMentionTweet();
 
     await expect(parseThreadIntent(mention, thread)).rejects.toThrow(
-      'Failed to parse thread intent — Claude returned invalid JSON'
+      'Failed to parse thread intent — LLM returned invalid JSON'
     );
   });
 
@@ -520,6 +546,7 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify({ title: 'Has Title', depth: 'standard', audienceLevel: 'beginner', tone: 'casual', focusAreas: [] }),
       inputTokens: 50,
       outputTokens: 50,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
@@ -544,6 +571,7 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify(mockResult),
       inputTokens: 100,
       outputTokens: 100,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
@@ -573,12 +601,13 @@ describe('parseThreadIntent', () => {
       content: JSON.stringify(mockResult),
       inputTokens: 100,
       outputTokens: 100,
+      model: 'test-model',
     });
 
     const thread = createMockThread();
     const mention = createMockMentionTweet();
 
-    await parseThreadIntent(mention, thread, 'user-api-key-123');
+    await parseThreadIntent(mention, thread, { apiKeyOverride: 'user-api-key-123' });
 
     expect(mockGenerateResponse).toHaveBeenCalledWith(
       expect.any(String),

@@ -31,7 +31,7 @@ vi.mock('@/lib/providers/ai', () => ({
   resolveAiProvider: (...args: unknown[]) => mockResolveAiProvider(...args),
 }));
 
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
 }));
 

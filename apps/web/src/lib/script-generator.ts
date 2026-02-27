@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './llm';
 import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { minutesToWords, wordCountBounds } from './duration';

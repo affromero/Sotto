@@ -4,7 +4,7 @@ import { prisma } from './prisma';
 import { getFreeTierConfig } from './free-tier-config';
 import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
-import { WEB_SEARCH_TOOL } from './claude';
+import { WEB_SEARCH_TOOL } from './llm';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';

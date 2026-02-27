@@ -27,6 +27,7 @@ export interface TwitterMediaVariant {
 export interface TwitterMedia {
   media_key: string;
   type: 'video' | 'animated_gif' | 'photo';
+  url?: string;
   duration_ms?: number;
   variants?: TwitterMediaVariant[];
   preview_image_url?: string;

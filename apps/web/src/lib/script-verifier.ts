@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './claude';
+import { generateResponse, WEB_SEARCH_TOOL } from './llm';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 import { hashTurn, matchClaimsToTurns } from './turn-diff';
 

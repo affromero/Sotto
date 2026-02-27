@@ -1,6 +1,24 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { moderateOrThrow, moderateContent } from './moderation';
 import { logger } from './logger';
+import type { ContentPart } from './providers/ai';
+
+type LlmContent = string | ContentPart[];
+
+/** Extract plain text from content (string or ContentPart[]). */
+function extractText(content: LlmContent): string {
+  if (typeof content === 'string') return content;
+  return content.filter((p) => p.type === 'text').map((p) => (p as { text: string }).text).join('\n');
+}
+
+/** Convert ContentPart[] to Anthropic's ContentBlockParam[]. */
+function toAnthropicContent(content: LlmContent): string | Anthropic.Messages.ContentBlockParam[] {
+  if (typeof content === 'string') return content;
+  return content.map((part) => {
+    if (part.type === 'text') return { type: 'text' as const, text: part.text };
+    return { type: 'image' as const, source: { type: 'url' as const, url: part.url } };
+  });
+}
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -53,7 +71,7 @@ export const WEB_SEARCH_TOOL = {
  */
 export async function generateResponse(
   systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: LlmContent }>,
   options?: {
     maxTokens?: number;
     model?: string;
@@ -66,7 +84,7 @@ export async function generateResponse(
   if (!options?.skipModeration) {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
-      await moderateOrThrow(lastUserMsg.content);
+      await moderateOrThrow(extractText(lastUserMsg.content));
     }
   }
 
@@ -75,11 +93,29 @@ export async function generateResponse(
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
-    const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    const result = await executeClaudeCode(systemPrompt, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: hasWebSearch,
     });
     return { ...result, model: options.model };
+  }
+
+  // Guardrail: auto-route non-Anthropic models to the correct provider.
+  // Prevents e.g. 'gpt-5-mini' being sent to the Anthropic API.
+  if (options?.model) {
+    const { getProviderForModel } = await import('./providers/ai-registry');
+    const ownerProvider = getProviderForModel(options.model);
+    if (ownerProvider && ownerProvider !== 'anthropic') {
+      const { createAIProvider } = await import('./providers/ai');
+      const ai = createAIProvider(ownerProvider);
+      return ai.generateResponse(systemPrompt, messages, {
+        maxTokens: options.maxTokens,
+        model: options.model,
+        apiKeyOverride: options.apiKeyOverride,
+        skipModeration: options.skipModeration,
+      });
+    }
   }
 
   const activeClient = options?.apiKeyOverride
@@ -87,17 +123,22 @@ export async function generateResponse(
     : client;
 
   if (!activeClient) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
+    throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
   const resolvedModel = options?.model || 'claude-sonnet-4-6';
+
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role,
+    content: toAnthropicContent(m.content),
+  }));
 
   const response = await withRetry('generateResponse', () =>
     activeClient.messages.create({
       model: resolvedModel,
       max_tokens: options?.maxTokens || 4096,
       system: systemPrompt,
-      messages,
+      messages: anthropicMessages,
       ...(options?.tools?.length ? { tools: options.tools } : {}),
     })
   );
@@ -134,7 +175,7 @@ export async function generateResponse(
  */
 export async function* streamResponse(
   systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: LlmContent }>,
   options?: {
     maxTokens?: number;
     model?: string;
@@ -148,7 +189,7 @@ export async function* streamResponse(
   if (!options?.skipModeration) {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
-      await moderateOrThrow(lastUserMsg.content);
+      await moderateOrThrow(extractText(lastUserMsg.content));
     }
   }
 
@@ -157,7 +198,8 @@ export async function* streamResponse(
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
-    yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    yield* streamClaudeCode(systemPrompt, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: hasWebSearch,
     });
@@ -165,15 +207,37 @@ export async function* streamResponse(
     return;
   }
 
+  // Guardrail: auto-route non-Anthropic models to the correct provider.
+  if (options?.model) {
+    const { getProviderForModel } = await import('./providers/ai-registry');
+    const ownerProvider = getProviderForModel(options.model);
+    if (ownerProvider && ownerProvider !== 'anthropic') {
+      const { createAIProvider } = await import('./providers/ai');
+      const ai = createAIProvider(ownerProvider);
+      yield* ai.streamResponse(systemPrompt, messages, {
+        maxTokens: options.maxTokens,
+        model: options.model,
+        apiKeyOverride: options.apiKeyOverride,
+        skipModeration: options.skipModeration,
+      });
+      return;
+    }
+  }
+
   const activeClient = options?.apiKeyOverride
     ? new Anthropic({ apiKey: options.apiKeyOverride })
     : client;
 
   if (!activeClient) {
-    throw new Error('Claude client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
+    throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
   const streamModel = options?.model || 'claude-sonnet-4-6';
+
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role,
+    content: toAnthropicContent(m.content),
+  }));
 
   let yieldedAny = false;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -182,7 +246,7 @@ export async function* streamResponse(
         model: streamModel,
         max_tokens: options?.maxTokens || 4096,
         system: systemPrompt,
-        messages,
+        messages: anthropicMessages,
         ...(options?.tools?.length ? { tools: options.tools } : {}),
       });
 
