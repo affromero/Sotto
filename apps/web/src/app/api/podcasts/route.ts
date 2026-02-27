@@ -11,6 +11,7 @@ import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/ti
 import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
+import { generatePodcastSlug } from '@/lib/slugify';
 import type { ExtractContentPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
@@ -224,6 +225,12 @@ export async function POST(request: NextRequest) {
     : await prisma.podcast.create({
         data: { ...podcastData, userId: authResult.userId },
       });
+
+  // Generate slug for vanity URL
+  const slug = await generatePodcastSlug(parsed.data.title, authResult.userId, prisma);
+  if (slug) {
+    await prisma.podcast.update({ where: { id: podcast.id }, data: { slug } });
+  }
 
   // Create PodcastVoice records from the voices array
   if (voiceEntries.length > 0) {

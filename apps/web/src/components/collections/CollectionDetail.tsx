@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ListMusic, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { profileUrl } from '@/lib/urls';
+import { profileUrl, podcastUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './CollectionDetail.module.css';
 
@@ -188,7 +188,7 @@ export function CollectionDetail({
           {items.map((item) => (
             <li key={item.id} className={styles.item}>
               <Link
-                href={`/podcast/${item.id}`}
+                href={podcastUrl(item, item.user.handle)}
                 className={styles.itemLink}
                 aria-label={`${item.title} - ${item.topic}`}
               >

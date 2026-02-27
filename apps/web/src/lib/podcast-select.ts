@@ -27,6 +27,7 @@ export const PODCAST_PUBLIC_SELECT = {
   isHumanContent: true,
   sourcePlatform: true,
   source: true,
+  slug: true,
   createdAt: true,
   updatedAt: true,
   userId: true,
