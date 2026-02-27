@@ -174,6 +174,10 @@ export const adminWaitlistActionSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
 });
 
+export const adminWaitlistDeleteSchema = z.object({
+  id: z.string(),
+});
+
 /**
  * Twitter settings validation
  */

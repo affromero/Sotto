@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guards';
-import { adminWaitlistActionSchema } from '@/lib/validations';
+import { adminWaitlistActionSchema, adminWaitlistDeleteSchema } from '@/lib/validations';
 import { sendEmail } from '@/lib/email';
 import { buildWaitlistApprovalEmail } from '@/lib/email-templates';
 import { logger } from '@/lib/logger';
@@ -44,4 +44,28 @@ export async function PATCH(request: NextRequest) {
   }
 
   return NextResponse.json({ entry: updated });
+}
+
+export async function DELETE(request: NextRequest) {
+  const adminId = await requireAdmin();
+  if (!adminId) {
+    return errorResponse('Forbidden', 403);
+  }
+
+  const body = await request.json();
+  const parsed = adminWaitlistDeleteSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(parsed.error.flatten(), 400);
+  }
+
+  const { id } = parsed.data;
+
+  const entry = await prisma.waitlist.findUnique({ where: { id } });
+  if (!entry) {
+    return errorResponse('Waitlist entry not found', 404);
+  }
+
+  await prisma.waitlist.delete({ where: { id } });
+
+  return NextResponse.json({ deleted: true });
 }
