@@ -17,8 +17,12 @@ export async function POST(request: NextRequest) {
 
   const { email, twitterHandle, source, wishlist, referralCode } = parsed.data;
 
+  // Check if this is a genuinely new signup before upserting
+  const existing = await prisma.waitlist.findUnique({ where: { email } });
+  const isNewSignup = !existing;
+
   // Upsert: if email already exists, just return success (no error to user)
-  const entry = await prisma.waitlist.upsert({
+  await prisma.waitlist.upsert({
     where: { email },
     create: { email, twitterHandle, source, wishlist, referralCode },
     update: {
@@ -29,7 +33,7 @@ export async function POST(request: NextRequest) {
   });
 
   // Send welcome email + admin Telegram notification for new signups
-  if (entry.createdAt.getTime() > Date.now() - 5000) {
+  if (isNewSignup) {
     const { subject, html } = buildWaitlistWelcomeEmail(email);
     const sent = await sendEmail({ to: email, subject, html });
     if (!sent) {
