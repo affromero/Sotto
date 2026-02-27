@@ -1,4 +1,4 @@
-import { generateResponse } from './claude';
+import { generateResponse } from './llm';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 

@@ -7,7 +7,7 @@ const mockGenerateResponse = vi.fn();
 
 global.fetch = mockFetch;
 
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
   WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
 }));

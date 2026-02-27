@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   generateResponse: vi.fn().mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1 }),
 }));
 

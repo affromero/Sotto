@@ -1,4 +1,4 @@
-import { generateResponse } from './claude';
+import { generateResponse } from './llm';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';

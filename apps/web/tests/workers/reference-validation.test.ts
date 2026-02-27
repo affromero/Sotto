@@ -122,8 +122,8 @@ vi.mock('@/lib/tier-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] }),
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
 }));
 
 vi.mock('@/lib/logger', () => ({

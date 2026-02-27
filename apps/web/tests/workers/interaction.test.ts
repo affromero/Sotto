@@ -47,7 +47,7 @@ const mockGenerateResponse = vi.fn().mockResolvedValue({
 
 const mockLogUsage = vi.fn();
 
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
 }));
 
@@ -76,8 +76,8 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] }),
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
 }));
 
 vi.mock('@/lib/logger', () => ({

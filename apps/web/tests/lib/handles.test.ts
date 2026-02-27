@@ -18,7 +18,7 @@ vi.mock('@/lib/prisma', () => {
 });
 
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
 }));
 

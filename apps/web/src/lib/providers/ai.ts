@@ -31,11 +31,11 @@ export interface AIProvider {
 }
 
 /**
- * Anthropic Claude provider — wraps the existing claude.ts client.
+ * Anthropic Claude provider — wraps the existing llm.ts client.
  */
 class AnthropicProvider implements AIProvider {
   private getClient() {
-    return import('../claude');
+    return import('../llm');
   }
 
   async generateResponse(

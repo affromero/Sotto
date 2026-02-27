@@ -35,7 +35,7 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
-vi.mock('@/lib/claude', () => ({
+vi.mock('@/lib/llm', () => ({
   logApiUsage: vi.fn(),
 }));
 
