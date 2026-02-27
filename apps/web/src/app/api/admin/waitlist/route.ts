@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guards';
 import { adminWaitlistActionSchema } from '@/lib/validations';
+import { sendEmail } from '@/lib/email';
+import { buildWaitlistApprovalEmail } from '@/lib/email-templates';
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 
 export async function PATCH(request: NextRequest) {
@@ -31,14 +34,13 @@ export async function PATCH(request: NextRequest) {
     },
   });
 
-  // Send approval email (fire-and-forget)
-  if (status === 'APPROVED') {
-    import('@/lib/email-templates').then(({ buildWaitlistApprovalEmail }) =>
-      import('@/lib/email').then(({ sendEmail }) => {
-        const { subject, html } = buildWaitlistApprovalEmail(entry.email);
-        sendEmail({ to: entry.email, subject, html }).catch(() => {});
-      })
-    );
+  // Send approval email
+  if (status === 'APPROVED' && !entry.unsubscribed) {
+    const { subject, html } = buildWaitlistApprovalEmail(entry.email);
+    const sent = await sendEmail({ to: entry.email, subject, html });
+    if (!sent) {
+      logger.warn('Waitlist approval email failed', { email: entry.email, waitlistId: id });
+    }
   }
 
   return NextResponse.json({ entry: updated });
