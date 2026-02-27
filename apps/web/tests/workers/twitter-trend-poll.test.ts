@@ -63,6 +63,10 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('@/lib/slugify', () => ({
+  generatePodcastSlug: vi.fn().mockResolvedValue('test-slug'),
+}));
+
 // ---- Import under test ----
 
 import { processTrendPoll } from '@/workers/twitter-trend-poll.worker';

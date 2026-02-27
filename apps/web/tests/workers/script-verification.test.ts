@@ -598,7 +598,8 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'script-verification' },
         'verify_script',
-        { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001' }
+        { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
+        { jobId: 'verify-podcast-001-2' }
       );
     });
 

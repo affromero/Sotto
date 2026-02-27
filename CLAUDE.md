@@ -108,6 +108,16 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 - Test at 375px min (iPhone SE); verify nothing hidden behind MiniPlayer
 - No inline styles (CSP); no `eval()`; use `next/image`
 
+## MANDATORY — Test Sync
+
+**When modifying ANY source file that has a corresponding test file, you MUST update the test to match. No exceptions.**
+
+- Before editing a source file, check for test files that import it (in `tests/` mirror or co-located)
+- After editing source, run the affected test: `npm test -- --run <test-file>`
+- If tests fail, fix them in the SAME commit — never leave broken tests
+- When changing function signatures, mock return shapes, adding required fields, or modifying enum values: grep ALL test files for the old shape and update every occurrence
+- A pre-commit hook (`enforce-test-sync.sh`) will block commits when affected tests fail
+
 ## Commit Checklist
 
 **Run `npm run ci` before every commit — no exceptions.**
@@ -116,6 +126,7 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 - [ ] No secrets or `.env` values in staged files
 - [ ] All lint errors, type errors, and test failures fixed before presenting work as complete
 - [ ] Unused imports removed proactively
+- [ ] **Affected test files updated and passing** (the pre-commit hook enforces this)
 - After Prisma schema changes: run `npx prisma generate` before type-checking
 - In RTL tests: `waitFor` a visible UI state before interactions, not mock call counts
 

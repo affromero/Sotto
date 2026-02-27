@@ -128,6 +128,10 @@ vi.mock('@/lib/validations', async () => {
   return actual;
 });
 
+vi.mock('@/lib/slugify', () => ({
+  generatePodcastSlug: vi.fn().mockResolvedValue('test-slug'),
+}));
+
 import { POST } from '@/app/api/podcasts/[podcastId]/fork/route';
 
 function createRequest(body: Record<string, unknown> = {}): NextRequest {
@@ -184,6 +188,7 @@ function setupSuccessMocks(userId = 'user-1') {
       podcast: {
         create: mockPodcastCreate,
         update: mockPodcastUpdate,
+        findUnique: vi.fn().mockResolvedValue(null),
       },
       podcastVoice: {
         createMany: mockPodcastVoiceCreateMany,
