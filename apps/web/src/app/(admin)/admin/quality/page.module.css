@@ -1,0 +1,210 @@
+/* Admin Quality Analytics Dashboard */
+
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
+.rangeNav { composes: rangeNav from '../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../admin.module.css'; }
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
+.columns { composes: columns from '../admin.module.css'; }
+.tableContainer { composes: tableContainer from '../admin.module.css'; }
+.table { composes: table from '../admin.module.css'; }
+.hBarContainer { composes: hBarContainer from '../admin.module.css'; }
+.hBarRow { composes: hBarRow from '../admin.module.css'; }
+.hBarLabel { composes: hBarLabel from '../admin.module.css'; }
+.hBarTrack { composes: hBarTrack from '../admin.module.css'; }
+.hBarFill { composes: hBarFill from '../admin.module.css'; }
+.chartContainer { composes: chartContainer from '../admin.module.css'; }
+.chartLabel { composes: chartLabel from '../admin.module.css'; }
+.chartBarFill { composes: chartBarFill from '../admin.module.css'; }
+.chartBarFillAccent { composes: chartBarFillAccent from '../admin.module.css'; }
+
+/* Hero Grid — 4 cards */
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 1024px) {
+  .heroGrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.card {
+  composes: card from '../admin.module.css';
+}
+
+.cardLabel {
+  composes: cardLabel from '../admin.module.css';
+}
+
+.cardValue {
+  composes: cardValue from '../admin.module.css';
+}
+
+.cardValueSm {
+  font: var(--text-h3);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-transform: capitalize;
+}
+
+.cardUnit {
+  font-size: 0.5em;
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.cardDetail {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Sub-section titles */
+
+.subSectionTitle {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Horizontal bar accent variant */
+
+.hBarFillAccent {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+}
+
+.hBarValue {
+  composes: hBarValue from '../admin.module.css';
+}
+
+/* Chart bars with tooltip */
+
+.chartBar {
+  composes: chartBar from '../admin.module.css';
+  position: relative;
+}
+
+.chartTooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.chartTooltipDetail {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.chartBar:hover .chartTooltip {
+  display: flex;
+}
+
+/* Quality bar color variants */
+
+.barGreen {
+  background: var(--color-success) !important;
+}
+
+.barAmber {
+  background: var(--color-primary) !important;
+}
+
+.barRed {
+  background: var(--color-error) !important;
+}
+
+/* Table cells */
+
+.numberCol {
+  text-align: right;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.providerCell {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.topicCell {
+  font-weight: 500;
+}
+
+/* Score color coding */
+
+.scoreGreen {
+  color: var(--color-success) !important;
+}
+
+.scoreAmber {
+  color: var(--color-primary) !important;
+}
+
+.scoreRed {
+  color: var(--color-error) !important;
+}
+
+/* Chart header with legend */
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.chartLegend {
+  display: flex;
+  gap: var(--spacing-md);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legendDotCreator {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+
+.legendDotListener {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
