@@ -71,7 +71,7 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
 
   for (const query of config.trendSearchQueries) {
     try {
-      const tweets = await searchPopularTweets(query, 10);
+      const { tweets } = await searchPopularTweets(query, 10);
       for (const tweet of tweets) {
         allTweets.push({ tweet, query });
       }

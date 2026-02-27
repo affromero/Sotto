@@ -91,6 +91,13 @@ function makeTweet(id: string, text: string, likes = 100, retweets = 10, replies
   };
 }
 
+function makeSearchResult(tweets: ReturnType<typeof makeTweet>[]) {
+  const authorMap = new Map(
+    tweets.map((t) => [t.author_id, { username: `user-${t.id}`, name: `User ${t.id}` }])
+  );
+  return { tweets, authorMap };
+}
+
 const DEFAULT_CONFIG = {
   autoTweetEnabled: false,
   minLikes: 10,
@@ -145,7 +152,7 @@ describe('processTrendPoll', () => {
   });
 
   it('skips when no tweets are found', async () => {
-    mockSearchPopularTweets.mockResolvedValue([]);
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([]));
 
     await processTrendPoll(createMockJob());
 
@@ -153,7 +160,7 @@ describe('processTrendPoll', () => {
   });
 
   it('bails when @sotto user is not found', async () => {
-    mockSearchPopularTweets.mockResolvedValue([makeTweet('t1', 'AI is amazing')]);
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([makeTweet('t1', 'AI is amazing')]));
     mockPrismaUserFindUnique.mockResolvedValue(null);
 
     await processTrendPoll(createMockJob());
@@ -162,7 +169,7 @@ describe('processTrendPoll', () => {
   });
 
   it('creates podcast and auto-tweet record for top trending tweet', async () => {
-    mockSearchPopularTweets.mockResolvedValue([makeTweet('t1', 'AI is changing everything')]);
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([makeTweet('t1', 'AI is changing everything')]));
 
     await processTrendPoll(createMockJob());
 
@@ -187,10 +194,10 @@ describe('processTrendPoll', () => {
 
   it('respects remaining daily budget', async () => {
     mockPrismaTwitterAutoTweetCount.mockResolvedValue(2); // only 1 left
-    mockSearchPopularTweets.mockResolvedValue([
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([
       makeTweet('t1', 'First totally unique topic about quantum physics', 200),
       makeTweet('t2', 'Second completely different topic about marine biology', 150),
-    ]);
+    ]));
 
     await processTrendPoll(createMockJob());
 
@@ -199,11 +206,11 @@ describe('processTrendPoll', () => {
 
   it('deduplicates similar tweets by keyword overlap', async () => {
     // Two tweets with very similar content should be deduplicated
-    mockSearchPopularTweets.mockResolvedValue([
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([
       makeTweet('t1', 'Artificial intelligence transforming healthcare industry rapidly', 200),
       makeTweet('t2', 'Artificial intelligence transforming healthcare industry today', 150),
       makeTweet('t3', 'Quantum computing breaks new records in speed and accuracy', 100),
-    ]);
+    ]));
 
     await processTrendPoll(createMockJob());
 
@@ -213,8 +220,8 @@ describe('processTrendPoll', () => {
 
   it('sorts by engagement score (likes + 2*retweets + replies)', async () => {
     mockSearchPopularTweets
-      .mockResolvedValueOnce([makeTweet('low', 'Low engagement topic about weather', 10, 1, 1)])
-      .mockResolvedValueOnce([makeTweet('high', 'High engagement topic about space exploration', 500, 100, 50)]);
+      .mockResolvedValueOnce(makeSearchResult([makeTweet('low', 'Low engagement topic about weather', 10, 1, 1)]))
+      .mockResolvedValueOnce(makeSearchResult([makeTweet('high', 'High engagement topic about space exploration', 500, 100, 50)]));
 
     await processTrendPoll(createMockJob());
 
@@ -224,7 +231,7 @@ describe('processTrendPoll', () => {
   });
 
   it('searches all configured queries', async () => {
-    mockSearchPopularTweets.mockResolvedValue([]);
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([]));
 
     await processTrendPoll(createMockJob());
 
@@ -236,7 +243,7 @@ describe('processTrendPoll', () => {
   it('continues processing when one search query fails', async () => {
     mockSearchPopularTweets
       .mockRejectedValueOnce(new Error('Rate limited'))
-      .mockResolvedValueOnce([makeTweet('t1', 'Science breakthrough topic about new discovery')]);
+      .mockResolvedValueOnce(makeSearchResult([makeTweet('t1', 'Science breakthrough topic about new discovery')]));
 
     await processTrendPoll(createMockJob());
 
