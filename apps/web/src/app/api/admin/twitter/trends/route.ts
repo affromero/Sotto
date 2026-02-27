@@ -6,43 +6,89 @@ import { parseTweetIntent } from '@/lib/tweet-parser';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTwitterConfig } from '@/lib/twitter-config';
-import { trendGenerateSchema } from '@/lib/validations';
-import type { TwitterTweet, TrendTopic } from '@/types/twitter';
+import { trendGenerateSchema, trendFilterSchema } from '@/lib/validations';
+import type { TwitterTweet, TrendTopic, EnrichedTrendTweet, TweetAuthor } from '@/types/twitter';
 
 import { errorResponse } from '@/lib/api-response';
+
 function engagementScore(tweet: TwitterTweet): number {
   const m = tweet.public_metrics;
   if (!m) return 0;
   return m.like_count + m.retweet_count * 2 + m.reply_count;
 }
 
-export async function GET() {
+function enrichTweet(
+  tweet: TwitterTweet,
+  authorMap: Map<string, TweetAuthor>
+): EnrichedTrendTweet {
+  const author = authorMap.get(tweet.author_id);
+  const m = tweet.public_metrics;
+  return {
+    id: tweet.id,
+    text: tweet.text,
+    authorId: tweet.author_id,
+    authorUsername: author?.username ?? 'unknown',
+    authorName: author?.name ?? 'Unknown',
+    authorVerified: author?.verified,
+    authorVerifiedType: author?.verifiedType,
+    engagementScore: engagementScore(tweet),
+    likeCount: m?.like_count ?? 0,
+    retweetCount: m?.retweet_count ?? 0,
+    replyCount: m?.reply_count ?? 0,
+    createdAt: tweet.created_at,
+    tweetUrl: `https://x.com/${author?.username ?? 'i'}/status/${tweet.id}`,
+  };
+}
+
+export async function GET(request: NextRequest) {
   const adminId = await requireAdmin();
   if (!adminId) {
     return errorResponse('Forbidden', 403);
   }
 
+  const params = Object.fromEntries(request.nextUrl.searchParams);
+  const filterResult = trendFilterSchema.safeParse(params);
+  if (!filterResult.success) {
+    return errorResponse(filterResult.error.flatten(), 400);
+  }
+
+  const filters = filterResult.data;
   const config = await getTwitterConfig();
+  const maxPerQuery = filters.maxPerQuery ?? 20;
   const trends: TrendTopic[] = [];
 
-  for (const query of config.trendSearchQueries) {
+  for (const baseQuery of config.trendSearchQueries) {
     try {
-      const tweets = await searchPopularTweets(query, 10);
+      const query = filters.lang ? `${baseQuery} lang:${filters.lang}` : baseQuery;
+      const { tweets, authorMap } = await searchPopularTweets(query, maxPerQuery);
+
       if (tweets.length > 0) {
-        const sorted = tweets.sort((a, b) => engagementScore(b) - engagementScore(a));
-        trends.push({
-          query,
-          topTweet: sorted[0],
-          engagementScore: engagementScore(sorted[0]),
-          tweetCount: tweets.length,
-        });
+        let enriched = tweets.map((t) => enrichTweet(t, authorMap));
+
+        if (filters.verified) {
+          enriched = enriched.filter((t) => t.authorVerified);
+        }
+
+        if (filters.minEngagement !== undefined) {
+          enriched = enriched.filter((t) => t.engagementScore >= filters.minEngagement!);
+        }
+
+        enriched.sort((a, b) => b.engagementScore - a.engagementScore);
+
+        if (enriched.length > 0) {
+          trends.push({
+            query: baseQuery,
+            tweets: enriched,
+            totalTweetCount: tweets.length,
+          });
+        }
       }
     } catch {
       // Skip failed queries
     }
   }
 
-  trends.sort((a, b) => b.engagementScore - a.engagementScore);
+  trends.sort((a, b) => (b.tweets[0]?.engagementScore ?? 0) - (a.tweets[0]?.engagementScore ?? 0));
 
   return NextResponse.json({ trends });
 }
