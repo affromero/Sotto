@@ -549,7 +549,17 @@ export const referralSchema = z.object({
 });
 
 /**
- * Trend generate validation (admin)
+ * Trend filter validation (admin GET)
+ */
+export const trendFilterSchema = z.object({
+  lang: z.string().min(2).max(5).optional(),
+  verified: z.coerce.boolean().optional(),
+  minEngagement: z.coerce.number().int().min(0).optional(),
+  maxPerQuery: z.coerce.number().int().min(10).max(100).optional(),
+});
+
+/**
+ * Trend generate validation (admin POST)
  */
 export const trendGenerateSchema = z.object({
   tweetText: z.string().min(1).max(5000),

@@ -67,20 +67,24 @@ vi.mock('@/lib/twitter-config', () => ({
   setTwitterConfig: (...args: unknown[]) => mockSetTwitterConfig(...args),
 }));
 
-vi.mock('@/lib/validations', () => ({
-  twitterConfigUpdateSchema: {
-    safeParse: (...args: unknown[]) => mockTwitterConfigUpdateSafeParse(...args),
-  },
-  threadToPodcastSchema: {
-    safeParse: (...args: unknown[]) => mockThreadToPodcastSafeParse(...args),
-  },
-  manualTweetSchema: {
-    safeParse: (...args: unknown[]) => mockManualTweetSchemaSafeParse(...args),
-  },
-  trendGenerateSchema: {
-    safeParse: (...args: unknown[]) => mockTrendGenerateSafeParse(...args),
-  },
-}));
+vi.mock('@/lib/validations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/validations')>();
+  return {
+    twitterConfigUpdateSchema: {
+      safeParse: (...args: unknown[]) => mockTwitterConfigUpdateSafeParse(...args),
+    },
+    threadToPodcastSchema: {
+      safeParse: (...args: unknown[]) => mockThreadToPodcastSafeParse(...args),
+    },
+    manualTweetSchema: {
+      safeParse: (...args: unknown[]) => mockManualTweetSchemaSafeParse(...args),
+    },
+    trendGenerateSchema: {
+      safeParse: (...args: unknown[]) => mockTrendGenerateSafeParse(...args),
+    },
+    trendFilterSchema: actual.trendFilterSchema,
+  };
+});
 
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
@@ -395,23 +399,55 @@ describe('GET /api/admin/twitter/trends', () => {
 
   it('returns 403 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
-    const response = await getTrends();
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/trends'));
+    const response = await getTrends(request);
     expect(response.status).toBe(403);
   });
 
-  it('returns trends when admin', async () => {
+  it('returns enriched trends when admin', async () => {
     mockAdmin();
     mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI podcasts'] });
-    mockSearchPopularTweets.mockResolvedValue([
-      { id: 't1', text: 'Great podcast', public_metrics: { like_count: 100, retweet_count: 50, reply_count: 10 } },
-    ]);
+    mockSearchPopularTweets.mockResolvedValue({
+      tweets: [
+        { id: 't1', text: 'Great podcast', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 100, retweet_count: 50, reply_count: 10, quote_count: 0 } },
+      ],
+      authorMap: new Map([['a1', { username: 'testuser', name: 'Test User', verified: true, verifiedType: 'blue' }]]),
+    });
 
-    const response = await getTrends();
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/trends'));
+    const response = await getTrends(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.trends).toHaveLength(1);
     expect(body.trends[0].query).toBe('AI podcasts');
+    expect(body.trends[0].tweets).toHaveLength(1);
+    expect(body.trends[0].tweets[0].authorUsername).toBe('testuser');
+    expect(body.trends[0].tweets[0].authorVerified).toBe(true);
+    expect(body.trends[0].tweets[0].tweetUrl).toContain('x.com/testuser/status/t1');
+  });
+
+  it('filters by verified when param set', async () => {
+    mockAdmin();
+    mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI'] });
+    mockSearchPopularTweets.mockResolvedValue({
+      tweets: [
+        { id: 't1', text: 'Verified tweet', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 50, retweet_count: 10, reply_count: 5, quote_count: 0 } },
+        { id: 't2', text: 'Unverified tweet', author_id: 'a2', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 200, retweet_count: 100, reply_count: 20, quote_count: 0 } },
+      ],
+      authorMap: new Map([
+        ['a1', { username: 'verified_user', name: 'Verified', verified: true }],
+        ['a2', { username: 'random_user', name: 'Random', verified: false }],
+      ]),
+    });
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/trends?verified=true'));
+    const response = await getTrends(request);
+    const body = await response.json();
+
+    expect(body.trends).toHaveLength(1);
+    expect(body.trends[0].tweets).toHaveLength(1);
+    expect(body.trends[0].tweets[0].authorUsername).toBe('verified_user');
   });
 });
 

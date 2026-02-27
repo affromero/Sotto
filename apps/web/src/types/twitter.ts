@@ -158,9 +158,36 @@ export interface TwitterAutoTweetData {
   };
 }
 
+export interface TweetAuthor {
+  username: string;
+  name: string;
+  verified?: boolean;
+  verifiedType?: string;
+}
+
+export interface EnrichedTrendTweet {
+  id: string;
+  text: string;
+  authorId: string;
+  authorUsername: string;
+  authorName: string;
+  authorVerified?: boolean;
+  authorVerifiedType?: string;
+  engagementScore: number;
+  likeCount: number;
+  retweetCount: number;
+  replyCount: number;
+  createdAt: string;
+  tweetUrl: string;
+}
+
+export interface TweetSearchResult {
+  tweets: TwitterTweet[];
+  authorMap: Map<string, TweetAuthor>;
+}
+
 export interface TrendTopic {
   query: string;
-  topTweet: TwitterTweet;
-  engagementScore: number;
-  tweetCount: number;
+  tweets: EnrichedTrendTweet[];
+  totalTweetCount: number;
 }
