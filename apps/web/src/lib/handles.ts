@@ -90,7 +90,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
     const cached = await cache.get<HandleCheckResult>(cacheKey);
     if (cached !== null) return cached;
 
-    const autoConfig = await resolveAutoModel('FREE');
+    const autoConfig = await resolveAutoModel('PLATFORM');
 
     const handleResponse = await generateResponse(
       'Classify the word into exactly one category. Answer with a single word: NAME, OFFENSIVE, or OK. Nothing else.',

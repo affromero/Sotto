@@ -9,6 +9,7 @@ import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { fetchNewsletterArticles, formatArticlesForPrompt } from './newsletter-fetcher';
 
 function hashQuestion(text: string): string {
   return createHash('sha256').update(text.toLowerCase().trim()).digest('hex').slice(0, 12);
@@ -539,15 +540,30 @@ export async function generateNewsQuestions(
     ? `Focus questions on "${safeNewsTopic}" and closely related areas`
     : 'Cover diverse topics: science, politics, tech, business, culture, sports';
 
-  const systemPrompt = loadAndRender('feeds/news.md', {
-    TIME_LABEL: timeLabel,
-    REQUEST_COUNT: String(requestCount),
-    DIVERSITY_NOTE: diversityNote,
-    EXCLUDE_CONTEXT: excludeContext,
-    TOPIC_FOCUS: topicFocus,
-    TAXONOMY: ctx.taxonomyLines.join('\n'),
-    INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
-  });
+  // Try newsletter-grounded path first (avoids web search, saves tokens + latency)
+  const articles = await fetchNewsletterArticles(timeRange).catch(() => []);
+  const useNewsletterPath = articles.length >= 3;
+
+  const systemPrompt = useNewsletterPath
+    ? loadAndRender('feeds/news-from-newsletters.md', {
+        TIME_LABEL: timeLabel,
+        REQUEST_COUNT: String(requestCount),
+        NEWSLETTER_ARTICLES: formatArticlesForPrompt(articles),
+        DIVERSITY_NOTE: diversityNote,
+        EXCLUDE_CONTEXT: excludeContext,
+        TOPIC_FOCUS: topicFocus,
+        TAXONOMY: ctx.taxonomyLines.join('\n'),
+        INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
+      })
+    : loadAndRender('feeds/news.md', {
+        TIME_LABEL: timeLabel,
+        REQUEST_COUNT: String(requestCount),
+        DIVERSITY_NOTE: diversityNote,
+        EXCLUDE_CONTEXT: excludeContext,
+        TOPIC_FOCUS: topicFocus,
+        TAXONOMY: ctx.taxonomyLines.join('\n'),
+        INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
+      });
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
@@ -559,38 +575,66 @@ export async function generateNewsQuestions(
     let usedModel = effectiveModel;
     const llmStart = Date.now();
 
-    const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
-    if (anthropicApiKey) {
-      // Use Anthropic SDK with server-side web search tool
-      const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      const client = new Anthropic({ apiKey: anthropicApiKey });
-      const response = await client.messages.create({
-        model: effectiveModel,
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: systemPrompt }],
-        tools: [WEB_SEARCH_TOOL],
-      });
-      responseText = response.content
-        .filter(
-          (block): block is Extract<(typeof response.content)[number], { type: 'text' }> =>
-            block.type === 'text'
-        )
-        .map((block) => block.text)
-        .join('\n\n');
-      inputTokens = response.usage.input_tokens;
-      outputTokens = response.usage.output_tokens;
+    if (useNewsletterPath) {
+      // Newsletter-grounded: no web search needed, use any available provider
+      const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (anthropicApiKey) {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        const client = new Anthropic({ apiKey: anthropicApiKey });
+        const response = await client.messages.create({
+          model: effectiveModel,
+          max_tokens: 2048,
+          messages: [{ role: 'user', content: systemPrompt }],
+        });
+        const textBlock = response.content.find((block) => block.type === 'text');
+        responseText = textBlock?.type === 'text' ? textBlock.text : '';
+        inputTokens = response.usage.input_tokens;
+        outputTokens = response.usage.output_tokens;
+      } else {
+        const ai = createAIProvider(ctx.autoModel.aiProvider);
+        const result = await ai.generateResponse(
+          systemPrompt,
+          [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
+          { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
+        );
+        responseText = result.content;
+        inputTokens = result.inputTokens;
+        outputTokens = result.outputTokens;
+        usedModel = result.model;
+      }
     } else {
-      // Use AI provider (claude-code CLI has built-in web search)
-      const ai = createAIProvider(ctx.autoModel.aiProvider);
-      const result = await ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
-      );
-      responseText = result.content;
-      inputTokens = result.inputTokens;
-      outputTokens = result.outputTokens;
-      usedModel = result.model;
+      // Fallback: web search path (existing behavior)
+      const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
+      if (anthropicApiKey) {
+        const { default: Anthropic } = await import('@anthropic-ai/sdk');
+        const client = new Anthropic({ apiKey: anthropicApiKey });
+        const response = await client.messages.create({
+          model: effectiveModel,
+          max_tokens: 2048,
+          messages: [{ role: 'user', content: systemPrompt }],
+          tools: [WEB_SEARCH_TOOL],
+        });
+        responseText = response.content
+          .filter(
+            (block): block is Extract<(typeof response.content)[number], { type: 'text' }> =>
+              block.type === 'text'
+          )
+          .map((block) => block.text)
+          .join('\n\n');
+        inputTokens = response.usage.input_tokens;
+        outputTokens = response.usage.output_tokens;
+      } else {
+        const ai = createAIProvider(ctx.autoModel.aiProvider);
+        const result = await ai.generateResponse(
+          systemPrompt,
+          [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
+          { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
+        );
+        responseText = result.content;
+        inputTokens = result.inputTokens;
+        outputTokens = result.outputTokens;
+        usedModel = result.model;
+      }
     }
 
     const durationMs = Date.now() - llmStart;
@@ -608,7 +652,7 @@ export async function generateNewsQuestions(
       outputTokens,
       durationMs,
       userId,
-      metadata: { questionCount: questions.length, topic: topic ?? null, timeRange },
+      metadata: { questionCount: questions.length, topic: topic ?? null, timeRange, useNewsletterPath },
     });
 
     return questions;

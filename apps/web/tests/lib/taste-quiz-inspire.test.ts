@@ -39,6 +39,14 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
+const mockFetchNewsletterArticles = vi.fn();
+const mockFormatArticlesForPrompt = vi.fn();
+
+vi.mock('@/lib/newsletter-fetcher', () => ({
+  fetchNewsletterArticles: (...args: unknown[]) => mockFetchNewsletterArticles(...args),
+  formatArticlesForPrompt: (...args: unknown[]) => mockFormatArticlesForPrompt(...args),
+}));
+
 import { generateForYouQuestions, generateNewsQuestions, generateCuriosityQuestions } from '@/lib/taste-quiz';
 
 // ---- Helpers ----
@@ -77,6 +85,9 @@ function setupDefaultMocks() {
   mockUserFindUnique.mockResolvedValue({ plan: 'FREE' });
   // Default: no BYOK key, falls through to createAIProvider
   mockResolveAiProvider.mockRejectedValue(new Error('No AI provider'));
+  // Default: no newsletter articles, falls back to web search path
+  mockFetchNewsletterArticles.mockResolvedValue([]);
+  mockFormatArticlesForPrompt.mockReturnValue('');
 }
 
 function createMockAI(responseContent: string) {
@@ -244,6 +255,68 @@ describe('generateNewsQuestions', () => {
 
     const result = await generateNewsQuestions('user-1', 3);
     expect(result).toEqual([]);
+  });
+
+  it('uses newsletter-grounded path when 3+ articles available', async () => {
+    const mockArticles = [
+      { title: 'Article 1', url: 'https://a.com', summary: 'Summary 1', pubDate: '2026-02-27', source: 'Reuters' },
+      { title: 'Article 2', url: 'https://b.com', summary: 'Summary 2', pubDate: '2026-02-26', source: 'NPR' },
+      { title: 'Article 3', url: 'https://c.com', summary: 'Summary 3', pubDate: '2026-02-25', source: 'BBC' },
+    ];
+    mockFetchNewsletterArticles.mockResolvedValue(mockArticles);
+    mockFormatArticlesForPrompt.mockReturnValue('[1] Reuters — "Article 1"\n[2] NPR — "Article 2"\n[3] BBC — "Article 3"');
+
+    // Falls through to createAIProvider since resolveAiProvider rejects by default
+    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    delete process.env.ANTHROPIC_API_KEY;
+
+    const ai = createMockAI(JSON.stringify([
+      { text: 'News from newsletters', tagSlugs: ['science'], category: 'science' },
+    ]));
+    mockCreateAIProvider.mockReturnValue(ai);
+
+    const result = await generateNewsQuestions('user-1', 1);
+
+    expect(result).toHaveLength(1);
+    expect(mockFetchNewsletterArticles).toHaveBeenCalledWith('1w');
+    expect(mockFormatArticlesForPrompt).toHaveBeenCalledWith(mockArticles);
+  });
+
+  it('falls back to web search when fewer than 3 articles', async () => {
+    mockFetchNewsletterArticles.mockResolvedValue([
+      { title: 'Only One', url: 'https://a.com', summary: 'Solo', pubDate: '2026-02-27', source: 'Reuters' },
+    ]);
+
+    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    delete process.env.ANTHROPIC_API_KEY;
+
+    const ai = createMockAI(JSON.stringify([
+      { text: 'Web search news', tagSlugs: ['science'], category: 'science' },
+    ]));
+    mockCreateAIProvider.mockReturnValue(ai);
+
+    const result = await generateNewsQuestions('user-1', 1);
+
+    expect(result).toHaveLength(1);
+    // formatArticlesForPrompt should NOT be called when < 3 articles
+    expect(mockFormatArticlesForPrompt).not.toHaveBeenCalled();
+  });
+
+  it('falls back to web search when fetchNewsletterArticles fails', async () => {
+    mockFetchNewsletterArticles.mockRejectedValue(new Error('Fetch failed'));
+
+    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    delete process.env.ANTHROPIC_API_KEY;
+
+    const ai = createMockAI(JSON.stringify([
+      { text: 'Fallback news', tagSlugs: ['technology'], category: 'technology' },
+    ]));
+    mockCreateAIProvider.mockReturnValue(ai);
+
+    const result = await generateNewsQuestions('user-1', 1);
+
+    expect(result).toHaveLength(1);
+    expect(mockFormatArticlesForPrompt).not.toHaveBeenCalled();
   });
 });
 

@@ -127,7 +127,7 @@ export async function generateResponse(
   }
 
   const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('FREE');
+  const autoConfig = await resolveAutoModel('PLATFORM');
   const resolvedModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({
@@ -235,7 +235,7 @@ export async function* streamResponse(
   }
 
   const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('FREE');
+  const autoConfig = await resolveAutoModel('PLATFORM');
   const streamModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({

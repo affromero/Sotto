@@ -63,6 +63,7 @@ const EXPECTED_FILES = [
   'feeds/for-you.md',
   'feeds/curiosity.md',
   'feeds/news.md',
+  'feeds/news-from-newsletters.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -110,6 +111,10 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/news.md': [
     'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
     'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
+  ].sort(),
+  'feeds/news-from-newsletters.md': [
+    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
+    'NEWSLETTER_ARTICLES', 'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
   ].sort(),
 };
 
