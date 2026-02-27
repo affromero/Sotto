@@ -21,18 +21,23 @@ export async function generateMetadata({ params }: PodcastPageProps): Promise<Me
     select: {
       title: true,
       topic: true,
+      slug: true,
       audioUrl: true,
       visibility: true,
       defaultVoiceTrackId: true,
       voiceTracks: { where: { status: 'READY' }, select: { id: true, audioUrl: true } },
-      user: { select: { name: true } },
+      user: { select: { name: true, handle: true } },
     },
   });
 
   if (!podcast) return { title: 'Podcast Not Found' };
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
-  const podcastUrl = `${appUrl}/podcast/${podcastId}`;
+  // Use vanity URL as canonical when slug + handle exist
+  const vanityPath = podcast.slug && podcast.user.handle
+    ? `/@${podcast.user.handle}/${podcast.slug}`
+    : `/podcast/${podcastId}`;
+  const podcastUrl = `${appUrl}${vanityPath}`;
   const creatorName = podcast.user.name || 'Anonymous';
 
   return {
@@ -283,6 +288,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     id: podcast.id,
     title: podcast.title,
     topic: podcast.topic,
+    slug: podcast.slug,
     status: podcast.status,
     visibility,
     audioUrl: resolvedAudioUrl,
@@ -348,6 +354,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           id={podcast.id}
           title={podcast.title}
           topic={podcast.topic}
+          slug={podcast.slug}
           createdAt={podcast.createdAt.toISOString()}
           duration={podcast.duration}
           audioUrl={resolvedAudioUrl}

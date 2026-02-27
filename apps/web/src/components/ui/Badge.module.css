@@ -54,3 +54,9 @@
   color: var(--color-primary);
   border: 1px solid rgba(217, 119, 6, 0.25);
 }
+
+.earlyAccess {
+  background: rgba(217, 119, 6, 0.08);
+  color: var(--color-primary);
+  border: 1px solid rgba(217, 119, 6, 0.15);
+}

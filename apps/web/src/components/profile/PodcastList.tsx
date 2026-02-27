@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/hooks/useAuth';
+import { podcastUrl } from '@/lib/urls';
 import { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastList.module.css';
 
@@ -75,7 +76,7 @@ export function PodcastList({
       {podcasts.map((podcast) => (
         <li key={podcast.id} className={styles.item}>
           <a
-            href={`/podcast/${podcast.id}`}
+            href={podcastUrl(podcast, podcast.user.handle)}
             className={styles.link}
             aria-label={`${podcast.title} - ${podcast.topic}`}
           >

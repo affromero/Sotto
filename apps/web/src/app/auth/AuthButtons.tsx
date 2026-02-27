@@ -63,36 +63,106 @@ const providerConfig: Record<ProviderId, { icon: React.FC; label: string }> = {
 
 export function AuthButtons({ callbackUrl = '/dashboard' }: AuthButtonsProps) {
   const [availableProviders, setAvailableProviders] = useState<ProviderId[]>([]);
+  const [hasResend, setHasResend] = useState(false);
+  const [email, setEmail] = useState('');
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     getProviders().then((providers) => {
       if (providers) {
         const ids = Object.keys(providers).filter((id): id is ProviderId => id in providerConfig);
         setAvailableProviders(ids);
+        setHasResend('resend' in providers);
       }
     });
   }, []);
 
-  if (availableProviders.length === 0) {
+  async function handleEmailSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = email.trim().toLowerCase();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+    setEmailSending(true);
+    setEmailError(null);
+    try {
+      const result = await signIn('resend', { email: trimmed, callbackUrl, redirect: false });
+      if (result?.error) {
+        setEmailError('Unable to send magic link. You may not be on the waitlist yet.');
+      } else {
+        setEmailSent(true);
+      }
+    } catch {
+      setEmailError('Something went wrong. Please try again.');
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
+  if (availableProviders.length === 0 && !hasResend) {
     return null;
   }
 
   return (
-    <div className={styles.providers}>
-      {availableProviders.map((id) => {
-        const { icon: Icon, label } = providerConfig[id];
-        return (
-          <button
-            key={id}
-            className={styles.providerBtn}
-            onClick={() => signIn(id, { callbackUrl })}
-            type="button"
-          >
-            <Icon />
-            {label}
-          </button>
-        );
-      })}
-    </div>
+    <>
+      {hasResend && (
+        <div className={styles.emailSection}>
+          {emailSent ? (
+            <p className={styles.emailSentMsg}>
+              Check your inbox — we sent a sign-in link to <strong>{email}</strong>
+            </p>
+          ) : (
+            <form onSubmit={handleEmailSubmit} className={styles.emailForm}>
+              <input
+                type="email"
+                className={styles.emailInput}
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setEmailError(null); }}
+                disabled={emailSending}
+                autoComplete="email"
+                aria-label="Email address"
+              />
+              <button
+                type="submit"
+                className={styles.emailSubmitBtn}
+                disabled={emailSending}
+              >
+                {emailSending ? 'Sending...' : 'Send magic link'}
+              </button>
+              {emailError && <p className={styles.emailError}>{emailError}</p>}
+            </form>
+          )}
+        </div>
+      )}
+
+      {hasResend && availableProviders.length > 0 && (
+        <div className={styles.divider}>
+          <span className={styles.dividerText}>or</span>
+        </div>
+      )}
+
+      {availableProviders.length > 0 && (
+        <div className={styles.providers}>
+          {availableProviders.map((id) => {
+            const { icon: Icon, label } = providerConfig[id];
+            return (
+              <button
+                key={id}
+                className={styles.providerBtn}
+                onClick={() => signIn(id, { callbackUrl })}
+                type="button"
+              >
+                <Icon />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </>
   );
 }

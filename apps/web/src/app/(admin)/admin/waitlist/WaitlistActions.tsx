@@ -27,8 +27,35 @@ export function WaitlistActions({ id, status }: WaitlistActionsProps) {
     }
   }
 
+  async function handleRemove() {
+    if (!window.confirm('Remove this waitlist entry? This cannot be undone.')) return;
+    setLoading('REMOVE');
+    try {
+      await fetch('/api/admin/waitlist', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      router.refresh();
+    } finally {
+      setLoading(null);
+    }
+  }
+
   if (status !== 'PENDING') {
-    return <span className={styles[`status${status.charAt(0) + status.slice(1).toLowerCase()}`]}>{status.toLowerCase()}</span>;
+    return (
+      <div className={styles.actions}>
+        <span className={styles[`status${status.charAt(0) + status.slice(1).toLowerCase()}`]}>{status.toLowerCase()}</span>
+        <button
+          className={styles.removeBtn}
+          onClick={handleRemove}
+          disabled={loading !== null}
+          type="button"
+        >
+          {loading === 'REMOVE' ? '...' : 'Remove'}
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -37,6 +64,7 @@ export function WaitlistActions({ id, status }: WaitlistActionsProps) {
         className={styles.approveBtn}
         onClick={() => handleAction('APPROVED')}
         disabled={loading !== null}
+        type="button"
       >
         {loading === 'APPROVED' ? '...' : 'Approve'}
       </button>
@@ -44,8 +72,17 @@ export function WaitlistActions({ id, status }: WaitlistActionsProps) {
         className={styles.rejectBtn}
         onClick={() => handleAction('REJECTED')}
         disabled={loading !== null}
+        type="button"
       >
         {loading === 'REJECTED' ? '...' : 'Reject'}
+      </button>
+      <button
+        className={styles.removeBtn}
+        onClick={handleRemove}
+        disabled={loading !== null}
+        type="button"
+      >
+        {loading === 'REMOVE' ? '...' : 'Remove'}
       </button>
     </div>
   );

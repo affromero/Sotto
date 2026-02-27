@@ -672,6 +672,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           <ShareMenu
             podcastId={podcast.id}
             podcastTitle={podcast.title}
+            slug={podcast.slug}
+            handle={podcast.user.handle}
             isPublic={podcast.visibility === 'PUBLIC'}
             triggerClassName={styles.actionBtn}
           />

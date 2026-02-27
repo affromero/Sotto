@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       take: 20,
       select: {
         ...PODCAST_PUBLIC_SELECT,
-        user: { select: { id: true, name: true, image: true, role: true } },
+        user: { select: { id: true, name: true, handle: true, image: true, role: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
       },
     });
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
         take: limit,
         select: {
           ...PODCAST_PUBLIC_SELECT,
-          user: { select: { id: true, name: true, image: true, role: true } },
+          user: { select: { id: true, name: true, handle: true, image: true, role: true } },
           tags: { include: { tag: true } },
           forkedFrom: { select: { id: true, title: true } },
         },
@@ -226,7 +226,7 @@ export async function GET(request: NextRequest) {
       take: limit,
       select: {
         ...PODCAST_PUBLIC_SELECT,
-        user: { select: { id: true, name: true, image: true, role: true } },
+        user: { select: { id: true, name: true, handle: true, image: true, role: true } },
         tags: { include: { tag: true } },
         forkedFrom: { select: { id: true, title: true } },
       },

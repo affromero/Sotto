@@ -248,6 +248,7 @@ model Podcast {
   id        String        @id @default(cuid())
   userId    String
   title     String
+  slug      String?
   topic     String        @db.Text
   status         PodcastStatus @default(PENDING)
   failedAtStatus String?
@@ -347,6 +348,7 @@ model Podcast {
   duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
   duplicateMatches  DuplicateMatch[] @relation("DuplicateMatch")
 
+  @@unique([userId, slug])
   @@index([userId])
   @@index([status])
   @@index([visibility])

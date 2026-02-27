@@ -2,6 +2,7 @@ interface PodcastJsonLdProps {
   id: string;
   title: string;
   topic: string;
+  slug?: string | null;
   createdAt: string;
   duration: number | null;
   audioUrl: string | null;
@@ -26,12 +27,15 @@ export function PodcastJsonLd({
   id,
   title,
   topic,
+  slug,
   createdAt,
   duration,
   audioUrl,
   creator,
 }: PodcastJsonLdProps) {
-  const podcastUrl = `https://sotto.fm/podcast/${id}`;
+  const podcastUrl = slug && creator.handle
+    ? `https://sotto.fm/@${creator.handle}/${slug}`
+    : `https://sotto.fm/podcast/${id}`;
   const creatorName = creator.name || 'Anonymous';
   const creatorUrl = creator.handle
     ? `https://sotto.fm/@${creator.handle}`
