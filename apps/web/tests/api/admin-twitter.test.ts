@@ -406,10 +406,10 @@ describe('GET /api/admin/twitter/trends', () => {
 
   it('returns enriched trends when admin', async () => {
     mockAdmin();
-    mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI podcasts'] });
+    mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI'] });
     mockSearchPopularTweets.mockResolvedValue({
       tweets: [
-        { id: 't1', text: 'Great podcast', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 100, retweet_count: 50, reply_count: 10, quote_count: 0 } },
+        { id: 't1', text: 'AI is transforming the podcast industry', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 100, retweet_count: 50, reply_count: 10, quote_count: 0 } },
       ],
       authorMap: new Map([['a1', { username: 'testuser', name: 'Test User', verified: true, verifiedType: 'blue' }]]),
     });
@@ -420,11 +420,42 @@ describe('GET /api/admin/twitter/trends', () => {
 
     expect(response.status).toBe(200);
     expect(body.trends).toHaveLength(1);
-    expect(body.trends[0].query).toBe('AI podcasts');
+    expect(body.trends[0].query).toBe('AI');
     expect(body.trends[0].tweets).toHaveLength(1);
     expect(body.trends[0].tweets[0].authorUsername).toBe('testuser');
     expect(body.trends[0].tweets[0].authorVerified).toBe(true);
     expect(body.trends[0].tweets[0].tweetUrl).toContain('x.com/testuser/status/t1');
+  });
+
+  it('filters out retweets and zero-like tweets', async () => {
+    mockAdmin();
+    mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI'] });
+    mockSearchPopularTweets.mockResolvedValue({
+      tweets: [
+        // Good: original tweet with likes, keyword in text
+        { id: 't1', text: 'AI research breakthrough this week', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 200, retweet_count: 50, reply_count: 10, quote_count: 0 } },
+        // Bad: native retweet (referenced_tweets)
+        { id: 't2', text: 'RT @someone: AI is cool', author_id: 'a2', created_at: '2026-01-01T00:00:00Z', referenced_tweets: [{ type: 'retweeted', id: 'orig-1' }], public_metrics: { like_count: 0, retweet_count: 3000, reply_count: 0, quote_count: 0 } },
+        // Bad: zero likes
+        { id: 't3', text: 'AI thoughts from me', author_id: 'a3', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 0, retweet_count: 5, reply_count: 0, quote_count: 0 } },
+        // Bad: keyword only in author name, not in tweet text
+        { id: 't4', text: 'Arsenal in the Premier League!', author_id: 'a4', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 50, retweet_count: 10, reply_count: 5, quote_count: 0 } },
+      ],
+      authorMap: new Map([
+        ['a1', { username: 'researcher', name: 'Researcher' }],
+        ['a2', { username: 'spammer', name: 'AI Spam Bot' }],
+        ['a3', { username: 'nobody', name: 'Nobody' }],
+        ['a4', { username: 'techcompany', name: 'AI Technology Corp' }],
+      ]),
+    });
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/trends'));
+    const response = await getTrends(request);
+    const body = await response.json();
+
+    expect(body.trends).toHaveLength(1);
+    expect(body.trends[0].tweets).toHaveLength(1);
+    expect(body.trends[0].tweets[0].id).toBe('t1');
   });
 
   it('filters by verified when param set', async () => {
@@ -432,8 +463,8 @@ describe('GET /api/admin/twitter/trends', () => {
     mockGetTwitterConfig.mockResolvedValue({ trendSearchQueries: ['AI'] });
     mockSearchPopularTweets.mockResolvedValue({
       tweets: [
-        { id: 't1', text: 'Verified tweet', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 50, retweet_count: 10, reply_count: 5, quote_count: 0 } },
-        { id: 't2', text: 'Unverified tweet', author_id: 'a2', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 200, retweet_count: 100, reply_count: 20, quote_count: 0 } },
+        { id: 't1', text: 'AI verified research findings', author_id: 'a1', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 50, retweet_count: 10, reply_count: 5, quote_count: 0 } },
+        { id: 't2', text: 'AI unverified hot take', author_id: 'a2', created_at: '2026-01-01T00:00:00Z', public_metrics: { like_count: 200, retweet_count: 100, reply_count: 20, quote_count: 0 } },
       ],
       authorMap: new Map([
         ['a1', { username: 'verified_user', name: 'Verified', verified: true }],

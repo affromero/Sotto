@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
 import { searchPopularTweets } from '@/lib/twitter';
+import { engagementScore, filterQualityTweets } from '@/lib/twitter-utils';
 import { parseTweetIntent } from '@/lib/tweet-parser';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
@@ -10,12 +11,6 @@ import { trendGenerateSchema, trendFilterSchema } from '@/lib/validations';
 import type { TwitterTweet, TrendTopic, EnrichedTrendTweet, TweetAuthor } from '@/types/twitter';
 
 import { errorResponse } from '@/lib/api-response';
-
-function engagementScore(tweet: TwitterTweet): number {
-  const m = tweet.public_metrics;
-  if (!m) return 0;
-  return m.like_count + m.retweet_count * 2 + m.reply_count;
-}
 
 function enrichTweet(
   tweet: TwitterTweet,
@@ -62,8 +57,11 @@ export async function GET(request: NextRequest) {
       const query = filters.lang ? `${baseQuery} lang:${filters.lang}` : baseQuery;
       const { tweets, authorMap } = await searchPopularTweets(query, maxPerQuery);
 
-      if (tweets.length > 0) {
-        let enriched = tweets.map((t) => enrichTweet(t, authorMap));
+      // Filter out retweets, zero-like tweets, and tweets that only matched via author name
+      const qualityTweets = filterQualityTweets(tweets, baseQuery);
+
+      if (qualityTweets.length > 0) {
+        let enriched = qualityTweets.map((t) => enrichTweet(t, authorMap));
 
         if (filters.verified) {
           enriched = enriched.filter((t) => t.authorVerified);
@@ -79,7 +77,7 @@ export async function GET(request: NextRequest) {
           trends.push({
             query: baseQuery,
             tweets: enriched,
-            totalTweetCount: tweets.length,
+            totalTweetCount: qualityTweets.length,
           });
         }
       }

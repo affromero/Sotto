@@ -76,7 +76,14 @@ function createMockJob(): Job<PollTwitterTrendsPayload> {
   } as unknown as Job<PollTwitterTrendsPayload>;
 }
 
-function makeTweet(id: string, text: string, likes = 100, retweets = 10, replies = 5) {
+function makeTweet(
+  id: string,
+  text: string,
+  likes = 100,
+  retweets = 10,
+  replies = 5,
+  opts?: { referenced_tweets?: Array<{ type: 'retweeted' | 'quoted' | 'replied_to'; id: string }> }
+) {
   return {
     id,
     text,
@@ -88,6 +95,7 @@ function makeTweet(id: string, text: string, likes = 100, retweets = 10, replies
       reply_count: replies,
       quote_count: 0,
     },
+    ...opts,
   };
 }
 
@@ -195,8 +203,8 @@ describe('processTrendPoll', () => {
   it('respects remaining daily budget', async () => {
     mockPrismaTwitterAutoTweetCount.mockResolvedValue(2); // only 1 left
     mockSearchPopularTweets.mockResolvedValue(makeSearchResult([
-      makeTweet('t1', 'First totally unique topic about quantum physics', 200),
-      makeTweet('t2', 'Second completely different topic about marine biology', 150),
+      makeTweet('t1', 'AI is revolutionizing quantum physics research', 200),
+      makeTweet('t2', 'AI breakthroughs in marine biology are exciting', 150),
     ]));
 
     await processTrendPoll(createMockJob());
@@ -207,9 +215,9 @@ describe('processTrendPoll', () => {
   it('deduplicates similar tweets by keyword overlap', async () => {
     // Two tweets with very similar content should be deduplicated
     mockSearchPopularTweets.mockResolvedValue(makeSearchResult([
-      makeTweet('t1', 'Artificial intelligence transforming healthcare industry rapidly', 200),
-      makeTweet('t2', 'Artificial intelligence transforming healthcare industry today', 150),
-      makeTweet('t3', 'Quantum computing breaks new records in speed and accuracy', 100),
+      makeTweet('t1', 'AI transforming healthcare industry rapidly', 200),
+      makeTweet('t2', 'AI transforming healthcare industry today', 150),
+      makeTweet('t3', 'AI in quantum computing breaks new records', 120),
     ]));
 
     await processTrendPoll(createMockJob());
@@ -220,14 +228,34 @@ describe('processTrendPoll', () => {
 
   it('sorts by engagement score (likes + 2*retweets + replies)', async () => {
     mockSearchPopularTweets
-      .mockResolvedValueOnce(makeSearchResult([makeTweet('low', 'Low engagement topic about weather', 10, 1, 1)]))
-      .mockResolvedValueOnce(makeSearchResult([makeTweet('high', 'High engagement topic about space exploration', 500, 100, 50)]));
+      .mockResolvedValueOnce(makeSearchResult([makeTweet('low', 'AI research update this morning', 110, 5, 5)]))
+      .mockResolvedValueOnce(makeSearchResult([makeTweet('high', 'Science breakthrough in fusion energy', 500, 100, 50)]));
 
     await processTrendPoll(createMockJob());
 
     // The first podcast created should be the high-engagement one
     const firstCreate = mockPrismaPodcastCreate.mock.calls[0][0];
     expect(firstCreate.data.sourceTweetId).toBe('high');
+  });
+
+  it('filters out retweets, zero-like tweets, and author-name-only matches', async () => {
+    mockSearchPopularTweets.mockResolvedValue(makeSearchResult([
+      // Good: original tweet with AI keyword and high engagement
+      makeTweet('good', 'AI is changing everything we know', 200, 50, 20),
+      // Bad: retweet (RT @ prefix + referenced_tweets)
+      makeTweet('rt', 'RT @someone: AI is cool', 0, 3000, 0, { referenced_tweets: [{ type: 'retweeted', id: 'orig' }] }),
+      // Bad: zero likes
+      makeTweet('nolikes', 'AI thoughts from me today', 0, 5, 0),
+      // Bad: keyword only in author name, not tweet text
+      makeTweet('irrelevant', 'Arsenal vs Chelsea match tonight', 150, 50, 30),
+      // Bad: below min engagement (score < 100)
+      makeTweet('loweng', 'AI is neat I guess', 10, 1, 1),
+    ]));
+
+    await processTrendPoll(createMockJob());
+
+    expect(mockPrismaPodcastCreate).toHaveBeenCalledTimes(1);
+    expect(mockPrismaPodcastCreate.mock.calls[0][0].data.sourceTweetId).toBe('good');
   });
 
   it('searches all configured queries', async () => {

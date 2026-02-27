@@ -552,10 +552,14 @@ export async function searchPopularTweets(
     return { tweets: [], authorMap: new Map() };
   }
 
+  // Exclude retweets and replies at the API level to improve result quality
+  // and avoid matching query keywords against author names in RT spam
+  const qualifiedQuery = `${query} -is:retweet -is:reply`;
+
   const params = new URLSearchParams({
-    query,
+    query: qualifiedQuery,
     sort_order: 'relevancy',
-    'tweet.fields': 'public_metrics,created_at,author_id,conversation_id',
+    'tweet.fields': 'public_metrics,created_at,author_id,conversation_id,referenced_tweets',
     expansions: 'author_id',
     'user.fields': 'username,name,verified,verified_type',
     max_results: String(Math.min(Math.max(maxResults, 10), 100)),
