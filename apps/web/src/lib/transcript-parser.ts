@@ -1,7 +1,10 @@
 import { generateResponse } from './llm';
+import { loadPrompt } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import type { TranscriptionResult } from './providers/stt';
+
+const DIARIZATION_SYSTEM_PROMPT = loadPrompt('import/transcript-diarization.md');
 
 /**
  * Parsed segment with speaker diarization
@@ -213,18 +216,9 @@ export async function diarizeSpeakers(
 
   const transcriptText = segments.map((s, i) => `[${i}] ${s.text}`).join('\n');
 
-  const systemPrompt = `You are a speaker diarization assistant for Sotto podcasts. You will receive a transcript where segments are numbered [0], [1], etc. Your task is to identify two speakers (HOST and EXPERT) and assign each segment to one of them.
-
-Rules:
-1. The HOST typically introduces topics, asks questions, and guides the conversation
-2. The EXPERT typically provides answers, explanations, and expert knowledge
-3. You MUST assign each segment to either HOST or EXPERT
-4. Return ONLY a JSON array of speaker assignments, one per line: [{"index": 0, "speaker": "HOST"}, {"index": 1, "speaker": "EXPERT"}, ...]
-5. Do NOT include any explanation or markdown formatting, just the raw JSON array`;
-
   const userPrompt = `Transcript segments:\n${transcriptText}\n\nAssign each segment index to either HOST or EXPERT as a JSON array.`;
 
-  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userPrompt }], {
+  const response = await generateResponse(DIARIZATION_SYSTEM_PROMPT, [{ role: 'user', content: userPrompt }], {
     maxTokens: 4096,
     apiKeyOverride,
   });
