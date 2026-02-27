@@ -5,6 +5,7 @@ import { generateResponse } from '@/lib/llm';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
+import { loadAndRender } from '@/lib/prompt-loader';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
@@ -102,8 +103,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   const responseLanguage = user?.preferredLanguage || podcast?.language || 'en';
   const languageLabel = getLanguageLabel(responseLanguage) || 'English';
 
-  const systemPrompt = `You are Sotto's Q&A assistant. The user is listening to a podcast and paused to ask a question.
-Answer concisely and helpfully, using the podcast context. Keep answers under 200 words. Respond in ${languageLabel}.${VOICE_REALISM_SHORT}${CONTENT_SAFETY_INSTRUCTIONS}${INPUT_SANITIZATION_INSTRUCTIONS}`;
+  const systemPrompt = loadAndRender('interaction/qa-assistant.md', { LANGUAGE_LABEL: languageLabel }) + VOICE_REALISM_SHORT + CONTENT_SAFETY_INSTRUCTIONS + INPUT_SANITIZATION_INSTRUCTIONS;
 
   let response;
   try {

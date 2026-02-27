@@ -1,6 +1,7 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './llm';
-import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
+import { CONTENT_SAFETY_INSTRUCTIONS } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
+import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
@@ -289,14 +290,25 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
  * Produces natural, immersive dialogue with delivery directions, sound effect cues,
  * and inline citations backed by real references.
  */
-const AUDIENCE_GUIDANCE: Record<string, string> = {
-  kids: 'This podcast is for CHILDREN aged 6-10. Use simple vocabulary and short sentences. Rely on playful analogies, fun comparisons, and real-world examples a child would know. Keep energy high and enthusiastic. Absolutely no scary, violent, or mature content. Keep segments punchy and fast-paced — kids lose attention quickly.',
-  teens:
-    "This podcast is for TEENAGERS aged 11-16. Use relatable references (social media, gaming, school life). Don't condescend — teens can handle complex topics but keep language accessible. Light humor works well. You can discuss challenging topics but frame them age-appropriately.",
-  family:
-    'This podcast is FAMILY-FRIENDLY — safe for all ages in the room together. Use inclusive language, no profanity or explicit content. Explain concepts so both kids and adults stay engaged. Think "dinner table conversation" — interesting for everyone.',
-  general: 'Standard adult content with no special restrictions. This is the default audience.',
-  mature: MATURE_AUDIENCE_GUIDANCE,
+const VALID_AUDIENCES = new Set(['kids', 'teens', 'family', 'general', 'mature']);
+
+function getAudienceGuidance(audience: string | undefined): string {
+  const key = audience && VALID_AUDIENCES.has(audience) ? audience : 'general';
+  return loadPrompt(`shared/audience/${key}.md`);
+}
+
+const TONE_GUIDANCE_MAIN: Record<string, string> = {
+  casual: '- Keep it light, use humor freely, casual language, pop culture references',
+  professional: '- Maintain a professional but warm tone, with occasional humor to keep it engaging',
+  socratic: '- Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery',
+  storytelling: '- Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.',
+};
+
+const TONE_GUIDANCE_REVISION: Record<string, string> = {
+  casual: '- Keep it light, use humor freely, casual language',
+  professional: '- Maintain a professional but warm tone',
+  socratic: '- Use the Socratic method — probing questions building on each other',
+  storytelling: '- Frame everything as narrative — characters, conflict, resolution',
 };
 
 export interface SourceMetadata {
@@ -339,175 +351,32 @@ export async function generateScript(params: {
   const speakerSection = speakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
   const voiceDeliveryGuidelines = speakerCount === 1
-    ? `## Monologue Guidelines:
-- Write a compelling solo narrative — the HOST speaks directly to the listener
-- Address the listener using "you" and rhetorical questions: "Have you ever wondered...?", "Here's what most people miss..."
-- Use first-person storytelling: personal examples, vivid metaphors, concrete anecdotes
-- Vary pace: short punchy sentences for emphasis, longer sentences for explanation and flow
-- Insert brief reflective pauses using stage directions like (pause) at key dramatic moments
-- Build tension and payoffs: plant a question early, deliver the satisfying answer later
-- NEVER reference a co-host, "we", or another speaker — this is fully solo`
-    : `## Voice & Delivery Guidelines:
-- Write dialogue that sounds like a REAL conversation, not a lecture
-- Include natural speech patterns: "So here's the thing...", "Wait, really?", "That's fascinating because..."
-- Let speakers occasionally overlap in energy — the HOST can finish the EXPERT's thought, or react mid-explanation
-- Build tension and payoffs: set up interesting questions, then deliver satisfying answers
-- Use the "cliffhanger" technique between segments: end a thought with intrigue before the next turn picks it up`;
+    ? loadPrompt('generation/monologue-guidelines.md')
+    : loadPrompt('generation/dialogue-guidelines.md');
 
-  const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive ${speakerCount}-voice podcast scripts that listeners can't stop playing.
+  const eli5Section = params.depth === 'eli5'
+    ? loadPrompt('generation/eli5-section.md')
+    : '';
 
-CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio. Conversational, natural phrasing produces engaging audio.
-
-## Speakers:
-${speakerSection}
-
-${voiceDeliveryGuidelines}
-
-## Audio Expression Tags:
-For richer vocal expression, embed inline audio tags in the turn TEXT:
-- [laughs], [chuckles] — genuine amusement
-- [sighs] — exasperation, relief, or contemplation
-- [whispers] — emphasis or dramatic effect
-- [gasps] — surprise or shock
-- [excited] — enthusiasm, energy
-- [sarcastic] — dry wit, irony
-- [curious] — inquisitive, wondering
-- [pause], [long pause] — natural beat or dramatic timing
-Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
-Example: "Wait, really? [laughs] That's incredible."
-These go inline in the text field, NOT in the direction field.
-
-## Direction Field:
-The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
-energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
-${VOICE_REALISM_INSTRUCTIONS}
-- ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language, pop culture references' : ''}
-- ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
-- ${params.tone === 'socratic' ? 'Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery' : ''}
-- ${params.tone === 'storytelling' ? 'Frame everything as a narrative — characters, conflict, resolution. Make facts feel like plot points.' : ''}
-${params.depth === 'eli5' ? `## ELI5 Depth — Explain Like I'm 5:
-- Use the simplest possible language — imagine explaining to a curious 5-year-old
-- Rely heavily on analogies, metaphors, and comparisons to everyday objects/experiences
-- Break complex ideas into tiny, digestible pieces
-- Use lots of "imagine...", "it's kind of like...", "you know how..."
-- Keep sentences short and punchy
-- Avoid jargon entirely — if a technical term is unavoidable, immediately explain it in plain words
-- Make it fun and engaging — wonder and curiosity over precision
-- It's OK to simplify — use analogies and concrete examples over technical precision, but do NOT fabricate statistics, invent citations, or state specific percentages without a real source` : ''}
-
-## Audience: ${params.audience || 'general'}
-${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
-
-## Pacing for Maximum Engagement:
-- Start with a HOOK in the first 15 seconds — a surprising fact, provocative question, or bold claim
-- Alternate between high-energy and reflective moments
-- Every 2-3 minutes, introduce a new angle or surprising connection
-- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
-- Audience level: ${params.audienceLevel}
-- Focus areas: ${params.focusAreas.join(', ')}
-
-## Inline Citations — STRICT REQUIREMENTS:
-You MUST include inline citations in the dialogue using [N] notation (e.g. [1], [2]).
-
-### Hard Minimum Reference Counts (scripts below these thresholds WILL be rejected):
-- deep_dive: minimum 10 references
-- standard: minimum 5 references
-- quick_overview: minimum 3 references
-- eli5: minimum 3 references
-
-### Reference Type Hierarchy (prefer types at the top):
-1. PAPER — peer-reviewed journal articles (highest quality). Include DOI when available (e.g. doi: "10.1038/s41586-023-06185-3")
-2. BOOK — published books from academic or major publishers
-3. REPORT — government reports (.gov), official organization reports (WHO, UNESCO, IPCC)
-4. ARTICLE — established news outlets (Reuters, AP, BBC, NYT, etc.)
-5. WEB — other reputable web sources (use sparingly, only when better types aren't available)
-6. VIDEO — use only when the video itself is the primary source
-
-### Serious Source Ratio Requirements (PAPER + BOOK + REPORT must make up at least):
-- deep_dive: 60% of all references
-- standard: 40% of all references
-- quick_overview: 20% of all references
-- eli5: no minimum ratio
-
-### Citation Rules:
-- Only cite REAL, verifiable sources — search the web to find actual papers, books, and reports
-- Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)
-- For journal papers, always include the DOI in the "doi" field
-- ${speakers[0].name} introduces citations conversationally: "I read that researchers at MIT found..." [3]
-- ${speakers.length > 1 ? speakers[1].name : speakers[0].name} cites to back claims: "According to a 2023 study in Nature [4], the results showed..."
-- Grouped citations are fine: [1,2] when multiple sources support one claim
-- Do NOT invent fake citations. Do NOT cite personal blogs, social media, or content farms
-- Each non-obvious factual claim should be supported by at least 3 independent sources
-
-### Citation Accuracy — Anti-Hallucination:
-Violations of these rules WILL cause the script to be rejected by the fact-checker:
-
-**Statistics and percentages:**
-- NEVER state a specific percentage, ratio, or magnitude without first verifying it via web search
-- If web search finds no peer-reviewed primary source for a figure, use hedged language: "research suggests..." or "studies indicate..." — never specify a number you cannot source
-- Commonly hallucinated figures to avoid unless verified with a DOI-linked source: "X% more trustworthy", "Y% of consumers", "Z% faster", "N in 10 people"
-
-**Citation-to-claim accuracy:**
-- The dialogue must accurately reflect what the cited source actually says — do not overstate findings
-- Do NOT attribute a source to an institution that did not publish it (e.g. do not say "Google researchers found X" when reference [1] is from OpenAI)
-- Do NOT describe a correlational study as proving causation
-- Do NOT cite a source for a claim the source does not actually make
-
-**Study verification:**
-- Before citing any journal article by name, year, or journal, use web search to confirm the paper exists and the DOI resolves
-- NEVER cite a study from memory — always verify via web search before writing the citation into the script
-- If a study cannot be found via DOI or title search, do NOT cite it and do NOT substitute a different fake study
-
-**Source quality for statistics:**
-- Design blogs, marketing sites, SEO content farms, and secondary "roundup" articles are NOT acceptable sources for quantitative claims
-- A specific statistic requires a primary source: the original peer-reviewed paper, official survey report, or government data
-- If a statistic exists only in blog posts citing other blog posts, trace it to the original study or remove the figure entirely
-
-**When no verifiable source exists:**
-- If web search finds no primary source for a specific claim, rephrase without the number: e.g. "serif fonts are generally perceived as more formal and trustworthy" instead of "serif fonts increase perceived trustworthiness by 40%"
-- If a claim has no credible source at all, remove it and replace with a well-sourced alternative on the same theme
-- Fewer claims with solid citations is better than more claims with weak or fabricated sources
-- This rule applies at all depth levels including eli5
-
-## Sound Effect Cues:
-Include sound effect suggestions as [SFX: description] markers at natural transition points:
-- [SFX: warm podcast intro jingle, 3s] at the very start
-- [SFX: subtle transition whoosh, 1s] between major topic shifts
-- [SFX: gentle outro music, 4s] at the end
-- Use sparingly (3-5 per episode max) — they should enhance, not distract
-
-## Output Format:
-Return a JSON object with three arrays:
-{
-  "turns": [
-    {"speaker": "${speakers[0].name}", "text": "...", "direction": "energetic"},
-    {"speaker": "${speakers.length > 1 ? speakers[1].name : speakers[0].name}", "text": "According to a 2023 study [1], ...", "direction": "thoughtful"}
-  ],
-  "soundCues": [
-    {"type": "intro", "prompt": "warm upbeat podcast intro jingle with soft chimes", "durationSeconds": 3, "insertAfterTurn": -1},
-    {"type": "transition", "prompt": "subtle whoosh transition sound", "durationSeconds": 1, "insertAfterTurn": 8},
-    {"type": "outro", "prompt": "gentle melodic podcast outro with fade", "durationSeconds": 4, "insertAfterTurn": 20}
-  ],
-  "references": [
-    {"number": 1, "title": "Study Title", "authors": ["Author A", "Author B"], "year": 2023, "url": "https://...", "type": "PAPER", "publisher": "Nature", "doi": "10.1234/..."},
-    {"number": 2, "title": "Book Title", "authors": ["Author C"], "year": 2021, "url": null, "type": "BOOK", "publisher": "Publisher Name", "doi": null}
-  ]
-}
-
-The "direction" field is optional — only include it when the delivery should notably shift from conversational default.
-The "insertAfterTurn" field is the 0-based index; use -1 to insert before the first turn.
-The "references" array must contain an entry for every [N] cited in the turns. Type must be one of: WEB, PAPER, BOOK, ARTICLE, VIDEO, REPORT.
-
-## Web Search:
-You have access to web search. Use it to:
-- Find current events, recent news, and up-to-date information
-- Verify facts and find accurate statistics
-- Discover recent studies, reports, and publications
-- Ground the podcast in real, current information rather than outdated training data
-For time-sensitive topics (current events, "what happened today/this week", latest developments), ALWAYS search the web first before writing the script.
-Always search before stating any specific percentage, statistic, or numerical finding — do not rely on training data for figures.
-
-Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
+  const systemPrompt = loadAndRender('generation/script-generator.md', {
+    SPEAKER_COUNT: String(speakerCount),
+    SPEAKER_SECTION: speakerSection,
+    VOICE_DELIVERY_GUIDELINES: voiceDeliveryGuidelines,
+    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+    TONE_GUIDANCE: TONE_GUIDANCE_MAIN[params.tone] || '',
+    ELI5_SECTION: eli5Section,
+    AUDIENCE: params.audience || 'general',
+    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
+    DURATION_TARGET: String(params.durationTarget),
+    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+    AUDIENCE_LEVEL: params.audienceLevel,
+    FOCUS_AREAS: params.focusAreas.join(', '),
+    HOST_SPEAKER: speakers[0].name,
+    EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
+    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+  });
 
   const userMessage = params.sourceContent
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
@@ -559,139 +428,20 @@ export async function generateScriptWithFeedback(params: {
   ];
   const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
-  const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on fact-checking feedback.
-
-CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio.
-
-## REVISION INSTRUCTIONS:
-A fact-checking agent reviewed your previous script and found issues. You MUST address every piece of feedback below. Do NOT ignore any feedback item.
-
-Key rules for this revision:
-1. Fix ALL unsourced claims — add real citations or remove the claim
-2. Replace ALL unreliable sources (blogs, social media) with peer-reviewed journals, books, government reports, or established news outlets
-3. Ensure every non-obvious factual claim has at least 1 citation, ideally 3+ independent sources
-4. If a claim cannot be properly sourced, remove it and replace with a well-sourced alternative
-5. Maintain the conversational quality and engagement of the original script
-
-## Speakers:
-${feedbackSpeakerSection}
-
-## Voice & Delivery Guidelines:
-- Write dialogue that sounds like a REAL conversation, not a lecture
-- Include natural speech patterns and delivery directions in parentheses when tone shifts
-${VOICE_REALISM_INSTRUCTIONS}
-
-## Audio Expression Tags:
-For richer vocal expression, embed inline audio tags in the turn TEXT:
-- [laughs], [chuckles] — genuine amusement
-- [sighs] — exasperation, relief, or contemplation
-- [whispers] — emphasis or dramatic effect
-- [gasps] — surprise or shock
-- [excited] — enthusiasm, energy
-- [sarcastic] — dry wit, irony
-- [curious] — inquisitive, wondering
-- [pause], [long pause] — natural beat or dramatic timing
-Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
-These go inline in the text field, NOT in the direction field.
-
-## Direction Field:
-The "direction" field controls vocal delivery style. Well-supported values:
-energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
-
-- ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
-- ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
-- ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}
-- ${params.tone === 'storytelling' ? 'Frame everything as narrative — characters, conflict, resolution' : ''}
-
-## Audience: ${params.audience || 'general'}
-${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
-
-## Pacing:
-- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
-- Audience level: ${params.audienceLevel}
-- Focus areas: ${params.focusAreas.join(', ')}
-
-## Citation Requirements — STRICT (scripts that fail these thresholds will be rejected again):
-
-### Hard Minimum Reference Counts:
-- deep_dive: minimum 10 references
-- standard: minimum 5 references
-- quick_overview: minimum 3 references
-- eli5: minimum 3 references
-
-### Reference Type Hierarchy (prefer types at the top):
-1. PAPER — peer-reviewed journal articles. Include DOI when available
-2. BOOK — published books from academic or major publishers
-3. REPORT — government reports (.gov), official organization reports (WHO, UNESCO, IPCC)
-4. ARTICLE — established news outlets (Reuters, AP, BBC, NYT, etc.)
-5. WEB — other reputable web sources (use sparingly)
-6. VIDEO — use only when the video itself is the primary source
-
-### Serious Source Ratio (PAPER + BOOK + REPORT must make up at least):
-- deep_dive: 60% of all references
-- standard: 40% of all references
-- quick_overview: 20% of all references
-- eli5: no minimum ratio
-
-### Rules:
-- Do NOT invent fake citations. Every citation MUST reference a real, verifiable source
-- Do NOT cite personal blogs, social media, or content farms
-- Set the correct "type" field for each reference
-- For journal papers, always include the DOI in the "doi" field
-- Use [N] notation for inline citations
-- Each non-obvious factual claim should be supported by at least 3 independent sources
-- If the previous feedback flagged REFERENCES quality issues, use web search to find REAL peer-reviewed papers, books, and official reports to replace weak WEB/ARTICLE sources
-
-### Addressing Each Feedback Type:
-For each issue flagged by the fact-checker, apply the fix below exactly — do NOT just rephrase the same claim with different wording:
-
-**MISATTRIBUTION:**
-- Use web search to find what the cited reference actually says and who actually published it
-- Rewrite the surrounding dialogue to accurately reflect the source — if the real finding is weaker than claimed, soften the claim in the script to match
-- Do NOT simply swap citation numbers; rewrite the text that describes the finding so it matches the actual source
-- If the cited source does not support the claim at all, find a new source that does or remove the claim entirely
-
-**Unverified statistics (specific percentages or numbers):**
-- Use web search to find the original primary source (peer-reviewed paper or official report) for the figure
-- If no primary source exists after searching, rewrite the claim using hedged language with no specific number
-- NEVER retain a specific percentage or numerical claim in the revised script without a verified, DOI-linked source
-- Replacing one unverified number with a different unverified number is NOT a fix
-
-**Fabricated or unverifiable citations:**
-- Use web search to find a real paper, book, or report that supports the underlying claim
-- If no real source supports the claim, remove the claim entirely — do not substitute a plausible-sounding fake citation
-- Verify each new citation exists before including it: confirm the DOI resolves or the title appears in search results
-- Do not re-use the same fake citation reassigned to a different claim
-
-**Empty or insufficient references:**
-- Use web search to find 3+ peer-reviewed papers, books, or official reports for each major claim
-- Replace WEB-type references backing statistical or causal claims with PAPER, BOOK, or REPORT types
-- Address each unsourced claim listed in the feedback individually — do not just append references to the list without connecting them to specific claims in the turns via [N] markers
-- Every [N] marker in the revised turns must correspond to an entry in the references array
-
-**Source misattribution by institution or author:**
-- Do not say a finding comes from "Harvard researchers" or "a Stanford study" unless the reference is actually published by those institutions
-- Verify the publishing institution, lead author, and journal name via web search before stating them in dialogue
-- If the actual institution differs from what was stated, rewrite the dialogue line to use the correct institution
-
-**Unreliable or low-quality sources (design blogs, marketing sites, career advice sites, educational aggregator blogs):**
-- If the fact-checker flags a source as unreliable (e.g., "designmodo.com is a design agency blog"), do NOT retain that citation even if the claim text is accurate
-- If the fact-checker names specific replacement papers in its feedback (e.g., "Arditi & Cho 2005", "Song & Schwarz 2008"), use web search to find those exact papers first — search by author + year + topic, verify the DOI exists, then cite them
-- If no peer-reviewed source supports the specific claim after searching, rewrite the claim in hedged language ("research suggests..." / "designers generally believe...") without citing a specific study
-- Design/marketing blogs (e.g., designmodo.com, gouldingmedia.com) are NOT acceptable for psychological, behavioral, or statistical claims even if they appear authoritative
-- Educational aggregator blogs (e.g., cognitiontoday.com) are NOT acceptable as primary sources — trace their claims back to the original peer-reviewed paper and cite that instead
-- Career advice / lifestyle sites are NOT acceptable sources for empirical behavioral claims
-- Replacing one low-quality source with a different low-quality source is NOT a fix — the replacement must be Tier 1 (peer-reviewed) or Tier 2 (academic institution, established news outlet)
-
-## Sound Effect Cues:
-Include [SFX: description] markers at natural transition points (3-5 per episode max).
-
-## Web Search:
-You have access to web search. Use it to verify facts, find accurate statistics, and discover current information to improve the script.
-
-## Output Format:
-Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
-Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
+  const systemPrompt = loadAndRender('generation/script-revision-factcheck.md', {
+    SPEAKER_SECTION: feedbackSpeakerSection,
+    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+    TONE_GUIDANCE: TONE_GUIDANCE_REVISION[params.tone] || '',
+    AUDIENCE: params.audience || 'general',
+    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
+    DURATION_TARGET: String(params.durationTarget),
+    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+    AUDIENCE_LEVEL: params.audienceLevel,
+    FOCUS_AREAS: params.focusAreas.join(', '),
+    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+  });
 
   const previousScriptText = params.previousScript
     .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
@@ -764,73 +514,20 @@ export async function generateScriptWithUserFeedback(params: {
   ];
   const feedbackSpeakerSection = feedbackSpeakers.map((s) => `- ${s.name}: ${s.description}`).join('\n');
 
-  const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on **user feedback**.
-
-CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio.
-
-## REVISION INSTRUCTIONS:
-The user reviewed the script and provided feedback. Address every piece of feedback while maintaining the overall quality and flow of the script.
-
-Key rules for this revision:
-1. Keep what works — only change what the user flagged
-2. Address ALL user notes: general feedback, turn-specific comments, and text annotations
-3. Maintain conversational quality and engagement
-4. Preserve existing citations and references unless the user specifically asks to change them
-5. If the user requests new information, use web search to find accurate, well-sourced content
-
-## Speakers:
-${feedbackSpeakerSection}
-
-## Voice & Delivery Guidelines:
-- Write dialogue that sounds like a REAL conversation, not a lecture
-- Include natural speech patterns and delivery directions in parentheses when tone shifts
-${VOICE_REALISM_INSTRUCTIONS}
-
-## Audio Expression Tags:
-For richer vocal expression, embed inline audio tags in the turn TEXT:
-- [laughs], [chuckles] — genuine amusement
-- [sighs] — exasperation, relief, or contemplation
-- [whispers] — emphasis or dramatic effect
-- [gasps] — surprise or shock
-- [excited] — enthusiasm, energy
-- [sarcastic] — dry wit, irony
-- [curious] — inquisitive, wondering
-- [pause], [long pause] — natural beat or dramatic timing
-Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
-These go inline in the text field, NOT in the direction field.
-
-## Direction Field:
-The "direction" field controls vocal delivery style. Well-supported values:
-energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
-
-- ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
-- ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
-- ${params.tone === 'socratic' ? 'Use the Socratic method — probing questions building on each other' : ''}
-- ${params.tone === 'storytelling' ? 'Frame everything as narrative — characters, conflict, resolution' : ''}
-
-## Audience: ${params.audience || 'general'}
-${AUDIENCE_GUIDANCE[params.audience || 'general'] || AUDIENCE_GUIDANCE.general}
-
-## Pacing:
-- Target exactly ${params.durationTarget} minutes. Your script MUST be between ${wordCountBounds(params.durationTarget).min} and ${wordCountBounds(params.durationTarget).max} words (${minutesToWords(params.durationTarget)} ideal). Scripts outside this range will be rejected.
-- Audience level: ${params.audienceLevel}
-- Focus areas: ${params.focusAreas.join(', ')}
-
-## Citation Rules:
-- Use [N] notation for inline citations
-- Keep existing citations intact unless the user asks to change them
-- If adding new content, cite real, verifiable sources
-- Set the correct "type" field for each reference (PAPER, BOOK, REPORT, ARTICLE, WEB, or VIDEO)
-
-## Sound Effect Cues:
-Include [SFX: description] markers at natural transition points (3-5 per episode max).
-
-## Web Search:
-You have access to web search. Use it to verify facts and find accurate information for any new content the user requests.
-
-## Output Format:
-Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
-Only return the JSON object, nothing else.${CONTENT_SAFETY_INSTRUCTIONS}`;
+  const systemPrompt = loadAndRender('generation/script-revision-user.md', {
+    SPEAKER_SECTION: feedbackSpeakerSection,
+    VOICE_REALISM: VOICE_REALISM_INSTRUCTIONS,
+    TONE_GUIDANCE: TONE_GUIDANCE_REVISION[params.tone] || '',
+    AUDIENCE: params.audience || 'general',
+    AUDIENCE_GUIDANCE: getAudienceGuidance(params.audience),
+    DURATION_TARGET: String(params.durationTarget),
+    WORD_COUNT_MIN: String(wordCountBounds(params.durationTarget).min),
+    WORD_COUNT_MAX: String(wordCountBounds(params.durationTarget).max),
+    WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
+    AUDIENCE_LEVEL: params.audienceLevel,
+    FOCUS_AREAS: params.focusAreas.join(', '),
+    CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
+  });
 
   const previousScriptText = params.previousScript
     .map((t, i) => `[${i}] ${t.speaker}: ${t.text}`)
