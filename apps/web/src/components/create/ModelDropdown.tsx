@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronUp } from 'lucide-react';
+import { Check, ChevronUp } from 'lucide-react';
 import styles from './ModelDropdown.module.css';
 
 export interface ModelOption {
@@ -118,48 +118,56 @@ export function ModelDropdown({
             ? Array.from(groups.entries()).map(([group, opts]) => (
                 <div key={group}>
                   {group && <div className={styles.groupHeader}>{group}</div>}
-                  {opts.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="option"
-                      aria-selected={opt.id === (value ?? options[0]?.id)}
-                      className={`${styles.option} ${
-                        opt.id === (value ?? options[0]?.id) ? styles.optionActive : ''
-                      } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
-                      onClick={() => handleSelect(opt)}
-                      disabled={opt.unavailable}
-                    >
-                      <div className={styles.optionContent}>
-                        <span className={styles.optionName}>{opt.displayName}</span>
-                        {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
-                      </div>
-                      {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
-                      {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
-                    </button>
-                  ))}
+                  {opts.map((opt) => {
+                    const isSelected = opt.id === (value ?? options[0]?.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        className={`${styles.option} ${
+                          isSelected ? styles.optionActive : ''
+                        } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
+                        onClick={() => handleSelect(opt)}
+                        disabled={opt.unavailable}
+                      >
+                        <span className={styles.optionCheck}>{isSelected && <Check size={14} />}</span>
+                        <div className={styles.optionContent}>
+                          <span className={styles.optionName}>{opt.displayName}</span>
+                          {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
+                        </div>
+                        {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
+                        {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
+                      </button>
+                    );
+                  })}
                 </div>
               ))
-            : options.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="option"
-                  aria-selected={opt.id === (value ?? options[0]?.id)}
-                  className={`${styles.option} ${
-                    opt.id === (value ?? options[0]?.id) ? styles.optionActive : ''
-                  } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
-                  onClick={() => handleSelect(opt)}
-                  disabled={opt.unavailable}
-                >
-                  <div className={styles.optionContent}>
-                    <span className={styles.optionName}>{opt.displayName}</span>
-                    {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
-                  </div>
-                  {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
-                  {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
-                </button>
-              ))}
+            : options.map((opt) => {
+                const isSelected = opt.id === (value ?? options[0]?.id);
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    className={`${styles.option} ${
+                      isSelected ? styles.optionActive : ''
+                    } ${opt.unavailable ? styles.optionUnavailable : ''} ${opt.hint ? styles.optionWithHint : ''}`}
+                    onClick={() => handleSelect(opt)}
+                    disabled={opt.unavailable}
+                  >
+                    <span className={styles.optionCheck}>{isSelected && <Check size={14} />}</span>
+                    <div className={styles.optionContent}>
+                      <span className={styles.optionName}>{opt.displayName}</span>
+                      {opt.hint && <span className={styles.optionHint}>{opt.hint}</span>}
+                    </div>
+                    {opt.badge && <span className={styles.optionBadge}>{opt.badge}</span>}
+                    {opt.unavailable && <span className={styles.optionNoKey}>No key</span>}
+                  </button>
+                );
+              })}
         </div>
       )}
     </div>
