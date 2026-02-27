@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { ReplyTelegramPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { sendMessage } from '@/lib/telegram';
+import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 
 const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
@@ -12,7 +13,7 @@ export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Prom
 
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { title: true, duration: true, status: true },
+    select: { title: true, duration: true, status: true, slug: true, user: { select: { handle: true } } },
   });
 
   if (podcast.status === 'FAILED') {
@@ -39,7 +40,7 @@ export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Prom
 
   const durationMin = podcast.duration ? Math.round(podcast.duration / 60) : 0;
   const durationStr = durationMin > 0 ? ` (${durationMin} min)` : '';
-  const podcastUrl = `${SOTTO_APP_URL}/podcast/${podcastId}`;
+  const podcastUrl = `${SOTTO_APP_URL}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`;
 
   await sendMessage(chatId,
     `Your podcast is ready! "${podcast.title}"${durationStr}`,
