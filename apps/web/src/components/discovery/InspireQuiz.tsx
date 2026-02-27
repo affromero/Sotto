@@ -134,7 +134,7 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
     (cardIndex: number) => {
       const card = gridCards[cardIndex];
       if (!card || card.status !== 'visible') return;
-      onSelectTopic(card.question.topic);
+      onSelectTopic(card.question.text);
     },
     [gridCards, onSelectTopic]
   );
