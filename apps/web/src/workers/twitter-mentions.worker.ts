@@ -277,6 +277,8 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         ttsProvider: effectiveTtsProvider,
         ttsModel: effectiveTtsModel,
         aiModel: effectiveAiModel,
+        aiAutoResolved: true,
+        ttsAutoResolved: true,
         visibility: 'PUBLIC',
         discovery: {
           create: {
