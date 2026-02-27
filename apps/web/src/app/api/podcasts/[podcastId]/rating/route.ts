@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 }
 
 /**
- * POST /api/podcasts/[podcastId]/rating — Submit or update rating (creator-only)
+ * POST /api/podcasts/[podcastId]/rating — Submit or update rating (creator + listener)
  */
 export async function POST(request: NextRequest, context: RouteContext) {
   const session = await auth();
@@ -44,15 +44,22 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { userId: true },
+    select: { userId: true, status: true, visibility: true },
   });
 
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
   }
 
-  if (podcast.userId !== session.user.id) {
-    return errorResponse('Only the podcast creator can rate it', 403);
+  const isCreator = podcast.userId === session.user.id;
+
+  if (!isCreator) {
+    if (podcast.status !== 'READY') {
+      return errorResponse('Podcast is not ready', 400);
+    }
+    if (podcast.visibility === 'PRIVATE') {
+      return errorResponse('Cannot rate a private podcast', 403);
+    }
   }
 
   const body = await request.json();
@@ -60,6 +67,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
   if (!parsed.success) {
     return errorResponse('Invalid rating data', 400, { details: parsed.error.flatten() });
   }
+
+  const { completionPercent, ...ratingData } = parsed.data;
 
   const rating = await prisma.podcastRating.upsert({
     where: {
@@ -71,9 +80,14 @@ export async function POST(request: NextRequest, context: RouteContext) {
     create: {
       userId: session.user.id,
       podcastId,
-      ...parsed.data,
+      isCreator,
+      completionPercent: completionPercent ?? null,
+      ...ratingData,
     },
-    update: parsed.data,
+    update: {
+      ...ratingData,
+      completionPercent: completionPercent ?? undefined,
+    },
   });
 
   return NextResponse.json({ rating });

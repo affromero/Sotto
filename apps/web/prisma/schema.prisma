@@ -677,7 +677,9 @@ model PodcastRating {
   conversationFlow    Int // 1-5: "Does the back-and-forth feel natural?"
   overallSatisfaction Int // 1-5: overall summary
 
-  comment   String?  @db.Text
+  comment           String?  @db.Text
+  isCreator         Boolean  @default(true)
+  completionPercent Float?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -687,6 +689,7 @@ model PodcastRating {
 
   @@unique([userId, podcastId])
   @@index([podcastId])
+  @@index([podcastId, isCreator])
 }
 
 // ============ TAGS ============

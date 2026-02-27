@@ -452,6 +452,7 @@ export const podcastRatingSchema = z.object({
   conversationFlow: z.number().int().min(1).max(5),
   overallSatisfaction: z.number().int().min(1).max(5),
   comment: z.string().max(2000).optional(),
+  completionPercent: z.number().min(0).max(100).optional(),
 });
 
 /**
