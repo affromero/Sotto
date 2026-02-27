@@ -181,6 +181,7 @@ body {
   --z-modal: 1300;
   --z-toast: 1400;
   --z-player: 1500;
+  --z-command: 1600;
 
   /* Layout */
   --sidebar-width: 260px;

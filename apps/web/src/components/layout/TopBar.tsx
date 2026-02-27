@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { Search } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import styles from './TopBar.module.css';
 
@@ -32,6 +35,14 @@ export function TopBar({ user }: TopBarProps) {
         <Link href="/create">Create</Link>
       </nav>
       <div className={styles.actions}>
+        <button
+          className={styles.searchTrigger}
+          onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+          aria-label="Open search"
+          type="button"
+        >
+          <Search size={18} aria-hidden="true" />
+        </button>
         <ThemeToggle />
         {user ? (
           <Link

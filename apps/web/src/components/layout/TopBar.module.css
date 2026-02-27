@@ -78,8 +78,32 @@
   line-height: 1;
 }
 
+/* Search trigger (mobile-first, hidden on desktop where cmd+k is available) */
+.searchTrigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.searchTrigger:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
 @media (max-width: 768px) {
   .nav {
     display: none;
+  }
+
+  .searchTrigger {
+    display: flex;
   }
 }
