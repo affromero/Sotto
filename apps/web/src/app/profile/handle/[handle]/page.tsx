@@ -109,6 +109,20 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
 
   const isOwnProfile = currentUserId === user.id;
 
+  // Check early access: user's email has a waitlist entry with signedUpAt set
+  let isEarlyAccess = false;
+  const userEmail = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { email: true },
+  });
+  if (userEmail?.email) {
+    const waitlistEntry = await prisma.waitlist.findUnique({
+      where: { email: userEmail.email },
+      select: { signedUpAt: true },
+    });
+    isEarlyAccess = !!waitlistEntry?.signedUpAt;
+  }
+
   const profileData = {
     id: user.id,
     name: user.name,
@@ -137,6 +151,7 @@ export default async function HandleProfilePage({ params }: HandleProfilePagePro
           isOwnProfile={isOwnProfile}
           initialIsFollowing={isFollowing}
           isAuthenticated={!!currentUserId}
+          isEarlyAccess={isEarlyAccess}
           currentUserId={currentUserId}
         />
       </div>

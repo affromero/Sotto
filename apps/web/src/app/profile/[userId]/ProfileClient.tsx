@@ -28,6 +28,7 @@ interface ProfileClientProps {
   isOwnProfile: boolean;
   initialIsFollowing: boolean;
   isAuthenticated?: boolean;
+  isEarlyAccess?: boolean;
   currentUserId?: string;
 }
 
@@ -51,6 +52,7 @@ export function ProfileClient({
   isOwnProfile,
   initialIsFollowing,
   isAuthenticated = true,
+  isEarlyAccess,
   currentUserId,
 }: ProfileClientProps) {
   const router = useRouter();
@@ -126,6 +128,7 @@ export function ProfileClient({
         isOwnProfile={isOwnProfile}
         isFollowing={isFollowing}
         isAuthenticated={isAuthenticated}
+        isEarlyAccess={isEarlyAccess}
         onFollow={handleFollow}
         onEdit={handleEdit}
         onFollowerClick={() => setFollowModal('followers')}
