@@ -1,8 +1,9 @@
 ---
 name: deploy-ios
 description: |
-  Deploy Sotto iOS app to TestFlight via GitHub Actions.
-  Triggers the ios.yml workflow, monitors the run, and reports status.
+  Deploy Sotto iOS app to TestFlight.
+  Supports 3 modes: GitHub Actions, Local (eas-cli), or Server-direct (SSH).
+  Auto-detects mode from context or asks when ambiguous.
 ---
 
 # Deploy iOS — Sotto TestFlight Skill
@@ -11,24 +12,31 @@ Builds the Sotto iOS app via EAS and submits to TestFlight.
 
 ## Trigger
 
-`/deploy-ios`
+`/deploy-ios [github|local|server]` — optional inline mode selector
 
-## Mode Detection
+---
 
-The skill has two modes — **auto-detected** based on context:
+## Step 0: Mode Selection
 
-### Server-direct mode (via sotto-prod SSH)
+### Auto-detect shortcuts (skip the prompt)
 
-Activated when **any** of these are true:
-- `/sotto-deploy` was also invoked in the same conversation
-- GitHub Actions billing is blocked (check: `gh run list --workflow=ci.yml --limit=1` shows billing error)
-- User explicitly says "from the server" or "direct"
+| Signal | Mode |
+|--------|------|
+| User says "github" / "via github" / "actions" | GitHub Actions |
+| User says "locally" / "from here" / "from my machine" | Local |
+| User says "server" / "SSH" / "direct" / "sotto-prod" | Server-direct |
+| `/sotto-deploy` also invoked in the same conversation | Server-direct |
+| Inline arg: `/deploy-ios local`, `/deploy-ios github`, `/deploy-ios server` | As specified |
 
-In this mode, the build runs on `sotto-prod` via SSH using `eas build` (which builds in Expo's cloud). The server is the trigger machine, not GitHub Actions.
+### When ambiguous — ask
 
-### GitHub Actions mode (default)
+If no signal matches, use `AskUserQuestion`:
 
-When none of the above apply, trigger the `ios.yml` workflow via `gh workflow run`.
+| Option | Label | Description |
+|--------|-------|-------------|
+| GitHub Actions | `GitHub Actions` | Trigger `ios.yml` workflow (requires GH billing active) |
+| Local | `Local` | Run `eas build` + `eas submit` from this machine via Doppler |
+| Server-direct | `Server-direct` | SSH to `sotto-prod` and build there |
 
 ---
 
@@ -40,7 +48,7 @@ Build numbers are managed by EAS remotely (`appVersionSource: "remote"` in `eas.
 
 ### 1b. Check CI status
 
-**Server-direct mode:** Run CI locally with `npm run ci`. If it fails, stop.
+**Local mode & Server-direct mode:** Run CI locally with `npm run ci`. If it fails, stop.
 
 **GitHub Actions mode:** Check via API:
 ```bash
@@ -61,7 +69,11 @@ gh run list --workflow=ci.yml --branch=$(git branch --show-current) --limit=1 --
 
   Stop here.
 
-- **Exception:** If the CI run failed due to GitHub billing/payment issues (not code), treat it as if CI passed and proceed — the billing block is the reason we're using server-direct mode.
+- **Billing-aware exception:** If the CI run failed in <30 seconds with no steps executed, GitHub billing is likely blocked. Report:
+
+  > GitHub Actions billing appears blocked — CI run failed with no steps executed.
+
+  Then ask the user to choose **Local** or **Server-direct** mode instead. Do not proceed with GitHub Actions mode.
 
 ### 1c. Check for uncommitted changes
 
@@ -78,6 +90,17 @@ Use `AskUserQuestion` with options:
 - "Cancel" — stop and let the user commit first
 
 If clean, proceed.
+
+### 1d. Local pre-flight (Local mode only)
+
+Verify local tooling before starting:
+
+```bash
+eas --version           # Confirm eas-cli installed
+doppler secrets get EXPO_TOKEN --plain --project sotto --config prd  # Confirm Doppler prd access
+```
+
+If either fails, stop and report the error.
 
 ---
 
@@ -122,7 +145,7 @@ ENDSSH
 
 **Important:** Run this with `run_in_background: true` since it takes 30-60 minutes. Tell the user they'll be notified when it finishes.
 
-After the SSH command completes (success or failure), send a Telegram notification (Step 3).
+After the SSH command completes (success or failure), proceed to Step 3 (Telegram notification).
 
 ---
 
@@ -161,43 +184,88 @@ Ask to monitor:
 
 ---
 
-## Step 3: Telegram Notification (server-direct mode only)
+## Step 2c: Local Deploy
+
+Run from the local machine using `eas-cli` + Doppler `prd` secrets. All commands run from `/Users/afromero/Code/Sotto/apps/mobile`.
+
+### 1. Sync EXPO_PUBLIC vars
+
+```bash
+doppler secrets download --no-file --format env --project sotto --config prd \
+  | grep '^EXPO_PUBLIC_' > /tmp/expo-public.env
+doppler run --project sotto --config prd -- \
+  eas env:push production --path /tmp/expo-public.env --force
+rm -f /tmp/expo-public.env
+```
+
+### 2. Build (background, 60-min timeout)
+
+```bash
+cd /Users/afromero/Code/Sotto/apps/mobile
+doppler run --project sotto --config prd -- \
+  eas build --platform ios --profile production --non-interactive --wait
+```
+
+Run with `run_in_background: true` and 60-minute timeout. Tell the user they'll be notified when it finishes.
+
+### 3. Write ASC key
+
+```bash
+doppler secrets get ASC_API_KEY_P8 --plain --project sotto --config prd > /tmp/asc-api-key.p8
+```
+
+### 4. Submit to TestFlight
+
+```bash
+cd /Users/afromero/Code/Sotto/apps/mobile
+ASC_API_KEY_ID=$(doppler secrets get ASC_API_KEY_ID --plain --project sotto --config prd) \
+ASC_ISSUER_ID=$(doppler secrets get ASC_ISSUER_ID --plain --project sotto --config prd) \
+doppler run --project sotto --config prd -- \
+  eas submit --platform ios --latest --non-interactive
+```
+
+### 5. Cleanup (always — even on failure)
+
+```bash
+rm -f /tmp/asc-api-key.p8
+```
+
+### 6. Proceed to Step 3 (Telegram notification with "(local)" label)
+
+---
+
+## Step 3: Telegram Notification
 
 Read bot token from `~/.claude/skills/telegram/config.json` (use `sotto` bot).
-Send to Andrés (chat_id: `668874307`).
+Send to Andres (chat_id: `668874307`).
+
+**Mode label:** Use `(local)` for Local mode, `(server-direct)` for Server-direct mode. Omit for GitHub Actions mode (the workflow has its own notify job).
 
 **On success:**
 ```
-✅ <b>Sotto iOS TestFlight build submitted</b> <i>(server-direct)</i>
+<b>Sotto iOS TestFlight build submitted</b> <i>({mode_label})</i>
 <code>{COMMIT_SHA}</code>  <i>{COMMIT_MSG}</i>
 by {AUTHOR}
 ```
 
 **On failure:**
 ```
-❌ <b>Sotto iOS build failed</b> <i>(server-direct)</i>
+<b>Sotto iOS build failed</b> <i>({mode_label})</i>
 <code>{COMMIT_SHA}</code>  <i>{COMMIT_MSG}</i>
 by {AUTHOR}
 
-⚠️ <b>Reason: {last error line from SSH output}</b>
+<b>Reason: {last error line from build output}</b>
 ```
 
 Use the sotto bot token: send via `curl` to Telegram Bot API with `parse_mode: "HTML"`.
 
 ---
 
-## Server Prerequisites
-
-The following must be set up on `sotto-prod` (one-time):
-
-### Runtime (already installed)
-- Node.js 20 (`/usr/bin/node`)
-- eas-cli (`/usr/lib/node_modules/eas-cli/`)
-- Doppler CLI
+## Prerequisites
 
 ### Doppler secrets (project: sotto, config: prd)
 
-These must exist in Doppler `prd` config:
+These must exist in Doppler `prd` config for **all modes**:
 
 | Secret | Purpose |
 |--------|---------|
@@ -207,3 +275,14 @@ These must exist in Doppler `prd` config:
 | `ASC_API_KEY_P8` | Apple App Store Connect private key (full .p8 file contents) |
 
 Add with: `doppler secrets set KEY=value --project sotto --config prd`
+
+### Server-direct mode (sotto-prod)
+
+- Node.js 20 (`/usr/bin/node`)
+- eas-cli (`/usr/lib/node_modules/eas-cli/`)
+- Doppler CLI
+
+### Local mode
+
+- `eas-cli` installed locally (`npm install -g eas-cli`)
+- Doppler CLI with access to `sotto/prd` config
