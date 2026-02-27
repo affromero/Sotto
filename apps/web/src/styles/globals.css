@@ -59,7 +59,6 @@ body {
   --color-text-secondary: #6B7280;
   --color-text-tertiary: #9CA3AF;
   --color-text-inverse: #FFFFFF;
-  --color-muted: #6B7280;
 
   /* Colors - Speaker (Podcast) — indexed palette for up to 4 speakers */
   --color-speaker-0: #D97706;
@@ -130,19 +129,7 @@ body {
   --font-size-4xl: 36px;
   --font-size-5xl: 48px;
 
-  /* Spacing (4px base unit) */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-16: 64px;
-
-  /* Spacing - Semantic */
+  /* Spacing - Semantic (source of truth) */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
@@ -150,6 +137,18 @@ body {
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
   --spacing-3xl: 64px;
+
+  /* Spacing - Numeric aliases (refer to semantic tokens) */
+  --space-1: var(--spacing-xs);    /* 4px */
+  --space-2: var(--spacing-sm);    /* 8px */
+  --space-3: 12px;                 /* no semantic equivalent */
+  --space-4: var(--spacing-md);    /* 16px */
+  --space-5: 20px;                 /* no semantic equivalent */
+  --space-6: var(--spacing-lg);    /* 24px */
+  --space-8: var(--spacing-xl);    /* 32px */
+  --space-10: 40px;                /* no semantic equivalent */
+  --space-12: var(--spacing-2xl);  /* 48px */
+  --space-16: var(--spacing-3xl);  /* 64px */
 
   /* Border Radius */
   --radius-sm: 4px;
@@ -209,7 +208,6 @@ body {
   --color-text-secondary: #A09B93;
   --color-text-tertiary: #6B6660;
   --color-text-inverse: #1A1917;
-  --color-muted: #A09B93;
 
   /* Primary — brighten amber for dark backgrounds */
   --color-primary: #E8890F;
