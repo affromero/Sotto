@@ -6,6 +6,7 @@ import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
 import { WEB_SEARCH_TOOL } from './llm';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
+import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 
@@ -75,36 +76,13 @@ export async function generateQuestions(
   // Request extra to account for hash collisions with prior answers
   const requestCount = count + Math.min(priorAnswers.length, 10);
 
-  const systemPrompt = `You generate taste quiz questions for a podcast discovery platform called Sotto.
-
-Each question is a short yes/no prompt. VARY the phrasing — never start more than one question the same way. Good openers:
-- "Ever wonder why…?"
-- "Did you know…?"
-- "Are you curious about…?"
-- "What if…?"
-- "Should we rethink…?"
-- "How does…?"
-- Direct statements that provoke: "Octopuses taste the world by licking their arms."
-
-Rules:
-- Generate exactly ${requestCount} questions
-- Each question maps to 1-3 existing tag slugs from the taxonomy below
-- Mix question styles: curiosity-driven, opinion-based, niche deep-dives, contrarian takes
-- Questions should be specific and vivid, not generic ("Ever wonder why cats purr even when they're alone?" not "Are you interested in animals?")
-- Never repeat questions the user has already answered
-- Bias toward unexplored areas the user hasn't engaged with yet
-- Category is the parent slug the question primarily belongs to
-
-Taxonomy (parent: [children]):
-${taxonomyLines.join('\n')}
-
-${interestSummary ? `User's current interests: ${interestSummary}` : 'User has no interests yet — explore broadly.'}
-${dislikedSummary ? `User dislikes: ${dislikedSummary}` : ''}
-
-${recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recentQuestions}` : ''}
-
-Respond with a JSON array only, no markdown. Each item:
-{"text": "Did you know octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+  const systemPrompt = loadAndRender('feeds/taste-quiz.md', {
+    REQUEST_COUNT: String(requestCount),
+    TAXONOMY: taxonomyLines.join('\n'),
+    INTEREST_SUMMARY: interestSummary ? `User's current interests: ${interestSummary}` : 'User has no interests yet — explore broadly.',
+    DISLIKED_SUMMARY: dislikedSummary ? `User dislikes: ${dislikedSummary}` : '',
+    RECENT_QUESTIONS: recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recentQuestions}` : '',
+  });
 
   const ai = createAIProvider(autoFree.aiProvider);
   const response = await ai.generateResponse(
@@ -353,27 +331,13 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
 
   const requestCount = count + 5;
 
-  const systemPrompt = `You generate personalized podcast topic questions for Sotto's "For You" feed.
-
-Each question is a short, compelling yes/no prompt — specific enough that answering "yes" means the user wants a podcast on that exact topic.
-
-IMPORTANT: Vary your phrasing. Never start more than one question the same way. Mix openers like "Ever wonder…?", "Did you know…?", "What if…?", "How does…?", or direct provocative statements.
-
-${interestContext}${topicContext}
-
-Rules:
-- Generate exactly ${requestCount} questions
-- Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must be specific, vivid, and concrete — not generic
-- Focus on CREATIVE COMBINATIONS and ADJACENT INTERESTS — not straightforward "more of what you like"
-- Category is the parent slug the question belongs to
-
-Taxonomy (parent: [children]):
-${ctx.taxonomyLines.join('\n')}
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with a JSON array only, no markdown. Each item:
-{"text": "Ever wonder how octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+  const systemPrompt = loadAndRender('feeds/for-you.md', {
+    REQUEST_COUNT: String(requestCount),
+    INTEREST_CONTEXT: interestContext,
+    TOPIC_CONTEXT: topicContext,
+    TAXONOMY: ctx.taxonomyLines.join('\n'),
+    INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
+  });
 
   try {
     // Use user's BYOK key if available (faster than platform claude-code CLI)
@@ -455,36 +419,12 @@ export async function generateCuriosityQuestions(
 
   const requestCount = count + 5;
 
-  const systemPrompt = `You generate serendipitous curiosity questions for Sotto's "Curiosity" feed — the feeling of falling down a Wikipedia rabbit hole at 2am.
-
-Each question is a short, compelling yes/no prompt — specific enough that answering "yes" means a podcast gets created on that exact topic. VARY your phrasing: "Ever wonder…?", "Did you know…?", "What if…?", direct provocative statements, etc. Never start more than one question the same way.
-
-Your job is to surface the most SURPRISING, COUNTERINTUITIVE, and FASCINATING topics across all of human knowledge:
-- Counterintuitive science (quantum weirdness, time perception, paradoxes)
-- Obscure history (forgotten civilizations, bizarre events, historical coincidences)
-- Philosophical thought experiments (trolley problems, ship of Theseus variants, consciousness puzzles)
-- Linguistic oddities (untranslatable words, language quirks, etymology surprises)
-- Mathematical curiosities (infinity types, impossible shapes, elegant proofs)
-- Cross-disciplinary mashups (music + neuroscience, cooking + chemistry, sports + game theory)
-- Emerging fields (synthetic biology, computational archaeology, astrolinguistics)
-- "Things most people get wrong about X"
-- Unexpected connections between unrelated fields
-
-Do NOT personalize to the user's interests — the whole point is serendipity and surprise.${topicContext}
-
-Rules:
-- Generate exactly ${requestCount} questions
-- Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must be specific, vivid, and concrete — not generic
-- Maximize diversity: no two questions from the same narrow topic area
-- Category is the parent slug the question belongs to
-
-Taxonomy (parent: [children]):
-${ctx.taxonomyLines.join('\n')}
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with a JSON array only, no markdown. Each item:
-{"text": "Why can't you tickle yourself — but a robot might be able to?", "topic": "why we can't tickle ourselves but robots might be able to", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+  const systemPrompt = loadAndRender('feeds/curiosity.md', {
+    REQUEST_COUNT: String(requestCount),
+    TOPIC_CONTEXT: topicContext,
+    TAXONOMY: ctx.taxonomyLines.join('\n'),
+    INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
+  });
 
   try {
     const resolved = await resolveAiProvider(userId).catch(() => null);
@@ -589,25 +529,15 @@ export async function generateNewsQuestions(
     ? `Focus questions on "${safeNewsTopic}" and closely related areas`
     : 'Cover diverse topics: science, politics, tech, business, culture, sports';
 
-  const systemPrompt = `You generate current-events podcast topic questions for Sotto's "In the News" feed.
-
-Search the web for notable events, breakthroughs, controversies, and developments from ${timeLabel}. Prefer questions grounded in specific, real, verifiable events.
-
-Rules:
-- Generate exactly ${requestCount} questions as a JSON array
-- Each question should reference a real event, person, date, or development — prefer recent but fall back to relevant ongoing stories if no recent results exist
-- Each question maps to 1-3 existing tag slugs from the taxonomy
-- Questions must feel timely and compelling — vary phrasing (never start more than one the same way)
-- Category is the parent slug the question belongs to
-- NEVER refuse or apologize — always generate the full count of questions
-- ${diversityNote}${excludeContext}${topicFocus}
-
-Taxonomy (parent: [children]):
-${ctx.taxonomyLines.join('\n')}
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with a JSON array only, no markdown. Each item:
-{"text": "How is the EU's new AI Act already reshaping Silicon Valley?", "topic": "EU AI Act impact on Silicon Valley", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
+  const systemPrompt = loadAndRender('feeds/news.md', {
+    TIME_LABEL: timeLabel,
+    REQUEST_COUNT: String(requestCount),
+    DIVERSITY_NOTE: diversityNote,
+    EXCLUDE_CONTEXT: excludeContext,
+    TOPIC_FOCUS: topicFocus,
+    TAXONOMY: ctx.taxonomyLines.join('\n'),
+    INPUT_SANITIZATION: INPUT_SANITIZATION_INSTRUCTIONS,
+  });
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });

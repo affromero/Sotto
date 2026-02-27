@@ -46,6 +46,7 @@ COPY --chown=sotto:sotto packages/shared ./packages/shared/
 COPY --chown=sotto:sotto packages/verification-standard ./packages/verification-standard/
 COPY --chown=sotto:sotto apps/web/src ./apps/web/src/
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
+COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 
 USER sotto
 
