@@ -194,6 +194,8 @@ interface DigestPodcast {
   id: string;
   title: string;
   topic: string | null;
+  slug?: string | null;
+  creatorHandle?: string | null;
   creatorName: string | null;
 }
 
@@ -206,7 +208,7 @@ export function buildWeeklyDigestEmail(
       (p) => `
       <tr>
         <td style="padding:12px 0; border-bottom:1px solid #f3f4f6;">
-          <a href="${APP_URL}/podcast/${p.id}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
+          <a href="${APP_URL}${p.slug && p.creatorHandle ? `/@${p.creatorHandle}/${p.slug}` : `/podcast/${p.id}`}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
             ${p.title}
           </a>
           <p style="font-size:12px; color:#6B7280; margin:4px 0 0;">

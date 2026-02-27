@@ -6,7 +6,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
 import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import { resolveAudioUrl } from '@/lib/r2';
-
+import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -123,15 +123,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
   }
 
+  // Regenerate slug when title changes
+  const slugData = updateData.title
+    ? { slug: await generatePodcastSlug(updateData.title, authResult.userId, prisma) }
+    : {};
+
   const updated = await prisma.podcast.update({
     where: { id: podcastId },
     data: {
       ...updateData,
+      ...slugData,
       ...(dismissSuggestion && { suggestedTitle: null, suggestedTopic: null }),
     },
     select: {
       ...PODCAST_PUBLIC_SELECT,
-      user: { select: { id: true, name: true, image: true } },
+      user: { select: { id: true, name: true, handle: true, image: true } },
       tags: { include: { tag: true } },
     },
   });

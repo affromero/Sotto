@@ -21,7 +21,8 @@ export async function processEmailDigest(job: Job): Promise<{ sent: number; skip
       id: true,
       title: true,
       topic: true,
-      user: { select: { name: true } },
+      slug: true,
+      user: { select: { name: true, handle: true } },
     },
   });
 
@@ -34,6 +35,8 @@ export async function processEmailDigest(job: Job): Promise<{ sent: number; skip
     id: p.id,
     title: p.title,
     topic: p.topic,
+    slug: p.slug,
+    creatorHandle: p.user.handle,
     creatorName: p.user.name,
   }));
 

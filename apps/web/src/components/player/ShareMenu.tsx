@@ -4,16 +4,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Share2, Link2, Code } from 'lucide-react';
 import { Toast } from '@/components/ui/Toast';
 import { EmbedCodeModal } from '@/components/player/EmbedCodeModal';
+import { podcastUrl } from '@/lib/urls';
 import styles from './ShareMenu.module.css';
 
 interface ShareMenuProps {
   podcastId: string;
   podcastTitle: string;
+  slug?: string | null;
+  handle?: string | null;
   isPublic: boolean;
   triggerClassName?: string;
 }
 
-export function ShareMenu({ podcastId, podcastTitle, isPublic, triggerClassName }: ShareMenuProps) {
+export function ShareMenu({ podcastId, podcastTitle, slug, handle, isPublic, triggerClassName }: ShareMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showEmbed, setShowEmbed] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -42,14 +45,16 @@ export function ShareMenu({ podcastId, podcastTitle, isPublic, triggerClassName 
   }, [isOpen]);
 
   const handleCopyLink = useCallback(async () => {
-    const url = `${window.location.origin}/podcast/${podcastId}`;
+    const path = podcastUrl({ id: podcastId, slug }, handle);
+    const url = `${window.location.origin}${path}`;
     await navigator.clipboard.writeText(url);
     setToastMessage('Link copied!');
     setIsOpen(false);
-  }, [podcastId]);
+  }, [podcastId, slug, handle]);
 
   const handleShareTwitter = useCallback(() => {
-    const url = `${window.location.origin}/podcast/${podcastId}`;
+    const path = podcastUrl({ id: podcastId, slug }, handle);
+    const url = `${window.location.origin}${path}`;
     const text = encodeURIComponent(`Check out "${podcastTitle}" on Sotto`);
     window.open(
       `https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(url)}`,
@@ -57,7 +62,7 @@ export function ShareMenu({ podcastId, podcastTitle, isPublic, triggerClassName 
       'noopener,noreferrer'
     );
     setIsOpen(false);
-  }, [podcastId, podcastTitle]);
+  }, [podcastId, slug, handle, podcastTitle]);
 
   const handleEmbed = useCallback(() => {
     setIsOpen(false);
@@ -118,6 +123,8 @@ export function ShareMenu({ podcastId, podcastTitle, isPublic, triggerClassName 
         isOpen={showEmbed}
         onClose={() => setShowEmbed(false)}
         podcastId={podcastId}
+        slug={slug}
+        handle={handle}
       />
 
       {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
