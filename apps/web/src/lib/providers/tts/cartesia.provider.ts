@@ -1,10 +1,15 @@
 /**
- * Cartesia TTS provider — premium voice generation.
+ * Cartesia TTS provider — premium voice generation via Sonic 3.
+ *
+ * API docs: https://docs.cartesia.ai/api-reference/tts/bytes
+ * Sonic 3 supports [laughter] markers natively in transcript text.
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+
+const CARTESIA_API_VERSION = '2025-04-16';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
 const SPEAKER_VOICE_HOST_SET = new Set(['HOST', 'GUEST']);
@@ -15,9 +20,11 @@ export class CartesiaProvider implements TtsProvider {
   private apiKey: string;
   private model: string;
 
-  constructor(apiKey: string, model?: string) {
-    this.apiKey = apiKey;
-    this.model = model ?? 'sonic-2';
+  constructor(apiKey?: string, model?: string) {
+    const key = apiKey || process.env.CARTESIA_API_KEY;
+    if (!key) throw new Error('Cartesia requires an API key (BYOK or CARTESIA_API_KEY env var)');
+    this.apiKey = key;
+    this.model = model ?? 'sonic-3';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
@@ -25,7 +32,7 @@ export class CartesiaProvider implements TtsProvider {
       method: 'POST',
       headers: {
         'X-API-Key': this.apiKey,
-        'Cartesia-Version': '2024-06-10',
+        'Cartesia-Version': CARTESIA_API_VERSION,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -34,7 +41,7 @@ export class CartesiaProvider implements TtsProvider {
         voice: { mode: 'id', id: params.voiceId },
         output_format: {
           container: 'mp3',
-          encoding: 'mp3',
+          bit_rate: 128000,
           sample_rate: 44100,
         },
       }),
@@ -47,6 +54,7 @@ export class CartesiaProvider implements TtsProvider {
 
     const arrayBuffer = await response.arrayBuffer();
     logger.info('Cartesia speech generated', {
+      model: this.model,
       voiceId: params.voiceId,
       chars: params.text.length,
     });
