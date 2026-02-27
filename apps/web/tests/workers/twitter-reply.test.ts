@@ -66,6 +66,8 @@ describe('processTwitterReply', () => {
         title: 'Introduction to Quantum Computing',
         duration: 600,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -100,6 +102,8 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 300,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -122,6 +126,8 @@ describe('processTwitterReply', () => {
         title: 'Machine Learning Basics',
         duration: 480,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
       mockReplyToTweet.mockResolvedValue('new-reply-id');
 
@@ -151,6 +157,8 @@ describe('processTwitterReply', () => {
         title: longTitle,
         duration: 720,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -176,6 +184,8 @@ describe('processTwitterReply', () => {
         title: shortTitle,
         duration: 180,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -201,6 +211,8 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 540,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -223,6 +235,8 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 635,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -245,6 +259,8 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: 0,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -267,6 +283,8 @@ describe('processTwitterReply', () => {
         title: 'Test Podcast',
         duration: null,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -291,6 +309,8 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -317,6 +337,8 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -340,6 +362,8 @@ describe('processTwitterReply', () => {
         title: 'Failed Podcast',
         duration: null,
         status: 'FAILED',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -364,6 +388,8 @@ describe('processTwitterReply', () => {
         title: 'Progress Test',
         duration: 300,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
@@ -389,6 +415,8 @@ describe('processTwitterReply', () => {
         title: 'The History of the Internet',
         duration: 600,
         status: 'READY',
+        slug: null,
+        user: { handle: null },
       });
 
       const job = createMockJob(payload);
