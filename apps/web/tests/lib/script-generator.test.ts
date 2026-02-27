@@ -713,6 +713,115 @@ describe('generateScript', () => {
       expect(result.turns[0].text).toBe('Hey kids!');
     });
 
+    it('injects bias guidance for political source with non-center bias', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'Political topic.' }, { speaker: 'EXPERT', text: 'Indeed.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'US Immigration Policy',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: ['immigration'],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceContent: 'Article about immigration reform',
+        sourceMetadata: {
+          title: 'Immigration Reform',
+          siteName: 'The Daily Wire',
+          biasAnalysis: {
+            isPolitical: true,
+            sourceBias: 'right',
+            sourceFactuality: 'mixed',
+            sourceName: 'The Daily Wire',
+          },
+        },
+      });
+
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+      expect(systemPrompt).toContain('Political Balance Guidance');
+      expect(systemPrompt).toContain('The Daily Wire');
+      expect(systemPrompt).toContain('right');
+    });
+
+    it('does not inject bias guidance for non-political topics', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'Science topic.' }, { speaker: 'EXPERT', text: 'Indeed.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'Quantum Computing Breakthroughs',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: ['qubits'],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceMetadata: {
+          title: 'Quantum Paper',
+          biasAnalysis: {
+            isPolitical: false,
+            sourceBias: 'left',
+            sourceFactuality: 'high',
+            sourceName: 'Some Source',
+          },
+        },
+      });
+
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+      expect(systemPrompt).not.toContain('Political Balance Guidance');
+    });
+
+    it('does not inject bias guidance for center sources', async () => {
+      const mockResponse = {
+        turns: [{ speaker: 'HOST', text: 'News.' }, { speaker: 'EXPERT', text: 'Indeed.' }],
+        soundCues: [],
+        references: [],
+      };
+
+      mockGenerateResponse.mockResolvedValue({
+        content: JSON.stringify(mockResponse),
+        inputTokens: 500,
+        outputTokens: 600,
+      });
+
+      await generateScript({
+        topic: 'Immigration Policy Update',
+        depth: 'standard',
+        audienceLevel: 'intermediate',
+        focusAreas: ['immigration'],
+        tone: 'professional',
+        durationTarget: 10,
+        sourceMetadata: {
+          title: 'Reuters Article',
+          biasAnalysis: {
+            isPolitical: true,
+            sourceBias: 'center',
+            sourceFactuality: 'very-high',
+            sourceName: 'Reuters',
+          },
+        },
+      });
+
+      const systemPrompt = mockGenerateResponse.mock.calls[0][0];
+      expect(systemPrompt).not.toContain('Political Balance Guidance');
+    });
+
     it('passes web search tool to generateResponse', async () => {
       const mockResponse = {
         turns: [{ speaker: 'HOST', text: 'Current events.' }, { speaker: 'EXPERT', text: 'Indeed.' }],

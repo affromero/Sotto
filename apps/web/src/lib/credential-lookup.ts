@@ -2,6 +2,7 @@ import { generateResponse, WEB_SEARCH_TOOL } from './llm';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { logUsage } from './usage-logger';
+import { resolveAutoModel } from './auto-model-config';
 
 export interface ParticipantInput {
   authorUsername: string;
@@ -47,11 +48,14 @@ export async function lookupParticipantCredentials(
   const userMessage = `Verify the credentials of these Twitter/X participants:\n\n${participantDescriptions.join('\n\n')}`;
 
   try {
+    const autoConfig = await resolveAutoModel('PLATFORM');
+
     const response = await generateResponse(
       SYSTEM_PROMPT,
       [{ role: 'user', content: userMessage }],
       {
         maxTokens: 2048,
+        model: autoConfig.aiModel,
         apiKeyOverride,
         tools: [WEB_SEARCH_TOOL],
         skipModeration: true,

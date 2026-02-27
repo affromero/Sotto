@@ -56,6 +56,15 @@ export default async function AutoModelsPage() {
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
       />
+
+      <div className={styles.platformNote}>
+        <strong>Platform Operations</strong> uses a dedicated AI model for internal tasks
+        that run without user context. This can be more capable than the free/pro defaults.
+        <ul>
+          <li>Handle screening &mdash; classifying usernames as names, offensive, or OK</li>
+          <li>Credential lookup &mdash; verifying participant credentials via web search</li>
+        </ul>
+      </div>
     </div>
   );
 }

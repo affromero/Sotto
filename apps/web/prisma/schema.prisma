@@ -1660,10 +1660,12 @@ model AutoModelConfig {
   proAiModel      String   @default("claude-haiku-4-5-20251001")
   proTtsProvider  String   @default("elevenlabs")
   proTtsModel     String   @default("eleven_v3")
-  proSttProvider  String   @default("groq")
-  proSttModel     String   @default("whisper-large-v3-turbo")
-  updatedAt       DateTime @updatedAt
-  updatedBy       String?
+  proSttProvider      String   @default("groq")
+  proSttModel         String   @default("whisper-large-v3-turbo")
+  platformAiProvider  String   @default("anthropic")
+  platformAiModel     String   @default("claude-haiku-4-5-20251001")
+  updatedAt           DateTime @updatedAt
+  updatedBy           String?
 }
 
 model FreeProviderUsage {

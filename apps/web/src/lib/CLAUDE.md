@@ -55,7 +55,8 @@ All shared business logic and external service integrations live here.
 | `pipeline-resume.ts` | Smart resume: `markPodcastFailed(podcastId)` records `failedAtStatus`, `determineResumePoint(podcastId)` inspects existing data (Script, Segments, References) and returns the optimal pipeline restart step | Uses `prisma.ts` |
 | `api-keys.ts` | API key generation, hashing, validation | crypto |
 | `tag-icons.tsx` | Tag slug → SVG icon mapping (12 categories), `TagIcon` component, `ONBOARDING_TAG_SLUGS` array | React (SVG) |
-| `taste-quiz.ts` | Taste quiz + Inspire Me: `generateQuestions()` for onboarding, `generateForYouQuestions()` (interest-based, no web search), `generateNewsQuestions()` (current events, web search), `generateCuriosityQuestions()` (fascinating facts + surprising connections) | Anthropic API + `redis.ts` |
+| `taste-quiz.ts` | Taste quiz + Inspire Me: `generateQuestions()` for onboarding, `generateForYouQuestions()` (interest-based, no web search), `generateNewsQuestions()` (current events, newsletter-first with web search fallback), `generateCuriosityQuestions()` (fascinating facts + surprising connections) | Anthropic API + `redis.ts` |
+| `newsletter-fetcher.ts` | RSS fetcher for "In the News": curated politically-balanced feeds, JSDOM XML parsing, Redis caching, `fetchNewsletterArticles()` + `formatArticlesForPrompt()` | Fetch + JSDOM + `redis.ts` |
 | `handles.ts` | Handle validation, availability checks, unique generation (reserved handles, format validation) | Uses `prisma.ts` |
 | `rss.ts` | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts | Uses `prisma.ts` |
 | `free-tier-config.ts` | `getFreeTierConfig()` reads singleton FreeTierConfig row; `setFreeTierConfig()` for admin updates | Uses `prisma.ts` |
@@ -85,6 +86,7 @@ All shared business logic and external service integrations live here.
 | `slugify.ts` | URL-safe tag slug generator: `generateTagSlug(name)` (50 char cap) | Pure utility |
 | `theme-script.ts` | Inline dark mode init script (`THEME_INIT_SCRIPT`) — prevents flash on page load | Pure utility |
 | `topic-tagger.ts` | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI) | Pure utility |
+| `media-bias.ts` | MBFC media bias detection: domain lookup, alias resolution, political topic detection, `analyzeBias()` for source bias analysis | Filesystem (static JSON) |
 | `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `llm.ts` |
 | `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |

@@ -3,6 +3,7 @@ import { generateResponse } from './llm';
 import { cache } from './redis';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { resolveAutoModel } from './auto-model-config';
 
 const HANDLE_REGEX = /^[a-z0-9_]{3,30}$/;
 
@@ -89,6 +90,8 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
     const cached = await cache.get<HandleCheckResult>(cacheKey);
     if (cached !== null) return cached;
 
+    const autoConfig = await resolveAutoModel('PLATFORM');
+
     const handleResponse = await generateResponse(
       'Classify the word into exactly one category. Answer with a single word: NAME, OFFENSIVE, or OK. Nothing else.',
       [
@@ -97,7 +100,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
           content: `Classify "${normalized}":\n- NAME if it is a common given name (first name) in any language or culture\n- OFFENSIVE if it is profane, vulgar, a slur, hate speech, or sexually explicit\n- OK otherwise`,
         },
       ],
-      { maxTokens: 3, model: 'claude-haiku-4-5-20251001', apiKeyOverride, skipModeration: true }
+      { maxTokens: 3, model: autoConfig.aiModel, apiKeyOverride, skipModeration: true }
     );
 
     logUsage({

@@ -11,6 +11,25 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-test-model',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/prompt-loader', () => ({
+  loadPrompt: vi.fn().mockReturnValue('You are a credential lookup agent.'),
+}));
+
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import type { ParticipantInput } from '@/lib/credential-lookup';
 

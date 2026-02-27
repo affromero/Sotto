@@ -14,6 +14,7 @@ interface InspireMeProps {
   open: boolean;
   onClose: () => void;
   onSelectTopic: (topic: string) => void;
+  aiModel?: string;
 }
 
 type Section = InspireSection;
@@ -34,7 +35,7 @@ interface SseEvent {
   error?: string;
 }
 
-export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
+export function InspireMe({ open, onClose, onSelectTopic, aiModel }: InspireMeProps) {
   const [activeSection, setActiveSection] = useState<Section>('forYou');
   const [sectionsLoading, setSectionsLoading] = useState<Record<Section, boolean>>({
     forYou: false,
@@ -66,7 +67,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     setSectionsLoading({ forYou: true, trending: true, news: true, curiosity: true });
     setFetchError(false);
 
-    const url = buildUrl({ topic });
+    const url = buildUrl({ topic, model: aiModel });
 
     fetch(url, { signal: controller.signal })
       .then(async (res) => {
@@ -147,7 +148,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [aiModel]);
 
   // Pre-fetch all tabs on open
   useEffect(() => {
@@ -173,7 +174,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
     async (section: 'forYou' | 'news' | 'curiosity', timeRange?: NewsTimeRange) => {
       setIsLoadingMore(true);
       try {
-        const res = await fetch(buildUrl({ section, timeRange, topic: activeTopic }));
+        const res = await fetch(buildUrl({ section, timeRange, topic: activeTopic, model: aiModel }));
         if (!res.ok) return;
         const data = await res.json();
         if (section === 'forYou' && data.forYou) {
@@ -187,7 +188,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         setIsLoadingMore(false);
       }
     },
-    [activeTopic]
+    [activeTopic, aiModel]
   );
 
   const handleTimeRangeChange = useCallback(
@@ -196,7 +197,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
       setNewsTimeRange(range);
       setIsLoadingNews(true);
       try {
-        const res = await fetch(buildUrl({ section: 'news', timeRange: range, topic: activeTopic }));
+        const res = await fetch(buildUrl({ section: 'news', timeRange: range, topic: activeTopic, model: aiModel }));
         if (!res.ok) return;
         const data = await res.json();
         if (data.news) {
@@ -206,7 +207,7 @@ export function InspireMe({ open, onClose, onSelectTopic }: InspireMeProps) {
         setIsLoadingNews(false);
       }
     },
-    [activeTopic, newsTimeRange]
+    [activeTopic, newsTimeRange, aiModel]
   );
 
   const handleTopicSubmit = useCallback(() => {

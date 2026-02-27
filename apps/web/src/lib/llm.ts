@@ -126,7 +126,9 @@ export async function generateResponse(
     throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const resolvedModel = options?.model || 'claude-sonnet-4-6';
+  const { resolveAutoModel } = await import('./auto-model-config');
+  const autoConfig = await resolveAutoModel('PLATFORM');
+  const resolvedModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({
     role: m.role,
@@ -232,7 +234,9 @@ export async function* streamResponse(
     throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
 
-  const streamModel = options?.model || 'claude-sonnet-4-6';
+  const { resolveAutoModel } = await import('./auto-model-config');
+  const autoConfig = await resolveAutoModel('PLATFORM');
+  const streamModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({
     role: m.role,

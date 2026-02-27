@@ -17,3 +17,27 @@
   color: var(--color-text-secondary);
   margin: 0;
 }
+
+.platformNote {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-surface-secondary, #f9fafb);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.platformNote strong {
+  color: var(--color-text-primary);
+}
+
+.platformNote ul {
+  margin: var(--spacing-xs) 0 0;
+  padding-left: var(--spacing-md);
+}
+
+.platformNote li {
+  margin-bottom: var(--spacing-xxs);
+}

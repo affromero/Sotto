@@ -9,6 +9,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
+import { analyzeBias } from '@/lib/media-bias';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
   const { podcastId, userId, sourceUrl, sourceText, useAdminCredits } = job.data;
@@ -62,6 +63,25 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     };
   }
 
+  // Fetch topic/depth/focusAreas in one query for bias analysis + feasibility check
+  const discoveryMeta = await prisma.discovery.findUnique({
+    where: { podcastId },
+    select: { topic: true, depth: true, focusAreas: true },
+  });
+
+  // Bias analysis — run before persisting so we can store results in sourceMetadata
+  if (sourceUrl && discoveryMeta?.topic) {
+    const biasAnalysis = analyzeBias({
+      sourceUrl,
+      topic: discoveryMeta.topic,
+      focusAreas: (discoveryMeta.focusAreas as string[]) ?? [],
+    });
+    sourceMetadata = {
+      ...(sourceMetadata as Record<string, unknown> | undefined),
+      biasAnalysis,
+    };
+  }
+
   // Store extracted content and metadata in discovery
   const discovery = await prisma.discovery.update({
     where: { podcastId },
@@ -81,11 +101,6 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
   });
 
   if (podcast.source === 'WEB') {
-    const discoveryMeta = await prisma.discovery.findUnique({
-      where: { podcastId },
-      select: { topic: true, depth: true },
-    });
-
     if (discoveryMeta?.topic) {
       logger.info('Running topic feasibility check', { podcastId });
 
