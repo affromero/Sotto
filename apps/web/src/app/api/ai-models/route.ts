@@ -7,6 +7,14 @@ import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
+
+const TIER_GROUP_LABELS: Record<string, string> = {
+  fast: 'Quick generation',
+  balanced: 'Balanced',
+  best: 'Best quality',
+  max: 'Max',
+};
+
 // Env var names for each platform-level AI provider key
 const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
   anthropic: 'ANTHROPIC_API_KEY',
@@ -51,7 +59,8 @@ export async function GET() {
             tier: m.tier,
             requiredPlan: m.requiredPlan,
             isDefault: false,
-            group: `${p.displayName} (API)`,
+            group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+            hint: p.displayName,
           }))
         );
 
@@ -75,7 +84,8 @@ export async function GET() {
           tier: m.tier,
           requiredPlan: m.requiredPlan,
           isDefault: false,
-          group: `${p.displayName} (API)`,
+          group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+          hint: p.displayName,
         }))
       );
 
@@ -88,7 +98,7 @@ export async function GET() {
     });
   }
 
-  // BYOK keys present — show models for every valid provider, grouped by provider name
+  // BYOK keys present — show models for every valid provider, grouped by quality tier
   // Deduplicate by provider (take first valid key per provider) and exclude Groq (STT-only)
   const seenProviders = new Set<string>();
   const uniqueKeys = validKeys.filter((key) => {
@@ -105,7 +115,8 @@ export async function GET() {
       tier: m.tier,
       requiredPlan: m.requiredPlan,
       isDefault: false,
-      group: `${p.displayName} (API)`,
+      group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+      hint: p.displayName,
     }));
   });
 
