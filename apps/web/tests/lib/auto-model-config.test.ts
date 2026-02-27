@@ -33,6 +33,8 @@ const defaultRow = {
   proTtsModel: 'eleven_v3',
   proSttProvider: 'groq',
   proSttModel: 'whisper-large-v3-turbo',
+  platformAiProvider: 'anthropic',
+  platformAiModel: 'claude-haiku-4-5-20251001',
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -65,6 +67,10 @@ describe('getAutoModelConfig', () => {
         ttsModel: 'eleven_v3',
         sttProvider: 'groq',
         sttModel: 'whisper-large-v3-turbo',
+      },
+      platform: {
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
       },
     });
   });
@@ -176,6 +182,19 @@ describe('resolveAutoModel', () => {
       aiModel: 'claude-haiku-4-5-20251001',
       ttsProvider: 'elevenlabs',
       ttsModel: 'eleven_v3',
+      sttProvider: 'groq',
+      sttModel: 'whisper-large-v3-turbo',
+    });
+  });
+
+  it('returns platform AI config with free TTS/STT for PLATFORM plan', async () => {
+    const result = await resolveAutoModel('PLATFORM');
+
+    expect(result).toEqual({
+      aiProvider: 'anthropic',
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'kittentts',
+      ttsModel: 'kitten-tts-mini-0.8',
       sttProvider: 'groq',
       sttModel: 'whisper-large-v3-turbo',
     });

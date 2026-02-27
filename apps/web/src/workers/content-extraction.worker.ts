@@ -78,8 +78,8 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     });
     sourceMetadata = {
       ...(sourceMetadata as Record<string, unknown> | undefined),
-      biasAnalysis,
-    };
+      biasAnalysis: { ...biasAnalysis },
+    } as Prisma.InputJsonValue;
   }
 
   // Store extracted content and metadata in discovery
