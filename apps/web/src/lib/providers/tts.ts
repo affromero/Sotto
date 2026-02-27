@@ -22,6 +22,10 @@ export interface SpeechParams {
   apiKeyOverride?: string;
   previousText?: string;
   nextText?: string;
+  /** Delivery direction from the script (e.g. "energetic", "thoughtful", "sarcastic") */
+  direction?: string;
+  /** Speaker role (e.g. "HOST", "EXPERT") — used by some providers for baseline expression */
+  speaker?: string;
 }
 
 export interface SfxParams {
