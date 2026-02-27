@@ -216,6 +216,7 @@
 
 .cardWrapper {
   position: relative;
+  isolation: isolate;
 }
 
 .podcastGrid {
