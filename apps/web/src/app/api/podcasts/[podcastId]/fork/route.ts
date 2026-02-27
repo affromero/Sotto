@@ -12,6 +12,7 @@ import { getTierFeatures } from '@/lib/tier-features';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import type { ExtractContentPayload, SendNotificationPayload } from '@/lib/queue';
 
+import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
@@ -173,11 +174,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Create fork podcast + discovery in a transaction
   const forkedPodcast = await prisma.$transaction(async (tx) => {
+    const forkTitle = topic ? `${topic}` : `Fork of ${sourcePodcast.title}`;
+    const slug = await generatePodcastSlug(forkTitle, userId, tx);
     const newPodcast = await tx.podcast.create({
       data: {
         userId,
-        title: topic ? `${topic}` : `Fork of ${sourcePodcast.title}`,
+        title: forkTitle,
         topic: topic || sourcePodcast.topic,
+        slug,
         remixNote: remixNote || null,
         status: 'PENDING',
         forkedFromId: podcastId,

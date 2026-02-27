@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { ReplyTwitterPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { replyToTweet } from '@/lib/twitter';
+import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 
 const SOTTO_APP_URL = process.env.NEXTAUTH_URL || 'https://sotto.fm';
@@ -12,7 +13,7 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
 
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
-    select: { title: true, duration: true, status: true },
+    select: { title: true, duration: true, status: true, slug: true, user: { select: { handle: true } } },
   });
 
   if (podcast.status === 'FAILED') {
@@ -39,7 +40,7 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
   // Compose reply (must be under 280 chars)
   const durationMin = podcast.duration ? Math.round(podcast.duration / 60) : 0;
   const durationStr = durationMin > 0 ? ` (${durationMin} min)` : '';
-  const podcastUrl = `${SOTTO_APP_URL}/podcast/${podcastId}`;
+  const podcastUrl = `${SOTTO_APP_URL}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`;
 
   // Template: 'Your podcast is ready! "TITLE"DURATION\n\nListen: URL'
   // Reserve space for fixed parts + URL + duration, then fit the title

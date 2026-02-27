@@ -7,6 +7,7 @@ import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
+import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import type { AdminThreadToPodcastPayload } from '@/lib/queue';
 
@@ -114,11 +115,13 @@ export async function processAdminThreadToPodcast(
     ? formatThreadAsSourceText(threadData, parsed, participantCredentials)
     : undefined;
 
+  const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
   const podcast = await prisma.podcast.create({
     data: {
       userId: sottoUser.id,
       title: parsed.title,
       topic: parsed.topic,
+      slug,
       status: 'EXTRACTING',
       source: 'TWITTER',
       sourceTweetId: tweetId,

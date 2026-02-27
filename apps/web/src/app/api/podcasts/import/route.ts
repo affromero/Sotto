@@ -11,6 +11,7 @@ import { getAiKey, getByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
+import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import type { SttProviderId } from '@sotto/shared';
@@ -254,6 +255,12 @@ export async function POST(request: NextRequest) {
       : await prisma.podcast.create({
           data: { ...importData, userId },
         });
+
+    // Generate slug if missing (covers both create and draft-to-import update)
+    if (!podcast.slug) {
+      const slug = await generatePodcastSlug(importData.title, userId, prisma);
+      await prisma.podcast.update({ where: { id: podcast.id }, data: { slug } });
+    }
 
     const ext = fileExt || 'mp3';
     const audioKey = `imports/${podcast.id}/original.${ext}`;

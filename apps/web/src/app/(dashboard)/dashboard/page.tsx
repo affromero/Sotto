@@ -11,6 +11,7 @@ import { VisibilityToggle } from '@/components/ui/VisibilityToggle';
 import { ReferralSharePrompt } from '@/components/referral/ReferralSharePrompt';
 import { Shield } from 'lucide-react';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
+import { podcastUrl } from '@/lib/urls';
 import type { PodcastStatus } from '@prisma/client';
 import styles from './page.module.css';
 
@@ -111,6 +112,7 @@ export default async function DashboardPage() {
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
+        slug: true,
         title: true,
         topic: true,
         status: true,
@@ -154,6 +156,7 @@ export default async function DashboardPage() {
       take: 6,
       select: {
         id: true,
+        slug: true,
         title: true,
         topic: true,
         status: true,
@@ -321,7 +324,7 @@ export default async function DashboardPage() {
               return (
                 <div key={podcast.id} className={`${styles.cardWrapper} dashboardCardWrapper`} role="listitem">
                   <Link
-                    href={podcast.status === 'DRAFT' ? `/create?draftId=${podcast.id}` : `/podcast/${podcast.id}`}
+                    href={podcast.status === 'DRAFT' ? `/create?draftId=${podcast.id}` : podcastUrl(podcast, podcast.user.handle)}
                     className={styles.miniGradientCard}
                     style={gradientVars}
                     aria-label={`${podcast.title} - ${statusLabels[podcast.status]}`}
