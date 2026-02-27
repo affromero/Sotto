@@ -31,7 +31,7 @@ export async function processReferenceValidation(
   const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
-  const [references, script, podcast, userRecord] = await Promise.all([
+  const [references, script, podcast, userPlanRecord] = await Promise.all([
     prisma.reference.findMany({
       where: { podcastId },
       orderBy: { number: 'asc' },
@@ -52,7 +52,7 @@ export async function processReferenceValidation(
     model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
   }
   if (!model) {
-    const autoConfig = await resolveAutoModel(userRecord.plan as 'FREE' | 'PRO');
+    const autoConfig = await resolveAutoModel(userPlanRecord.plan as 'FREE' | 'PRO');
     model = autoConfig.aiModel;
   }
 
