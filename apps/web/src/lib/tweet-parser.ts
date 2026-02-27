@@ -2,13 +2,14 @@ import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
 import { getAllAiProviderMeta } from './providers/ai-registry';
-import { createAIProvider, resolveAiProvider, type AIProvider } from './providers/ai';
+import { createAIProvider, resolveAiProvider, type AIProvider, type ContentPart } from './providers/ai';
 import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 export interface ParseOptions {
   userId?: string;
   apiKeyOverride?: string;
+  imageUrls?: string[];
 }
 
 async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string }> {
@@ -43,6 +44,7 @@ Rules:
 - If the tweet contains a URL, extract it as sourceUrl
 - Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
 - Infer durationTarget in minutes: short tweet or quick_overview → 5, detailed or deep_dive → 15, default → 10
+- If the tweet includes image(s), analyze them to understand the topic. An image-only tweet (or one with minimal text like just "@sottofm") should still produce a valid topic from the visual content.
 - Strip @sottofm mention and any Twitter handles from the topic
 - If the user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). If not mentioned, set to null.
 ${INPUT_SANITIZATION_INSTRUCTIONS}
@@ -71,15 +73,31 @@ export async function parseTweetIntent(
   parentTweetText?: string,
   opts?: ParseOptions
 ): Promise<TweetParseResult> {
-  let userMessage = `Tweet: "${tweetText}"`;
+  let textMessage = `Tweet: "${tweetText}"`;
   if (parentTweetText) {
-    userMessage += `\n\nThis tweet is a reply to: "${parentTweetText}"`;
+    textMessage += `\n\nThis tweet is a reply to: "${parentTweetText}"`;
   }
 
+  // Build multimodal content when images are attached
+  const content: string | ContentPart[] = opts?.imageUrls?.length
+    ? [
+        { type: 'text' as const, text: textMessage },
+        ...opts.imageUrls.map((url) => ({ type: 'image_url' as const, url })),
+      ]
+    : textMessage;
+
   const { provider, providerName } = await getProviderForParsing(opts);
+
+  if (opts?.imageUrls?.length && providerName === 'groq') {
+    logger.warn('Images attached but provider does not support vision — images will be ignored', {
+      provider: providerName,
+      imageCount: String(opts.imageUrls.length),
+    });
+  }
+
   const response = await provider.generateResponse(
     SYSTEM_PROMPT,
-    [{ role: 'user', content: userMessage }],
+    [{ role: 'user', content }],
     { maxTokens: 512, apiKeyOverride: opts?.apiKeyOverride }
   );
 
