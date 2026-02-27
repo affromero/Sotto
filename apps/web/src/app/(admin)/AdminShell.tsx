@@ -30,6 +30,7 @@ import {
   ListTodo,
   Globe,
   Scale,
+  Receipt,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -75,6 +76,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
       { href: '/admin/costs', label: 'Costs', icon: DollarSign },
+      { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
     ],
   },
   {
