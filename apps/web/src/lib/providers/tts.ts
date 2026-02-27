@@ -156,6 +156,10 @@ export function createTtsProvider(type?: string, byokApiKey?: string, model?: st
       const { OpenAITtsProvider } = require('./tts/openai.provider');
       return new OpenAITtsProvider(byokApiKey, model);
     }
+    case 'cartesia': {
+      const { CartesiaProvider } = require('./tts/cartesia.provider');
+      return new CartesiaProvider(byokApiKey, model);
+    }
     case 'kittentts': {
       const { KittenTtsProvider } = require('./tts/kittentts.provider');
       return new KittenTtsProvider();
@@ -186,7 +190,6 @@ export async function createTtsProviderAsync(
       return new Cls(apiKey, model);
     }
     case 'cartesia': {
-      if (!apiKey) throw new Error('Cartesia requires an API key');
       const Cls = await importCartesia();
       return new Cls(apiKey, model);
     }
@@ -295,6 +298,12 @@ export async function resolveTtsProvider(context: {
         providerId: 'openai',
       };
     }
+    if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
+      const config = await getFreeTierConfig();
+      const model = requestedModel ?? (config.ttsProvider === 'cartesia' ? config.ttsModel : undefined);
+      const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
+      return { provider, source: 'platform', providerId: 'cartesia' };
+    }
 
     // No key available for requested provider
     throw new Error(
@@ -360,6 +369,7 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (process.env.KITTENTTS_URL) return true;
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
+  if (process.env.CARTESIA_API_KEY) return true;
   return false;
 }
 
