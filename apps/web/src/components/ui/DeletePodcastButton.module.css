@@ -14,6 +14,7 @@
   color: #fff;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   transition: opacity var(--transition-fast), background var(--transition-fast);
 }
 
@@ -24,12 +25,14 @@
 /* Show on hover of parent card wrapper */
 :global(.dashboardCardWrapper):hover .deleteBtn {
   opacity: 1;
+  pointer-events: auto;
 }
 
 /* Always show on touch devices */
 @media (hover: none) {
   .deleteBtn {
     opacity: 0.7;
+    pointer-events: auto;
   }
 }
 
