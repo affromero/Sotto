@@ -262,7 +262,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
       <fieldset className={styles.section}>
         <legend className={styles.sectionTitle}>Platform Operations</legend>
         <p className={styles.platformDescription}>
-          AI model for internal tasks: handle screening, credential lookup, and LLM fallback when no model is selected.
+          AI model for internal platform tasks: handle screening (name/offensive classification) and credential lookup (participant verification via web search).
         </p>
 
         <div className={styles.field}>

@@ -100,7 +100,7 @@ export async function setAutoModelConfig(
 /**
  * Resolve the auto model config for a specific plan tier.
  * 'PLATFORM' is a dedicated AI-only config for internal operations
- * (handle screening, credential lookup, LLM fallback).
+ * (handle screening, credential lookup).
  */
 export async function resolveAutoModel(plan: 'FREE' | 'PRO' | 'PLATFORM'): Promise<PlanModelConfig> {
   const config = await getAutoModelConfig();
