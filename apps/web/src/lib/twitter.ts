@@ -1,5 +1,5 @@
 import { logger } from './logger';
-import type { TwitterTweet, TwitterMedia, TwitterMentionsResult, ThreadTweet, ThreadData } from '@/types/twitter';
+import type { TwitterTweet, TwitterMedia, TwitterMentionsResult, ThreadTweet, ThreadData, TweetAuthor, TweetSearchResult } from '@/types/twitter';
 
 function getEnv(key: string): string | undefined {
   return process.env[key];
@@ -536,11 +536,12 @@ export async function sendDirectMessage(
 /**
  * Search for popular recent tweets matching a query.
  * Uses Twitter API v2 GET /2/tweets/search/recent with relevancy sorting.
+ * Returns tweets with an authorMap for enrichment (username, verified status).
  */
 export async function searchPopularTweets(
   query: string,
   maxResults: number = 10
-): Promise<TwitterTweet[]> {
+): Promise<TweetSearchResult> {
   const bearerToken = getEnv('TWITTER_BEARER_TOKEN');
 
   if (!bearerToken) {
@@ -548,13 +549,15 @@ export async function searchPopularTweets(
   }
 
   if (!canMakeRequest('search')) {
-    return [];
+    return { tweets: [], authorMap: new Map() };
   }
 
   const params = new URLSearchParams({
     query,
     sort_order: 'relevancy',
     'tweet.fields': 'public_metrics,created_at,author_id,conversation_id',
+    expansions: 'author_id',
+    'user.fields': 'username,name,verified,verified_type',
     max_results: String(Math.min(Math.max(maxResults, 10), 100)),
   });
 
@@ -573,11 +576,23 @@ export async function searchPopularTweets(
   const data = await response.json();
 
   if (!data.data) {
-    return [];
+    return { tweets: [], authorMap: new Map() };
   }
 
-  logger.info('Searched popular tweets', { query, count: String(data.data.length) });
-  return data.data as TwitterTweet[];
+  const authorMap = new Map<string, TweetAuthor>();
+  if (data.includes?.users) {
+    for (const user of data.includes.users) {
+      authorMap.set(user.id, {
+        username: user.username,
+        name: user.name,
+        verified: user.verified,
+        verifiedType: user.verified_type,
+      });
+    }
+  }
+
+  logger.info('Searched popular tweets', { query, count: String(data.data.length), authors: String(authorMap.size) });
+  return { tweets: data.data as TwitterTweet[], authorMap };
 }
 
 export function isTwitterConfigured(): boolean {
