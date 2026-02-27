@@ -142,6 +142,10 @@ vi.mock('@/lib/twitter-utils', () => ({
   getVerifiedParticipants: (...args: unknown[]) => mockGetVerifiedParticipants(...args),
 }));
 
+vi.mock('@/lib/slugify', () => ({
+  generatePodcastSlug: vi.fn().mockResolvedValue('test-slug'),
+}));
+
 // ---- Import under test ----
 import { processTwitterMentions } from '@/workers/twitter-mentions.worker';
 import type { PollTwitterMentionsPayload } from '@/lib/queue';
@@ -312,6 +316,7 @@ describe('processTwitterMentions', () => {
           userId: 'user-001',
           title: mockParseResult.title,
           topic: mockParseResult.topic,
+          slug: 'test-slug',
           status: 'EXTRACTING',
           source: 'TWITTER',
           sourceTweetId: tweet.id,
@@ -326,6 +331,8 @@ describe('processTwitterMentions', () => {
           ttsProvider: undefined,
           ttsModel: undefined,
           aiModel: undefined,
+          aiAutoResolved: true,
+          ttsAutoResolved: true,
           visibility: 'PUBLIC',
           discovery: {
             create: {
