@@ -23,6 +23,7 @@ interface ProfileHeaderProps {
   isOwnProfile: boolean;
   isFollowing: boolean;
   isAuthenticated: boolean;
+  isEarlyAccess?: boolean;
   onFollow: () => void;
   onEdit?: () => void;
   onFollowerClick?: () => void;
@@ -57,6 +58,7 @@ export function ProfileHeader({
   isOwnProfile,
   isFollowing,
   isAuthenticated,
+  isEarlyAccess,
   onFollow,
   onEdit,
   onFollowerClick,
@@ -91,6 +93,7 @@ export function ProfileHeader({
             {user.role === 'SYSTEM' && <Badge variant="system">Sotto</Badge>}
             {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
             {user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
+            {isEarlyAccess && <Badge variant="earlyAccess">Early Access</Badge>}
           </h1>
           <div className={styles.action}>
             {isOwnProfile

@@ -9,6 +9,7 @@ export interface PodcastSummary {
   id: string;
   title: string;
   topic: string;
+  slug?: string | null;
   status: PodcastStatus;
   visibility: PodcastVisibility;
   audioUrl: string | null;

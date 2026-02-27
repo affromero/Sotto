@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { Badge } from '@/components/ui/Badge';
 import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
+import { podcastUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
 import styles from './PodcastCard.module.css';
 
@@ -114,7 +115,7 @@ export function PodcastCard({
   return (
     <article className={cardClassName} ref={cardRef} style={gradientVars}>
       <Link
-        href={`/podcast/${podcast.id}`}
+        href={podcastUrl(podcast, podcast.user.handle)}
         className={styles.cardLink}
         aria-label={`Listen to ${podcast.title} by ${podcast.user.name || 'Unknown'}`}
         onClick={handleClick}
@@ -234,7 +235,7 @@ export function PodcastCard({
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          router.push(`/podcast/${podcast.id}?fork=1`);
+          router.push(`${podcastUrl(podcast, podcast.user.handle)}?fork=1`);
         }}
         aria-label={`Fork ${podcast.title}`}
         type="button"

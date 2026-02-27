@@ -11,7 +11,8 @@ interface BadgeProps {
     | 'soon'
     | 'creator'
     | 'admin'
-    | 'system';
+    | 'system'
+    | 'earlyAccess';
 }
 
 export function Badge({ children, variant = 'default' }: BadgeProps) {

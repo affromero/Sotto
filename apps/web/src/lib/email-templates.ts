@@ -95,6 +95,34 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
   };
 }
 
+export function buildMagicLinkEmail(url: string): { subject: string; html: string } {
+  return {
+    subject: 'Sign in to Sotto',
+    html: `${HEADER}
+      <div style="padding:16px 32px 32px;">
+        <h2 style="font-family:'DM Serif Display',Georgia,serif; font-size:20px; color:#1A1A1A; margin:0 0 12px;">
+          Sign in to Sotto
+        </h2>
+        <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
+          Click the button below to sign in. This link expires in 24 hours.
+        </p>
+        <a href="${url}" style="display:inline-block; background:#D97706; color:#fff; font-size:14px; font-weight:600; padding:12px 28px; border-radius:8px; text-decoration:none;">
+          Sign In
+        </a>
+        <p style="font-size:12px; line-height:1.5; color:#9ca3af; margin:24px 0 0;">
+          If you didn&apos;t request this email, you can safely ignore it.
+        </p>
+      </div>
+      <div style="padding:24px 32px; border-top:1px solid #f3f4f6; text-align:center;">
+        <p style="font-size:12px; color:#9ca3af; margin:0;">
+          <a href="${APP_URL}" style="color:#9ca3af; text-decoration:underline;">sotto.fm</a>
+        </p>
+      </div>
+    </div>
+  </div>`,
+  };
+}
+
 export function buildWaitlistApprovalEmail(email: string): { subject: string; html: string } {
   return {
     subject: 'Your early access to Sotto is ready',
@@ -166,6 +194,8 @@ interface DigestPodcast {
   id: string;
   title: string;
   topic: string | null;
+  slug?: string | null;
+  creatorHandle?: string | null;
   creatorName: string | null;
 }
 
@@ -178,7 +208,7 @@ export function buildWeeklyDigestEmail(
       (p) => `
       <tr>
         <td style="padding:12px 0; border-bottom:1px solid #f3f4f6;">
-          <a href="${APP_URL}/podcast/${p.id}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
+          <a href="${APP_URL}${p.slug && p.creatorHandle ? `/@${p.creatorHandle}/${p.slug}` : `/podcast/${p.id}`}?utm_source=digest&utm_medium=email&utm_campaign=weekly" style="font-size:14px; font-weight:600; color:#1A1A1A; text-decoration:none;">
             ${p.title}
           </a>
           <p style="font-size:12px; color:#6B7280; margin:4px 0 0;">

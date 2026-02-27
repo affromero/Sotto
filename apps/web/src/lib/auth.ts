@@ -4,9 +4,12 @@ import Google from 'next-auth/providers/google';
 import GitHub from 'next-auth/providers/github';
 import Twitter from 'next-auth/providers/twitter';
 import Apple from 'next-auth/providers/apple';
+import Resend from 'next-auth/providers/resend';
 import { prisma } from './prisma';
 import { generateUniqueHandle } from './handles';
 import { isAdminEmail } from './admin-emails';
+import { sendEmail } from './email';
+import { buildMagicLinkEmail } from './email-templates';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
@@ -46,6 +49,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             clientId: process.env.APPLE_CLIENT_ID,
             clientSecret: process.env.APPLE_CLIENT_SECRET,
 
+          }),
+        ]
+      : []),
+    ...(process.env.RESEND_API_KEY
+      ? [
+          Resend({
+            apiKey: process.env.RESEND_API_KEY,
+            from: process.env.EMAIL_FROM || 'Sotto <hello@sotto.fm>',
+            async sendVerificationRequest({ identifier: to, url }) {
+              const { subject, html } = buildMagicLinkEmail(url);
+              const sent = await sendEmail({ to, subject, html });
+              if (!sent) throw new Error('Failed to send magic link email');
+            },
           }),
         ]
       : []),
@@ -112,6 +128,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async signIn({ user, profile }) {
+      // Account linking (e.g. Twitter connect) — user already exists in DB
+      if (user?.id) {
+        const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+        if (existing) return true;
+      }
+
       const email = profile?.email ?? user?.email;
       if (!email) return '/auth/waitlisted?reason=no-email';
 

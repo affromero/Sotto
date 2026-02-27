@@ -24,7 +24,7 @@ const PUBLIC_ROUTES = new Set([
   '/developers',
   '/api/monitoring',
 ]);
-const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed', '/api/waitlist', '/api/telegram', '/ref'];
+const PUBLIC_PREFIXES = ['/api/auth', '/api/pitch', '/api/oembed', '/api/waitlist', '/api/telegram', '/ref', '/podcast/by-slug'];
 
 function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
