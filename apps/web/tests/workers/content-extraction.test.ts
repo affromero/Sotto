@@ -84,12 +84,14 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-sonnet-4-20250514',
-    ttsProvider: 'elevenlabs',
-    maxFreeGenerations: 3,
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
   }),
 }));
 

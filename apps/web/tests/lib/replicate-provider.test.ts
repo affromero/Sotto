@@ -39,6 +39,17 @@ vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: vi.fn().mockResolvedValue({ ttsProvider: 'openai', ttsModel: 'tts-1-hd' }),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
+
 import { ReplicateProvider } from '@/lib/providers/tts/replicate.provider';
 
 const mockAudioBytes = new Uint8Array([0xff, 0xfb, 0x90, 0x00]);

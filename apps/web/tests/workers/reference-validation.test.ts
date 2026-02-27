@@ -122,8 +122,15 @@ vi.mock('@/lib/tier-features', () => ({
   getJobPriority: vi.fn().mockReturnValue(1),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: vi.fn().mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] }),
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
 }));
 
 vi.mock('@/lib/logger', () => ({
