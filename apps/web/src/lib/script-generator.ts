@@ -26,6 +26,41 @@ function extractFirstJson(text: string, open: '{' | '['): string {
   throw new Error('Unbalanced JSON in response');
 }
 
+/**
+ * Sanitize common LLM JSON formatting issues:
+ * - Strip markdown code fences (```json ... ```)
+ * - Remove [N] index annotations from array elements (e.g., [0] "text" → "text")
+ */
+function sanitizeLlmJson(text: string): string {
+  let cleaned = text.trim();
+  // Strip markdown code fences
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '');
+  // Remove [N] index annotations before values (e.g., `[0] "HOST: ..."` → `"HOST: ..."`)
+  cleaned = cleaned.replace(/\[\d+\]\s*/g, '');
+  return cleaned;
+}
+
+/**
+ * Last-resort: extract SPEAKER: text patterns from raw LLM output when JSON parsing fails entirely.
+ * Returns null if fewer than 2 turns found (not enough for a conversation).
+ */
+function extractTurnsFromText(text: string): ScriptTurn[] | null {
+  // Match patterns like "HOST: text" or "EXPERT: text" at line starts (with optional quotes/prefixes)
+  const turnPattern = /^\s*(?:[-*•]\s*)?(?:"|')?([A-Z][A-Z\s]*?)(?:"|')?\s*:\s*(.+)/gm;
+  const turns: ScriptTurn[] = [];
+  let match;
+  while ((match = turnPattern.exec(text)) !== null) {
+    const speaker = match[1].trim();
+    let turnText = match[2].trim();
+    // Strip trailing quotes/commas from JSON-like remnants
+    turnText = turnText.replace(/[",]+$/, '').trim();
+    if (speaker && turnText && turnText.length > 10) {
+      turns.push({ speaker, text: turnText });
+    }
+  }
+  return turns.length >= 2 ? turns : null;
+}
+
 export type ScriptTurn = {
   speaker: string;
   text: string;
@@ -171,6 +206,23 @@ function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknow
         break;
       }
     }
+  }
+
+  // --- turns: coerce string entries like "HOST: text" into {speaker, text} objects ---
+  if (Array.isArray(result.turns)) {
+    result.turns = (result.turns as unknown[]).map((turn) => {
+      if (typeof turn === 'string') {
+        const colonIdx = turn.indexOf(':');
+        if (colonIdx > 0 && colonIdx < 30) {
+          return {
+            speaker: turn.substring(0, colonIdx).trim(),
+            text: turn.substring(colonIdx + 1).trim(),
+          };
+        }
+        return { speaker: 'HOST', text: turn.trim() };
+      }
+      return turn;
+    });
   }
 
   // --- soundCues: map alternate key names, drop incomplete items ---
@@ -833,32 +885,63 @@ function parseScriptResponse(response: {
   model: string;
 } {
   let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
-  try {
-    const rawParsed = JSON.parse(response.content);
-    if (Array.isArray(rawParsed)) {
-      parsed = { turns: rawParsed, soundCues: [], references: [] };
-    } else {
-      parsed = rawParsed;
-    }
-  } catch {
+
+  // Helper: attempt JSON parse with optional array-wrapping
+  function tryParseJson(text: string): typeof parsed | null {
     try {
-      parsed = JSON.parse(extractFirstJson(response.content, '{'));
+      const rawParsed = JSON.parse(text);
+      if (Array.isArray(rawParsed)) return { turns: rawParsed, soundCues: [], references: [] };
+      return rawParsed;
+    } catch { return null; }
+  }
+
+  // Helper: extract first JSON object or array from text
+  function tryExtractJson(text: string): typeof parsed | null {
+    try {
+      return JSON.parse(extractFirstJson(text, '{'));
     } catch {
       try {
-        const turns = JSON.parse(extractFirstJson(response.content, '['));
-        parsed = { turns, soundCues: [], references: [] };
-      } catch {
-        logger.error('AI returned completely unparseable script output', {
-          model: response.model,
-          contentLength: String(response.content.length),
-          contentPreview: response.content.substring(0, 500),
-        });
-        throw new Error(
-          `AI returned unparseable script output (${response.content.length} chars, model: ${response.model}). ` +
-          `Preview: ${response.content.substring(0, 200)}`
-        );
-      }
+        const turns = JSON.parse(extractFirstJson(text, '['));
+        return { turns, soundCues: [], references: [] };
+      } catch { return null; }
     }
+  }
+
+  // Phase 1: Try raw content directly
+  parsed = tryParseJson(response.content)!;
+
+  // Phase 2: Try extracting JSON from raw content (handles surrounding text)
+  if (!parsed) parsed = tryExtractJson(response.content)!;
+
+  // Phase 3: Sanitize (strip code fences, [N] indices) then retry
+  if (!parsed) {
+    const sanitized = sanitizeLlmJson(response.content);
+    parsed = tryParseJson(sanitized)!;
+    if (!parsed) parsed = tryExtractJson(sanitized)!;
+  }
+
+  // Phase 4: Last resort — regex-extract SPEAKER: text patterns
+  if (!parsed) {
+    const turns = extractTurnsFromText(response.content);
+    if (turns) {
+      logger.warn('Recovered script from non-JSON output via text extraction', {
+        model: response.model,
+        turnCount: String(turns.length),
+      });
+      parsed = { turns, soundCues: [], references: [] };
+    }
+  }
+
+  if (!parsed) {
+    logger.error('AI returned completely unparseable script output', {
+      model: response.model,
+      contentLength: String(response.content.length),
+      contentPreview: response.content.substring(0, 500),
+    });
+    throw new Error(
+      `AI returned unparseable script output (${response.content.length} chars, model: ${response.model}). ` +
+      `Preview: ${response.content.substring(0, 200)}`
+    );
   }
 
   const coerced = coerceScriptOutput(parsed as Record<string, unknown>);
