@@ -3,6 +3,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
+import { logger } from './logger';
 
 
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
@@ -159,6 +160,18 @@ function coerceRefType(raw: unknown): string | null {
  */
 function coerceScriptOutput(raw: Record<string, unknown>): Record<string, unknown> {
   const result = { ...raw };
+
+  // --- turns: map alternate key names the AI might use ---
+  if (!Array.isArray(result.turns) || result.turns.length === 0) {
+    const TURN_ALIASES = ['dialogue', 'dialog', 'conversation', 'script', 'lines', 'segments', 'entries'];
+    for (const alias of TURN_ALIASES) {
+      if (Array.isArray(result[alias]) && (result[alias] as unknown[]).length > 0) {
+        result.turns = result[alias];
+        delete result[alias];
+        break;
+      }
+    }
+  }
 
   // --- soundCues: map alternate key names, drop incomplete items ---
   if (Array.isArray(result.soundCues)) {
@@ -835,7 +848,15 @@ function parseScriptResponse(response: {
         const turns = JSON.parse(extractFirstJson(response.content, '['));
         parsed = { turns, soundCues: [], references: [] };
       } catch {
-        parsed = { turns: [], soundCues: [], references: [] };
+        logger.error('AI returned completely unparseable script output', {
+          model: response.model,
+          contentLength: String(response.content.length),
+          contentPreview: response.content.substring(0, 500),
+        });
+        throw new Error(
+          `AI returned unparseable script output (${response.content.length} chars, model: ${response.model}). ` +
+          `Preview: ${response.content.substring(0, 200)}`
+        );
       }
     }
   }
