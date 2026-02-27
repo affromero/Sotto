@@ -12,6 +12,12 @@ const QUALITY_BADGES: Record<string, string> = {
   ultra: 'Ultra',
 };
 
+const TIER_GROUP_LABELS: Record<string, string> = {
+  standard: 'Standard',
+  premium: 'High quality',
+  ultra: 'Studio quality',
+};
+
 // Env var names for each platform-level TTS provider key
 const PLATFORM_TTS_ENV: Partial<Record<TtsProviderId, string>> = {
   elevenlabs: 'ELEVENLABS_API_KEY',
@@ -60,12 +66,14 @@ export async function GET() {
       for (const meta of getAllProviderMeta()) {
         if (!hasPlatformKey(meta.id)) continue;
 
+        const isKitten = meta.id === 'kittentts';
         for (const model of meta.models) {
           options.push({
             id: `${meta.id}:${model.id}`,
             displayName: `${meta.displayName} ${model.displayName}`,
             badge: QUALITY_BADGES[model.tier],
-            group: meta.displayName,
+            group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
+            hint: isKitten ? undefined : meta.displayName,
           });
         }
       }
@@ -108,7 +116,8 @@ export async function GET() {
         id: `${meta.id}:${model.id}`,
         displayName: `${meta.displayName} ${model.displayName}`,
         badge: QUALITY_BADGES[model.tier],
-        group: meta.displayName,
+        group: TIER_GROUP_LABELS[model.tier] ?? model.tier,
+        hint: meta.displayName,
       });
     }
   }
