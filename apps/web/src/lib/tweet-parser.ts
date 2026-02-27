@@ -1,5 +1,5 @@
-import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { logUsage } from './usage-logger';
+import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { getAllAiProviderMeta } from './providers/ai-registry';
 import { createAIProvider, resolveAiProvider, type AIProvider, type ContentPart } from './providers/ai';
@@ -31,38 +31,7 @@ async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: A
   return { provider: createAIProvider(defaultProvider), providerName: defaultProvider };
 }
 
-const SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
-Users tag @sottofm on Twitter to request podcast generation. Extract structured metadata from their tweet.
-
-Rules:
-- Extract the core topic they want a podcast about
-- Generate a concise, engaging title (max 80 chars)
-- Infer depth from cues: "eli5" or "explain like I'm 5" → eli5, short tweets → quick_overview, detailed requests → deep_dive, default → standard
-- Infer audience from language complexity: jargon-heavy → expert, plain language → beginner, default → intermediate
-- Infer tone from tweet style: emoji-heavy/casual → casual, formal → professional, question-heavy → socratic
-- Extract focus areas if the user mentions specific subtopics
-- If the tweet contains a URL, extract it as sourceUrl
-- Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
-- Infer durationTarget in minutes: short tweet or quick_overview → 5, detailed or deep_dive → 15, default → 10
-- If the tweet includes image(s), analyze them to understand the topic. An image-only tweet (or one with minimal text like just "@sottofm") should still produce a valid topic from the visual content.
-- Strip @sottofm mention and any Twitter handles from the topic
-- If the user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). If not mentioned, set to null.
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with ONLY valid JSON matching this shape:
-{
-  "topic": "string — the core topic",
-  "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
-  "audienceLevel": "beginner" | "intermediate" | "expert",
-  "tone": "casual" | "professional" | "socratic",
-  "focusAreas": ["string array of specific subtopics"],
-  "audience": "general" | "kids" | "mature",
-  "durationTarget": 5 | 10 | 15,
-  "sourceUrl": "string | null — URL if found in tweet",
-  "requestedAiModel": "string | null — AI model name if user specified one",
-  "requestedTtsProvider": "string | null — TTS/audio provider name if user specified one"
-}`;
+const SYSTEM_PROMPT = loadPrompt('social/tweet-parser.md');
 
 /**
  * Parse a tweet mentioning @sottofm into structured podcast generation metadata.
@@ -134,52 +103,7 @@ export async function parseTweetIntent(
   return parsed;
 }
 
-const THREAD_SYSTEM_PROMPT = `You are an intent parser for Sotto, an AI podcast generation platform.
-You are analyzing a full Twitter/X thread conversation where someone tagged @sottofm.
-
-Your job:
-1. Read the entire thread carefully
-2. Identify the core topic of discussion
-3. Determine if this is a debate (multiple contrasting viewpoints) or informational (one perspective, explanations)
-4. For SELF-AUTHORED threads (one person posting a multi-tweet thread): treat as long-form content, extract the thesis and key points, prefer "deep_dive" depth
-5. Extract ALL URLs shared by any participant
-6. Summarize each distinct viewpoint with attribution (@username)
-7. Generate structured metadata for podcast generation
-8. Set isSelfAuthored: true if the thread is from a single author posting a multi-tweet essay/explainer
-
-Rules:
-- Generate a concise, engaging title (max 80 chars) that captures the thread's essence
-- If there are opposing viewpoints, set isDebate: true and list each viewpoint
-- Extract ALL URLs from the thread into sourceUrls array
-- Pick the single most relevant URL as sourceUrl (or null if none)
-- Infer depth from thread complexity: "eli5" or "explain like I'm 5" → eli5, short threads → standard, long detailed threads → deep_dive, self-authored threads → deep_dive
-- Infer audience from language: jargon → expert, plain → beginner, default → intermediate
-- If debate: tone should be "socratic"; if informational: infer from style
-- Focus areas should include key subtopics discussed across the thread
-- Infer audience content rating: kids/educational → kids, explicit/NSFW → mature, default → general
-- Infer durationTarget in minutes: short threads → 10, long detailed threads → 15, default → 15
-- Strip @sottofm and other handles from the topic
-- If the tagging user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). Only look at the tagging user's tweet, not the thread content. If not mentioned, set to null.
-${INPUT_SANITIZATION_INSTRUCTIONS}
-
-Respond with ONLY valid JSON matching this shape:
-{
-  "topic": "string — the core topic",
-  "title": "string — engaging podcast title (max 80 chars)",
-  "depth": "eli5" | "quick_overview" | "standard" | "deep_dive",
-  "audienceLevel": "beginner" | "intermediate" | "expert",
-  "tone": "casual" | "professional" | "socratic",
-  "focusAreas": ["string array of specific subtopics"],
-  "audience": "general" | "kids" | "mature",
-  "durationTarget": 10 | 15,
-  "sourceUrl": "string | null — most relevant URL",
-  "sourceUrls": ["all URLs found in thread"],
-  "isDebate": true | false,
-  "isSelfAuthored": true | false,
-  "viewpoints": ["@alice argues X because Y", "@bob counters with Z"],
-  "requestedAiModel": "string | null — AI model name if user specified one",
-  "requestedTtsProvider": "string | null — TTS/audio provider name if user specified one"
-}`;
+const THREAD_SYSTEM_PROMPT = loadPrompt('social/thread-analyzer.md');
 
 function formatThreadForParsing(thread: ThreadData): string {
   const lines: string[] = [];
