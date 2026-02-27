@@ -14,6 +14,74 @@ import { errorResponse } from '@/lib/api-response';
 import { auth } from '@/lib/auth';
 import { checkSuspension } from '@/lib/auth-guards';
 
+/**
+ * Streaming filter that suppresses [METADATA]...[/METADATA] and [chips:...] blocks
+ * from being sent to the client. Tags arrive token-by-token across multiple chunks,
+ * so the filter buffers potential tag starts and only emits confirmed-safe text.
+ */
+function createStreamingMarkupFilter() {
+  let buffer = '';
+  let insideMetadata = false;
+
+  return {
+    push(text: string): string {
+      buffer += text;
+      let output = '';
+
+      while (buffer.length > 0) {
+        if (insideMetadata) {
+          const endIdx = buffer.indexOf('[/METADATA]');
+          if (endIdx !== -1) {
+            insideMetadata = false;
+            buffer = buffer.substring(endIdx + '[/METADATA]'.length);
+            continue;
+          }
+          return output;
+        }
+
+        const metaStart = buffer.indexOf('[METADATA]');
+        if (metaStart !== -1) {
+          output += buffer.substring(0, metaStart);
+          insideMetadata = true;
+          buffer = buffer.substring(metaStart + '[METADATA]'.length);
+          continue;
+        }
+
+        const chipStart = buffer.indexOf('[chips:');
+        if (chipStart !== -1) {
+          const chipEnd = buffer.indexOf(']', chipStart);
+          if (chipEnd !== -1) {
+            output += buffer.substring(0, chipStart);
+            buffer = buffer.substring(chipEnd + 1);
+            continue;
+          }
+          output += buffer.substring(0, chipStart);
+          buffer = buffer.substring(chipStart);
+          return output;
+        }
+
+        // Hold back trailing chars that could be the start of a tag
+        const tags = ['[METADATA]', '[chips:'];
+        let holdFrom = buffer.length;
+        for (const tag of tags) {
+          for (let i = 1; i < tag.length && i <= buffer.length; i++) {
+            if (buffer.endsWith(tag.substring(0, i))) {
+              holdFrom = Math.min(holdFrom, buffer.length - i);
+              break;
+            }
+          }
+        }
+
+        output += buffer.substring(0, holdFrom);
+        buffer = buffer.substring(holdFrom);
+        break;
+      }
+
+      return output;
+    },
+  };
+}
+
 export async function POST(request: NextRequest) {
   const authed = await authenticateRequest(request);
   if (!authed) {
@@ -148,6 +216,7 @@ export async function POST(request: NextRequest) {
     async start(controller) {
       try {
         let fullResponse = '';
+        const markupFilter = createStreamingMarkupFilter();
         for await (const chunk of streamDiscoveryResponse(
           messages,
           aiKey?.apiKey,
@@ -168,17 +237,23 @@ export async function POST(request: NextRequest) {
           const text = typeof chunk === 'string' ? chunk : '';
           if (text) {
             fullResponse += text;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
+            // Filter out [METADATA]...[/METADATA] and [chips:...] so they never reach the client
+            const safeText = markupFilter.push(text);
+            if (safeText) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: safeText })}\n\n`));
+            }
           }
         }
 
         // Check for visually-empty response: truly empty OR response contains only metadata/chips markup
+        // A metadata-only response with ready:true is valid (AI skipped confirmation text)
         const visibleContent = fullResponse
           .replace(/\[METADATA\][\s\S]*?\[\/METADATA\]/g, '')
           .replace(/\[chips:\s*.+?\]/g, '')
           .trim();
+        const hasValidMetadata = !!parseMetadata(fullResponse);
 
-        if (!visibleContent) {
+        if (!visibleContent && !hasValidMetadata) {
           logger.info('Discovery: empty/markup-only response detected, attempting fallback', {
             userId: authed.userId,
             fullResponseLength: fullResponse.length,
