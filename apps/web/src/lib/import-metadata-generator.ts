@@ -31,14 +31,15 @@ function extractFirstJsonObject(text: string): string {
 
 export async function generateImportMetadata(
   transcriptText: string,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  model?: string
 ): Promise<{ title: string; topic: string }> {
   const truncated = transcriptText.slice(0, MAX_TRANSCRIPT_LENGTH);
 
   const response = await generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content: `Transcript:\n${truncated}` }],
-    { maxTokens: 256, apiKeyOverride }
+    { maxTokens: 256, apiKeyOverride, model }
   );
 
   logUsage({

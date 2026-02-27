@@ -206,7 +206,8 @@ function extractFirstJsonArray(text: string): string {
 
 export async function diarizeSpeakers(
   segments: TranscriptionResult['segments'],
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  model?: string
 ): Promise<ParsedSegment[]> {
   if (segments.length === 0) {
     return [];
@@ -221,6 +222,7 @@ export async function diarizeSpeakers(
   const response = await generateResponse(DIARIZATION_SYSTEM_PROMPT, [{ role: 'user', content: userPrompt }], {
     maxTokens: 4096,
     apiKeyOverride,
+    model,
   });
 
   logUsage({

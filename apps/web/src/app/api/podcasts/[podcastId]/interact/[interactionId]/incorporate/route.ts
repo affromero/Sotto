@@ -8,6 +8,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { loadAndRender } from '@/lib/prompt-loader';
 import { getAiKey } from '@/lib/byok';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -41,7 +42,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const interaction = await prisma.interaction.findUnique({
     where: { id: interactionId },
     include: {
-      podcast: { select: { id: true, userId: true, status: true, source: true, language: true } },
+      podcast: { select: { id: true, userId: true, status: true, source: true, language: true, aiModel: true } },
     },
   });
 
@@ -131,6 +132,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Resolve user's AI key for BYOK passthrough
   const aiKey = await getAiKey(userId);
 
+  // Resolve model from podcast's creation-time selection
+  const { model: resolvedModel } = await resolveAiModelAndProvider({
+    podcastAiModel: interaction.podcast.aiModel,
+    aiKey: aiKey ? { provider: 'anthropic', apiKey: aiKey.apiKey } : null,
+  });
+
   // Generate the explanation segment text via Claude
   // Always use podcast language for incorporation (segment becomes part of the audio)
   const podcastLanguage = interaction.podcast.language || 'en';
@@ -143,7 +150,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       role: 'user',
       content: `Podcast context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural podcast segment that addresses this question and answer.`,
     },
-  ], { apiKeyOverride: aiKey?.apiKey });
+  ], { apiKeyOverride: aiKey?.apiKey, model: resolvedModel });
 
   await logUsage({
     service: 'anthropic',
