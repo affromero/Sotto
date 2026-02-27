@@ -124,7 +124,7 @@ describe('generateForYouQuestions', () => {
     expect(mockCreateAIProvider).toHaveBeenCalled();
   });
 
-  it('filters questions with invalid tag slugs', async () => {
+  it('keeps questions with invalid tag slugs in lenient mode', async () => {
     const questions = JSON.stringify([
       { text: 'Valid question', tagSlugs: ['ai'], category: 'technology' },
       { text: 'Invalid slugs', tagSlugs: ['nonexistent'], category: 'fake' },
@@ -133,8 +133,11 @@ describe('generateForYouQuestions', () => {
 
     const result = await generateForYouQuestions('user-1', 5);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0].text).toBe('Valid question');
+    expect(result[0].tagSlugs).toEqual(['ai']);
+    expect(result[1].text).toBe('Invalid slugs');
+    expect(result[1].tagSlugs).toEqual(['nonexistent']);
   });
 
   it('deduplicates against prior answers', async () => {
@@ -342,7 +345,7 @@ describe('generateCuriosityQuestions', () => {
     expect(mockUserInterestFindMany).not.toHaveBeenCalled();
   });
 
-  it('filters questions with invalid tag slugs', async () => {
+  it('keeps questions with invalid tag slugs in lenient mode', async () => {
     const questions = JSON.stringify([
       { text: 'Valid curiosity', tagSlugs: ['physics'], category: 'science' },
       { text: 'Bad slugs curiosity', tagSlugs: ['nonexistent'], category: 'fake' },
@@ -351,8 +354,11 @@ describe('generateCuriosityQuestions', () => {
 
     const result = await generateCuriosityQuestions('user-1', 5);
 
-    expect(result).toHaveLength(1);
+    expect(result).toHaveLength(2);
     expect(result[0].text).toBe('Valid curiosity');
+    expect(result[0].tagSlugs).toEqual(['physics']);
+    expect(result[1].text).toBe('Bad slugs curiosity');
+    expect(result[1].tagSlugs).toEqual(['nonexistent']);
   });
 
   it('deduplicates against prior answers', async () => {
