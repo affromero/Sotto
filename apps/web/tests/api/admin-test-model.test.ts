@@ -247,6 +247,8 @@ describe('POST /api/admin/test-model', () => {
 
   describe('STT', () => {
     it('returns success with the transcription text', async () => {
+      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: 'Hello world', segments: [], language: 'en' });
 
@@ -260,6 +262,8 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('returns silence note when transcription is empty', async () => {
+      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('GROQ_API_KEY', 'gsk-test-key');
       mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
 
@@ -267,7 +271,7 @@ describe('POST /api/admin/test-model', () => {
       const body = await res.json();
 
       expect(body.success).toBe(true);
-      expect(body.transcript).toBe('(silence — API reachable)');
+      expect(body.transcript).toBe('(empty transcript)');
     });
 
     it('returns failure when the STT key is missing', async () => {
@@ -280,6 +284,8 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('passes the correct key and model to createSttProvider', async () => {
+      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('GROQ_API_KEY', 'groq-key-123');
       mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
@@ -289,6 +295,8 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('routes ElevenLabs STT to ELEVENLABS_API_KEY', async () => {
+      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('ELEVENLABS_API_KEY', 'xi-stt-key');
       mockTranscribe.mockResolvedValue({ text: 'transcribed', segments: [], language: 'en' });
 
@@ -298,6 +306,8 @@ describe('POST /api/admin/test-model', () => {
     });
 
     it('classifies a network error from the STT provider', async () => {
+      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
       vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockRejectedValue(new Error('fetch failed: ECONNREFUSED'));
 
@@ -372,6 +382,8 @@ describe('POST /api/admin/test-model', () => {
 
     describe('STT BYOK', () => {
       it('uses AI BYOK key for openai STT', async () => {
+        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
@@ -382,6 +394,8 @@ describe('POST /api/admin/test-model', () => {
       });
 
       it('uses AI BYOK key for groq STT', async () => {
+        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
         mockGetAiKey.mockResolvedValue({ apiKey: 'byok-groq-key', provider: 'groq' });
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 
@@ -392,6 +406,8 @@ describe('POST /api/admin/test-model', () => {
       });
 
       it('uses TTS BYOK key for elevenlabs STT', async () => {
+        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
+        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
         mockGetByokKey.mockResolvedValue('byok-xi-stt-key');
         mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
 

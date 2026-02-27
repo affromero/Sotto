@@ -79,6 +79,8 @@ describe('processAutoTweet', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       title: 'AI Ethics Debate',
       topic: 'Exploring ethical implications of AI',
+      slug: null,
+      user: { handle: null },
     });
     mockPostTweet.mockResolvedValue('tweet-id-123');
     mockPrismaTwitterAutoTweetUpdate.mockResolvedValue({});
@@ -110,6 +112,8 @@ describe('processAutoTweet', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       title: 'Test',
       topic: longTopic,
+      slug: null,
+      user: { handle: null },
     });
     mockPostTweet.mockResolvedValue('tweet-id-456');
     mockPrismaTwitterAutoTweetUpdate.mockResolvedValue({});
@@ -130,6 +134,8 @@ describe('processAutoTweet', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       title: 'Test',
       topic: 'Test topic',
+      slug: null,
+      user: { handle: null },
     });
     mockPostTweet.mockRejectedValue(new Error('Twitter API error'));
     mockPrismaTwitterAutoTweetUpdate.mockResolvedValue({});
@@ -152,6 +158,8 @@ describe('processAutoTweet', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
       title: 'My Podcast',
       topic: 'Short topic',
+      slug: null,
+      user: { handle: null },
     });
     mockPostTweet.mockResolvedValue('tweet-id-789');
     mockPrismaTwitterAutoTweetUpdate.mockResolvedValue({});
