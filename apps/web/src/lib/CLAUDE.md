@@ -85,6 +85,7 @@ All shared business logic and external service integrations live here.
 | `slugify.ts` | URL-safe tag slug generator: `generateTagSlug(name)` (50 char cap) | Pure utility |
 | `theme-script.ts` | Inline dark mode init script (`THEME_INIT_SCRIPT`) — prevents flash on page load | Pure utility |
 | `topic-tagger.ts` | Keyword-based topic tag matcher: maps topics to tag slugs (deterministic, no AI) | Pure utility |
+| `media-bias.ts` | MBFC media bias detection: domain lookup, alias resolution, political topic detection, `analyzeBias()` for source bias analysis | Filesystem (static JSON) |
 | `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `llm.ts` |
 | `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
