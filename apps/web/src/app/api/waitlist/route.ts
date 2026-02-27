@@ -27,10 +27,13 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Send welcome email + admin Telegram notification for new signups (fire-and-forget)
+  // Send welcome email + admin Telegram notification for new signups
   if (entry.createdAt.getTime() > Date.now() - 5000) {
     const { subject, html } = buildWaitlistWelcomeEmail(email);
-    sendEmail({ to: email, subject, html }).catch(() => {});
+    const sent = await sendEmail({ to: email, subject, html });
+    if (!sent) {
+      logger.warn('Waitlist welcome email failed', { email });
+    }
 
     if (isTelegramBotConfigured()) {
       notifyAdminsViaTelegram({ email, twitterHandle, source, wishlist }).catch(() => {});
