@@ -6,12 +6,6 @@ import { ModelDropdown, type ModelOption } from './ModelDropdown';
 const STORAGE_KEY = 'sotto:aiModel';
 const AUTO_ID = '__auto__';
 
-const TIER_BADGES: Record<string, string> = {
-  fast: 'Fast',
-  balanced: 'Balanced',
-  best: 'Best',
-};
-
 interface AiModelsResponse {
   models: Array<{
     id: string;
@@ -20,6 +14,7 @@ interface AiModelsResponse {
     requiredPlan: 'FREE' | 'PRO';
     isDefault: boolean;
     group?: string;
+    hint?: string;
   }>;
   readOnly: boolean;
   userPlan?: 'FREE' | 'PRO';
@@ -48,12 +43,14 @@ export function LlmModelDropdown({ value, onChange }: LlmModelDropdownProps) {
         const autoOption: ModelOption = {
           id: AUTO_ID,
           displayName: 'Auto (recommended)',
+          hint: 'Sotto picks the best model for you',
         };
 
         const modelOptions: ModelOption[] = (data.models || []).map((m) => ({
           id: m.id,
           displayName: m.displayName,
-          badge: isLocked(m) ? 'Pro' : TIER_BADGES[m.tier],
+          badge: isLocked(m) ? 'Pro' : undefined,
+          hint: m.hint,
           group: m.group,
           unavailable: isLocked(m),
         }));
