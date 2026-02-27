@@ -112,6 +112,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   callbacks: {
     async signIn({ user, profile }) {
+      // Account linking (e.g. Twitter connect) — user already exists in DB
+      if (user?.id) {
+        const existing = await prisma.user.findUnique({ where: { id: user.id }, select: { id: true } });
+        if (existing) return true;
+      }
+
       const email = profile?.email ?? user?.email;
       if (!email) return '/auth/waitlisted?reason=no-email';
 
