@@ -492,7 +492,7 @@ describe('processTwitterMentions', () => {
       await processTwitterMentions(job);
 
       expect(mockGetTweet).toHaveBeenCalledWith('parent-123');
-      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text, { userId: 'user-001', apiKeyOverride: undefined });
+      expect(mockParseTweetIntent).toHaveBeenCalledWith(tweet.text, parentTweet.text, { userId: 'user-001', apiKeyOverride: undefined, imageUrls: [] });
     });
   });
 

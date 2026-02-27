@@ -139,7 +139,7 @@ export async function getMentions(sinceId?: string): Promise<TwitterMentionsResu
   const params = new URLSearchParams({
     'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics,attachments',
     expansions: 'attachments.media_keys',
-    'media.fields': 'type,variants,duration_ms,preview_image_url,alt_text',
+    'media.fields': 'type,url,variants,duration_ms,preview_image_url,alt_text',
     max_results: '100',
   });
 
@@ -191,7 +191,7 @@ export async function getTweet(tweetId: string): Promise<{ tweet: TwitterTweet; 
   const params = new URLSearchParams({
     'tweet.fields': 'author_id,created_at,in_reply_to_user_id,referenced_tweets,conversation_id,entities,public_metrics,attachments',
     expansions: 'attachments.media_keys',
-    'media.fields': 'type,variants,duration_ms,preview_image_url,alt_text',
+    'media.fields': 'type,url,variants,duration_ms,preview_image_url,alt_text',
   });
 
   const url = `${TWITTER_API_BASE}/tweets/${tweetId}?${params}`;
