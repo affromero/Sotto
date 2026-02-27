@@ -35,6 +35,7 @@ const EXPECTED_FILES = [
   'shared/audience/family.md',
   'shared/audience/general.md',
   'shared/audience/mature.md',
+  'shared/bias-guidance.md',
   'discovery/agent.md',
   'discovery/fallback.md',
   'topic-assessor.md',
@@ -62,6 +63,7 @@ const EXPECTED_FILES = [
   'feeds/for-you.md',
   'feeds/curiosity.md',
   'feeds/news.md',
+  'feeds/news-from-newsletters.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -70,7 +72,7 @@ const EXPECTED_FILES = [
 
 const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'generation/script-generator.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'CONTENT_SAFETY', 'DURATION_TARGET',
+    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'BIAS_GUIDANCE', 'CONTENT_SAFETY', 'DURATION_TARGET',
     'ELI5_SECTION', 'EXPERT_SPEAKER', 'FOCUS_AREAS', 'HOST_SPEAKER',
     'SPEAKER_COUNT', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
     'VOICE_DELIVERY_GUIDELINES', 'VOICE_REALISM',
@@ -78,15 +80,16 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
     'AUDIENCE_LEVEL',
   ].sort(),
   'generation/script-revision-factcheck.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'CONTENT_SAFETY',
+    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
     'DURATION_TARGET', 'FOCUS_AREAS', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
     'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
   'generation/script-revision-user.md': [
-    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'CONTENT_SAFETY',
+    'AUDIENCE', 'AUDIENCE_GUIDANCE', 'AUDIENCE_LEVEL', 'BIAS_GUIDANCE', 'CONTENT_SAFETY',
     'DURATION_TARGET', 'FOCUS_AREAS', 'SPEAKER_SECTION', 'TONE_GUIDANCE',
     'VOICE_REALISM', 'WORD_COUNT_IDEAL', 'WORD_COUNT_MAX', 'WORD_COUNT_MIN',
   ].sort(),
+  'shared/bias-guidance.md': ['SOURCE_BIAS', 'SOURCE_NAME'].sort(),
   'interaction/qa-assistant.md': ['LANGUAGE_LABEL'],
   'interaction/incorporate-segment.md': ['ACTIVE_SPEAKER', 'LANGUAGE_LABEL'],
   'verification/script-verifier-base.md': ['AUDIENCE_LEVEL', 'ATTEMPT_NUMBER'].sort(),
@@ -108,6 +111,10 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   'feeds/news.md': [
     'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
     'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
+  ].sort(),
+  'feeds/news-from-newsletters.md': [
+    'DIVERSITY_NOTE', 'EXCLUDE_CONTEXT', 'INPUT_SANITIZATION',
+    'NEWSLETTER_ARTICLES', 'REQUEST_COUNT', 'TAXONOMY', 'TIME_LABEL', 'TOPIC_FOCUS',
   ].sort(),
 };
 

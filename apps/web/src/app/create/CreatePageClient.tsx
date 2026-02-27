@@ -542,6 +542,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           open={inspireMeOpen}
           onClose={() => setInspireMeOpen(false)}
           onSelectTopic={handleInspireTopic}
+          aiModel={aiModel}
         />
 
         {step === 'voice' && tabMode === 'create' && (

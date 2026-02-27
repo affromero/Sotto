@@ -23,9 +23,15 @@ const planModelSchema = z.object({
   sttModel: z.string().min(1).optional(),
 });
 
+const platformSchema = z.object({
+  aiProvider: z.enum(['anthropic', 'openai', 'groq', 'together']).optional(),
+  aiModel: z.string().min(1).optional(),
+});
+
 const updateSchema = z.object({
   free: planModelSchema.optional(),
   pro: planModelSchema.optional(),
+  platform: platformSchema.optional(),
 });
 
 export async function PATCH(request: NextRequest) {

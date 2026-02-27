@@ -35,6 +35,21 @@ vi.mock('@/lib/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-test-model',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
+
+vi.mock('@/lib/usage-logger', () => ({
+  logUsage: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---- Import under test ----
 
 import {

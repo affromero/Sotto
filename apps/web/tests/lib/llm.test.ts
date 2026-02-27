@@ -43,6 +43,17 @@ vi.mock('@/lib/claude-code-client', () => ({
   streamClaudeCode: vi.fn(),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-test-model',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
+
 // ---- Tests ----
 
 describe('claude', () => {
@@ -87,7 +98,7 @@ describe('claude', () => {
         content: 'This is a test response from Claude.',
         inputTokens: 150,
         outputTokens: 75,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-test-model', // from resolveAutoModel mock
       });
     });
 
