@@ -78,6 +78,17 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 - **Worker**: `export async function processJob(job: Job)` → `job.updateProgress()` → return.
 - **Lib**: Class-based client, singleton export, retry logic.
 
+## Planning & Implementation
+
+- When creating implementation plans, validate ALL file paths and function signatures against the actual codebase before presenting. Use Read/Grep/Glob to confirm — never guess paths or APIs.
+- Self-critique plans before presenting: verify every import is valid, every function signature matches, and the approach aligns with existing patterns (Doppler for secrets, CSS Modules for styling, BullMQ for queues, etc.).
+
+## Debugging Guidelines
+
+- When debugging UI/CSS issues, investigate the root cause systematically before attempting fixes. Do not try multiple speculative CSS changes in sequence.
+- Read the component hierarchy, check inherited styles, identify the actual constraint before editing.
+- For any bug: explain the suspected root cause, which files you'll modify and why, and how you verified this against the actual codebase. Wait for approval before editing.
+
 ## DO
 
 - Use CSS Modules for all styling
@@ -114,12 +125,14 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 
 - [ ] `npm run ci` passes (zero errors + successful build)
 - [ ] No secrets or `.env` values in staged files
+- [ ] All lint errors, type errors, and test failures fixed before presenting work as complete
+- [ ] Unused imports removed proactively
 - After Prisma schema changes: run `npx prisma generate` before type-checking
 - In RTL tests: `waitFor` a visible UI state before interactions, not mock call counts
 
 ## Environment Variables
 
-All secrets via **Doppler** — never `.env` files. Project: `sotto`, config: `dev`. Scripts wrap with `doppler run --`.
+All secrets via **Doppler** — NEVER suggest `.env` files, dotenv, or hardcoded environment variables. Project: `sotto`, config: `dev`. Scripts wrap with `doppler run --`.
 
 Critical: `DATABASE_URL`, `REDIS_URL`, `NEXTAUTH_SECRET`, `ANTHROPIC_API_KEY`, `ELEVENLABS_API_KEY`, `R2_*`, `BYOK_ENCRYPTION_KEY`, `KITTENTTS_URL`.
 Swappable: `AI_PROVIDER`, `TTS_PROVIDER`, `STT_PROVIDER`, `STORAGE_PROVIDER`, `PAYMENT_PROVIDER`.
