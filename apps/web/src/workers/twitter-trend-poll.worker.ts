@@ -6,6 +6,7 @@ import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { parseTweetIntent } from '@/lib/tweet-parser';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { engagementScore, filterQualityTweets } from '@/lib/twitter-utils';
+import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import type { PollTwitterTrendsPayload } from '@/lib/queue';
 import type { TwitterTweet } from '@/types/twitter';
@@ -121,12 +122,14 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
       const parsed = await parseTweetIntent(tweet.text);
 
       const voicePair = selectVoicePair(tweet.id);
+      const slug = await generatePodcastSlug(parsed.title, sottoUser.id, prisma);
 
       const podcast = await prisma.podcast.create({
         data: {
           userId: sottoUser.id,
           title: parsed.title,
           topic: parsed.topic,
+          slug,
           status: 'EXTRACTING',
           source: 'TWITTER',
           sourceTweetId: tweet.id,

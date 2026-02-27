@@ -2,6 +2,7 @@ import { Job } from 'bullmq';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { postTweet } from '@/lib/twitter';
 import { getTwitterConfig } from '@/lib/twitter-config';
+import { podcastUrl as buildPodcastPath } from '@/lib/urls';
 import { logger } from '@/lib/logger';
 import type { AutoTweetPayload } from '@/lib/queue';
 
@@ -43,7 +44,7 @@ export async function processAutoTweet(job: Job<AutoTweetPayload>): Promise<void
   try {
     const podcast = await prisma.podcast.findUniqueOrThrow({
       where: { id: podcastId },
-      select: { title: true, topic: true },
+      select: { title: true, topic: true, slug: true, user: { select: { handle: true } } },
     });
 
     const config = await getTwitterConfig();
@@ -51,7 +52,7 @@ export async function processAutoTweet(job: Job<AutoTweetPayload>): Promise<void
     const tweetText = interpolateTemplate(config.tweetTemplate, {
       title: podcast.title,
       topic: podcast.topic.length > 100 ? podcast.topic.slice(0, 97) + '...' : podcast.topic,
-      url: `${SOTTO_APP_URL}/podcast/${podcastId}`,
+      url: `${SOTTO_APP_URL}${buildPodcastPath({ id: podcastId, slug: podcast.slug }, podcast.user.handle)}`,
     });
 
     const tweetId = await postTweet(tweetText);
