@@ -8,7 +8,7 @@ interface WaitlistFormProps {
 }
 
 export function WaitlistForm({ source }: WaitlistFormProps) {
-  const { email, setEmail, twitter, setTwitter, wishlist, setWishlist, loading, error, handleSubmit } = useWaitlist();
+  const { email, setEmail, twitter, setTwitter, wishlist, setWishlist, referral, setReferral, loading, error, handleSubmit } = useWaitlist();
 
   return (
     <>
@@ -33,6 +33,18 @@ export function WaitlistForm({ source }: WaitlistFormProps) {
             title="So we can DM you early access and keep you in the loop"
           />
           <span className={styles.inputHint}>So we can DM you early access</span>
+        </div>
+        <div className={styles.inputWrapper}>
+          <input
+            className={styles.input}
+            type="text"
+            placeholder="Referral code (optional)"
+            value={referral}
+            onChange={(e) => setReferral(e.target.value)}
+            aria-label="Referral code"
+            title="Know someone on Sotto? Enter their handle"
+          />
+          <span className={styles.inputHint}>Know someone on Sotto? Enter their handle</span>
         </div>
         <textarea
           className={styles.textarea}

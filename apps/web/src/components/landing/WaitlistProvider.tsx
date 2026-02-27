@@ -9,6 +9,8 @@ interface WaitlistState {
   setTwitter: (v: string) => void;
   wishlist: string;
   setWishlist: (v: string) => void;
+  referral: string;
+  setReferral: (v: string) => void;
   submitted: boolean;
   loading: boolean;
   error: string;
@@ -27,6 +29,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState('');
   const [twitter, setTwitter] = useState('');
   const [wishlist, setWishlist] = useState('');
+  const [referral, setReferral] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,6 +46,7 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
           email,
           twitterHandle: twitter || undefined,
           wishlist: wishlist || undefined,
+          referralCode: referral || undefined,
           source,
         }),
       });
@@ -56,11 +60,11 @@ export function WaitlistProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [email, twitter, wishlist]);
+  }, [email, twitter, wishlist, referral]);
 
   return (
     <WaitlistContext.Provider
-      value={{ email, setEmail, twitter, setTwitter, wishlist, setWishlist, submitted, loading, error, handleSubmit }}
+      value={{ email, setEmail, twitter, setTwitter, wishlist, setWishlist, referral, setReferral, submitted, loading, error, handleSubmit }}
     >
       {children}
     </WaitlistContext.Provider>
