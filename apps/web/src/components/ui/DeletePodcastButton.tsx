@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
+import { useToast } from '@/components/providers/ToastProvider';
 import styles from './DeletePodcastButton.module.css';
 
 interface DeletePodcastButtonProps {
@@ -11,21 +12,28 @@ interface DeletePodcastButtonProps {
 
 export function DeletePodcastButton({ podcastId }: DeletePodcastButtonProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = async () => {
     setDeleting(true);
     try {
       const response = await fetch(`/api/podcasts/${podcastId}`, { method: 'DELETE' });
       if (response.ok) {
+        showToast('Podcast deleted', 'success');
         router.refresh();
+      } else {
+        showToast('Failed to delete podcast', 'error');
+        setDeleting(false);
+        setConfirming(false);
       }
     } catch {
+      showToast('Failed to delete podcast', 'error');
       setDeleting(false);
       setConfirming(false);
     }
-  }, [podcastId, router]);
+  };
 
   if (confirming) {
     return (
