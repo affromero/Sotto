@@ -1646,6 +1646,24 @@ model FreeTierConfig {
   updatedBy             String?
 }
 
+model AutoModelConfig {
+  id              String   @id @default("singleton")
+  freeAiProvider  String   @default("groq")
+  freeAiModel     String   @default("llama-3.1-8b-instant")
+  freeTtsProvider String   @default("kittentts")
+  freeTtsModel    String   @default("kitten-tts-mini-0.8")
+  freeSttProvider String   @default("groq")
+  freeSttModel    String   @default("whisper-large-v3-turbo")
+  proAiProvider   String   @default("anthropic")
+  proAiModel      String   @default("claude-haiku-4-5-20251001")
+  proTtsProvider  String   @default("elevenlabs")
+  proTtsModel     String   @default("eleven_v3")
+  proSttProvider  String   @default("groq")
+  proSttModel     String   @default("whisper-large-v3-turbo")
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+}
+
 model FreeProviderUsage {
   id       String @id @default(cuid())
   userId   String
