@@ -249,6 +249,9 @@ function parseAndFilterQuestions(
 
   for (const q of rawQuestions) {
     if (!q.text) { skippedNoText++; continue; }
+    // Strip Claude web search citation tags: <cite index="N-M">...</cite> → just the inner text
+    q.text = q.text.replace(/<cite[^>]*>/g, '').replace(/<\/cite>/g, '');
+    if (q.topic) q.topic = q.topic.replace(/<cite[^>]*>/g, '').replace(/<\/cite>/g, '');
     const id = hashQuestion(q.text);
     if (priorQuestionIds.has(id) || seenIds.has(id)) { skippedDuped++; continue; }
 
@@ -377,7 +380,8 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
     const durationMs = Date.now() - llmStart;
 
     const questions = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      { lenient: true }
     );
 
     logUsage({
@@ -462,7 +466,8 @@ export async function generateCuriosityQuestions(
     const durationMs = Date.now() - llmStart;
 
     const questions = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds
+      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      { lenient: true }
     );
 
     logUsage({
@@ -545,7 +550,7 @@ export async function generateNewsQuestions(
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = 'claude-haiku-4-5-20251001';
+    let usedModel = ctx.autoModel.aiModel || 'claude-haiku-4-5-20251001';
     const llmStart = Date.now();
 
     const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
