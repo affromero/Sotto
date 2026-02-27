@@ -162,7 +162,7 @@ export interface InspireContext {
   autoModel: PlanModelConfig;
 }
 
-export async function loadInspireContext(userId: string): Promise<InspireContext> {
+export async function loadInspireContext(userId: string, opts?: { model?: string; plan?: 'FREE' | 'PRO' }): Promise<InspireContext> {
   const [categories, priorAnswers, autoFreeConfig] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
@@ -181,7 +181,7 @@ export async function loadInspireContext(userId: string): Promise<InspireContext
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
-    resolveAutoModel('FREE'),
+    resolveAutoModel(opts?.plan ?? 'FREE'),
   ]);
 
   const validSlugs = new Set<string>();
@@ -197,11 +197,16 @@ export async function loadInspireContext(userId: string): Promise<InspireContext
     return `${cat.slug}: [${children}]`;
   });
 
+  // If caller passed an explicit model, override the auto-resolved config
+  const resolvedAutoModel = opts?.model
+    ? { ...autoFreeConfig, aiModel: opts.model }
+    : autoFreeConfig;
+
   return {
     taxonomyLines,
     validSlugs,
     priorQuestionIds: new Set(priorAnswers.map((a) => a.questionId)),
-    autoModel: autoFreeConfig,
+    autoModel: resolvedAutoModel,
   };
 }
 
@@ -297,7 +302,8 @@ export async function generateForYouQuestions(
   userId: string,
   count: number,
   topic?: string,
-  preloadedCtx?: InspireContext
+  preloadedCtx?: InspireContext,
+  model?: string
 ): Promise<TasteQuestion[]> {
 
   const [ctx, existingInterests] = await Promise.all([
@@ -346,14 +352,15 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = ctx.autoModel.aiModel || 'claude-haiku-4-5-20251001';
+    const effectiveModel = model || ctx.autoModel.aiModel;
+    let usedModel = effectiveModel;
     const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: resolved.apiKey });
       const response = await client.messages.create({
-        model: usedModel,
+        model: effectiveModel,
         max_tokens: 2048,
         messages: [{ role: 'user', content: systemPrompt }],
       });
@@ -366,7 +373,7 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
-        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;
@@ -406,7 +413,8 @@ export async function generateCuriosityQuestions(
   userId: string,
   count: number,
   topic?: string,
-  preloadedCtx?: InspireContext
+  preloadedCtx?: InspireContext,
+  model?: string
 ): Promise<TasteQuestion[]> {
 
   const ctx = preloadedCtx ?? await loadInspireContext(userId);
@@ -431,14 +439,15 @@ export async function generateCuriosityQuestions(
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = ctx.autoModel.aiModel || 'claude-haiku-4-5-20251001';
+    const effectiveModel = model || ctx.autoModel.aiModel;
+    let usedModel = effectiveModel;
     const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: resolved.apiKey });
       const response = await client.messages.create({
-        model: usedModel,
+        model: effectiveModel,
         max_tokens: 2048,
         messages: [{ role: 'user', content: systemPrompt }],
       });
@@ -451,7 +460,7 @@ export async function generateCuriosityQuestions(
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
-        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;
@@ -505,7 +514,8 @@ export async function generateNewsQuestions(
   excludeTopics: string[] = [],
   timeRange: NewsTimeRange = '1w',
   topic?: string,
-  preloadedCtx?: InspireContext
+  preloadedCtx?: InspireContext,
+  model?: string
 ): Promise<TasteQuestion[]> {
 
   const ctx = preloadedCtx ?? await loadInspireContext(userId);
@@ -545,7 +555,8 @@ export async function generateNewsQuestions(
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = 'claude-haiku-4-5-20251001';
+    const effectiveModel = model || ctx.autoModel.aiModel;
+    let usedModel = effectiveModel;
     const llmStart = Date.now();
 
     const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
@@ -554,7 +565,7 @@ export async function generateNewsQuestions(
       const { default: Anthropic } = await import('@anthropic-ai/sdk');
       const client = new Anthropic({ apiKey: anthropicApiKey });
       const response = await client.messages.create({
-        model: usedModel,
+        model: effectiveModel,
         max_tokens: 2048,
         messages: [{ role: 'user', content: systemPrompt }],
         tools: [WEB_SEARCH_TOOL],
@@ -574,7 +585,7 @@ export async function generateNewsQuestions(
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;

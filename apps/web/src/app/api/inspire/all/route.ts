@@ -19,6 +19,7 @@ const inspireAllSchema = z.object({
   section: z.enum(['forYou', 'news', 'curiosity', 'trending']).optional(),
   timeRange: z.enum(['1h', '12h', '24h', '1w', '1m']).optional(),
   topic: z.string().max(50).optional(),
+  model: z.string().optional(),
 });
 
 /**
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
     return errorResponse(validation.error.errors[0].message, 400);
   }
 
-  const { section, timeRange, topic } = validation.data;
+  const { section, timeRange, topic, model } = validation.data;
   const newsTimeRange: NewsTimeRange = timeRange ?? '1w';
   const topicHint = topic ? sanitizeTopic(topic) || undefined : undefined;
   const userId = authResult.userId;
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (section === 'forYou') {
-      const forYou = await generateForYouQuestions(userId, 6, topicHint);
+      const forYou = await generateForYouQuestions(userId, 6, topicHint, undefined, model);
       await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
       return new Response(JSON.stringify({ forYou }), {
         headers: { 'Content-Type': 'application/json' },
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (section === 'news') {
-      const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint);
+      const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, undefined, model);
       await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
       return new Response(JSON.stringify({ news }), {
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +138,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (section === 'curiosity') {
-      const curiosity = await generateCuriosityQuestions(userId, 6, topicHint);
+      const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, undefined, model);
       await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, CACHE_TTL.curiosity);
       return new Response(JSON.stringify({ curiosity }), {
         headers: { 'Content-Type': 'application/json' },
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Load shared context once for generators
-      const ctxPromise = loadInspireContext(userId);
+      const ctxPromise = loadInspireContext(userId, { model });
 
       // Fire all 4 sections in parallel
       const results = await Promise.allSettled([
@@ -237,7 +238,7 @@ export async function GET(request: NextRequest) {
             return;
           }
           const ctx = await ctxPromise;
-          const forYou = await generateForYouQuestions(userId, 6, topicHint, ctx);
+          const forYou = await generateForYouQuestions(userId, 6, topicHint, ctx, model);
           await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
           send({ section: 'forYou', data: forYou });
         })(),
@@ -249,7 +250,7 @@ export async function GET(request: NextRequest) {
             return;
           }
           const ctx = await ctxPromise;
-          const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx);
+          const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx, model);
           await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
           send({ section: 'news', data: news });
         })(),
@@ -261,7 +262,7 @@ export async function GET(request: NextRequest) {
             return;
           }
           const ctx = await ctxPromise;
-          const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, ctx);
+          const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, ctx, model);
           await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, cacheTtl('curiosity'));
           send({ section: 'curiosity', data: curiosity });
         })(),
