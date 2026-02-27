@@ -51,7 +51,7 @@
   align-items: center;
   justify-content: center;
   min-width: 44px;
-  height: 32px;
+  height: 44px;
   padding: 0 var(--spacing-sm);
   border-radius: var(--radius-full);
   border: 1px solid var(--color-border);

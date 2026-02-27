@@ -269,8 +269,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: none;
   color: var(--color-text-tertiary);
@@ -949,11 +949,6 @@
 
   .dragHandle {
     display: none !important;
-  }
-
-  .turnActionBtn {
-    width: 44px;
-    height: 44px;
   }
 
   .turnComment {

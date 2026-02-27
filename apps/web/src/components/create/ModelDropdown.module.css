@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  height: 32px;
+  height: 36px;
   padding: 0 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
