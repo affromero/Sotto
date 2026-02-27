@@ -1,5 +1,8 @@
 /**
  * Fal.ai TTS provider — Qwen3-TTS open-source voice generation.
+ * No expression/emotion controls — relies on text content for prosody.
+ *
+ * @tts-research-date 2026-02-27 — Qwen3-TTS has no explicit emotion API
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
