@@ -1,17 +1,22 @@
 name: Deploy
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/web/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'docker-compose.prod.yml'
-      - 'apps/web/Dockerfile'
-      - 'apps/web/Dockerfile.workers'
-      - '.github/workflows/deploy.yml'
+# Disabled — using /sotto-deploy skill instead (direct SSH deploy)
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+
+on: workflow_dispatch
+# Manual trigger only — uncomment the push trigger above to re-enable auto-deploy
+# Original paths filter:
+#      - 'apps/web/**'
+#      - 'packages/**'
+#      - 'package.json'
+#      - 'package-lock.json'
+#      - 'docker-compose.prod.yml'
+#      - 'apps/web/Dockerfile'
+#      - 'apps/web/Dockerfile.workers'
+#      - '.github/workflows/deploy.yml'
 
 concurrency:
   group: deploy
