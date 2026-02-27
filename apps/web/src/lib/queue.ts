@@ -557,12 +557,13 @@ export async function addJob<T>(
   queue: Queue,
   jobType: JobType,
   payload: T,
-  options?: { priority?: number; delay?: number; attempts?: number }
+  options?: { priority?: number; delay?: number; attempts?: number; jobId?: string }
 ): Promise<Job<T>> {
   const job = await queue.add(jobType, payload, {
     priority: options?.priority,
     delay: options?.delay,
     attempts: options?.attempts,
+    jobId: options?.jobId,
   });
 
   logger.info(`Job added to queue: ${queue.name}`, { jobId: job.id, jobType });

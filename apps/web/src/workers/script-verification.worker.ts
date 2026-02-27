@@ -396,7 +396,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     userId,
     discoveryId,
     useAdminCredits,
-  });
+  }, { jobId: `verify-${podcastId}-${attemptNumber + 1}` });
 
   logger.info('Script revised and re-queued for verification', {
     podcastId,
