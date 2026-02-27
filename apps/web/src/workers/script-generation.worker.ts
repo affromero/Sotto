@@ -59,6 +59,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
+    plan: user.plan as 'FREE' | 'PRO',
   });
 
   // Get discovery metadata

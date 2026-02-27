@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { listByokProviders } from '@/lib/byok';
 import { getAllProviderMeta, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
+import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 const QUALITY_BADGES: Record<string, string> = {
@@ -72,10 +73,12 @@ export async function GET() {
       return NextResponse.json({ readOnly: false, options });
     }
 
-    // Non-admins: single free-tier model, read-only
-    const config = await getFreeTierConfig();
-    const provider = getProviderMeta(config.ttsProvider);
-    const model = provider.models.find((m) => m.id === config.ttsModel);
+    // Non-admins: single auto-resolved model, read-only
+    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } });
+    const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
+    const autoConfig = await resolveAutoModel(userPlan);
+    const provider = getProviderMeta(autoConfig.ttsProvider as TtsProviderId);
+    const model = provider.models.find((m) => m.id === autoConfig.ttsModel);
 
     return NextResponse.json({
       readOnly: true,

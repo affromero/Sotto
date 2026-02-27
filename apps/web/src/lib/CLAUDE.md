@@ -59,13 +59,14 @@ All shared business logic and external service integrations live here.
 | `handles.ts` | Handle validation, availability checks, unique generation (reserved handles, format validation) | Uses `prisma.ts` |
 | `rss.ts` | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts | Uses `prisma.ts` |
 | `free-tier-config.ts` | `getFreeTierConfig()` reads singleton FreeTierConfig row; `setFreeTierConfig()` for admin updates | Uses `prisma.ts` |
+| `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
 | `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()` — centralized pricing for all AI models | Pure utility |
 | `usage-logger.ts` | Unified `logUsage()` function for all provider cost tracking — replaces old `logApiUsage()`, auto-computes AI costs from model pricing | Uses `prisma.ts`, `pricing.ts` |
 | `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation | Uses `prisma.ts` |
-| `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts` |
+| `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts`, `auto-model-config.ts` |
 | `revenue-metrics.ts` | Revenue aggregation: `getRevenueOverview()`, `getDailyRevenueTrend()`, `getTopSellingVoices()`, `getRevenueByStatus()`, `getMarketplaceHealth()` — voice marketplace | Uses `prisma.ts` |
 | `engagement-metrics.ts` | Engagement queries: `getEngagementOverview()`, `getDailyEngagementTrend()`, `getTopLiked/Forked/Commented()`, `getInteractionStats()` — social metrics | Uses `prisma.ts` |
 | `playback-metrics.ts` | Playback analytics: `getPlaybackOverview()`, `getSpeedDistribution()`, `getCompletionDistribution()`, `getDailyListenHours()` — listening data | Uses `prisma.ts` |

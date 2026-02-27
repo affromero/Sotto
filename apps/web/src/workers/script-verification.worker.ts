@@ -63,6 +63,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcastRecord.aiModel,
     aiKey,
+    plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
   const requestedDuration = discovery.durationTarget || 10;

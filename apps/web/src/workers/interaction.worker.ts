@@ -52,6 +52,7 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast?.aiModel,
     aiKey,
+    plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
   // Get podcast script context

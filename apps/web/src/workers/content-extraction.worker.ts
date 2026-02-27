@@ -90,7 +90,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       logger.info('Running topic feasibility check', { podcastId });
 
       const aiKey = useAdminCredits ? null : await getAiKey(userId);
-      const { model } = await resolveAiModelAndProvider({ aiKey });
+      const { model } = await resolveAiModelAndProvider({ aiKey, plan: 'FREE' });
 
       const assessment = await assessTopicFeasibility({
         topic: discoveryMeta.topic,

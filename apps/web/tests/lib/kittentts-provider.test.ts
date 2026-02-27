@@ -33,6 +33,17 @@ vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: vi.fn().mockResolvedValue({ ttsProvider: 'openai', ttsModel: 'tts-1-hd' }),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
+
 // Mock child_process.spawn to avoid needing real FFmpeg
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();

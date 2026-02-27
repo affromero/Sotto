@@ -85,7 +85,7 @@ vi.mock('@/lib/pipeline-resume', () => ({
 
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
 const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3 });
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3, ttsAllocations: [], aiAllocations: [] });
 
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
@@ -94,6 +94,17 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'groq',
+    aiModel: 'llama-3.1-8b-instant',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
 }));
 
 const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });

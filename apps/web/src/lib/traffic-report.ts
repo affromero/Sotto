@@ -9,6 +9,7 @@ import { subDays, startOfDay } from 'date-fns';
 import { prisma } from './prisma';
 import { getCostBreakdown, getDailyCostTrend } from './cost-monitor';
 import { getFreeTierConfig } from './free-tier-config';
+import { getAutoModelConfig, type AutoModelConfigData } from './auto-model-config';
 import { DURATION_TOLERANCE_SECONDS } from './duration';
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,7 @@ export interface ContentSection {
 
 export interface FreeTierSection {
   config: { aiProvider: string; aiModel: string; ttsProvider: string; generationLimit: number };
+  autoModelConfig: AutoModelConfigData;
   usersWithFreeGenerations: number;
   avgFreeGenerationsUsed: number;
   usersExhaustedFreeTier: number;
@@ -326,8 +328,9 @@ export async function buildTrafficReport(
     durationAccuracyWithinTarget,
     durationAccuracyStats,
 
-    // === Free Tier (5) ===
+    // === Free Tier (6) ===
     freeTierConfig,
+    autoModelConfig,
     usersWithFreeGen,
     avgFreeGenUsed,
     usersExhausted,
@@ -726,6 +729,7 @@ export async function buildTrafficReport(
     // Free Tier
     // -----------------------------------------------------------------------
     getFreeTierConfig(),
+    getAutoModelConfig(),
     prisma.user.count({ where: { freeGenerationsUsed: { gt: 0 } } }),
     prisma.user.aggregate({
       where: { freeGenerationsUsed: { gt: 0 } },
@@ -1108,6 +1112,7 @@ export async function buildTrafficReport(
 
     freeTier: {
       config: freeTierConfig,
+      autoModelConfig,
       usersWithFreeGenerations: usersWithFreeGen,
       avgFreeGenerationsUsed: avgFreeGenUsed._avg.freeGenerationsUsed ?? 0,
       usersExhaustedFreeTier: n(usersExhausted[0]?.count ?? 0n),
