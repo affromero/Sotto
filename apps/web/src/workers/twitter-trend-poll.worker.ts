@@ -5,15 +5,13 @@ import { getTwitterConfig } from '@/lib/twitter-config';
 import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { parseTweetIntent } from '@/lib/tweet-parser';
 import { selectVoicePair } from '@/lib/elevenlabs';
+import { engagementScore, filterQualityTweets } from '@/lib/twitter-utils';
 import { logger } from '@/lib/logger';
 import type { PollTwitterTrendsPayload } from '@/lib/queue';
 import type { TwitterTweet } from '@/types/twitter';
 
-function engagementScore(tweet: TwitterTweet): number {
-  const m = tweet.public_metrics;
-  if (!m) return 0;
-  return m.like_count + m.retweet_count * 2 + m.reply_count;
-}
+/** Minimum engagement score for autonomous podcast generation */
+const MIN_WORKER_ENGAGEMENT = 100;
 
 function extractKeywords(text: string): Set<string> {
   return new Set(
@@ -72,7 +70,9 @@ export async function processTrendPoll(job: Job<PollTwitterTrendsPayload>): Prom
   for (const query of config.trendSearchQueries) {
     try {
       const { tweets } = await searchPopularTweets(query, 10);
-      for (const tweet of tweets) {
+      // Filter out retweets, zero-like tweets, low engagement, and author-name-only matches
+      const quality = filterQualityTweets(tweets, query, MIN_WORKER_ENGAGEMENT);
+      for (const tweet of quality) {
         allTweets.push({ tweet, query });
       }
     } catch (err) {

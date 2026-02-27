@@ -1,7 +1,63 @@
-import type { ThreadData, TweetParseResult } from '@/types/twitter';
+import type { ThreadData, TweetParseResult, TwitterTweet } from '@/types/twitter';
 import type { ParticipantCredential, ParticipantInput } from './credential-lookup';
 
 const POPULAR_LIKE_THRESHOLD = 10;
+
+/**
+ * Engagement score: likes + (retweets × 2) + replies.
+ * Shared between trends API route and trend poll worker.
+ */
+export function engagementScore(tweet: TwitterTweet): number {
+  const m = tweet.public_metrics;
+  if (!m) return 0;
+  return m.like_count + m.retweet_count * 2 + m.reply_count;
+}
+
+/**
+ * Check if a tweet is a retweet — structurally via referenced_tweets
+ * or by text prefix "RT @" as fallback.
+ */
+export function isRetweet(tweet: TwitterTweet): boolean {
+  if (tweet.referenced_tweets?.some((r) => r.type === 'retweeted')) return true;
+  if (tweet.text.startsWith('RT @')) return true;
+  return false;
+}
+
+/**
+ * Check if the search query keywords actually appear in the tweet text,
+ * not just in the author's name/bio. Twitter's search API matches against
+ * author metadata too, which causes irrelevant results.
+ */
+export function tweetMatchesQuery(tweet: TwitterTweet, query: string): boolean {
+  const textLower = tweet.text.toLowerCase();
+  // Strip Twitter search operators (e.g. "-is:retweet") — only check content words
+  const keywords = query
+    .split(/\s+/)
+    .filter((w) => !w.startsWith('-') && !w.includes(':'))
+    .map((w) => w.toLowerCase().replace(/^"|"$/g, ''));
+  return keywords.some((kw) => textLower.includes(kw));
+}
+
+/**
+ * Filter tweets to quality standards for trend display/generation.
+ * - Excludes retweets (structural + text fallback)
+ * - Requires at least 1 like (pure RT engagement = spam)
+ * - Requires search keyword in tweet text (not just author name)
+ * - Optionally enforces minimum engagement score
+ */
+export function filterQualityTweets(
+  tweets: TwitterTweet[],
+  query: string,
+  minEngagement = 0
+): TwitterTweet[] {
+  return tweets.filter((tweet) => {
+    if (isRetweet(tweet)) return false;
+    if (!tweet.public_metrics || tweet.public_metrics.like_count < 1) return false;
+    if (!tweetMatchesQuery(tweet, query)) return false;
+    if (minEngagement > 0 && engagementScore(tweet) < minEngagement) return false;
+    return true;
+  });
+}
 const TOP_REPLIES_COUNT = 5;
 
 /**
