@@ -29,7 +29,7 @@ export interface PodcastBadge {
 export function getPodcastBadges(
   podcast: Pick<
     PodcastSummary,
-    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
+    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language' | 'aiAutoResolved' | 'ttsAutoResolved'
   >
 ): PodcastBadge[] {
   const badges: PodcastBadge[] = [];
@@ -44,11 +44,14 @@ export function getPodcastBadges(
     variant: isHuman ? 'success' : isImport ? 'default' : 'info',
   });
 
-  // 2. AI badge — "Provider · Model" format (e.g. "Claude · Sonnet 4.6")
+  // 2. AI badge — "Auto · Model" or "Provider · Model" format
   if (!isImport) {
-    const providerShort = podcast.aiProvider
-      ? AI_PROVIDER_DISPLAY[podcast.aiProvider]?.shortLabel
-      : null;
+    const isAiAuto = !!podcast.aiAutoResolved;
+    const providerShort = isAiAuto
+      ? 'Auto'
+      : podcast.aiProvider
+        ? AI_PROVIDER_DISPLAY[podcast.aiProvider]?.shortLabel
+        : null;
     const modelShort = podcast.aiModel
       ? AI_MODEL_SHORT_DISPLAY[podcast.aiModel]
       : null;
@@ -72,9 +75,12 @@ export function getPodcastBadges(
     }
   }
 
-  // 3. TTS badge — "Provider · Model" format (e.g. "ElevenLabs · v3")
+  // 3. TTS badge — "Auto · Model" or "Provider · Model" format
   if (!isImport) {
-    const ttsProviderShort = getTtsProviderLabel(podcast.ttsProvider);
+    const isTtsAuto = !!podcast.ttsAutoResolved;
+    const ttsProviderShort = isTtsAuto
+      ? 'Auto'
+      : getTtsProviderLabel(podcast.ttsProvider);
     const ttsModelShort = getTtsModelLabel(podcast.ttsModel);
 
     let ttsLabel: string | null = null;

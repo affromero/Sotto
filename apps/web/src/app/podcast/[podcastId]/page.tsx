@@ -307,6 +307,8 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     ttsProvider: podcast.ttsProvider,
     ttsModel: podcast.ttsModel,
     language: podcast.language,
+    aiAutoResolved: podcast.aiAutoResolved,
+    ttsAutoResolved: podcast.ttsAutoResolved,
     forkedFromId: podcast.forkedFromId,
     remixNote: podcast.remixNote,
     failureReason: podcast.failureReason,

@@ -22,6 +22,8 @@ export interface PodcastSummary {
   ttsProvider?: string | null;
   ttsModel?: string | null;
   language?: string | null;
+  aiAutoResolved?: boolean | null;
+  ttsAutoResolved?: boolean | null;
   forkedFromId: string | null;
   user: {
     id: string;
