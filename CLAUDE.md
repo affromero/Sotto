@@ -78,17 +78,6 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 - **Worker**: `export async function processJob(job: Job)` → `job.updateProgress()` → return.
 - **Lib**: Class-based client, singleton export, retry logic.
 
-## Planning & Implementation
-
-- When creating implementation plans, validate ALL file paths and function signatures against the actual codebase before presenting. Use Read/Grep/Glob to confirm — never guess paths or APIs.
-- Self-critique plans before presenting: verify every import is valid, every function signature matches, and the approach aligns with existing patterns (Doppler for secrets, CSS Modules for styling, BullMQ for queues, etc.).
-
-## Debugging Guidelines
-
-- When debugging UI/CSS issues, investigate the root cause systematically before attempting fixes. Do not try multiple speculative CSS changes in sequence.
-- Read the component hierarchy, check inherited styles, identify the actual constraint before editing.
-- For any bug: explain the suspected root cause, which files you'll modify and why, and how you verified this against the actual codebase. Wait for approval before editing.
-
 ## DO
 
 - Use CSS Modules for all styling
