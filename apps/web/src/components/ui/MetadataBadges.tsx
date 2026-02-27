@@ -9,7 +9,7 @@ type BadgeCategory = PodcastBadge['category'];
 interface MetadataBadgesProps {
   podcast: Pick<
     PodcastSummary,
-    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language'
+    'source' | 'isHumanContent' | 'sourcePlatform' | 'aiProvider' | 'aiModel' | 'ttsProvider' | 'ttsModel' | 'language' | 'aiAutoResolved' | 'ttsAutoResolved'
   >;
   categories?: BadgeCategory[];
   compact?: boolean;
