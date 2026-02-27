@@ -35,6 +35,10 @@ export interface TasteQuestion {
   topic: string;
   tagSlugs: string[];
   category: string;
+  /** Article URL from newsletter feeds (news questions only) */
+  sourceUrl?: string;
+  /** Source publication name, e.g. "Reuters", "NPR" (news questions only) */
+  sourceName?: string;
 }
 
 export interface TasteAnswer {

@@ -223,7 +223,7 @@ function parseAndFilterQuestions(
   priorQuestionIds: Set<string>,
   opts?: ParseOptions
 ): TasteQuestion[] {
-  let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string }>;
+  let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string; sourceUrl?: string; sourceName?: string }>;
   try {
     const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const jsonMatch = cleaned.match(/\[[\s\S]*\]/);
@@ -273,13 +273,16 @@ function parseAndFilterQuestions(
     }
 
     seenIds.add(id);
-    questions.push({
+    const question: TasteQuestion = {
       id,
       text: q.text,
       topic: q.topic || q.text,
       tagSlugs: validTagSlugs,
       category: validSlugs.has(q.category) ? q.category : (validTagSlugs[0] ?? 'general'),
-    });
+    };
+    if (q.sourceUrl) question.sourceUrl = q.sourceUrl;
+    if (q.sourceName) question.sourceName = q.sourceName;
+    questions.push(question);
     if (questions.length >= count) break;
   }
 

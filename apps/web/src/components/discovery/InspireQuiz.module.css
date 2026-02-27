@@ -103,6 +103,26 @@
   flex: 1;
 }
 
+/* ---- Source attribution ---- */
+
+.sourceAttribution {
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.2;
+}
+
+.sourceAttribution a {
+  color: var(--color-text-tertiary);
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 2px;
+}
+
+.sourceAttribution a:hover {
+  color: var(--color-text-secondary);
+  text-decoration-color: var(--color-text-secondary);
+}
+
 /* ---- Saved feedback ---- */
 
 .savedFeedback {

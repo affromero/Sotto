@@ -18,5 +18,5 @@ Taxonomy (parent: [children]):
 {{TAXONOMY}}
 {{INPUT_SANITIZATION}}
 
-Respond with a JSON array only, no markdown. Each item:
-{"text": "How is the EU's new AI Act already reshaping Silicon Valley?", "topic": "EU AI Act impact on Silicon Valley", "tagSlugs": ["slug1"], "category": "parent-slug"}
+Respond with a JSON array only, no markdown. Each item must include sourceUrl and sourceName from the article it was based on:
+{"text": "How is the EU's new AI Act already reshaping Silicon Valley?", "topic": "EU AI Act impact on Silicon Valley", "tagSlugs": ["slug1"], "category": "parent-slug", "sourceUrl": "https://example.com/article", "sourceName": "Reuters"}

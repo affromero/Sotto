@@ -134,7 +134,12 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
     (cardIndex: number) => {
       const card = gridCards[cardIndex];
       if (!card || card.status !== 'visible') return;
-      onSelectTopic(card.question.text);
+      // If the question has a source article URL, append it so the discovery agent
+      // can use it as source material for the podcast
+      const topic = card.question.sourceUrl
+        ? `${card.question.text}\n${card.question.sourceUrl}`
+        : card.question.text;
+      onSelectTopic(topic);
     },
     [gridCards, onSelectTopic]
   );
@@ -210,6 +215,15 @@ export function InspireQuiz({ questions, onSelectTopic, onLoadMore, isLoadingMor
               <span className={styles.categoryBadge}>{card.question.category}</span>
             )}
             <p className={styles.questionText}>{card.question.text}</p>
+            {card.question.sourceName && (
+              <span className={styles.sourceAttribution}>
+                {card.question.sourceUrl ? (
+                  <a href={card.question.sourceUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                    {card.question.sourceName}
+                  </a>
+                ) : card.question.sourceName}
+              </span>
+            )}
 
             {isSaved && <div className={styles.savedFeedback}>Saved!</div>}
 
