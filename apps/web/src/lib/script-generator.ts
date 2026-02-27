@@ -1,5 +1,6 @@
 import { generateResponse, WEB_SEARCH_TOOL } from './claude';
 import { CONTENT_SAFETY_INSTRUCTIONS, MATURE_AUDIENCE_GUIDANCE } from './safety-prompts';
+import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 
@@ -290,6 +291,8 @@ export async function generateScript(params: {
 
   const systemPrompt = `You are a world-class podcast script writer for Sotto. Generate immersive, addictive ${speakerCount}-voice podcast scripts that listeners can't stop playing.
 
+CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio. Conversational, natural phrasing produces engaging audio.
+
 ## Speakers:
 ${speakerSection}
 
@@ -305,6 +308,7 @@ Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 Example: "Wait, really? [laughs] That's incredible."
 These go inline in the text field, NOT in the direction field.
 You may still use parenthetical directions like (leaning in), (thoughtful pause) in the direction field for context.
+${VOICE_REALISM_INSTRUCTIONS}
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language, pop culture references' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
 - ${params.tone === 'socratic' ? 'Use the Socratic method — HOST asks probing questions that build on each other, EXPERT guides discovery' : ''}
@@ -485,6 +489,8 @@ export async function generateScriptWithFeedback(params: {
 
   const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on fact-checking feedback.
 
+CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio.
+
 ## REVISION INSTRUCTIONS:
 A fact-checking agent reviewed your previous script and found issues. You MUST address every piece of feedback below. Do NOT ignore any feedback item.
 
@@ -501,6 +507,7 @@ ${feedbackSpeakerSection}
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture
 - Include natural speech patterns and delivery directions in parentheses when tone shifts
+${VOICE_REALISM_INSTRUCTIONS}
 
 ## Audio Expression Tags:
 For richer vocal expression, embed inline audio tags in the turn TEXT:
@@ -679,6 +686,8 @@ export async function generateScriptWithUserFeedback(params: {
 
   const systemPrompt = `You are a world-class podcast script writer for Sotto. You are REVISING a previously generated script based on **user feedback**.
 
+CRITICAL: Your text goes directly through text-to-speech. Write the way people SPEAK, not the way they write. Stiff, formal, or "written-sounding" text produces robotic audio.
+
 ## REVISION INSTRUCTIONS:
 The user reviewed the script and provided feedback. Address every piece of feedback while maintaining the overall quality and flow of the script.
 
@@ -695,6 +704,7 @@ ${feedbackSpeakerSection}
 ## Voice & Delivery Guidelines:
 - Write dialogue that sounds like a REAL conversation, not a lecture
 - Include natural speech patterns and delivery directions in parentheses when tone shifts
+${VOICE_REALISM_INSTRUCTIONS}
 
 ## Audio Expression Tags:
 For richer vocal expression, embed inline audio tags in the turn TEXT:
