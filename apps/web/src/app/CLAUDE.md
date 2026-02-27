@@ -126,7 +126,7 @@
 | `/api/health` | GET | No | Health check |
 | `/api/feedback` | POST/GET | No | Feedback |
 | `/api/admin/waitlist` | PATCH | ADMIN | Approve/reject waitlist entries |
-| `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, config, costs, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, traffic-report) |
+| `/api/admin/*` | Various | ADMIN | Admin endpoints (users, podcasts, config, auto-models, costs, ratings, handles, announcements, twitter, moderation, reports, claims, test-model, traffic-report) |
 | `/api/admin/kittentts/health` | GET | ADMIN | Proxy to `KITTENTTS_URL/health`; returns `{ configured, status, model?, latencyMs }` |
 
 ## Route Groups
