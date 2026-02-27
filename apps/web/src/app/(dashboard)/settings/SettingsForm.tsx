@@ -185,7 +185,7 @@ export function SettingsForm({
     ]).then(([aiData, ttsData]) => {
       if (aiData?.models) setAiModelOptions(aiData.models);
       if (ttsData?.options) setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
-    });
+    }).catch(() => {});
   }, [isTwitterConnected]);
 
   // Taste quiz state

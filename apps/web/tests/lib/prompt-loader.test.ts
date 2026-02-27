@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { render, loadPrompt, loadAndRender } from '../../src/lib/prompt-loader';
 
-// Mock fs — the vi.mock call is hoisted above imports
-vi.mock('fs', () => ({
-  readFileSync: vi.fn(),
-}));
+// Mock fs — vi.mock is hoisted above imports. CJS modules need a `default` re-export.
+vi.mock(import('fs'), async (importOriginal) => {
+  const actual = await importOriginal();
+  const mock = { ...actual, readFileSync: vi.fn() };
+  return { ...mock, default: mock };
+});
 
 const mockReadFileSync = vi.mocked(readFileSync);
 
