@@ -15,15 +15,16 @@ export async function POST(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  const { email, twitterHandle, source, wishlist } = parsed.data;
+  const { email, twitterHandle, source, wishlist, referralCode } = parsed.data;
 
   // Upsert: if email already exists, just return success (no error to user)
   const entry = await prisma.waitlist.upsert({
     where: { email },
-    create: { email, twitterHandle, source, wishlist },
+    create: { email, twitterHandle, source, wishlist, referralCode },
     update: {
       ...(twitterHandle ? { twitterHandle } : {}),
       ...(wishlist ? { wishlist } : {}),
+      ...(referralCode ? { referralCode } : {}),
     },
   });
 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     sendEmail({ to: email, subject, html }).catch(() => {});
 
     if (isTelegramBotConfigured()) {
-      notifyAdminsViaTelegram({ email, twitterHandle, source, wishlist }).catch(() => {});
+      notifyAdminsViaTelegram({ email, twitterHandle, source, wishlist, referralCode }).catch(() => {});
     }
   }
 
@@ -45,6 +46,7 @@ async function notifyAdminsViaTelegram(signup: {
   twitterHandle?: string;
   source?: string;
   wishlist?: string;
+  referralCode?: string;
 }) {
   const admins = await prisma.user.findMany({
     where: { role: 'ADMIN', telegramEnabled: true, telegramChatId: { not: null } },
@@ -63,6 +65,7 @@ async function notifyAdminsViaTelegram(signup: {
   if (signup.twitterHandle) lines.push(`*Twitter:* @${signup.twitterHandle}`);
   if (signup.source) lines.push(`*Source:* ${signup.source}`);
   if (signup.wishlist) lines.push(`*Wishlist:* ${signup.wishlist}`);
+  if (signup.referralCode) lines.push(`*Referral:* ${signup.referralCode}`);
 
   const text = lines.join('\n');
 

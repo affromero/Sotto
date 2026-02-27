@@ -22,13 +22,14 @@ export async function GET() {
     });
 
     const csv = [
-      'Email,Twitter,Source,Wishlist,Status,Signed Up,Approved At,Converted At',
+      'Email,Twitter,Source,Referral,Wishlist,Status,Signed Up,Approved At,Converted At',
       ...entries.map((entry) => {
         const wishlist = (entry.wishlist ?? '').replace(/"/g, '""');
         return [
           entry.email,
           entry.twitterHandle ?? '',
           entry.source ?? 'unknown',
+          entry.referralCode ?? '',
           wishlist.includes(',') || wishlist.includes('"') || wishlist.includes('\n')
             ? `"${wishlist}"` : wishlist,
           entry.status,
