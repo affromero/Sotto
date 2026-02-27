@@ -1,6 +1,24 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { moderateOrThrow, moderateContent } from './moderation';
 import { logger } from './logger';
+import type { ContentPart } from './providers/ai';
+
+type LlmContent = string | ContentPart[];
+
+/** Extract plain text from content (string or ContentPart[]). */
+function extractText(content: LlmContent): string {
+  if (typeof content === 'string') return content;
+  return content.filter((p) => p.type === 'text').map((p) => (p as { text: string }).text).join('\n');
+}
+
+/** Convert ContentPart[] to Anthropic's ContentBlockParam[]. */
+function toAnthropicContent(content: LlmContent): string | Anthropic.Messages.ContentBlockParam[] {
+  if (typeof content === 'string') return content;
+  return content.map((part) => {
+    if (part.type === 'text') return { type: 'text' as const, text: part.text };
+    return { type: 'image' as const, source: { type: 'url' as const, url: part.url } };
+  });
+}
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -53,7 +71,7 @@ export const WEB_SEARCH_TOOL = {
  */
 export async function generateResponse(
   systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: LlmContent }>,
   options?: {
     maxTokens?: number;
     model?: string;
@@ -66,7 +84,7 @@ export async function generateResponse(
   if (!options?.skipModeration) {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
-      await moderateOrThrow(lastUserMsg.content);
+      await moderateOrThrow(extractText(lastUserMsg.content));
     }
   }
 
@@ -109,12 +127,17 @@ export async function generateResponse(
 
   const resolvedModel = options?.model || 'claude-sonnet-4-6';
 
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role,
+    content: toAnthropicContent(m.content),
+  }));
+
   const response = await withRetry('generateResponse', () =>
     activeClient.messages.create({
       model: resolvedModel,
       max_tokens: options?.maxTokens || 4096,
       system: systemPrompt,
-      messages,
+      messages: anthropicMessages,
       ...(options?.tools?.length ? { tools: options.tools } : {}),
     })
   );
@@ -151,7 +174,7 @@ export async function generateResponse(
  */
 export async function* streamResponse(
   systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: LlmContent }>,
   options?: {
     maxTokens?: number;
     model?: string;
@@ -165,7 +188,7 @@ export async function* streamResponse(
   if (!options?.skipModeration) {
     const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
-      await moderateOrThrow(lastUserMsg.content);
+      await moderateOrThrow(extractText(lastUserMsg.content));
     }
   }
 
@@ -209,6 +232,11 @@ export async function* streamResponse(
 
   const streamModel = options?.model || 'claude-sonnet-4-6';
 
+  const anthropicMessages = messages.map((m) => ({
+    role: m.role,
+    content: toAnthropicContent(m.content),
+  }));
+
   let yieldedAny = false;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -216,7 +244,7 @@ export async function* streamResponse(
         model: streamModel,
         max_tokens: options?.maxTokens || 4096,
         system: systemPrompt,
-        messages,
+        messages: anthropicMessages,
         ...(options?.tools?.length ? { tools: options.tools } : {}),
       });
 

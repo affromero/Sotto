@@ -3,9 +3,55 @@ import { logger } from '../logger';
 import { getAiKey, hasAiKey } from '../byok';
 import type { AiProviderId } from './ai-registry';
 
+export interface TextContentPart { type: 'text'; text: string }
+export interface ImageContentPart { type: 'image_url'; url: string }
+export type ContentPart = TextContentPart | ImageContentPart;
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ContentPart[];
+}
+
+/** Extract plain text from message content for moderation. */
+function textOf(content: string | ContentPart[]): string {
+  if (typeof content === 'string') return content;
+  return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
+}
+
+/** Convert ChatMessage[] to OpenAI-compatible format (images → image_url). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
+  return [
+    { role: 'system', content: system },
+    ...messages.map((m) => {
+      if (typeof m.content === 'string') return { role: m.role, content: m.content };
+      return {
+        role: m.role,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        content: m.content.map((p): any =>
+          p.type === 'text'
+            ? { type: 'text', text: p.text }
+            : { type: 'image_url', image_url: { url: p.url } }
+        ),
+      };
+    }),
+  ];
+}
+
+/** Convert ChatMessage[] for Groq (strip images — Llama has no vision). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toGroqMessages(system: string, messages: ChatMessage[]): any[] {
+  return [
+    { role: 'system', content: system },
+    ...messages.map((m) => {
+      if (typeof m.content === 'string') return { role: m.role, content: m.content };
+      const textParts = m.content.filter((p) => p.type === 'text');
+      const text = textParts.length > 0
+        ? textParts.map((p) => (p as TextContentPart).text).join('\n')
+        : '[Image attached — this model does not support vision]';
+      return { role: m.role, content: text };
+    }),
+  ];
 }
 
 export interface AIOptions {
@@ -88,7 +134,7 @@ class OpenAIProvider implements AIProvider {
   ): Promise<AIResponse> {
     if (!opts?.skipModeration) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
@@ -103,7 +149,7 @@ class OpenAIProvider implements AIProvider {
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [{ role: 'system', content: system }, ...messages],
+      messages: toOpenAiMessages(system, messages),
       ...(tools ? { tools } : {}),
     });
 
@@ -123,7 +169,7 @@ class OpenAIProvider implements AIProvider {
   ): AsyncGenerator<string> {
     if (!opts?.skipModeration) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
@@ -138,7 +184,7 @@ class OpenAIProvider implements AIProvider {
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [{ role: 'system', content: system }, ...messages],
+      messages: toOpenAiMessages(system, messages),
       stream: true,
       ...(tools ? { tools } : {}),
     });
@@ -169,7 +215,7 @@ class GroqProvider implements AIProvider {
   ): Promise<AIResponse> {
     if (!opts?.skipModeration) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
@@ -179,7 +225,7 @@ class GroqProvider implements AIProvider {
       model,
       max_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [{ role: 'system', content: system }, ...messages],
+      messages: toGroqMessages(system, messages),
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -198,7 +244,7 @@ class GroqProvider implements AIProvider {
   ): AsyncGenerator<string> {
     if (!opts?.skipModeration) {
       const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(lastUserMsg.content);
+      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
@@ -208,7 +254,7 @@ class GroqProvider implements AIProvider {
       model,
       max_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
-      messages: [{ role: 'system', content: system }, ...messages],
+      messages: toGroqMessages(system, messages),
       stream: true,
     });
 
