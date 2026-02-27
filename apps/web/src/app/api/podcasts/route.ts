@@ -9,7 +9,7 @@ import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generatio
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
-import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
+import { getModelRequiredPlan, getProviderForModel } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -158,6 +158,7 @@ export async function POST(request: NextRequest) {
   let autoResolvedTtsProvider: string | undefined;
   let autoResolvedTtsModel: string | undefined;
   let autoResolvedAiModel: string | undefined;
+  let autoResolvedAiProvider: string | undefined;
   if (!gate.isByokUser && !gate.isProUser) {
     const selected = await selectFreeTierProviders(authResult.userId);
     const ok = await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
@@ -170,12 +171,14 @@ export async function POST(request: NextRequest) {
     autoResolvedTtsProvider = selected.ttsProvider;
     autoResolvedTtsModel = selected.ttsModel;
     autoResolvedAiModel = selected.aiModel;
+    autoResolvedAiProvider = selected.aiProvider;
   }
 
   // Pro non-BYOK: resolve auto model for Pro tier
   if (!gate.isByokUser && gate.isProUser && !parsed.data.aiModel) {
     const proConfig = await resolveAutoModel('PRO');
     autoResolvedAiModel = proConfig.aiModel;
+    autoResolvedAiProvider = proConfig.aiProvider;
     autoResolvedTtsProvider = proConfig.ttsProvider;
     autoResolvedTtsModel = proConfig.ttsModel;
   }
@@ -215,13 +218,22 @@ export async function POST(request: NextRequest) {
 
   const verificationMode = parsed.data.metadata?.verificationMode ?? 'standard';
 
+  // Compute auto-resolution flags
+  const aiAutoResolved = !parsed.data.aiModel && !!autoResolvedAiModel;
+  const ttsAutoResolved = !parsed.data.ttsProvider && !parsed.data.ttsModel && !!autoResolvedTtsProvider;
+
   const podcastData = {
     title: parsed.data.title,
     topic: parsed.data.topic,
     status: 'EXTRACTING' as const,
     ttsProvider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
     ttsModel: parsed.data.ttsModel ?? autoResolvedTtsModel ?? null,
+    aiProvider: parsed.data.aiModel
+      ? (getProviderForModel(parsed.data.aiModel) ?? null)
+      : (autoResolvedAiProvider ?? null),
     aiModel: parsed.data.aiModel ?? autoResolvedAiModel ?? null,
+    aiAutoResolved,
+    ttsAutoResolved,
     verificationMode,
     ...(isApiKeyAuth && { source: 'API' as const }),
   };
