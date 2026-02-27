@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { prisma } from '@/lib/prisma';
-
+import { generatePodcastSlug } from '@/lib/slugify';
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   const adminId = await requireAdmin();
@@ -27,11 +27,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Create podcast owned by @sotto
+  const slug = await generatePodcastSlug(title, sottoUser.id, prisma);
   const podcast = await prisma.podcast.create({
     data: {
       userId: sottoUser.id,
       title,
       topic,
+      slug,
       status: 'PENDING',
       visibility: 'PUBLIC',
       source: 'WEB',

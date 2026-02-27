@@ -12,6 +12,7 @@ import { selectVoicePair } from '@/lib/elevenlabs';
 import { lookupParticipantCredentials } from '@/lib/credential-lookup';
 import { formatThreadAsSourceText, getVerifiedParticipants } from '@/lib/twitter-utils';
 import { extractTwitterVideoTranscript } from '@/lib/twitter-video';
+import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import type { TwitterTweet, TwitterMedia, TweetParseResult, ThreadData } from '@/types/twitter';
 import type { ParticipantCredential } from '@/lib/credential-lookup';
@@ -258,11 +259,13 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     }
 
     // 10. Create Podcast + Discovery records
+    const slug = await generatePodcastSlug(parsed.title, userId, prisma);
     const podcast = await prisma.podcast.create({
       data: {
         userId,
         title: parsed.title,
         topic: parsed.topic,
+        slug,
         status: 'EXTRACTING',
         source: 'TWITTER',
         sourceTweetId: tweet.id,

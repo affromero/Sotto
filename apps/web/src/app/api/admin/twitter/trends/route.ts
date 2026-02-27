@@ -8,6 +8,7 @@ import { addJob, JobType, contentExtractionQueue } from '@/lib/queue';
 import { selectVoicePair } from '@/lib/elevenlabs';
 import { getTwitterConfig } from '@/lib/twitter-config';
 import { trendGenerateSchema, trendFilterSchema } from '@/lib/validations';
+import { generatePodcastSlug } from '@/lib/slugify';
 import type { TwitterTweet, TrendTopic, EnrichedTrendTweet, TweetAuthor } from '@/types/twitter';
 
 import { errorResponse } from '@/lib/api-response';
@@ -114,12 +115,14 @@ export async function POST(request: NextRequest) {
 
   const intent = await parseTweetIntent(parsed.data.tweetText);
   const voicePair = selectVoicePair(parsed.data.tweetId || intent.title);
+  const slug = await generatePodcastSlug(intent.title, sottoUser.id, prisma);
 
   const podcast = await prisma.podcast.create({
     data: {
       userId: sottoUser.id,
       title: intent.title,
       topic: intent.topic,
+      slug,
       status: 'EXTRACTING',
       source: 'TWITTER',
       sourceTweetId: parsed.data.tweetId,
