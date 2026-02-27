@@ -2,6 +2,9 @@
  * KittenTTS provider — CPU-only open-source TTS sidecar.
  * Calls the internal FastAPI microservice at KITTENTTS_URL.
  * WAV response is converted to MP3 via FFmpeg (already available in workers).
+ * No expression/emotion controls — basic text + voice synthesis only.
+ *
+ * @tts-research-date 2026-02-27 — KittenTTS has no expression API
  */
 import { spawn } from 'child_process';
 import type { TtsProvider, SpeechParams } from '../tts';

@@ -260,7 +260,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { podcastId });
       } else {
         // Auto-approve for TWITTER/API sources (no user at browser)
-        const scriptTurns = turns as Array<{ speaker: string; text: string }>;
+        const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
         await createSegmentsAndQueueAudio(podcastId, scriptTurns);
 
         await prisma.podcast.update({
