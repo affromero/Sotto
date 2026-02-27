@@ -20,7 +20,7 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
@@ -66,10 +66,8 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
   }
   if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
+    const autoConfig = await resolveAutoModel(userPlan.plan as 'FREE' | 'PRO');
+    model = autoConfig.aiModel;
   }
 
   const requestedDuration = discovery.durationTarget || 10;

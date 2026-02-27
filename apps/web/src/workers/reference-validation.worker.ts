@@ -15,7 +15,7 @@ import {
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
@@ -31,7 +31,7 @@ export async function processReferenceValidation(
   const aiKey = useAdminCredits ? null : await getAiKey(userId);
 
   // Load references and script
-  const [references, script, podcast] = await Promise.all([
+  const [references, script, podcast, userRecord] = await Promise.all([
     prisma.reference.findMany({
       where: { podcastId },
       orderBy: { number: 'asc' },
@@ -43,18 +43,17 @@ export async function processReferenceValidation(
       where: { id: podcastId },
       select: { topic: true, aiModel: true },
     }),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } }),
   ]);
 
-  // Model priority: user's choice > provider default > free tier admin config
+  // Model priority: user's choice > provider default > auto model config
   let model = podcast?.aiModel ?? undefined;
   if (!model && aiKey) {
     model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
   }
   if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
+    const autoConfig = await resolveAutoModel(userRecord.plan as 'FREE' | 'PRO');
+    model = autoConfig.aiModel;
   }
 
   if (!script) {

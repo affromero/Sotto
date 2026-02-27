@@ -7,6 +7,7 @@ import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
 import { getModelRequiredPlan } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
@@ -154,9 +155,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Atomically increment daily free-tier counter BEFORE creating anything (avoids TOCTOU race)
-  let freeTierTtsProvider: string | undefined;
-  let freeTierTtsModel: string | undefined;
-  let freeTierAiModel: string | undefined;
+  let autoResolvedTtsProvider: string | undefined;
+  let autoResolvedTtsModel: string | undefined;
+  let autoResolvedAiModel: string | undefined;
   if (!gate.isByokUser && !gate.isProUser) {
     const selected = await selectFreeTierProviders(authResult.userId);
     const ok = await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
@@ -166,9 +167,17 @@ export async function POST(request: NextRequest) {
     if (!ok) {
       return errorResponse('Daily podcast limit reached.', 403, { code: 'daily_limit_reached' });
     }
-    freeTierTtsProvider = selected.ttsProvider;
-    freeTierTtsModel = selected.ttsModel;
-    freeTierAiModel = selected.aiModel;
+    autoResolvedTtsProvider = selected.ttsProvider;
+    autoResolvedTtsModel = selected.ttsModel;
+    autoResolvedAiModel = selected.aiModel;
+  }
+
+  // Pro non-BYOK: resolve auto model for Pro tier
+  if (!gate.isByokUser && gate.isProUser && !parsed.data.aiModel) {
+    const proConfig = await resolveAutoModel('PRO');
+    autoResolvedAiModel = proConfig.aiModel;
+    autoResolvedTtsProvider = proConfig.ttsProvider;
+    autoResolvedTtsModel = proConfig.ttsModel;
   }
 
   // Check if selected voices require payment (skip if paymentIntentIds provided)
@@ -210,9 +219,9 @@ export async function POST(request: NextRequest) {
     title: parsed.data.title,
     topic: parsed.data.topic,
     status: 'EXTRACTING' as const,
-    ttsProvider: parsed.data.ttsProvider ?? freeTierTtsProvider ?? null,
-    ttsModel: parsed.data.ttsModel ?? freeTierTtsModel ?? null,
-    aiModel: parsed.data.aiModel ?? freeTierAiModel ?? null,
+    ttsProvider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
+    ttsModel: parsed.data.ttsModel ?? autoResolvedTtsModel ?? null,
+    aiModel: parsed.data.aiModel ?? autoResolvedAiModel ?? null,
     verificationMode,
     ...(isApiKeyAuth && { source: 'API' as const }),
   };

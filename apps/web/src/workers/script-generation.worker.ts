@@ -4,7 +4,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { generateScript, generateScriptWithUserFeedback, type SourceMetadata } from '@/lib/script-generator';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
@@ -62,10 +62,8 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
   }
   if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
+    const autoConfig = await resolveAutoModel(user.plan as 'FREE' | 'PRO');
+    model = autoConfig.aiModel;
   }
 
   // Get discovery metadata
@@ -244,7 +242,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
   // Resolve the actual AI provider used
   const resolvedAiProvider = model?.startsWith('claude-code:')
     ? 'claude-code'
-    : aiKey?.provider ?? (await getFreeTierConfig()).aiProvider;
+    : aiKey?.provider ?? (await resolveAutoModel(user.plan as 'FREE' | 'PRO')).aiProvider;
 
   await prisma.podcast.update({
     where: { id: podcastId },
