@@ -7,7 +7,7 @@ import { addJob, JobType, audioGenerationQueue } from './queue';
  */
 export async function createSegmentsAndQueueAudio(
   podcastId: string,
-  turns: Array<{ speaker: string; text: string }>
+  turns: Array<{ speaker: string; text: string; direction?: string }>
 ): Promise<void> {
   for (let i = 0; i < turns.length; i++) {
     const segment = await prisma.segment.create({
@@ -29,6 +29,7 @@ export async function createSegmentsAndQueueAudio(
       text: turns[i].text,
       previousText,
       nextText,
+      direction: turns[i].direction,
     });
   }
 }

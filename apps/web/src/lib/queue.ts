@@ -74,6 +74,7 @@ export interface GenerateAudioPayload {
   text: string;
   previousText?: string;
   nextText?: string;
+  direction?: string;
 }
 
 export interface StitchAudioPayload {

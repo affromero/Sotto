@@ -63,7 +63,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   const turns = script.turns as ScriptTurn[];
   await createSegmentsAndQueueAudio(
     podcastId,
-    turns.map((t) => ({ speaker: t.speaker, text: t.text }))
+    turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }))
   );
 
   await prisma.podcast.update({
