@@ -49,6 +49,13 @@
   box-shadow: 0 0 0 2px var(--color-primary-subtle);
 }
 
+.platformDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
 .error {
   padding: 10px 14px;
   background: var(--color-error-subtle, #fef2f2);

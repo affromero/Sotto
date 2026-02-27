@@ -24,10 +24,16 @@ interface PlanConfig {
   sttModel: string;
 }
 
+interface PlatformConfig {
+  aiProvider: string;
+  aiModel: string;
+}
+
 interface AutoModelFormProps {
   initialConfig: {
     free: PlanConfig;
     pro: PlanConfig;
+    platform: PlatformConfig;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -193,6 +199,18 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const freeState = usePlanState(initialConfig.free, providers);
   const proState = usePlanState(initialConfig.pro, providers);
 
+  const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
+  const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
+  const platformAiModels = aiProviders.find((p) => p.id === platformAiProvider)?.models ?? [];
+
+  const handlePlatformAiProviderChange = (newProvider: string) => {
+    setPlatformAiProvider(newProvider);
+    const provider = aiProviders.find((p) => p.id === newProvider);
+    if (provider && provider.models.length > 0) {
+      setPlatformAiModel(provider.models[0].id);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -205,6 +223,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         body: JSON.stringify({
           free: freeState.toData(),
           pro: proState.toData(),
+          platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
         }),
       });
 
@@ -239,6 +258,41 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
       />
+
+      <fieldset className={styles.section}>
+        <legend className={styles.sectionTitle}>Platform Operations</legend>
+        <p className={styles.platformDescription}>
+          AI model for internal tasks: handle screening, credential lookup, and LLM fallback when no model is selected.
+        </p>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="platform-aiProvider">AI Provider</label>
+          <select
+            id="platform-aiProvider"
+            className={styles.select}
+            value={platformAiProvider}
+            onChange={(e) => handlePlatformAiProviderChange(e.target.value)}
+          >
+            {aiProviders.map((p) => (
+              <option key={p.id} value={p.id}>{p.displayName}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="platform-aiModel">AI Model</label>
+          <select
+            id="platform-aiModel"
+            className={styles.select}
+            value={platformAiModel}
+            onChange={(e) => setPlatformAiModel(e.target.value)}
+          >
+            {platformAiModels.map((m) => (
+              <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
+            ))}
+          </select>
+        </div>
+      </fieldset>
 
       {error && (
         <div className={styles.error} role="alert">{error}</div>

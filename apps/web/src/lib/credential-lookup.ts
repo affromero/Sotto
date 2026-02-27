@@ -48,7 +48,7 @@ export async function lookupParticipantCredentials(
   const userMessage = `Verify the credentials of these Twitter/X participants:\n\n${participantDescriptions.join('\n\n')}`;
 
   try {
-    const autoConfig = await resolveAutoModel('FREE');
+    const autoConfig = await resolveAutoModel('PLATFORM');
 
     const response = await generateResponse(
       SYSTEM_PROMPT,

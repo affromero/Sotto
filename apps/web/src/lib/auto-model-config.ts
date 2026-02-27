@@ -12,9 +12,15 @@ export interface PlanModelConfig {
   sttModel: string;
 }
 
+export interface PlatformAiConfig {
+  aiProvider: AiProviderId;
+  aiModel: string;
+}
+
 export interface AutoModelConfigData {
   free: PlanModelConfig;
   pro: PlanModelConfig;
+  platform: PlatformAiConfig;
 }
 
 /**
@@ -45,6 +51,10 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
       sttProvider: row.proSttProvider as SttProviderId,
       sttModel: row.proSttModel,
     },
+    platform: {
+      aiProvider: row.platformAiProvider as AiProviderId,
+      aiModel: row.platformAiModel,
+    },
   };
 }
 
@@ -52,7 +62,7 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
  * Update the auto model configuration (admin only).
  */
 export async function setAutoModelConfig(
-  data: { free?: Partial<PlanModelConfig>; pro?: Partial<PlanModelConfig> },
+  data: { free?: Partial<PlanModelConfig>; pro?: Partial<PlanModelConfig>; platform?: Partial<PlatformAiConfig> },
   adminId: string
 ): Promise<void> {
   const update: Record<string, string> = { updatedBy: adminId };
@@ -75,6 +85,11 @@ export async function setAutoModelConfig(
     if (data.pro.sttModel) update.proSttModel = data.pro.sttModel;
   }
 
+  if (data.platform) {
+    if (data.platform.aiProvider) update.platformAiProvider = data.platform.aiProvider;
+    if (data.platform.aiModel) update.platformAiModel = data.platform.aiModel;
+  }
+
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
     create: { id: 'singleton', ...update },
@@ -84,8 +99,17 @@ export async function setAutoModelConfig(
 
 /**
  * Resolve the auto model config for a specific plan tier.
+ * 'PLATFORM' is a dedicated AI-only config for internal operations
+ * (handle screening, credential lookup, LLM fallback).
  */
-export async function resolveAutoModel(plan: 'FREE' | 'PRO'): Promise<PlanModelConfig> {
+export async function resolveAutoModel(plan: 'FREE' | 'PRO' | 'PLATFORM'): Promise<PlanModelConfig> {
   const config = await getAutoModelConfig();
+  if (plan === 'PLATFORM') {
+    return {
+      ...config.free,
+      aiProvider: config.platform.aiProvider,
+      aiModel: config.platform.aiModel,
+    };
+  }
   return plan === 'PRO' ? config.pro : config.free;
 }
