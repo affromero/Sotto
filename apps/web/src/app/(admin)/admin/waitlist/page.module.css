@@ -224,6 +224,29 @@
   cursor: not-allowed;
 }
 
+.removeBtn {
+  padding: 4px 12px;
+  font: var(--text-caption);
+  font-weight: 600;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.removeBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Pagination */
 
 .pagination {
