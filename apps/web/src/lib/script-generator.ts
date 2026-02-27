@@ -5,6 +5,7 @@ import { loadPrompt, loadAndRender } from './prompt-loader';
 import { minutesToWords, wordCountBounds } from './duration';
 import { generatedScriptSchema } from './validations';
 import { logger } from './logger';
+import type { BiasAnalysis } from './media-bias';
 
 
 /** Extract the first complete JSON object or array from a string containing surrounding text. */
@@ -318,6 +319,22 @@ export interface SourceMetadata {
   siteName?: string;
   wordCount?: number;
   sourceType?: string;
+  biasAnalysis?: BiasAnalysis;
+}
+
+/**
+ * Render bias guidance prompt when source is politically biased.
+ * Returns empty string for non-political topics, center sources, or missing data.
+ */
+function renderBiasGuidance(sourceMetadata?: SourceMetadata): string {
+  const bias = sourceMetadata?.biasAnalysis;
+  if (!bias?.isPolitical || !bias.sourceBias || bias.sourceBias === 'center' || bias.sourceBias === 'pro-science') {
+    return '';
+  }
+  return '\n\n' + loadAndRender('shared/bias-guidance.md', {
+    SOURCE_NAME: bias.sourceName ?? 'the source',
+    SOURCE_BIAS: bias.sourceBias,
+  });
 }
 
 export async function generateScript(params: {
@@ -375,6 +392,7 @@ export async function generateScript(params: {
     FOCUS_AREAS: params.focusAreas.join(', '),
     HOST_SPEAKER: speakers[0].name,
     EXPERT_SPEAKER: speakers.length > 1 ? speakers[1].name : speakers[0].name,
+    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
     CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
   });
 
@@ -440,6 +458,7 @@ export async function generateScriptWithFeedback(params: {
     WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
     AUDIENCE_LEVEL: params.audienceLevel,
     FOCUS_AREAS: params.focusAreas.join(', '),
+    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
     CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
   });
 
@@ -526,6 +545,7 @@ export async function generateScriptWithUserFeedback(params: {
     WORD_COUNT_IDEAL: String(minutesToWords(params.durationTarget)),
     AUDIENCE_LEVEL: params.audienceLevel,
     FOCUS_AREAS: params.focusAreas.join(', '),
+    BIAS_GUIDANCE: renderBiasGuidance(params.sourceMetadata),
     CONTENT_SAFETY: CONTENT_SAFETY_INSTRUCTIONS,
   });
 

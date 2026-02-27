@@ -127,4 +127,4 @@ You have access to web search. Use it to verify facts, find accurate statistics,
 
 ## Output Format:
 Return a JSON object with three arrays: "turns", "soundCues", "references" (same format as original generation).
-Only return the JSON object, nothing else.{{CONTENT_SAFETY}}
+Only return the JSON object, nothing else.{{BIAS_GUIDANCE}}{{CONTENT_SAFETY}}
