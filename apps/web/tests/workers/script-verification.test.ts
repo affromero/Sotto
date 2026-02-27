@@ -97,9 +97,9 @@ vi.mock('@/lib/tier-features', () => ({
   }),
 }));
 
-const mockGetFreeTierConfig = vi.fn();
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+const mockResolveAutoModel = vi.fn();
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -208,7 +208,14 @@ describe('processScriptVerification', () => {
     mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
     mockVerifyScript.mockResolvedValue(passedVerdict);
     mockGenerateScriptWithFeedback.mockResolvedValue(revisedScriptResult);
-    mockGetFreeTierConfig.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] });
+    mockResolveAutoModel.mockResolvedValue({
+      aiProvider: 'groq',
+      aiModel: 'llama-3.1-8b-instant',
+      ttsProvider: 'kittentts',
+      ttsModel: 'kitten-tts-mini-0.8',
+      sttProvider: 'groq',
+      sttModel: 'whisper-large-v3-turbo',
+    });
   });
 
   describe('model resolution', () => {
@@ -223,15 +230,22 @@ describe('processScriptVerification', () => {
       );
     });
 
-    it('falls back to free tier config when no podcast aiModel and no BYOK key', async () => {
+    it('falls back to auto model config when no podcast aiModel and no BYOK key', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ aiModel: null, source: 'WEB' });
-      mockGetFreeTierConfig.mockResolvedValue({ aiModel: 'claude-haiku-4-5-20251001', aiAllocations: [] });
+      mockResolveAutoModel.mockResolvedValue({
+        aiProvider: 'groq',
+        aiModel: 'llama-3.1-8b-instant',
+        ttsProvider: 'kittentts',
+        ttsModel: 'kitten-tts-mini-0.8',
+        sttProvider: 'groq',
+        sttModel: 'whisper-large-v3-turbo',
+      });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
       expect(mockVerifyScript).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+        expect.objectContaining({ model: 'llama-3.1-8b-instant' })
       );
     });
   });

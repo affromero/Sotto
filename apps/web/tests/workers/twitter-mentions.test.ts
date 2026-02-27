@@ -74,10 +74,23 @@ vi.mock('@/lib/generation-gate', () => ({
   tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
 }));
 
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3 });
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3, ttsAllocations: [], aiAllocations: [] });
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
+const mockResolveAutoModel = vi.fn().mockResolvedValue({
+  aiProvider: 'groq',
+  aiModel: 'llama-3.1-8b-instant',
+  ttsProvider: 'kittentts',
+  ttsModel: 'kitten-tts-mini-0.8',
+  sttProvider: 'groq',
+  sttModel: 'whisper-large-v3-turbo',
+});
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 const mockGetAiKey = vi.fn().mockResolvedValue(null);

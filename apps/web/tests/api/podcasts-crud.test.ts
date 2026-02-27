@@ -16,6 +16,14 @@ const mockCheckGenerationGate = vi.fn();
 const mockTryIncrementFreeGeneration = vi.fn();
 const mockGetFreeTierStatus = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
+const mockResolveAutoModel = vi.fn().mockResolvedValue({
+  aiProvider: 'groq',
+  aiModel: 'llama-3.1-8b-instant',
+  ttsProvider: 'kittentts',
+  ttsModel: 'kitten-tts-mini-0.8',
+  sttProvider: 'groq',
+  sttModel: 'whisper-large-v3-turbo',
+});
 const mockAddJob = vi.fn();
 
 const mockAuthenticateRequest = vi.fn();
@@ -82,6 +90,10 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
 vi.mock('@/lib/stripe', () => ({
