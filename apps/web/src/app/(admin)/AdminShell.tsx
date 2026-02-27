@@ -108,7 +108,7 @@ const navGroups: NavGroup[] = [
   {
     label: 'AI / ML',
     items: [
-      { href: '/admin/ratings', label: 'TTS Ratings', icon: Star },
+      { href: '/admin/ratings', label: 'Quality Ratings', icon: Star },
       { href: '/admin/inspire', label: 'Inspire', icon: Sparkles },
       { href: '/admin/intelligence', label: 'Intelligence', icon: Brain },
       { href: '/admin/recommendations', label: 'Recommendations', icon: Target },

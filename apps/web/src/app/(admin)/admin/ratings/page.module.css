@@ -1,4 +1,4 @@
-/* Admin TTS Ratings Page */
+/* Admin Quality Ratings Page */
 
 .container {
   composes: container from '../admin.module.css';
@@ -34,17 +34,23 @@
   composes: rangeLinkActive from '../admin.module.css';
 }
 
-/* Stats Grid */
+/* Summary Grid — 6 cards */
 
-.grid {
+.summaryGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-md);
 }
 
 @media (min-width: 640px) {
-  .grid {
-    grid-template-columns: repeat(4, 1fr);
+  .summaryGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .summaryGrid {
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
@@ -70,8 +76,21 @@
   composes: sectionTitle from '../admin.module.css';
 }
 
+.subSectionTitle {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+
 .empty {
   composes: empty from '../admin.module.css';
+}
+
+/* Columns layout for side-by-side tables */
+
+.columns {
+  composes: columns from '../admin.module.css';
 }
 
 /* Table */
@@ -95,6 +114,12 @@
   text-transform: capitalize;
 }
 
+.modelCell {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85em;
+  color: var(--color-text-secondary);
+}
+
 .titleCell {
   max-width: 250px;
   overflow: hidden;
@@ -109,6 +134,28 @@
   white-space: nowrap;
   color: var(--color-text-secondary);
   font-style: italic;
+}
+
+/* Source badges */
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badgeCreator {
+  background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  color: var(--color-primary);
+}
+
+.badgeListener {
+  background-color: color-mix(in srgb, var(--color-accent, #1E3A5F) 15%, transparent);
+  color: var(--color-accent, #1E3A5F);
 }
 
 /* Score color coding */
