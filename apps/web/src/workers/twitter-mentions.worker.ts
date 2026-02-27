@@ -169,7 +169,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         urls: tweet.entities?.urls?.map((u) => u.expanded_url) ?? [],
         createdAt: tweet.created_at,
       };
-      parsed = await parseThreadIntent(mentionAsThreadTweet, threadData, aiKey?.apiKey);
+      parsed = await parseThreadIntent(mentionAsThreadTweet, threadData, { userId, apiKeyOverride: aiKey?.apiKey });
     } else {
       // Single-tweet path: existing behavior
       let parentText: string | undefined;
@@ -180,7 +180,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
           parentText = parentResult.tweet.text;
         }
       }
-      parsed = await parseTweetIntent(tweet.text, parentText, aiKey?.apiKey);
+      parsed = await parseTweetIntent(tweet.text, parentText, { userId, apiKeyOverride: aiKey?.apiKey });
     }
 
     // 7b. Look up credentials for verified thread participants

@@ -93,7 +93,8 @@ export async function generateResponse(
     const { executeClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
-    const result = await executeClaudeCode(systemPrompt, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    const result = await executeClaudeCode(systemPrompt, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: hasWebSearch,
     });
@@ -197,7 +198,8 @@ export async function* streamResponse(
     const { streamClaudeCode, serializeMessages } = await import('./claude-code-client');
     const ccModel = options.model.split(':')[1] || 'opus';
     const hasWebSearch = options?.tools?.some((t) => (t as { type: string }).type === 'web_search_20250305');
-    yield* streamClaudeCode(systemPrompt, serializeMessages(messages), {
+    const textMessages = messages.map((m) => ({ role: m.role, content: extractText(m.content) }));
+    yield* streamClaudeCode(systemPrompt, serializeMessages(textMessages), {
       model: ccModel,
       useWebSearch: hasWebSearch,
     });
