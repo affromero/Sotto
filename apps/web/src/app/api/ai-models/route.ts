@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
 
@@ -38,7 +38,7 @@ export async function GET() {
 
   // No BYOK AI key
   if (!isByok) {
-    const config = await getFreeTierConfig();
+    const autoConfig = await resolveAutoModel(userPlan);
 
     // Admins see all platform-configured API providers (from env vars) + Claude Code local
     if (isAdmin) {
@@ -56,7 +56,7 @@ export async function GET() {
         );
 
       return NextResponse.json({
-        provider: config.aiProvider,
+        provider: autoConfig.aiProvider,
         readOnly: false,
         userPlan: 'PRO',
         isByok: false,
@@ -80,7 +80,7 @@ export async function GET() {
       );
 
     return NextResponse.json({
-      provider: config.aiProvider,
+      provider: autoConfig.aiProvider,
       readOnly: false,
       userPlan,
       isByok: false,

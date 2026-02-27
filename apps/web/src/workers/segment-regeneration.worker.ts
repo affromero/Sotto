@@ -24,7 +24,7 @@ export async function processSegmentRegeneration(
   logger.info('Regenerating segment', { podcastId, interactionId });
   await job.updateProgress(10);
 
-  // Fetch podcast to determine voice configuration
+  // Fetch podcast + user plan to determine voice configuration
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
     select: {
@@ -32,6 +32,7 @@ export async function processSegmentRegeneration(
       voices: { select: { speaker: true, voiceId: true } },
       ttsProvider: true,
       ttsModel: true,
+      user: { select: { plan: true } },
     },
   });
 
@@ -55,6 +56,7 @@ export async function processSegmentRegeneration(
     podcastId,
     requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
     requestedModel: podcast.ttsModel,
+    plan: podcast.user.plan as 'FREE' | 'PRO',
   });
 
   const podcastVoice = podcast.voices.find(v => v.speaker === speaker);

@@ -7,7 +7,7 @@ import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
 import { ContentModerationError } from '@/lib/moderation';
 import { getAiKey, hasByokKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures } from '@/lib/tier-features';
 import { getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
@@ -55,10 +55,8 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
     model = getAiProviderMeta(aiKey.provider as AiProviderId).defaultModel;
   }
   if (!model) {
-    const config = await getFreeTierConfig();
-    model = config.aiAllocations.length > 0
-      ? config.aiAllocations[0].model
-      : config.aiModel;
+    const autoConfig = await resolveAutoModel(userPlan.plan as 'FREE' | 'PRO');
+    model = autoConfig.aiModel;
   }
 
   // Get podcast script context

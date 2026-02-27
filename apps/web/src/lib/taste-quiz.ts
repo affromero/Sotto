@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { prisma } from './prisma';
-import { getFreeTierConfig } from './free-tier-config';
+import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
 import { createAIProvider } from './providers/ai';
 import { resolveAiProvider } from './providers/ai';
 import { WEB_SEARCH_TOOL } from './claude';
@@ -22,7 +22,7 @@ export async function generateQuestions(
   count: number
 ): Promise<TasteQuestion[]> {
   // Fetch taxonomy, user context, and prior answers in parallel
-  const [categories, existingInterests, priorAnswers, freeTierConfig] = await Promise.all([
+  const [categories, existingInterests, priorAnswers, autoFree] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -44,7 +44,7 @@ export async function generateQuestions(
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
-    getFreeTierConfig(),
+    resolveAutoModel('FREE'),
   ]);
 
   const priorQuestionIds = new Set(priorAnswers.map((a) => a.questionId));
@@ -106,15 +106,15 @@ ${recentQuestions ? `Previously asked questions (DO NOT repeat these):\n${recent
 Respond with a JSON array only, no markdown. Each item:
 {"text": "Did you know octopuses taste the world by licking their arms?", "topic": "how octopuses taste the world by licking their arms", "tagSlugs": ["slug1"], "category": "parent-slug"}`;
 
-  const ai = createAIProvider(freeTierConfig.aiProvider);
+  const ai = createAIProvider(autoFree.aiProvider);
   const response = await ai.generateResponse(
     systemPrompt,
     [{ role: 'user', content: `Generate ${requestCount} taste quiz questions.` }],
-    { model: freeTierConfig.aiModel, maxTokens: 4096, temperature: 1.0 }
+    { model: autoFree.aiModel, maxTokens: 4096, temperature: 1.0 }
   );
 
   logUsage({
-    service: freeTierConfig.aiProvider === 'openai' ? 'openai' : 'anthropic',
+    service: autoFree.aiProvider === 'openai' ? 'openai' : 'anthropic',
     model: response.model,
     category: 'taste_quiz',
     inputTokens: response.inputTokens,
@@ -181,11 +181,11 @@ export interface InspireContext {
   taxonomyLines: string[];
   validSlugs: Set<string>;
   priorQuestionIds: Set<string>;
-  freeTierConfig: { aiProvider: string; aiModel: string };
+  autoModel: PlanModelConfig;
 }
 
 export async function loadInspireContext(userId: string): Promise<InspireContext> {
-  const [categories, priorAnswers, freeTierConfig] = await Promise.all([
+  const [categories, priorAnswers, autoFreeConfig] = await Promise.all([
     prisma.tag.findMany({
       where: { parentId: null },
       select: {
@@ -203,7 +203,7 @@ export async function loadInspireContext(userId: string): Promise<InspireContext
       orderBy: { createdAt: 'desc' },
       take: 200,
     }),
-    getFreeTierConfig(),
+    resolveAutoModel('FREE'),
   ]);
 
   const validSlugs = new Set<string>();
@@ -223,7 +223,7 @@ export async function loadInspireContext(userId: string): Promise<InspireContext
     taxonomyLines,
     validSlugs,
     priorQuestionIds: new Set(priorAnswers.map((a) => a.questionId)),
-    freeTierConfig,
+    autoModel: autoFreeConfig,
   };
 }
 
@@ -382,7 +382,7 @@ Respond with a JSON array only, no markdown. Each item:
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001';
+    let usedModel = ctx.autoModel.aiModel || 'claude-haiku-4-5-20251001';
     const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
@@ -398,11 +398,11 @@ Respond with a JSON array only, no markdown. Each item:
       inputTokens = response.usage.input_tokens;
       outputTokens = response.usage.output_tokens;
     } else {
-      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const ai = createAIProvider(ctx.autoModel.aiProvider);
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
-        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;
@@ -491,7 +491,7 @@ Respond with a JSON array only, no markdown. Each item:
     let responseText: string;
     let inputTokens = 0;
     let outputTokens = 0;
-    let usedModel = ctx.freeTierConfig.aiModel || 'claude-haiku-4-5-20251001';
+    let usedModel = ctx.autoModel.aiModel || 'claude-haiku-4-5-20251001';
     const llmStart = Date.now();
 
     if (resolved?.apiKey && resolved.provider === 'anthropic') {
@@ -507,11 +507,11 @@ Respond with a JSON array only, no markdown. Each item:
       inputTokens = response.usage.input_tokens;
       outputTokens = response.usage.output_tokens;
     } else {
-      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const ai = createAIProvider(ctx.autoModel.aiProvider);
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
-        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;
@@ -640,11 +640,11 @@ Respond with a JSON array only, no markdown. Each item:
       outputTokens = response.usage.output_tokens;
     } else {
       // Use AI provider (claude-code CLI has built-in web search)
-      const ai = createAIProvider(ctx.freeTierConfig.aiProvider);
+      const ai = createAIProvider(ctx.autoModel.aiProvider);
       const result = await ai.generateResponse(
         systemPrompt,
         [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-        { model: ctx.freeTierConfig.aiModel, maxTokens: 2048, temperature: 1.0 }
+        { model: ctx.autoModel.aiModel, maxTokens: 2048, temperature: 1.0 }
       );
       responseText = result.content;
       inputTokens = result.inputTokens;

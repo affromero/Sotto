@@ -7,7 +7,7 @@ import { assessTopicFeasibility } from '@/lib/topic-assessor';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
-import { getFreeTierConfig } from '@/lib/free-tier-config';
+import { resolveAutoModel } from '@/lib/auto-model-config';
 import { logger } from '@/lib/logger';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
@@ -92,10 +92,8 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       const aiKey = useAdminCredits ? null : await getAiKey(userId);
       let model: string | undefined;
       if (!model) {
-        const config = await getFreeTierConfig();
-        model = config.aiAllocations.length > 0
-          ? config.aiAllocations[0].model
-          : config.aiModel;
+        const autoConfig = await resolveAutoModel('FREE');
+        model = autoConfig.aiModel;
       }
 
       const assessment = await assessTopicFeasibility({
