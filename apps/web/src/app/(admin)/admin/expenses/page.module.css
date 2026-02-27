@@ -1,0 +1,57 @@
+/* Admin Expenses Dashboard */
+
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
+.rangeNav { composes: rangeNav from '../admin.module.css'; }
+.rangeLink { composes: rangeLink from '../admin.module.css'; }
+.rangeLinkActive { composes: rangeLinkActive from '../admin.module.css'; }
+.grid { composes: grid from '../admin.module.css'; }
+.card { composes: card from '../admin.module.css'; }
+.cardLabel { composes: cardLabel from '../admin.module.css'; }
+.cardValue { composes: cardValue from '../admin.module.css'; }
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
+.empty { composes: empty from '../admin.module.css'; }
+.columns { composes: columns from '../admin.module.css'; }
+.table { composes: tableCompact from '../admin.module.css'; }
+
+/* Horizontal bar chart */
+.hBarContainer { composes: hBarContainer from '../admin.module.css'; }
+.hBarRow { composes: hBarRow from '../admin.module.css'; }
+.hBarLabel { composes: hBarLabel from '../admin.module.css'; min-width: 120px; }
+.hBarTrack { composes: hBarTrack from '../admin.module.css'; }
+.hBarFill { composes: hBarFill from '../admin.module.css'; }
+.hBarValue { composes: hBarValue from '../admin.module.css'; }
+
+/* Grid: 4 columns on desktop */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Positive / negative value styling */
+.positive {
+  color: #059669;
+}
+
+.negative {
+  color: #dc2626;
+}
+
+/* Account column in transaction table */
+.accountCell {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* Amount alignment */
+.amountCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
