@@ -310,7 +310,9 @@ async function routeResume(
         useAdminCredits: useAdminCredits || undefined,
       };
 
-      await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload);
+      await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT, payload, {
+        jobId: `verify-${podcastId}-resume-${Date.now()}`,
+      });
       return NextResponse.json({
         success: true,
         message: 'Generation resumed from script verification',
