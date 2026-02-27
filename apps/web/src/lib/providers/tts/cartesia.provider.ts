@@ -1,13 +1,21 @@
 /**
  * Cartesia TTS provider — premium voice generation via Sonic 3.
  *
+ * Expression support:
+ *   - generation_config.emotion: 60 emotion values (excited, calm, sarcastic, etc.)
+ *   - generation_config.speed: 0.6–1.5 multiplier
+ *   - Inline SSML: <emotion value="..."/>, <break time="..."/>, <speed ratio="..."/>
+ *   - Native [laughter] marker in transcript text
+ *   - Emotion is guidance, not strict — works best when text aligns with emotion
+ *
  * API docs: https://docs.cartesia.ai/api-reference/tts/bytes
- * Sonic 3 supports [laughter] markers natively in transcript text.
+ * @tts-research-date 2026-02-27 — Sonic 3 generation_config, SSML tags, [laughter]
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
 import type { TtsProviderId } from '../tts-registry';
 import { CARTESIA_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
+import { mapDirectionToExpression } from '../../tts-expression-mapper';
 
 const CARTESIA_API_VERSION = '2025-04-16';
 
@@ -28,6 +36,26 @@ export class CartesiaProvider implements TtsProvider {
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {
+    // Map direction to Cartesia emotion
+    const expression = mapDirectionToExpression(params.direction, params.speaker, 'cartesia');
+    const emotion = expression.cartesia?.emotion;
+
+    const body: Record<string, unknown> = {
+      transcript: params.text,
+      model_id: this.model,
+      voice: { mode: 'id', id: params.voiceId },
+      output_format: {
+        container: 'mp3',
+        bit_rate: 128000,
+        sample_rate: 44100,
+      },
+    };
+
+    // Add generation_config with emotion if available
+    if (emotion) {
+      body.generation_config = { emotion };
+    }
+
     const response = await fetch('https://api.cartesia.ai/tts/bytes', {
       method: 'POST',
       headers: {
@@ -35,16 +63,7 @@ export class CartesiaProvider implements TtsProvider {
         'Cartesia-Version': CARTESIA_API_VERSION,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        transcript: params.text,
-        model_id: this.model,
-        voice: { mode: 'id', id: params.voiceId },
-        output_format: {
-          container: 'mp3',
-          bit_rate: 128000,
-          sample_rate: 44100,
-        },
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -57,6 +76,7 @@ export class CartesiaProvider implements TtsProvider {
       model: this.model,
       voiceId: params.voiceId,
       chars: params.text.length,
+      emotion: emotion ?? 'none',
     });
     return Buffer.from(arrayBuffer);
   }

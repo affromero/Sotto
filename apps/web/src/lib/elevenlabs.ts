@@ -118,7 +118,8 @@ export async function generateSpeech(params: {
     voice_settings: {
       stability,
       similarity_boost: params.similarityBoost ?? 0.75,
-      style: params.style ?? 0.45,
+      // style 0.0 per ElevenLabs recommendation — higher values add latency and instability
+      style: params.style ?? 0.0,
     },
   };
   if (supportsContext && params.previousText) body.previous_text = params.previousText;

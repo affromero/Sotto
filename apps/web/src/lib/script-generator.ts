@@ -304,10 +304,17 @@ For richer vocal expression, embed inline audio tags in the turn TEXT:
 - [sighs] — exasperation, relief, or contemplation
 - [whispers] — emphasis or dramatic effect
 - [gasps] — surprise or shock
+- [excited] — enthusiasm, energy
+- [sarcastic] — dry wit, irony
+- [curious] — inquisitive, wondering
+- [pause], [long pause] — natural beat or dramatic timing
 Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 Example: "Wait, really? [laughs] That's incredible."
 These go inline in the text field, NOT in the direction field.
-You may still use parenthetical directions like (leaning in), (thoughtful pause) in the direction field for context.
+
+## Direction Field:
+The "direction" field on each turn controls vocal delivery style. Use it when the delivery should notably shift from conversational default. Well-supported values:
+energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
 ${VOICE_REALISM_INSTRUCTIONS}
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language, pop culture references' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone, with occasional humor to keep it engaging' : ''}
@@ -515,8 +522,16 @@ For richer vocal expression, embed inline audio tags in the turn TEXT:
 - [sighs] — exasperation, relief, or contemplation
 - [whispers] — emphasis or dramatic effect
 - [gasps] — surprise or shock
+- [excited] — enthusiasm, energy
+- [sarcastic] — dry wit, irony
+- [curious] — inquisitive, wondering
+- [pause], [long pause] — natural beat or dramatic timing
 Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 These go inline in the text field, NOT in the direction field.
+
+## Direction Field:
+The "direction" field controls vocal delivery style. Well-supported values:
+energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
 
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}
@@ -712,8 +727,16 @@ For richer vocal expression, embed inline audio tags in the turn TEXT:
 - [sighs] — exasperation, relief, or contemplation
 - [whispers] — emphasis or dramatic effect
 - [gasps] — surprise or shock
+- [excited] — enthusiasm, energy
+- [sarcastic] — dry wit, irony
+- [curious] — inquisitive, wondering
+- [pause], [long pause] — natural beat or dramatic timing
 Use SPARINGLY — at most 1-2 per turn, only when the emotion genuinely fits.
 These go inline in the text field, NOT in the direction field.
+
+## Direction Field:
+The "direction" field controls vocal delivery style. Well-supported values:
+energetic, excited, thoughtful, serious, playful, sarcastic, warm, urgent, hesitant, confident, nostalgic, dramatic, calm, curious, laughing, whispering, frustrated, surprised, sad, skeptical
 
 - ${params.tone === 'casual' ? 'Keep it light, use humor freely, casual language' : ''}
 - ${params.tone === 'professional' ? 'Maintain a professional but warm tone' : ''}

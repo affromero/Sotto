@@ -82,7 +82,7 @@ export async function processReferenceValidation(
     type: r.type,
   }));
 
-  const scriptTurns = script.turns as Array<{ speaker: string; text: string }>;
+  const scriptTurns = script.turns as Array<{ speaker: string; text: string; direction?: string }>;
 
   await job.updateProgress(15);
 
