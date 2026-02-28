@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
+const mockPodcastFindUniqueOrThrow = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockCreateSegmentsAndQueueAudio = vi.fn();
@@ -10,6 +11,7 @@ const mockPodcastVoiceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPodcastVoiceCreateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockCheckGenerationGate = vi.fn();
 const mockSelectFreeTierProviders = vi.fn();
+const mockConvertTurnsForProvider = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -19,6 +21,7 @@ vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
     },
     script: {
@@ -47,6 +50,10 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
   selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+}));
+
+vi.mock('@/lib/tts-tag-converter', () => ({
+  convertTurnsForProvider: (...args: unknown[]) => mockConvertTurnsForProvider(...args),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -82,6 +89,8 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2', ttsQuota: 10,
     });
     mockPodcastUpdate.mockResolvedValue({});
+    mockPodcastFindUniqueOrThrow.mockResolvedValue({ ttsProvider: null });
+    mockConvertTurnsForProvider.mockImplementation((turns: unknown[]) => Promise.resolve(turns));
     mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
   });
 
