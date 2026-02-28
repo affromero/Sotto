@@ -90,13 +90,38 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     select: { tone: true, audienceLevel: true, audience: true },
   });
 
-  const voiceMetadata: VoiceMatchMetadata | undefined = discovery
+  let voiceMetadata: VoiceMatchMetadata | undefined = discovery
     ? {
         tone: discovery.tone as VoiceMatchMetadata['tone'],
         audienceLevel: discovery.audienceLevel as VoiceMatchMetadata['audienceLevel'],
         audience: discovery.audience as VoiceMatchMetadata['audience'],
       }
     : undefined;
+
+  // When discovery doesn't have a tone, infer from script delivery directions
+  if (!voiceMetadata?.tone) {
+    const script = await prisma.script.findUnique({
+      where: { podcastId },
+      select: { turns: true },
+    });
+    if (script?.turns) {
+      const turns = script.turns as Array<{ direction?: string }>;
+      const directions = turns
+        .map((t) => t.direction?.toLowerCase() ?? '')
+        .filter(Boolean)
+        .join(' ');
+      if (directions) {
+        const casualPatterns = /excited|enthusiastic|laughing|playful|humorous|energetic|fun/;
+        const professionalPatterns = /serious|academic|formal|whispering|soft|calm|measured|thoughtful/;
+        const casualCount = (directions.match(casualPatterns) || []).length;
+        const professionalCount = (directions.match(professionalPatterns) || []).length;
+        if (casualCount > 0 || professionalCount > 0) {
+          const inferredTone = casualCount >= professionalCount ? 'casual' : 'professional';
+          voiceMetadata = { ...voiceMetadata, tone: inferredTone };
+        }
+      }
+    }
+  }
 
   const startTime = Date.now();
 
