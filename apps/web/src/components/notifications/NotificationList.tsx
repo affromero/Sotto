@@ -1,6 +1,21 @@
 'use client';
 
-import { Headphones, Heart, GitFork, UserPlus, Bell, AlertTriangle } from 'lucide-react';
+import {
+  Headphones,
+  Heart,
+  GitFork,
+  UserPlus,
+  Bell,
+  AlertTriangle,
+  MessageCircle,
+  Reply,
+  HelpCircle,
+  ThumbsUp,
+  FileText,
+  ShieldCheck,
+  Trash2,
+  Gift,
+} from 'lucide-react';
 import styles from './NotificationList.module.css';
 
 interface Notification {
@@ -26,6 +41,16 @@ const typeIcons: Record<string, typeof Bell> = {
   PODCAST_FORKED: GitFork,
   NEW_FOLLOWER: UserPlus,
   PIPELINE_FAILURE: AlertTriangle,
+  COMMENT_ON_YOUR_PODCAST: MessageCircle,
+  COMMENT_REPLY: Reply,
+  QUESTION_ON_YOUR_PODCAST: HelpCircle,
+  QUESTION_UPVOTED: ThumbsUp,
+  SCRIPT_READY: FileText,
+  VOICE_VERIFICATION_REQUIRED: ShieldCheck,
+  VOICE_VERIFICATION_PASSED: ShieldCheck,
+  VOICE_VERIFICATION_FAILED: ShieldCheck,
+  CONTENT_REMOVED: Trash2,
+  REFERRAL_SIGNUP: Gift,
 };
 
 function getRelativeTime(dateString: string): string {

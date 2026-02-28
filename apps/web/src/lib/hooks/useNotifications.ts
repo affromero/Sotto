@@ -23,7 +23,8 @@ export function useNotifications(): UseNotificationsReturn {
     try {
       const response = await fetch('/api/notifications');
       if (!response.ok) return;
-      const data: NotificationData[] = await response.json();
+      const json = await response.json();
+      const data: NotificationData[] = json.notifications ?? [];
       setNotifications(data);
     } catch {
       // Silently fail on poll errors

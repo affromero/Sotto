@@ -9,6 +9,10 @@ vi.mock('@/components/layout/AccountSwitcher', () => ({
   ),
 }));
 
+vi.mock('@/components/notifications/NotificationDropdown', () => ({
+  NotificationDropdown: () => <div data-testid="notification-dropdown" />,
+}));
+
 const mockUser = {
   name: 'John Doe',
   email: 'john@example.com',

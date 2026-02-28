@@ -55,7 +55,7 @@ describe('useNotifications', () => {
     it('fetches notifications on mount', async () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
-        json: async () => mockNotifications,
+        json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
       } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -71,7 +71,7 @@ describe('useNotifications', () => {
     it('calculates unread count correctly', async () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
-        json: async () => mockNotifications,
+        json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
       } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -84,7 +84,7 @@ describe('useNotifications', () => {
     it('handles empty notifications', async () => {
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
-        json: async () => [],
+        json: async () => ({ notifications: [], unreadCount: 0, total: 0 }),
       } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -131,7 +131,7 @@ describe('useNotifications', () => {
 
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
-        json: async () => mockNotifications,
+        json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
       } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -169,7 +169,7 @@ describe('useNotifications', () => {
 
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
-        json: async () => mockNotifications,
+        json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
       } as Response);
 
       const { unmount } = renderHook(() => useNotifications());
@@ -201,11 +201,11 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => initialNotifications,
+          json: async () => ({ notifications: initialNotifications, unreadCount: 1, total: 1 }),
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => updatedNotifications,
+          json: async () => ({ notifications: updatedNotifications, unreadCount: 2, total: 3 }),
         } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -234,7 +234,7 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response)
         .mockResolvedValueOnce({ ok: true } as Response);
 
@@ -268,7 +268,7 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response)
         .mockResolvedValueOnce({ ok: false } as Response);
 
@@ -294,7 +294,7 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response)
         .mockResolvedValueOnce({ ok: true } as Response);
 
@@ -317,7 +317,7 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response)
         .mockResolvedValueOnce({ ok: true } as Response);
 
@@ -345,7 +345,7 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response)
         .mockResolvedValueOnce({ ok: false } as Response);
 
@@ -374,11 +374,11 @@ describe('useNotifications', () => {
       vi.mocked(fetch)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => initialNotifications,
+          json: async () => ({ notifications: initialNotifications, unreadCount: 1, total: 1 }),
         } as Response)
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => mockNotifications,
+          json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
         } as Response);
 
       const { result } = renderHook(() => useNotifications());
@@ -402,7 +402,7 @@ describe('useNotifications', () => {
             setTimeout(() => {
               resolve({
                 ok: true,
-                json: async () => mockNotifications,
+                json: async () => ({ notifications: mockNotifications, unreadCount: 2, total: 3 }),
               } as Response);
             }, 100);
           })

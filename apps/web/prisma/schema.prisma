@@ -831,6 +831,7 @@ enum NotificationType {
   CLAIM_REPORT_ON_YOUR_PODCAST
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
+  VOICE_TRACK_FAILED
 }
 
 // ============ MODERATION ============
