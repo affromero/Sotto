@@ -94,3 +94,47 @@ export class CartesiaProvider implements TtsProvider {
     return this.model;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Adaptive Concurrency
+// ---------------------------------------------------------------------------
+
+const DEFAULT_CARTESIA_CONCURRENCY = 2;
+
+/**
+ * Resolve the concurrency limit for a Cartesia API key.
+ * Returns a cached value from Redis if available, otherwise the conservative default (2).
+ * Unlike ElevenLabs, Cartesia has no API endpoint to query the limit — we learn it from 429 errors.
+ */
+export async function getCartesiaConcurrencyLimit(apiKey: string): Promise<number> {
+  const { cache } = await import('../../redis');
+  const crypto = await import('crypto');
+  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const cacheKey = `tts:concurrency:cartesia:${keyHash}`;
+
+  const cached = await cache.get<number>(cacheKey);
+  if (cached !== null) return cached;
+
+  return DEFAULT_CARTESIA_CONCURRENCY;
+}
+
+/**
+ * Parse a Cartesia 429 error body for the actual concurrency limit and cache it.
+ * Cartesia's 429 response includes "Current limit: N" — we extract and cache that value.
+ */
+export async function updateCartesiaConcurrencyFromError(apiKey: string, errorMessage: string): Promise<void> {
+  try {
+    const match = errorMessage.match(/Current limit:\s*(\d+)/i);
+    if (!match) return;
+    const limit = parseInt(match[1], 10);
+    if (isNaN(limit) || limit <= 0) return;
+
+    const { cache } = await import('../../redis');
+    const crypto = await import('crypto');
+    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    await cache.set(`tts:concurrency:cartesia:${keyHash}`, limit, 300);
+    logger.info('Cartesia concurrency limit detected from 429', { limit });
+  } catch {
+    // Swallow Redis errors — original 429 still propagates via BullMQ retry
+  }
+}
