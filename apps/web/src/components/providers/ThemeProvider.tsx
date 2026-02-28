@@ -30,15 +30,17 @@ function isLightOnlyRoute(pathname: string): boolean {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'system';
+  const [theme, setThemeState] = useState<Theme>('system');
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>('light');
+
+  // Hydrate theme from localStorage + matchMedia after mount
+  useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-    return stored && ['light', 'dark', 'system'].includes(stored) ? stored : 'system';
-  });
-  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => {
-    if (typeof window === 'undefined') return 'light';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+    if (stored && ['light', 'dark', 'system'].includes(stored)) {
+      setThemeState(stored);
+    }
+    setSystemTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  }, []);
 
   // Listen for OS theme changes
   useEffect(() => {

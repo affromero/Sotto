@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import styles from './ReferralSharePrompt.module.css';
@@ -12,13 +12,12 @@ interface ReferralSharePromptProps {
 
 const DISMISSED_KEY = 'sotto_referral_prompt_dismissed';
 
-function isDismissed(): boolean {
-  if (typeof window === 'undefined') return true;
-  return !!localStorage.getItem(DISMISSED_KEY);
-}
-
 export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSharePromptProps) {
-  const [dismissed, setDismissed] = useState(isDismissed);
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    setDismissed(!!localStorage.getItem(DISMISSED_KEY));
+  }, []);
   const [copied, setCopied] = useState(false);
 
   if (!hasFirstReadyPodcast || dismissed) return null;
