@@ -95,3 +95,21 @@
   font: var(--text-body-sm);
   color: var(--color-text-secondary);
 }
+
+/* Generation Health */
+
+.healthWarning {
+  border-color: var(--color-warning, #f59e0b);
+}
+
+.healthBad {
+  font: var(--text-h2);
+  font-weight: 700;
+  color: var(--color-warning, #f59e0b);
+}
+
+.healthGood {
+  font: var(--text-h2);
+  font-weight: 700;
+  color: var(--color-success, #10b981);
+}
