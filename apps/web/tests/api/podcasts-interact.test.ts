@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // Define mock functions at module scope for proper typing
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockInteractionCreate = vi.fn();
 const mockAddJob = vi.fn();
 const mockCheckRateLimit = vi.fn();
 
 // Mock dependencies
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 const mockUserFindUniqueOrThrow = vi.fn();
@@ -42,6 +42,11 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+}));
+
+// The route dynamically imports @/lib/auth for session-based suspension checks
+vi.mock('@/lib/auth', () => ({
+  auth: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/auth-guards', () => ({
@@ -90,15 +95,6 @@ function createRequest(
   };
 }
 
-const mockSession = {
-  user: {
-    id: 'user-123',
-    email: 'user@example.com',
-    name: 'Test User',
-  },
-  expires: '2026-12-31',
-};
-
 const mockPodcast = {
   id: 'podcast-123',
 };
@@ -130,7 +126,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const { request, params } = createRequest('podcast-123', {
       question: 'Test question',
@@ -145,7 +141,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('returns 404 when podcast does not exist', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const { request, params } = createRequest('podcast-nonexistent', {
@@ -161,7 +157,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('returns 400 when question is empty', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
 
     const { request, params } = createRequest('podcast-123', {
@@ -177,7 +173,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('returns 400 when timestamp is negative', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
 
     const { request, params } = createRequest('podcast-123', {
@@ -193,7 +189,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('returns 429 when rate limited', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockCheckRateLimit.mockResolvedValue({ allowed: false, remaining: 0, resetAt: Date.now() + 3600000 });
 
     const { request, params } = createRequest('podcast-123', {
@@ -209,7 +205,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('creates interaction with PENDING status', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
     mockAddJob.mockResolvedValue({ id: 'job-123' });
@@ -225,7 +221,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('includes user data in response', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
     mockAddJob.mockResolvedValue({ id: 'job-123' });
@@ -247,7 +243,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
   });
 
   it('dispatches queue job with correct payload', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
     mockPodcastFindUnique.mockResolvedValue(mockPodcast);
     mockInteractionCreate.mockResolvedValue(mockInteraction);
     mockAddJob.mockResolvedValue({ id: 'job-123' });

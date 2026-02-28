@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
 import { getAllProviderMeta, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { resolveAutoModel } from '@/lib/auto-model-config';
@@ -45,14 +45,18 @@ interface TtsOption {
   hint?: string;
 }
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const isAdmin = session.user.role === 'ADMIN';
-  const byokKeys = await listByokProviders(session.user.id);
+  const user = await prisma.user.findUnique({
+    where: { id: authResult.userId },
+    select: { plan: true, role: true },
+  });
+  const isAdmin = user?.role === 'ADMIN';
+  const byokKeys = await listByokProviders(authResult.userId);
   const validProviderIds = byokKeys.filter((k) => k.isValid).map((k) => k.provider);
 
   // No BYOK TTS keys
@@ -82,7 +86,6 @@ export async function GET() {
     }
 
     // Non-admins: single auto-resolved model, read-only
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } });
     const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
     const autoConfig = await resolveAutoModel(userPlan);
     const provider = getProviderMeta(autoConfig.ttsProvider as TtsProviderId);
