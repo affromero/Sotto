@@ -43,8 +43,33 @@ const CARTESIA_TAG_MAP: Record<string, string> = {
 const HUME_NATIVE_TAGS = new Set(['pause', 'long pause']);
 
 /**
- * Strip non-speech markers from text before sending to TTS.
- * Removes: [SFX: ...] markers, (delivery directions), [N] citation markers.
+ * Map parenthetical directions → bracket audio tag equivalents.
+ * Gerund/adverb forms map to the tag that TTS providers recognize.
+ * Entries already in bracket form (pause, short pause) pass through as-is.
+ */
+const PAREN_TO_TAG: Record<string, string> = {
+  // Gerund → vocal tag
+  laughing: 'laughs', chuckling: 'chuckles', whispering: 'whispers',
+  sighing: 'sighs', pausing: 'pause',
+  // Adverb → emotion/tone tag
+  excitedly: 'excited', thoughtfully: 'calm', sarcastically: 'sarcastic',
+  softly: 'whispers', loudly: 'excited', dramatically: 'dramatic',
+  gently: 'calm', warmly: 'cheerfully', seriously: 'calm',
+  jokingly: 'playfully', hesitantly: 'hesitantly', confidently: 'excited',
+  curiously: 'curious', enthusiastically: 'excited', nervously: 'nervously',
+  calmly: 'calm', urgently: 'rushed', playfully: 'playfully',
+  'matter-of-factly': 'calm', slowly: 'slow', quickly: 'rushed',
+  // Pause forms — pass through
+  pause: 'pause', 'short pause': 'short pause', 'long pause': 'long pause',
+  'brief pause': 'short pause', 'dramatic pause': 'dramatic pause', beat: 'pause',
+};
+
+/**
+ * Clean non-speech markers and convert delivery directions to audio tags
+ * before sending text to TTS providers.
+ *
+ * Removes: [SFX: ...] markers, [N] citation markers.
+ * Converts: (direction) → [audio tag] so provider-specific handling applies.
  *
  * Provider-specific audio tag handling:
  *   ElevenLabs v3: keeps ALL audio tags as-is (1,450+ supported natively)
@@ -59,11 +84,11 @@ export function cleanTextForTts(
   let cleaned = text
     // Remove [SFX: ...] markers (e.g. "[SFX: upbeat music, 3s]")
     .replace(/\[SFX:.*?\]/gi, '')
-    // Remove parenthetical delivery directions (e.g. "(laughing)", "(whispering)")
+    // Convert parenthetical directions to bracket audio tags
+    // e.g. "(laughing)" → "[laughs]", "(short pause)" → "[short pause]"
     .replace(/\(([^)]{1,30})\)/g, (_, inner) => {
-      const directions =
-        /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly|pause|short pause|long pause|brief pause|dramatic pause|beat)$/i;
-      return directions.test(inner.trim()) ? '' : `(${inner})`;
+      const tag = PAREN_TO_TAG[inner.trim().toLowerCase()];
+      return tag ? `[${tag}]` : `(${inner})`;
     })
     // Remove citation markers like [1], [2, 3], [1, 2, 3] — also consume leading space
     .replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '');
