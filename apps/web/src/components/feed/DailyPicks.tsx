@@ -52,6 +52,7 @@ function pickToPodcastSummary(pick: Pick): PodcastSummary {
     source: 'WEB',
     isHumanContent: false,
     forkedFromId: null,
+    ownerIsPro: false,
     user: {
       ...pick.user,
       handle: pick.user.handle || null,

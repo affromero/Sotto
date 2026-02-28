@@ -7,6 +7,28 @@ import { PODCAST_PUBLIC_SELECT } from '@/lib/podcast-select';
 import type { Prisma } from '@prisma/client';
 
 import { errorResponse } from '@/lib/api-response';
+
+/** Serialize a Prisma podcast row for public feed consumption. */
+function serializeFeedPodcast(p: {
+  user: { plan?: string | null; role?: string | null; [key: string]: unknown };
+  createdAt: Date | string;
+  updatedAt?: Date | string;
+  tags: Array<{ tag: { id: string; name: string; slug: string }; [key: string]: unknown }>;
+  forkedFrom?: { id: string; title: string } | null;
+  [key: string]: unknown;
+}) {
+  const { plan, ...safeUser } = p.user;
+  return {
+    ...p,
+    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
+    ...(p.updatedAt ? { updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt } : {}),
+    tags: p.tags.map((pt) => pt.tag),
+    ownerIsPro: plan === 'PRO' || ['ADMIN', 'SYSTEM'].includes((safeUser.role as string) ?? ''),
+    forkedFrom: p.forkedFrom ?? null,
+    user: safeUser,
+  };
+}
+
 /**
  * GET /api/feed
  * Modes:
@@ -71,17 +93,13 @@ export async function GET(request: NextRequest) {
       take: 20,
       select: {
         ...PODCAST_PUBLIC_SELECT,
-        user: { select: { id: true, name: true, handle: true, image: true, role: true } },
+        user: { select: { id: true, name: true, handle: true, image: true, role: true, plan: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
+        forkedFrom: { select: { id: true, title: true } },
       },
     });
 
-    const serialized = podcasts.map((p) => ({
-      ...p,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-      tags: p.tags.map((pt) => pt.tag),
-    }));
+    const serialized = podcasts.map(serializeFeedPodcast);
 
     return NextResponse.json({ podcasts: serialized, total: serialized.length });
   }
@@ -114,7 +132,7 @@ export async function GET(request: NextRequest) {
         take: limit,
         select: {
           ...PODCAST_PUBLIC_SELECT,
-          user: { select: { id: true, name: true, handle: true, image: true, role: true } },
+          user: { select: { id: true, name: true, handle: true, image: true, role: true, plan: true } },
           tags: { include: { tag: true } },
           forkedFrom: { select: { id: true, title: true } },
         },
@@ -123,7 +141,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({
-      podcasts,
+      podcasts: podcasts.map(serializeFeedPodcast),
       total,
       page,
       limit,
@@ -226,7 +244,7 @@ export async function GET(request: NextRequest) {
       take: limit,
       select: {
         ...PODCAST_PUBLIC_SELECT,
-        user: { select: { id: true, name: true, handle: true, image: true, role: true } },
+        user: { select: { id: true, name: true, handle: true, image: true, role: true, plan: true } },
         tags: { include: { tag: true } },
         forkedFrom: { select: { id: true, title: true } },
       },
@@ -235,7 +253,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
-    podcasts,
+    podcasts: podcasts.map(serializeFeedPodcast),
     total,
     page,
     limit,
