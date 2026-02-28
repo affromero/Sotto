@@ -73,7 +73,7 @@ describe('GET /api/health', () => {
     expect(body.timestamp).toBeDefined();
     expect(body.checks).toBeUndefined();
     expect(body.env).toBeUndefined();
-    expect(body.version).toBeUndefined();
+    expect(body.version).toBeDefined();
     expect(body.oauth).toBeUndefined();
     expect(body.vapid).toBeUndefined();
   });
