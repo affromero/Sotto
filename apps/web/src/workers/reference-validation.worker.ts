@@ -14,10 +14,12 @@ import {
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
-import { getAiKey, hasByokKey } from '@/lib/byok';
+import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
 
 export async function processReferenceValidation(
@@ -68,10 +70,19 @@ export async function processReferenceValidation(
         data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
       });
     }
-    await createSegmentsAndQueueAudio(
-      podcastId,
-      script.turns as Array<{ speaker: string; text: string }>
-    );
+
+    // Assign voices for multi-speaker podcasts
+    const earlyTurns = script.turns as Array<{ speaker: string; text: string }>;
+    const earlyPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    const earlyProvider = (earlyPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    const earlySpeakers = [...new Set(earlyTurns.map((t) => t.speaker))].map((name) => ({ name }));
+    const earlyTtsKey = isByokEarly ? ((await getByokKey(userId, earlyProvider)) ?? undefined) : undefined;
+    await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider, earlyTtsKey);
+
+    await createSegmentsAndQueueAudio(podcastId, earlyTurns);
     await job.updateProgress(100);
     return;
   }
@@ -281,6 +292,16 @@ export async function processReferenceValidation(
       });
     }
     // BYOK: leave null — worker's resolveTtsProvider() picks best available
+
+    // Assign voices for multi-speaker podcasts
+    const latePodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    const lateProvider = (latePodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+    const lateSpeakers = [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
+    const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
+    await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey);
 
     await createSegmentsAndQueueAudio(podcastId, turns);
 

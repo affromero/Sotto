@@ -103,6 +103,7 @@ vi.mock('@/lib/queue', () => ({
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
   hasByokKey: vi.fn().mockResolvedValue(false),
+  getByokKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -135,6 +136,10 @@ vi.mock('@/lib/free-tier-provider-selector', () => ({
     ttsModel: 'eleven_multilingual_v2',
     ttsQuota: 10,
   }),
+}));
+
+vi.mock('@/lib/voice-assigner', () => ({
+  assignVoicesForPodcast: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({

@@ -5,6 +5,9 @@ import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { assignVoicesForPodcast } from '@/lib/voice-assigner';
+import { getByokKey } from '@/lib/byok';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
@@ -96,14 +99,39 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  const script = await prisma.script.findUnique({
-    where: { podcastId },
-  });
+  const [script, discovery] = await Promise.all([
+    prisma.script.findUnique({ where: { podcastId } }),
+    prisma.discovery.findFirst({ where: { podcastId }, select: { speakers: true } }),
+  ]);
   if (!script) {
     return errorResponse('Script not found', 404);
   }
 
   const turns = script.turns as ScriptTurn[];
+
+  // Assign voices for multi-speaker podcasts (skip if user provided custom voices)
+  if (!bodyVoices || bodyVoices.length === 0) {
+    const podcastRecord = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    const resolvedProvider = (podcastRecord.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+
+    // Derive speakers from discovery or script turns
+    const discoverySpeakers = discovery?.speakers as Array<{ name: string; description?: string }> | null;
+    const speakers = discoverySpeakers && discoverySpeakers.length > 0
+      ? discoverySpeakers
+      : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
+
+    // Resolve API key for catalog fetch
+    let ttsApiKey: string | undefined;
+    if (gate.isByokUser) {
+      ttsApiKey = (await getByokKey(userId, resolvedProvider)) ?? undefined;
+    }
+
+    await assignVoicesForPodcast(podcastId, speakers, resolvedProvider, ttsApiKey);
+  }
+
   await createSegmentsAndQueueAudio(
     podcastId,
     turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }))

@@ -3,13 +3,16 @@ import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
+const mockPodcastFindUniqueOrThrow = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockScriptFindUnique = vi.fn();
+const mockDiscoveryFindFirst = vi.fn();
 const mockCreateSegmentsAndQueueAudio = vi.fn();
 const mockPodcastVoiceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockPodcastVoiceCreateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockCheckGenerationGate = vi.fn();
 const mockSelectFreeTierProviders = vi.fn();
+const mockAssignVoicesForPodcast = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -19,10 +22,14 @@ vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
       findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args),
+      findUniqueOrThrow: (...args: unknown[]) => mockPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPodcastUpdate(...args),
     },
     script: {
       findUnique: (...args: unknown[]) => mockScriptFindUnique(...args),
+    },
+    discovery: {
+      findFirst: (...args: unknown[]) => mockDiscoveryFindFirst(...args),
     },
     podcastVoice: {
       deleteMany: (...args: unknown[]) => mockPodcastVoiceDeleteMany(...args),
@@ -47,6 +54,14 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
   selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
+}));
+
+vi.mock('@/lib/voice-assigner', () => ({
+  assignVoicesForPodcast: (...args: unknown[]) => mockAssignVoicesForPodcast(...args),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getByokKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -82,7 +97,10 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2', ttsQuota: 10,
     });
     mockPodcastUpdate.mockResolvedValue({});
+    mockPodcastFindUniqueOrThrow.mockResolvedValue({ ttsProvider: 'elevenlabs' });
+    mockDiscoveryFindFirst.mockResolvedValue(null);
     mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
+    mockAssignVoicesForPodcast.mockResolvedValue(undefined);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -254,6 +272,47 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(response.status).toBe(200);
       expect(mockPodcastVoiceDeleteMany).not.toHaveBeenCalled();
       expect(mockPodcastVoiceCreateMany).not.toHaveBeenCalled();
+    });
+
+    it('calls assignVoicesForPodcast when no custom voices provided', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
+
+      const response = await POST(createRequest(), await createParams('pod-1'));
+
+      expect(response.status).toBe(200);
+      expect(mockAssignVoicesForPodcast).toHaveBeenCalledWith(
+        'pod-1',
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'HOST' }),
+          expect.objectContaining({ name: 'EXPERT' }),
+        ]),
+        'elevenlabs',
+        undefined,
+      );
+      // Voice assignment must happen before segment creation
+      const assignOrder = mockAssignVoicesForPodcast.mock.invocationCallOrder[0];
+      const segmentOrder = mockCreateSegmentsAndQueueAudio.mock.invocationCallOrder[0];
+      expect(assignOrder).toBeLessThan(segmentOrder);
+    });
+
+    it('skips assignVoicesForPodcast when custom voices provided', async () => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+      mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
+      mockScriptFindUnique.mockResolvedValue({ turns: defaultTurns });
+
+      const voices = [
+        { speaker: 'HOST', voiceId: 'voice-abc' },
+        { speaker: 'EXPERT', voiceId: 'voice-xyz' },
+      ];
+      const response = await POST(
+        createRequest({ ttsProvider: 'elevenlabs', voices }),
+        await createParams('pod-1')
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockAssignVoicesForPodcast).not.toHaveBeenCalled();
     });
 
     it('filters out voices with null voiceId', async () => {
