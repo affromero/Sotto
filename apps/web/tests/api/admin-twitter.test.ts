@@ -8,6 +8,7 @@ const mockSetTwitterConfig = vi.fn();
 const mockAddJob = vi.fn();
 const mockTweetMentionCount = vi.fn();
 const mockTweetMentionGroupBy = vi.fn();
+const mockTweetMentionFindMany = vi.fn();
 const mockTwitterAutoTweetCount = vi.fn();
 const mockTwitterAutoTweetGroupBy = vi.fn();
 const mockTwitterAutoTweetFindMany = vi.fn();
@@ -46,6 +47,7 @@ vi.mock('@/lib/prisma', () => ({
     tweetMention: {
       count: (...args: unknown[]) => mockTweetMentionCount(...args),
       groupBy: (...args: unknown[]) => mockTweetMentionGroupBy(...args),
+      findMany: (...args: unknown[]) => mockTweetMentionFindMany(...args),
     },
     twitterAutoTweet: {
       count: (...args: unknown[]) => mockTwitterAutoTweetCount(...args),
@@ -83,6 +85,7 @@ vi.mock('@/lib/validations', async (importOriginal) => {
       safeParse: (...args: unknown[]) => mockTrendGenerateSafeParse(...args),
     },
     trendFilterSchema: actual.trendFilterSchema,
+    mentionsQuerySchema: actual.mentionsQuerySchema,
   };
 });
 
@@ -121,6 +124,7 @@ import { POST as postThreadToPodcast } from '@/app/api/admin/twitter/thread-to-p
 import { GET as getAutoTweet, POST as postAutoTweet } from '@/app/api/admin/twitter/auto-tweet/route';
 import { GET as getAnalytics } from '@/app/api/admin/twitter/analytics/route';
 import { GET as getTrends, POST as postTrends } from '@/app/api/admin/twitter/trends/route';
+import { GET as getMentions } from '@/app/api/admin/twitter/mentions/route';
 
 function mockAdmin() {
   mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
@@ -544,5 +548,116 @@ describe('POST /api/admin/twitter/trends', () => {
     const response = await postTrends(request);
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ podcastId: 'pod-1' });
+  });
+});
+
+// --- Mentions ---
+
+describe('GET /api/admin/twitter/mentions', () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it('returns 403 when unauthenticated', async () => {
+    mockAuth.mockResolvedValue(null);
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions'));
+    const response = await getMentions(request);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: 'Forbidden' });
+  });
+
+  it('returns 403 when not admin', async () => {
+    mockNonAdmin();
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions'));
+    const response = await getMentions(request);
+    expect(response.status).toBe(403);
+  });
+
+  it('returns paginated mentions when admin', async () => {
+    mockAdmin();
+    const mentions = [
+      {
+        id: 'tm-1',
+        tweetId: '123456',
+        authorId: 'author-1',
+        text: '@sottofm make a podcast about AI',
+        parsedTopic: 'AI',
+        status: 'READY',
+        podcastId: 'pod-1',
+        replyTweetId: 'reply-1',
+        parentTweetId: null,
+        errorMessage: null,
+        createdAt: '2026-02-01T00:00:00Z',
+        updatedAt: '2026-02-01T00:00:00Z',
+        user: { name: 'Test User', handle: 'testuser', image: null },
+        podcast: { id: 'pod-1', title: 'AI Podcast', status: 'READY' },
+      },
+    ];
+    mockTweetMentionFindMany.mockResolvedValue(mentions);
+    mockTweetMentionCount.mockResolvedValue(1);
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions'));
+    const response = await getMentions(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mentions).toEqual(mentions);
+    expect(body.total).toBe(1);
+    expect(body.page).toBe(1);
+    expect(body.totalPages).toBe(1);
+  });
+
+  it('filters by status', async () => {
+    mockAdmin();
+    mockTweetMentionFindMany.mockResolvedValue([]);
+    mockTweetMentionCount.mockResolvedValue(0);
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions?status=FAILED'));
+    const response = await getMentions(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.mentions).toEqual([]);
+
+    const findManyCall = mockTweetMentionFindMany.mock.calls[0][0];
+    expect(findManyCall.where.status).toBe('FAILED');
+  });
+
+  it('filters by search text', async () => {
+    mockAdmin();
+    mockTweetMentionFindMany.mockResolvedValue([]);
+    mockTweetMentionCount.mockResolvedValue(0);
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions?search=podcast'));
+    const response = await getMentions(request);
+
+    expect(response.status).toBe(200);
+
+    const findManyCall = mockTweetMentionFindMany.mock.calls[0][0];
+    expect(findManyCall.where.OR).toBeDefined();
+    expect(findManyCall.where.OR).toHaveLength(3);
+  });
+
+  it('paginates correctly', async () => {
+    mockAdmin();
+    mockTweetMentionFindMany.mockResolvedValue([]);
+    mockTweetMentionCount.mockResolvedValue(45);
+
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions?page=2&limit=20'));
+    const response = await getMentions(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.page).toBe(2);
+    expect(body.totalPages).toBe(3);
+
+    const findManyCall = mockTweetMentionFindMany.mock.calls[0][0];
+    expect(findManyCall.skip).toBe(20);
+    expect(findManyCall.take).toBe(20);
+  });
+
+  it('returns 400 for invalid status', async () => {
+    mockAdmin();
+    const request = new NextRequest(new URL('http://localhost:3000/api/admin/twitter/mentions?status=INVALID'));
+    const response = await getMentions(request);
+    expect(response.status).toBe(400);
   });
 });

@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { AnalyticsSection } from './AnalyticsSection';
+import { MentionsSection } from './MentionsSection';
 import { AutoTweetSection } from './AutoTweetSection';
 import { TrendsSection } from './TrendsSection';
 import { ThreadSection } from './ThreadSection';
 import { SettingsSection } from './SettingsSection';
 import styles from './TwitterDashboard.module.css';
 
-type TabId = 'analytics' | 'auto-tweet' | 'trends' | 'thread' | 'settings';
+type TabId = 'analytics' | 'mentions' | 'auto-tweet' | 'trends' | 'thread' | 'settings';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'analytics', label: 'Analytics' },
+  { id: 'mentions', label: 'Mentions' },
   { id: 'auto-tweet', label: 'Auto-Tweet' },
   { id: 'trends', label: 'Trends' },
   { id: 'thread', label: 'Thread → Podcast' },
@@ -41,6 +43,9 @@ export function TwitterDashboard() {
       <div className={styles.content}>
         <div role="tabpanel" hidden={activeTab !== 'analytics'}>
           <AnalyticsSection />
+        </div>
+        <div role="tabpanel" hidden={activeTab !== 'mentions'}>
+          <MentionsSection />
         </div>
         <div role="tabpanel" hidden={activeTab !== 'auto-tweet'}>
           <AutoTweetSection />
