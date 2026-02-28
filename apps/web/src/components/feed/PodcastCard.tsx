@@ -3,13 +3,10 @@
 import { useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Play, Heart, GitFork } from 'lucide-react';
 import { getContentBadgeLabel } from '@sotto/shared';
 import { useTrack } from '@/components/providers/EventProvider';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Badge } from '@/components/ui/Badge';
-import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { getPodcastGradient } from '@/lib/podcast-gradient';
 import { podcastUrl } from '@/lib/urls';
 import type { PodcastSummary } from '@/types/podcast';
@@ -75,6 +72,7 @@ export function PodcastCard({
   const track = useTrack();
   const { user } = useAuth();
   const isOwner = user?.id === podcast.user.id;
+  const showStats = isOwner && podcast.ownerIsPro;
   const mountTimeRef = useRef(0);
   const duration = formatDuration(podcast.duration);
   const gradient = getPodcastGradient(podcast.id);
@@ -117,7 +115,7 @@ export function PodcastCard({
       <Link
         href={podcastUrl(podcast, podcast.user.handle)}
         className={styles.cardLink}
-        aria-label={`Listen to ${podcast.title} by ${podcast.user.name || 'Unknown'}`}
+        aria-label={`Listen to ${podcast.title}`}
         onClick={handleClick}
       >
         <div className={styles.cover}>
@@ -129,89 +127,46 @@ export function PodcastCard({
           </div>
 
           <div className={styles.coverContent}>
+            {podcast.forkedFromId && (
+              <p className={styles.remixSubline}>
+                Remix of {podcast.forkedFrom?.title || 'another podcast'}
+              </p>
+            )}
             <h3 className={styles.title}>{podcast.title}</h3>
             <p className={styles.topic}>{podcast.topic}</p>
           </div>
 
-          {/* Compact variant: overlay meta on cover */}
-          <div className={styles.compactMeta}>
-            <span className={styles.compactCreator}>
-              {podcast.user.name || 'Anonymous'}
-            </span>
-            {isOwner && (
-              <span className={styles.compactStat}>
-                <Play size={10} aria-hidden="true" />
-                {formatCount(podcast.playCount)}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* White body (hidden in compact variant via CSS) */}
-        <div className={styles.body}>
-          {podcast.forkedFromId && (
-            <p className={styles.remixSubline}>
-              Remix of {((podcast as unknown) as { forkedFrom?: { title: string } }).forkedFrom?.title || 'another podcast'}
-            </p>
-          )}
-
-          <div className={styles.creator}>
-            <div className={styles.avatar}>
-              {podcast.user.image ? (
-                <Image
-                  src={podcast.user.image}
-                  alt={podcast.user.name || 'Creator'}
-                  width={24}
-                  height={24}
-                  className={styles.avatarImage}
-                />
-              ) : (
-                <span className={styles.avatarFallback}>
-                  {(podcast.user.name || podcast.user.handle || 'U')[0].toUpperCase()}
-                </span>
-              )}
-            </div>
-            <span className={styles.creatorName}>
-              {podcast.user.name || 'Anonymous'}
-              {podcast.user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
-              {podcast.user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
-            </span>
-            <span className={styles.dot} aria-hidden="true" />
-            <time className={styles.date} dateTime={podcast.createdAt}>
-              {formatDate(podcast.createdAt)}
-            </time>
-          </div>
-
-          {(podcast.aiProvider || podcast.aiModel || podcast.ttsProvider || podcast.ttsModel || podcast.language) && (
-            <MetadataBadges podcast={podcast} categories={['ai', 'tts', 'language']} compact />
-          )}
-
-          {isOwner && (
-            <div className={styles.stats}>
-              <span className={styles.stat} aria-label={`${podcast.playCount} plays`}>
-                <Play size={14} aria-hidden="true" />
-                <span>{formatCount(podcast.playCount)}</span>
-              </span>
-              <span className={styles.stat} aria-label={`${podcast.likeCount} likes`}>
-                <Heart size={14} aria-hidden="true" />
-                <span>{formatCount(podcast.likeCount)}</span>
-              </span>
-              <span className={styles.stat} aria-label={`${podcast.forkCount} forks`}>
-                <GitFork size={14} aria-hidden="true" />
-                <span>{formatCount(podcast.forkCount)}</span>
-              </span>
-            </div>
-          )}
-
           {podcast.tags.length > 0 && (
-            <div className={styles.tags} aria-label="Tags">
-              {podcast.tags.map((tag) => (
-                <span key={tag.id} className={styles.tag}>
+            <div className={styles.coverTags} aria-label="Tags">
+              {podcast.tags.slice(0, 3).map((tag) => (
+                <span key={tag.id} className={styles.coverTag}>
                   {tag.name}
                 </span>
               ))}
             </div>
           )}
+
+          <div className={styles.coverMeta}>
+            <time className={styles.coverDate} dateTime={podcast.createdAt}>
+              {formatDate(podcast.createdAt)}
+            </time>
+            {showStats && (
+              <div className={styles.coverStats}>
+                <span className={styles.coverStat} aria-label={`${podcast.playCount} plays`}>
+                  <Play size={10} aria-hidden="true" />
+                  {formatCount(podcast.playCount)}
+                </span>
+                <span className={styles.coverStat} aria-label={`${podcast.likeCount} likes`}>
+                  <Heart size={10} aria-hidden="true" />
+                  {formatCount(podcast.likeCount)}
+                </span>
+                <span className={styles.coverStat} aria-label={`${podcast.forkCount} forks`}>
+                  <GitFork size={10} aria-hidden="true" />
+                  {formatCount(podcast.forkCount)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </Link>
 
