@@ -14,6 +14,7 @@ import {
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -82,7 +83,11 @@ export async function processReferenceValidation(
     const earlyTtsKey = isByokEarly ? ((await getByokKey(userId, earlyProvider)) ?? undefined) : undefined;
     await assignVoicesForPodcast(podcastId, earlySpeakers, earlyProvider, earlyTtsKey);
 
-    await createSegmentsAndQueueAudio(podcastId, earlyTurns);
+    // Convert TTS tags before creating segments
+    const convertedEarlyTurns = earlyPodcast.ttsProvider
+      ? await convertTurnsForProvider(earlyTurns, earlyProvider, podcastId)
+      : earlyTurns;
+    await createSegmentsAndQueueAudio(podcastId, convertedEarlyTurns);
     await job.updateProgress(100);
     return;
   }
@@ -303,7 +308,11 @@ export async function processReferenceValidation(
     const lateTtsKey = isByok ? ((await getByokKey(userId, lateProvider)) ?? undefined) : undefined;
     await assignVoicesForPodcast(podcastId, lateSpeakers, lateProvider, lateTtsKey);
 
-    await createSegmentsAndQueueAudio(podcastId, turns);
+    // Convert TTS tags before creating segments
+    const convertedTurns = latePodcast.ttsProvider
+      ? await convertTurnsForProvider(turns, lateProvider, podcastId)
+      : turns;
+    await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
     await prisma.podcast.update({
       where: { id: podcastId },

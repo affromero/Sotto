@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { getByokKey } from '@/lib/byok';
-import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
@@ -108,15 +109,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const turns = script.turns as ScriptTurn[];
+  // Fetch resolved ttsProvider for voice assignment and tag conversion
+  const resolvedPodcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { ttsProvider: true },
+  });
+  const resolvedProvider = (resolvedPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
 
   // Assign voices for multi-speaker podcasts (skip if user provided custom voices)
   if (!bodyVoices || bodyVoices.length === 0) {
-    const podcastRecord = await prisma.podcast.findUniqueOrThrow({
-      where: { id: podcastId },
-      select: { ttsProvider: true },
-    });
-    const resolvedProvider = (podcastRecord.ttsProvider ?? 'elevenlabs') as TtsProviderId;
-
     // Derive speakers from discovery or script turns
     const discoverySpeakers = discovery?.speakers as Array<{ name: string; description?: string }> | null;
     const speakers = discoverySpeakers && discoverySpeakers.length > 0
@@ -132,10 +133,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await assignVoicesForPodcast(podcastId, speakers, resolvedProvider, ttsApiKey);
   }
 
-  await createSegmentsAndQueueAudio(
-    podcastId,
-    turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }))
-  );
+  // Convert TTS tags before creating segments
+  const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));
+  const convertedTurns = resolvedPodcast.ttsProvider
+    ? await convertTurnsForProvider(turnData, resolvedProvider, podcastId)
+    : turnData;
+
+  await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
   await prisma.podcast.update({
     where: { id: podcastId },

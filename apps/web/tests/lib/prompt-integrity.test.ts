@@ -65,6 +65,7 @@ const EXPECTED_FILES = [
   'feeds/news.md',
   'feeds/news-from-newsletters.md',
   'audio/voice-assigner.md',
+  'audio/tts-tag-converter.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──
@@ -119,6 +120,9 @@ const VARIABLE_CONTRACTS: Record<string, string[]> = {
   ].sort(),
   'audio/voice-assigner.md': [
     'SPEAKERS', 'SPEAKER_COUNT', 'VOICE_CATALOG',
+  ].sort(),
+  'audio/tts-tag-converter.md': [
+    'PROVIDER_DOCS', 'PROVIDER_NAME', 'TURNS_JSON',
   ].sort(),
 };
 

@@ -204,7 +204,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   }
 
   // Strip non-speech markers before sending to TTS (preserves audio tags for ElevenLabs)
-  const ttsText = cleanTextForTts(text, { providerId });
+  const ttsText = cleanTextForTts(text);
 
   let audioBuffer: Buffer;
   let semaphoreReleased = false;

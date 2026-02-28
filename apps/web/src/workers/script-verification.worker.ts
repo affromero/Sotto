@@ -18,6 +18,7 @@ import {
   type SourceMetadata,
 } from '@/lib/script-generator';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
@@ -279,8 +280,12 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         const svTtsKey = hasTts ? ((await getByokKey(userId, svProvider)) ?? undefined) : undefined;
         await assignVoicesForPodcast(podcastId, speakerList, svProvider, svTtsKey);
 
+        // Convert TTS tags before creating segments
         const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
-        await createSegmentsAndQueueAudio(podcastId, scriptTurns);
+        const convertedScriptTurns = svPodcast.ttsProvider
+          ? await convertTurnsForProvider(scriptTurns, svProvider, podcastId)
+          : scriptTurns;
+        await createSegmentsAndQueueAudio(podcastId, convertedScriptTurns);
 
         await prisma.podcast.update({
           where: { id: podcastId },
