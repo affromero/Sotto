@@ -183,6 +183,7 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   if (!isAdmin) {
     return {
       status: healthy ? 'healthy' : 'degraded',
+      version: process.env.COMMIT_SHA || 'dev',
       timestamp: new Date().toISOString(),
     };
   }
