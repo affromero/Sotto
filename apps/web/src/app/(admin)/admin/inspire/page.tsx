@@ -99,6 +99,13 @@ async function getInspireStats(days: number) {
     trending: { hits: 0, misses: 0 },
   };
 
+  const healthStats: Record<string, { empty: number; errors: number }> = {
+    forYou: { empty: 0, errors: 0 },
+    news: { empty: 0, errors: 0 },
+    curiosity: { empty: 0, errors: 0 },
+    trending: { empty: 0, errors: 0 },
+  };
+
   const lookbackDays = Math.min(days, 7);
   const counterPromises: Promise<void>[] = [];
   for (let i = 0; i < lookbackDays; i++) {
@@ -106,12 +113,16 @@ async function getInspireStats(days: number) {
     for (const section of ['forYou', 'news', 'curiosity', 'trending'] as const) {
       counterPromises.push(
         (async () => {
-          const [hits, misses] = await Promise.all([
+          const [hits, misses, empty, errors] = await Promise.all([
             counters.get(`inspire:hits:${section}:${date}`),
             counters.get(`inspire:misses:${section}:${date}`),
+            counters.get(`inspire:empty:${section}:${date}`),
+            counters.get(`inspire:errors:${section}:${date}`),
           ]);
           cacheStats[section].hits += hits;
           cacheStats[section].misses += misses;
+          healthStats[section].empty += empty;
+          healthStats[section].errors += errors;
         })()
       );
     }
@@ -158,6 +169,12 @@ async function getInspireStats(days: number) {
         hitRate: total > 0 ? Math.round((hits / total) * 100) : 0,
       };
     }),
+    health: Object.entries(healthStats).map(([section, { empty, errors }]) => ({
+      section,
+      empty,
+      errors,
+      total: empty + errors,
+    })),
   };
 }
 
@@ -349,6 +366,28 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
             );
           })}
         </div>
+      </section>
+
+      {/* Generation health — empty results & errors */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Generation Health (last {Math.min(days, 7)} days)</h2>
+        {stats.health.every((h) => h.total === 0) ? (
+          <p className={styles.empty}>No empty results or errors recorded.</p>
+        ) : (
+          <div className={styles.cacheGrid}>
+            {stats.health.map((h) => (
+              <div key={h.section} className={`${styles.cacheCard} ${h.total > 0 ? styles.healthWarning : ''}`}>
+                <span className={styles.cacheSection}>{h.section}</span>
+                <span className={h.total > 0 ? styles.healthBad : styles.healthGood}>
+                  {h.total > 0 ? `${h.total} failures` : 'Healthy'}
+                </span>
+                <span className={styles.cacheDetail}>
+                  {h.empty} empty results / {h.errors} errors
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
