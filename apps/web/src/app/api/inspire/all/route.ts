@@ -82,6 +82,12 @@ async function cacheIfNonEmpty<T>(key: string, data: T[], ttl: number): Promise<
   }
 }
 
+/** Treat cached empty arrays as cache misses — stale [] shouldn't block regeneration */
+function nonEmpty<T>(cached: T[] | null): T[] | null {
+  if (cached !== null && cached.length === 0) return null;
+  return cached;
+}
+
 function mapTrendingToPodcastSummary(
   trendingRaw: Awaited<ReturnType<typeof getTrending>>
 ): PodcastSummary[] {
@@ -179,11 +185,12 @@ export async function GET(request: NextRequest) {
   }
 
   // Full fetch — check cache for all 4 sections in parallel
+  // nonEmpty() treats cached [] as a cache miss so stale empties trigger regeneration
   const [cachedForYou, cachedTrending, cachedNews, cachedCuriosity] = await Promise.all([
-    cache.get<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)),
-    cache.get<PodcastSummary[]>(cacheKey('trending', userId)),
-    cache.get<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)),
-    cache.get<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)),
+    cache.get<TasteQuestion[]>(cacheKey('forYou', userId, topicHint)).then(nonEmpty),
+    cache.get<PodcastSummary[]>(cacheKey('trending', userId)).then(nonEmpty),
+    cache.get<TasteQuestion[]>(cacheKey('news', userId, topicHint, newsTimeRange)).then(nonEmpty),
+    cache.get<TasteQuestion[]>(cacheKey('curiosity', userId, topicHint)).then(nonEmpty),
   ]);
 
   const allCached = cachedForYou !== null && cachedTrending !== null && cachedNews !== null && cachedCuriosity !== null;
