@@ -549,6 +549,16 @@ export const referralSchema = z.object({
 });
 
 /**
+ * Mentions list validation (admin GET)
+ */
+export const mentionsQuerySchema = z.object({
+  status: z.enum(['PENDING', 'PARSING', 'GENERATING', 'READY', 'REPLIED', 'FAILED', 'IGNORED']).optional(),
+  search: z.string().max(200).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+/**
  * Trend filter validation (admin GET)
  */
 export const trendFilterSchema = z.object({
