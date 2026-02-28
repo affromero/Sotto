@@ -29,6 +29,8 @@ export interface TtsProviderMeta {
   defaultModel: string;
   models: TtsModelOption[];
   supportsAudioTags: boolean;
+  /** URL to provider's text formatting docs (null = plain text, strip all tags). */
+  docsUrl: string | null;
   qualityTier: 'standard' | 'premium' | 'ultra';
   platformCostPerKChar: number;
   auth: {
@@ -54,6 +56,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'eleven_multilingual_v2', displayName: 'Eleven Multilingual v2', tier: 'premium' },
     ],
     supportsAudioTags: true,
+    docsUrl: 'https://elevenlabs.io/docs/speech-synthesis/audio-tags',
     qualityTier: 'premium',
     platformCostPerKChar: 0.17,
     auth: {
@@ -86,6 +89,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'gpt-4o-mini-tts', displayName: 'GPT-4o Mini TTS', tier: 'standard' },
     ],
     supportsAudioTags: false,
+    docsUrl: null,
     qualityTier: 'standard',
     platformCostPerKChar: 0.015,
     auth: {
@@ -118,6 +122,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'sonic-2', displayName: 'Sonic 2 (Legacy)', tier: 'premium' },
     ],
     supportsAudioTags: true,
+    docsUrl: 'https://docs.cartesia.ai/build-with-cartesia/text-to-speech/sonic-formatting',
     qualityTier: 'premium',
     platformCostPerKChar: 0.04,
     auth: {
@@ -151,6 +156,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'octave', displayName: 'Octave', tier: 'ultra' },
     ],
     supportsAudioTags: false,
+    docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
     qualityTier: 'ultra',
     platformCostPerKChar: 0.25,
     auth: {
@@ -191,6 +197,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'qwen3-tts-0.6b', displayName: 'Qwen3 TTS 0.6B', tier: 'standard' },
     ],
     supportsAudioTags: false,
+    docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0,
     auth: {
@@ -219,6 +226,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     defaultModel: 'qwen3-tts',
     models: [{ id: 'qwen3-tts', displayName: 'Qwen3 TTS', tier: 'premium' }],
     supportsAudioTags: false,
+    docsUrl: null,
     qualityTier: 'premium',
     platformCostPerKChar: 0,
     auth: {
@@ -249,6 +257,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
       { id: 'kitten-tts-mini-0.8', displayName: 'KittenTTS Mini 0.8', tier: 'standard' },
     ],
     supportsAudioTags: false,
+    docsUrl: null,
     qualityTier: 'standard',
     platformCostPerKChar: 0,
     auth: {
