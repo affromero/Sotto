@@ -14,6 +14,8 @@ import {
   cleanAndRenumberMarkdown,
 } from '@/lib/script-updater';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -68,10 +70,15 @@ export async function processReferenceValidation(
         data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
       });
     }
-    await createSegmentsAndQueueAudio(
-      podcastId,
-      script.turns as Array<{ speaker: string; text: string }>
-    );
+    const noRefPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    const noRefTurns = script.turns as Array<{ speaker: string; text: string }>;
+    const convertedNoRefTurns = noRefPodcast.ttsProvider
+      ? await convertTurnsForProvider(noRefTurns, noRefPodcast.ttsProvider as TtsProviderId, podcastId)
+      : noRefTurns;
+    await createSegmentsAndQueueAudio(podcastId, convertedNoRefTurns);
     await job.updateProgress(100);
     return;
   }
@@ -282,7 +289,14 @@ export async function processReferenceValidation(
     }
     // BYOK: leave null — worker's resolveTtsProvider() picks best available
 
-    await createSegmentsAndQueueAudio(podcastId, turns);
+    const approvedPodcast = await prisma.podcast.findUniqueOrThrow({
+      where: { id: podcastId },
+      select: { ttsProvider: true },
+    });
+    const convertedTurns = approvedPodcast.ttsProvider
+      ? await convertTurnsForProvider(turns, approvedPodcast.ttsProvider as TtsProviderId, podcastId)
+      : turns;
+    await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
     await prisma.podcast.update({
       where: { id: podcastId },
