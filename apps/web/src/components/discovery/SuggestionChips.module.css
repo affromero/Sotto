@@ -1,4 +1,4 @@
-/* SuggestionChips — Horizontal scrollable chip row */
+/* SuggestionChips — Wrapping pill buttons */
 
 .root {
   width: 100%;
@@ -7,46 +7,14 @@
 
 .scrollContainer {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
-  overflow-x: auto;
   padding: var(--spacing-xs) var(--spacing-xs);
-  -webkit-overflow-scrolling: touch;
-
-  /* Hide scrollbar on mobile */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.scrollContainer::-webkit-scrollbar {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .scrollContainer {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
-  }
-
-  .scrollContainer::-webkit-scrollbar {
-    display: block;
-    height: 4px;
-  }
-
-  .scrollContainer::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .scrollContainer::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: var(--radius-full);
-  }
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
-  flex-shrink: 0;
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-full);
   border: 1px solid var(--color-primary);
@@ -56,7 +24,6 @@
   color: var(--color-primary);
   cursor: pointer;
   transition: all var(--transition-fast);
-  white-space: nowrap;
 
   /* Staggered slide-up entrance */
   opacity: 0;
