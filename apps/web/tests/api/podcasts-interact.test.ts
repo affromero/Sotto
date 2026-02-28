@@ -7,6 +7,7 @@ const mockPodcastFindUnique = vi.fn();
 const mockInteractionCreate = vi.fn();
 const mockAddJob = vi.fn();
 const mockCheckRateLimit = vi.fn();
+const mockUserFindUnique = vi.fn();
 
 // Mock dependencies
 vi.mock('@/lib/api-keys', () => ({
@@ -27,6 +28,7 @@ vi.mock('@/lib/prisma', () => {
     },
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -34,9 +36,11 @@ vi.mock('@/lib/prisma', () => {
 
 vi.mock('@/lib/queue', () => ({
   interactionQueue: {},
+  notificationQueue: {},
   addJob: (...args: unknown[]) => mockAddJob(...args),
   JobType: {
     PROCESS_INTERACTION: 'PROCESS_INTERACTION',
+    SEND_NOTIFICATION: 'SEND_NOTIFICATION',
   },
 }));
 
@@ -97,6 +101,8 @@ function createRequest(
 
 const mockPodcast = {
   id: 'podcast-123',
+  userId: 'owner-123',
+  title: 'Test Podcast',
 };
 
 const mockInteraction = {
@@ -122,6 +128,7 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: 0 });
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'PRO', role: 'USER' });
+    mockUserFindUnique.mockResolvedValue(null);
     mockInteractionCount.mockResolvedValue(0);
   });
 
@@ -256,5 +263,62 @@ describe('POST /api/podcasts/[podcastId]/interact', () => {
     const response = await POST(request, params);
 
     expect(response.status).toBe(201);
+  });
+
+  it('enqueues QUESTION_ON_YOUR_PODCAST notification for podcast owner', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
+    mockInteractionCreate.mockResolvedValue(mockInteraction);
+    mockAddJob.mockResolvedValue({ id: 'job-123' });
+    mockUserFindUnique.mockResolvedValue({ name: 'Test User' });
+
+    const { request, params } = createRequest('podcast-123', {
+      question: 'Can you explain quantum entanglement?',
+      timestamp: 120.5,
+    });
+
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'owner-123',
+        type: 'QUESTION_ON_YOUR_PODCAST',
+      })
+    );
+  });
+
+  it('does not enqueue notification when asking on own podcast', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'owner-123' });
+    mockPodcastFindUnique.mockResolvedValue(mockPodcast);
+    mockInteractionCreate.mockResolvedValue({
+      ...mockInteraction,
+      userId: 'owner-123',
+    });
+    mockAddJob.mockResolvedValue({ id: 'job-123' });
+
+    const { request, params } = createRequest('podcast-123', {
+      question: 'Testing my own podcast',
+      timestamp: 10,
+    });
+
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // addJob should only be called for PROCESS_INTERACTION, not SEND_NOTIFICATION
+    expect(mockAddJob).toHaveBeenCalledTimes(1);
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'PROCESS_INTERACTION',
+      expect.anything()
+    );
   });
 });

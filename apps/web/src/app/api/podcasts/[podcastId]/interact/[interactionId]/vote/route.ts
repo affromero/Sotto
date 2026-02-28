@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { notificationQueue, addJob, JobType } from '@/lib/queue';
+import type { SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string; interactionId: string }> };
@@ -17,7 +19,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
   const interaction = await prisma.interaction.findUnique({
     where: { id: interactionId },
-    select: { id: true, podcastId: true, visibility: true },
+    select: { id: true, podcastId: true, visibility: true, userId: true },
   });
 
   if (!interaction || interaction.podcastId !== podcastId) {
@@ -70,6 +72,22 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     where: { id: interactionId },
     select: { upvoteCount: true },
   });
+
+  // Fire-and-forget notification for question author
+  if (interaction.userId && interaction.userId !== userId) {
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+      .then((voter) => {
+        const payload: SendNotificationPayload = {
+          userId: interaction.userId,
+          type: 'QUESTION_UPVOTED',
+          title: 'Your question was upvoted',
+          message: `${voter?.name ?? 'Someone'} upvoted your question`,
+          data: { podcastId, interactionId },
+        };
+        return addJob(notificationQueue, JobType.SEND_NOTIFICATION, payload);
+      })
+      .catch(() => {});
+  }
 
   return NextResponse.json({
     voted: true,
