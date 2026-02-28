@@ -1,8 +1,7 @@
-/* PodcastCard — Gradient cover card for podcast feed */
+/* PodcastCard — Cover-only gradient card for podcast feed */
 
 .card {
   position: relative;
-  background: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   transition: box-shadow var(--transition-base), transform var(--transition-base);
@@ -25,11 +24,11 @@
   color: inherit;
 }
 
-/* ── Gradient Cover ─────────────────────────── */
+/* ── Gradient Cover (full card) ────────────── */
 
 .cover {
   position: relative;
-  height: 140px;
+  height: 180px;
   background: linear-gradient(
     var(--cover-angle, 145deg),
     var(--cover-from, var(--color-primary)),
@@ -40,8 +39,19 @@
   flex-direction: column;
   justify-content: flex-end;
   padding: var(--space-4);
+  gap: var(--space-1);
 }
 
+/* Bottom scrim for text legibility */
+.cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+
+/* Hover overlay */
 .cover::after {
   content: '';
   position: absolute;
@@ -97,13 +107,27 @@
   margin-left: auto;
 }
 
-/* Cover content (bottom row) */
+/* ── Cover content (title + topic) ─────────── */
+
 .coverContent {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.remixSubline {
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .title {
@@ -129,6 +153,71 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
+}
+
+/* ── Cover tags (frosted glass pills) ──────── */
+
+.coverTags {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  overflow: hidden;
+  margin-top: var(--space-1);
+}
+
+.coverTag {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  color: #fff;
+  white-space: nowrap;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+
+/* ── Cover meta (date + stats bottom row) ──── */
+
+.coverMeta {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.coverDate {
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.65);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.coverStats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.coverStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font: var(--text-caption);
+  font-size: var(--font-size-xs);
+  color: rgba(255, 255, 255, 0.65);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.coverStat svg {
+  flex-shrink: 0;
 }
 
 /* ── Play Button (centered on cover) ────────── */
@@ -168,11 +257,11 @@
   transform: translate(-50%, -50%) scale(0.96);
 }
 
-/* ── Fork Button (bottom-right on cover) ────── */
+/* ── Fork Button (bottom-right, above coverMeta) */
 
 .forkButton {
   position: absolute;
-  bottom: var(--space-3);
+  bottom: calc(var(--space-3) + 24px);
   right: var(--space-3);
   z-index: 2;
   display: inline-flex;
@@ -216,135 +305,10 @@
   }
 }
 
-/* Hide fork button text on compact variant */
-.compact .forkButton {
-  bottom: var(--space-2);
-  right: var(--space-2);
-  padding: 6px;
-}
-
-.compact .forkButton span {
-  display: none;
-}
-
-/* ── White Body ─────────────────────────────── */
-
-.body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-/* Remix subline */
-.remixSubline {
-  font: var(--text-caption);
-  color: var(--color-text-tertiary);
-  font-style: italic;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* Creator row */
-.creator {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--color-primary-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatarImage {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: var(--radius-full);
-}
-
-.avatarFallback {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.creatorName {
-  font: var(--text-body-sm);
-  color: var(--color-text-primary);
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.dot {
-  width: 3px;
-  height: 3px;
-  border-radius: var(--radius-full);
-  background: var(--color-text-tertiary);
-  flex-shrink: 0;
-}
-
-.date {
-  font: var(--text-caption);
-  color: var(--color-text-tertiary);
-}
-
-/* Stats row */
-.stats {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.stat {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font: var(--text-caption);
-  color: var(--color-text-secondary);
-}
-
-.stat svg {
-  flex-shrink: 0;
-  color: var(--color-primary);
-}
-
-/* Tags */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.tag {
-  display: inline-block;
-  padding: 1px var(--space-2);
-  font: var(--text-caption);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  white-space: nowrap;
-}
-
 /* ── Variant: Featured ──────────────────────── */
 
 .featured .cover {
-  height: 200px;
+  height: 240px;
 }
 
 .featured .title {
@@ -354,21 +318,13 @@
 /* ── Variant: Compact ───────────────────────── */
 
 .compact {
-  background: none;
   box-shadow: none;
 }
 
 .compact .cover {
   height: 160px;
   border-radius: var(--radius-xl);
-}
-
-.compact .body {
-  display: none;
-}
-
-.compact .coverContent {
-  gap: var(--space-1);
+  padding: var(--space-3);
 }
 
 .compact .coverBadges {
@@ -377,41 +333,19 @@
   right: var(--space-3);
 }
 
-.compact .cover {
-  padding: var(--space-3);
+.compact .coverContent {
+  gap: var(--space-1);
 }
 
-/* Compact: show creator + stats overlaid on cover */
-.compactMeta {
+/* Hide fork button text on compact variant */
+.compact .forkButton {
+  bottom: calc(var(--space-2) + 20px);
+  right: var(--space-2);
+  padding: 6px;
+}
+
+.compact .forkButton span {
   display: none;
-}
-
-.compact .compactMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  position: relative;
-  z-index: 1;
-  margin-top: var(--space-1);
-}
-
-.compactCreator {
-  font: var(--text-caption);
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.compactStat {
-  font: var(--text-caption);
-  color: rgba(255, 255, 255, 0.65);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.compactStat svg {
-  flex-shrink: 0;
 }
 
 /* ── Mobile ─────────────────────────────────── */
@@ -423,11 +357,11 @@
   }
 
   .cover {
-    height: 120px;
+    height: 140px;
   }
 
   .featured .cover {
-    height: 160px;
+    height: 180px;
   }
 }
 

@@ -19,6 +19,7 @@ interface ExploreResult {
   createdAt: string;
   user: { id: string; name: string | null; image: string | null; handle?: string | null };
   tags: Array<{ id: string; name: string; slug: string }>;
+  ownerIsPro?: boolean;
   score: number;
   explanation: string;
 }
@@ -43,6 +44,7 @@ function resultToPodcastSummary(result: ExploreResult): PodcastSummary {
     source: 'WEB',
     isHumanContent: false,
     forkedFromId: null,
+    ownerIsPro: result.ownerIsPro ?? false,
     user: {
       ...result.user,
       handle: result.user.handle || null,

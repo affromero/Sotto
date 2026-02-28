@@ -140,7 +140,7 @@ describe('GET /api/feed', () => {
       image: 'https://example.com/alice.jpg',
     });
     expect(podcast.tags).toHaveLength(1);
-    expect(podcast.tags[0].tag.slug).toBe('science');
+    expect(podcast.tags[0].slug).toBe('science');
   });
 
   it('applies default parameters (page=1, limit=20, sort=recent)', async () => {
