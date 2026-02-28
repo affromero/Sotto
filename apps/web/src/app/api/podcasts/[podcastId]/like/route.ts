@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
+import { notificationQueue, addJob, JobType } from '@/lib/queue';
+import type { SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -18,7 +20,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true },
+    select: { id: true, userId: true, title: true },
   });
 
   if (!podcast) {
@@ -60,6 +62,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       targetType: 'podcast',
     },
   }).catch(() => {});
+
+  // Fire-and-forget notification for podcast owner
+  if (podcast.userId && podcast.userId !== userId) {
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+      .then((liker) => {
+        const payload: SendNotificationPayload = {
+          userId: podcast.userId,
+          type: 'PODCAST_LIKED',
+          title: 'Someone liked your podcast',
+          message: `${liker?.name ?? 'Someone'} liked "${podcast.title ?? 'your podcast'}"`,
+          data: { podcastId },
+        };
+        return addJob(notificationQueue, JobType.SEND_NOTIFICATION, payload);
+      })
+      .catch(() => {});
+  }
 
   // Fire-and-forget auto-tweet threshold check (after transaction committed)
   checkAutoTweetThreshold(podcastId).catch(() => {});

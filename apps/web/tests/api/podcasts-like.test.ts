@@ -8,6 +8,8 @@ const mockLikeCreate = vi.fn();
 const mockLikeDelete = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockTransaction = vi.fn();
+const mockUserFindUnique = vi.fn();
+const mockAddJob = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -24,6 +26,9 @@ vi.mock('@/lib/prisma', () => {
       create: (...args: unknown[]) => mockLikeCreate(...args),
       delete: (...args: unknown[]) => mockLikeDelete(...args),
     },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+    },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
@@ -31,6 +36,12 @@ vi.mock('@/lib/prisma', () => {
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/queue', () => ({
+  notificationQueue: {},
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { SEND_NOTIFICATION: 'SEND_NOTIFICATION' },
+}));
 
 import { POST, DELETE } from '@/app/api/podcasts/[podcastId]/like/route';
 
@@ -46,6 +57,8 @@ async function createParams(podcastId: string) {
 describe('POST /api/podcasts/[podcastId]/like', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue(null);
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -87,7 +100,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
   it('returns liked: true without creating duplicate when already liked', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1', title: 'Test Podcast' });
     mockLikeFindUnique.mockResolvedValue({
       id: 'like-1',
       userId: 'user-1',
@@ -106,7 +119,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
   it('creates like and increments likeCount when not already liked', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1', title: 'Test Podcast' });
     mockLikeFindUnique.mockResolvedValue(null);
     mockTransaction.mockImplementation(async (callback) => {
       const tx = {
@@ -133,6 +146,65 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
 
     expect(response.status).toBe(200);
     expect(body).toEqual({ liked: true });
+  });
+
+  it('enqueues PODCAST_LIKED notification when liking another user\'s podcast', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1', title: 'Test Podcast' });
+    mockLikeFindUnique.mockResolvedValue(null);
+    mockTransaction.mockImplementation(async (callback) => {
+      const tx = {
+        like: { create: mockLikeCreate },
+        podcast: { update: mockPodcastUpdate },
+      };
+      return callback(tx);
+    });
+    mockLikeCreate.mockResolvedValue({ id: 'like-1' });
+    mockPodcastUpdate.mockResolvedValue({ id: 'pod-1', likeCount: 1 });
+    mockUserFindUnique.mockResolvedValue({ name: 'Liker User' });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const request = createRequest();
+    const params = await createParams('pod-1');
+    await POST(request, params);
+
+    // Allow fire-and-forget promise chain to resolve
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockUserFindUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'user-1' },
+    }));
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'owner-1',
+        type: 'PODCAST_LIKED',
+      })
+    );
+  });
+
+  it('does not enqueue notification when liking own podcast', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'owner-1' });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1', title: 'Test Podcast' });
+    mockLikeFindUnique.mockResolvedValue(null);
+    mockTransaction.mockImplementation(async (callback) => {
+      const tx = {
+        like: { create: mockLikeCreate },
+        podcast: { update: mockPodcastUpdate },
+      };
+      return callback(tx);
+    });
+    mockLikeCreate.mockResolvedValue({ id: 'like-1' });
+    mockPodcastUpdate.mockResolvedValue({ id: 'pod-1', likeCount: 1 });
+
+    const request = createRequest();
+    const params = await createParams('pod-1');
+    await POST(request, params);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
 });

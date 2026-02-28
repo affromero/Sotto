@@ -14,6 +14,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { AccountSwitcher } from './AccountSwitcher';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import styles from './Sidebar.module.css';
 
 interface SidebarProps {
@@ -91,6 +92,10 @@ export function Sidebar({ currentPath, isOpen = false, onClose, hasPodcasts = fa
             );
           })}
         </nav>
+
+        <div className={styles.notificationSection}>
+          <NotificationDropdown />
+        </div>
 
         <div className={styles.statusLink}>
           <a

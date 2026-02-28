@@ -1,0 +1,19 @@
+.root {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + var(--spacing-sm));
+  right: 0;
+  z-index: var(--z-dropdown);
+}
+
+@media (max-width: 420px) {
+  .dropdown {
+    position: fixed;
+    top: var(--topbar-height);
+    right: 0;
+    left: 0;
+  }
+}
