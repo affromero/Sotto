@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockLikeFindUnique = vi.fn();
 const mockLikeCreate = vi.fn();
@@ -9,8 +9,8 @@ const mockLikeDelete = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -49,7 +49,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest();
     const params = await createParams('pod-1');
@@ -61,7 +61,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest();
     const params = await createParams('pod-1');
@@ -73,7 +73,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns 404 when podcast does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const request = createRequest();
@@ -86,7 +86,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns liked: true without creating duplicate when already liked', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
     mockLikeFindUnique.mockResolvedValue({
       id: 'like-1',
@@ -105,7 +105,7 @@ describe('POST /api/podcasts/[podcastId]/like', () => {
   });
 
   it('creates like and increments likeCount when not already liked', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1' });
     mockLikeFindUnique.mockResolvedValue(null);
     mockTransaction.mockImplementation(async (callback) => {
@@ -143,7 +143,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest();
     const params = await createParams('pod-1');
@@ -155,7 +155,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns 401 when session exists but user.id is missing', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createRequest();
     const params = await createParams('pod-1');
@@ -167,7 +167,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
   });
 
   it('returns liked: false without deleting when like does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockLikeFindUnique.mockResolvedValue(null);
 
     const request = createRequest();
@@ -180,7 +180,7 @@ describe('DELETE /api/podcasts/[podcastId]/like', () => {
   });
 
   it('deletes like and decrements likeCount when like exists', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockLikeFindUnique.mockResolvedValue({
       id: 'like-1',
       userId: 'user-1',

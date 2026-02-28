@@ -3,10 +3,10 @@ import { NextRequest } from 'next/server';
 
 // ---- Mocks ----
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 const mockPrismaUserFindUnique = vi.fn();
@@ -48,7 +48,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createMockRequest();
     const response = await POST(request, {
@@ -61,7 +61,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createMockRequest();
     const response = await POST(request, {
@@ -74,7 +74,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('returns 400 when trying to follow yourself', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-123' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
 
     const request = createMockRequest();
     const response = await POST(request, {
@@ -87,7 +87,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('returns 404 when target user does not exist', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'current-user-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'current-user-id' });
     mockPrismaUserFindUnique.mockResolvedValue(null);
 
     const request = createMockRequest();
@@ -101,7 +101,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('successfully creates a new follow relationship', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
     mockPrismaUserFindUnique.mockResolvedValue({
       id: 'following-id',
       name: 'Target User',
@@ -124,7 +124,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('returns 200 when already following (P2002 unique constraint violation)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
     mockPrismaUserFindUnique.mockResolvedValue({
       id: 'following-id',
       name: 'Target User',
@@ -145,7 +145,7 @@ describe('POST /api/users/[userId]/follow', () => {
   });
 
   it('throws error for non-P2002 database errors', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
     mockPrismaUserFindUnique.mockResolvedValue({
       id: 'following-id',
       name: 'Target User',
@@ -172,7 +172,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createMockRequest();
     const response = await DELETE(request, {
@@ -185,7 +185,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
   });
 
   it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createMockRequest();
     const response = await DELETE(request, {
@@ -198,7 +198,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
   });
 
   it('successfully deletes an existing follow relationship', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
     mockPrismaFollowDelete.mockResolvedValue({
       followerId: 'follower-id',
       followingId: 'following-id',
@@ -216,7 +216,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
   });
 
   it('returns 200 when not following (P2025 record not found)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
 
     const notFoundError = new Error('Record not found');
     Object.assign(notFoundError, { code: 'P2025' });
@@ -233,7 +233,7 @@ describe('DELETE /api/users/[userId]/follow', () => {
   });
 
   it('throws error for non-P2025 database errors', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'follower-id' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
 
     const databaseError = new Error('Database connection failed');
     Object.assign(databaseError, { code: 'P1001' });
