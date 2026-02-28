@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
+import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
 import { Menu } from 'lucide-react';
 import styles from './DashboardShell.module.css';
 
@@ -47,6 +48,9 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
             <Menu size={24} aria-hidden="true" />
           </button>
           <span className={styles.logo}>Sotto</span>
+          <div className={styles.bellWrapper}>
+            <NotificationDropdown />
+          </div>
         </header>
 
         <div key={pathname} className={styles.content}>

@@ -47,6 +47,10 @@
   color: var(--color-primary);
 }
 
+.bellWrapper {
+  margin-left: auto;
+}
+
 .content {
   flex: 1;
   padding: var(--spacing-lg) var(--spacing-md);
