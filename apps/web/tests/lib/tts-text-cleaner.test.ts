@@ -5,6 +5,9 @@ describe('tts-text-cleaner', () => {
   describe('common cleaning (all providers)', () => {
     it('removes SFX markers', () => {
       expect(cleanTextForTts('[SFX: upbeat music, 3s] Hello there'))
+        .toBe('[laughs] Hello there'.replace('[laughs] ', ''));
+      // Simpler:
+      expect(cleanTextForTts('[SFX: upbeat music, 3s] Hello there'))
         .toBe('Hello there');
     });
 
@@ -13,12 +16,16 @@ describe('tts-text-cleaner', () => {
         .toBe('According to a study, this works.');
     });
 
-    it('removes parenthetical delivery directions', () => {
+    it('converts parenthetical directions to bracket audio tags', () => {
+      // Without a provider, audio tags get stripped → net effect is removal
       expect(cleanTextForTts('(laughing) That is so funny'))
         .toBe('That is so funny');
+      expect(cleanTextForTts('(whispering) Secret stuff'))
+        .toBe('Secret stuff');
     });
 
-    it('removes parenthetical pause directions', () => {
+    it('converts parenthetical pause directions to bracket tags', () => {
+      // Without a provider, converted tags get stripped
       expect(cleanTextForTts('And then (short pause) it happened'))
         .toBe('And then it happened');
       expect(cleanTextForTts('Wow (long pause) that is heavy'))
@@ -64,6 +71,15 @@ describe('tts-text-cleaner', () => {
       expect(cleanTextForTts(text, { providerId: 'elevenlabs' }))
         .toBe('[snorts] [crying] [trembling] Really?');
     });
+
+    it('converts parenthetical directions to native audio tags', () => {
+      expect(cleanTextForTts('(laughing) That is funny', { providerId: 'elevenlabs' }))
+        .toBe('[laughs] That is funny');
+      expect(cleanTextForTts('(short pause) And then', { providerId: 'elevenlabs' }))
+        .toBe('[short pause] And then');
+      expect(cleanTextForTts('(excitedly) Wow!', { providerId: 'elevenlabs' }))
+        .toBe('[excited] Wow!');
+    });
   });
 
   describe('Cartesia — converts to SSML and [laughter]', () => {
@@ -91,6 +107,15 @@ describe('tts-text-cleaner', () => {
       expect(cleanTextForTts('[whispers] Secret [excited] Yay', { providerId: 'cartesia' }))
         .toBe('Secret Yay');
     });
+
+    it('converts parenthetical directions through to Cartesia format', () => {
+      // (laughing) → [laughs] → [laughter]
+      expect(cleanTextForTts('(laughing) Ha!', { providerId: 'cartesia' }))
+        .toBe('[laughter] Ha!');
+      // (short pause) → [short pause] → <break time="500ms"/>
+      expect(cleanTextForTts('And (short pause) then', { providerId: 'cartesia' }))
+        .toBe('And <break time="500ms"/> then');
+    });
   });
 
   describe('Hume — keeps native pause markers', () => {
@@ -108,6 +133,15 @@ describe('tts-text-cleaner', () => {
       expect(cleanTextForTts('[laughs] [excited] Hello [pause] there', { providerId: 'hume' }))
         .toBe('Hello [pause] there');
     });
+
+    it('converts parenthetical pause to native Hume tag', () => {
+      // (short pause) → [short pause] → stripped (not in Hume native set)
+      expect(cleanTextForTts('Wait (short pause) okay', { providerId: 'hume' }))
+        .toBe('Wait okay');
+      // (pause) → [pause] → kept (native)
+      expect(cleanTextForTts('And (pause) then', { providerId: 'hume' }))
+        .toBe('And [pause] then');
+    });
   });
 
   describe('OpenAI and others — strips all audio tags', () => {
@@ -124,6 +158,11 @@ describe('tts-text-cleaner', () => {
     it('strips all tags when no provider specified', () => {
       expect(cleanTextForTts('[whispers] Secret [gasps] Oh no'))
         .toBe('Secret Oh no');
+    });
+
+    it('strips converted parenthetical directions too', () => {
+      expect(cleanTextForTts('(laughing) Ha! (short pause) Okay', { providerId: 'openai' }))
+        .toBe('Ha! Okay');
     });
   });
 });
