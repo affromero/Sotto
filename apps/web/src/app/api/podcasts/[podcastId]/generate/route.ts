@@ -145,15 +145,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Smart resume: inspect existing data and pick up where we left off
       const resumePoint = await determineResumePoint(podcastId);
 
+      // Parse optional provider override from JSON body (audio failure retry)
+      let bodyProvider: string | undefined;
+      let bodyModel: string | undefined;
+      try {
+        const body = await request.json();
+        bodyProvider = body?.ttsProvider;
+        bodyModel = body?.ttsModel;
+      } catch {
+        // No JSON body — bare retry
+      }
+
+      if (bodyProvider) {
+        // User picked a different provider — override the dead one
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: { ttsProvider: bodyProvider, ttsModel: bodyModel ?? null },
+        });
+        // Old voice IDs are provider-specific — clear them
+        await prisma.podcastVoice.deleteMany({ where: { podcastId } });
+      } else {
+        // Bare retry — clear locked provider so resolveTtsProvider() auto-resolves fresh
+        await prisma.podcast.update({
+          where: { id: podcastId },
+          data: { ttsProvider: null, ttsModel: null },
+        });
+      }
+
       if (useAdminCredits) {
         const selected = await selectFreeTierProviders(podcast.userId);
         await prisma.podcast.update({
           where: { id: podcastId },
-          data: {
-            ttsProvider: selected.ttsProvider,
-            ttsModel: selected.ttsModel,
-            aiModel: selected.aiModel,
-          },
+          data: { aiModel: selected.aiModel },
         });
       }
 
@@ -189,15 +212,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
 
   if (useAdminCredits) {
-    // Use platform API keys: write free-tier provider selection, skip counter
+    // Use platform API keys: write AI model only — TTS deferred to script approval
     const selected = await selectFreeTierProviders(podcast.userId);
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: {
-        ttsProvider: selected.ttsProvider,
-        ttsModel: selected.ttsModel,
-        aiModel: selected.aiModel,
-      },
+      data: { aiModel: selected.aiModel },
     });
   } else if (!gate.isByokUser) {
     // Increment free tier counter (skip for FAILED retries — already counted)
@@ -206,14 +225,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ai: { provider: selected.aiProvider, quota: selected.aiQuota },
       tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
     });
-    // Write selected providers onto the podcast
+    // Write AI model only — TTS deferred to script approval
     await prisma.podcast.update({
       where: { id: podcastId },
-      data: {
-        ttsProvider: selected.ttsProvider,
-        ttsModel: selected.ttsModel,
-        aiModel: selected.aiModel,
-      },
+      data: { aiModel: selected.aiModel },
     });
   }
 
@@ -348,9 +363,16 @@ async function routeResume(
       await prisma.podcastVersion.deleteMany({ where: { podcastId } });
       await prisma.segment.deleteMany({ where: { podcastId } });
 
+      // Clear TTS provider so user re-enters audio config UI
       await prisma.podcast.update({
         where: { id: podcastId },
-        data: { status: 'SCRIPT_READY', failedAtStatus: null, failureReason: null },
+        data: {
+          status: 'SCRIPT_READY',
+          failedAtStatus: null,
+          failureReason: null,
+          ttsProvider: null,
+          ttsModel: null,
+        },
       });
 
       return NextResponse.json({

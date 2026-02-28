@@ -4,6 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { ScriptTurn } from '@/lib/script-generator';
 
 import { errorResponse } from '@/lib/api-response';
@@ -51,6 +52,48 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
   if (podcast.status !== 'SCRIPT_READY') {
     return errorResponse('Script can only be approved when status is SCRIPT_READY', 400);
+  }
+
+  // Parse optional audio config from request body
+  let bodyTtsProvider: string | undefined;
+  let bodyTtsModel: string | undefined;
+  let bodyVoices: Array<{ speaker: string; voiceId: string | null }> | undefined;
+  try {
+    const body = await request.json();
+    bodyTtsProvider = body?.ttsProvider;
+    bodyTtsModel = body?.ttsModel;
+    bodyVoices = body?.voices;
+  } catch {
+    // No JSON body — use defaults
+  }
+
+  // Write TTS provider at approve time (deferred from pipeline start)
+  if (gate.isByokUser) {
+    if (bodyTtsProvider) {
+      // BYOK user explicitly picked a provider
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { ttsProvider: bodyTtsProvider, ttsModel: bodyTtsModel ?? null },
+      });
+    }
+    // else: leave null — worker's resolveTtsProvider() picks best available
+  } else {
+    // Free-tier: auto-select provider (moved from generate route)
+    const selected = await selectFreeTierProviders(userId);
+    await prisma.podcast.update({
+      where: { id: podcastId },
+      data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+    });
+  }
+
+  // Write custom voice selections if provided
+  if (bodyVoices && bodyVoices.length > 0) {
+    await prisma.podcastVoice.deleteMany({ where: { podcastId } });
+    await prisma.podcastVoice.createMany({
+      data: bodyVoices
+        .filter((v) => v.voiceId)
+        .map((v) => ({ podcastId, speaker: v.speaker, voiceId: v.voiceId! })),
+    });
   }
 
   const script = await prisma.script.findUnique({

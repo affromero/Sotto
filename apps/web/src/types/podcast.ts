@@ -70,6 +70,7 @@ export interface PodcastDetail extends PodcastSummary {
   commentCount: number;
   remixNote: string | null;
   failureReason: string | null;
+  failedAtStatus?: string | null;
   verificationMode?: string;
   forkedFrom: ForkedFromInfo | null;
   forks: ForkSummary[];

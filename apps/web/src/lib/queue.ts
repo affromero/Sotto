@@ -431,6 +431,11 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           // BYOK TTS key was used (ttsProvider is set)
           await markTtsKeyInvalid(podcast.userId, podcast.ttsProvider as TtsProviderId);
           failureReason = userMessage(errorKind, podcast.ttsProvider);
+          // Clear locked provider so retry can auto-resolve or user can pick a different one
+          await prisma.podcast.update({
+            where: { id: podcastId },
+            data: { ttsProvider: null, ttsModel: null },
+          });
           if (notifQueue) {
             await notifQueue.add('send_notification', {
               userId: podcast.userId,

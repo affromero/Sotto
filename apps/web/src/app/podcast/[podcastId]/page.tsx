@@ -313,6 +313,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     ownerIsPro: false,
     remixNote: podcast.remixNote,
     failureReason: podcast.failureReason,
+    failedAtStatus: podcast.failedAtStatus,
     verificationMode: podcast.verificationMode,
     currentVersion: podcast.currentVersion,
     user: podcast.user,

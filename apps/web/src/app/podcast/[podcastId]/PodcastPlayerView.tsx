@@ -48,6 +48,7 @@ import { MetadataBadges } from '@/components/ui/MetadataBadges';
 import { Button } from '@/components/ui/Button';
 import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptPreview } from '@/components/player/ScriptPreview';
+import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -158,6 +159,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [scriptTurns, setScriptTurns] = useState<Array<{ speaker: string; text: string }> | null>(null);
   const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
+  const [audioConfig, setAudioConfig] = useState<AudioConfig>({ ttsProvider: undefined, ttsModel: undefined, voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
   const [playerInView, setPlayerInView] = useState(true);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
@@ -206,9 +208,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [isOwner, podcast.id, podcast.status]);
 
-  // Fetch script turns for review when SCRIPT_READY
+  // Fetch script turns for review when SCRIPT_READY or FAILED (for AudioConfigPanel speakers)
+  const needsScript = liveStatus === 'SCRIPT_READY' || (liveStatus === 'FAILED' && ['GENERATING_AUDIO', 'STITCHING'].includes(podcast.failedAtStatus ?? ''));
   useEffect(() => {
-    if (liveStatus !== 'SCRIPT_READY' || !isOwner) return;
+    if (!needsScript || !isOwner) return;
     fetch(`/api/podcasts/${podcast.id}/script`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -216,7 +219,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if (data?.references) setScriptRefs(data.references);
       })
       .catch(() => {});
-  }, [liveStatus, isOwner, podcast.id]);
+  }, [needsScript, isOwner, podcast.id]);
 
   // Poll for status updates while podcast is processing
   useEffect(() => {
@@ -293,8 +296,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
     try {
+      const body: Record<string, unknown> = {};
+      if (audioConfig.ttsProvider) {
+        body.ttsProvider = audioConfig.ttsProvider;
+        body.ttsModel = audioConfig.ttsModel;
+      }
       const response = await fetch(`/api/podcasts/${podcast.id}/generate`, {
         method: 'POST',
+        ...(Object.keys(body).length > 0
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          : {}),
       });
       if (response.ok) {
         window.location.reload();
@@ -302,7 +313,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     } catch {
       setRetrying(false);
     }
-  }, [podcast.id]);
+  }, [podcast.id, audioConfig]);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -322,8 +333,19 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const handleApproveScript = useCallback(async () => {
     setApproving(true);
     try {
+      const body: Record<string, unknown> = {};
+      if (audioConfig.ttsProvider) {
+        body.ttsProvider = audioConfig.ttsProvider;
+        body.ttsModel = audioConfig.ttsModel;
+      }
+      if (audioConfig.voices.length > 0) {
+        body.voices = audioConfig.voices;
+      }
       const response = await fetch(`/api/podcasts/${podcast.id}/script/approve`, {
         method: 'POST',
+        ...(Object.keys(body).length > 0
+          ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+          : {}),
       });
       if (response.ok) {
         setLiveStatus('GENERATING_AUDIO');
@@ -333,7 +355,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     } finally {
       setApproving(false);
     }
-  }, [podcast.id]);
+  }, [podcast.id, audioConfig]);
 
   const handleRegenerateScript = useCallback(async () => {
     setRegenerating(true);
@@ -530,6 +552,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               View in Admin Panel
             </Link>
           )}
+          {['GENERATING_AUDIO', 'STITCHING'].includes(podcast.failedAtStatus ?? '') && (
+            <AudioConfigPanel
+              speakers={scriptTurns?.map((t) => t.speaker).filter((s, i, a) => a.indexOf(s) === i) ?? ['HOST', 'EXPERT']}
+              onConfigChange={setAudioConfig}
+              failedProvider={podcast.ttsProvider}
+            />
+          )}
           <div className={styles.failedActions}>
             <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
               <RefreshCw size={16} />
@@ -571,7 +600,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             Your script is ready for review. Approve to start audio generation, or regenerate for a fresh script.
           </p>
           {scriptTurns && scriptTurns.length > 0 && (
-            <ScriptPreview turns={scriptTurns} references={scriptRefs} podcastId={podcast.id} />
+            <>
+              <ScriptPreview turns={scriptTurns} references={scriptRefs} podcastId={podcast.id} />
+              <AudioConfigPanel
+                speakers={[...new Set(scriptTurns.map((t) => t.speaker))]}
+                onConfigChange={setAudioConfig}
+              />
+            </>
           )}
           <textarea
             className={styles.regenerateFeedback}
