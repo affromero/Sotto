@@ -16,6 +16,7 @@ import {
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { getTierFeatures } from '@/lib/tier-features';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
 
@@ -58,6 +59,15 @@ export async function processReferenceValidation(
 
   if (references.length === 0) {
     logger.info('No references to validate, proceeding to audio generation', { podcastId });
+    // Select TTS provider at auto-approve time (deferred from pipeline start)
+    const isByokEarly = useAdminCredits ? true : await hasByokKey(userId);
+    if (!isByokEarly) {
+      const selected = await selectFreeTierProviders(userId);
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+      });
+    }
     await createSegmentsAndQueueAudio(
       podcastId,
       script.turns as Array<{ speaker: string; text: string }>
@@ -262,6 +272,16 @@ export async function processReferenceValidation(
     logger.info('References validated, paused at SCRIPT_READY for review', { podcastId });
   } else {
     // Auto-approve for TWITTER/API sources or Free users
+    // Select TTS provider at auto-approve time (deferred from pipeline start)
+    if (!isByok) {
+      const selected = await selectFreeTierProviders(userId);
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+      });
+    }
+    // BYOK: leave null — worker's resolveTtsProvider() picks best available
+
     await createSegmentsAndQueueAudio(podcastId, turns);
 
     await prisma.podcast.update({
