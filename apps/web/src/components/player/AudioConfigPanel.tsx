@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { TtsModelDropdown } from '@/components/create/TtsModelDropdown';
 import { VoiceCard } from '@/components/discovery/VoiceCard';
 import { HumeVoiceBrowser } from '@/components/discovery/HumeVoiceBrowser';
@@ -55,15 +55,6 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
   const [userClones, setUserClones] = useState<VoiceClone[]>([]);
   const [sharedVoices, setSharedVoices] = useState<SharedVoice[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const prevProviderRef = useRef(ttsProvider);
-
-  // Clear voice selections when TTS provider changes (voice IDs are provider-specific)
-  useEffect(() => {
-    if (prevProviderRef.current !== ttsProvider) {
-      prevProviderRef.current = ttsProvider;
-      setVoiceMap({});
-    }
-  }, [ttsProvider]);
 
   // Load voice options
   useEffect(() => {
@@ -95,7 +86,11 @@ export function AudioConfigPanel({ speakers, onConfigChange, failedProvider }: A
   }, [emitConfig]);
 
   const handleProviderChange = useCallback((provider: string | undefined, model: string | undefined) => {
-    setTtsProvider(provider);
+    setTtsProvider((prev) => {
+      // Clear voice selections when provider changes (voice IDs are provider-specific)
+      if (prev !== provider) setVoiceMap({});
+      return provider;
+    });
     setTtsModel(model);
   }, []);
 

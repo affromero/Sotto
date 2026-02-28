@@ -18,6 +18,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
+const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -34,6 +35,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
+    },
+    script: {
+      findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),

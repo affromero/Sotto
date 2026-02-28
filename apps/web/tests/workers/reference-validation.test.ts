@@ -126,6 +126,17 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
 }));
 
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    aiQuota: 10,
+    ttsProvider: 'elevenlabs',
+    ttsModel: 'eleven_multilingual_v2',
+    ttsQuota: 10,
+  }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
