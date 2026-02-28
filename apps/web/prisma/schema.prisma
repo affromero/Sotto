@@ -506,6 +506,7 @@ model PodcastVoice {
   podcastId String
   speaker   String  // "Host", "Expert", "Skeptic", etc.
   voiceId   String? // TTS voice ID (pool or clone)
+  provider  String? // TTS provider that assigned the voiceId
   podcast   Podcast @relation(fields: [podcastId], references: [id], onDelete: Cascade)
 
   @@unique([podcastId, speaker])
@@ -1871,6 +1872,7 @@ model VoiceTrackVoice {
   voiceTrackId String
   speaker      String
   voiceId      String
+  provider     String? // TTS provider that assigned the voiceId
 
   voiceTrack VoiceTrack @relation(fields: [voiceTrackId], references: [id], onDelete: Cascade)
 
