@@ -70,12 +70,13 @@ const nextConfig = {
   async headers() {
     const defaultCsp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' https:",
       "media-src 'self' data: https: blob:",
+      "frame-src 'self' https://js.stripe.com",
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -83,12 +84,13 @@ const nextConfig = {
 
     const embedCsp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data: https://fonts.gstatic.com",
       "connect-src 'self' https:",
       "media-src 'self' data: https: blob:",
+      "frame-src 'self' https://js.stripe.com",
       'frame-ancestors *',
       "base-uri 'self'",
       "form-action 'self'",
