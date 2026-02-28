@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { authenticateRequest } from '@/lib/api-keys';
-import { cache, checkRateLimit, counters } from '@/lib/redis';
+import { cache, checkRateLimit, counters, inspireFailures } from '@/lib/redis';
 import {
   generateForYouQuestions,
   generateNewsQuestions,
@@ -306,8 +306,10 @@ export async function GET(request: NextRequest) {
         const result = results[i];
         if (result.status === 'rejected') {
           const sec = sectionNames[i];
+          const reason = `SSE rejection: ${(result.reason as Error).message}`;
           logger.error('Inspire section generation failed', { section: sec, error: (result.reason as Error).message });
           trackError(sec);
+          inspireFailures.push({ section: sec, reason, userId, timestamp: new Date().toISOString() }).catch(() => {});
           // Send empty array so the client doesn't hang waiting for this section
           send({ section: sec, data: [] });
         }

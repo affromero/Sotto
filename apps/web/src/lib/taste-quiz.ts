@@ -9,6 +9,7 @@ import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
+import { inspireFailures } from './redis';
 import { fetchNewsletterArticles, formatArticlesForPrompt } from './newsletter-fetcher';
 
 function hashQuestion(text: string): string {
@@ -216,13 +217,19 @@ interface ParseOptions {
   lenient?: boolean;
 }
 
+interface ParseResult {
+  questions: TasteQuestion[];
+  /** When questions is empty, explains why (for admin diagnostics). */
+  emptyReason?: string;
+}
+
 function parseAndFilterQuestions(
   responseText: string,
   count: number,
   validSlugs: Set<string>,
   priorQuestionIds: Set<string>,
   opts?: ParseOptions
-): TasteQuestion[] {
+): ParseResult {
   let rawQuestions: Array<{ text: string; topic?: string; tagSlugs: string[]; category: string; sourceUrl?: string; sourceName?: string }>;
   try {
     const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -232,7 +239,7 @@ function parseAndFilterQuestions(
         responseLength: String(responseText.length),
         preview: responseText.slice(0, 300),
       });
-      return [];
+      return { questions: [], emptyReason: `No JSON array in LLM response (${responseText.length} chars). Preview: ${responseText.slice(0, 200)}` };
     }
     rawQuestions = JSON.parse(jsonMatch[0]);
   } catch (err) {
@@ -241,10 +248,10 @@ function parseAndFilterQuestions(
       responseLength: String(responseText.length),
       preview: responseText.slice(0, 300),
     });
-    return [];
+    return { questions: [], emptyReason: `JSON parse failed: ${(err as Error).message}. Preview: ${responseText.slice(0, 200)}` };
   }
 
-  if (!Array.isArray(rawQuestions)) return [];
+  if (!Array.isArray(rawQuestions)) return { questions: [], emptyReason: 'LLM response was not an array' };
 
   const questions: TasteQuestion[] = [];
   const seenIds = new Set<string>();
@@ -297,7 +304,11 @@ function parseAndFilterQuestions(
     skippedSlugs: String(skippedSlugs),
   });
 
-  return questions;
+  const emptyReason = questions.length === 0
+    ? `All ${rawQuestions.length} filtered out: ${skippedNoText} no text, ${skippedDuped} duplicates, ${skippedSlugs} invalid slugs`
+    : undefined;
+
+  return { questions, emptyReason };
 }
 
 /**
@@ -390,7 +401,7 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
 
     const durationMs = Date.now() - llmStart;
 
-    const questions = parseAndFilterQuestions(
+    const { questions, emptyReason } = parseAndFilterQuestions(
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
@@ -406,9 +417,15 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
       metadata: { questionCount: questions.length, topic: topic ?? null },
     });
 
+    if (emptyReason) {
+      inspireFailures.push({ section: 'forYou', reason: emptyReason, userId, timestamp: new Date().toISOString() }).catch(() => {});
+    }
+
     return questions;
   } catch (err) {
+    const reason = `LLM error: ${(err as Error).message}`;
     logger.warn('Failed to generate ForYou questions', { error: (err as Error).message });
+    inspireFailures.push({ section: 'forYou', reason, userId, timestamp: new Date().toISOString() }).catch(() => {});
     return [];
   }
 }
@@ -478,7 +495,7 @@ export async function generateCuriosityQuestions(
 
     const durationMs = Date.now() - llmStart;
 
-    const questions = parseAndFilterQuestions(
+    const { questions, emptyReason } = parseAndFilterQuestions(
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
@@ -494,9 +511,15 @@ export async function generateCuriosityQuestions(
       metadata: { questionCount: questions.length, topic: topic ?? null },
     });
 
+    if (emptyReason) {
+      inspireFailures.push({ section: 'curiosity', reason: emptyReason, userId, timestamp: new Date().toISOString() }).catch(() => {});
+    }
+
     return questions;
   } catch (err) {
+    const reason = `LLM error: ${(err as Error).message}`;
     logger.warn('Failed to generate Curiosity questions', { error: (err as Error).message });
+    inspireFailures.push({ section: 'curiosity', reason, userId, timestamp: new Date().toISOString() }).catch(() => {});
     return [];
   }
 }
@@ -647,7 +670,7 @@ export async function generateNewsQuestions(
 
     const durationMs = Date.now() - llmStart;
 
-    const questions = parseAndFilterQuestions(
+    const { questions, emptyReason } = parseAndFilterQuestions(
       responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
@@ -663,9 +686,15 @@ export async function generateNewsQuestions(
       metadata: { questionCount: questions.length, topic: topic ?? null, timeRange, useNewsletterPath },
     });
 
+    if (emptyReason) {
+      inspireFailures.push({ section: 'news', reason: emptyReason, userId, timestamp: new Date().toISOString() }).catch(() => {});
+    }
+
     return questions;
   } catch (err) {
+    const reason = `LLM error: ${(err as Error).message}`;
     logger.warn('Failed to generate News questions', { error: (err as Error).message });
+    inspireFailures.push({ section: 'news', reason, userId, timestamp: new Date().toISOString() }).catch(() => {});
     return [];
   }
 }

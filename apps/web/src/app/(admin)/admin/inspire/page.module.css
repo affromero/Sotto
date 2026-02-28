@@ -113,3 +113,79 @@
   font-weight: 700;
   color: var(--color-success, #10b981);
 }
+
+/* Failure Log */
+
+.failureHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.clearButton {
+  font: var(--text-body-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clearButton:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.failureLog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.failureEntry {
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning, #f59e0b);
+  border-radius: var(--radius-md);
+}
+
+.failureMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.failureSection {
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-warning, #f59e0b);
+  text-transform: capitalize;
+}
+
+.failureTime {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+.failureUser {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.failureReason {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
