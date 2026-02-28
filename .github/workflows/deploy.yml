@@ -85,24 +85,32 @@ jobs:
 
             echo "Building containers..."
             export COMMIT_SHA=$(git rev-parse --short HEAD)
-            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml build --no-cache
 
             echo "Running database migrations..."
             docker compose -f docker-compose.prod.yml --profile migration run --build --rm migrate npx prisma db push --schema=prisma/schema.prisma
 
             echo "Restarting services..."
-            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
             echo "Waiting for health check..."
             for i in $(seq 1 12); do
               sleep 10
-              if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
-                echo "Health check passed (attempt $i)"
-                break
+              HEALTH=$(curl -sf http://localhost:3000/api/health 2>/dev/null || echo "")
+              if [ -n "$HEALTH" ]; then
+                LIVE_VERSION=$(echo "$HEALTH" | jq -r '.version // "unknown"')
+                if [ "$LIVE_VERSION" = "$COMMIT_SHA" ]; then
+                  echo "Health check passed — version $LIVE_VERSION matches (attempt $i)"
+                  break
+                else
+                  echo "Attempt $i/12 — healthy but serving $LIVE_VERSION, expected $COMMIT_SHA"
+                fi
+              else
+                echo "Attempt $i/12 — not ready yet"
               fi
-              echo "Attempt $i/12 — not ready yet"
               if [ "$i" -eq 12 ]; then
-                echo "Health check failed after 120s"
+                echo "Deploy verification failed after 120s"
+                echo "Expected version: $COMMIT_SHA, got: ${LIVE_VERSION:-unreachable}"
                 docker compose -f docker-compose.prod.yml logs --tail=50 web
                 exit 1
               fi
