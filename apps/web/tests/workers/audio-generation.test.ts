@@ -50,6 +50,18 @@ vi.mock('@/lib/elevenlabs', () => ({
   getElevenLabsConcurrencyLimit: vi.fn().mockResolvedValue(5),
 }));
 
+vi.mock('@/lib/providers/tts/cartesia.provider', () => ({
+  CartesiaProvider: vi.fn(),
+  getCartesiaConcurrencyLimit: vi.fn().mockResolvedValue(2),
+  updateCartesiaConcurrencyFromError: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/providers/tts/hume.provider', () => ({
+  HumeProvider: vi.fn(),
+  getHumeConcurrencyLimit: vi.fn().mockResolvedValue(5),
+  updateHumeConcurrencyFromError: vi.fn().mockResolvedValue(undefined),
+}));
+
 const mockPremiumGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
 const mockStandardGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
 const mockProviderGetVoiceId = vi.fn().mockReturnValue('voice-abc');
@@ -135,6 +147,10 @@ vi.mock('@/lib/tts-text-cleaner', () => ({
 import { processAudioGeneration } from '@/workers/audio-generation.worker';
 import type { GenerateAudioPayload } from '@/lib/queue';
 import type { Job } from 'bullmq';
+import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
+import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
+import { semaphore } from '@/lib/redis';
+import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
 
 // ---- Helpers ----
 
@@ -196,6 +212,35 @@ function setupByokProvider(providerId: 'elevenlabs' | 'openai' = 'elevenlabs') {
   });
 }
 
+const mockCartesiaGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
+const mockHumeGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('fake-audio'));
+
+function setupCartesiaProvider() {
+  mockResolveTtsProvider.mockResolvedValue({
+    provider: {
+      generateSpeech: (...args: unknown[]) => mockCartesiaGenerateSpeech(...args),
+      getVoiceId: (...args: unknown[]) => mockProviderGetVoiceId(...args),
+      getModelId: () => 'sonic-3',
+      providerId: 'cartesia',
+    },
+    source: 'platform',
+    providerId: 'cartesia',
+  });
+}
+
+function setupHumeProvider() {
+  mockResolveTtsProvider.mockResolvedValue({
+    provider: {
+      generateSpeech: (...args: unknown[]) => mockHumeGenerateSpeech(...args),
+      getVoiceId: (...args: unknown[]) => mockProviderGetVoiceId(...args),
+      getModelId: () => 'octave',
+      providerId: 'hume',
+    },
+    source: 'platform',
+    providerId: 'hume',
+  });
+}
+
 // ---- Tests ----
 
 describe('processAudioGeneration', () => {
@@ -215,8 +260,11 @@ describe('processAudioGeneration', () => {
     // Default: no pending segments (all done)
     mockPrismaSegmentCount.mockResolvedValue(0);
     mockPrismaSegmentFindMany.mockResolvedValue([{ id: 'segment-001' }, { id: 'segment-002' }]);
+    mockPrismaSegmentUpdate.mockResolvedValue({});
     mockPremiumGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockStandardGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
+    mockCartesiaGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
+    mockHumeGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio-data'));
     mockUploadSegmentAudio.mockResolvedValue(
       'https://r2.example.com/podcasts/podcast-001/segments/segment-001.mp3'
     );
@@ -878,6 +926,117 @@ describe('processAudioGeneration', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioGeneration(job)).rejects.toThrow('Record not found');
+    });
+  });
+
+  describe('concurrency limit resolution', () => {
+    it('uses getCartesiaConcurrencyLimit for Cartesia provider', async () => {
+      setupCartesiaProvider();
+      process.env.CARTESIA_API_KEY = 'test-cartesia-key';
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(getCartesiaConcurrencyLimit).toHaveBeenCalledWith('test-cartesia-key');
+      expect(semaphore.acquire).toHaveBeenCalledWith(
+        expect.stringContaining('cartesia'),
+        2
+      );
+      delete process.env.CARTESIA_API_KEY;
+    });
+
+    it('uses getHumeConcurrencyLimit for Hume provider', async () => {
+      setupHumeProvider();
+      process.env.HUME_API_KEY = 'test-hume-key';
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(getHumeConcurrencyLimit).toHaveBeenCalledWith('test-hume-key');
+      expect(semaphore.acquire).toHaveBeenCalledWith(
+        expect.stringContaining('hume'),
+        5
+      );
+      delete process.env.HUME_API_KEY;
+    });
+
+    it('still uses getElevenLabsConcurrencyLimit for ElevenLabs provider', async () => {
+      setupPremiumProvider();
+      process.env.ELEVENLABS_API_KEY = 'test-el-key';
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(getElevenLabsConcurrencyLimit).toHaveBeenCalledWith('test-el-key');
+      delete process.env.ELEVENLABS_API_KEY;
+    });
+
+    it('falls back to default 5 for unknown providers without API key', async () => {
+      setupStandardProvider(); // openai
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(semaphore.acquire).toHaveBeenCalledWith(
+        expect.stringContaining('openai'),
+        5
+      );
+    });
+  });
+
+  describe('429 error handling', () => {
+    it('calls updateCartesiaConcurrencyFromError on Cartesia 429', async () => {
+      setupCartesiaProvider();
+      process.env.CARTESIA_API_KEY = 'test-cartesia-key';
+      mockCartesiaGenerateSpeech.mockRejectedValue(
+        new Error('Cartesia API error (429): Rate limited. Current limit: 3')
+      );
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioGeneration(job)).rejects.toThrow('(429)');
+      expect(updateCartesiaConcurrencyFromError).toHaveBeenCalledWith(
+        'test-cartesia-key',
+        'Cartesia API error (429): Rate limited. Current limit: 3'
+      );
+      delete process.env.CARTESIA_API_KEY;
+    });
+
+    it('calls updateHumeConcurrencyFromError on Hume 429', async () => {
+      setupHumeProvider();
+      process.env.HUME_API_KEY = 'test-hume-key';
+      mockHumeGenerateSpeech.mockRejectedValue(
+        new Error('Hume AI API error (429): concurrency limit 3 exceeded')
+      );
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioGeneration(job)).rejects.toThrow('(429)');
+      expect(updateHumeConcurrencyFromError).toHaveBeenCalledWith(
+        'test-hume-key',
+        'Hume AI API error (429): concurrency limit 3 exceeded'
+      );
+      delete process.env.HUME_API_KEY;
+    });
+
+    it('does not call update functions on non-429 errors', async () => {
+      setupCartesiaProvider();
+      process.env.CARTESIA_API_KEY = 'test-cartesia-key';
+      mockCartesiaGenerateSpeech.mockRejectedValue(
+        new Error('Cartesia API error (500): internal server error')
+      );
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioGeneration(job)).rejects.toThrow('(500)');
+      expect(updateCartesiaConcurrencyFromError).not.toHaveBeenCalled();
+      delete process.env.CARTESIA_API_KEY;
+    });
+
+    it('releases semaphore on 429 error', async () => {
+      setupCartesiaProvider();
+      process.env.CARTESIA_API_KEY = 'test-cartesia-key';
+      mockCartesiaGenerateSpeech.mockRejectedValue(
+        new Error('Cartesia API error (429): Rate limited. Current limit: 2')
+      );
+      const job = createMockJob(defaultPayload);
+
+      await expect(processAudioGeneration(job)).rejects.toThrow('(429)');
+      expect(semaphore.release).toHaveBeenCalled();
+      delete process.env.CARTESIA_API_KEY;
     });
   });
 });
