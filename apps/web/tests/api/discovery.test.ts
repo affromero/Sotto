@@ -509,7 +509,8 @@ describe('POST /api/discovery', () => {
         'test-ai-key',
         undefined,
         expect.any(Function),
-        'anthropic'
+        'anthropic',
+        undefined,
       );
     });
 

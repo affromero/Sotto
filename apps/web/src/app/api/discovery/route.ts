@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { message, content, discoveryId, history, model } = body;
+  const { message, content, discoveryId, history, model, maxDuration } = body;
 
   // Block non-admins from using claude-code models
   if (typeof model === 'string' && model.startsWith('claude-code:')) {
@@ -210,6 +210,11 @@ export async function POST(request: NextRequest) {
 
   const effectiveProvider = modelProvider ?? aiKey?.provider ?? 'anthropic';
 
+  // For free-tier users (maxDuration <= 5), tell the AI not to ask about duration
+  const systemSuffix = typeof maxDuration === 'number' && maxDuration <= 5
+    ? 'IMPORTANT: This user is on the free tier with a fixed 5-minute podcast duration. Do NOT ask about duration preference — skip step 7 entirely. Always set "duration_target": 5 in the metadata.'
+    : undefined;
+
   // Stream response
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -232,6 +237,7 @@ export async function POST(request: NextRequest) {
             });
           },
           effectiveProvider,
+          systemSuffix,
         )) {
           // Only stream string chunks (skip objects from claude-code stream-json)
           const text = typeof chunk === 'string' ? chunk : '';

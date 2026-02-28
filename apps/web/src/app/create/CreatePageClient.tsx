@@ -508,6 +508,7 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
               initialDraftId={draftData?.id}
               initialMessages={draftData?.tabMode === 'create' ? draftData.messages : undefined}
               onDraftCreated={handleDraftCreated}
+              maxDuration={maxDuration}
             />
           </div>
         )}
@@ -556,7 +557,9 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
                 setTtsModel(model);
               }}
             />
-            <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
+            {maxDuration > 5 && (
+              <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
+            )}
             <div className={styles.voiceActions}>
               <button
                 type="button"
