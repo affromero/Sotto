@@ -6,6 +6,8 @@ import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registr
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
+import { getCartesiaConcurrencyLimit, updateCartesiaConcurrencyFromError } from '@/lib/providers/tts/cartesia.provider';
+import { getHumeConcurrencyLimit, updateHumeConcurrencyFromError } from '@/lib/providers/tts/hume.provider';
 import { semaphore } from '@/lib/redis';
 import { getByokKey } from '@/lib/byok';
 import { cleanTextForTts } from '@/lib/tts-text-cleaner';
@@ -125,13 +127,20 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
   const voiceId = podcastVoice?.voiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
-  // Resolve per-user concurrency limit for the TTS provider
+  // Resolve the raw API key for concurrency lookups
+  const resolvedApiKey = await getByokKey(podcast.userId, providerId)
+    || (providerId === 'elevenlabs' ? process.env.ELEVENLABS_API_KEY
+      : providerId === 'cartesia' ? process.env.CARTESIA_API_KEY
+      : providerId === 'hume' ? process.env.HUME_API_KEY
+      : undefined);
+
   let concurrencyLimit = 5;
-  if (providerId === 'elevenlabs') {
-    const apiKey = await getByokKey(podcast.userId, 'elevenlabs') || process.env.ELEVENLABS_API_KEY;
-    if (apiKey) {
-      concurrencyLimit = await getElevenLabsConcurrencyLimit(apiKey);
-    }
+  if (providerId === 'elevenlabs' && resolvedApiKey) {
+    concurrencyLimit = await getElevenLabsConcurrencyLimit(resolvedApiKey);
+  } else if (providerId === 'cartesia' && resolvedApiKey) {
+    concurrencyLimit = await getCartesiaConcurrencyLimit(resolvedApiKey);
+  } else if (providerId === 'hume' && resolvedApiKey) {
+    concurrencyLimit = await getHumeConcurrencyLimit(resolvedApiKey);
   }
 
   const semaphoreKey = `tts:sem:${podcast.userId}:${providerId}`;
@@ -173,10 +182,28 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
   const ttsText = cleanTextForTts(text, { providerId });
 
   let audioBuffer: Buffer;
+  let semaphoreReleased = false;
   try {
     audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId, previousText, nextText, direction, speaker });
-  } finally {
+  } catch (err) {
     await semaphore.release(semaphoreKey);
+    semaphoreReleased = true;
+
+    // On 429, update cached concurrency limit so BullMQ retry uses the correct value
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (resolvedApiKey && /\(429\)/.test(errMsg)) {
+      if (providerId === 'cartesia') {
+        await updateCartesiaConcurrencyFromError(resolvedApiKey, errMsg);
+      } else if (providerId === 'hume') {
+        await updateHumeConcurrencyFromError(resolvedApiKey, errMsg);
+      }
+      logger.warn('TTS 429 — concurrency limit cached, BullMQ will retry', { providerId, podcastId, segmentId });
+    }
+    throw err;
+  } finally {
+    if (!semaphoreReleased) {
+      await semaphore.release(semaphoreKey);
+    }
   }
 
   const service = source === 'byok' ? `${providerId}_byok` : providerId;
