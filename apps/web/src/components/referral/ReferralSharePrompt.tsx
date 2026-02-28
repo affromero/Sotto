@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import styles from './ReferralSharePrompt.module.css';
@@ -12,12 +12,30 @@ interface ReferralSharePromptProps {
 
 const DISMISSED_KEY = 'sotto_referral_prompt_dismissed';
 
-export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSharePromptProps) {
-  const [dismissed, setDismissed] = useState(true);
+let dismissListeners: Array<() => void> = [];
 
-  useEffect(() => {
-    setDismissed(!!localStorage.getItem(DISMISSED_KEY));
-  }, []);
+function subscribeDismissed(listener: () => void) {
+  dismissListeners = [...dismissListeners, listener];
+  return () => {
+    dismissListeners = dismissListeners.filter((l) => l !== listener);
+  };
+}
+
+function getDismissedSnapshot(): boolean {
+  return !!localStorage.getItem(DISMISSED_KEY);
+}
+
+function getDismissedServerSnapshot(): boolean {
+  return true;
+}
+
+function setDismissed() {
+  localStorage.setItem(DISMISSED_KEY, '1');
+  dismissListeners.forEach((l) => l());
+}
+
+export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSharePromptProps) {
+  const dismissed = useSyncExternalStore(subscribeDismissed, getDismissedSnapshot, getDismissedServerSnapshot);
   const [copied, setCopied] = useState(false);
 
   if (!hasFirstReadyPodcast || dismissed) return null;
@@ -27,8 +45,7 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
   const twitterShareUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(referralUrl)}`;
 
   function dismiss() {
-    localStorage.setItem(DISMISSED_KEY, '1');
-    setDismissed(true);
+    setDismissed();
   }
 
   function copyLink() {
