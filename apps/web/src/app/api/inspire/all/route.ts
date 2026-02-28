@@ -38,10 +38,10 @@ function sanitizeTopic(raw: string): string {
 
 // Cache TTLs in seconds
 const CACHE_TTL = {
-  forYou: 600, // 10 min
-  news: 300, // 5 min
+  forYou: 120, // 2 min
+  news: 120, // 2 min
   trending: 120, // 2 min (global)
-  curiosity: 600, // 10 min (timeless content caches well)
+  curiosity: 120, // 2 min
 } as const;
 
 type Section = 'forYou' | 'trending' | 'news' | 'curiosity';
