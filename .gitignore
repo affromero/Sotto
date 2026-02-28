@@ -96,3 +96,7 @@ packages/mcp/dist/
 # VS Code
 Sotto.code-workspace
 media/recordings/
+
+# Claude Code
+.claude/worktrees/
+.claude/settings.local.json
