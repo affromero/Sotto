@@ -133,7 +133,7 @@ export function CommentCard({
             <Link href={profileHref} className={styles.authorName}>
               {comment.user.name || 'Anonymous'}
             </Link>
-            <span className={styles.time}>{formatRelativeTime(comment.createdAt)}</span>
+            <span className={styles.time} suppressHydrationWarning>{formatRelativeTime(comment.createdAt)}</span>
             {comment.timestamp !== null && comment.timestamp !== undefined && (
               <span className={styles.timestampBadge} aria-label={`At ${formatTimestamp(comment.timestamp)}`}>
                 {formatTimestamp(comment.timestamp)}
@@ -232,7 +232,7 @@ export function CommentCard({
                     >
                       {reply.user.name || 'Anonymous'}
                     </Link>
-                    <span className={styles.time}>{formatRelativeTime(reply.createdAt)}</span>
+                    <span className={styles.time} suppressHydrationWarning>{formatRelativeTime(reply.createdAt)}</span>
                     {reply.timestamp !== null && reply.timestamp !== undefined && (
                       <span className={styles.timestampBadge} aria-label={`At ${formatTimestamp(reply.timestamp)}`}>
                         {formatTimestamp(reply.timestamp)}
