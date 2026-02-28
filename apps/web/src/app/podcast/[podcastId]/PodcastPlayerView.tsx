@@ -543,9 +543,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Failed state */}
       {liveStatus === 'FAILED' && (isOwner || isAdmin) && (
         <div className={styles.failedState}>
-          <p className={styles.failedText}>
-            {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
-          </p>
+          {!retrying && (
+            <p className={styles.failedText}>
+              {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
+            </p>
+          )}
           {isAdmin && (
             <Link href={`/admin/podcasts?search=${podcast.id}`} className={styles.adminLink}>
               <Shield size={14} />
@@ -561,7 +563,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           )}
           <div className={styles.failedActions}>
             <Button onClick={handleRetry} loading={retrying} disabled={retrying || deleting}>
-              <RefreshCw size={16} />
+              {!retrying && <RefreshCw size={16} />}
               {retrying ? 'Retrying...' : 'Retry Generation'}
             </Button>
             {showDeleteConfirm ? (
