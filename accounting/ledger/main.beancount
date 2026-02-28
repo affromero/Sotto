@@ -22,3 +22,4 @@ include "opening.beancount"
 
 ; Monthly transaction files
 include "2026/02-february.beancount"
+include "2026/03-march.beancount"

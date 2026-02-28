@@ -96,6 +96,9 @@
 2026-01-01 open Expenses:TTS:ElevenLabs:SoundEffects            USD
 2026-01-01 open Expenses:TTS:ElevenLabs:VoiceClone              USD
 
+; Hume — voice AI generation
+2026-01-01 open Expenses:TTS:Hume                               USD
+
 ; OpenAI TTS — standard voice generation (fallback/default)
 2026-01-01 open Expenses:TTS:OpenAI:Standard                    USD
 

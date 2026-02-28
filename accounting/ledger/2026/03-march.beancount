@@ -1,0 +1,6 @@
+; Sotto — March 2026 Transactions
+; Monthly operational expenses and revenue
+
+2026-03-01 * "Hume" "AI subscription — March 2026"
+  Expenses:TTS:Hume                              6.16 USD
+  Assets:Current:Cash:Bank                      -6.16 USD
