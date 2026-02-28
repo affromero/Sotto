@@ -17,6 +17,7 @@ import type { TtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { TtsProviderCards } from '@/components/settings/TtsProviderCards';
 import { AiProviderCards } from '@/components/settings/AiProviderCards';
 import { ThemeSelector } from '@/components/settings/ThemeSelector';
+import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import styles from './page.module.css';
 
 interface VoiceCloneData {
@@ -149,6 +150,7 @@ export function SettingsForm({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(initialEmailNotifications);
   const [pushNotifications, setPushNotifications] = useState(initialPushNotifications);
+  const { pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
 
   const [avatarUrl, setAvatarUrl] = useState(image);
   const [uploading, setUploading] = useState(false);
@@ -666,13 +668,18 @@ export function SettingsForm({
             <div className={styles.toggleInfo}>
               <span className={styles.toggleLabel}>Push Notifications</span>
               <span className={styles.toggleDescription}>
-                Get notified when your podcast is ready
+                {pushState === 'denied'
+                  ? 'Push notifications are blocked in your browser settings'
+                  : pushState === 'unsupported'
+                    ? 'Push notifications are not supported in this browser'
+                    : 'Get notified when your podcast is ready'}
               </span>
             </div>
             <input
               type="checkbox"
               className={styles.toggle}
               checked={pushNotifications}
+              disabled={pushState === 'denied' || pushState === 'unsupported'}
               onChange={async (e) => {
                 const checked = e.target.checked;
                 setPushNotifications(checked);
@@ -681,6 +688,11 @@ export function SettingsForm({
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ pushNotifications: checked }),
                 });
+                if (checked) {
+                  await pushSubscribe();
+                } else {
+                  await pushUnsubscribe();
+                }
               }}
               aria-label="Toggle push notifications"
             />

@@ -6,6 +6,8 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { NotificationDropdown } from '@/components/notifications/NotificationDropdown';
+import { PushPrompt } from '@/components/notifications/PushPrompt';
+import { usePushSubscription } from '@/lib/hooks/usePushSubscription';
 import { Menu } from 'lucide-react';
 import styles from './DashboardShell.module.css';
 
@@ -23,8 +25,13 @@ interface DashboardShellProps {
 export function DashboardShell({ user, hasPodcasts = false, children }: DashboardShellProps) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pushDismissed, setPushDismissed] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('sotto:push-prompt-dismissed') === 'true';
+  });
   const player = usePlayer();
   const hasActivePlayer = !!player.podcastId;
+  const { pushState, subscribe } = usePushSubscription();
 
   return (
     <div className={styles.layout}>
@@ -54,6 +61,15 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
         </header>
 
         <div key={pathname} className={styles.content}>
+          {pushState === 'prompt' && !pushDismissed && (
+            <PushPrompt
+              onEnable={subscribe}
+              onDismiss={() => {
+                localStorage.setItem('sotto:push-prompt-dismissed', 'true');
+                setPushDismissed(true);
+              }}
+            />
+          )}
           {children}
         </div>
       </div>

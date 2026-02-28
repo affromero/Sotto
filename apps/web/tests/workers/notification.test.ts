@@ -3,12 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks ----
 
 const mockPrismaNotificationCreate = vi.fn().mockResolvedValue({ id: 'notif-001' });
+const mockPrismaNotificationUpdate = vi.fn().mockResolvedValue({ id: 'notif-001', pushed: true });
 const mockPrismaUserFindUnique = vi.fn().mockResolvedValue({ pushNotifications: true });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     notification: {
       create: (...args: unknown[]) => mockPrismaNotificationCreate(...args),
+      update: (...args: unknown[]) => mockPrismaNotificationUpdate(...args),
     },
     user: {
       findUnique: (...args: unknown[]) => mockPrismaUserFindUnique(...args),
@@ -91,6 +93,10 @@ describe('processNotification', () => {
       { type: 'PODCAST_FORKED', title: 'Your podcast was forked', message: 'Forked.' },
       { type: 'NEW_FOLLOWER', title: 'New follower!', message: 'Followed.' },
       { type: 'SIMILAR_PODCAST_CREATED', title: 'Similar podcast created', message: 'Similar.' },
+      { type: 'COMMENT_ON_YOUR_PODCAST', title: 'New comment', message: 'Commented.' },
+      { type: 'COMMENT_REPLY', title: 'Reply to your comment', message: 'Replied.' },
+      { type: 'QUESTION_ON_YOUR_PODCAST', title: 'New question', message: 'Asked.' },
+      { type: 'QUESTION_UPVOTED', title: 'Question upvoted', message: 'Upvoted.' },
     ] as const)('creates notification with $type type', async ({ type, title, message }) => {
       const job = createMockJob({ ...defaultPayload, type, title, message });
       await processNotification(job);
@@ -170,6 +176,25 @@ describe('processNotification', () => {
 
       expect(mockSendPushNotification).toHaveBeenCalled();
       expect(mockSendExpoPushNotification).toHaveBeenCalled();
+    });
+
+    it('marks notification as pushed when push delivery succeeds', async () => {
+      mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: true });
+      const job = createMockJob(defaultPayload);
+      await processNotification(job);
+
+      expect(mockPrismaNotificationUpdate).toHaveBeenCalledWith({
+        where: { id: 'notif-001' },
+        data: { pushed: true },
+      });
+    });
+
+    it('does not mark pushed when push notifications are disabled', async () => {
+      mockPrismaUserFindUnique.mockResolvedValue({ pushNotifications: false });
+      const job = createMockJob(defaultPayload);
+      await processNotification(job);
+
+      expect(mockPrismaNotificationUpdate).not.toHaveBeenCalled();
     });
 
     it('skips push notifications when user has pushNotifications disabled', async () => {
