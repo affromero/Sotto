@@ -166,7 +166,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     throw new Error(`Timed out waiting for TTS semaphore (${providerId}, limit ${concurrencyLimit})`);
   }
 
-  const ttsText = cleanTextForTts(text, { providerId });
+  const ttsText = cleanTextForTts(text);
 
   let audioBuffer: Buffer;
   let semaphoreReleased = false;

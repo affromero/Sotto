@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
+import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -104,10 +106,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const turns = script.turns as ScriptTurn[];
-  await createSegmentsAndQueueAudio(
-    podcastId,
-    turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }))
-  );
+  const turnData = turns.map((t) => ({ speaker: t.speaker, text: t.text, direction: t.direction }));
+
+  // Fetch resolved ttsProvider to convert tags before creating segments
+  const resolvedPodcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { ttsProvider: true },
+  });
+  const convertedTurns = resolvedPodcast.ttsProvider
+    ? await convertTurnsForProvider(turnData, resolvedPodcast.ttsProvider as TtsProviderId, podcastId)
+    : turnData;
+
+  await createSegmentsAndQueueAudio(podcastId, convertedTurns);
 
   await prisma.podcast.update({
     where: { id: podcastId },
