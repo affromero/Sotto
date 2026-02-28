@@ -91,7 +91,7 @@ export function NotificationList({
                     <span className={styles.itemTitle}>{notification.title}</span>
                     <span className={styles.message}>{notification.message}</span>
                   </div>
-                  <span className={styles.time}>
+                  <span className={styles.time} suppressHydrationWarning>
                     {getRelativeTime(notification.createdAt)}
                   </span>
                 </button>

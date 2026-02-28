@@ -147,7 +147,7 @@ export function PodcastCard({
           )}
 
           <div className={styles.coverMeta}>
-            <time className={styles.coverDate} dateTime={podcast.createdAt}>
+            <time className={styles.coverDate} dateTime={podcast.createdAt} suppressHydrationWarning>
               {formatDate(podcast.createdAt)}
             </time>
             {showStats && (
