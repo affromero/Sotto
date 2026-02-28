@@ -62,7 +62,7 @@ export function cleanTextForTts(
     // Remove parenthetical delivery directions (e.g. "(laughing)", "(whispering)")
     .replace(/\(([^)]{1,30})\)/g, (_, inner) => {
       const directions =
-        /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly)$/i;
+        /^(laughing|chuckling|whispering|sighing|pausing|excitedly|thoughtfully|sarcastically|softly|loudly|slowly|quickly|dramatically|gently|warmly|seriously|jokingly|hesitantly|confidently|curiously|enthusiastically|nervously|calmly|urgently|playfully|matter-of-factly|pause|short pause|long pause|brief pause|dramatic pause|beat)$/i;
       return directions.test(inner.trim()) ? '' : `(${inner})`;
     })
     // Remove citation markers like [1], [2, 3], [1, 2, 3] — also consume leading space
