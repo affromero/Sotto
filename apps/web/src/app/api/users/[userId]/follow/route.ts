@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
+import { notificationQueue, addJob, JobType } from '@/lib/queue';
+import type { SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 export async function POST(
@@ -51,6 +53,20 @@ export async function POST(
       targetType: 'user',
     },
   }).catch(() => {});
+
+  // Fire-and-forget notification for followed user
+  prisma.user.findUnique({ where: { id: authResult.userId }, select: { name: true } })
+    .then((follower) => {
+      const payload: SendNotificationPayload = {
+        userId,
+        type: 'NEW_FOLLOWER',
+        title: 'New follower',
+        message: `${follower?.name ?? 'Someone'} started following you`,
+        data: { followerId: authResult.userId },
+      };
+      return addJob(notificationQueue, JobType.SEND_NOTIFICATION, payload);
+    })
+    .catch(() => {});
 
   return NextResponse.json({ following: true }, { status: 201 });
 }

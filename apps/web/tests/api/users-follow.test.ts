@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 // ---- Mocks ----
 
 const mockAuthenticateRequest = vi.fn();
+const mockAddJob = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -28,6 +29,12 @@ vi.mock('@/lib/prisma', () => {
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/queue', () => ({
+  notificationQueue: {},
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { SEND_NOTIFICATION: 'SEND_NOTIFICATION' },
+}));
 
 // ---- Import under test ----
 import { POST, DELETE } from '@/app/api/users/[userId]/follow/route';
@@ -121,6 +128,38 @@ describe('POST /api/users/[userId]/follow', () => {
 
     expect(response.status).toBe(201);
     expect(data).toEqual({ following: true });
+  });
+
+  it('enqueues NEW_FOLLOWER notification', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'follower-id' });
+    // First call: target user existence check; second call: follower name lookup
+    mockPrismaUserFindUnique
+      .mockResolvedValueOnce({ id: 'following-id', name: 'Target User' })
+      .mockResolvedValueOnce({ name: 'Follower User' });
+    mockPrismaFollowCreate.mockResolvedValue({
+      followerId: 'follower-id',
+      followingId: 'following-id',
+      createdAt: new Date(),
+    });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const request = createMockRequest();
+    const response = await POST(request, {
+      params: Promise.resolve({ userId: 'following-id' }),
+    });
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'following-id',
+        type: 'NEW_FOLLOWER',
+      })
+    );
   });
 
   it('returns 200 when already following (P2002 unique constraint violation)', async () => {

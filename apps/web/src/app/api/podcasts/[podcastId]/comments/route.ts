@@ -5,6 +5,8 @@ import { checkRateLimit } from '@/lib/redis';
 import { createCommentSchema, paginationSchema } from '@/lib/validations';
 import { moderateOrThrow, ContentModerationError } from '@/lib/moderation';
 import { checkSuspension } from '@/lib/auth-guards';
+import { notificationQueue, addJob, JobType } from '@/lib/queue';
+import type { SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -128,13 +130,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   // If replying, verify parent exists and belongs to the same podcast
+  let parentComment: { id: string; podcastId: string; userId: string } | null = null;
   if (parentId) {
-    const parent = await prisma.comment.findUnique({
+    parentComment = await prisma.comment.findUnique({
       where: { id: parentId },
-      select: { id: true, podcastId: true },
+      select: { id: true, podcastId: true, userId: true },
     });
 
-    if (!parent || parent.podcastId !== podcastId) {
+    if (!parentComment || parentComment.podcastId !== podcastId) {
       return errorResponse('Parent comment not found', 404);
     }
   }
@@ -185,6 +188,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       metadata: { commentId: comment.id },
     },
   }).catch(() => {});
+
+  // Fire-and-forget notifications
+  prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+    .then((commenter) => {
+      const commenterName = commenter?.name ?? 'Someone';
+      const promises: Promise<unknown>[] = [];
+
+      // Notify podcast owner about the comment
+      if (podcast.userId !== userId) {
+        const ownerPayload: SendNotificationPayload = {
+          userId: podcast.userId,
+          type: 'COMMENT_ON_YOUR_PODCAST',
+          title: 'New comment on your podcast',
+          message: `${commenterName} commented on your podcast`,
+          data: { podcastId, commentId: comment.id },
+        };
+        promises.push(addJob(notificationQueue, JobType.SEND_NOTIFICATION, ownerPayload));
+      }
+
+      // If reply, notify parent comment author (avoid double-notifying podcast owner)
+      if (parentId && parentComment && parentComment.userId !== userId && parentComment.userId !== podcast.userId) {
+        const replyPayload: SendNotificationPayload = {
+          userId: parentComment.userId,
+          type: 'COMMENT_REPLY',
+          title: 'Reply to your comment',
+          message: `${commenterName} replied to your comment`,
+          data: { podcastId, commentId: comment.id, parentCommentId: parentId },
+        };
+        promises.push(addJob(notificationQueue, JobType.SEND_NOTIFICATION, replyPayload));
+      }
+
+      return Promise.all(promises);
+    })
+    .catch(() => {});
 
   return NextResponse.json(
     {
