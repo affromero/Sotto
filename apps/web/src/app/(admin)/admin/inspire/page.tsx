@@ -1,10 +1,18 @@
+import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
-import { counters } from '@/lib/redis';
+import { counters, inspireFailures } from '@/lib/redis';
+import type { InspireFailureEvent } from '@/lib/redis';
 import { subDays, startOfDay } from 'date-fns';
 import styles from './page.module.css';
 
 interface PageProps {
   searchParams: Promise<{ range?: string }>;
+}
+
+async function clearFailureLog() {
+  'use server';
+  await inspireFailures.clear();
+  redirect('/admin/inspire');
 }
 
 async function getInspireStats(days: number) {
@@ -175,6 +183,7 @@ async function getInspireStats(days: number) {
       errors,
       total: empty + errors,
     })),
+    recentFailures: await inspireFailures.recent(20),
   };
 }
 
@@ -384,6 +393,40 @@ export default async function AdminInspirePage({ searchParams }: PageProps) {
                 <span className={styles.cacheDetail}>
                   {h.empty} empty results / {h.errors} errors
                 </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Recent failure log — detailed reasons */}
+      <section className={styles.section}>
+        <div className={styles.failureHeader}>
+          <h2 className={styles.sectionTitle}>Recent Failures</h2>
+          {stats.recentFailures.length > 0 && (
+            <form action={clearFailureLog}>
+              <button type="submit" className={styles.clearButton}>
+                Clear log
+              </button>
+            </form>
+          )}
+        </div>
+        {stats.recentFailures.length === 0 ? (
+          <p className={styles.empty}>No recent failures recorded.</p>
+        ) : (
+          <div className={styles.failureLog}>
+            {stats.recentFailures.map((f: InspireFailureEvent, i: number) => (
+              <div key={`${f.timestamp}-${i}`} className={styles.failureEntry}>
+                <div className={styles.failureMeta}>
+                  <span className={styles.failureSection}>{f.section}</span>
+                  <time className={styles.failureTime} dateTime={f.timestamp}>
+                    {new Date(f.timestamp).toLocaleString('en-US', {
+                      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                    })}
+                  </time>
+                  {f.userId && <span className={styles.failureUser}>{f.userId.slice(0, 8)}</span>}
+                </div>
+                <p className={styles.failureReason}>{f.reason}</p>
               </div>
             ))}
           </div>
