@@ -85,6 +85,7 @@ function mapTrendingToPodcastSummary(
     source: 'WEB' as const,
     isHumanContent: false,
     forkedFromId: null,
+    ownerIsPro: p.ownerIsPro ?? false,
     user: { ...p.user, handle: null },
     tags: p.tags,
   }));

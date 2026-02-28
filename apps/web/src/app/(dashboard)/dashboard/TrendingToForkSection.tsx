@@ -60,6 +60,7 @@ export async function TrendingToForkSection({ userId }: TrendingToForkSectionPro
     ...p,
     createdAt: p.createdAt.toISOString(),
     tags: p.tags.map((pt) => pt.tag),
+    ownerIsPro: false,
   }));
 
   return (

@@ -102,6 +102,7 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
       ...item.podcast,
       createdAt: item.podcast.createdAt.toISOString(),
       tags: item.podcast.tags.map((pt) => pt.tag),
+      ownerIsPro: false,
       addedAt: item.addedAt.toISOString(),
       order: item.order,
     }));
