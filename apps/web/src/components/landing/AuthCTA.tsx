@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import { useWaitlist } from './WaitlistProvider';
 import { WaitlistForm } from './WaitlistForm';
 import styles from './AuthCTA.module.css';
@@ -12,9 +13,10 @@ interface AuthCTAProps {
 
 export function AuthCTA({ source }: AuthCTAProps) {
   const { isAuthenticated } = useAuth();
+  const mounted = useHasMounted();
   const { submitted } = useWaitlist();
 
-  if (isAuthenticated) {
+  if (mounted && isAuthenticated) {
     return (
       <div className={styles.ctas}>
         <Link href="/feed" className={styles.btnPrimary}>

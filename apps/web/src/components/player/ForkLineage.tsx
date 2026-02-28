@@ -102,7 +102,7 @@ export function ForkLineage({ ancestors, forks }: ForkLineageProps) {
                         />
                         <div className={styles.forkMeta}>
                           <span className={styles.forkUserName}>{userName}</span>
-                          <span className={styles.forkDate}>{formatDate(fork.createdAt)}</span>
+                          <span className={styles.forkDate} suppressHydrationWarning>{formatDate(fork.createdAt)}</span>
                         </div>
                       </div>
                     </div>

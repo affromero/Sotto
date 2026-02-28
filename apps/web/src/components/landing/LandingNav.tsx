@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useHasMounted } from '@/lib/hooks/useHasMounted';
 import styles from './LandingNav.module.css';
 
 export function LandingNav() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const mounted = useHasMounted();
   const [navSolid, setNavSolid] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -38,7 +40,7 @@ export function LandingNav() {
           <Link href="/feed" className={styles.navCta}>
             Explore Feed
           </Link>
-          {!authLoading && (
+          {mounted && !authLoading && (
             isAuthenticated ? (
               <Link href="/dashboard" className={styles.navSign}>
                 Dashboard

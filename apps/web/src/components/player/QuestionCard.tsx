@@ -149,7 +149,7 @@ export function QuestionCard({ question, podcastId }: QuestionCardProps) {
             at {formatTimestamp(question.timestamp)}
           </span>
           <span className={styles.metaSeparator} aria-hidden="true" />
-          <time className={styles.timeAgo} dateTime={question.createdAt}>
+          <time className={styles.timeAgo} dateTime={question.createdAt} suppressHydrationWarning>
             {formatTimeAgo(question.createdAt)}
           </time>
         </div>
