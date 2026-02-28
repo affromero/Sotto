@@ -126,6 +126,17 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
 }));
 
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    aiQuota: 10,
+    ttsProvider: 'elevenlabs',
+    ttsModel: 'eleven_multilingual_v2',
+    ttsQuota: 10,
+  }),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
@@ -847,6 +858,95 @@ describe('processReferenceValidation', () => {
         expect(calls[i]).toBeGreaterThanOrEqual(calls[i - 1]);
       }
       expect(calls[calls.length - 1]).toBe(100);
+    });
+  });
+
+  describe('auto-select TTS provider at auto-approve', () => {
+    beforeEach(() => {
+      // Set up for auto-approve path: TWITTER source, non-WEB
+      mockPrismaReferenceFindMany.mockResolvedValue([]);
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+    });
+
+    it('calls selectFreeTierProviders for free-tier user (no-refs path)', async () => {
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+      const { selectFreeTierProviders } = await import('@/lib/free-tier-provider-selector');
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(selectFreeTierProviders).toHaveBeenCalledWith('user-001');
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-001' },
+          data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
+        })
+      );
+    });
+
+    it('skips selectFreeTierProviders for BYOK user (no-refs path)', async () => {
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+      const { selectFreeTierProviders } = await import('@/lib/free-tier-provider-selector');
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(selectFreeTierProviders).not.toHaveBeenCalled();
+    });
+
+    it('calls selectFreeTierProviders for free-tier at full-validation auto-approve', async () => {
+      // Has references → goes through full validation path
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        { id: 'ref-001', number: 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' },
+      ]);
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+      // TWITTER auto-approves + non-BYOK
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+      const { selectFreeTierProviders } = await import('@/lib/free-tier-provider-selector');
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(selectFreeTierProviders).toHaveBeenCalledWith('user-001');
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2' },
+        })
+      );
+    });
+
+    it('skips selectFreeTierProviders for BYOK at full-validation auto-approve', async () => {
+      mockPrismaReferenceFindMany.mockResolvedValue([
+        { id: 'ref-001', number: 1, title: 'Paper', authors: [], year: 2023, url: 'https://example.com', doi: null, type: 'article' },
+      ]);
+      mockRunReferenceVerification.mockResolvedValue({
+        results: new Map([
+          ['ref-001', { domain: 'GENERAL', verdict: { status: 'VERIFIED', confidence: 0.8 }, score: 0.8, checks: [], logOddsContributions: {} }],
+        ]),
+        rejectedRefIds: new Set<string>(),
+      });
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({ source: 'TWITTER' });
+      const { hasByokKey } = await import('@/lib/byok');
+      (hasByokKey as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+      const { selectFreeTierProviders } = await import('@/lib/free-tier-provider-selector');
+
+      const job = createMockJob(defaultPayload);
+      await processReferenceValidation(job);
+
+      expect(selectFreeTierProviders).not.toHaveBeenCalled();
     });
   });
 

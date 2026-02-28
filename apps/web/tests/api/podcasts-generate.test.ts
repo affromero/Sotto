@@ -23,6 +23,8 @@ const mockPrismaDiscoveryFindUniqueOrThrow = vi.fn().mockResolvedValue({
   sourceContent: null,
 });
 
+const mockPrismaPodcastVoiceDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     podcast: {
@@ -50,6 +52,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaDiscoveryFindUniqueOrThrow(...args),
+    },
+    podcastVoice: {
+      deleteMany: (...args: unknown[]) => mockPrismaPodcastVoiceDeleteMany(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -94,6 +99,15 @@ vi.mock('@/lib/generation-gate', () => ({
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+}));
+
+const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
+  aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', aiQuota: 10,
+  ttsProvider: 'elevenlabs', ttsModel: 'eleven_multilingual_v2', ttsQuota: 10,
+});
+
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
 }));
 
 vi.mock('@/lib/auto-model-config', () => ({
@@ -151,7 +165,7 @@ import { POST } from '@/app/api/podcasts/[podcastId]/generate/route';
 
 // ---- Helpers ----
 
-function createMockRequest(searchParams?: Record<string, string>): NextRequest {
+function createMockRequest(searchParams?: Record<string, string>, body?: Record<string, unknown>): NextRequest {
   const url = new URL('http://localhost/api/podcasts/p/generate');
   if (searchParams) {
     for (const [k, v] of Object.entries(searchParams)) {
@@ -160,7 +174,11 @@ function createMockRequest(searchParams?: Record<string, string>): NextRequest {
   }
   return new NextRequest(url, {
     method: 'POST',
-    headers: { authorization: 'Bearer test-api-key' },
+    headers: {
+      authorization: 'Bearer test-api-key',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
 }
 
@@ -441,6 +459,81 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
       expect(response.status).toBe(200);
       expect(data.message).toBe('Generation started');
+    });
+  });
+
+  describe('FAILED retry provider override', () => {
+    const failedPodcast = {
+      id: 'podcast-fail',
+      userId: 'user-001',
+      status: 'FAILED',
+      source: 'WEB',
+      discovery: { id: 'disc-fail', sourceUrl: null, sourceContent: null, durationTarget: null },
+    };
+
+    beforeEach(() => {
+      mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
+      mockPrismaPodcastFindUnique.mockResolvedValue(failedPodcast);
+      mockDetermineResumePoint.mockResolvedValue({
+        step: 'GENERATE_AUDIO',
+        pendingSegmentIds: ['seg-1'],
+      });
+      mockPrismaSegmentFindMany.mockResolvedValue([
+        { id: 'seg-1', speaker: 'HOST', text: 'Hello' },
+      ]);
+    });
+
+    it('writes provider override and deletes old voices when body has ttsProvider', async () => {
+      const request = createMockRequest(undefined, { ttsProvider: 'openai', ttsModel: 'tts-1-hd' });
+      const params = await createMockParams('podcast-fail');
+      const response = await POST(request, params);
+
+      expect(response.status).toBe(200);
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-fail' },
+          data: { ttsProvider: 'openai', ttsModel: 'tts-1-hd' },
+        })
+      );
+      expect(mockPrismaPodcastVoiceDeleteMany).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-fail' },
+      });
+    });
+
+    it('clears locked provider when no body is provided (bare retry)', async () => {
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-fail');
+      const response = await POST(request, params);
+
+      expect(response.status).toBe(200);
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-fail' },
+          data: { ttsProvider: null, ttsModel: null },
+        })
+      );
+      expect(mockPrismaPodcastVoiceDeleteMany).not.toHaveBeenCalled();
+    });
+
+    it('clears ttsProvider/ttsModel on SCRIPT_READY resume', async () => {
+      mockDetermineResumePoint.mockResolvedValue({ step: 'SCRIPT_READY' });
+
+      const request = createMockRequest();
+      const params = await createMockParams('podcast-fail');
+      const response = await POST(request, params);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.resumedAt).toBe('SCRIPT_READY');
+      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'podcast-fail' },
+          data: expect.objectContaining({
+            ttsProvider: null,
+            ttsModel: null,
+          }),
+        })
+      );
     });
   });
 

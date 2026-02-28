@@ -18,6 +18,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 });
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
+const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -34,6 +35,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
+    },
+    script: {
+      findUnique: (...args: unknown[]) => mockPrismaScriptFindUnique(...args),
     },
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
@@ -898,6 +902,105 @@ describe('processAudioGeneration', () => {
           previousText: undefined,
           nextText: undefined,
         })
+      );
+    });
+  });
+
+  describe('tone inference from script delivery directions', () => {
+    beforeEach(() => {
+      // Discovery has no tone — triggers inference from script
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({
+        tone: null,
+        audienceLevel: 'intermediate',
+        audience: 'general',
+      });
+    });
+
+    it('infers casual tone from enthusiastic/playful directions', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', direction: 'enthusiastic' },
+          { speaker: 'EXPERT', direction: 'playful' },
+        ],
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        expect.objectContaining({ tone: 'casual' })
+      );
+    });
+
+    it('infers professional tone from serious/formal directions', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', direction: 'serious' },
+          { speaker: 'EXPERT', direction: 'formal' },
+        ],
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        expect.objectContaining({ tone: 'professional' })
+      );
+    });
+
+    it('skips inference when discovery already has tone', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue({
+        tone: 'casual',
+        audienceLevel: 'intermediate',
+        audience: 'general',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      // Should NOT fetch script for inference
+      expect(mockPrismaScriptFindUnique).not.toHaveBeenCalled();
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        expect.objectContaining({ tone: 'casual' })
+      );
+    });
+
+    it('does not set tone when no directions match any pattern', async () => {
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [
+          { speaker: 'HOST', direction: 'neutral' },
+          { speaker: 'EXPERT' },
+        ],
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      // No pattern match → tone stays null from discovery (not overwritten)
+      const voiceMetadataArg = mockProviderGetVoiceId.mock.calls[0][2];
+      expect(voiceMetadataArg).toBeDefined();
+      expect(voiceMetadataArg.tone).toBeNull();
+    });
+
+    it('passes undefined metadata when discovery is null and script has no directions', async () => {
+      mockPrismaDiscoveryFindUnique.mockResolvedValue(null);
+      mockPrismaScriptFindUnique.mockResolvedValue({
+        turns: [{ speaker: 'HOST' }, { speaker: 'EXPERT' }],
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockProviderGetVoiceId).toHaveBeenCalledWith(
+        'HOST',
+        'podcast-001',
+        undefined
       );
     });
   });
