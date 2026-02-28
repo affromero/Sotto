@@ -114,12 +114,16 @@ export function streamDiscoveryResponse(
   apiKeyOverride?: string,
   model?: string,
   onComplete?: (usage: { inputTokens: number; outputTokens: number; model: string }) => void,
-  providerType?: string
+  providerType?: string,
+  systemSuffix?: string,
 ): AsyncGenerator<string> {
+  const systemPrompt = systemSuffix
+    ? DISCOVERY_SYSTEM_PROMPT + '\n\n' + systemSuffix
+    : DISCOVERY_SYSTEM_PROMPT;
   if (providerType && providerType !== 'anthropic' && providerType !== 'claude-code') {
     const provider = createAIProvider(providerType);
     async function* gen() {
-      yield* provider.streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+      yield* provider.streamResponse(systemPrompt, messages, {
         maxTokens: 2048,
         apiKeyOverride,
         model,
@@ -128,7 +132,7 @@ export function streamDiscoveryResponse(
     }
     return gen();
   }
-  return streamResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+  return streamResponse(systemPrompt, messages, {
     maxTokens: 2048,
     apiKeyOverride,
     model,

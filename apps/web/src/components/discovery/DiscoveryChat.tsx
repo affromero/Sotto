@@ -18,6 +18,7 @@ interface DiscoveryChatProps {
   initialDraftId?: string;
   initialMessages?: DiscoveryMessage[];
   onDraftCreated?: (id: string) => void;
+  maxDuration?: number;
 }
 
 const GREETING: DiscoveryMessage = {
@@ -29,8 +30,8 @@ const GREETING: DiscoveryMessage = {
   createdAt: new Date(0).toISOString(),
 };
 
-export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, onAiModelChange, initialDraftId, initialMessages, onDraftCreated }: DiscoveryChatProps) {
-  const { messages, metadata, isLoading, sendMessage, draftId } = useDiscovery(initialDraftId, initialMessages);
+export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, onAiModelChange, initialDraftId, initialMessages, onDraftCreated, maxDuration }: DiscoveryChatProps) {
+  const { messages, metadata, isLoading, sendMessage, draftId } = useDiscovery(initialDraftId, initialMessages, maxDuration);
   const prevDraftIdRef = useRef<string | null>(initialDraftId ?? null);
   const [inputValue, setInputValue] = useState('');
   const initialTopicSentRef = useRef(false);

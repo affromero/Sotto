@@ -34,6 +34,7 @@ const initialState: DiscoveryState = {
 export function useDiscovery(
   initialDraftId?: string,
   initialMessages?: DiscoveryMessage[],
+  maxDuration?: number,
 ): UseDiscoveryReturn {
   const [state, setState] = useState<DiscoveryState>(() => {
     if (initialMessages && initialMessages.length > 0) {
@@ -144,6 +145,9 @@ export function useDiscovery(
         }
         if (model) {
           body.model = model;
+        }
+        if (maxDuration) {
+          body.maxDuration = maxDuration;
         }
 
         const response = await fetch('/api/discovery', {
