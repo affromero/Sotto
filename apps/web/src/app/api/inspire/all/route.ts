@@ -67,6 +67,21 @@ function trackCacheMetric(section: Section, hit: boolean): void {
   counters.increment(`inspire:${kind}:${section}:${date}`).catch(() => {});
 }
 
+function trackEmptyResult(section: Section): void {
+  counters.increment(`inspire:empty:${section}:${today()}`).catch(() => {});
+}
+
+function trackError(section: Section): void {
+  counters.increment(`inspire:errors:${section}:${today()}`).catch(() => {});
+}
+
+/** Cache only non-empty results — caching [] would serve empty state for the entire TTL */
+async function cacheIfNonEmpty<T>(key: string, data: T[], ttl: number): Promise<void> {
+  if (data.length > 0) {
+    await cache.set(key, data, ttl);
+  }
+}
+
 function mapTrendingToPodcastSummary(
   trendingRaw: Awaited<ReturnType<typeof getTrending>>
 ): PodcastSummary[] {
@@ -123,7 +138,8 @@ export async function GET(request: NextRequest) {
 
     if (section === 'forYou') {
       const forYou = await generateForYouQuestions(userId, 6, topicHint, undefined, model);
-      await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
+      if (forYou.length === 0) trackEmptyResult('forYou');
+      await cacheIfNonEmpty(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
       return new Response(JSON.stringify({ forYou }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -131,7 +147,8 @@ export async function GET(request: NextRequest) {
 
     if (section === 'news') {
       const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, undefined, model);
-      await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
+      if (news.length === 0) trackEmptyResult('news');
+      await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
       return new Response(JSON.stringify({ news }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -139,7 +156,8 @@ export async function GET(request: NextRequest) {
 
     if (section === 'curiosity') {
       const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, undefined, model);
-      await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, CACHE_TTL.curiosity);
+      if (curiosity.length === 0) trackEmptyResult('curiosity');
+      await cacheIfNonEmpty(cacheKey('curiosity', userId, topicHint), curiosity, CACHE_TTL.curiosity);
       return new Response(JSON.stringify({ curiosity }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -151,7 +169,8 @@ export async function GET(request: NextRequest) {
         return [];
       });
       const trending = mapTrendingToPodcastSummary(trendingRaw);
-      await cache.set(cacheKey('trending', userId), trending, CACHE_TTL.trending);
+      if (trending.length === 0) trackEmptyResult('trending');
+      await cacheIfNonEmpty(cacheKey('trending', userId), trending, CACHE_TTL.trending);
       return new Response(JSON.stringify({ trending }), {
         headers: { 'Content-Type': 'application/json' },
       });
@@ -224,10 +243,12 @@ export async function GET(request: NextRequest) {
           }
           const trendingRaw = await getTrending().catch((err) => {
             logger.warn('Failed to fetch trending for inspire', { error: (err as Error).message });
+            trackError('trending');
             return [];
           });
           const trending = mapTrendingToPodcastSummary(trendingRaw);
-          await cache.set(cacheKey('trending', userId), trending, CACHE_TTL.trending);
+          if (trending.length === 0) trackEmptyResult('trending');
+          await cacheIfNonEmpty(cacheKey('trending', userId), trending, CACHE_TTL.trending);
           send({ section: 'trending', data: trending });
         })(),
 
@@ -239,7 +260,8 @@ export async function GET(request: NextRequest) {
           }
           const ctx = await ctxPromise;
           const forYou = await generateForYouQuestions(userId, 6, topicHint, ctx, model);
-          await cache.set(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
+          if (forYou.length === 0) trackEmptyResult('forYou');
+          await cacheIfNonEmpty(cacheKey('forYou', userId, topicHint), forYou, CACHE_TTL.forYou);
           send({ section: 'forYou', data: forYou });
         })(),
 
@@ -251,7 +273,8 @@ export async function GET(request: NextRequest) {
           }
           const ctx = await ctxPromise;
           const news = await generateNewsQuestions(userId, 6, [], newsTimeRange, topicHint, ctx, model);
-          await cache.set(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
+          if (news.length === 0) trackEmptyResult('news');
+          await cacheIfNonEmpty(cacheKey('news', userId, topicHint, newsTimeRange), news, CACHE_TTL.news);
           send({ section: 'news', data: news });
         })(),
 
@@ -263,15 +286,22 @@ export async function GET(request: NextRequest) {
           }
           const ctx = await ctxPromise;
           const curiosity = await generateCuriosityQuestions(userId, 6, topicHint, ctx, model);
-          await cache.set(cacheKey('curiosity', userId, topicHint), curiosity, cacheTtl('curiosity'));
+          if (curiosity.length === 0) trackEmptyResult('curiosity');
+          await cacheIfNonEmpty(cacheKey('curiosity', userId, topicHint), curiosity, cacheTtl('curiosity'));
           send({ section: 'curiosity', data: curiosity });
         })(),
       ]);
 
-      // Log any failures
-      for (const result of results) {
+      // Log any failures and track error metrics
+      const sectionNames: Section[] = ['trending', 'forYou', 'news', 'curiosity'];
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
         if (result.status === 'rejected') {
-          logger.error('Inspire section generation failed', { error: (result.reason as Error).message });
+          const sec = sectionNames[i];
+          logger.error('Inspire section generation failed', { section: sec, error: (result.reason as Error).message });
+          trackError(sec);
+          // Send empty array so the client doesn't hang waiting for this section
+          send({ section: sec, data: [] });
         }
       }
 
