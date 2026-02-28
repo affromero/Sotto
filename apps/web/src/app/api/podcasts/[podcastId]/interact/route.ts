@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
-import { interactionQueue, addJob, JobType } from '@/lib/queue';
+import { interactionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
 import { getTierFeatures } from '@/lib/tier-features';
 import { hasByokKey } from '@/lib/byok';
-import type { ProcessInteractionPayload } from '@/lib/queue';
+import type { ProcessInteractionPayload, SendNotificationPayload } from '@/lib/queue';
 
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const podcast = await prisma.podcast.findUnique({
     where: { id: podcastId },
-    select: { id: true },
+    select: { id: true, userId: true, title: true },
   });
 
   if (!podcast) {
@@ -99,6 +99,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   };
 
   await addJob(interactionQueue, JobType.PROCESS_INTERACTION, payload);
+
+  // Fire-and-forget notification for podcast owner
+  if (podcast.userId && podcast.userId !== authResult.userId) {
+    prisma.user.findUnique({ where: { id: authResult.userId }, select: { name: true } })
+      .then((questioner) => {
+        const truncated = question.length > 80 ? `${question.slice(0, 80)}...` : question;
+        const notifPayload: SendNotificationPayload = {
+          userId: podcast.userId,
+          type: 'QUESTION_ON_YOUR_PODCAST',
+          title: 'New question on your podcast',
+          message: `${questioner?.name ?? 'Someone'} asked: "${truncated}"`,
+          data: { podcastId, interactionId: interaction.id },
+        };
+        return addJob(notificationQueue, JobType.SEND_NOTIFICATION, notifPayload);
+      })
+      .catch(() => {});
+  }
 
   return NextResponse.json(interaction, { status: 201 });
 }

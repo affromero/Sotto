@@ -7,6 +7,8 @@ const mockCommentFindMany = vi.fn();
 const mockCommentCount = vi.fn();
 const mockCommentFindUnique = vi.fn();
 const mockTransaction = vi.fn();
+const mockUserFindUnique = vi.fn();
+const mockAddJob = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -22,11 +24,20 @@ vi.mock('@/lib/prisma', () => ({
       count: (...args: unknown[]) => mockCommentCount(...args),
       findUnique: (...args: unknown[]) => mockCommentFindUnique(...args),
     },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
+    },
     activity: {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
+}));
+
+vi.mock('@/lib/queue', () => ({
+  notificationQueue: {},
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { SEND_NOTIFICATION: 'SEND_NOTIFICATION' },
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -163,6 +174,8 @@ describe('GET /api/podcasts/[podcastId]/comments', () => {
 describe('POST /api/podcasts/[podcastId]/comments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue(null);
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -306,5 +319,145 @@ describe('POST /api/podcasts/[podcastId]/comments', () => {
 
     expect(response.status).toBe(201);
     expect(body.timestamp).toBe(42.5);
+  });
+
+  it('enqueues COMMENT_ON_YOUR_PODCAST notification for podcast owner', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1' });
+    const now = new Date('2024-01-01T00:00:00.000Z');
+    const createdComment = {
+      id: 'comment-1',
+      content: 'Great episode!',
+      timestamp: null,
+      replyCount: 0,
+      createdAt: now,
+      user: { id: 'user-1', name: 'Commenter', image: null, handle: 'commenter' },
+    };
+    mockTransaction.mockImplementation(async (callback) => {
+      const tx = {
+        comment: {
+          create: vi.fn().mockResolvedValue(createdComment),
+          update: vi.fn().mockResolvedValue({}),
+        },
+        podcast: { update: vi.fn().mockResolvedValue({}) },
+      };
+      return callback(tx);
+    });
+    mockUserFindUnique.mockResolvedValue({ name: 'Commenter' });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const request = createPostRequest({ content: 'Great episode!' });
+    const params = await createParams('pod-1');
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'owner-1',
+        type: 'COMMENT_ON_YOUR_PODCAST',
+      })
+    );
+  });
+
+  it('enqueues COMMENT_REPLY for parent comment author on reply', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1' });
+    mockCommentFindUnique.mockResolvedValue({ id: 'parent-1', podcastId: 'pod-1', userId: 'parent-author' });
+    const now = new Date('2024-01-01T00:00:00.000Z');
+    const createdComment = {
+      id: 'comment-2',
+      content: 'I agree!',
+      timestamp: null,
+      replyCount: 0,
+      createdAt: now,
+      user: { id: 'user-1', name: 'Replier', image: null, handle: 'replier' },
+    };
+    mockTransaction.mockImplementation(async (callback) => {
+      const tx = {
+        comment: {
+          create: vi.fn().mockResolvedValue(createdComment),
+          update: vi.fn().mockResolvedValue({}),
+        },
+        podcast: { update: vi.fn().mockResolvedValue({}) },
+      };
+      return callback(tx);
+    });
+    mockUserFindUnique.mockResolvedValue({ name: 'Replier' });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const request = createPostRequest({ content: 'I agree!', parentId: 'parent-1' });
+    const params = await createParams('pod-1');
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'owner-1',
+        type: 'COMMENT_ON_YOUR_PODCAST',
+      })
+    );
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'parent-author',
+        type: 'COMMENT_REPLY',
+      })
+    );
+  });
+
+  it('does not double-notify when parent comment author is podcast owner', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'owner-1' });
+    mockCommentFindUnique.mockResolvedValue({ id: 'parent-1', podcastId: 'pod-1', userId: 'owner-1' });
+    const now = new Date('2024-01-01T00:00:00.000Z');
+    const createdComment = {
+      id: 'comment-3',
+      content: 'Nice!',
+      timestamp: null,
+      replyCount: 0,
+      createdAt: now,
+      user: { id: 'user-1', name: 'Replier', image: null, handle: 'replier' },
+    };
+    mockTransaction.mockImplementation(async (callback) => {
+      const tx = {
+        comment: {
+          create: vi.fn().mockResolvedValue(createdComment),
+          update: vi.fn().mockResolvedValue({}),
+        },
+        podcast: { update: vi.fn().mockResolvedValue({}) },
+      };
+      return callback(tx);
+    });
+    mockUserFindUnique.mockResolvedValue({ name: 'Replier' });
+    mockAddJob.mockResolvedValue({ id: 'job-1' });
+
+    const request = createPostRequest({ content: 'Nice!', parentId: 'parent-1' });
+    const params = await createParams('pod-1');
+    const response = await POST(request, params);
+
+    expect(response.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockAddJob).toHaveBeenCalledTimes(1);
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.anything(),
+      'SEND_NOTIFICATION',
+      expect.objectContaining({
+        userId: 'owner-1',
+        type: 'COMMENT_ON_YOUR_PODCAST',
+      })
+    );
   });
 });
