@@ -36,7 +36,7 @@ export class HumeProvider implements TtsProvider {
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
-    this.model = model ?? 'octave';
+    this.model = model ?? 'octave-v1';
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {

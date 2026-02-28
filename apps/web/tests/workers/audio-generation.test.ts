@@ -237,7 +237,7 @@ function setupHumeProvider() {
     provider: {
       generateSpeech: (...args: unknown[]) => mockHumeGenerateSpeech(...args),
       getVoiceId: (...args: unknown[]) => mockProviderGetVoiceId(...args),
-      getModelId: () => 'octave',
+      getModelId: () => 'octave-v1',
       providerId: 'hume',
     },
     source: 'platform',

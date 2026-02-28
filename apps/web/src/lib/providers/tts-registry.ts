@@ -151,9 +151,9 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     supportsVoiceCloning: true,
     supportsStreaming: false,
     maxSegmentChars: 5000,
-    defaultModel: 'octave',
+    defaultModel: 'octave-v1',
     models: [
-      { id: 'octave', displayName: 'Octave', tier: 'ultra' },
+      { id: 'octave-v1', displayName: 'Octave V1', tier: 'ultra' },
     ],
     supportsAudioTags: false,
     docsUrl: 'https://dev.hume.ai/docs/text-to-speech/text-to-speech-guide',
