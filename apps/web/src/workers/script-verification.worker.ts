@@ -19,8 +19,11 @@ import {
 } from '@/lib/script-generator';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { logUsage } from '@/lib/usage-logger';
-import { getAiKey, hasByokKey } from '@/lib/byok';
+import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { assignVoicesForPodcast } from '@/lib/voice-assigner';
+import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
 
@@ -254,6 +257,28 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         logger.info('Script verified (no refs), paused at SCRIPT_READY for review', { podcastId });
       } else {
         // Auto-approve for TWITTER/API sources (no user at browser)
+        // Select TTS provider at auto-approve time (deferred from pipeline start)
+        if (!hasTts) {
+          const selected = await selectFreeTierProviders(userId);
+          await prisma.podcast.update({
+            where: { id: podcastId },
+            data: { ttsProvider: selected.ttsProvider, ttsModel: selected.ttsModel },
+          });
+        }
+
+        // Assign voices for multi-speaker podcasts
+        const svPodcast = await prisma.podcast.findUniqueOrThrow({
+          where: { id: podcastId },
+          select: { ttsProvider: true },
+        });
+        const svProvider = (svPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+        const svSpeakers = discovery.speakers as Array<{ name: string; description?: string }> | null;
+        const speakerList = svSpeakers && svSpeakers.length > 0
+          ? svSpeakers
+          : [...new Set(turns.map((t) => t.speaker))].map((name) => ({ name }));
+        const svTtsKey = hasTts ? ((await getByokKey(userId, svProvider)) ?? undefined) : undefined;
+        await assignVoicesForPodcast(podcastId, speakerList, svProvider, svTtsKey);
+
         const scriptTurns = turns as Array<{ speaker: string; text: string; direction?: string }>;
         await createSegmentsAndQueueAudio(podcastId, scriptTurns);
 

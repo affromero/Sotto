@@ -79,6 +79,7 @@ vi.mock('@/lib/queue', () => ({
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
   hasByokKey: vi.fn().mockResolvedValue(false),
+  getByokKey: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@/lib/tier-features', () => ({
@@ -99,6 +100,21 @@ vi.mock('@/lib/tier-features', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' }),
+}));
+
+vi.mock('@/lib/free-tier-provider-selector', () => ({
+  selectFreeTierProviders: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    aiQuota: 10,
+    ttsProvider: 'elevenlabs',
+    ttsModel: 'eleven_multilingual_v2',
+    ttsQuota: 10,
+  }),
+}));
+
+vi.mock('@/lib/voice-assigner', () => ({
+  assignVoicesForPodcast: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/logger', () => ({
