@@ -202,7 +202,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
             </>
           )}
         </p>
-        <time className={styles.timestamp} dateTime={activity.createdAt}>
+        <time className={styles.timestamp} dateTime={activity.createdAt} suppressHydrationWarning>
           {formatRelativeTime(activity.createdAt)}
         </time>
       </div>

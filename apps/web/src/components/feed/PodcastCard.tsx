@@ -177,7 +177,7 @@ export function PodcastCard({
               {podcast.user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
             </span>
             <span className={styles.dot} aria-hidden="true" />
-            <time className={styles.date} dateTime={podcast.createdAt}>
+            <time className={styles.date} dateTime={podcast.createdAt} suppressHydrationWarning>
               {formatDate(podcast.createdAt)}
             </time>
           </div>
