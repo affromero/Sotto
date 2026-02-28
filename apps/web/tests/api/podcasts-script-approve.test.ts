@@ -13,6 +13,7 @@ const mockPodcastVoiceCreateMany = vi.fn().mockResolvedValue({ count: 0 });
 const mockCheckGenerationGate = vi.fn();
 const mockSelectFreeTierProviders = vi.fn();
 const mockAssignVoicesForPodcast = vi.fn();
+const mockConvertTurnsForProvider = vi.fn();
 
 vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
@@ -60,6 +61,10 @@ vi.mock('@/lib/voice-assigner', () => ({
   assignVoicesForPodcast: (...args: unknown[]) => mockAssignVoicesForPodcast(...args),
 }));
 
+vi.mock('@/lib/tts-tag-converter', () => ({
+  convertTurnsForProvider: (...args: unknown[]) => mockConvertTurnsForProvider(...args),
+}));
+
 vi.mock('@/lib/byok', () => ({
   getByokKey: vi.fn().mockResolvedValue(null),
 }));
@@ -99,6 +104,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
     mockPodcastUpdate.mockResolvedValue({});
     mockPodcastFindUniqueOrThrow.mockResolvedValue({ ttsProvider: 'elevenlabs' });
     mockDiscoveryFindFirst.mockResolvedValue(null);
+    mockConvertTurnsForProvider.mockImplementation((turns: unknown[]) => Promise.resolve(turns));
     mockCreateSegmentsAndQueueAudio.mockResolvedValue(undefined);
     mockAssignVoicesForPodcast.mockResolvedValue(undefined);
   });

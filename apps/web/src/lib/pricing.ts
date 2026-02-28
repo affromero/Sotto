@@ -44,3 +44,16 @@ export function getAiCost(model: string, inputTokens: number, outputTokens: numb
   const outputCost = (outputTokens / 1_000_000) * pricing.outputPerMTok;
   return inputCost + outputCost;
 }
+
+/** Pick the cheapest generative model from the pricing table (excludes embeddings + local CLI). */
+export function getCheapestModel(): string {
+  let cheapest: { model: string; cost: number } | null = null;
+  for (const [model, pricing] of Object.entries(AI_PRICING)) {
+    if (model.startsWith('text-embedding') || model.startsWith('claude-code:')) continue;
+    const totalCost = pricing.inputPerMTok + pricing.outputPerMTok;
+    if (!cheapest || totalCost < cheapest.cost) {
+      cheapest = { model, cost: totalCost };
+    }
+  }
+  return cheapest?.model ?? 'claude-haiku-4-5-20251001';
+}
