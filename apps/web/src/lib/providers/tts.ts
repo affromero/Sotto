@@ -310,6 +310,18 @@ export async function resolveTtsProvider(context: {
       const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
       return { provider, source: 'platform', providerId: 'cartesia' };
     }
+    if (requestedProvider === 'hume' && process.env.HUME_API_KEY) {
+      const provider = await createTtsProviderAsync('hume', process.env.HUME_API_KEY, undefined, requestedModel ?? undefined);
+      return { provider, source: 'platform', providerId: 'hume' };
+    }
+    if (requestedProvider === 'fal' && process.env.FAL_KEY) {
+      const provider = await createTtsProviderAsync('fal', process.env.FAL_KEY, undefined, requestedModel ?? undefined);
+      return { provider, source: 'platform', providerId: 'fal' };
+    }
+    if (requestedProvider === 'replicate' && process.env.REPLICATE_API_TOKEN) {
+      const provider = await createTtsProviderAsync('replicate', process.env.REPLICATE_API_TOKEN, undefined, requestedModel ?? undefined);
+      return { provider, source: 'platform', providerId: 'replicate' };
+    }
 
     // No key available for requested provider
     throw new Error(
@@ -370,6 +382,9 @@ export async function canResolveTts(userId: string): Promise<boolean> {
   if (process.env.ELEVENLABS_API_KEY) return true;
   if (process.env.OPENAI_API_KEY) return true;
   if (process.env.CARTESIA_API_KEY) return true;
+  if (process.env.HUME_API_KEY) return true;
+  if (process.env.FAL_KEY) return true;
+  if (process.env.REPLICATE_API_TOKEN) return true;
   return false;
 }
 
