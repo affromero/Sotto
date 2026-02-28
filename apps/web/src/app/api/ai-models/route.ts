@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
 import { resolveAutoModel } from '@/lib/auto-model-config';
@@ -27,17 +27,20 @@ const CLAUDE_CODE_MODELS = [
   { id: 'claude-code:opus', displayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO' as const, isDefault: false, group: 'Claude Code (Local)' },
 ];
 
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const isAdmin = session.user.role === 'ADMIN';
-  const [aiKeys, claudeAvailable, user] = await Promise.all([
-    listAiProviders(session.user.id),
+  const user = await prisma.user.findUnique({
+    where: { id: authResult.userId },
+    select: { plan: true, role: true },
+  });
+  const isAdmin = user?.role === 'ADMIN';
+  const [aiKeys, claudeAvailable] = await Promise.all([
+    listAiProviders(authResult.userId),
     isAdmin ? isClaudeAvailable() : Promise.resolve(false),
-    prisma.user.findUnique({ where: { id: session.user.id }, select: { plan: true } }),
   ]);
   const validKeys = aiKeys.filter((k) => k.isValid);
   const claudeCodeModels = claudeAvailable ? CLAUDE_CODE_MODELS : [];

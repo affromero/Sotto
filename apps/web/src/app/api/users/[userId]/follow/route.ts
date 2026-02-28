@@ -1,20 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
   const { userId } = await params;
 
-  if (session.user.id === userId) {
+  if (authResult.userId === userId) {
     return errorResponse('Cannot follow yourself', 400);
   }
 
@@ -26,7 +26,7 @@ export async function POST(
   try {
     await prisma.follow.create({
       data: {
-        followerId: session.user.id,
+        followerId: authResult.userId,
         followingId: userId,
       },
     });
@@ -45,7 +45,7 @@ export async function POST(
   // Fire-and-forget activity record
   prisma.activity.create({
     data: {
-      userId: session.user.id,
+      userId: authResult.userId,
       type: 'USER_FOLLOWED',
       targetId: userId,
       targetType: 'user',
@@ -56,11 +56,11 @@ export async function POST(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
@@ -70,7 +70,7 @@ export async function DELETE(
     await prisma.follow.delete({
       where: {
         followerId_followingId: {
-          followerId: session.user.id,
+          followerId: authResult.userId,
           followingId: userId,
         },
       },

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockDiscoveryFindUnique = vi.fn();
@@ -10,8 +10,8 @@ const mockAddJob = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockReferenceFindMany = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -83,7 +83,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -93,7 +93,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -103,7 +103,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 404 when podcast not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -114,7 +114,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 403 when user does not own the podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'other-user', status: 'SCRIPT_READY' });
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -125,7 +125,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 400 when status is not SCRIPT_READY', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'GENERATING_AUDIO' });
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -136,7 +136,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 404 when discovery not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue(null);
 
@@ -148,7 +148,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('deletes old data, transitions to SCRIPTING, and queues regeneration job (no feedback)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: 'some content' });
     mockTransaction.mockResolvedValue(undefined);
@@ -168,7 +168,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('reads script before delete and passes feedback fields when body has feedback', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
     mockScriptFindUnique.mockResolvedValue({
@@ -204,7 +204,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('handles empty body the same as no body (backward compat)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockDiscoveryFindUnique.mockResolvedValue({ id: 'disc-1', sourceContent: null });
     mockTransaction.mockResolvedValue(undefined);
@@ -223,7 +223,7 @@ describe('POST /api/podcasts/[podcastId]/script/regenerate', () => {
   });
 
   it('returns 400 for invalid feedback body', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const req = new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/script/regenerate'), {
       method: 'POST',

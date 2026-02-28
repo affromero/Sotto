@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockScriptUpdate = vi.fn();
 const mockReferenceFindMany = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -61,7 +61,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await GET(createGetRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -71,7 +71,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await GET(createGetRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -81,7 +81,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 404 when podcast not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const response = await GET(createGetRequest(), await createParams('pod-1'));
@@ -92,7 +92,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 403 when user does not own the podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'other-user' });
 
     const response = await GET(createGetRequest(), await createParams('pod-1'));
@@ -103,7 +103,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 404 when script not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
     mockScriptFindUnique.mockResolvedValue(null);
 
@@ -115,7 +115,7 @@ describe('GET /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns script turns, references, and version on success', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1' });
     const turns = [
       { speaker: 'HOST', text: 'Hello' },
@@ -144,7 +144,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   ];
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
     const body = await response.json();
@@ -154,7 +154,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 404 when podcast not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
@@ -165,7 +165,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 403 when user does not own the podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'other-user', status: 'SCRIPT_READY' });
 
     const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
@@ -176,7 +176,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 400 when status is not SCRIPT_READY', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'READY' });
 
     const response = await PATCH(createPatchRequest({ turns: validTurns }), await createParams('pod-1'));
@@ -187,7 +187,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 400 on invalid input (missing turns)', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
 
     const response = await PATCH(createPatchRequest({}), await createParams('pod-1'));
@@ -196,7 +196,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 400 when turns is empty', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
 
     const response = await PATCH(
@@ -209,7 +209,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
 
   it('accepts a single-turn monologue script', async () => {
     const monologueTurn = [{ speaker: 'HOST', text: 'Solo monologue turn.' }];
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockScriptFindUnique.mockResolvedValue({ turns: monologueTurn, version: 1 });
     mockReferenceFindMany.mockResolvedValue([]);
@@ -224,7 +224,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('returns 404 when script not found during update', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockScriptFindUnique.mockResolvedValue(null);
 
@@ -236,7 +236,7 @@ describe('PATCH /api/podcasts/[podcastId]/script', () => {
   });
 
   it('updates script and returns new turns and version', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockScriptFindUnique.mockResolvedValue({
       turns: [
