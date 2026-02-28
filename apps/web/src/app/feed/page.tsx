@@ -33,6 +33,7 @@ const podcastSelect = {
   ttsModel: true,
   language: true,
   forkedFromId: true,
+  forkedFrom: { select: { id: true, title: true } },
   user: {
     select: {
       id: true,
@@ -40,6 +41,7 @@ const podcastSelect = {
       image: true,
       handle: true,
       role: true,
+      plan: true,
     },
   },
   tags: {
@@ -86,11 +88,17 @@ export default async function FeedPage() {
   ]);
 
   const serializePodcasts = (list: typeof podcasts) =>
-    list.map((p) => ({
-      ...p,
-      createdAt: p.createdAt.toISOString(),
-      tags: p.tags.map((pt) => pt.tag),
-    }));
+    list.map((p) => {
+      const { plan, ...safeUser } = p.user;
+      return {
+        ...p,
+        createdAt: p.createdAt.toISOString(),
+        tags: p.tags.map((pt) => pt.tag),
+        ownerIsPro: plan === 'PRO' || ['ADMIN', 'SYSTEM'].includes(safeUser.role ?? ''),
+        forkedFrom: p.forkedFrom ?? null,
+        user: safeUser,
+      };
+    });
 
   const serializedAll = serializePodcasts(podcasts);
   const serializedTrending = serializePodcasts(trending);

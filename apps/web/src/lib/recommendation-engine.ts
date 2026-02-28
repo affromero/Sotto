@@ -22,8 +22,9 @@ export interface RecommendedPodcast {
   likeCount: number;
   forkCount: number;
   createdAt: string;
-  user: { id: string; name: string | null; image: string | null };
+  user: { id: string; name: string | null; image: string | null; handle?: string | null; role?: string };
   tags: Array<{ id: string; name: string; slug: string }>;
+  ownerIsPro?: boolean;
   score: number;
   signals: RecommendationSignals;
   explanation: string;
@@ -35,6 +36,15 @@ export interface DailyPicksResult {
   categories: PickCategory[];
   refreshBatch: number;
   message?: string;
+}
+
+/** Compute ownerIsPro and strip plan from a Prisma user row. */
+function resolveOwnerPro(user: { plan?: string | null; role?: string | null; [key: string]: unknown }) {
+  const { plan, ...safeUser } = user;
+  return {
+    safeUser,
+    ownerIsPro: plan === 'PRO' || ['ADMIN', 'SYSTEM'].includes((safeUser.role as string) ?? ''),
+  };
 }
 
 /**
@@ -281,7 +291,7 @@ export async function searchPodcasts(
       likeCount: true,
       forkCount: true,
       createdAt: true,
-      user: { select: { id: true, name: true, image: true } },
+      user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
     },
     orderBy: [{ playCount: 'desc' }, { likeCount: 'desc' }],
@@ -294,6 +304,7 @@ export async function searchPodcasts(
     const scored: RecommendedPodcast[] = [];
 
     for (const p of podcasts) {
+      const { safeUser, ownerIsPro } = resolveOwnerPro(p.user);
       try {
         const result = await ml.computeScore(userId, p.id);
         scored.push({
@@ -306,8 +317,9 @@ export async function searchPodcasts(
           likeCount: p.likeCount,
           forkCount: p.forkCount,
           createdAt: p.createdAt.toISOString(),
-          user: p.user,
+          user: safeUser as RecommendedPodcast['user'],
           tags: p.tags.map((pt) => pt.tag),
+          ownerIsPro,
           score: result.score,
           signals: result.signals,
           explanation: result.explanation,
@@ -324,8 +336,9 @@ export async function searchPodcasts(
           likeCount: p.likeCount,
           forkCount: p.forkCount,
           createdAt: p.createdAt.toISOString(),
-          user: p.user,
+          user: safeUser as RecommendedPodcast['user'],
           tags: p.tags.map((pt) => pt.tag),
+          ownerIsPro,
           score: 0.5,
           signals: { relevance: 0, collaborative: 0, quality: 0.5, freshness: 0, novelty: 0 },
           explanation: 'Popular in search results',
@@ -337,23 +350,27 @@ export async function searchPodcasts(
     return scored.sort((a, b) => b.score - a.score);
   }
 
-  return podcasts.map((p) => ({
-    podcastId: p.id,
-    title: p.title,
-    topic: p.topic,
-    duration: p.duration,
-    audioUrl: p.audioUrl,
-    playCount: p.playCount,
-    likeCount: p.likeCount,
-    forkCount: p.forkCount,
-    createdAt: p.createdAt.toISOString(),
-    user: p.user,
-    tags: p.tags.map((pt) => pt.tag),
-    score: 0,
-    signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
-    explanation: '',
-    category: 'explore',
-  }));
+  return podcasts.map((p) => {
+    const { safeUser, ownerIsPro } = resolveOwnerPro(p.user);
+    return {
+      podcastId: p.id,
+      title: p.title,
+      topic: p.topic,
+      duration: p.duration,
+      audioUrl: p.audioUrl,
+      playCount: p.playCount,
+      likeCount: p.likeCount,
+      forkCount: p.forkCount,
+      createdAt: p.createdAt.toISOString(),
+      user: safeUser as RecommendedPodcast['user'],
+      tags: p.tags.map((pt) => pt.tag),
+      ownerIsPro,
+      score: 0,
+      signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
+      explanation: '',
+      category: 'explore',
+    };
+  });
 }
 
 /**
@@ -388,28 +405,32 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
         likeCount: true,
         forkCount: true,
         createdAt: true,
-        user: { select: { id: true, name: true, image: true } },
+        user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
         tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
       },
     });
 
-    return popular.map((p) => ({
-      podcastId: p.id,
-      title: p.title,
-      topic: p.topic,
-      duration: p.duration,
-      audioUrl: p.audioUrl,
-      playCount: p.playCount,
-      likeCount: p.likeCount,
-      forkCount: p.forkCount,
-      createdAt: p.createdAt.toISOString(),
-      user: p.user,
-      tags: p.tags.map((pt) => pt.tag),
-      score: 0,
-      signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
-      explanation: 'Trending this week',
-      category: 'trending',
-    }));
+    return popular.map((p) => {
+      const { safeUser, ownerIsPro } = resolveOwnerPro(p.user);
+      return {
+        podcastId: p.id,
+        title: p.title,
+        topic: p.topic,
+        duration: p.duration,
+        audioUrl: p.audioUrl,
+        playCount: p.playCount,
+        likeCount: p.likeCount,
+        forkCount: p.forkCount,
+        createdAt: p.createdAt.toISOString(),
+        user: safeUser as RecommendedPodcast['user'],
+        tags: p.tags.map((pt) => pt.tag),
+        ownerIsPro,
+        score: 0,
+        signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
+        explanation: 'Trending this week',
+        category: 'trending',
+      };
+    });
   }
 
   const podcasts = await prisma.podcast.findMany({
@@ -432,7 +453,7 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
       likeCount: true,
       forkCount: true,
       createdAt: true,
-      user: { select: { id: true, name: true, image: true } },
+      user: { select: { id: true, name: true, image: true, handle: true, role: true, plan: true } },
       tags: { include: { tag: { select: { id: true, name: true, slug: true } } } },
     },
   });
@@ -446,23 +467,27 @@ export async function getTrending(): Promise<RecommendedPodcast[]> {
   );
   podcasts.sort((a, b) => (orderMap.get(a.id) ?? 0) - (orderMap.get(b.id) ?? 0));
 
-  return podcasts.map((p) => ({
-    podcastId: p.id,
-    title: p.title,
-    topic: p.topic,
-    duration: p.duration,
-    audioUrl: p.audioUrl,
-    playCount: p.playCount,
-    likeCount: p.likeCount,
-    forkCount: p.forkCount,
-    createdAt: p.createdAt.toISOString(),
-    user: p.user,
-    tags: p.tags.map((pt) => pt.tag),
-    score: 0,
-    signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
-    explanation: 'Trending this week',
-    category: 'trending',
-  }));
+  return podcasts.map((p) => {
+    const { safeUser, ownerIsPro } = resolveOwnerPro(p.user);
+    return {
+      podcastId: p.id,
+      title: p.title,
+      topic: p.topic,
+      duration: p.duration,
+      audioUrl: p.audioUrl,
+      playCount: p.playCount,
+      likeCount: p.likeCount,
+      forkCount: p.forkCount,
+      createdAt: p.createdAt.toISOString(),
+      user: safeUser as RecommendedPodcast['user'],
+      tags: p.tags.map((pt) => pt.tag),
+      ownerIsPro,
+      score: 0,
+      signals: { relevance: 0, collaborative: 0, quality: 0, freshness: 0, novelty: 0 },
+      explanation: 'Trending this week',
+      category: 'trending',
+    };
+  });
 }
 
 /**
