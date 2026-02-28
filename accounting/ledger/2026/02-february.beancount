@@ -68,13 +68,19 @@
   Assets:Prepaid:APICredits                    60.00 USD
   Assets:Current:Cash:Bank                    -60.00 USD
 
-2026-02-23 * "API credits amortization" "Anthropic — February 2026 (1/2)"
-  Expenses:AI:Claude:Other                     30.00 USD
-  Assets:Prepaid:APICredits                   -30.00 USD
+; Prepaid: OpenAI API credits — 60.00 USD over 2 months (30.00/mo)
+; Amortize with: /expense amortize
+2026-02-17 * "OpenAI" "API credits (2 months prepaid)"
+  Assets:Prepaid:APICredits                    60.00 USD
+  Assets:Current:Cash:Bank                    -60.00 USD
 
 2026-02-18 * "Twitter" "Developer Console — February 2026"
   Expenses:Software:DevTools                   50.00 USD
   Assets:Current:Cash:Bank                    -50.00 USD
+
+2026-02-23 * "API credits amortization" "Anthropic — February 2026 (1/2)"
+  Expenses:AI:Claude:Other                     30.00 USD
+  Assets:Prepaid:APICredits                   -30.00 USD
 
 2026-02-26 * "Twitter" "X Premium subscription — @sottofm — February 2026"
   Expenses:Software:Other                      5.25 USD
