@@ -18,6 +18,17 @@ describe('tts-text-cleaner', () => {
         .toBe('That is so funny');
     });
 
+    it('removes parenthetical pause directions', () => {
+      expect(cleanTextForTts('And then (short pause) it happened'))
+        .toBe('And then it happened');
+      expect(cleanTextForTts('Wow (long pause) that is heavy'))
+        .toBe('Wow that is heavy');
+      expect(cleanTextForTts('Wait (beat) okay'))
+        .toBe('Wait okay');
+      expect(cleanTextForTts('So (dramatic pause) here we go'))
+        .toBe('So here we go');
+    });
+
     it('preserves non-direction parentheticals', () => {
       expect(cleanTextForTts('The study (published in Nature) found'))
         .toBe('The study (published in Nature) found');
