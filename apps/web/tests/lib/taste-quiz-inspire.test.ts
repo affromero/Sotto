@@ -31,8 +31,8 @@ vi.mock('@/lib/providers/ai', () => ({
   resolveAiProvider: (...args: unknown[]) => mockResolveAiProvider(...args),
 }));
 
-vi.mock('@/lib/llm', () => ({
-  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getProviderForModel: () => null,
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -96,7 +96,12 @@ function setupDefaultMocks() {
 
 function createMockAI(responseContent: string) {
   return {
-    generateResponse: vi.fn().mockResolvedValue({ content: responseContent }),
+    generateResponse: vi.fn().mockResolvedValue({
+      content: responseContent,
+      model: 'llama-3.1-8b-instant',
+      inputTokens: 100,
+      outputTokens: 50,
+    }),
   };
 }
 
@@ -257,8 +262,10 @@ describe('generateNewsQuestions', () => {
     expect(call[0]).toContain('Psychology of music');
   });
 
-  it('returns empty array on failure', async () => {
-    mockResolveAiProvider.mockRejectedValue(new Error('No provider'));
+  it('returns empty array on AI failure', async () => {
+    mockCreateAIProvider.mockReturnValue({
+      generateResponse: vi.fn().mockRejectedValue(new Error('API down')),
+    });
 
     const result = await generateNewsQuestions('user-1', 3);
     expect(result).toEqual([]);

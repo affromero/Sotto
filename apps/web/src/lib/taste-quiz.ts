@@ -2,9 +2,8 @@ import { createHash } from 'crypto';
 import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { prisma } from './prisma';
 import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
-import { createAIProvider } from './providers/ai';
-import { resolveAiProvider } from './providers/ai';
-import { WEB_SEARCH_TOOL } from './llm';
+import { createAIProvider, resolveAiProvider } from './providers/ai';
+import { getProviderForModel } from './providers/ai-registry';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -212,6 +211,29 @@ export async function loadInspireContext(userId: string, opts?: { model?: string
   };
 }
 
+/**
+ * Resolve the AI provider, API key, and model for Inspire sections.
+ * Ensures the model always matches the resolved provider to prevent
+ * cross-provider 404s (e.g. sending 'gpt-5-mini' to Anthropic).
+ */
+function resolveInspireProvider(
+  resolved: { provider: string; source: string; apiKey?: string; model?: string } | null,
+  autoModel: PlanModelConfig,
+  explicitModel?: string
+): { providerType: string; apiKey: string | undefined; model: string | undefined } {
+  const providerType = resolved?.provider ?? autoModel.aiProvider;
+  const apiKey = resolved?.source === 'byok' ? resolved.apiKey : undefined;
+
+  // Prefer: explicit model → resolver model (e.g. platform Groq) → auto config model
+  const candidateModel = explicitModel ?? resolved?.model ?? autoModel.aiModel;
+
+  // Only use the candidate if it belongs to the target provider (or is unknown to the registry)
+  const modelOwner = getProviderForModel(candidateModel);
+  const model = (!modelOwner || modelOwner === providerType) ? candidateModel : undefined;
+
+  return { providerType, apiKey, model };
+}
+
 interface ParseOptions {
   /** When true, keep questions even if no slugs match the taxonomy (uses category or 'general' as fallback). */
   lenient?: boolean;
@@ -364,54 +386,31 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
   });
 
   try {
-    // Use user's BYOK key if available (faster than platform claude-code CLI)
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
     const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
-    let responseText: string;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    const effectiveModel = model || ctx.autoModel.aiModel;
-    let usedModel = effectiveModel;
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 
-    if (resolved?.apiKey && resolved.provider === 'anthropic') {
-      const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      const client = new Anthropic({ apiKey: resolved.apiKey });
-      const response = await client.messages.create({
-        model: effectiveModel,
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: systemPrompt }],
-      });
-      const textBlock = response.content.find((block) => block.type === 'text');
-      responseText = textBlock?.type === 'text' ? textBlock.text : '';
-      inputTokens = response.usage.input_tokens;
-      outputTokens = response.usage.output_tokens;
-    } else {
-      const ai = createAIProvider(ctx.autoModel.aiProvider);
-      const result = await ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
-        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
-      );
-      responseText = result.content;
-      inputTokens = result.inputTokens;
-      outputTokens = result.outputTokens;
-      usedModel = result.model;
-    }
+    const ai = createAIProvider(providerType);
+    const result = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0 }
+    );
 
     const durationMs = Date.now() - llmStart;
 
     const { questions, emptyReason } = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      result.content, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
 
     logUsage({
-      service: resolved?.provider === 'openai' ? 'openai' : 'anthropic',
-      model: usedModel,
+      service: providerType,
+      model: result.model,
       category: 'inspire_foryou',
-      inputTokens,
-      outputTokens,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
       durationMs,
       userId,
       metadata: { questionCount: questions.length, topic: topic ?? null },
@@ -460,52 +459,31 @@ export async function generateCuriosityQuestions(
   });
 
   try {
-    const resolved = await resolveAiProvider(userId).catch(() => null);
-    let responseText: string;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    const effectiveModel = model || ctx.autoModel.aiModel;
-    let usedModel = effectiveModel;
+    const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 
-    if (resolved?.apiKey && resolved.provider === 'anthropic') {
-      const { default: Anthropic } = await import('@anthropic-ai/sdk');
-      const client = new Anthropic({ apiKey: resolved.apiKey });
-      const response = await client.messages.create({
-        model: effectiveModel,
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: systemPrompt }],
-      });
-      const textBlock = response.content.find((block) => block.type === 'text');
-      responseText = textBlock?.type === 'text' ? textBlock.text : '';
-      inputTokens = response.usage.input_tokens;
-      outputTokens = response.usage.output_tokens;
-    } else {
-      const ai = createAIProvider(ctx.autoModel.aiProvider);
-      const result = await ai.generateResponse(
-        systemPrompt,
-        [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
-        { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
-      );
-      responseText = result.content;
-      inputTokens = result.inputTokens;
-      outputTokens = result.outputTokens;
-      usedModel = result.model;
-    }
+    const ai = createAIProvider(providerType);
+    const result = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0 }
+    );
 
     const durationMs = Date.now() - llmStart;
 
     const { questions, emptyReason } = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      result.content, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
 
     logUsage({
-      service: resolved?.provider === 'openai' ? 'openai' : 'anthropic',
-      model: usedModel,
+      service: providerType,
+      model: result.model,
       category: 'inspire_curiosity',
-      inputTokens,
-      outputTokens,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
       durationMs,
       userId,
       metadata: { questionCount: questions.length, topic: topic ?? null },
@@ -598,89 +576,30 @@ export async function generateNewsQuestions(
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO');
-    let responseText: string;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    const effectiveModel = model || ctx.autoModel.aiModel;
-    let usedModel = effectiveModel;
+    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
+    const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 
-    if (useNewsletterPath) {
-      // Newsletter-grounded: no web search needed, use any available provider
-      const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
-      if (anthropicApiKey) {
-        const { default: Anthropic } = await import('@anthropic-ai/sdk');
-        const client = new Anthropic({ apiKey: anthropicApiKey });
-        const response = await client.messages.create({
-          model: effectiveModel,
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: systemPrompt }],
-        });
-        const textBlock = response.content.find((block) => block.type === 'text');
-        responseText = textBlock?.type === 'text' ? textBlock.text : '';
-        inputTokens = response.usage.input_tokens;
-        outputTokens = response.usage.output_tokens;
-      } else {
-        const ai = createAIProvider(ctx.autoModel.aiProvider);
-        const result = await ai.generateResponse(
-          systemPrompt,
-          [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-          { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
-        );
-        responseText = result.content;
-        inputTokens = result.inputTokens;
-        outputTokens = result.outputTokens;
-        usedModel = result.model;
-      }
-    } else {
-      // Fallback: web search path (existing behavior)
-      const anthropicApiKey = resolved.apiKey || process.env.ANTHROPIC_API_KEY;
-      if (anthropicApiKey) {
-        const { default: Anthropic } = await import('@anthropic-ai/sdk');
-        const client = new Anthropic({ apiKey: anthropicApiKey });
-        const response = await client.messages.create({
-          model: effectiveModel,
-          max_tokens: 2048,
-          messages: [{ role: 'user', content: systemPrompt }],
-          tools: [WEB_SEARCH_TOOL],
-        });
-        responseText = response.content
-          .filter(
-            (block): block is Extract<(typeof response.content)[number], { type: 'text' }> =>
-              block.type === 'text'
-          )
-          .map((block) => block.text)
-          .join('\n\n');
-        inputTokens = response.usage.input_tokens;
-        outputTokens = response.usage.output_tokens;
-      } else {
-        const ai = createAIProvider(ctx.autoModel.aiProvider);
-        const result = await ai.generateResponse(
-          systemPrompt,
-          [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-          { model: effectiveModel, maxTokens: 2048, temperature: 1.0 }
-        );
-        responseText = result.content;
-        inputTokens = result.inputTokens;
-        outputTokens = result.outputTokens;
-        usedModel = result.model;
-      }
-    }
+    const ai = createAIProvider(providerType);
+    const result = await ai.generateResponse(
+      systemPrompt,
+      [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0, useWebSearch: !useNewsletterPath }
+    );
 
     const durationMs = Date.now() - llmStart;
 
     const { questions, emptyReason } = parseAndFilterQuestions(
-      responseText, count, ctx.validSlugs, ctx.priorQuestionIds,
+      result.content, count, ctx.validSlugs, ctx.priorQuestionIds,
       { lenient: true }
     );
 
     logUsage({
-      service: resolved.provider === 'openai' ? 'openai' : 'anthropic',
-      model: usedModel,
+      service: providerType,
+      model: result.model,
       category: 'inspire_news',
-      inputTokens,
-      outputTokens,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
       durationMs,
       userId,
       metadata: { questionCount: questions.length, topic: topic ?? null, timeRange, useNewsletterPath },
