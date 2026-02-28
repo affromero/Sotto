@@ -70,7 +70,7 @@ export async function processSegmentRegeneration(
     podcastId,
   });
 
-  const ttsText = cleanTextForTts(newText, { providerId });
+  const ttsText = cleanTextForTts(newText);
   const audioBuffer = await provider.generateSpeech({ text: ttsText, voiceId });
 
   const charCount = ttsText.length;

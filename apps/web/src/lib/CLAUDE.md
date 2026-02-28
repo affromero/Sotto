@@ -64,7 +64,7 @@ All shared business logic and external service integrations live here.
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
-| `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()` — centralized pricing for all AI models | Pure utility |
+| `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()`, `getCheapestModel()` — centralized pricing for all AI models | Pure utility |
 | `usage-logger.ts` | Unified `logUsage()` function for all provider cost tracking — replaces old `logApiUsage()`, auto-computes AI costs from model pricing | Uses `prisma.ts`, `pricing.ts` |
 | `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation | Uses `prisma.ts` |
 | `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts`, `auto-model-config.ts` |
@@ -90,7 +90,9 @@ All shared business logic and external service integrations live here.
 | `transcript-parser.ts` | Transcript parser (SRT, VTT, plain text) → `ParsedSegment[]` with speaker diarization | Uses `llm.ts` |
 | `email.ts` | Resend email client (graceful no-op if key missing) | Resend API |
 | `email-templates.ts` | Waitlist welcome + weekly digest HTML templates | Pure utility |
-| `tts-text-cleaner.ts` | TTS text preprocessor: strips `[SFX:]`, citations, delivery directions; preserves audio tags for ElevenLabs | Pure utility |
+| `tts-text-cleaner.ts` | TTS text safety net: strips `[SFX:]` markers and `[N]` citations before sending to TTS. Provider-specific tag conversion handled upstream by `tts-tag-converter.ts` | Pure utility |
+| `tts-tag-converter.ts` | LLM-based TTS tag converter: converts script inline markup to provider-native format at approve time. Uses cheapest model via `pricing.ts`, fetches provider docs via `tts-doc-fetcher.ts` | Uses `llm.ts`, `pricing.ts`, `tts-doc-fetcher.ts` |
+| `tts-doc-fetcher.ts` | TTS provider docs fetcher: fetches formatting docs from provider URL, Redis cache (24h TTL), HTML content extraction | Fetch + `redis.ts` |
 
 ## Hooks (`src/lib/hooks/`)
 
