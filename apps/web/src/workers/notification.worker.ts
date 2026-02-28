@@ -16,7 +16,7 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
   });
 
   // Create in-app notification
-  await prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: {
       userId,
       type: type as NotificationType,
@@ -33,6 +33,15 @@ export async function processNotification(job: Job<SendNotificationPayload>): Pr
       sendPushNotification({ userId, title, body: message, data }),
       sendExpoPushNotification({ userId, title, body: message, data }),
     ]);
+
+    const anyPushSucceeded = pushResults.some((r) => r.status === 'fulfilled');
+    if (anyPushSucceeded) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: { pushed: true },
+      });
+    }
+
     for (const result of pushResults) {
       if (result.status === 'rejected') {
         logger.warn('Push notification channel failed', {
