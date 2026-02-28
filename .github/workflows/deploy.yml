@@ -98,7 +98,8 @@ jobs:
               sleep 10
               HEALTH=$(curl -sf http://localhost:3000/api/health 2>/dev/null || echo "")
               if [ -n "$HEALTH" ]; then
-                LIVE_VERSION=$(echo "$HEALTH" | jq -r '.version // "unknown"')
+                LIVE_VERSION=$(echo "$HEALTH" | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')
+                [ -z "$LIVE_VERSION" ] && LIVE_VERSION="unknown"
                 if [ "$LIVE_VERSION" = "$COMMIT_SHA" ]; then
                   echo "Health check passed — version $LIVE_VERSION matches (attempt $i)"
                   break
