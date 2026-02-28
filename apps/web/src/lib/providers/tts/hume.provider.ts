@@ -99,3 +99,56 @@ export class HumeProvider implements TtsProvider {
     return this.model;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Adaptive Concurrency
+// ---------------------------------------------------------------------------
+
+const DEFAULT_HUME_CONCURRENCY = 5;
+
+/**
+ * Resolve the concurrency limit for a Hume API key.
+ * Returns a cached value from Redis if available, otherwise the conservative default (5).
+ * Hume has no API endpoint to query the limit — we learn it from 429 errors.
+ */
+export async function getHumeConcurrencyLimit(apiKey: string): Promise<number> {
+  const { cache } = await import('../../redis');
+  const crypto = await import('crypto');
+  const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+  const cacheKey = `tts:concurrency:hume:${keyHash}`;
+
+  const cached = await cache.get<number>(cacheKey);
+  if (cached !== null) return cached;
+
+  return DEFAULT_HUME_CONCURRENCY;
+}
+
+/**
+ * Parse a Hume 429 error body for the concurrency limit and cache it.
+ * Uses a generic regex to match any limit/concurrency number in the error.
+ * If no number is found, caches (default - 1) with a short TTL to re-probe quickly.
+ */
+export async function updateHumeConcurrencyFromError(apiKey: string, errorMessage: string): Promise<void> {
+  try {
+    const { cache } = await import('../../redis');
+    const crypto = await import('crypto');
+    const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
+    const cacheKey = `tts:concurrency:hume:${keyHash}`;
+
+    const match = errorMessage.match(/(?:limit|concurr\w*)\D*(\d+)/i);
+    if (match) {
+      const limit = parseInt(match[1], 10);
+      if (!isNaN(limit) && limit >= 1 && limit <= 100) {
+        await cache.set(cacheKey, limit, 300);
+        logger.info('Hume concurrency limit detected from 429', { limit });
+        return;
+      }
+    }
+
+    // No parseable limit — cache a reduced default with short TTL to re-probe quickly
+    await cache.set(cacheKey, DEFAULT_HUME_CONCURRENCY - 1, 60);
+    logger.info('Hume 429 without parseable limit, reducing default', { newLimit: DEFAULT_HUME_CONCURRENCY - 1 });
+  } catch {
+    // Swallow Redis errors — original 429 still propagates via BullMQ retry
+  }
+}
