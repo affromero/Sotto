@@ -260,6 +260,7 @@ export async function POST(request: NextRequest) {
         podcastId: podcast.id,
         speaker: v.speaker,
         voiceId: v.voiceId ?? null,
+        provider: parsed.data.ttsProvider ?? autoResolvedTtsProvider ?? null,
       })),
     });
   }

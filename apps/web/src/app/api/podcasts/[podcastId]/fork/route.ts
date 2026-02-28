@@ -101,7 +101,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     where: { id: podcastId },
     include: {
       tags: { select: { tagId: true } },
-      voices: { select: { speaker: true, voiceId: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
       discovery: {
         select: {
           durationTarget: true,
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Check if the source podcast's voices are paid and forker needs to pay
   const paymentIntentIds: string[] | undefined = body.paymentIntentIds;
   const skipPaidVoices = body.skipPaidVoices === true;
-  let forkVoices = sourcePodcast.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId }));
+  let forkVoices = sourcePodcast.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId, provider: v.provider }));
   const forkVoicesWithIds = forkVoices.filter(
     (v): v is { speaker: string; voiceId: string } => !!v.voiceId
   );
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // If skipping paid voices, clear the voice IDs so the pool will be used instead
   if (skipPaidVoices) {
-    forkVoices = forkVoices.map(v => ({ ...v, voiceId: null }));
+    forkVoices = forkVoices.map(v => ({ ...v, voiceId: null, provider: null }));
   }
 
   // Verify provided payment intents
@@ -198,6 +198,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           podcastId: newPodcast.id,
           speaker: v.speaker,
           voiceId: v.voiceId,
+          provider: v.provider ?? null,
         })),
       });
     }
