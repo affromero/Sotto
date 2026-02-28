@@ -114,6 +114,7 @@ export async function assignVoicesForPodcast(
         podcastId,
         speaker: e.speaker,
         voiceId: e.voiceId,
+        provider: providerId,
       })),
       skipDuplicates: true,
     });
@@ -228,12 +229,13 @@ async function fallbackAssign(
 ): Promise<void> {
   const voiceIds = getFallbackVoiceIds(podcastId, speakers.length, providerId, metadata);
 
-  const entries: Array<{ podcastId: string; speaker: string; voiceId: string }> = [];
+  const entries: Array<{ podcastId: string; speaker: string; voiceId: string; provider: string }> = [];
   for (let i = 0; i < speakers.length && i < voiceIds.length; i++) {
     entries.push({
       podcastId,
       speaker: speakers[i].name,
       voiceId: voiceIds[i],
+      provider: providerId,
     });
   }
 

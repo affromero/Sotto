@@ -90,13 +90,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   }
 
+  // Fetch resolved ttsProvider for voice assignment and tag conversion
+  // (must happen after TTS provider is written to DB above)
+  const resolvedPodcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { ttsProvider: true },
+  });
+  const resolvedProvider = (resolvedPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
+
   // Write custom voice selections if provided
   if (bodyVoices && bodyVoices.length > 0) {
     await prisma.podcastVoice.deleteMany({ where: { podcastId } });
     await prisma.podcastVoice.createMany({
       data: bodyVoices
         .filter((v) => v.voiceId)
-        .map((v) => ({ podcastId, speaker: v.speaker, voiceId: v.voiceId! })),
+        .map((v) => ({ podcastId, speaker: v.speaker, voiceId: v.voiceId!, provider: resolvedProvider })),
     });
   }
 
@@ -109,12 +117,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   const turns = script.turns as ScriptTurn[];
-  // Fetch resolved ttsProvider for voice assignment and tag conversion
-  const resolvedPodcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
-    select: { ttsProvider: true },
-  });
-  const resolvedProvider = (resolvedPodcast.ttsProvider ?? 'elevenlabs') as TtsProviderId;
 
   // Assign voices for multi-speaker podcasts (skip if user provided custom voices)
   if (!bodyVoices || bodyVoices.length === 0) {

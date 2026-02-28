@@ -141,6 +141,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         voiceTrackId: track.id,
         speaker: v.speaker,
         voiceId: v.voiceId,
+        provider: providerId,
       })),
     });
 
