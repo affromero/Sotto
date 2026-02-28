@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { isHandleAvailable } from '@/lib/handles';
@@ -228,8 +227,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
+    const authResult = await authenticateRequest(request);
+    if (!authResult) {
       return errorResponse('Unauthorized', 401);
     }
 
@@ -239,7 +238,7 @@ export async function DELETE(request: NextRequest) {
       return errorResponse('You must send { "confirm": "DELETE" } to delete your account', 400);
     }
 
-    const userId = session.user.id;
+    const userId = authResult.userId;
 
     // Collect podcast IDs and storage keys before deleting
     const podcasts = await prisma.podcast.findMany({

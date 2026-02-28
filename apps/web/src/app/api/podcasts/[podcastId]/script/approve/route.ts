@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { checkRateLimit } from '@/lib/redis';
 import { checkGenerationGate } from '@/lib/generation-gate';
@@ -9,14 +9,14 @@ import type { ScriptTurn } from '@/lib/script-generator';
 import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const userId = session.user.id;
+  const userId = authResult.userId;
 
   // Rate limit: 20/hour, 100/day
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);

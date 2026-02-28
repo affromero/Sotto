@@ -1,23 +1,23 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { VOICE_POOL } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
 
 import { errorResponse } from '@/lib/api-response';
-export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
   const [user, userClones, approvedRequests, allowlistEntries] = await Promise.all([
     prisma.user.findUniqueOrThrow({
-      where: { id: session.user.id },
+      where: { id: authResult.userId },
       select: { stripeAccountId: true, stripeOnboarded: true },
     }),
     prisma.voiceClone.findMany({
-      where: { userId: session.user.id },
+      where: { userId: authResult.userId },
       select: {
         id: true,
         name: true,
@@ -37,7 +37,7 @@ export async function GET() {
     }),
     prisma.voiceRequest.findMany({
       where: {
-        requesterId: session.user.id,
+        requesterId: authResult.userId,
         status: 'APPROVED',
         voiceClone: {
           verificationStatus: { in: ['VERIFIED', 'ADMIN_VERIFIED'] },
@@ -58,7 +58,7 @@ export async function GET() {
     }),
     prisma.voiceAllowlist.findMany({
       where: {
-        allowedUserId: session.user.id,
+        allowedUserId: authResult.userId,
         voiceClone: {
           verificationStatus: { in: ['VERIFIED', 'ADMIN_VERIFIED'] },
         },

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockUserFindUnique = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockTagFindMany = vi.fn();
@@ -20,8 +20,8 @@ const txClient = {
   },
 };
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -94,7 +94,7 @@ describe('GET /api/users/me', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createGetRequest();
     const response = await GET(request);
@@ -105,9 +105,7 @@ describe('GET /api/users/me', () => {
   });
 
   it('returns current user data when authenticated', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice Johnson', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.findUnique.mockResolvedValue(mockUser);
 
     const request = createGetRequest();
@@ -122,9 +120,7 @@ describe('GET /api/users/me', () => {
   });
 
   it('handles user with null optional fields', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-2', name: 'Bob Smith', email: 'bob@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-2' });
     mockPrisma.user.findUnique.mockResolvedValue(mockUserMinimal);
 
     const request = createGetRequest();
@@ -139,9 +135,7 @@ describe('GET /api/users/me', () => {
   });
 
   it('returns 404 when user not found in database', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-999', name: 'Unknown', email: 'unknown@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-999' });
     mockPrisma.user.findUnique.mockResolvedValue(null);
 
     const request = createGetRequest();
@@ -160,7 +154,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const request = createPatchRequest({ name: 'New Name' });
     const response = await PATCH(request);
@@ -171,9 +165,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('updates user name successfully', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       name: 'Alice Updated',
@@ -188,9 +180,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('updates user bio successfully', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       bio: 'New bio text',
@@ -205,9 +195,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('updates both name and bio together', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       name: 'Alice Updated',
@@ -227,9 +215,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('returns 400 when name is empty string', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({ name: '' });
     const response = await PATCH(request);
@@ -240,9 +226,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('returns 400 when name exceeds 100 characters', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({ name: 'a'.repeat(101) });
     const response = await PATCH(request);
@@ -253,9 +237,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('returns 400 when bio exceeds 500 characters', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({ bio: 'a'.repeat(501) });
     const response = await PATCH(request);
@@ -266,9 +248,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('accepts empty bio to clear it', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       bio: '',
@@ -283,9 +263,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('handles empty request body without errors', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue(mockUser);
 
     const request = createPatchRequest({});
@@ -295,9 +273,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('rejects invalid fields not in schema', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({
       email: 'newemail@example.com',
@@ -311,9 +287,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('rejects attempt to update email', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({
       name: 'Alice',
@@ -325,9 +299,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('rejects name that is just whitespace', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
 
     const request = createPatchRequest({ name: '   ' });
     const response = await PATCH(request);
@@ -336,9 +308,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('returns updated user data in response', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     const updatedUser = {
       ...mockUser,
       name: 'Alice New',
@@ -362,9 +332,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('validates bio length at exactly 500 characters', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       bio: 'a'.repeat(500),
@@ -377,9 +345,7 @@ describe('PATCH /api/users/me', () => {
   });
 
   it('validates name length at exactly 100 characters', async () => {
-    mockAuth.mockResolvedValue({
-      user: { id: 'user-1', name: 'Alice', email: 'alice@example.com' },
-    });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.user.update.mockResolvedValue({
       ...mockUser,
       name: 'a'.repeat(100),

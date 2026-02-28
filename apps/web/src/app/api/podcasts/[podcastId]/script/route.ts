@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { updateScriptSchema } from '@/lib/validations';
 import { errorResponse } from '@/lib/api-response';
 import {
@@ -12,10 +12,10 @@ import type { ScriptTurn } from '@/lib/script-generator';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
-export async function GET(_request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
@@ -27,7 +27,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
   }
-  if (podcast.userId !== session.user.id) {
+  if (podcast.userId !== authResult.userId) {
     return errorResponse('Forbidden', 403);
   }
 
@@ -53,8 +53,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
-  if (!session?.user?.id) {
+  const authResult = await authenticateRequest(request);
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!podcast) {
     return errorResponse('Podcast not found', 404);
   }
-  if (podcast.userId !== session.user.id) {
+  if (podcast.userId !== authResult.userId) {
     return errorResponse('Forbidden', 403);
   }
   if (podcast.status !== 'SCRIPT_READY') {

@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockPodcastFindUnique = vi.fn();
 const mockPodcastUpdate = vi.fn();
 const mockScriptFindUnique = vi.fn();
 const mockCreateSegmentsAndQueueAudio = vi.fn();
 
-vi.mock('@/lib/auth', () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -59,7 +59,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -69,7 +69,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 401 when session has no user id', async () => {
-    mockAuth.mockResolvedValue({ user: {} });
+    mockAuthenticateRequest.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
     const body = await response.json();
@@ -79,7 +79,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 404 when podcast not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -90,7 +90,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 403 when user does not own the podcast', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'other-user', status: 'SCRIPT_READY' });
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -101,7 +101,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 400 when status is not SCRIPT_READY', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'GENERATING_AUDIO' });
 
     const response = await POST(createRequest(), await createParams('pod-1'));
@@ -112,7 +112,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('returns 404 when script not found', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     mockScriptFindUnique.mockResolvedValue(null);
 
@@ -124,7 +124,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
   });
 
   it('creates segments, queues audio, and transitions to GENERATING_AUDIO', async () => {
-    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockPodcastFindUnique.mockResolvedValue({ userId: 'user-1', status: 'SCRIPT_READY' });
     const turns = [
       { speaker: 'HOST', text: 'Welcome', direction: 'enthusiastic' },

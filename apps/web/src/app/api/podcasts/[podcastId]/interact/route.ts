@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { interactionSchema } from '@/lib/validations';
 import { interactionQueue, addJob, JobType } from '@/lib/queue';
@@ -14,17 +14,26 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
-  const session = await auth();
+  const authResult = await authenticateRequest(request);
 
-  if (!session?.user?.id) {
+  if (!authResult) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const suspended = checkSuspension(session);
-  if (suspended) return suspended;
+  // Session-based suspension check (skip for API key auth)
+  const authHeader = request.headers.get('authorization');
+  const isApiKeyAuth = authHeader?.startsWith('Bearer ');
+  if (!isApiKeyAuth) {
+    const { auth } = await import('@/lib/auth');
+    const session = await auth();
+    if (session) {
+      const suspended = checkSuspension(session);
+      if (suspended) return suspended;
+    }
+  }
 
   // Rate limit: 60/hour
-  const hourly = await checkRateLimit(`interact:hour:${session.user.id}`, 60, 3600);
+  const hourly = await checkRateLimit(`interact:hour:${authResult.userId}`, 60, 3600);
   if (!hourly.allowed) {
     return errorResponse('Rate limit exceeded: max 60 interactions per hour.', 429);
   }
@@ -32,16 +41,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Check Q&A interaction limit based on tier
   const [user, isByok] = await Promise.all([
     prisma.user.findUniqueOrThrow({
-      where: { id: session.user.id },
+      where: { id: authResult.userId },
       select: { plan: true, role: true },
     }),
-    hasByokKey(session.user.id),
+    hasByokKey(authResult.userId),
   ]);
   const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', isByok, user.role);
 
   if (isFinite(tierFeatures.maxQaInteractions)) {
     const existingCount = await prisma.interaction.count({
-      where: { userId: session.user.id, podcastId },
+      where: { userId: authResult.userId, podcastId },
     });
     if (existingCount >= tierFeatures.maxQaInteractions) {
       return errorResponse(`Q&A limit reached (${tierFeatures.maxQaInteractions} per podcast). Upgrade to Pro for unlimited Q&A.`, 403);
@@ -70,7 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const interaction = await prisma.interaction.create({
     data: {
       podcastId,
-      userId: session.user.id,
+      userId: authResult.userId,
       question,
       timestamp,
       status: 'PENDING',
@@ -84,7 +93,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const payload: ProcessInteractionPayload = {
     podcastId,
     interactionId: interaction.id,
-    userId: session.user.id,
+    userId: authResult.userId,
     question,
     timestamp,
   };
