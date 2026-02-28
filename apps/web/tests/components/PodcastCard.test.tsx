@@ -37,6 +37,8 @@ const mockPodcast: PodcastSummary = {
   source: 'WEB' as const,
   isHumanContent: false,
   forkedFromId: null,
+  forkedFrom: null,
+  ownerIsPro: true,
   user: {
     id: 'user-1',
     name: 'Jane Smith',
@@ -62,44 +64,22 @@ describe('PodcastCard', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders creator name', () => {
-    render(<PodcastCard podcast={mockPodcast} />);
-    const names = screen.getAllByText('Jane Smith');
-    expect(names.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('renders creator avatar image when provided', () => {
-    render(<PodcastCard podcast={mockPodcast} />);
-    const avatar = screen.getByAltText('Jane Smith');
-    expect(avatar).toBeInTheDocument();
-    expect(avatar).toHaveAttribute('src', expect.stringContaining('avatar.jpg'));
-  });
-
-  it('renders fallback initials when no avatar image', () => {
-    const podcastNoImage = {
-      ...mockPodcast,
-      user: { ...mockPodcast.user, image: null },
-    };
-    render(<PodcastCard podcast={podcastNoImage} />);
-    expect(screen.getByText('J')).toBeInTheDocument();
-  });
-
   it('formats and displays duration', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByText('10 min')).toBeInTheDocument();
   });
 
-  it('displays play count with proper formatting', () => {
+  it('displays play count for Pro owner', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
   });
 
-  it('displays like count', () => {
+  it('displays like count for Pro owner', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('89 likes')).toBeInTheDocument();
   });
 
-  it('displays fork count', () => {
+  it('displays fork count for Pro owner', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByLabelText('12 forks')).toBeInTheDocument();
   });
@@ -110,7 +90,7 @@ describe('PodcastCard', () => {
     expect(screen.getByLabelText('2500000 plays')).toBeInTheDocument();
   });
 
-  it('renders all tags', () => {
+  it('renders tags as cover overlays', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.getByText('Science')).toBeInTheDocument();
     expect(screen.getByText('Technology')).toBeInTheDocument();
@@ -125,21 +105,21 @@ describe('PodcastCard', () => {
   it('links to podcast detail page', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     const link = screen.getByRole('link', {
-      name: 'Listen to Introduction to Quantum Computing by Jane Smith',
+      name: 'Listen to Introduction to Quantum Computing',
     });
     expect(link).toHaveAttribute('href', '/podcast/podcast-1');
   });
 
-  it('has accessible link label with title and creator', () => {
+  it('has accessible link label without creator identity', () => {
     render(<PodcastCard podcast={mockPodcast} />);
     expect(
       screen.getByRole('link', {
-        name: 'Listen to Introduction to Quantum Computing by Jane Smith',
+        name: 'Listen to Introduction to Quantum Computing',
       })
     ).toBeInTheDocument();
   });
 
-  it('displays relative date for recent podcasts', () => {
+  it('renders date on card', () => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const recentPodcast = {
@@ -177,31 +157,43 @@ describe('PodcastCard', () => {
     expect(screen.queryByLabelText(/^Play /)).not.toBeInTheDocument();
   });
 
-  it('displays Anonymous for user without name', () => {
-    const podcastNoName = {
-      ...mockPodcast,
-      user: { ...mockPodcast.user, name: null },
-    };
-    render(<PodcastCard podcast={podcastNoName} />);
-    const anonymousElements = screen.getAllByText('Anonymous');
-    expect(anonymousElements.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('uses U fallback for anonymous user avatar', () => {
-    const podcastAnon = {
-      ...mockPodcast,
-      user: { ...mockPodcast.user, name: null, handle: null, image: null },
-    };
-    render(<PodcastCard podcast={podcastAnon} />);
-    const fallbacks = screen.getAllByText('U');
-    expect(fallbacks.length).toBeGreaterThanOrEqual(1);
-  });
-
   it('hides stats for non-owners', () => {
     mockUseAuth.mockReturnValueOnce({ user: { id: 'other-user' }, isAuthenticated: true, isLoading: false });
     render(<PodcastCard podcast={mockPodcast} />);
     expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
+  });
+
+  it('hides stats for free owner viewing own podcast', () => {
+    const freePodcast = { ...mockPodcast, ownerIsPro: false };
+    render(<PodcastCard podcast={freePodcast} />);
+    expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('89 likes')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('12 forks')).not.toBeInTheDocument();
+  });
+
+  it('shows stats for Pro owner viewing own podcast', () => {
+    render(<PodcastCard podcast={mockPodcast} />);
+    expect(screen.getByLabelText('1250 plays')).toBeInTheDocument();
+    expect(screen.getByLabelText('89 likes')).toBeInTheDocument();
+    expect(screen.getByLabelText('12 forks')).toBeInTheDocument();
+  });
+
+  it('hides stats for Pro owner viewing someone else\'s podcast', () => {
+    mockUseAuth.mockReturnValueOnce({ user: { id: 'other-user' }, isAuthenticated: true, isLoading: false });
+    render(<PodcastCard podcast={mockPodcast} />);
+    expect(screen.queryByLabelText('1250 plays')).not.toBeInTheDocument();
+  });
+
+  it('renders remix subline when forkedFromId set', () => {
+    const remixPodcast = {
+      ...mockPodcast,
+      forkedFromId: 'original-1',
+      forkedFrom: { id: 'original-1', title: 'Original Podcast' },
+    };
+    render(<PodcastCard podcast={remixPodcast} />);
+    expect(screen.getByText(/Remix of/)).toBeInTheDocument();
+    expect(screen.getByText(/Original Podcast/)).toBeInTheDocument();
   });
 });

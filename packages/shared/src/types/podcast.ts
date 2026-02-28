@@ -25,6 +25,8 @@ export interface PodcastSummary {
   aiAutoResolved?: boolean | null;
   ttsAutoResolved?: boolean | null;
   forkedFromId: string | null;
+  forkedFrom?: { id: string; title: string } | null;
+  ownerIsPro?: boolean;
   user: {
     id: string;
     name: string | null;
