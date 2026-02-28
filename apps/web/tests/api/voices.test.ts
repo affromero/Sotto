@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
+const mockAuthenticateRequest = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
 const mockVoiceCloneFindMany = vi.fn();
 const mockVoiceCloneCount = vi.fn();
@@ -18,6 +19,10 @@ const mockCheckRateLimit = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
+}));
+
+vi.mock('@/lib/api-keys', () => ({
+  authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
 vi.mock('@/lib/prisma', () => {
@@ -184,9 +189,10 @@ describe('GET /api/voices', () => {
   });
 
   it('returns 401 when user is not authenticated', async () => {
-    mockAuth.mockResolvedValue(null);
+    mockAuthenticateRequest.mockResolvedValue(null);
 
-    const response = await GET();
+    const request = createRequest();
+    const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(401);
@@ -194,12 +200,13 @@ describe('GET /api/voices', () => {
   });
 
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([
       { ...mockVoiceClone, description: null, requestable: false, priceInCents: null, voicePurchases: [] },
     ]);
 
-    const response = await GET();
+    const request = createRequest();
+    const response = await GET(request);
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -212,7 +219,7 @@ describe('GET /api/voices', () => {
   });
 
   it('returns user voice clones with correct fields', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([
       {
         id: 'clone-1',
@@ -238,7 +245,8 @@ describe('GET /api/voices', () => {
       },
     ]);
 
-    const response = await GET();
+    const request = createRequest();
+    const response = await GET(request);
     const body = await response.json();
 
     expect(body.userClones).toHaveLength(2);
@@ -251,7 +259,7 @@ describe('GET /api/voices', () => {
   });
 
   it('returns sharedVoices including allowlisted voices', async () => {
-    mockAuth.mockResolvedValue(mockSession);
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([]); // no user clones
     mockVoiceRequestFindMany.mockResolvedValue([]); // no approved requests
     mockVoiceAllowlistFindMany.mockResolvedValue([
@@ -267,7 +275,8 @@ describe('GET /api/voices', () => {
       },
     ]);
 
-    const response = await GET();
+    const request = createRequest();
+    const response = await GET(request);
     const body = await response.json();
 
     expect(body.sharedVoices).toHaveLength(1);
