@@ -78,18 +78,25 @@ ${refsContext}
 
 Evaluate each reference according to its domain instructions. Return JSON only.`;
 
+  const AI_TIMEOUT_MS = 90_000;
+
   try {
     const ai = createAIProvider(provider);
-    const response = await ai.generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: userMessage }],
-      {
-        maxTokens: 4096,
-        apiKeyOverride,
-        model,
-        useWebSearch: true,
-      }
-    );
+    const response = await Promise.race([
+      ai.generateResponse(
+        systemPrompt,
+        [{ role: 'user', content: userMessage }],
+        {
+          maxTokens: 4096,
+          apiKeyOverride,
+          model,
+          useWebSearch: true,
+        }
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('AI evaluation timed out after 90s')), AI_TIMEOUT_MS)
+      ),
+    ]);
 
     logUsage({
       service: provider ?? 'anthropic',
