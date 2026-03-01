@@ -650,7 +650,7 @@ describe('processScriptVerification', () => {
         { name: 'script-verification' },
         'verify_script',
         { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
-        { jobId: 'verify-podcast-001-2' }
+        { jobId: expect.stringMatching(/^verify-podcast-001-\d+-2$/) }
       );
     });
 
