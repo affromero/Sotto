@@ -255,7 +255,7 @@ describe('processScriptGeneration', () => {
           discoveryId: 'discovery-001',
           useAdminCredits: undefined,
         },
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^verify-podcast-001-\d+-1$/) }
       );
     });
 
@@ -646,7 +646,7 @@ describe('processScriptGeneration', () => {
         userId: 'user-001',
         discoveryId: 'discovery-001',
         useAdminCredits: undefined,
-      }, { jobId: 'verify-podcast-001-1' });
+      }, { jobId: expect.stringMatching(/^verify-podcast-001-\d+-1$/) });
     });
 
     it('updates podcast status to VERIFYING_SCRIPT without references', async () => {
@@ -692,7 +692,7 @@ describe('processScriptGeneration', () => {
         userId: 'user-001',
         discoveryId: 'discovery-001',
         useAdminCredits: undefined,
-      }, { jobId: 'verify-podcast-001-1' });
+      }, { jobId: expect.stringMatching(/^verify-podcast-001-\d+-1$/) });
     });
 
   });
@@ -934,7 +934,7 @@ describe('processScriptGeneration', () => {
         { name: 'script-verification' },
         'verify_script',
         expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^verify-podcast-001-\d+-1$/) }
       );
 
       // Usage logged
@@ -983,7 +983,7 @@ describe('processScriptGeneration', () => {
         { name: 'script-verification' },
         'verify_script',
         expect.objectContaining({ podcastId: 'podcast-001' }),
-        { jobId: 'verify-podcast-001-1' }
+        { jobId: expect.stringMatching(/^verify-podcast-001-\d+-1$/) }
       );
 
       // Status updated to VERIFYING_SCRIPT
