@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { extractContent } from '@/lib/extractors';
 import { extractHtmlContent } from '@/lib/extractors/html';
+import * as pinchtabModule from '@/lib/extractors/pinchtab';
 
 // Mock summarize-core to avoid real network calls from YouTube extractor
 vi.mock('@steipete/summarize-core', () => ({
@@ -314,6 +315,78 @@ describe('extractors', () => {
 
       expect(result.sourceType).toBe('youtube');
       expect(result.extractionMethod).toBe('summarize-core');
+    });
+  });
+
+  describe('Pinchtab fallback', () => {
+    const THIN_HTML = '<html><head><meta property="og:title" content="SPA Page"><meta property="og:site_name" content="MySite"></head><body><p>Loading...</p></body></html>';
+    const LONG_PINCHTAB_TEXT = Array(100).fill('This is rich content from the browser rendering.').join(' ');
+
+    it('triggers Pinchtab when static extraction yields thin content', async () => {
+      mockFetchResponse(THIN_HTML);
+      const availableSpy = vi.spyOn(pinchtabModule, 'isPinchtabAvailable').mockReturnValue(true);
+      const extractSpy = vi.spyOn(pinchtabModule, 'extractViaPinchtab').mockResolvedValue(LONG_PINCHTAB_TEXT);
+
+      const result = await extractContent('https://example.com/spa');
+
+      expect(availableSpy).toHaveBeenCalled();
+      expect(extractSpy).toHaveBeenCalledWith('https://example.com/spa');
+      expect(result.extractionMethod).toBe('pinchtab');
+      expect(result.text).toContain('rich content from the browser');
+      // Preserves static OG metadata
+      expect(result.title).toBe('SPA Page');
+      expect(result.siteName).toBe('MySite');
+    });
+
+    it('returns static result when Pinchtab does not improve word count', async () => {
+      mockFetchResponse(THIN_HTML);
+      vi.spyOn(pinchtabModule, 'isPinchtabAvailable').mockReturnValue(true);
+      // Return even fewer words than static
+      vi.spyOn(pinchtabModule, 'extractViaPinchtab').mockResolvedValue('Loading');
+
+      const result = await extractContent('https://example.com/spa');
+
+      expect(result.extractionMethod).not.toBe('pinchtab');
+    });
+
+    it('returns static result when Pinchtab errors', async () => {
+      mockFetchResponse(THIN_HTML);
+      vi.spyOn(pinchtabModule, 'isPinchtabAvailable').mockReturnValue(true);
+      vi.spyOn(pinchtabModule, 'extractViaPinchtab').mockRejectedValue(new Error('Connection refused'));
+
+      const result = await extractContent('https://example.com/spa');
+
+      expect(result.extractionMethod).not.toBe('pinchtab');
+      expect(result.sourceType).toBe('html');
+    });
+
+    it('skips Pinchtab when not configured', async () => {
+      mockFetchResponse(THIN_HTML);
+      vi.spyOn(pinchtabModule, 'isPinchtabAvailable').mockReturnValue(false);
+      const extractSpy = vi.spyOn(pinchtabModule, 'extractViaPinchtab');
+
+      const result = await extractContent('https://example.com/spa');
+
+      expect(extractSpy).not.toHaveBeenCalled();
+      expect(result.extractionMethod).not.toBe('pinchtab');
+    });
+
+    it('does not trigger Pinchtab when static extraction has enough content', async () => {
+      mockFetchResponse(WELL_STRUCTURED_HTML);
+      const extractSpy = vi.spyOn(pinchtabModule, 'extractViaPinchtab');
+
+      const result = await extractContent('https://example.com/article');
+
+      expect(extractSpy).not.toHaveBeenCalled();
+      expect(result.extractionMethod).not.toBe('pinchtab');
+    });
+
+    it('never triggers Pinchtab for YouTube URLs', async () => {
+      const extractSpy = vi.spyOn(pinchtabModule, 'extractViaPinchtab');
+
+      await extractContent('https://www.youtube.com/watch?v=test123');
+
+      expect(extractSpy).not.toHaveBeenCalled();
     });
   });
 });
