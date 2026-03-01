@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import styles from './AutoModelForm.module.css';
 
 interface ModelOption {
@@ -34,6 +34,8 @@ interface AutoModelFormProps {
     free: PlanConfig;
     pro: PlanConfig;
     platform: PlatformConfig;
+    freeIncludedModels: string[] | null;
+    proIncludedModels: string[] | null;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -190,6 +192,101 @@ function PlanSection({
   );
 }
 
+function IncludedModelsEditor({
+  aiProviders,
+  freeIncluded,
+  proIncluded,
+  freeDefault,
+  proDefault,
+  onFreeChange,
+  onProChange,
+  onClear,
+}: {
+  aiProviders: ProviderOption[];
+  freeIncluded: Set<string>;
+  proIncluded: Set<string>;
+  freeDefault: string;
+  proDefault: string;
+  onFreeChange: (modelId: string, checked: boolean) => void;
+  onProChange: (modelId: string, checked: boolean) => void;
+  onClear: () => void;
+}) {
+  const hasOverrides = freeIncluded.size > 0 || proIncluded.size > 0;
+
+  return (
+    <fieldset className={styles.section}>
+      <legend className={styles.sectionTitle}>Included Models</legend>
+      <p className={styles.platformDescription}>
+        Control which AI models appear in the picker for non-BYOK users.
+        Free models are always included in the Pro tier.
+      </p>
+
+      {!hasOverrides && (
+        <p className={styles.defaultsHint}>
+          Using defaults — only the auto model per tier is shown to users.
+        </p>
+      )}
+
+      <div className={styles.includedModels}>
+        <div className={styles.includedHeader}>
+          <span className={styles.modelNameHeader}>Model</span>
+          <span className={styles.checkboxHeader}>Free</span>
+          <span className={styles.checkboxHeader}>Pro</span>
+        </div>
+
+        {aiProviders.map((provider) => (
+          <div key={provider.id}>
+            <div className={styles.providerGroup}>{provider.displayName}</div>
+            {provider.models.map((model) => {
+              const isFreDefault = model.id === freeDefault;
+              const isProDefault = model.id === proDefault;
+
+              return (
+                <div key={model.id} className={styles.modelRow}>
+                  <span className={styles.modelName}>
+                    {model.displayName}
+                    {(isFreDefault || isProDefault) && (
+                      <span className={styles.defaultBadge}>
+                        {isFreDefault && isProDefault ? 'free + pro default' : isFreDefault ? 'free default' : 'pro default'}
+                      </span>
+                    )}
+                  </span>
+                  <label className={styles.checkboxCell}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={freeIncluded.has(model.id)}
+                      onChange={(e) => onFreeChange(model.id, e.target.checked)}
+                    />
+                  </label>
+                  <label className={styles.checkboxCell}>
+                    <input
+                      type="checkbox"
+                      className={styles.checkbox}
+                      checked={proIncluded.has(model.id)}
+                      onChange={(e) => onProChange(model.id, e.target.checked)}
+                    />
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {hasOverrides && (
+        <button
+          type="button"
+          className={styles.clearButton}
+          onClick={onClear}
+        >
+          Clear overrides (use defaults)
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
 export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -198,6 +295,13 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const providers = { ai: aiProviders, tts: ttsProviders, stt: sttProviders };
   const freeState = usePlanState(initialConfig.free, providers);
   const proState = usePlanState(initialConfig.pro, providers);
+
+  const [freeIncluded, setFreeIncluded] = useState<Set<string>>(
+    new Set(initialConfig.freeIncludedModels ?? [])
+  );
+  const [proIncluded, setProIncluded] = useState<Set<string>>(
+    new Set(initialConfig.proIncludedModels ?? [])
+  );
 
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
@@ -210,6 +314,43 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
       setPlatformAiModel(provider.models[0].id);
     }
   };
+
+  const handleFreeChange = useCallback((modelId: string, checked: boolean) => {
+    setFreeIncluded((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(modelId);
+        // Checking Free auto-checks Pro
+        setProIncluded((p) => new Set(p).add(modelId));
+      } else {
+        next.delete(modelId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleProChange = useCallback((modelId: string, checked: boolean) => {
+    setProIncluded((prev) => {
+      const next = new Set(prev);
+      if (checked) {
+        next.add(modelId);
+      } else {
+        next.delete(modelId);
+        // Unchecking Pro auto-unchecks Free
+        setFreeIncluded((f) => {
+          const nf = new Set(f);
+          nf.delete(modelId);
+          return nf;
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleClearIncluded = useCallback(() => {
+    setFreeIncluded(new Set());
+    setProIncluded(new Set());
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -224,6 +365,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           free: freeState.toData(),
           pro: proState.toData(),
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
+          freeIncludedModels: freeIncluded.size > 0 ? [...freeIncluded] : null,
+          proIncludedModels: proIncluded.size > 0 ? [...proIncluded] : null,
         }),
       });
 
@@ -257,6 +400,17 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         aiProviders={aiProviders}
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
+      />
+
+      <IncludedModelsEditor
+        aiProviders={aiProviders}
+        freeIncluded={freeIncluded}
+        proIncluded={proIncluded}
+        freeDefault={freeState.aiModel}
+        proDefault={proState.aiModel}
+        onFreeChange={handleFreeChange}
+        onProChange={handleProChange}
+        onClear={handleClearIncluded}
       />
 
       <fieldset className={styles.section}>
