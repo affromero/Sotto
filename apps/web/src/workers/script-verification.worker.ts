@@ -27,6 +27,7 @@ import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
+import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 const MAX_VERIFICATION_ATTEMPTS = 3;
 
@@ -300,6 +301,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       }
     }
 
+    await logPipelineStageComplete(podcastId, 'script-verification');
     await job.updateProgress(100);
     return;
   }

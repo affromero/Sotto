@@ -9,6 +9,7 @@ import { detectLanguage } from '@/lib/language-detect';
 import { matchTopicTags, TAG_PARENT_MAP } from '@/lib/topic-tagger';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
+import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processScriptGeneration(job: Job<GenerateScriptPayload>): Promise<void> {
   const { podcastId, userId, discoveryId, useAdminCredits } = job.data;
@@ -237,6 +238,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     userId,
   });
 
+  await logPipelineStageComplete(podcastId, 'script-generation');
   await job.updateProgress(100);
   logger.info('Script generation complete', {
     podcastId,

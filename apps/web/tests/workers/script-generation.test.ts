@@ -144,6 +144,10 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModelAndProvider(...args),
 }));
 
+vi.mock('@/lib/pipeline-events', () => ({
+  logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
