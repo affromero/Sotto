@@ -18,7 +18,7 @@ function textOf(content: string | ContentPart[]): string {
   return content.filter((p) => p.type === 'text').map((p) => (p as TextContentPart).text).join('\n');
 }
 
-/** Convert ChatMessage[] to OpenAI-compatible format (images → image_url). */
+/** Convert ChatMessage[] to OpenAI Chat Completions format (images → image_url). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
   return [
@@ -36,6 +36,23 @@ function toOpenAiMessages(system: string, messages: ChatMessage[]): any[] {
       };
     }),
   ];
+}
+
+/** Convert ChatMessage[] to OpenAI Responses API format (input_text / input_image). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toResponsesInput(messages: ChatMessage[]): any[] {
+  return messages.map((m) => {
+    if (typeof m.content === 'string') return { role: m.role, content: m.content };
+    return {
+      role: m.role,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      content: m.content.map((p): any =>
+        p.type === 'text'
+          ? { type: 'input_text', text: p.text }
+          : { type: 'input_image', image_url: p.url }
+      ),
+    };
+  });
 }
 
 /** Convert ChatMessage[] for Groq (strip images — Llama has no vision). */
@@ -138,19 +155,34 @@ class OpenAIProvider implements AIProvider {
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
+    const model = opts?.model || process.env.OPENAI_MODEL;
+    if (!model) throw new Error('No OpenAI model configured. Set OPENAI_MODEL or pass opts.model.');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any[] | undefined = opts?.useWebSearch
-      ? [{ type: 'web_search_preview' }]
-      : undefined;
+    // web_search_preview requires the Responses API (not Chat Completions)
+    if (opts?.useWebSearch) {
+      // OpenAI SDK v6 exposes client.responses but types may lag — cast to access it
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const response = await (client as any).responses.create({
+        model,
+        instructions: system,
+        input: toResponsesInput(messages),
+        tools: [{ type: 'web_search_preview' }],
+        max_output_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+      });
+      return {
+        content: response.output_text || '',
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+        model,
+      };
+    }
 
     const response = await client.chat.completions.create({
       model,
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
-      ...(tools ? { tools } : {}),
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -173,12 +205,30 @@ class OpenAIProvider implements AIProvider {
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.OPENAI_MODEL || 'gpt-4o';
+    const model = opts?.model || process.env.OPENAI_MODEL;
+    if (!model) throw new Error('No OpenAI model configured. Set OPENAI_MODEL or pass opts.model.');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: any[] | undefined = opts?.useWebSearch
-      ? [{ type: 'web_search_preview' }]
-      : undefined;
+    // web_search_preview requires the Responses API (not Chat Completions)
+    if (opts?.useWebSearch) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const stream = await (client as any).responses.create({
+        model,
+        instructions: system,
+        input: toResponsesInput(messages),
+        tools: [{ type: 'web_search_preview' }],
+        max_output_tokens: opts?.maxTokens || 4096,
+        temperature: opts?.temperature,
+        stream: true,
+      });
+      for await (const event of stream) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((event as any).type === 'response.output_text.delta') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          yield (event as any).delta;
+        }
+      }
+      return;
+    }
 
     const stream = await client.chat.completions.create({
       model,
@@ -186,7 +236,6 @@ class OpenAIProvider implements AIProvider {
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
       stream: true,
-      ...(tools ? { tools } : {}),
     });
 
     for await (const chunk of stream) {
@@ -219,7 +268,8 @@ class GroqProvider implements AIProvider {
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+    const model = opts?.model || process.env.GROQ_MODEL;
+    if (!model) throw new Error('No Groq model configured. Set GROQ_MODEL or pass opts.model.');
 
     const response = await client.chat.completions.create({
       model,
@@ -248,7 +298,8 @@ class GroqProvider implements AIProvider {
     }
 
     const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+    const model = opts?.model || process.env.GROQ_MODEL;
+    if (!model) throw new Error('No Groq model configured. Set GROQ_MODEL or pass opts.model.');
 
     const stream = await client.chat.completions.create({
       model,
