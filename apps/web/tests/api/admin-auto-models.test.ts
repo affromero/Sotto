@@ -185,4 +185,66 @@ describe('PATCH /api/admin/auto-models', () => {
       'admin-1'
     );
   });
+
+  it('accepts freeIncludedModels and proIncludedModels in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedModels: ['model-a'],
+        proIncludedModels: ['model-a', 'model-b'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedModels: ['model-a'], proIncludedModels: ['model-a', 'model-b'] },
+      'admin-1'
+    );
+  });
+
+  it('rejects when free models are not a subset of pro models', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedModels: ['model-a', 'model-c'],
+        proIncludedModels: ['model-a', 'model-b'],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
+
+  it('accepts null to clear included model overrides', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedModels: null,
+        proIncludedModels: null,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedModels: null, proIncludedModels: null },
+      'admin-1'
+    );
+  });
+
+  it('allows freeIncludedModels without proIncludedModels', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ freeIncludedModels: ['model-a'] })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedModels: ['model-a'] },
+      'admin-1'
+    );
+  });
 });
