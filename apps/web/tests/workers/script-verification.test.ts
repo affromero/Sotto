@@ -32,6 +32,9 @@ vi.mock('@/lib/prisma', () => {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
     },
+    pipelineEvent: {
+      create: vi.fn().mockResolvedValue({}),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -100,6 +103,7 @@ vi.mock('@/lib/tier-features', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-sonnet-4-6', provider: 'anthropic' }),
+  getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
 }));
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
@@ -226,15 +230,16 @@ describe('processScriptVerification', () => {
   });
 
   describe('model resolution', () => {
-    it('uses model from resolveAiModelAndProvider', async () => {
+    it('uses cheap model for verification even when full model is resolved', async () => {
       const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
       vi.mocked(resolveAiModelAndProvider).mockResolvedValueOnce({ model: 'claude-opus-4-6-20251101', provider: 'anthropic' });
 
       const job = createMockJob(defaultPayload);
       await processScriptVerification(job);
 
+      // verifyScript gets the cheap model, not the full resolved model
       expect(mockVerifyScript).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'claude-opus-4-6-20251101' })
+        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
       );
     });
 
@@ -247,6 +252,27 @@ describe('processScriptVerification', () => {
 
       expect(resolveAiModelAndProvider).toHaveBeenCalledWith(
         expect.objectContaining({ podcastAiModel: 'claude-haiku-4-5-20251001' })
+      );
+    });
+  });
+
+  describe('cheap model for verification', () => {
+    it('uses cheap model for verifyScript but full model for regeneration', async () => {
+      // First call fails verification, triggering regeneration
+      mockVerifyScript.mockResolvedValue(failedVerdict);
+      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({ ...defaultScript, verificationAttempts: 0 });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      // verifyScript should receive the cheap model
+      expect(mockVerifyScript).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+      );
+
+      // generateScriptWithFeedback should receive the full model
+      expect(mockGenerateScriptWithFeedback).toHaveBeenCalledWith(
+        expect.objectContaining({ model: 'claude-sonnet-4-6' })
       );
     });
   });
