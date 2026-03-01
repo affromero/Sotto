@@ -1,4 +1,4 @@
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 
@@ -21,6 +21,7 @@ export async function assessTopicFeasibility(params: {
   depth?: string;
   apiKeyOverride?: string;
   model?: string;
+  provider?: string;
 }): Promise<FeasibilityAssessment> {
   const { topic, sourceContent, depth } = params;
 
@@ -32,7 +33,8 @@ export async function assessTopicFeasibility(params: {
     .filter(Boolean)
     .join('\n');
 
-  const response = await generateResponse(SYSTEM_PROMPT, [{ role: 'user', content: userMessage }], {
+  const ai = createAIProvider(params.provider);
+  const response = await ai.generateResponse(SYSTEM_PROMPT, [{ role: 'user', content: userMessage }], {
     maxTokens: 512,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
