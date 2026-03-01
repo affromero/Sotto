@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import styles from './VoiceManager.module.css';
 import { VoiceVerificationChallenge } from '@/components/settings/VoiceVerificationChallenge';
+import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 
 interface VoiceClone {
   id: string;
@@ -72,8 +73,10 @@ export function VoiceManager() {
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+  const [inputTab, setInputTab] = useState<'upload' | 'record'>('upload');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 5 });
 
   useEffect(() => {
     fetchVoices();
@@ -306,16 +309,25 @@ export function VoiceManager() {
 
   async function handleClone(e: React.FormEvent) {
     e.preventDefault();
-    if (!cloneFile || !cloneName.trim()) return;
+    const isRecord = inputTab === 'record';
+    if (isRecord && !recorder.recordedBlob) return;
+    if (!isRecord && !cloneFile) return;
+    if (!cloneName.trim()) return;
 
     try {
       setCloning(true);
       setError(null);
 
       const formData = new FormData();
-      formData.append('audio', cloneFile);
+      if (isRecord && recorder.recordedBlob) {
+        const ext = recorder.mimeType?.includes('webm') ? 'webm' : 'm4a';
+        formData.append('audio', recorder.recordedBlob, `recording.${ext}`);
+        formData.append('sourceType', 'RECORD');
+      } else if (cloneFile) {
+        formData.append('audio', cloneFile);
+        formData.append('sourceType', 'UPLOAD');
+      }
       formData.append('name', cloneName.trim());
-      formData.append('sourceType', 'UPLOAD');
 
       const response = await fetch('/api/voices/clone', {
         method: 'POST',
@@ -329,6 +341,7 @@ export function VoiceManager() {
 
       setCloneName('');
       setCloneFile(null);
+      recorder.reset();
       await fetchVoices();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clone voice');
@@ -897,27 +910,115 @@ export function VoiceManager() {
               maxLength={100}
             />
           </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="voice-file" className={styles.label}>
-              Audio Sample
-            </label>
-            <input
-              id="voice-file"
-              type="file"
-              className={styles.fileInput}
-              accept="audio/*"
-              onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
-              required
+
+          <div className={styles.inputTabs} role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inputTab === 'upload'}
+              className={`${styles.inputTab} ${inputTab === 'upload' ? styles.inputTabActive : ''}`}
+              onClick={() => setInputTab('upload')}
+              disabled={cloning || recorder.isRecording}
+            >
+              Upload File
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inputTab === 'record'}
+              className={`${styles.inputTab} ${inputTab === 'record' ? styles.inputTabActive : ''}`}
+              onClick={() => setInputTab('record')}
               disabled={cloning}
-            />
-            <p className={styles.hint}>
-              Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
-            </p>
+            >
+              Record Mic
+            </button>
           </div>
+
+          {inputTab === 'upload' ? (
+            <div className={styles.formGroup}>
+              <label htmlFor="voice-file" className={styles.label}>
+                Audio Sample
+              </label>
+              <input
+                id="voice-file"
+                type="file"
+                className={styles.fileInput}
+                accept="audio/*"
+                onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+                required
+                disabled={cloning}
+              />
+              <p className={styles.hint}>
+                Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.recorderSection}>
+              {recorder.error && (
+                <div className={styles.error} role="alert">{recorder.error}</div>
+              )}
+
+              {!recorder.isRecording && !recorder.recordedBlob && (
+                <button
+                  type="button"
+                  className={styles.recordButton}
+                  onClick={recorder.startRecording}
+                  disabled={cloning}
+                  aria-label="Start recording"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                  Start Recording
+                </button>
+              )}
+
+              {recorder.isRecording && (
+                <div className={styles.recorderSection}>
+                  <div className={styles.recordTimer}>
+                    <span className={styles.recordButtonRecording} aria-hidden="true" />
+                    Recording... {recorder.duration}s
+                    {recorder.duration < recorder.minSeconds && (
+                      <span className={styles.hint}> (min {recorder.minSeconds}s)</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.cloneButton}
+                    onClick={recorder.stopRecording}
+                    disabled={recorder.duration < recorder.minSeconds}
+                  >
+                    Stop
+                  </button>
+                </div>
+              )}
+
+              {!recorder.isRecording && recorder.recordedBlob && (
+                <div className={styles.recordPreview}>
+                  <button type="button" className={styles.inputTab} onClick={recorder.playPreview}>
+                    Play Preview
+                  </button>
+                  <button type="button" className={styles.inputTab} onClick={recorder.reset}>
+                    Re-record
+                  </button>
+                  <span className={styles.hint}>{recorder.duration}s recorded</span>
+                </div>
+              )}
+
+              <p className={styles.hint}>
+                Record a clear voice sample. At least 30 seconds for best results.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
             className={styles.cloneButton}
-            disabled={cloning || !cloneName.trim() || !cloneFile}
+            disabled={
+              cloning ||
+              !cloneName.trim() ||
+              (inputTab === 'upload' ? !cloneFile : !recorder.recordedBlob)
+            }
           >
             {cloning ? (
               <>
