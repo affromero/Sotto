@@ -190,6 +190,32 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         maxSeconds: String(Math.round(maxDurationSeconds)),
       });
 
+      // Queue Twitter failure reply for duration-exceeded
+      if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
+        const mention = await prisma.tweetMention.findFirst({
+          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, tweetId: true },
+        }).catch(() => null);
+        if (mention) {
+          await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
+            podcastId, tweetMentionId: mention.id, originalTweetId: mention.tweetId,
+          }).catch(() => {});
+        }
+      }
+
+      // Queue Telegram failure reply for duration-exceeded
+      if (podcast.user.telegramEnabled && podcast.user.telegramChatId) {
+        const tgMsg = await prisma.telegramMessage.findFirst({
+          where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+          select: { id: true, chatId: true },
+        }).catch(() => null);
+        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
+          podcastId,
+          telegramMessageId: tgMsg?.id,
+          chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
+        }).catch(() => {});
+      }
+
       await job.updateProgress(100);
       return;
     }
