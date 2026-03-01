@@ -45,6 +45,7 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
       case 'hume': return !!process.env.HUME_API_KEY;
       case 'fal': return !!process.env.FAL_KEY;
       case 'replicate': return !!process.env.REPLICATE_API_TOKEN;
+      case 'minimax': return !!process.env.FAL_KEY;
       case 'kittentts': return !!process.env.KITTENTTS_URL;
       default: return false;
     }
