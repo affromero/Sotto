@@ -79,7 +79,7 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     where: { id: podcastId },
     select: {
       userId: true,
-      voices: { select: { speaker: true, voiceId: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
       user: { select: { plan: true } },
@@ -148,9 +148,11 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     });
   }
 
-  // Use custom voice ID if set, otherwise let the provider pick from its pool
+  // Use custom voice ID if set and provider matches, otherwise let the provider pick from its pool
   const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
-  const voiceId = podcastVoice?.voiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
+  const voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
+    ? podcastVoice.voiceId
+    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
   // Resolve the raw API key for concurrency lookups
   const resolvedApiKey = await getByokKey(podcast.userId, providerId)

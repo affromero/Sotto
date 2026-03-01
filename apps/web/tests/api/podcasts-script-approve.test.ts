@@ -262,8 +262,8 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
       expect(mockPodcastVoiceDeleteMany).toHaveBeenCalledWith({ where: { podcastId: 'pod-1' } });
       expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith({
         data: [
-          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc' },
-          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'voice-xyz' },
+          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc', provider: 'elevenlabs' },
+          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'voice-xyz', provider: 'elevenlabs' },
         ],
       });
     });
@@ -337,7 +337,7 @@ describe('POST /api/podcasts/[podcastId]/script/approve', () => {
 
       expect(response.status).toBe(200);
       expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith({
-        data: [{ podcastId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc' }],
+        data: [{ podcastId: 'pod-1', speaker: 'HOST', voiceId: 'voice-abc', provider: 'elevenlabs' }],
       });
     });
   });

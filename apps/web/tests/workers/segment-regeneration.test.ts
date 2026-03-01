@@ -219,11 +219,11 @@ describe('processSegmentRegeneration', () => {
       expect(mockProviderGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
     });
 
-    it('uses custom hostVoiceId when set', async () => {
+    it('uses custom hostVoiceId when set and provider matches', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         voices: [
-          { speaker: 'HOST', voiceId: 'custom-host-voice' },
+          { speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' },
         ],
         ttsProvider: null,
         ttsModel: null,
@@ -237,11 +237,11 @@ describe('processSegmentRegeneration', () => {
       );
     });
 
-    it('uses custom expertVoiceId when set', async () => {
+    it('uses custom expertVoiceId when set and provider matches', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         voices: [
-          { speaker: 'EXPERT', voiceId: 'custom-expert-voice' },
+          { speaker: 'EXPERT', voiceId: 'custom-expert-voice', provider: 'elevenlabs' },
         ],
         ttsProvider: null,
         ttsModel: null,
@@ -252,6 +252,45 @@ describe('processSegmentRegeneration', () => {
 
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
         expect.objectContaining({ voiceId: 'custom-expert-voice' })
+      );
+    });
+
+    it('falls back to pool when stored voice has wrong provider', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        voices: [
+          { speaker: 'EXPERT', voiceId: 'elevenlabs-voice-id', provider: 'elevenlabs' },
+        ],
+        ttsProvider: null,
+        ttsModel: null,
+        user: { plan: 'FREE' },
+      });
+      setupStandardProvider(); // openai
+      mockStandardGetVoiceId.mockReturnValue('openai-pool-voice');
+      const job = createMockJob(defaultPayload);
+      await processSegmentRegeneration(job);
+
+      expect(mockStandardGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ voiceId: 'openai-pool-voice' })
+      );
+    });
+
+    it('falls back to pool when stored voice has null provider (legacy)', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        voices: [
+          { speaker: 'EXPERT', voiceId: 'old-voice-id', provider: null },
+        ],
+        ttsProvider: null,
+        ttsModel: null,
+        user: { plan: 'FREE' },
+      });
+      mockProviderGetVoiceId.mockReturnValue('pool-voice');
+      const job = createMockJob(defaultPayload);
+      await processSegmentRegeneration(job);
+
+      expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ voiceId: 'pool-voice' })
       );
     });
   });

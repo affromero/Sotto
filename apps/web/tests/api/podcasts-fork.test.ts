@@ -156,8 +156,8 @@ const mockSourcePodcast = {
   forkedFromId: null,
   tags: [{ tagId: 'tag-science' }, { tagId: 'tag-tech' }],
   voices: [
-    { speaker: 'HOST', voiceId: 'voice-host-1' },
-    { speaker: 'EXPERT', voiceId: 'voice-expert-1' },
+    { speaker: 'HOST', voiceId: 'voice-host-1', provider: 'elevenlabs' },
+    { speaker: 'EXPERT', voiceId: 'voice-expert-1', provider: 'elevenlabs' },
   ],
   discovery: {
     durationTarget: 10,
