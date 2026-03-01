@@ -29,7 +29,7 @@ export async function processSegmentRegeneration(
     where: { id: podcastId },
     select: {
       userId: true,
-      voices: { select: { speaker: true, voiceId: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
       ttsProvider: true,
       ttsModel: true,
       user: { select: { plan: true } },
@@ -60,7 +60,9 @@ export async function processSegmentRegeneration(
   });
 
   const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
-  const voiceId = podcastVoice?.voiceId || provider.getVoiceId(speaker, podcastId, voiceMetadata);
+  const voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
+    ? podcastVoice.voiceId
+    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
   logger.info('Segment regen: using TTS provider', {
     speaker,

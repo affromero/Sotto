@@ -80,7 +80,7 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     select: {
       ttsProvider: true,
       ttsModel: true,
-      voices: { select: { speaker: true, voiceId: true } },
+      voices: { select: { speaker: true, voiceId: true, provider: true } },
       podcast: {
         select: { userId: true, user: { select: { plan: true } } },
       },
@@ -111,9 +111,11 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     });
   }
 
-  // Use voice track voice assignment, otherwise let provider pick from pool
+  // Use voice track voice assignment if provider matches, otherwise let provider pick from pool
   const trackVoice = voiceTrack.voices.find(v => v.speaker === speaker);
-  const voiceId = trackVoice?.voiceId || provider.getVoiceId(speaker, podcastId);
+  const voiceId = (trackVoice?.voiceId && trackVoice.provider === providerId)
+    ? trackVoice.voiceId
+    : provider.getVoiceId(speaker, podcastId);
 
   // Resolve the raw API key for concurrency lookups
   const resolvedApiKey = await getByokKey(userId, providerId)

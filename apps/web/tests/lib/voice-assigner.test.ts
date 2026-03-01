@@ -83,8 +83,8 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
         ]),
       }),
     );
@@ -139,9 +139,9 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1' },
-          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'v2' },
-          { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v3' },
+          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1', provider: 'elevenlabs' },
+          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'v2', provider: 'elevenlabs' },
+          { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v3', provider: 'elevenlabs' },
         ]),
       }),
     );
@@ -169,9 +169,9 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'elevenlabs' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'elevenlabs' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST', provider: 'elevenlabs' }),
         ]),
       }),
     );
@@ -210,9 +210,9 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT' }),
-          expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'HOST', provider: 'kittentts' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'EXPERT', provider: 'kittentts' }),
+          expect.objectContaining({ podcastId: 'pod-1', speaker: 'GUEST', provider: 'kittentts' }),
         ]),
       }),
     );
@@ -241,8 +241,8 @@ describe('assignVoicesForPodcast', () => {
     const llmData = createCall.data;
     // HOST gets v1, EXPERT is deduped out, GUEST gets v2
     expect(llmData).toEqual([
-      { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1' },
-      { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v2' },
+      { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1', provider: 'elevenlabs' },
+      { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v2', provider: 'elevenlabs' },
     ]);
 
     // EXPERT should be assigned via fallback (second createMany call)
@@ -271,9 +271,9 @@ describe('assignVoicesForPodcast', () => {
     expect(mockPodcastVoiceCreateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.arrayContaining([
-          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1' },
-          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'v2' },
-          { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v3' },
+          { podcastId: 'pod-1', speaker: 'HOST', voiceId: 'v1', provider: 'elevenlabs' },
+          { podcastId: 'pod-1', speaker: 'EXPERT', voiceId: 'v2', provider: 'elevenlabs' },
+          { podcastId: 'pod-1', speaker: 'GUEST', voiceId: 'v3', provider: 'elevenlabs' },
         ]),
       }),
     );
