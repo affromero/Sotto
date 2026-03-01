@@ -64,6 +64,21 @@ export async function processSegmentRegeneration(
     ? podcastVoice.voiceId
     : provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
+  // Persist resolved voice for retry consistency and analytics
+  if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+    try {
+      await prisma.podcastVoice.upsert({
+        where: { podcastId_speaker: { podcastId, speaker } },
+        update: { voiceId, provider: providerId },
+        create: { podcastId, speaker, voiceId, provider: providerId },
+      });
+    } catch (err) {
+      logger.warn('Failed to persist voice assignment', {
+        podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   logger.info('Segment regen: using TTS provider', {
     speaker,
     providerId,

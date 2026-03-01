@@ -19,6 +19,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 const mockPrismaApiUsageLogCreate = vi.fn().mockResolvedValue({});
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaScriptFindUnique = vi.fn().mockResolvedValue(null);
+const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -41,6 +42,9 @@ vi.mock('@/lib/prisma', () => {
     },
     apiUsageLog: {
       create: (...args: unknown[]) => mockPrismaApiUsageLogCreate(...args),
+    },
+    podcastVoice: {
+      upsert: (...args: unknown[]) => mockPrismaPodcastVoiceUpsert(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -432,6 +436,69 @@ describe('processAudioGeneration', () => {
       });
       mockProviderGetVoiceId.mockReturnValue('pool-voice');
       const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
+      await processAudioGeneration(job);
+
+      expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ voiceId: 'pool-voice' })
+      );
+    });
+
+    it('persists resolved voice when no PodcastVoice row exists', async () => {
+      mockProviderGetVoiceId.mockReturnValue('pool-voice-xyz');
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
+        where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'HOST' } },
+        update: { voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
+        create: { podcastId: 'podcast-001', speaker: 'HOST', voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
+      });
+    });
+
+    it('persists resolved voice when provider mismatch', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        voices: [
+          { speaker: 'HOST', voiceId: 'old-elevenlabs-voice', provider: 'elevenlabs' },
+        ],
+        ttsProvider: null,
+        ttsModel: null,
+        user: { plan: 'FREE' },
+      });
+      setupHumeProvider();
+      mockProviderGetVoiceId.mockReturnValue('hume-pool-voice');
+      const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
+      await processAudioGeneration(job);
+
+      expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
+        where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'HOST' } },
+        update: { voiceId: 'hume-pool-voice', provider: 'hume' },
+        create: { podcastId: 'podcast-001', speaker: 'HOST', voiceId: 'hume-pool-voice', provider: 'hume' },
+      });
+    });
+
+    it('does not upsert when existing voice matches', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        voices: [
+          { speaker: 'HOST', voiceId: 'custom-host-voice', provider: 'elevenlabs' },
+        ],
+        ttsProvider: null,
+        ttsModel: null,
+        user: { plan: 'FREE' },
+      });
+      const job = createMockJob({ ...defaultPayload, speaker: 'HOST' });
+      await processAudioGeneration(job);
+
+      expect(mockPrismaPodcastVoiceUpsert).not.toHaveBeenCalled();
+    });
+
+    it('continues without error when upsert fails', async () => {
+      mockPrismaPodcastVoiceUpsert.mockRejectedValue(new Error('DB constraint violation'));
+      mockProviderGetVoiceId.mockReturnValue('pool-voice');
+      const job = createMockJob(defaultPayload);
+
+      // Should not throw — the upsert failure is caught and logged
       await processAudioGeneration(job);
 
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
