@@ -32,8 +32,8 @@ const TTS_PROVIDERS = [
   { id: 'openai', name: 'OpenAI TTS', qualityTier: 'Standard' },
   { id: 'cartesia', name: 'Cartesia', qualityTier: 'Premium' },
   { id: 'hume', name: 'Hume', qualityTier: 'Ultra' },
-  { id: 'fal', name: 'Fal (Qwen3-TTS)', qualityTier: 'Premium' },
-  { id: 'replicate', name: 'Replicate (Qwen3-TTS)', qualityTier: 'Premium' },
+  { id: 'fal', name: 'Fal', qualityTier: 'Premium' },
+  { id: 'replicate', name: 'Replicate', qualityTier: 'Premium' },
 ] as const;
 
 function ProviderRow({
