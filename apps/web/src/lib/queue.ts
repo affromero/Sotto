@@ -382,7 +382,11 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
 
       const podcast = await prisma.podcast.findUnique({
         where: { id: podcastId },
-        select: { status: true, userId: true, title: true, ttsProvider: true },
+        select: {
+          status: true, userId: true, title: true, ttsProvider: true,
+          source: true, sourceTweetId: true,
+          user: { select: { telegramEnabled: true, telegramChatId: true } },
+        },
       });
       if (!podcast) return;
 
@@ -533,6 +537,40 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
             logger.warn('Failed to send admin pipeline-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
           });
+        }
+      }
+
+      // Queue Twitter failure reply for Twitter-sourced podcasts
+      if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
+        const twitterReplyQ = queueInstances.get('twitter-reply');
+        if (twitterReplyQ) {
+          const mention = await prisma.tweetMention.findFirst({
+            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+            select: { id: true, tweetId: true },
+          }).catch(() => null);
+          if (mention) {
+            await twitterReplyQ.add('reply_twitter', {
+              podcastId,
+              tweetMentionId: mention.id,
+              originalTweetId: mention.tweetId,
+            }, { jobId: `twitter-fail-${podcastId}` }).catch(() => {});
+          }
+        }
+      }
+
+      // Queue Telegram failure reply for users with Telegram enabled
+      if (podcast.user?.telegramEnabled && podcast.user?.telegramChatId) {
+        const telegramReplyQ = queueInstances.get('telegram-reply');
+        if (telegramReplyQ) {
+          const tgMsg = await prisma.telegramMessage.findFirst({
+            where: { podcastId, status: { in: ['GENERATING', 'READY'] } },
+            select: { id: true, chatId: true },
+          }).catch(() => null);
+          await telegramReplyQ.add('reply_telegram', {
+            podcastId,
+            telegramMessageId: tgMsg?.id,
+            chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
+          }, { jobId: `telegram-fail-${podcastId}` }).catch(() => {});
         }
       }
 
