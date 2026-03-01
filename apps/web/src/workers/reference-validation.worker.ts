@@ -22,6 +22,7 @@ import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { logger } from '@/lib/logger';
+import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 export async function processReferenceValidation(
   job: Job<ValidateReferencesPayload>
@@ -322,6 +323,7 @@ export async function processReferenceValidation(
     logger.info('References validated, auto-approved for audio generation', { podcastId });
   }
 
+  await logPipelineStageComplete(podcastId, 'reference-validation');
   await job.updateProgress(100);
 
   const verifiedCount = [...verificationResults.values()].filter(

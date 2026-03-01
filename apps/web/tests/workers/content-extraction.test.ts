@@ -52,6 +52,10 @@ vi.mock('@/lib/queue', () => ({
   scriptGenerationQueue: { name: 'script-generation' },
 }));
 
+vi.mock('@/lib/pipeline-events', () => ({
+  logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),
