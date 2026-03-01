@@ -4,7 +4,7 @@
  */
 import { logger } from '../logger';
 
-export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'kittentts';
+export type TtsProviderId = 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'kittentts';
 
 export interface TtsProviderAuthField {
   key: string;
@@ -202,6 +202,38 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
     platformCostPerKChar: 0,
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'fal_sk_...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://rest.fal.ai/keys/', {
+            headers: { Authorization: `Key ${creds.apiKey}` },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  minimax: {
+    id: 'minimax',
+    displayName: 'MiniMax',
+    getApiKeyUrl: 'https://fal.ai/dashboard/keys',
+    supportsSfx: false,
+    supportsVoiceCloning: false,
+    supportsStreaming: false,
+    maxSegmentChars: 5000,
+    defaultModel: 'speech-02-hd',
+    models: [
+      { id: 'speech-02-hd', displayName: 'Speech-02 HD', tier: 'premium' },
+      { id: 'speech-02-turbo', displayName: 'Speech-02 Turbo', tier: 'standard' },
+    ],
+    supportsAudioTags: false,
+    docsUrl: null,
+    qualityTier: 'premium',
+    platformCostPerKChar: 0.10,
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'Your FAL API key' }],
       validate: async (creds) => {
         try {
           const res = await fetch('https://rest.fal.ai/keys/', {

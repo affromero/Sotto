@@ -14,6 +14,7 @@ const TTS_PLATFORM_KEY_ENVS: Record<string, string> = {
   hume: 'HUME_API_KEY',
   fal: 'FAL_KEY',
   replicate: 'REPLICATE_API_TOKEN',
+  minimax: 'FAL_KEY',
 };
 
 export interface SelectedFreeTierProviders {

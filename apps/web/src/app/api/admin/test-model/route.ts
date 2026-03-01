@@ -14,6 +14,7 @@ import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
+  MINIMAX_VOICE_POOL,
 } from '@/lib/providers/tts-voices';
 
 const requestSchema = z.object({
@@ -31,6 +32,7 @@ const TTS_TEST_VOICES: Record<string, string> = {
   hume: HUME_VOICE_POOL[0].id,
   fal: FAL_VOICE_POOL[0].id,
   replicate: FAL_VOICE_POOL[0].id,
+  minimax: MINIMAX_VOICE_POOL[0].id,
   kittentts: 'bella',
 };
 
@@ -48,6 +50,8 @@ function getTtsPlatformKey(provider: string): {
     case 'hume':
       return { apiKey: process.env.HUME_API_KEY };
     case 'fal':
+      return { apiKey: process.env.FAL_KEY };
+    case 'minimax':
       return { apiKey: process.env.FAL_KEY };
     case 'replicate':
       return { apiKey: process.env.REPLICATE_API_TOKEN };
@@ -83,7 +87,7 @@ function getSttPlatformKey(provider: string): string | undefined {
  * Returns null if no TTS provider is available.
  */
 const TTS_PROBE_ORDER: TtsProviderId[] = [
-  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate',
+  'kittentts', 'openai', 'elevenlabs', 'cartesia', 'hume', 'fal', 'replicate', 'minimax',
 ];
 
 async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } | null> {

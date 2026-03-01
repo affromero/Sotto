@@ -48,6 +48,13 @@ describe('getVoiceCatalog', () => {
       expect(fal).toEqual(replicate);
     });
 
+    it('returns static MiniMax voices', async () => {
+      const catalog = await getVoiceCatalog('minimax');
+
+      expect(catalog.length).toBe(12);
+      expect(catalog[0]).toMatchObject({ id: 'Deep_Voice_Man', name: 'Deep Voice Man' });
+    });
+
     it('returns static KittenTTS voices', async () => {
       const catalog = await getVoiceCatalog('kittentts');
 
