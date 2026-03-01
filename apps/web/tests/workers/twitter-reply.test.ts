@@ -376,6 +376,30 @@ describe('processTwitterReply', () => {
     });
   });
 
+  describe('mid-generation guard', () => {
+    it('skips reply when podcast is mid-generation from retry', async () => {
+      const payload: ReplyTwitterPayload = {
+        podcastId: 'podcast-retry',
+        tweetMentionId: 'mention-retry',
+        originalTweetId: 'tweet-retry',
+      };
+
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        title: 'Retrying Podcast',
+        duration: null,
+        status: 'EXTRACTING',
+        slug: null,
+        user: { handle: null },
+      });
+
+      const job = createMockJob(payload);
+      await processTwitterReply(job);
+
+      expect(mockReplyToTweet).not.toHaveBeenCalled();
+      expect(mockPrismaTweetMentionUpdate).not.toHaveBeenCalled();
+    });
+  });
+
   describe('job progress updates', () => {
     it('reports monotonically increasing progress ending at 100', async () => {
       const payload: ReplyTwitterPayload = {
