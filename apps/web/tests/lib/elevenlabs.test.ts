@@ -523,7 +523,7 @@ describe('elevenlabs', () => {
         json: async () => ({ voice_id: 'cloned-voice-123' }),
       });
 
-      const result = await cloneVoice('My Custom Voice', audioFiles, 'Test voice');
+      const result = await cloneVoice('My Custom Voice', audioFiles, { description: 'Test voice' });
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/voices/add'),
@@ -540,7 +540,7 @@ describe('elevenlabs', () => {
     it('throws error when API key is missing', async () => {
       delete process.env.ELEVENLABS_API_KEY;
 
-      await expect(cloneVoice('Test', [Buffer.from('audio')], 'desc')).rejects.toThrow(
+      await expect(cloneVoice('Test', [Buffer.from('audio')], { description: 'desc' })).rejects.toThrow(
         'ElevenLabs API key not configured — set ELEVENLABS_API_KEY'
       );
     });
@@ -555,6 +555,27 @@ describe('elevenlabs', () => {
       await expect(cloneVoice('Test', [Buffer.from('audio')])).rejects.toThrow(
         /ElevenLabs.*400/
       );
+    });
+
+    it('uses apiKeyOverride when provided', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ voice_id: 'byok-voice-123' }),
+      });
+
+      const result = await cloneVoice('BYOK Voice', [Buffer.from('audio')], {
+        apiKeyOverride: 'user-custom-key',
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/voices/add'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'xi-api-key': 'user-custom-key',
+          }),
+        })
+      );
+      expect(result.voiceId).toBe('byok-voice-123');
     });
   });
 
@@ -592,6 +613,20 @@ describe('elevenlabs', () => {
 
       await expect(deleteClonedVoice('nonexistent-voice')).rejects.toThrow(
         /ElevenLabs.*404/
+      );
+    });
+
+    it('uses apiKeyOverride when provided', async () => {
+      mockFetch.mockResolvedValue({ ok: true });
+
+      await deleteClonedVoice('voice-byok', 'user-custom-key');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/voices/voice-byok'),
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({ 'xi-api-key': 'user-custom-key' }),
+        })
       );
     });
   });

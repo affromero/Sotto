@@ -334,16 +334,17 @@ export function getOpenAiPerKCharRate(): number {
 export async function cloneVoice(
   name: string,
   audioFiles: Buffer[],
-  description?: string
+  options?: { description?: string; apiKeyOverride?: string }
 ): Promise<{ voiceId: string }> {
-  if (!getApiKey()) {
+  const apiKey = options?.apiKeyOverride || getApiKey();
+  if (!apiKey) {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
   const formData = new FormData();
   formData.append('name', name);
-  if (description) {
-    formData.append('description', description);
+  if (options?.description) {
+    formData.append('description', options.description);
   }
 
   for (let i = 0; i < audioFiles.length; i++) {
@@ -355,7 +356,7 @@ export async function cloneVoice(
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/add`, {
     method: 'POST',
     headers: {
-      'xi-api-key': getApiKey()!,
+      'xi-api-key': apiKey,
     },
     body: formData,
   });
@@ -373,14 +374,15 @@ export async function cloneVoice(
 /**
  * Delete a cloned voice from ElevenLabs.
  */
-export async function deleteClonedVoice(voiceId: string): Promise<void> {
-  if (!getApiKey()) {
+export async function deleteClonedVoice(voiceId: string, apiKeyOverride?: string): Promise<void> {
+  const apiKey = apiKeyOverride || getApiKey();
+  if (!apiKey) {
     throw new Error('ElevenLabs API key not configured');
   }
 
   const response = await fetch(`${ELEVENLABS_BASE_URL}/voices/${voiceId}`, {
     method: 'DELETE',
-    headers: { 'xi-api-key': getApiKey()! },
+    headers: { 'xi-api-key': apiKey },
   });
 
   if (!response.ok) {

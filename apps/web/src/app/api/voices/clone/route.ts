@@ -81,7 +81,10 @@ export async function POST(request: NextRequest) {
     const { embeddingUrl } = await cloneVoiceViaFal(falKey, cloneBuffer);
     externalVoiceId = embeddingUrl;
   } else {
-    const { voiceId } = await cloneVoice(parsed.data.name, [cloneBuffer]);
+    const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
+    const { voiceId } = await cloneVoice(parsed.data.name, [cloneBuffer], {
+      apiKeyOverride: elevenLabsKey ?? undefined,
+    });
     externalVoiceId = voiceId;
   }
 
@@ -214,7 +217,8 @@ export async function DELETE(request: NextRequest) {
 
   // Only call ElevenLabs delete API for ElevenLabs voices
   if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
-    await deleteClonedVoice(voiceClone.externalVoiceId);
+    const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
+    await deleteClonedVoice(voiceClone.externalVoiceId, elevenLabsKey ?? undefined);
   }
 
   // Clean up voice requests for this clone

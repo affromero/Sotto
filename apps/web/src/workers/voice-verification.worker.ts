@@ -6,6 +6,7 @@ import { downloadFile, deleteFile } from '@/lib/r2';
 import { deleteClonedVoice } from '@/lib/elevenlabs';
 import { extractVoiceprint, findDuplicateVoiceprints, verifyChallenge } from '@/lib/voice-fingerprint';
 import { generateChallengePhrase, CHALLENGE_EXPIRY_MS, MAX_CHALLENGE_ATTEMPTS } from '@/lib/voice-challenge-phrases';
+import { getByokKey } from '@/lib/byok';
 import { logger } from '@/lib/logger';
 
 export async function processVoiceVerification(job: Job<VerifyVoicePayload>): Promise<void> {
@@ -94,12 +95,13 @@ async function handleCheckDuplicates(voiceCloneId: string, userId: string) {
     // Clean up the blocked voice from external provider
     const voiceClone = await prisma.voiceClone.findUnique({
       where: { id: voiceCloneId },
-      select: { provider: true, externalVoiceId: true, sampleUrl: true },
+      select: { provider: true, externalVoiceId: true, sampleUrl: true, userId: true },
     });
 
     if (voiceClone) {
       if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
-        await deleteClonedVoice(voiceClone.externalVoiceId).catch((err) =>
+        const byokKey = await getByokKey(voiceClone.userId, 'elevenlabs');
+        await deleteClonedVoice(voiceClone.externalVoiceId, byokKey ?? undefined).catch((err) =>
           logger.error('Failed to delete blocked voice from ElevenLabs', { error: err.message })
         );
       }
@@ -253,12 +255,13 @@ async function handleVerifyChallenge(voiceCloneId: string, userId: string, chall
   // Clean up
   const voiceClone = await prisma.voiceClone.findUnique({
     where: { id: voiceCloneId },
-    select: { provider: true, externalVoiceId: true, sampleUrl: true },
+    select: { provider: true, externalVoiceId: true, sampleUrl: true, userId: true },
   });
 
   if (voiceClone) {
     if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
-      await deleteClonedVoice(voiceClone.externalVoiceId).catch((err) =>
+      const byokKey = await getByokKey(voiceClone.userId, 'elevenlabs');
+      await deleteClonedVoice(voiceClone.externalVoiceId, byokKey ?? undefined).catch((err) =>
         logger.error('Failed to delete rejected voice from ElevenLabs', { error: err.message })
       );
     }

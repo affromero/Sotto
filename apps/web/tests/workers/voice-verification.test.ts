@@ -51,6 +51,12 @@ vi.mock('@/lib/elevenlabs', () => ({
   deleteClonedVoice: (...args: unknown[]) => mockDeleteClonedVoice(...args),
 }));
 
+const mockGetByokKey = vi.fn().mockResolvedValue(null);
+
+vi.mock('@/lib/byok', () => ({
+  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
+}));
+
 const mockExtractVoiceprint = vi.fn().mockResolvedValue([0.1, 0.2, 0.3]);
 const mockFindDuplicateVoiceprints = vi.fn().mockResolvedValue([]);
 const mockVerifyChallenge = vi.fn().mockResolvedValue({ similarity: 0.85, passed: true });
@@ -201,6 +207,7 @@ describe('processVoiceVerification', () => {
         provider: 'elevenlabs',
         externalVoiceId: 'el-voice-123',
         sampleUrl: 'https://r2.example.com/sample.mp3',
+        userId: 'user-uploader',
       });
     });
 
@@ -227,11 +234,13 @@ describe('processVoiceVerification', () => {
       });
     });
 
-    it('deletes the blocked voice from ElevenLabs', async () => {
+    it('deletes the blocked voice from ElevenLabs with BYOK key', async () => {
+      mockGetByokKey.mockResolvedValueOnce('user-el-key');
       const job = createMockJob(payload);
       await processVoiceVerification(job);
 
-      expect(mockDeleteClonedVoice).toHaveBeenCalledWith('el-voice-123');
+      expect(mockGetByokKey).toHaveBeenCalledWith('user-uploader', 'elevenlabs');
+      expect(mockDeleteClonedVoice).toHaveBeenCalledWith('el-voice-123', 'user-el-key');
     });
 
     it('deletes the sample audio from R2', async () => {
@@ -263,6 +272,7 @@ describe('processVoiceVerification', () => {
           provider: 'elevenlabs',
           externalVoiceId: 'el-voice-123',
           sampleUrl: 'https://r2.example.com/sample.mp3',
+          userId: 'user-uploader',
         };
       });
 
@@ -473,6 +483,7 @@ describe('processVoiceVerification', () => {
         provider: 'elevenlabs',
         externalVoiceId: 'el-voice-456',
         sampleUrl: 'https://r2.example.com/sample.mp3',
+        userId: 'user-1',
       });
     });
 
@@ -486,11 +497,13 @@ describe('processVoiceVerification', () => {
       });
     });
 
-    it('deletes voice from ElevenLabs', async () => {
+    it('deletes voice from ElevenLabs with BYOK key', async () => {
+      mockGetByokKey.mockResolvedValueOnce('user-el-key-2');
       const job = createMockJob(payload);
       await processVoiceVerification(job);
 
-      expect(mockDeleteClonedVoice).toHaveBeenCalledWith('el-voice-456');
+      expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs');
+      expect(mockDeleteClonedVoice).toHaveBeenCalledWith('el-voice-456', 'user-el-key-2');
     });
 
     it('deletes sample audio from R2', async () => {
