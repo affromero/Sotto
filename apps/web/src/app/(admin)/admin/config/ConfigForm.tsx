@@ -25,6 +25,7 @@ interface ConfigFormProps {
     sttProvider: string;
     sttModel: string;
     generationLimit: number;
+    dailyGenerationLimit: number;
     aiAllocations: Allocation[];
     ttsAllocations: Allocation[];
   };
@@ -41,6 +42,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
   const [sttProvider, setSttProvider] = useState(initialConfig.sttProvider);
   const [sttModel, setSttModel] = useState(initialConfig.sttModel);
   const [generationLimit, setGenerationLimit] = useState(initialConfig.generationLimit);
+  const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
   const [useAiAllocations, setUseAiAllocations] = useState(initialConfig.aiAllocations.length > 0);
   const [aiAllocations, setAiAllocations] = useState<Allocation[]>(initialConfig.aiAllocations);
   const [useTtsAllocations, setUseTtsAllocations] = useState(initialConfig.ttsAllocations.length > 0);
@@ -91,6 +93,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           ttsProvider, ttsModel,
           sttProvider, sttModel,
           generationLimit,
+          dailyGenerationLimit,
           aiAllocations: useAiAllocations ? aiAllocations : [],
           ttsAllocations: useTtsAllocations ? ttsAllocations : [],
         }),
@@ -240,6 +243,22 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           max={100}
         />
         <span className={styles.hint}>Max free podcasts per user before requiring BYOK keys</span>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor="dailyGenerationLimit">
+          Daily Generation Limit
+        </label>
+        <input
+          id="dailyGenerationLimit"
+          type="number"
+          className={styles.input}
+          value={dailyGenerationLimit}
+          onChange={(e) => setDailyGenerationLimit(parseInt(e.target.value, 10) || 0)}
+          min={0}
+          max={100}
+        />
+        <span className={styles.hint}>Max free podcasts per user per day (0 = unlimited)</span>
       </div>
 
       <div className={styles.field}>

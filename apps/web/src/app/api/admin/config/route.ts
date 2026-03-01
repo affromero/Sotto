@@ -28,6 +28,7 @@ const updateConfigSchema = z.object({
   sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().min(1).optional(),
   generationLimit: z.number().int().min(0).max(100).optional(),
+  dailyGenerationLimit: z.number().int().min(0).max(100).optional(),
   aiAllocations: z.array(providerAllocationSchema).optional(),
   ttsAllocations: z.array(providerAllocationSchema).optional(),
 });
