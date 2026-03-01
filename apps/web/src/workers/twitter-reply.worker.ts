@@ -35,6 +35,14 @@ export async function processTwitterReply(job: Job<ReplyTwitterPayload>): Promis
     return;
   }
 
+  if (podcast.status !== 'READY') {
+    // Podcast is mid-generation (retry in progress) — skip, reply will be queued when done
+    logger.info('Skipping Twitter reply — podcast not in terminal state', {
+      podcastId, status: podcast.status,
+    });
+    return;
+  }
+
   await job.updateProgress(30);
 
   // Compose reply (must be under 280 chars)
