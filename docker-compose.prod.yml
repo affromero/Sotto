@@ -106,6 +106,8 @@ services:
         condition: service_healthy
       kittentts:
         condition: service_started
+      pinchtab:
+        condition: service_started
     networks:
       - sotto-network
     logging:
@@ -126,6 +128,36 @@ services:
       timeout: 10s
       retries: 5
       start_period: 300s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '20m'
+        max-file: '3'
+
+  pinchtab:
+    image: pinchtab/pinchtab
+    container_name: sotto-prod-pinchtab
+    restart: unless-stopped
+    environment:
+      BRIDGE_BIND: '0.0.0.0'
+      BRIDGE_PORT: '9867'
+      BRIDGE_HEADLESS: 'true'
+      BRIDGE_STEALTH: 'full'
+      BRIDGE_BLOCK_IMAGES: 'true'
+      BRIDGE_BLOCK_ADS: 'true'
+      BRIDGE_BLOCK_MEDIA: 'true'
+      BRIDGE_NAV_TIMEOUT: '25'
+    shm_size: '1gb'
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:9867/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     networks:
       - sotto-network
     logging:

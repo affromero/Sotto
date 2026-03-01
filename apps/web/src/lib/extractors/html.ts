@@ -5,7 +5,7 @@ import { logger } from '../logger';
 import { safeFetch } from '../url-validator';
 import type { ExtractedContent } from './types';
 
-const MAX_CONTENT_LENGTH = 50000;
+export const MAX_CONTENT_LENGTH = 50000;
 const FETCH_TIMEOUT_MS = 15000;
 
 const STRIP_SELECTORS = [
@@ -225,6 +225,6 @@ function stripHtml(html: string): string {
     .trim();
 }
 
-function countWords(text: string): number {
+export function countWords(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length;
 }

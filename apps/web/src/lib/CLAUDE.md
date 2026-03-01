@@ -34,7 +34,7 @@ All shared business logic and external service integrations live here.
 | `byok.ts` | Multi-provider BYOK key management: encrypt/decrypt (AES-256-GCM), store/retrieve via `UserTtsKey` + `UserAiKey` models, validate keys per provider | Uses `prisma.ts` |
 | `byok-errors.ts` | BYOK job failure classifier: `classifyError()` → `auth_invalid`, `insufficient_credits`, `rate_limited`, `provider_error`; `isKeyInvalidationError()`, `userMessage()` | Pure utility |
 | `content-parser.ts` | Thin re-export wrapper (deprecated) — delegates to `extractors/` | — |
-| `extractors/` | Multi-layer content extraction: Readability + cheerio HTML, pdf-parse PDF, YouTube transcript. Facade via `extractContent(url)` and `extractFromPdfBuffer(buffer)`, returns `ExtractedContent` | jsdom, @mozilla/readability, cheerio, fetch |
+| `extractors/` | Multi-layer content extraction: Readability + cheerio HTML, pdf-parse PDF, YouTube transcript, Pinchtab browser fallback. Facade via `extractContent(url)` and `extractFromPdfBuffer(buffer)`, returns `ExtractedContent` | jsdom, @mozilla/readability, cheerio, fetch |
 | `recommendations.ts` | Search similar public podcasts (PostgreSQL full-text) | Uses `prisma.ts` |
 | `recommendation-engine.ts` | ML-powered recommendation engine: daily picks, explore, trending categories | Uses `prisma.ts`, `providers/ml.ts` |
 | `push-notifications.ts` | Web Push API: send to user devices, clean expired subs | web-push |
