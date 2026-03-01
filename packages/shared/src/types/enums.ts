@@ -110,7 +110,7 @@ export type ReportStatus =
   | 'RESOLVED_ACTIONED'
   | 'RESOLVED_DISMISSED';
 
-export type VoiceCloneSource = 'UPLOAD' | 'RECORD';
+export type VoiceCloneSource = 'UPLOAD' | 'RECORD' | 'IMPORT';
 
 export type VoiceVerificationStatus =
   | 'PENDING_VERIFICATION'

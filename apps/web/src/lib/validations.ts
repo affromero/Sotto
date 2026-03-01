@@ -139,7 +139,13 @@ export const voicePriceSchema = z.object({
  */
 export const cloneVoiceSchema = z.object({
   name: z.string().min(1).max(100),
-  sourceType: z.enum(['UPLOAD', 'RECORD']),
+  sourceType: z.enum(['UPLOAD', 'RECORD', 'IMPORT']),
+});
+
+export const importVoiceSchema = z.object({
+  name: z.string().min(1).max(100),
+  externalVoiceId: z.string().min(1).max(200),
+  provider: z.literal('hume'),
 });
 
 export const voiceVerifyChallengeSchema = z.object({

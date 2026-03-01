@@ -3,13 +3,14 @@
 import { useEffect, useState, useRef } from 'react';
 import styles from './VoiceManager.module.css';
 import { VoiceVerificationChallenge } from '@/components/settings/VoiceVerificationChallenge';
+import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 
 interface VoiceClone {
   id: string;
   name: string;
   description: string | null;
   externalVoiceId: string;
-  sourceType: 'UPLOAD' | 'RECORD';
+  sourceType: 'UPLOAD' | 'RECORD' | 'IMPORT';
   requestable: boolean;
   priceInCents: number | null;
   verificationStatus: string;
@@ -72,8 +73,14 @@ export function VoiceManager() {
   const [editingPrice, setEditingPrice] = useState<string | null>(null);
   const [priceDraft, setPriceDraft] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
+  const [inputTab, setInputTab] = useState<'upload' | 'record'>('upload');
+  const [cloneProvider, setCloneProvider] = useState<'elevenlabs' | 'cartesia' | 'hume'>('elevenlabs');
+  const [humeVoiceId, setHumeVoiceId] = useState('');
+  const [humeName, setHumeName] = useState('');
+  const [importingHume, setImportingHume] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 5 });
 
   useEffect(() => {
     fetchVoices();
@@ -306,16 +313,26 @@ export function VoiceManager() {
 
   async function handleClone(e: React.FormEvent) {
     e.preventDefault();
-    if (!cloneFile || !cloneName.trim()) return;
+    const isRecord = inputTab === 'record';
+    if (isRecord && !recorder.recordedBlob) return;
+    if (!isRecord && !cloneFile) return;
+    if (!cloneName.trim()) return;
 
     try {
       setCloning(true);
       setError(null);
 
       const formData = new FormData();
-      formData.append('audio', cloneFile);
+      if (isRecord && recorder.recordedBlob) {
+        const ext = recorder.mimeType?.includes('webm') ? 'webm' : 'm4a';
+        formData.append('audio', recorder.recordedBlob, `recording.${ext}`);
+        formData.append('sourceType', 'RECORD');
+      } else if (cloneFile) {
+        formData.append('audio', cloneFile);
+        formData.append('sourceType', 'UPLOAD');
+      }
       formData.append('name', cloneName.trim());
-      formData.append('sourceType', 'UPLOAD');
+      formData.append('provider', cloneProvider);
 
       const response = await fetch('/api/voices/clone', {
         method: 'POST',
@@ -329,11 +346,46 @@ export function VoiceManager() {
 
       setCloneName('');
       setCloneFile(null);
+      recorder.reset();
       await fetchVoices();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clone voice');
     } finally {
       setCloning(false);
+    }
+  }
+
+  async function handleImportHume(e: React.FormEvent) {
+    e.preventDefault();
+    if (!humeName.trim() || !humeVoiceId.trim()) return;
+
+    try {
+      setImportingHume(true);
+      setError(null);
+
+      const formData = new FormData();
+      formData.append('name', humeName.trim());
+      formData.append('provider', 'hume');
+      formData.append('externalVoiceId', humeVoiceId.trim());
+      formData.append('sourceType', 'IMPORT');
+
+      const response = await fetch('/api/voices/clone', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to import voice');
+      }
+
+      setHumeName('');
+      setHumeVoiceId('');
+      await fetchVoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import voice');
+    } finally {
+      setImportingHume(false);
     }
   }
 
@@ -880,6 +932,75 @@ export function VoiceManager() {
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Add New Voice</h3>
+
+        <div className={styles.providerPills} role="tablist" aria-label="Voice provider">
+          {(['elevenlabs', 'cartesia', 'hume'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="tab"
+              aria-selected={cloneProvider === p}
+              className={`${styles.pill} ${cloneProvider === p ? styles.pillActive : ''}`}
+              onClick={() => setCloneProvider(p)}
+              disabled={cloning || importingHume}
+            >
+              {p === 'elevenlabs' ? 'ElevenLabs' : p === 'cartesia' ? 'Cartesia' : 'Hume'}
+            </button>
+          ))}
+        </div>
+
+        {cloneProvider === 'hume' ? (
+          <form onSubmit={handleImportHume} className={styles.uploadForm}>
+            <p className={styles.hint}>
+              Paste a Hume custom voice ID to import it. No audio upload needed.
+            </p>
+            <div className={styles.formGroup}>
+              <label htmlFor="hume-name" className={styles.label}>
+                Voice Name
+              </label>
+              <input
+                id="hume-name"
+                type="text"
+                className={styles.nameInput}
+                value={humeName}
+                onChange={(e) => setHumeName(e.target.value)}
+                placeholder="My Hume Voice"
+                required
+                disabled={importingHume}
+                maxLength={100}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="hume-voice-id" className={styles.label}>
+                Hume Voice ID
+              </label>
+              <input
+                id="hume-voice-id"
+                type="text"
+                className={styles.nameInput}
+                value={humeVoiceId}
+                onChange={(e) => setHumeVoiceId(e.target.value)}
+                placeholder="e.g. 9e068547-5ba4-..."
+                required
+                disabled={importingHume}
+                maxLength={200}
+              />
+            </div>
+            <button
+              type="submit"
+              className={styles.cloneButton}
+              disabled={importingHume || !humeName.trim() || !humeVoiceId.trim()}
+            >
+              {importingHume ? (
+                <>
+                  <span className={styles.spinnerSmall} /> Importing...
+                </>
+              ) : (
+                'Import Voice'
+              )}
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleClone} className={styles.uploadForm}>
           <div className={styles.formGroup}>
             <label htmlFor="voice-name" className={styles.label}>
@@ -897,27 +1018,115 @@ export function VoiceManager() {
               maxLength={100}
             />
           </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="voice-file" className={styles.label}>
-              Audio Sample
-            </label>
-            <input
-              id="voice-file"
-              type="file"
-              className={styles.fileInput}
-              accept="audio/*"
-              onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
-              required
+
+          <div className={styles.inputTabs} role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inputTab === 'upload'}
+              className={`${styles.inputTab} ${inputTab === 'upload' ? styles.inputTabActive : ''}`}
+              onClick={() => setInputTab('upload')}
+              disabled={cloning || recorder.isRecording}
+            >
+              Upload File
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={inputTab === 'record'}
+              className={`${styles.inputTab} ${inputTab === 'record' ? styles.inputTabActive : ''}`}
+              onClick={() => setInputTab('record')}
               disabled={cloning}
-            />
-            <p className={styles.hint}>
-              Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
-            </p>
+            >
+              Record Mic
+            </button>
           </div>
+
+          {inputTab === 'upload' ? (
+            <div className={styles.formGroup}>
+              <label htmlFor="voice-file" className={styles.label}>
+                Audio Sample
+              </label>
+              <input
+                id="voice-file"
+                type="file"
+                className={styles.fileInput}
+                accept="audio/*"
+                onChange={(e) => setCloneFile(e.target.files?.[0] || null)}
+                required
+                disabled={cloning}
+              />
+              <p className={styles.hint}>
+                Upload a clear recording (MP3, WAV, M4A). At least 30 seconds for best results.
+              </p>
+            </div>
+          ) : (
+            <div className={styles.recorderSection}>
+              {recorder.error && (
+                <div className={styles.error} role="alert">{recorder.error}</div>
+              )}
+
+              {!recorder.isRecording && !recorder.recordedBlob && (
+                <button
+                  type="button"
+                  className={styles.recordButton}
+                  onClick={recorder.startRecording}
+                  disabled={cloning}
+                  aria-label="Start recording"
+                >
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <circle cx="10" cy="10" r="6" />
+                  </svg>
+                  Start Recording
+                </button>
+              )}
+
+              {recorder.isRecording && (
+                <div className={styles.recorderSection}>
+                  <div className={styles.recordTimer}>
+                    <span className={styles.recordButtonRecording} aria-hidden="true" />
+                    Recording... {recorder.duration}s
+                    {recorder.duration < recorder.minSeconds && (
+                      <span className={styles.hint}> (min {recorder.minSeconds}s)</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.cloneButton}
+                    onClick={recorder.stopRecording}
+                    disabled={recorder.duration < recorder.minSeconds}
+                  >
+                    Stop
+                  </button>
+                </div>
+              )}
+
+              {!recorder.isRecording && recorder.recordedBlob && (
+                <div className={styles.recordPreview}>
+                  <button type="button" className={styles.inputTab} onClick={recorder.playPreview}>
+                    Play Preview
+                  </button>
+                  <button type="button" className={styles.inputTab} onClick={recorder.reset}>
+                    Re-record
+                  </button>
+                  <span className={styles.hint}>{recorder.duration}s recorded</span>
+                </div>
+              )}
+
+              <p className={styles.hint}>
+                Record a clear voice sample. At least 30 seconds for best results.
+              </p>
+            </div>
+          )}
+
           <button
             type="submit"
             className={styles.cloneButton}
-            disabled={cloning || !cloneName.trim() || !cloneFile}
+            disabled={
+              cloning ||
+              !cloneName.trim() ||
+              (inputTab === 'upload' ? !cloneFile : !recorder.recordedBlob)
+            }
           >
             {cloning ? (
               <>
@@ -929,6 +1138,7 @@ export function VoiceManager() {
             )}
           </button>
         </form>
+        )}
       </section>
 
       {verifyingVoice && (

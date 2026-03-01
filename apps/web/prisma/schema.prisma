@@ -1357,7 +1357,7 @@ model VoiceClone {
   similarityMatchesAs     VoiceSimilarityMatch[]      @relation("MatchedVoice")
   blockedMatchesAs        VoiceSimilarityMatch[]      @relation("BlockedVoice")
 
-  @@unique([provider, externalVoiceId])
+  @@unique([userId, provider, externalVoiceId])
   @@index([userId])
   @@index([verificationStatus])
 }
@@ -1365,6 +1365,7 @@ model VoiceClone {
 enum VoiceCloneSource {
   UPLOAD
   RECORD
+  IMPORT
 }
 
 enum VoiceVerificationStatus {
