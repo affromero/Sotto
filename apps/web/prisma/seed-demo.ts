@@ -6,19 +6,19 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Seeding demo data...');
 
-  // ── 1. Demo user (CREATOR) ──────────────────────────────────────
+  // ── 1. Demo user ───────────────────────────────────────────────
   const demoUser = await prisma.user.upsert({
     where: { email: 'demo@sotto.fm' },
     update: {
       name: 'Nico Valerio',
-      role: 'CREATOR',
+      role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
       image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
     create: {
       email: 'demo@sotto.fm',
       name: 'Nico Valerio',
-      role: 'CREATOR',
+      role: 'USER',
       bio: 'Curious mind, lifelong learner. I make podcasts about the things that keep me up at night — from quantum mechanics to ancient philosophy.',
       image: 'https://ui-avatars.com/api/?name=K+B&background=D97706&color=fff&size=256&bold=true&format=png',
     },
@@ -43,13 +43,13 @@ async function main() {
     {
       email: 'maria.chen@example.com',
       name: 'Maria Chen',
-      role: 'CREATOR' as const,
+      role: 'USER' as const,
       seed: 'maria',
     },
     {
       email: 'james.okafor@example.com',
       name: 'James Okafor',
-      role: 'CREATOR' as const,
+      role: 'USER' as const,
       seed: 'james',
     },
     {
@@ -62,7 +62,7 @@ async function main() {
     {
       email: 'priya.sharma@example.com',
       name: 'Priya Sharma',
-      role: 'CREATOR' as const,
+      role: 'USER' as const,
       seed: 'priya',
     },
     { email: 'noah.weber@example.com', name: 'Noah Weber', role: 'USER' as const, seed: 'noah' },
@@ -70,7 +70,7 @@ async function main() {
     {
       email: 'omar.hassan@example.com',
       name: 'Omar Hassan',
-      role: 'CREATOR' as const,
+      role: 'USER' as const,
       seed: 'omar',
     },
     {

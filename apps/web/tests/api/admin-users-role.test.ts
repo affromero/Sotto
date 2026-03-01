@@ -38,7 +38,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
   it('returns 401 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const request = createRequest({ role: 'CREATOR' });
+    const request = createRequest({ role: 'USER' });
     const params = await createParams('user-2');
     const response = await PATCH(request, params);
     const body = await response.json();
@@ -50,7 +50,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
   it('returns 403 when user is not admin', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
-    const request = createRequest({ role: 'CREATOR' });
+    const request = createRequest({ role: 'USER' });
     const params = await createParams('user-2');
     const response = await PATCH(request, params);
     const body = await response.json();
@@ -85,10 +85,10 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
 
   it('updates user role successfully', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
-    const updatedUser = { id: 'user-2', name: 'Test User', email: 'test@test.com', role: 'CREATOR' };
+    const updatedUser = { id: 'user-2', name: 'Test User', email: 'test@test.com', role: 'ADMIN' };
     mockUserUpdate.mockResolvedValue(updatedUser);
 
-    const request = createRequest({ role: 'CREATOR' });
+    const request = createRequest({ role: 'ADMIN' });
     const params = await createParams('user-2');
     const response = await PATCH(request, params);
     const body = await response.json();
@@ -101,7 +101,7 @@ describe('PATCH /api/admin/users/[userId]/role', () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockUserUpdate.mockRejectedValue(new Error('DB error'));
 
-    const request = createRequest({ role: 'CREATOR' });
+    const request = createRequest({ role: 'USER' });
     const params = await createParams('user-2');
     const response = await PATCH(request, params);
     const body = await response.json();
