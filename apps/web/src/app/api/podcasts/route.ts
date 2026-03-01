@@ -5,7 +5,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { createPodcastSchema } from '@/lib/validations';
 import { checkRateLimit } from '@/lib/redis';
 import { contentExtractionQueue, addJob, JobType } from '@/lib/queue';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
@@ -107,6 +107,9 @@ export async function POST(request: NextRequest) {
   // Generation gate: BYOK, PRO, or free tier daily limit
   const gate = await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
+    if (gate.reason === 'generation_in_progress') {
+      return errorResponse('You already have a podcast being generated. Please wait for it to finish.', 403, { code: gate.reason });
+    }
     if (gate.reason === 'daily_limit_reached') {
       const resetH = gate.resetInSeconds ? Math.ceil(gate.resetInSeconds / 3600) : 24;
       return errorResponse(`Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`, 403, { code: gate.reason,
@@ -154,20 +157,13 @@ export async function POST(request: NextRequest) {
     return errorResponse(`Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`, 400, {  });
   }
 
-  // Atomically increment daily free-tier counter BEFORE creating anything (avoids TOCTOU race)
+  // Auto-resolve providers for free-tier users (quota consumed on success by workers)
   let autoResolvedTtsProvider: string | undefined;
   let autoResolvedTtsModel: string | undefined;
   let autoResolvedAiModel: string | undefined;
   let autoResolvedAiProvider: string | undefined;
   if (!gate.isByokUser && !gate.isProUser) {
     const selected = await selectFreeTierProviders(authResult.userId);
-    const ok = await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
-      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
-      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
-    });
-    if (!ok) {
-      return errorResponse('Daily podcast limit reached.', 403, { code: 'daily_limit_reached' });
-    }
     autoResolvedTtsProvider = selected.ttsProvider;
     autoResolvedTtsModel = selected.ttsModel;
     autoResolvedAiModel = selected.aiModel;

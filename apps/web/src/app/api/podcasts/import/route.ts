@@ -8,8 +8,8 @@ import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
 import { getAiKey, getByokKey } from '@/lib/byok';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { checkGenerationGate } from '@/lib/generation-gate';
+
 import { checkRateLimit } from '@/lib/redis';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
@@ -305,18 +305,7 @@ export async function POST(request: NextRequest) {
       sttApiKey,
     });
 
-    // Increment free tier counter for non-BYOK users
-    if (!gate.isByokUser) {
-      const selected = await selectFreeTierProviders(userId);
-      const ok = await tryIncrementFreeGeneration(userId, gate.dailyLimit, {
-        ai: { provider: selected.aiProvider, quota: selected.aiQuota },
-        tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
-      });
-      if (!ok) {
-        await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
-        return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
-      }
-    }
+    // Quota consumed on success by audio-import worker
 
     logger.info('Audio import queued', {
       podcastId: podcast.id,
