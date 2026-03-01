@@ -21,6 +21,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   ACADEMIC: 'Academic',
   NEWS: 'News',
   GOVERNMENT: 'Gov',
+  EDUCATIONAL: 'Edu',
   GENERAL: 'General',
 };
 
@@ -218,7 +219,7 @@ export function ReferenceList({ references }: ReferenceListProps) {
             >
               Sotto Open Verification Standard
             </a>{' '}
-            — domain-aware scoring for academic, news, government, and general sources.
+            — domain-aware scoring for academic, news, government, educational, and general sources.
           </p>
         </div>
       )}

@@ -106,7 +106,7 @@ export async function runReferenceVerification(
       checkPromises.push(verifyDoi(ref));
     }
 
-    if (domain === 'ACADEMIC' || domain === 'GENERAL') {
+    if (domain === 'ACADEMIC' || domain === 'GENERAL' || domain === 'EDUCATIONAL') {
       checkPromises.push(searchTitle(ref));
     }
 
