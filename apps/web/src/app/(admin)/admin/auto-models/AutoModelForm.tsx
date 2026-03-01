@@ -237,50 +237,59 @@ function IncludedModelsEditor({
         </p>
       )}
 
-      <div className={styles.includedModels}>
-        <div className={styles.includedHeader}>
-          <span className={styles.modelNameHeader}>Model</span>
-          <span className={styles.checkboxHeader}>Free</span>
-          <span className={styles.checkboxHeader}>Pro</span>
-        </div>
+      <div className={styles.providerCards}>
+        {providers.filter((p) => p.models.length > 0).map((provider) => (
+          <div key={provider.id} className={styles.providerCard}>
+            <div className={styles.providerCardHeader}>
+              <span className={styles.providerCardName}>{provider.displayName}</span>
+              <span className={styles.providerModelCount}>
+                {provider.models.length} model{provider.models.length !== 1 ? 's' : ''}
+              </span>
+            </div>
 
-        {providers.map((provider) => (
-          <div key={provider.id}>
-            <div className={styles.providerGroup}>{provider.displayName}</div>
-            {provider.models.map((model) => {
-              const key = modelKey(provider.id, model.id);
-              const isFreDefault = key === freeDefault;
-              const isProDefault = key === proDefault;
+            <div className={styles.providerCardBody}>
+              <div className={styles.providerCardColumns}>
+                <span className={styles.modelNameHeader}>Model</span>
+                <span className={styles.checkboxHeader}>Free</span>
+                <span className={styles.checkboxHeader}>Pro</span>
+              </div>
 
-              return (
-                <div key={key} className={styles.modelRow}>
-                  <span className={styles.modelName}>
-                    {model.displayName}
-                    {(isFreDefault || isProDefault) && (
-                      <span className={styles.defaultBadge}>
-                        {isFreDefault && isProDefault ? 'free + pro default' : isFreDefault ? 'free default' : 'pro default'}
-                      </span>
-                    )}
-                  </span>
-                  <label className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={freeIncluded.has(key)}
-                      onChange={(e) => onFreeChange(key, e.target.checked)}
-                    />
-                  </label>
-                  <label className={styles.checkboxCell}>
-                    <input
-                      type="checkbox"
-                      className={styles.checkbox}
-                      checked={proIncluded.has(key)}
-                      onChange={(e) => onProChange(key, e.target.checked)}
-                    />
-                  </label>
-                </div>
-              );
-            })}
+              {provider.models.map((model) => {
+                const key = modelKey(provider.id, model.id);
+                const isFreeDefault = key === freeDefault;
+                const isProDefault = key === proDefault;
+
+                return (
+                  <div key={key} className={styles.modelRow}>
+                    <span className={styles.modelName}>
+                      {model.displayName}
+                      <span className={styles.modelTier}>{model.tier}</span>
+                      {(isFreeDefault || isProDefault) && (
+                        <span className={styles.defaultBadge}>
+                          {isFreeDefault && isProDefault ? 'default' : isFreeDefault ? 'free default' : 'pro default'}
+                        </span>
+                      )}
+                    </span>
+                    <label className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={freeIncluded.has(key)}
+                        onChange={(e) => onFreeChange(key, e.target.checked)}
+                      />
+                    </label>
+                    <label className={styles.checkboxCell}>
+                      <input
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={proIncluded.has(key)}
+                        onChange={(e) => onProChange(key, e.target.checked)}
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ))}
       </div>
@@ -351,12 +360,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     const onFreeChange = (modelId: string, checked: boolean) => {
       setFree((prev) => {
         const next = new Set(prev);
-        if (checked) {
-          next.add(modelId);
-          setPro((p) => new Set(p).add(modelId));
-        } else {
-          next.delete(modelId);
-        }
+        if (checked) next.add(modelId);
+        else next.delete(modelId);
         return next;
       });
     };
@@ -364,16 +369,8 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     const onProChange = (modelId: string, checked: boolean) => {
       setPro((prev) => {
         const next = new Set(prev);
-        if (checked) {
-          next.add(modelId);
-        } else {
-          next.delete(modelId);
-          setFree((f) => {
-            const nf = new Set(f);
-            nf.delete(modelId);
-            return nf;
-          });
-        }
+        if (checked) next.add(modelId);
+        else next.delete(modelId);
         return next;
       });
     };
