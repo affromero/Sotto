@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
 import { getAllProviderMeta, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
-import { resolveAutoModel } from '@/lib/auto-model-config';
+import { getAutoModelConfig, resolveTtsIncludedModels } from '@/lib/auto-model-config';
 import { prisma } from '@/lib/prisma';
 
 import { errorResponse } from '@/lib/api-response';
@@ -44,6 +44,7 @@ interface TtsOption {
   badge?: string;
   group?: string;
   hint?: string;
+  requiredPlan?: 'FREE' | 'PRO';
 }
 
 export async function GET(request: NextRequest) {
@@ -86,24 +87,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ readOnly: false, options });
     }
 
-    // Non-admins: single auto-resolved model, read-only
+    // Non-admins: show included TTS models with plan gating
     const userPlan = (user?.plan ?? 'FREE') as 'FREE' | 'PRO';
-    const autoConfig = await resolveAutoModel(userPlan);
-    const provider = getProviderMeta(autoConfig.ttsProvider as TtsProviderId);
-    const model = provider.models.find((m) => m.id === autoConfig.ttsModel);
+    const autoConfig = await getAutoModelConfig();
+    const { freeTtsModels, proTtsModels } = resolveTtsIncludedModels(autoConfig);
+    const freeSet = new Set(freeTtsModels);
+    const proSet = new Set(proTtsModels);
 
-    return NextResponse.json({
-      readOnly: true,
-      options: model
-        ? [
-            {
-              id: `${provider.id}:${model.id}`,
-              displayName: `${provider.displayName} ${model.displayName}`,
-              badge: QUALITY_BADGES[model.tier],
-            },
-          ]
-        : [],
-    });
+    const options: TtsOption[] = [];
+
+    for (const meta of getAllProviderMeta()) {
+      if (!hasPlatformKey(meta.id)) continue;
+
+      const isKitten = meta.id === 'kittentts';
+      for (const model of meta.models) {
+        const compositeId = `${meta.id}:${model.id}`;
+        if (!proSet.has(compositeId)) continue;
+
+        options.push({
+          id: compositeId,
+          displayName: `${meta.displayName} ${model.displayName}`,
+          badge: QUALITY_BADGES[model.tier],
+          group: isKitten ? 'KittenTTS (Platform)' : (TIER_GROUP_LABELS[model.tier] ?? model.tier),
+          hint: isKitten ? undefined : meta.displayName,
+          requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
+        });
+      }
+    }
+
+    return NextResponse.json({ readOnly: false, userPlan, isByok: false, options });
   }
 
   // BYOK keys present — show models for every valid provider

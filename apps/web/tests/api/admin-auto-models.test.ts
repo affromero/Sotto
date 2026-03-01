@@ -247,4 +247,96 @@ describe('PATCH /api/admin/auto-models', () => {
       'admin-1'
     );
   });
+
+  it('accepts TTS included models in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
+        proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
+        proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3'],
+      },
+      'admin-1'
+    );
+  });
+
+  it('accepts STT included models in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+        proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+        proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+      },
+      'admin-1'
+    );
+  });
+
+  it('rejects when free TTS models are not a subset of pro TTS models', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+        proIncludedTtsModels: ['elevenlabs:eleven_v3'],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
+
+  it('rejects when free STT models are not a subset of pro STT models', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedSttModels: ['openai:whisper-1'],
+        proIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+      })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+  });
+
+  it('accepts null to clear TTS and STT included model overrides', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeIncludedTtsModels: null,
+        proIncludedTtsModels: null,
+        freeIncludedSttModels: null,
+        proIncludedSttModels: null,
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeIncludedTtsModels: null,
+        proIncludedTtsModels: null,
+        freeIncludedSttModels: null,
+        proIncludedSttModels: null,
+      },
+      'admin-1'
+    );
+  });
 });
