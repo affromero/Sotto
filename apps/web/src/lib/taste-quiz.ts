@@ -93,7 +93,7 @@ export async function generateQuestions(
   );
 
   logUsage({
-    service: autoFree.aiProvider === 'openai' ? 'openai' : 'anthropic',
+    service: autoFree.aiProvider,
     model: response.model,
     category: 'taste_quiz',
     inputTokens: response.inputTokens,
