@@ -178,7 +178,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
 
       await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
         userId: podcast.userId,
-        type: 'PODCAST_READY',
+        type: 'PODCAST_FAILED',
         title: 'Podcast generation failed',
         message: `"${podcast.title}" exceeded the ${LIMITS.maxDurationMinutes}-minute duration limit (${Math.round(duration / 60)} minutes). Please try with a shorter duration target.`,
         data: { podcastId },

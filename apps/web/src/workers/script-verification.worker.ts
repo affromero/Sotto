@@ -313,6 +313,24 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       technicalError: `Verification failed ${attemptNumber}/${MAX_VERIFICATION_ATTEMPTS}: ${verdict.feedback}`,
     });
 
+    await prisma.pipelineEvent.create({
+      data: {
+        podcastId,
+        stage: 'script-verification',
+        type: 'error',
+        message: `Verification failed after ${attemptNumber} attempts. Score: ${verdict.score}. ${verdict.feedback}`,
+        metadata: {
+          attemptNumber,
+          score: verdict.score,
+          totalClaims: verdict.totalClaims,
+          unsupported: verdict.unsupportedClaims.length,
+        },
+      },
+    }).catch(err => logger.error('Failed to write PipelineEvent', {
+      podcastId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+
     await prisma.script.update({
       where: { podcastId },
       data: {
@@ -324,7 +342,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
-      type: 'PODCAST_READY',
+      type: 'PODCAST_FAILED',
       title: 'Podcast generation failed',
       message:
         "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
