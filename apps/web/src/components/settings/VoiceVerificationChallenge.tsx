@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import styles from './VoiceVerificationChallenge.module.css';
+import { useAudioRecorder } from '@/lib/hooks/useAudioRecorder';
 
 interface VoiceVerificationChallengeProps {
   voiceCloneId: string;
@@ -28,13 +29,8 @@ export function VoiceVerificationChallenge({
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [status, setStatus] = useState<Status>('loading');
   const [error, setError] = useState<string | null>(null);
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
-  const chunks = useRef<Blob[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recorder = useAudioRecorder({ maxSeconds: 30, minSeconds: 5 });
 
   useEffect(() => {
     let cancelled = false;
@@ -56,79 +52,33 @@ export function VoiceVerificationChallenge({
     })();
     return () => {
       cancelled = true;
-      if (timerRef.current) clearInterval(timerRef.current);
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, [voiceCloneId]);
 
-  async function startRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/mp4';
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-      chunks.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.current.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunks.current, { type: mimeType });
-        setRecordedBlob(blob);
-        setStatus('recorded');
-        if (timerRef.current) clearInterval(timerRef.current);
-      };
-
-      mediaRecorder.current = recorder;
-      recorder.start();
-      setStatus('recording');
-      setRecordingTime(0);
-      setError(null);
-
-      timerRef.current = setInterval(() => {
-        setRecordingTime((t) => {
-          if (t >= 29) {
-            recorder.stop();
-            return 30;
-          }
-          return t + 1;
-        });
-      }, 1000);
-    } catch {
-      setError('Microphone access denied. Please allow microphone access and try again.');
+  async function handleStartRecording() {
+    setError(null);
+    setStatus('recording');
+    await recorder.startRecording();
+    if (recorder.error) {
+      setStatus('ready');
     }
   }
 
-  function stopRecording() {
-    if (mediaRecorder.current?.state === 'recording') {
-      mediaRecorder.current.stop();
-    }
-  }
-
-  function playPreview() {
-    if (!recordedBlob) return;
-    const url = URL.createObjectURL(recordedBlob);
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-    audioRef.current = new Audio(url);
-    audioRef.current.play();
-    audioRef.current.onended = () => URL.revokeObjectURL(url);
+  function handleStopRecording() {
+    recorder.stopRecording();
+    setStatus('recorded');
   }
 
   async function submitRecording() {
-    if (!recordedBlob) return;
+    if (!recorder.recordedBlob) return;
     setStatus('submitting');
     setError(null);
 
     try {
       const formData = new FormData();
       formData.append('voiceCloneId', voiceCloneId);
-      formData.append('audio', recordedBlob, 'challenge.webm');
+      formData.append('audio', recorder.recordedBlob, 'challenge.webm');
 
       const res = await fetch('/api/voices/verify', {
         method: 'POST',
@@ -163,7 +113,7 @@ export function VoiceVerificationChallenge({
         } else if (voice.verificationStatus === 'AWAITING_CHALLENGE') {
           // Failed but has retries — reload challenge
           if (pollRef.current) clearInterval(pollRef.current);
-          setRecordedBlob(null);
+          recorder.reset();
           if (pollData.challenge) {
             setChallenge(pollData.challenge);
             setStatus('ready');
@@ -184,8 +134,7 @@ export function VoiceVerificationChallenge({
   }
 
   function resetRecording() {
-    setRecordedBlob(null);
-    setRecordingTime(0);
+    recorder.reset();
     setStatus('ready');
   }
 
@@ -234,7 +183,7 @@ export function VoiceVerificationChallenge({
                 <button
                   type="button"
                   className={styles.recordBtn}
-                  onClick={startRecording}
+                  onClick={handleStartRecording}
                 >
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <circle cx="10" cy="10" r="6" />
@@ -253,16 +202,16 @@ export function VoiceVerificationChallenge({
                 <div className={styles.recordingState}>
                   <div className={styles.recordingIndicator}>
                     <span className={styles.recordingDot} />
-                    Recording... {recordingTime}s
-                    {recordingTime < 5 && (
-                      <span className={styles.minHint}>(min 5s)</span>
+                    Recording... {recorder.duration}s
+                    {recorder.duration < recorder.minSeconds && (
+                      <span className={styles.minHint}>(min {recorder.minSeconds}s)</span>
                     )}
                   </div>
                   <button
                     type="button"
                     className={styles.stopBtn}
-                    onClick={stopRecording}
-                    disabled={recordingTime < 5}
+                    onClick={handleStopRecording}
+                    disabled={recorder.duration < recorder.minSeconds}
                   >
                     Stop
                   </button>
@@ -271,7 +220,7 @@ export function VoiceVerificationChallenge({
 
               {status === 'recorded' && (
                 <div className={styles.recordedActions}>
-                  <button type="button" className={styles.secondaryBtn} onClick={playPreview}>
+                  <button type="button" className={styles.secondaryBtn} onClick={recorder.playPreview}>
                     Play Preview
                   </button>
                   <button type="button" className={styles.secondaryBtn} onClick={resetRecording}>
