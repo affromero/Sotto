@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listByokProviders } from '@/lib/byok';
-import { getAllProviderMeta, getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import { getAllProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { getAutoModelConfig, resolveTtsIncludedModels } from '@/lib/auto-model-config';
 import { prisma } from '@/lib/prisma';
 

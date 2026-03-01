@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { getAutoModelConfig, resolveSttIncludedModels } from '@/lib/auto-model-config';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
+import { prisma } from '@/lib/prisma';
 
 interface SttProviderInfo {
   id: string;
@@ -103,7 +104,8 @@ export async function GET() {
 
     // Non-BYOK, non-admin: include STT models filtered by included lists
     if (!isByok && !isAdmin) {
-      const userPlan = (session.user.plan ?? 'FREE') as 'FREE' | 'PRO';
+      const dbUser = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
+      const userPlan = (dbUser?.plan ?? 'FREE') as 'FREE' | 'PRO';
       const autoConfig = await getAutoModelConfig();
       const { freeSttModels, proSttModels } = resolveSttIncludedModels(autoConfig);
       const freeSet = new Set(freeSttModels);
