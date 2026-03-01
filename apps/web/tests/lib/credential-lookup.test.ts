@@ -2,9 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGenerateResponse = vi.fn();
 
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
-  WEB_SEARCH_TOOL: { type: 'web_search_20250305', name: 'web_search' },
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: (...args: unknown[]) => mockGenerateResponse(...args) }),
 }));
 
 vi.mock('@/lib/logger', () => ({

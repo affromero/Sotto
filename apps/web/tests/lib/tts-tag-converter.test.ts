@@ -4,8 +4,19 @@ const mockGenerateResponse = vi.fn();
 const mockFetchProviderDocs = vi.fn();
 const mockLogUsage = vi.fn();
 
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: (...args: unknown[]) => mockGenerateResponse(...args) }),
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    ttsProvider: 'elevenlabs',
+    ttsModel: 'eleven_v3',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
+  }),
 }));
 
 vi.mock('@/lib/tts-doc-fetcher', () => ({
@@ -18,10 +29,6 @@ vi.mock('@/lib/usage-logger', () => ({
 
 vi.mock('@/lib/prompt-loader', () => ({
   loadAndRender: vi.fn().mockReturnValue('rendered prompt'),
-}));
-
-vi.mock('@/lib/pricing', () => ({
-  getCheapestModel: vi.fn().mockReturnValue('gpt-5-mini'),
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({

@@ -6,9 +6,9 @@
  * On any failure, returns original turns unchanged — the audio worker's
  * cleanTextForTts() strips remaining tags as a safety net.
  */
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
-import { getCheapestModel } from './pricing';
+import { resolveAutoModel } from './auto-model-config';
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 import { fetchProviderDocs } from './tts-doc-fetcher';
 import { logUsage } from './usage-logger';
@@ -44,18 +44,18 @@ export async function convertTurnsForProvider(
     TURNS_JSON: turnsJson,
   });
 
-  const model = getCheapestModel();
+  const autoConfig = await resolveAutoModel('PLATFORM');
 
   try {
-    const response = await generateResponse(
+    const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
       systemPrompt,
       [{ role: 'user', content: 'Convert the turns above.' }],
-      { model, maxTokens: 4096, skipModeration: true }
+      { model: autoConfig.aiModel, maxTokens: 4096, skipModeration: true }
     );
 
     if (podcastId) {
       logUsage({
-        service: 'anthropic',
+        service: autoConfig.aiProvider,
         model: response.model,
         category: 'tts-tag-conversion',
         inputTokens: response.inputTokens,
