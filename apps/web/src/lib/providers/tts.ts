@@ -76,6 +76,11 @@ async function importReplicate() {
   return ReplicateProvider;
 }
 
+async function importMinimax() {
+  const { MinimaxProvider } = await import('./tts/minimax.provider');
+  return MinimaxProvider;
+}
+
 async function importKittenTts() {
   const { KittenTtsProvider } = await import('./tts/kittentts.provider');
   return KittenTtsProvider;
@@ -213,6 +218,11 @@ export async function createTtsProviderAsync(
       const Cls = await importReplicate();
       return new Cls(apiKey, model);
     }
+    case 'minimax': {
+      if (!apiKey) throw new Error('MiniMax requires an API key');
+      const Cls = await importMinimax();
+      return new Cls(apiKey, model);
+    }
     case 'kittentts': {
       const Cls = await importKittenTts();
       return new Cls();
@@ -321,6 +331,10 @@ export async function resolveTtsProvider(context: {
     if (requestedProvider === 'replicate' && process.env.REPLICATE_API_TOKEN) {
       const provider = await createTtsProviderAsync('replicate', process.env.REPLICATE_API_TOKEN, undefined, requestedModel ?? undefined);
       return { provider, source: 'platform', providerId: 'replicate' };
+    }
+    if (requestedProvider === 'minimax' && process.env.FAL_KEY) {
+      const provider = await createTtsProviderAsync('minimax', process.env.FAL_KEY, undefined, requestedModel ?? undefined);
+      return { provider, source: 'platform', providerId: 'minimax' };
     }
 
     // No key available for requested provider
