@@ -13,7 +13,7 @@ const mockLikeFindUnique = vi.fn();
 const mockSaveFindUnique = vi.fn();
 const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
-const mockTryIncrementFreeGeneration = vi.fn();
+
 const mockGetFreeTierStatus = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
 const mockResolveAutoModel = vi.fn().mockResolvedValue({
@@ -84,7 +84,6 @@ vi.mock('@/lib/queue', () => ({
 
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
   getFreeTierStatus: (...args: unknown[]) => mockGetFreeTierStatus(...args),
 }));
 

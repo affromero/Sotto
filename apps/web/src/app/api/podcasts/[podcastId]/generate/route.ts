@@ -14,7 +14,7 @@ import {
   addJob,
   JobType,
 } from '@/lib/queue';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { checkGenerationGate } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
@@ -211,21 +211,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   await addJob(contentExtractionQueue, JobType.EXTRACT_CONTENT, payload);
 
-  if (useAdminCredits) {
-    // Use platform API keys: write AI model only — TTS deferred to script approval
-    const selected = await selectFreeTierProviders(podcast.userId);
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { aiModel: selected.aiModel },
-    });
-  } else if (!gate.isByokUser) {
-    // Increment free tier counter (skip for FAILED retries — already counted)
-    const selected = await selectFreeTierProviders(authResult.userId);
-    await tryIncrementFreeGeneration(authResult.userId, gate.dailyLimit, {
-      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
-      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
-    });
-    // Write AI model only — TTS deferred to script approval
+  if (useAdminCredits || !gate.isByokUser) {
+    // Auto-resolve providers — quota consumed on success by workers
+    const selected = await selectFreeTierProviders(useAdminCredits ? podcast.userId : authResult.userId);
     await prisma.podcast.update({
       where: { id: podcastId },
       data: { aiModel: selected.aiModel },
