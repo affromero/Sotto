@@ -29,10 +29,15 @@ const mockPrismaSegmentCreate = vi.fn().mockImplementation((args) => ({
 
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({ aiModel: null });
-const mockPrismaTagFindUnique = vi
+const mockPrismaTagFindMany = vi
   .fn()
-  .mockResolvedValue({ id: 'tag-general', slug: 'general-audience' });
+  .mockResolvedValue([
+    { id: 'tag-general', slug: 'general-audience' },
+    { id: 'tag-prod', slug: 'prod-ai-generated' },
+    { id: 'tag-explainer', slug: 'type-explainer' },
+  ]);
 const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
+const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -57,10 +62,13 @@ vi.mock('@/lib/prisma', () => {
       findUniqueOrThrow: (...args: unknown[]) => mockPrismaPodcastFindUniqueOrThrow(...args),
     },
     tag: {
-      findUnique: (...args: unknown[]) => mockPrismaTagFindUnique(...args),
+      findMany: (...args: unknown[]) => mockPrismaTagFindMany(...args),
     },
     podcastTag: {
       upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
+    },
+    pipelineEvent: {
+      create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
