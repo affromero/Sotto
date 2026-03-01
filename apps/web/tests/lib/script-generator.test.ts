@@ -1163,7 +1163,7 @@ describe('generateScriptWithFeedback', () => {
       expect.any(String),
       expect.any(Array),
       expect.objectContaining({
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        useWebSearch: true,
       })
     );
   });

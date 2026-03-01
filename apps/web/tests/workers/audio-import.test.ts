@@ -178,6 +178,11 @@ vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' }),
+  getCheapestModelForProvider: vi.fn().mockReturnValue('claude-haiku-4-5-20251001'),
+}));
+
 const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/lib/generation-gate', () => ({
   consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),

@@ -328,7 +328,8 @@ describe('processReferenceValidation', () => {
         ]),
         'Quantum Computing Basics',
         undefined,
-        expect.any(String)
+        expect.any(String),
+        'anthropic'
       );
     });
 
