@@ -13,6 +13,7 @@ import {
   type PipelineErrorSortCol,
   type DiscoveryChatErrorSortCol,
 } from '@/lib/pipeline-events';
+import { getVoiceUsageByProvider, getTopVoices } from '@/lib/voice-metrics';
 import { subDays, startOfDay } from 'date-fns';
 import Link from 'next/link';
 import { CopyButton } from '@/components/admin/CopyButton';
@@ -124,6 +125,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const [
     funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats,
     inProgress, recentlySucceeded, draftAbandonment,
+    voiceByProvider, topVoices,
   ] = await Promise.all([
     getFreeTierFunnel(),
     getByokAdoption(),
@@ -134,12 +136,15 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     getInProgressPipelines(),
     getRecentlySucceeded(since, until),
     getDraftAbandonmentMetrics(since, until),
+    getVoiceUsageByProvider(since),
+    getTopVoices(since),
   ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
   const maxAi = Math.max(...adoption.ai.map((a) => a.count), 1);
   const maxTts = Math.max(...adoption.tts.map((t) => t.count), 1);
   const maxDay = Math.max(...errorStats.daily.map((d) => d.total), 1);
+  const maxVoiceAssignments = Math.max(...voiceByProvider.map((v) => v.totalAssignments), 1);
   const CHART_HEIGHT = 72;
 
   // Preserve all current params, then override specific ones
@@ -672,6 +677,63 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
           </div>
         )}
       </section>
+
+      {/* Voice Usage */}
+      <div className={styles.columns}>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Voices by Provider ({rangeLabel})</h2>
+          {voiceByProvider.length === 0 ? (
+            <p className={styles.empty}>No voice assignments yet.</p>
+          ) : (
+            <div className={styles.hBarContainer}>
+              {voiceByProvider.map((v) => (
+                <div key={v.provider} className={styles.hBarRow}>
+                  <span className={styles.hBarLabel}>{v.provider}</span>
+                  <div className={styles.hBarTrack}>
+                    <div
+                      className={styles.hBarFill}
+                      style={{ width: `${(v.totalAssignments / maxVoiceAssignments) * 100}%` }}
+                    />
+                  </div>
+                  <span className={styles.hBarValue}>
+                    {v.totalAssignments} ({v.uniqueVoices} voices)
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Most Used Voices ({rangeLabel})</h2>
+          {topVoices.length === 0 ? (
+            <p className={styles.empty}>No voice data yet.</p>
+          ) : (
+            <div className={styles.tableContainer}>
+              <table className={styles.recentTable}>
+                <thead>
+                  <tr>
+                    <th>Provider</th>
+                    <th>Voice ID</th>
+                    <th>Podcasts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topVoices.map((v) => (
+                    <tr key={`${v.provider}-${v.voiceId}`}>
+                      <td>{v.provider}</td>
+                      <td className={styles.errorCell}>
+                        {v.voiceId.length > 24 ? `${v.voiceId.slice(0, 24)}…` : v.voiceId}
+                      </td>
+                      <td>{v.podcastCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

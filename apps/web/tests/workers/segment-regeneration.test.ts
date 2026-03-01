@@ -17,6 +17,7 @@ const mockPrismaPodcastFindUniqueOrThrow = vi.fn().mockResolvedValue({
 
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaVoiceTrackUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+const mockPrismaPodcastVoiceUpsert = vi.fn().mockResolvedValue({});
 
 const mockPrismaTransaction = vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => {
   const tx = {
@@ -48,6 +49,9 @@ vi.mock('@/lib/prisma', () => {
     },
     voiceTrack: {
       updateMany: (...args: unknown[]) => mockPrismaVoiceTrackUpdateMany(...args),
+    },
+    podcastVoice: {
+      upsert: (...args: unknown[]) => mockPrismaPodcastVoiceUpsert(...args),
     },
     $transaction: (fn: (tx: unknown) => Promise<unknown>) => mockPrismaTransaction(fn),
   };
@@ -292,6 +296,18 @@ describe('processSegmentRegeneration', () => {
       expect(mockPremiumGenerateSpeech).toHaveBeenCalledWith(
         expect.objectContaining({ voiceId: 'pool-voice' })
       );
+    });
+
+    it('persists resolved voice when no PodcastVoice row exists', async () => {
+      mockProviderGetVoiceId.mockReturnValue('pool-voice-xyz');
+      const job = createMockJob(defaultPayload);
+      await processSegmentRegeneration(job);
+
+      expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
+        where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'EXPERT' } },
+        update: { voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
+        create: { podcastId: 'podcast-001', speaker: 'EXPERT', voiceId: 'pool-voice-xyz', provider: 'elevenlabs' },
+      });
     });
   });
 

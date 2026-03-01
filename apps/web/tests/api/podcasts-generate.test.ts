@@ -498,22 +498,25 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
       });
     });
 
-    it('clears locked provider when no body is provided (bare retry)', async () => {
+    it('preserves ttsProvider when no body is provided (bare retry)', async () => {
       const request = createMockRequest();
       const params = await createMockParams('podcast-fail');
       const response = await POST(request, params);
 
       expect(response.status).toBe(200);
-      expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'podcast-fail' },
-          data: { ttsProvider: null, ttsModel: null },
-        })
+      // Bare retry should NOT clear ttsProvider — keeps same voices on retry.
+      // The queue failure handler clears ttsProvider for key invalidation errors.
+      const updateCalls = mockPrismaPodcastUpdate.mock.calls.map(
+        (c: unknown[]) => c[0] as { where?: { id?: string }; data?: { ttsProvider?: unknown } }
       );
+      const providerClearCall = updateCalls.find(
+        (c) => c.data?.ttsProvider === null && c.where?.id === 'podcast-fail'
+      );
+      expect(providerClearCall).toBeUndefined();
       expect(mockPrismaPodcastVoiceDeleteMany).not.toHaveBeenCalled();
     });
 
-    it('clears ttsProvider/ttsModel on SCRIPT_READY resume', async () => {
+    it('clears ttsProvider/ttsModel and PodcastVoice on SCRIPT_READY resume', async () => {
       mockDetermineResumePoint.mockResolvedValue({ step: 'SCRIPT_READY' });
 
       const request = createMockRequest();
@@ -532,6 +535,10 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
           }),
         })
       );
+      // Stale voice assignments should be cleared on re-approval
+      expect(mockPrismaPodcastVoiceDeleteMany).toHaveBeenCalledWith({
+        where: { podcastId: 'podcast-fail' },
+      });
     });
   });
 
