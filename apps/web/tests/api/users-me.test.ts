@@ -24,6 +24,12 @@ vi.mock('@/lib/api-keys', () => ({
   authenticateRequest: (...args: unknown[]) => mockAuthenticateRequest(...args),
 }));
 
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getProviderForModel: vi.fn((id: string) =>
+    id.includes('claude') ? 'anthropic' : id.includes('gpt') ? 'openai' : null
+  ),
+}));
+
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
@@ -355,5 +361,35 @@ describe('PATCH /api/users/me', () => {
     const response = await PATCH(request);
 
     expect(response.status).toBe(200);
+  });
+
+  it('updates preferredAiModel successfully', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      preferredAiModel: 'claude-sonnet-4-6',
+    });
+
+    const request = createPatchRequest({ preferredAiModel: 'claude-sonnet-4-6' });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.preferredAiModel).toBe('claude-sonnet-4-6');
+  });
+
+  it('clears preferredAiModel when set to null', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.user.update.mockResolvedValue({
+      ...mockUser,
+      preferredAiModel: null,
+    });
+
+    const request = createPatchRequest({ preferredAiModel: null });
+    const response = await PATCH(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.preferredAiModel).toBeNull();
   });
 });

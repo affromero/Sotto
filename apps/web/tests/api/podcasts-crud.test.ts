@@ -29,6 +29,7 @@ const mockAddJob = vi.fn();
 const mockAuthenticateRequest = vi.fn();
 const mockCheckRateLimit = vi.fn();
 const mockAuth = vi.fn();
+const mockUserFindUnique = vi.fn();
 const mockUserFindUniqueOrThrow = vi.fn();
 
 const mockTransaction = vi.fn();
@@ -57,6 +58,7 @@ vi.mock('@/lib/prisma', () => {
       create: vi.fn().mockReturnValue({ catch: vi.fn() }),
     },
     user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
       findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args),
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
@@ -308,6 +310,7 @@ describe('GET /api/podcasts', () => {
 describe('POST /api/podcasts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue({ preferredAiModel: null });
   });
 
   it('returns 401 when not authenticated', async () => {

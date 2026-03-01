@@ -169,8 +169,10 @@ export function SettingsForm({
   const [twitterSaved, setTwitterSaved] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
-  // Twitter model preference state
+  // AI model preference state (general, not Twitter-specific)
   const [preferredAiModel, setPreferredAiModel] = useState(initialPreferredAiModel ?? '');
+  const [aiPrefSaving, setAiPrefSaving] = useState(false);
+  const [aiPrefSaved, setAiPrefSaved] = useState(false);
   const [preferredTtsOption, setPreferredTtsOption] = useState(
     initialPreferredTtsProvider && initialPreferredTtsModel
       ? `${initialPreferredTtsProvider}:${initialPreferredTtsModel}`
@@ -180,7 +182,6 @@ export function SettingsForm({
   const [ttsOptions, setTtsOptions] = useState<Array<{ id: string; displayName: string; badge?: string; group?: string }>>([]);
 
   useEffect(() => {
-    if (!isTwitterConnected) return;
     Promise.all([
       fetch('/api/ai-models').then((r) => r.ok ? r.json() : null),
       fetch('/api/tts-options').then((r) => r.ok ? r.json() : null),
@@ -188,7 +189,7 @@ export function SettingsForm({
       if (aiData?.models) setAiModelOptions(aiData.models);
       if (ttsData?.options) setTtsOptions(ttsData.options.filter((o: { id: string }) => o.id !== 'auto'));
     }).catch(() => {});
-  }, [isTwitterConnected]);
+  }, []);
 
   // Taste quiz state
   const [quizCount, setQuizCount] = useState(quizAnswerCount);
@@ -273,7 +274,6 @@ export function SettingsForm({
         body: JSON.stringify({
           twitterEnabled,
           voicePreferences: voicePrefs,
-          preferredAiModel: preferredAiModel || null,
           preferredTtsProvider: preferredTtsOption ? preferredTtsOption.split(':')[0] : null,
           preferredTtsModel: preferredTtsOption ? preferredTtsOption.split(':').slice(1).join(':') : null,
         }),
@@ -721,6 +721,63 @@ export function SettingsForm({
         </div>
       </section>
 
+      {/* AI Preferences Section */}
+      {aiModelOptions.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>AI Preferences</h2>
+          <p className={styles.sectionDesc}>
+            Choose your default AI model for new podcasts. You can override this per-podcast
+            in the creation flow.
+          </p>
+          <div className={styles.form}>
+            <div className={styles.fieldGroup}>
+              <label htmlFor="preferredAiModel" className={styles.fieldLabel}>
+                Default AI Model
+              </label>
+              <select
+                id="preferredAiModel"
+                className={styles.twitterSelect}
+                value={preferredAiModel}
+                onChange={(e) => setPreferredAiModel(e.target.value)}
+                aria-label="Preferred AI model for podcast generation"
+              >
+                <option value="">System default (Auto)</option>
+                {aiModelOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}{m.group ? ` (${m.group})` : ''} &mdash; {m.tier}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.formActions}>
+              <Button
+                onClick={async () => {
+                  setAiPrefSaving(true);
+                  setAiPrefSaved(false);
+                  try {
+                    const response = await fetch('/api/users/me', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ preferredAiModel: preferredAiModel || null }),
+                    });
+                    if (response.ok) {
+                      setAiPrefSaved(true);
+                      setTimeout(() => setAiPrefSaved(false), 3000);
+                    }
+                  } finally {
+                    setAiPrefSaving(false);
+                  }
+                }}
+                loading={aiPrefSaving}
+                disabled={aiPrefSaving}
+              >
+                {aiPrefSaved ? 'Saved' : 'Save AI Preference'}
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Twitter Integration Section */}
       {isTwitterProviderAvailable && (
         <section className={styles.section}>
@@ -775,55 +832,31 @@ export function SettingsForm({
                 />
               ))}
 
-              {(aiModelOptions.length > 0 || ttsOptions.length > 0) && (
+              {ttsOptions.length > 0 && (
                 <>
                   <p className={styles.twitterModelHint}>
-                    Override the default AI and voice models for your Twitter-generated podcasts.
+                    Override the default voice model for your Twitter-generated podcasts.
                   </p>
 
-                  {aiModelOptions.length > 0 && (
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="twitterAiModel" className={styles.fieldLabel}>
-                        AI Model
-                      </label>
-                      <select
-                        id="twitterAiModel"
-                        className={styles.twitterSelect}
-                        value={preferredAiModel}
-                        onChange={(e) => setPreferredAiModel(e.target.value)}
-                        aria-label="Preferred AI model for Twitter podcasts"
-                      >
-                        <option value="">System default</option>
-                        {aiModelOptions.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.displayName}{m.group ? ` (${m.group})` : ''} — {m.tier}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {ttsOptions.length > 0 && (
-                    <div className={styles.fieldGroup}>
-                      <label htmlFor="twitterTtsOption" className={styles.fieldLabel}>
-                        Voice Model
-                      </label>
-                      <select
-                        id="twitterTtsOption"
-                        className={styles.twitterSelect}
-                        value={preferredTtsOption}
-                        onChange={(e) => setPreferredTtsOption(e.target.value)}
-                        aria-label="Preferred voice model for Twitter podcasts"
-                      >
-                        <option value="">System default</option>
-                        {ttsOptions.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.displayName}{o.badge ? ` — ${o.badge}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <div className={styles.fieldGroup}>
+                    <label htmlFor="twitterTtsOption" className={styles.fieldLabel}>
+                      Voice Model
+                    </label>
+                    <select
+                      id="twitterTtsOption"
+                      className={styles.twitterSelect}
+                      value={preferredTtsOption}
+                      onChange={(e) => setPreferredTtsOption(e.target.value)}
+                      aria-label="Preferred voice model for Twitter podcasts"
+                    >
+                      <option value="">System default</option>
+                      {ttsOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.displayName}{o.badge ? ` — ${o.badge}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
 
