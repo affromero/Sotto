@@ -85,8 +85,11 @@ export default async function CreatePage({
     ? tierFeatures.maxDurationMinutes
     : LIMITS.maxDurationMinutes;
 
+  // dailyLimit === 0 is the sentinel for admin-granted unlimited override
+  const isUnlimitedOverride = gate.dailyLimit === 0;
+
   const freeTier =
-    gate.isByokUser || gate.isProUser
+    gate.isByokUser || gate.isProUser || isUnlimitedOverride
       ? null
       : {
           used: gate.freeGenerationsUsed,

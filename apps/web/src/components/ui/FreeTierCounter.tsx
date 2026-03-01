@@ -27,6 +27,15 @@ export function FreeTierCounter({
     );
   }
 
+  // dailyLimit === 0 is the sentinel for unlimited (admin dailyGenerationOverride = 0)
+  if (dailyLimit === 0) {
+    return (
+      <span className={`${styles.pill} ${styles.pro}`} aria-label="Unlimited generation">
+        Unlimited
+      </span>
+    );
+  }
+
   const remaining = Math.max(0, dailyLimit - dailyUsed);
   const variant = remaining === 0 ? 'exhausted' : remaining <= 1 ? 'warning' : 'default';
 
