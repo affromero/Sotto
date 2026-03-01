@@ -16,26 +16,28 @@ interface HumeVoice {
 interface HumeVoiceBrowserProps {
   selectedVoiceId?: string;
   onSelect: (voiceId: string, voiceName: string) => void;
+  showCustomTab?: boolean;
 }
 
-export function HumeVoiceBrowser({ selectedVoiceId, onSelect }: HumeVoiceBrowserProps) {
+export function HumeVoiceBrowser({ selectedVoiceId, onSelect, showCustomTab }: HumeVoiceBrowserProps) {
   const [voices, setVoices] = useState<HumeVoice[]>([]);
   const [allVoices, setAllVoices] = useState<HumeVoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [voiceTab, setVoiceTab] = useState<'library' | 'custom'>('library');
 
-  const loadVoices = useCallback(async () => {
+  const loadVoices = useCallback(async (provider?: string) => {
     setLoading(true);
     setError(null);
     try {
-      // Load all pages
       const all: HumeVoice[] = [];
       let page = 0;
       let totalPages = 1;
+      const providerParam = provider ? `&provider=${provider}` : '';
       while (page < totalPages) {
-        const res = await fetch(`/api/voices/hume?page=${page}`);
+        const res = await fetch(`/api/voices/hume?page=${page}${providerParam}`);
         if (!res.ok) {
           const data = await res.json();
           throw new Error(data.error || 'Failed to load voices');
@@ -54,8 +56,8 @@ export function HumeVoiceBrowser({ selectedVoiceId, onSelect }: HumeVoiceBrowser
   }, []);
 
   useEffect(() => {
-    loadVoices();
-  }, [loadVoices]);
+    loadVoices(voiceTab === 'custom' ? 'CUSTOM_VOICE' : undefined);
+  }, [loadVoices, voiceTab]);
 
   useEffect(() => {
     let filtered = allVoices;
@@ -87,7 +89,7 @@ export function HumeVoiceBrowser({ selectedVoiceId, onSelect }: HumeVoiceBrowser
     return (
       <div className={styles.error}>
         <p>{error}</p>
-        <button type="button" className={styles.retryButton} onClick={loadVoices}>
+        <button type="button" className={styles.retryButton} onClick={() => loadVoices(voiceTab === 'custom' ? 'CUSTOM_VOICE' : undefined)}>
           Try again
         </button>
       </div>
@@ -96,6 +98,28 @@ export function HumeVoiceBrowser({ selectedVoiceId, onSelect }: HumeVoiceBrowser
 
   return (
     <div className={styles.container}>
+      {showCustomTab && (
+        <div className={styles.genderPills} role="tablist" style={{ marginBottom: '0.75rem' }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={voiceTab === 'library'}
+            className={`${styles.pill} ${voiceTab === 'library' ? styles.pillActive : ''}`}
+            onClick={() => setVoiceTab('library')}
+          >
+            Library
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={voiceTab === 'custom'}
+            className={`${styles.pill} ${voiceTab === 'custom' ? styles.pillActive : ''}`}
+            onClick={() => setVoiceTab('custom')}
+          >
+            My Voices
+          </button>
+        </div>
+      )}
       <div className={styles.filters}>
         <div className={styles.searchWrapper}>
           <svg className={styles.searchIcon} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

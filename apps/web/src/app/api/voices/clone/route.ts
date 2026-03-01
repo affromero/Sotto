@@ -5,7 +5,7 @@ import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
 import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
 import { cloneVoiceViaCartesia } from '@/lib/cartesia-voice-clone';
 import { getByokKey, hasByokKey } from '@/lib/byok';
-import { cloneVoiceSchema } from '@/lib/validations';
+import { cloneVoiceSchema, importVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logUsage } from '@/lib/usage-logger';
@@ -49,6 +49,28 @@ export async function POST(request: NextRequest) {
   const sourceType = formData.get('sourceType') as string;
   const provider = (formData.get('provider') as string) || 'elevenlabs';
   const audioFile = formData.get('audio') as File | null;
+
+  // Hume import flow — no audio file needed
+  if (provider === 'hume') {
+    const externalVoiceId = formData.get('externalVoiceId') as string;
+    const importParsed = importVoiceSchema.safeParse({ name, externalVoiceId, provider });
+    if (!importParsed.success) {
+      return errorResponse(importParsed.error.flatten(), 400);
+    }
+
+    const voiceClone = await prisma.voiceClone.create({
+      data: {
+        userId: session.user.id,
+        name: importParsed.data.name,
+        provider: 'hume',
+        externalVoiceId: importParsed.data.externalVoiceId,
+        sourceType: 'IMPORT',
+        verificationStatus: 'ADMIN_VERIFIED',
+      },
+    });
+
+    return NextResponse.json(voiceClone, { status: 201 });
+  }
 
   const parsed = cloneVoiceSchema.safeParse({ name, sourceType });
   if (!parsed.success) {
@@ -223,8 +245,10 @@ export async function DELETE(request: NextRequest) {
     return errorResponse('Forbidden', 403);
   }
 
-  // Delete from external provider
-  if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
+  // Delete from external provider (skip for hume — imported voice, not ours to delete)
+  if (voiceClone.provider === 'hume') {
+    // Imported voice — no external cleanup needed
+  } else if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
     const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
     await deleteClonedVoice(voiceClone.externalVoiceId, elevenLabsKey ?? undefined);
   } else if (voiceClone.provider === 'cartesia') {

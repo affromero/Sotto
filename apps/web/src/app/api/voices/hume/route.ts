@@ -40,9 +40,15 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '0', 10);
   const gender = searchParams.get('gender')?.toUpperCase();
   const language = searchParams.get('language');
+  const voiceProvider = searchParams.get('provider') || 'HUME_AI';
+
+  // Custom voices require a BYOK key (no platform key fallback)
+  if (voiceProvider === 'CUSTOM_VOICE' && !byokKey) {
+    return errorResponse('Hume BYOK key required to browse custom voices', 400);
+  }
 
   const url = new URL('https://api.hume.ai/v0/tts/voices');
-  url.searchParams.set('provider', 'HUME_AI');
+  url.searchParams.set('provider', voiceProvider);
   url.searchParams.set('page_size', '100');
   url.searchParams.set('page_number', String(page));
 

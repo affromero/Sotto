@@ -19,6 +19,7 @@ interface VoiceClone {
   name: string;
   externalVoiceId: string;
   sourceType: string;
+  provider: string;
   createdAt: string;
 }
 
@@ -236,10 +237,32 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
               {speaker.name} Voice
             </span>
             {ttsProvider === 'hume' ? (
-              <HumeVoiceBrowser
-                selectedVoiceId={selectedVoiceId}
-                onSelect={(voiceId) => handleSelectVoice(speaker.name, voiceId)}
-              />
+              <>
+                {userClones.filter((c) => c.provider === 'hume').length > 0 && (
+                  <>
+                    <span className={styles.clonesLabel}>Your Hume Voices</span>
+                    <div className={styles.voiceGrid}>
+                      {userClones.filter((c) => c.provider === 'hume').map((clone) => (
+                        <VoiceCard
+                          key={clone.externalVoiceId}
+                          voiceId={clone.externalVoiceId}
+                          name={clone.name}
+                          accent="imported"
+                          character="Hume custom voice"
+                          isSelected={selectedVoiceId === clone.externalVoiceId}
+                          onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
+                          provider="hume"
+                        />
+                      ))}
+                    </div>
+                    <div className={styles.separator} />
+                  </>
+                )}
+                <HumeVoiceBrowser
+                  selectedVoiceId={selectedVoiceId}
+                  onSelect={(voiceId) => handleSelectVoice(speaker.name, voiceId)}
+                />
+              </>
             ) : (
               <>
                 {userClones.length > 0 && (
