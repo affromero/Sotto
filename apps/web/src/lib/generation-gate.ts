@@ -2,7 +2,6 @@ import { prisma } from './prisma';
 import { hasByokKey } from './byok';
 import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
 import { getRedisClient } from './redis';
-import { logger } from './logger';
 import { getReferralBonus, getActiveReferralCount } from './referrals';
 
 export interface ProviderQuotaStatus {
@@ -16,15 +15,12 @@ export interface ProviderQuotaStatus {
 export type GateReason =
   | 'ok'
   | 'no_provider'
-  | 'free_tier_exhausted'
   | 'daily_limit_reached'
   | 'generation_in_progress';
 
 export interface GenerationGateResult {
   allowed: boolean;
   reason: GateReason;
-  freeGenerationsUsed: number;
-  freeGenerationsLimit: number;
   dailyUsed: number;
   dailyLimit: number;
   resetInSeconds?: number;
@@ -97,7 +93,7 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
+      select: { role: true, plan: true, dailyGenerationOverride: true },
     }),
   ]);
 
@@ -116,8 +112,6 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
   const effectiveDailyLimit = baseLimit + referralBonus;
 
   const baseResult = {
-    freeGenerationsUsed: user.freeGenerationsUsed,
-    freeGenerationsLimit: config.generationLimit,
     dailyUsed: 0,
     dailyLimit: effectiveDailyLimit,
     isByokUser,
@@ -205,16 +199,6 @@ export async function tryIncrementFreeGeneration(
   const result = await redis.eval(lua, 1, key, String(limit));
   if (result === -1) return false;
 
-  // Increment lifetime analytics counter asynchronously (non-blocking)
-  prisma.user
-    .update({
-      where: { id: userId },
-      data: { freeGenerationsUsed: { increment: 1 } },
-    })
-    .catch((err) => {
-      logger.warn('Failed to increment freeGenerationsUsed', { userId, error: err instanceof Error ? err.message : String(err) });
-    });
-
   // Per-provider TTS usage tracking
   if (providerUsage?.tts) {
     const { provider, quota } = providerUsage.tts;
@@ -268,16 +252,6 @@ export async function consumeFreeGeneration(
   `;
   await redis.eval(lua, 1, key);
 
-  // Increment lifetime analytics counter (non-blocking)
-  prisma.user
-    .update({
-      where: { id: userId },
-      data: { freeGenerationsUsed: { increment: 1 } },
-    })
-    .catch((err) => {
-      logger.warn('Failed to increment freeGenerationsUsed', { userId, error: err instanceof Error ? err.message : String(err) });
-    });
-
   // Per-provider TTS usage tracking
   if (providerUsage?.tts) {
     const { provider, quota } = providerUsage.tts;
@@ -307,9 +281,6 @@ export async function consumeFreeGeneration(
  * Get free tier status for display purposes (dashboard, billing).
  */
 export async function getFreeTierStatus(userId: string): Promise<{
-  freeGenerationsUsed: number;
-  freeGenerationsLimit: number;
-  freeGenerationsRemaining: number;
   dailyUsed: number;
   dailyLimit: number;
   dailyRemaining: number;
@@ -324,7 +295,7 @@ export async function getFreeTierStatus(userId: string): Promise<{
     getFreeTierConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { freeGenerationsUsed: true, role: true, plan: true, dailyGenerationOverride: true },
+      select: { role: true, plan: true, dailyGenerationOverride: true },
     }),
     getDailyCount(userId),
   ]);
@@ -343,9 +314,6 @@ export async function getFreeTierStatus(userId: string): Promise<{
   const effectiveDailyLimit = baseLimit + referralBonus;
 
   const base = {
-    freeGenerationsUsed: user.freeGenerationsUsed,
-    freeGenerationsLimit: config.generationLimit,
-    freeGenerationsRemaining: Math.max(0, config.generationLimit - user.freeGenerationsUsed),
     dailyUsed: dailyData.count,
     dailyLimit: effectiveDailyLimit,
     dailyRemaining: effectiveDailyLimit === 0 ? Infinity : Math.max(0, effectiveDailyLimit - dailyData.count),

@@ -88,8 +88,8 @@ vi.mock('@/lib/pipeline-resume', () => ({
   determineResumePoint: (...args: unknown[]) => mockDetermineResumePoint(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3, ttsAllocations: [], aiAllocations: [] });
+const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', dailyGenerationLimit: 3, ttsAllocations: [], aiAllocations: [] });
 
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
@@ -190,7 +190,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRequireAdmin.mockResolvedValue(null); // non-admin by default
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
     mockPrismaPodcastUpdate.mockResolvedValue({});
     mockAddJob.mockResolvedValue({ id: 'job-1' });
@@ -261,7 +261,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
 
   it('returns 403 when TTS provider not configured', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-001' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
 
     const request = createMockRequest();
     const params = await createMockParams('podcast-noai');
@@ -586,7 +586,7 @@ describe('POST /api/podcasts/[podcastId]/generate', () => {
     it('admin skips generation gate', async () => {
       mockRequireAdmin.mockResolvedValue('admin-user-id');
       mockAuthenticateRequest.mockResolvedValue({ userId: 'admin-user-id' });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false, freeGenerationsUsed: 0, freeGenerationsLimit: 0 });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
       mockPrismaPodcastFindUnique.mockResolvedValue({
         id: 'podcast-gate-admin',
         userId: 'admin-user-id',

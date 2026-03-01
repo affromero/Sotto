@@ -104,9 +104,6 @@ describe('GET /api/billing/usage', () => {
     mockListByokProviders.mockResolvedValue([{ provider: 'elevenlabs', isValid: true }]);
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
     mockGetFreeTierStatus.mockResolvedValue({
-      freeGenerationsUsed: 3,
-      freeGenerationsLimit: 5,
-      freeGenerationsRemaining: 2,
       isByokUser: true,
     });
     const { hasByokKey } = await import('@/lib/byok');
@@ -146,9 +143,6 @@ describe('GET /api/billing/usage', () => {
     mockListByokProviders.mockResolvedValue([]);
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE', role: 'USER' });
     mockGetFreeTierStatus.mockResolvedValue({
-      freeGenerationsUsed: 1,
-      freeGenerationsLimit: 5,
-      freeGenerationsRemaining: 4,
       isByokUser: false,
     });
     const { getTierFeatures } = await import('@/lib/tier-features');

@@ -327,7 +327,7 @@ describe('POST /api/podcasts', () => {
   it('creates podcast and queues extraction pipeline', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue({
@@ -352,7 +352,7 @@ describe('POST /api/podcasts', () => {
   it('creates podcast with optional voice IDs', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockCheckRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockDiscoveryCreate.mockResolvedValue({ id: 'disc-1' });
     mockAddJob.mockResolvedValue(undefined);
     mockPrisma.podcast.create.mockResolvedValue(mockPodcast);

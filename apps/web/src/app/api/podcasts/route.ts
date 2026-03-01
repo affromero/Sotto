@@ -115,11 +115,7 @@ export async function POST(request: NextRequest) {
       return errorResponse(`Daily podcast limit reached. Next podcast available in ~${resetH}h. Upgrade to Pro for unlimited generation.`, 403, { code: gate.reason,
           resetInSeconds: gate.resetInSeconds, });
     }
-    const msg =
-      gate.reason === 'free_tier_exhausted'
-        ? 'Generation limit reached. Add your own API keys or upgrade to Pro.'
-        : 'No voice provider available. Add a TTS key or upgrade to Pro.';
-    return errorResponse(msg, 403, { code: gate.reason });
+    return errorResponse('No voice provider available. Add a TTS key in Settings for unlimited generation.', 403, { code: gate.reason });
   }
 
   // Get tier features for this user

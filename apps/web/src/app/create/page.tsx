@@ -92,9 +92,6 @@ export default async function CreatePage({
     gate.isByokUser || gate.isProUser || isUnlimitedOverride
       ? null
       : {
-          used: gate.freeGenerationsUsed,
-          limit: gate.freeGenerationsLimit,
-          remaining: Math.max(0, gate.freeGenerationsLimit - gate.freeGenerationsUsed),
           dailyUsed: gate.dailyUsed,
           dailyLimit: gate.dailyLimit,
           dailyRemaining: Math.max(0, gate.dailyLimit - gate.dailyUsed),

@@ -32,10 +32,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Generation gate: BYOK or free tier
   const gate = await checkGenerationGate(userId);
   if (!gate.allowed) {
-    const msg =
-      gate.reason === 'free_tier_exhausted'
-        ? 'Free generations used. Add your own API keys to continue.'
-        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    const msg = gate.reason === 'generation_in_progress'
+      ? 'A podcast is already generating. Wait for it to finish before starting another.'
+      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
 

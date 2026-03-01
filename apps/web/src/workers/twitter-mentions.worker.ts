@@ -118,10 +118,7 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
         text: tweet.text,
         status: 'IGNORED',
         userId,
-        errorMessage:
-          gate.reason === 'free_tier_exhausted'
-            ? 'Free generations exhausted'
-            : 'No AI provider configured',
+        errorMessage: 'No AI provider configured',
       },
     });
     return;

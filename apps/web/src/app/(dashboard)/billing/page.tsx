@@ -133,15 +133,15 @@ export default async function BillingPage() {
           <h2 className={styles.sectionTitle}>Free Tier</h2>
           <div className={styles.creditCard}>
             <div className={styles.creditBalance}>
-              {freeTier.freeGenerationsRemaining}/{freeTier.freeGenerationsLimit}
+              {freeTier.dailyRemaining}/{freeTier.dailyLimit}
             </div>
             <div className={styles.creditMeta}>
-              <span>free generations remaining</span>
+              <span>podcasts remaining today</span>
             </div>
           </div>
-          {freeTier.freeGenerationsRemaining === 0 && (
+          {freeTier.dailyRemaining === 0 && (
             <p className={styles.manageText}>
-              You&apos;ve used all your free generations.{' '}
+              You&apos;ve used today&apos;s free podcasts.{' '}
               <Link href="/onboarding?step=keys">Add a voice provider key</Link> for unlimited access.
             </p>
           )}

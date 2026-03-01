@@ -66,7 +66,6 @@ async function getUsers(search: string | undefined, page: number, tier: TierFilt
         bannedAt: true,
         suspendedUntil: true,
         plan: true,
-        freeGenerationsUsed: true,
         dailyGenerationOverride: true,
         subscription: { select: { status: true, currentPeriodEnd: true } },
         _count: {
