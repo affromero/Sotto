@@ -28,11 +28,32 @@ const platformSchema = z.object({
   aiModel: z.string().min(1).optional(),
 });
 
-const updateSchema = z.object({
-  free: planModelSchema.optional(),
-  pro: planModelSchema.optional(),
-  platform: platformSchema.optional(),
-});
+const updateSchema = z
+  .object({
+    free: planModelSchema.optional(),
+    pro: planModelSchema.optional(),
+    platform: platformSchema.optional(),
+    freeIncludedModels: z.array(z.string().min(1)).nullable().optional(),
+    proIncludedModels: z.array(z.string().min(1)).nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const freeList = data.freeIncludedModels;
+    const proList = data.proIncludedModels;
+
+    // Cross-field: free models must be a subset of pro models (when both are non-null)
+    if (freeList && proList) {
+      const proSet = new Set(proList);
+      for (const modelId of freeList) {
+        if (!proSet.has(modelId)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Free model "${modelId}" must also be in proIncludedModels`,
+            path: ['freeIncludedModels'],
+          });
+        }
+      }
+    }
+  });
 
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
