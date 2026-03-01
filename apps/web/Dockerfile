@@ -15,7 +15,7 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/verification-standard/package.json ./packages/verification-standard/
 COPY apps/web/prisma ./apps/web/prisma/
 
-RUN npm ci --ignore-scripts
+RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
 RUN npx prisma generate --schema=apps/web/prisma/schema.prisma
 
 # ---- Stage 2: Build the application ----
@@ -50,16 +50,17 @@ RUN apk add --no-cache libc6-compat openssl
 # Install Claude Code CLI so claude-code:* models can spawn the claude binary
 RUN npm install -g @anthropic-ai/claude-code
 
-ARG COMMIT_SHA=dev
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV COMMIT_SHA=${COMMIT_SHA}
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Create non-root user
 RUN addgroup --system --gid 1001 sotto
 RUN adduser --system --uid 1001 sotto
+
+ARG COMMIT_SHA=dev
+ENV COMMIT_SHA=${COMMIT_SHA}
 
 # Standalone output mirrors monorepo structure (apps/web/server.js + node_modules/)
 # Copy it to /app so paths resolve correctly

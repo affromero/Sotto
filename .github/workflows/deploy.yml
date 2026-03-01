@@ -85,7 +85,7 @@ jobs:
 
             echo "Building containers..."
             export COMMIT_SHA=$(git rev-parse --short HEAD)
-            docker compose -f docker-compose.prod.yml build --no-cache
+            docker compose -f docker-compose.prod.yml build
 
             echo "Running database migrations..."
             docker compose -f docker-compose.prod.yml --profile migration run --build --rm migrate npx prisma db push --schema=prisma/schema.prisma
