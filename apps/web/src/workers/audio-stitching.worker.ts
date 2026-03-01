@@ -373,7 +373,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 11. If generated from Twitter, queue a reply to the original tweet
     if (podcast.source === 'TWITTER' && podcast.sourceTweetId) {
       const mention = await prisma.tweetMention.findFirst({
-        where: { podcastId, status: { in: ['GENERATING'] } },
+        where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
         select: { id: true, tweetId: true },
       });
       if (mention) {
@@ -393,7 +393,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     if (!skipSfx && podcast.user.telegramEnabled && podcast.user.telegramChatId) {
       const telegramMsg = podcast.source === 'TELEGRAM'
         ? await prisma.telegramMessage.findFirst({
-            where: { podcastId, status: { in: ['GENERATING'] } },
+            where: { podcastId, status: { in: ['GENERATING', 'FAILED'] } },
             select: { id: true, chatId: true },
           })
         : null;
