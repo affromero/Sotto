@@ -17,7 +17,8 @@ export type GateReason =
   | 'ok'
   | 'no_provider'
   | 'free_tier_exhausted'
-  | 'daily_limit_reached';
+  | 'daily_limit_reached'
+  | 'generation_in_progress';
 
 export interface GenerationGateResult {
   allowed: boolean;
@@ -65,13 +66,29 @@ async function getDailyCount(userId: string): Promise<{ count: number; ttl: numb
 }
 
 /**
+ * Check whether a free user already has a non-terminal podcast in progress.
+ * Returns true if any podcast created in the last 24h is still in a pipeline state.
+ * The 24h cap prevents ancient stuck podcasts from blocking the user forever.
+ */
+async function hasInFlightGeneration(userId: string): Promise<boolean> {
+  const count = await prisma.podcast.count({
+    where: {
+      userId,
+      status: { notIn: ['READY', 'FAILED', 'DRAFT', 'DUPLICATE_REVIEW'] },
+      createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+    },
+  });
+  return count > 0;
+}
+
+/**
  * Check whether a user is allowed to start a new generation.
  *
  * Priority:
  * 1. BYOK user (has TTS key)  → always allowed, no counting
  * 2. PRO user                  → always allowed, no daily limit
  * 3. Admin/System              → always allowed
- * 4. Free user                 → check Redis rolling-window daily counter
+ * 4. Free user                 → check in-flight generation, then Redis rolling-window daily counter
  *                                (TTL 24h, configurable limit via FreeTierConfig)
  */
 export async function checkGenerationGate(userId: string): Promise<GenerationGateResult> {
@@ -125,6 +142,15 @@ export async function checkGenerationGate(userId: string): Promise<GenerationGat
 
   if (!hasPlatformTts) {
     return { ...baseResult, allowed: false, reason: 'no_provider' };
+  }
+
+  // Free user: check for in-flight generation before allowing a new one
+  if (await hasInFlightGeneration(userId)) {
+    return {
+      ...baseResult,
+      allowed: false,
+      reason: 'generation_in_progress',
+    };
   }
 
   // Free user: check Redis rolling 24h window
@@ -214,6 +240,67 @@ export async function tryIncrementFreeGeneration(
   }
 
   return true;
+}
+
+/**
+ * Record a successful free-tier generation (called by workers when podcast reaches READY).
+ *
+ * Increments the Redis daily counter unconditionally (no limit check — we already gated
+ * at creation time via checkGenerationGate) and bumps the lifetime analytics counter.
+ */
+export async function consumeFreeGeneration(
+  userId: string,
+  providerUsage?: {
+    ai?: { provider: string; quota: number };
+    tts?: { provider: string; quota: number };
+  }
+): Promise<void> {
+  const redis = getRedisClient();
+  const key = `free:daily:${userId}`;
+
+  // Increment daily counter unconditionally, set 24h TTL on first use
+  const lua = `
+    local newCount = redis.call('INCR', KEYS[1])
+    if newCount == 1 then
+      redis.call('EXPIRE', KEYS[1], 86400)
+    end
+    return newCount
+  `;
+  await redis.eval(lua, 1, key);
+
+  // Increment lifetime analytics counter (non-blocking)
+  prisma.user
+    .update({
+      where: { id: userId },
+      data: { freeGenerationsUsed: { increment: 1 } },
+    })
+    .catch((err) => {
+      logger.warn('Failed to increment freeGenerationsUsed', { userId, error: err instanceof Error ? err.message : String(err) });
+    });
+
+  // Per-provider TTS usage tracking
+  if (providerUsage?.tts) {
+    const { provider, quota } = providerUsage.tts;
+    await prisma.$executeRaw`
+      INSERT INTO "FreeProviderUsage" (id, "userId", category, provider, used)
+      VALUES (gen_random_uuid(), ${userId}, 'tts', ${provider}, 1)
+      ON CONFLICT ("userId", category, provider)
+      DO UPDATE SET used = "FreeProviderUsage".used + 1
+      WHERE "FreeProviderUsage".used < ${quota}
+    `;
+  }
+
+  // Per-provider AI usage tracking
+  if (providerUsage?.ai) {
+    const { provider, quota } = providerUsage.ai;
+    await prisma.$executeRaw`
+      INSERT INTO "FreeProviderUsage" (id, "userId", category, provider, used)
+      VALUES (gen_random_uuid(), ${userId}, 'ai', ${provider}, 1)
+      ON CONFLICT ("userId", category, provider)
+      DO UPDATE SET used = "FreeProviderUsage".used + 1
+      WHERE "FreeProviderUsage".used < ${quota}
+    `;
+  }
 }
 
 /**
