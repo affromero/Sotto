@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { prisma } from './prisma';
 import type { AiProviderId } from './providers/ai-registry';
 import type { TtsProviderId } from './providers/tts-registry';
@@ -21,7 +22,11 @@ export interface AutoModelConfigData {
   free: PlanModelConfig;
   pro: PlanModelConfig;
   platform: PlatformAiConfig;
+  freeIncludedModels: string[] | null;
+  proIncludedModels: string[] | null;
 }
+
+const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 
 /**
  * Get the current auto model configuration.
@@ -55,6 +60,8 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
       aiProvider: row.platformAiProvider as AiProviderId,
       aiModel: row.platformAiModel,
     },
+    freeIncludedModels: includedModelsSchema.parse(row.freeIncludedModels),
+    proIncludedModels: includedModelsSchema.parse(row.proIncludedModels),
   };
 }
 
@@ -62,10 +69,16 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
  * Update the auto model configuration (admin only).
  */
 export async function setAutoModelConfig(
-  data: { free?: Partial<PlanModelConfig>; pro?: Partial<PlanModelConfig>; platform?: Partial<PlatformAiConfig> },
+  data: {
+    free?: Partial<PlanModelConfig>;
+    pro?: Partial<PlanModelConfig>;
+    platform?: Partial<PlatformAiConfig>;
+    freeIncludedModels?: string[] | null;
+    proIncludedModels?: string[] | null;
+  },
   adminId: string
 ): Promise<void> {
-  const update: Record<string, string> = { updatedBy: adminId };
+  const update: Record<string, string | string[] | null> = { updatedBy: adminId };
 
   if (data.free) {
     if (data.free.aiProvider) update.freeAiProvider = data.free.aiProvider;
@@ -90,11 +103,35 @@ export async function setAutoModelConfig(
     if (data.platform.aiModel) update.platformAiModel = data.platform.aiModel;
   }
 
+  if (data.freeIncludedModels !== undefined) {
+    update.freeIncludedModels = data.freeIncludedModels;
+  }
+
+  if (data.proIncludedModels !== undefined) {
+    update.proIncludedModels = data.proIncludedModels;
+  }
+
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
     create: { id: 'singleton', ...update },
     update,
   });
+}
+
+/**
+ * Resolve effective included models per tier.
+ * When lists are null (unconfigured), derive from auto defaults.
+ */
+export function resolveIncludedModels(config: AutoModelConfigData): {
+  freeModels: string[];
+  proModels: string[];
+} {
+  const freeModels = config.freeIncludedModels ?? [config.free.aiModel];
+  const proSet = new Set([
+    ...(config.proIncludedModels ?? [config.pro.aiModel]),
+    ...freeModels,
+  ]);
+  return { freeModels, proModels: [...proSet] };
 }
 
 /**
