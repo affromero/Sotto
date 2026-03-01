@@ -1666,6 +1666,8 @@ model AutoModelConfig {
   proSttModel         String   @default("whisper-large-v3-turbo")
   platformAiProvider  String   @default("anthropic")
   platformAiModel     String   @default("claude-haiku-4-5-20251001")
+  freeIncludedModels  Json?
+  proIncludedModels   Json?
   updatedAt           DateTime @updatedAt
   updatedBy           String?
 }
