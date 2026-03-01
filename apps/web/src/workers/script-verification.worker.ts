@@ -324,7 +324,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
     await addJob(notificationQueue, JobType.SEND_NOTIFICATION, {
       userId,
-      type: 'PODCAST_READY',
+      type: 'PODCAST_FAILED',
       title: 'Podcast generation failed',
       message:
         "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",

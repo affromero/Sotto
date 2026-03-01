@@ -709,7 +709,7 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ userId: 'user-001', type: 'PODCAST_READY' })
+        expect.objectContaining({ userId: 'user-001', type: 'PODCAST_FAILED' })
       );
     });
 
