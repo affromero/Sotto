@@ -39,6 +39,26 @@ function extractFirstJsonObject(text: string): string {
   throw new Error('Unbalanced JSON object in response');
 }
 
+const PARSE_FAILURE_FEEDBACK = 'Script verification failed: could not parse AI response. Will retry.';
+
+async function retryParseWithStricterPrompt(
+  systemPrompt: string,
+  userMessage: string,
+  opts: { maxTokens: number; apiKeyOverride?: string; model?: string },
+): Promise<{ parsed: Record<string, unknown>; inputTokens: number; outputTokens: number; model: string } | null> {
+  try {
+    const response = await generateResponse(
+      systemPrompt + '\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. No prose, no markdown fences, no explanation. Start with { and end with }.',
+      [{ role: 'user', content: userMessage + '\n\nRespond with ONLY valid JSON.' }],
+      { ...opts, tools: [WEB_SEARCH_TOOL], skipModeration: true },
+    );
+    const parsed = JSON.parse(extractFirstJsonObject(response.content));
+    return { parsed, inputTokens: response.inputTokens, outputTokens: response.outputTokens, model: response.model };
+  } catch {
+    return null;
+  }
+}
+
 export interface ClaimAnalysis {
   claimText: string;
   turnIndex: number;
@@ -433,37 +453,49 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
     });
 
     let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
+    let extraInputTokens = 0;
+    let extraOutputTokens = 0;
+
     try {
       parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
-      return {
-        passed: false,
-        score: 0,
-        totalClaims: 0,
-        commonKnowledgeClaims: 0,
-        adequatelySourcedClaims: 0,
-        unsupportedClaims: [],
-        underSourcedClaims: [],
-        unreliableSourceClaims: [],
-        misattributedClaims: [],
-        referenceQuality: {
-          totalCount: 0,
-          requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
-          countPassed: false,
-          seriousCount: 0,
-          seriousRatio: 0,
-          requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
-          ratioPassed: false,
-          qualityScore: 0,
-          feedback: null,
-        },
-        durationFeedback: null,
-        feedback: 'Script verification failed: could not parse AI response. Will retry.',
-        allClaims: [],
-        inputTokens: response.inputTokens,
-        outputTokens: response.outputTokens,
-        model: response.model,
-      };
+      const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
+        maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model,
+      });
+      if (retry) {
+        parsed = retry.parsed as typeof parsed;
+        extraInputTokens = retry.inputTokens;
+        extraOutputTokens = retry.outputTokens;
+      } else {
+        return {
+          passed: false,
+          score: 0,
+          totalClaims: 0,
+          commonKnowledgeClaims: 0,
+          adequatelySourcedClaims: 0,
+          unsupportedClaims: [],
+          underSourcedClaims: [],
+          unreliableSourceClaims: [],
+          misattributedClaims: [],
+          referenceQuality: {
+            totalCount: 0,
+            requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+            countPassed: false,
+            seriousCount: 0,
+            seriousRatio: 0,
+            requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+            ratioPassed: false,
+            qualityScore: 0,
+            feedback: null,
+          },
+          durationFeedback: null,
+          feedback: PARSE_FAILURE_FEEDBACK,
+          allClaims: [],
+          inputTokens: response.inputTokens,
+          outputTokens: response.outputTokens,
+          model: response.model,
+        };
+      }
     }
 
     const { claims: newClaims, aiFeedback } = parseClaims(parsed, turns);
@@ -474,8 +506,8 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
     const allClaims = [...dedupedCarried, ...newClaims];
 
     return buildVerdict(allClaims, references, depth, maxDurationMinutes, turns, aiFeedback, {
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
+      inputTokens: response.inputTokens + extraInputTokens,
+      outputTokens: response.outputTokens + extraOutputTokens,
       model: response.model,
     }, params.verificationMode);
   }
@@ -506,45 +538,56 @@ Analyze every factual claim. Return JSON only.`;
   });
 
   let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
+  let extraInputTokens = 0;
+  let extraOutputTokens = 0;
 
   try {
     parsed = JSON.parse(extractFirstJsonObject(response.content));
   } catch {
-    return {
-      passed: false,
-      score: 0,
-      totalClaims: 0,
-      commonKnowledgeClaims: 0,
-      adequatelySourcedClaims: 0,
-      unsupportedClaims: [],
-      underSourcedClaims: [],
-      unreliableSourceClaims: [],
-      misattributedClaims: [],
-      referenceQuality: {
-        totalCount: 0,
-        requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
-        countPassed: false,
-        seriousCount: 0,
-        seriousRatio: 0,
-        requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
-        ratioPassed: false,
-        qualityScore: 0,
-        feedback: null,
-      },
-      durationFeedback: null,
-      feedback: 'Script verification failed: could not parse AI response. Will retry.',
-      allClaims: [],
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-      model: response.model,
-    };
+    const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
+      maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model,
+    });
+    if (retry) {
+      parsed = retry.parsed as typeof parsed;
+      extraInputTokens = retry.inputTokens;
+      extraOutputTokens = retry.outputTokens;
+    } else {
+      return {
+        passed: false,
+        score: 0,
+        totalClaims: 0,
+        commonKnowledgeClaims: 0,
+        adequatelySourcedClaims: 0,
+        unsupportedClaims: [],
+        underSourcedClaims: [],
+        unreliableSourceClaims: [],
+        misattributedClaims: [],
+        referenceQuality: {
+          totalCount: 0,
+          requiredCount: MIN_REFERENCE_COUNTS[depth] ?? 5,
+          countPassed: false,
+          seriousCount: 0,
+          seriousRatio: 0,
+          requiredSeriousRatio: MIN_SERIOUS_RATIO[depth] ?? 0.4,
+          ratioPassed: false,
+          qualityScore: 0,
+          feedback: null,
+        },
+        durationFeedback: null,
+        feedback: PARSE_FAILURE_FEEDBACK,
+        allClaims: [],
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        model: response.model,
+      };
+    }
   }
 
   const { claims, aiFeedback } = parseClaims(parsed, turns);
 
   return buildVerdict(claims, references, depth, maxDurationMinutes, turns, aiFeedback, {
-    inputTokens: response.inputTokens,
-    outputTokens: response.outputTokens,
+    inputTokens: response.inputTokens + extraInputTokens,
+    outputTokens: response.outputTokens + extraOutputTokens,
     model: response.model,
   }, params.verificationMode);
 }
