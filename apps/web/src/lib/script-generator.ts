@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './llm';
+import { createAIProvider } from './providers/ai';
 import { CONTENT_SAFETY_INSTRUCTIONS } from './safety-prompts';
 import { VOICE_REALISM_INSTRUCTIONS } from './voice-realism-prompts';
 import { loadPrompt, loadAndRender } from './prompt-loader';
@@ -350,6 +350,7 @@ export async function generateScript(params: {
   speakers?: Array<{ name: string; description: string }>;
   apiKeyOverride?: string;
   model?: string;
+  provider?: string;
   webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
@@ -400,11 +401,12 @@ export async function generateScript(params: {
     ? `Topic: ${params.topic}\nDepth: ${params.depth}\n\n${formatSourceBlock(params.sourceContent, params.sourceMetadata)}`
     : `Topic: ${params.topic}\nDepth: ${params.depth}`;
 
-  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+  const ai = createAIProvider(params.provider);
+  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
+    useWebSearch: params.webSearchEnabled !== false,
   });
 
   return parseScriptResponse(response);
@@ -430,6 +432,7 @@ export async function generateScriptWithFeedback(params: {
   verificationFeedback: string;
   apiKeyOverride?: string;
   model?: string;
+  provider?: string;
   webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
@@ -486,11 +489,12 @@ ${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sou
 
 Revise the script addressing ALL feedback. Return JSON only.`;
 
-  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+  const ai = createAIProvider(params.provider);
+  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
+    useWebSearch: params.webSearchEnabled !== false,
   });
 
   return parseScriptResponse(response);
@@ -517,6 +521,7 @@ export async function generateScriptWithUserFeedback(params: {
   userFeedback: string;
   apiKeyOverride?: string;
   model?: string;
+  provider?: string;
   webSearchEnabled?: boolean;
 }): Promise<{
   turns: ScriptTurn[];
@@ -573,11 +578,12 @@ ${params.sourceContent ? `\n${formatSourceBlock(params.sourceContent, params.sou
 
 Revise the script addressing ALL user feedback. Keep what works, change what the user flagged. Return JSON only.`;
 
-  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+  const ai = createAIProvider(params.provider);
+  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 12288,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    ...(params.webSearchEnabled !== false ? { tools: [WEB_SEARCH_TOOL] } : {}),
+    useWebSearch: params.webSearchEnabled !== false,
   });
 
   return parseScriptResponse(response);

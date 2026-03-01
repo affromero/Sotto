@@ -92,6 +92,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         userFeedback: job.data.userFeedback!,
         apiKeyOverride: aiKey?.apiKey,
         model,
+        provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
       })
     : await generateScript({
@@ -107,6 +108,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
         speakers: cappedSpeakers ?? undefined,
         apiKeyOverride: aiKey?.apiKey,
         model,
+        provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
       });
 

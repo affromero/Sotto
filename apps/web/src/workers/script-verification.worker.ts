@@ -173,6 +173,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
         verificationFeedback: `DURATION: ${verdict.durationFeedback}`,
         apiKeyOverride: aiKey?.apiKey,
         model,
+        provider,
         webSearchEnabled: tierFeatures.webSearchEnabled,
       });
 
@@ -395,6 +396,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     verificationFeedback: verdict.feedback,
     apiKeyOverride: aiKey?.apiKey,
     model,
+    provider,
     webSearchEnabled: tierFeatures.webSearchEnabled,
   });
 
