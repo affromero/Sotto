@@ -1,79 +1,209 @@
-.root {
-  padding: 0;
-}
-
-.title {
-  font: var(--text-h1);
-  color: var(--color-text-primary);
-  margin: 0 0 var(--space-6);
-}
+/* Summary Cards Row */
 
 .summary {
   display: flex;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
+  gap: var(--spacing-md);
   flex-wrap: wrap;
 }
 
-.summaryCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--space-4) var(--space-6);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  min-width: 100px;
-}
-
-.summaryCardFailed {
+.cardFailed {
   border-color: #dc2626;
   background: rgba(220, 38, 38, 0.05);
 }
 
-.summaryValue {
-  font: var(--text-h2);
+/* Toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.filterChips {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.filterChip {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.filterChip:hover {
+  border-color: var(--color-border-hover);
   color: var(--color-text-primary);
 }
 
-.summaryLabel {
-  font: var(--text-body-sm);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.filterChipActive {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
 }
 
-.tableWrap {
-  overflow-x: auto;
+.filterChipActive:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+.groupToggle {
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
+  border-radius: var(--radius-md);
   font: var(--text-body-sm);
-}
-
-.table th {
-  text-align: left;
-  padding: var(--space-3) var(--space-4);
   font-weight: 600;
   color: var(--color-text-secondary);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.groupToggle:hover {
+  border-color: var(--color-border-hover);
+  color: var(--color-text-primary);
+}
+
+/* Refresh Controls */
+
+.refreshControls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.autoRefreshToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
   white-space: nowrap;
 }
 
-.table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+.autoRefreshToggle input {
+  accent-color: var(--color-primary);
+}
+
+.lastRefreshed {
+  font: var(--text-body-sm);
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+/* Sort Button */
+
+.thSortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: none;
+  border: none;
+  padding: var(--spacing-xs) 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.thSortButton:hover {
   color: var(--color-text-primary);
 }
 
-.table tr:last-child td {
-  border-bottom: none;
+/* Stage Sections (Grouped View) */
+
+.stageSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
 }
+
+.stageHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.stageTitle {
+  font: var(--text-h3);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.stageCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--spacing-xs);
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-full);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* Description Column */
+
+.descriptionHeader {
+  min-width: 200px;
+}
+
+.queueDescription {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  max-width: 300px;
+}
+
+/* Queue Name */
+
+.queueName {
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Row Highlights */
 
 .rowFailed {
   background: rgba(220, 38, 38, 0.05);
@@ -83,21 +213,39 @@
   background: rgba(245, 158, 11, 0.05);
 }
 
-.queueName {
-  font-family: var(--font-mono, monospace);
-  font-size: 13px;
+/* Loading & Error */
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-2xl);
+  font: var(--text-body);
+  color: var(--color-text-secondary);
 }
+
+.errorBanner {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-md);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: #dc2626;
+}
+
+/* QueueActions */
 
 .actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--spacing-sm);
 }
 
 .actionButton {
   display: inline-flex;
   align-items: center;
-  padding: var(--space-1) var(--space-3);
+  padding: var(--spacing-xs) var(--spacing-md);
   background: var(--color-surface);
   color: var(--color-text-primary);
   font: var(--text-body-sm);
@@ -107,6 +255,7 @@
   cursor: pointer;
   transition: border-color var(--transition-fast);
   white-space: nowrap;
+  min-height: 44px;
 }
 
 .actionButton:hover {
@@ -130,13 +279,13 @@
 .failedList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
   width: 100%;
 }
 
 .failedJob {
-  padding: var(--space-3);
+  padding: var(--spacing-md);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -145,8 +294,8 @@
 .failedJobHeader {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-1);
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
 }
 
 .failedJobId {
@@ -163,7 +312,7 @@
 
 .retryButton {
   margin-left: auto;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--color-primary);
   color: var(--color-text-inverse);
   font: var(--text-body-sm);
@@ -171,6 +320,8 @@
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
 }
 
 .retryButton:hover {
@@ -185,7 +336,7 @@
 .failedReason {
   font: var(--text-body-sm);
   color: #dc2626;
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--spacing-xs);
   word-break: break-word;
 }
 
@@ -198,17 +349,40 @@
   font: var(--text-body-sm);
   color: var(--color-text-tertiary);
   text-align: center;
-  padding: var(--space-4);
+  padding: var(--spacing-md);
 }
 
+/* Responsive */
+
 @media (max-width: 768px) {
-  .summary {
+  .toolbar {
     flex-direction: column;
+    align-items: stretch;
   }
 
-  .summaryCard {
-    flex-direction: row;
-    justify-content: space-between;
+  .searchInput {
     min-width: 0;
+  }
+
+  .filterChips {
+    flex-wrap: wrap;
+  }
+
+  .refreshControls {
+    flex-wrap: wrap;
+  }
+
+  .queueDescription,
+  .descriptionHeader {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchInput,
+  .filterChip,
+  .groupToggle,
+  .actionButton {
+    transition: none;
   }
 }
