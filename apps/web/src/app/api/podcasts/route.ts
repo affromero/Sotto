@@ -157,6 +157,9 @@ export async function POST(request: NextRequest) {
     return errorResponse(`Requested duration (${durationTarget} min) exceeds your plan limit of ${effectiveMaxDuration} min.`, 400, {  });
   }
 
+  // Track whether the user explicitly chose a model in this request
+  const requestedAiModel = parsed.data.aiModel;
+
   // Auto-resolve providers for free-tier users (quota consumed on success by workers)
   let autoResolvedTtsProvider: string | undefined;
   let autoResolvedTtsModel: string | undefined;
@@ -177,6 +180,25 @@ export async function POST(request: NextRequest) {
     autoResolvedAiProvider = proConfig.aiProvider;
     autoResolvedTtsProvider = proConfig.ttsProvider;
     autoResolvedTtsModel = proConfig.ttsModel;
+  }
+
+  // User preference fallback (only when no explicit model was requested)
+  if (!requestedAiModel) {
+    const userPref = await prisma.user.findUnique({
+      where: { id: authResult.userId },
+      select: { preferredAiModel: true },
+    });
+    if (userPref?.preferredAiModel) {
+      const prefModel = userPref.preferredAiModel;
+      const isClaudeCode = prefModel.startsWith('claude-code:');
+      if (!isClaudeCode || isAdmin) {
+        const prefPlan = getModelRequiredPlan(prefModel);
+        if (!prefPlan || isModelAllowedForUser(prefPlan, gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined)) {
+          autoResolvedAiModel = prefModel;
+          autoResolvedAiProvider = getProviderForModel(prefModel) ?? autoResolvedAiProvider;
+        }
+      }
+    }
   }
 
   // Check if selected voices require payment (skip if paymentIntentIds provided)

@@ -6,6 +6,7 @@ import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/valida
 import { generateTagSlug } from '@/lib/slugify';
 import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { getProviderForModel } from '@/lib/providers/ai-registry';
 import { errorResponse } from '@/lib/api-response';
 import { z } from 'zod';
 
@@ -24,6 +25,7 @@ const updateUserSchema = z
       voiceId: z.string().min(1),
     })).optional(),
     preferredLanguage: z.string().max(5).nullable().optional(),
+    preferredAiModel: z.string().nullable().optional(),
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
     interests: z.array(z.string()).max(20).optional(),
@@ -70,6 +72,7 @@ export async function GET(request: NextRequest) {
       twitterEnabled: user.twitterEnabled,
       voicePreferences: user.voicePreferences,
       preferredLanguage: user.preferredLanguage,
+      preferredAiModel: user.preferredAiModel,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch user';
@@ -91,7 +94,15 @@ export async function PATCH(request: NextRequest) {
       return errorResponse(validation.error.errors[0].message, 400);
     }
 
-    const { interests, customTags, handle, voicePreferences, ...data } = validation.data;
+    const { interests, customTags, handle, voicePreferences, preferredAiModel, ...data } = validation.data;
+
+    // Derive preferredAiProvider from preferredAiModel
+    if (preferredAiModel !== undefined) {
+      (data as Record<string, unknown>).preferredAiModel = preferredAiModel;
+      (data as Record<string, unknown>).preferredAiProvider = preferredAiModel
+        ? (getProviderForModel(preferredAiModel) ?? null)
+        : null;
+    }
 
     // Validate handle availability if changing it
     if (handle !== undefined) {
@@ -218,6 +229,7 @@ export async function PATCH(request: NextRequest) {
       twitterEnabled: updatedUser.twitterEnabled,
       voicePreferences: updatedUser.voicePreferences,
       preferredLanguage: updatedUser.preferredLanguage,
+      preferredAiModel: updatedUser.preferredAiModel,
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update user';
