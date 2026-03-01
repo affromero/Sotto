@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 
 interface FailedJob {
@@ -12,8 +11,15 @@ interface FailedJob {
   attemptsMade: number;
 }
 
-export function QueueActions({ queueName, failedCount }: { queueName: string; failedCount: number }) {
-  const router = useRouter();
+export function QueueActions({
+  queueName,
+  failedCount,
+  onRefresh,
+}: {
+  queueName: string;
+  failedCount: number;
+  onRefresh?: () => void;
+}) {
   const [jobs, setJobs] = useState<FailedJob[] | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -38,7 +44,7 @@ export function QueueActions({ queueName, failedCount }: { queueName: string; fa
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId }),
       });
-      router.refresh();
+      onRefresh?.();
     });
   }
 
@@ -48,7 +54,7 @@ export function QueueActions({ queueName, failedCount }: { queueName: string; fa
       await fetch(`/api/admin/queues/${queueName}/clean`, { method: 'POST' });
       setExpanded(false);
       setJobs(null);
-      router.refresh();
+      onRefresh?.();
     });
   }
 
