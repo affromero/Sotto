@@ -44,6 +44,7 @@ const mockPrismaSegmentCreate = vi.fn();
 const mockPrismaSegmentUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTagFindUnique = vi.fn().mockResolvedValue(null);
 const mockPrismaPodcastTagUpsert = vi.fn().mockResolvedValue({});
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -71,6 +72,9 @@ vi.mock('@/lib/prisma', () => {
     },
     podcastTag: {
       upsert: (...args: unknown[]) => mockPrismaPodcastTagUpsert(...args),
+    },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -171,6 +175,12 @@ vi.mock('@/lib/usage-logger', () => ({
 
 vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/generation-gate', () => ({
+  consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),
 }));
 
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });

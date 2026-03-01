@@ -24,6 +24,7 @@ const mockPrismaTelegramMessageUpdate = vi.fn().mockResolvedValue({});
 const mockPrismaTwitterAutoTweetFindFirst = vi.fn().mockResolvedValue(null);
 const mockPrismaDiscoveryFindUnique = vi.fn().mockResolvedValue({ durationTarget: 5 });
 const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
+const mockPrismaUserFindUniqueOrThrow = vi.fn().mockResolvedValue({ role: 'USER', plan: 'FREE' });
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -44,6 +45,9 @@ vi.mock('@/lib/prisma', () => {
     },
     discovery: {
       findUnique: (...args: unknown[]) => mockPrismaDiscoveryFindUnique(...args),
+    },
+    user: {
+      findUniqueOrThrow: (...args: unknown[]) => mockPrismaUserFindUniqueOrThrow(...args),
     },
     tweetMention: {
       findFirst: (...args: unknown[]) => mockPrismaTweetMentionFindFirst(...args),
@@ -102,6 +106,15 @@ const mockGenerateSoundEffect = vi.fn().mockResolvedValue(Buffer.from('sfx-audio
 
 vi.mock('@/lib/elevenlabs', () => ({
   generateSoundEffect: (...args: unknown[]) => mockGenerateSoundEffect(...args),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/lib/generation-gate', () => ({
+  consumeFreeGeneration: (...args: unknown[]) => mockConsumeFreeGeneration(...args),
 }));
 
 vi.mock('@/lib/stripe', () => ({
