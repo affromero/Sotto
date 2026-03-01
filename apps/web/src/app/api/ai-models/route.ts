@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { listAiProviders } from '@/lib/byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from '@/lib/providers/ai-registry';
-import { resolveAutoModel } from '@/lib/auto-model-config';
+import { getAutoModelConfig, resolveIncludedModels } from '@/lib/auto-model-config';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
 import { prisma } from '@/lib/prisma';
 
@@ -49,7 +49,8 @@ export async function GET(request: NextRequest) {
 
   // No BYOK AI key
   if (!isByok) {
-    const autoConfig = await resolveAutoModel(userPlan);
+    const autoConfig = await getAutoModelConfig();
+    const tierConfig = userPlan === 'PRO' ? autoConfig.pro : autoConfig.free;
 
     // Admins see all platform-configured API providers (from env vars) + Claude Code local
     if (isAdmin) {
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
         );
 
       return NextResponse.json({
-        provider: autoConfig.aiProvider,
+        provider: tierConfig.aiProvider,
         readOnly: false,
         userPlan: 'PRO',
         isByok: false,
@@ -76,24 +77,29 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Free/Pro non-BYOK: show all platform models so users see what's available
-    // Pro models are locked for free users (client handles disabling via requiredPlan + userPlan)
+    // Free/Pro non-BYOK: filter to only included models with dynamic requiredPlan
+    const { freeModels, proModels } = resolveIncludedModels(autoConfig);
+    const freeSet = new Set(freeModels);
+    const proSet = new Set(proModels);
+
     const platformModels = getAllAiProviderMeta()
       .filter((p) => p.id !== 'groq' && p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
       .flatMap((p) =>
-        p.models.map((m) => ({
-          id: m.id,
-          displayName: m.displayName,
-          tier: m.tier,
-          requiredPlan: m.requiredPlan,
-          isDefault: false,
-          group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
-          hint: p.displayName,
-        }))
+        p.models
+          .filter((m) => proSet.has(m.id))
+          .map((m) => ({
+            id: m.id,
+            displayName: m.displayName,
+            tier: m.tier,
+            requiredPlan: freeSet.has(m.id) ? ('FREE' as const) : ('PRO' as const),
+            isDefault: false,
+            group: TIER_GROUP_LABELS[m.tier] ?? m.tier,
+            hint: p.displayName,
+          }))
       );
 
     return NextResponse.json({
-      provider: autoConfig.aiProvider,
+      provider: tierConfig.aiProvider,
       readOnly: false,
       userPlan,
       isByok: false,
