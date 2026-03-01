@@ -419,51 +419,6 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       premiumSfx: String(usePremiumSfx),
     });
   } catch (err) {
-    // Mark podcast as failed on unrecoverable error
-    await markPodcastFailed(podcastId, {
-      technicalError: err instanceof Error ? err.message : String(err),
-    }).catch(() => {});
-
-    // If Twitter-sourced, queue failure reply
-    if (job.data.podcastId) {
-      const mention = await prisma.tweetMention
-        .findFirst({
-          where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
-          select: { id: true, tweetId: true },
-        })
-        .catch(() => null);
-      if (mention) {
-        await addJob(twitterReplyQueue, JobType.REPLY_TWITTER, {
-          podcastId: job.data.podcastId,
-          tweetMentionId: mention.id,
-          originalTweetId: mention.tweetId,
-        }).catch(() => {});
-      }
-    }
-
-    // If user has Telegram enabled, queue failure notification
-    if (job.data.podcastId) {
-      const failedPodcast = await prisma.podcast
-        .findUnique({
-          where: { id: job.data.podcastId },
-          select: { user: { select: { telegramEnabled: true, telegramChatId: true } } },
-        })
-        .catch(() => null);
-      if (failedPodcast?.user.telegramEnabled && failedPodcast.user.telegramChatId) {
-        const telegramMsg = await prisma.telegramMessage
-          .findFirst({
-            where: { podcastId: job.data.podcastId, status: { in: ['GENERATING', 'READY'] } },
-            select: { id: true, chatId: true },
-          })
-          .catch(() => null);
-        await addJob(telegramReplyQueue, JobType.REPLY_TELEGRAM, {
-          podcastId: job.data.podcastId,
-          telegramMessageId: telegramMsg?.id,
-          chatId: telegramMsg?.chatId ?? failedPodcast.user.telegramChatId,
-        }).catch(() => {});
-      }
-    }
-
     throw err;
   } finally {
     // 11. Clean up temp directory
