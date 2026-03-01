@@ -164,13 +164,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         });
         // Old voice IDs are provider-specific — clear them
         await prisma.podcastVoice.deleteMany({ where: { podcastId } });
-      } else {
-        // Bare retry — clear locked provider so resolveTtsProvider() auto-resolves fresh
-        await prisma.podcast.update({
-          where: { id: podcastId },
-          data: { ttsProvider: null, ttsModel: null },
-        });
       }
+      // Bare retry: keep ttsProvider so the same voices are used on retry.
+      // The queue failure handler (queue.ts) already clears ttsProvider for
+      // key invalidation errors. For transient failures, preserving the
+      // provider ensures voice consistency.
 
       if (useAdminCredits) {
         const selected = await selectFreeTierProviders(podcast.userId);
@@ -350,6 +348,9 @@ async function routeResume(
       });
       await prisma.podcastVersion.deleteMany({ where: { podcastId } });
       await prisma.segment.deleteMany({ where: { podcastId } });
+      // Clear stale voice assignments — re-approval will assign fresh voices
+      // for whatever provider the user picks
+      await prisma.podcastVoice.deleteMany({ where: { podcastId } });
 
       // Clear TTS provider so user re-enters audio config UI
       await prisma.podcast.update({
