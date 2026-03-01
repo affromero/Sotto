@@ -58,8 +58,8 @@
 
 .error {
   padding: 10px 14px;
-  background: var(--color-error-subtle, #fef2f2);
-  color: var(--color-error, #dc2626);
+  background: var(--color-error-lighter);
+  color: var(--color-error);
   border-radius: var(--radius-md);
   font: var(--text-body-sm);
 }
@@ -91,7 +91,7 @@
 
 .defaultsHint {
   font: var(--text-body-sm);
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
   margin: 0;
   font-style: italic;
 }
@@ -113,7 +113,7 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-xs) var(--spacing-sm);
-  background: var(--color-background-hover, #f9fafb);
+  background: var(--color-surface-hover);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -125,7 +125,7 @@
 
 .providerModelCount {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 
 .providerCardBody {
@@ -144,7 +144,7 @@
 .modelNameHeader {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
   font-weight: 600;
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -152,7 +152,7 @@
 .checkboxHeader {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
   font-weight: 600;
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
   text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -167,7 +167,7 @@
 }
 
 .modelRow:hover {
-  background: var(--color-background-hover, #f9fafb);
+  background: var(--color-surface-hover);
   border-radius: var(--radius-sm);
 }
 
@@ -182,13 +182,13 @@
 
 .modelTier {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
-  color: var(--color-text-tertiary, #9ca3af);
+  color: var(--color-text-tertiary);
 }
 
 .defaultBadge {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
   color: var(--color-primary);
-  background: var(--color-primary-subtle, #fef3c7);
+  background: var(--color-primary-subtle);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   white-space: nowrap;
