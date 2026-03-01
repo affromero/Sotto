@@ -9,6 +9,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { logger } from '@/lib/logger';
+import { logPipelineStageComplete } from '@/lib/pipeline-events';
 import { analyzeBias } from '@/lib/media-bias';
 
 export async function processContentExtraction(job: Job<ExtractContentPayload>): Promise<void> {
@@ -177,6 +178,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
     useAdminCredits,
   });
 
+  await logPipelineStageComplete(podcastId, 'content-extraction');
   await job.updateProgress(100);
   logger.info('Content extraction complete', { podcastId });
 }

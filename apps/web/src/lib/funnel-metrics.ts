@@ -228,6 +228,53 @@ export async function getRecentlySucceeded(
   }));
 }
 
+// ── Per-Stage Timing ─────────────────────────────────────────────
+
+export interface StageTiming {
+  stage: string;
+  avgSeconds: number;
+  p50Seconds: number;
+  p95Seconds: number;
+  count: number;
+}
+
+/**
+ * Compute per-stage timing from consecutive 'complete' PipelineEvents.
+ * Uses SQL LAG() window function to find the gap between each stage completion
+ * and the previous one (or Podcast.createdAt for the first stage).
+ */
+export async function getPerStageTiming(since: Date): Promise<StageTiming[]> {
+  const rows = await prisma.$queryRaw<StageTiming[]>`
+    WITH ordered AS (
+      SELECT
+        pe."stage",
+        EXTRACT(EPOCH FROM (
+          pe."createdAt" - COALESCE(
+            LAG(pe."createdAt") OVER (PARTITION BY pe."podcastId" ORDER BY pe."createdAt"),
+            p."createdAt"
+          )
+        )) AS duration_seconds
+      FROM "PipelineEvent" pe
+      JOIN "Podcast" p ON p."id" = pe."podcastId"
+      WHERE pe."type" = 'complete'
+        AND p."deletedAt" IS NULL
+        AND p."source" != 'IMPORT'
+        AND p."createdAt" >= ${since}
+    )
+    SELECT
+      stage AS "stage",
+      AVG(duration_seconds)::float AS "avgSeconds",
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_seconds)::float AS "p50Seconds",
+      PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_seconds)::float AS "p95Seconds",
+      COUNT(*)::int AS "count"
+    FROM ordered
+    GROUP BY stage
+    ORDER BY MIN(duration_seconds)
+  `;
+
+  return rows;
+}
+
 // ── Draft Abandonment Metrics ─────────────────────────────────────
 
 export interface DraftAbandonmentMetrics {

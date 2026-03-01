@@ -198,6 +198,18 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   },
 };
 
+/**
+ * Return the cheapest (fast-tier) model ID for a provider.
+ * Falls back to the first model if no fast tier exists, or null if the provider
+ * has no models at all (e.g. STT-only providers like deepgram/assemblyai).
+ */
+export function getCheapestModelForProvider(providerId: AiProviderId): string | null {
+  const meta = AI_PROVIDERS[providerId];
+  if (!meta || meta.models.length === 0) return null;
+  const fast = meta.models.find((m) => m.tier === 'fast');
+  return fast?.id ?? meta.models[0].id;
+}
+
 export function getAiProviderMeta(id: AiProviderId): AiProviderMeta {
   const meta = AI_PROVIDERS[id];
   if (!meta) throw new Error(`Unknown AI provider: ${id}`);

@@ -5,6 +5,7 @@ import {
   getInProgressPipelines,
   getRecentlySucceeded,
   getDraftAbandonmentMetrics,
+  getPerStageTiming,
 } from '@/lib/funnel-metrics';
 import {
   getRecentPipelineErrors,
@@ -125,7 +126,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
   const [
     funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats,
     inProgress, recentlySucceeded, draftAbandonment,
-    voiceByProvider, topVoices,
+    voiceByProvider, topVoices, stageTiming,
   ] = await Promise.all([
     getFreeTierFunnel(),
     getByokAdoption(),
@@ -138,6 +139,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     getDraftAbandonmentMetrics(since, until),
     getVoiceUsageByProvider(since),
     getTopVoices(since),
+    getPerStageTiming(since),
   ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
@@ -321,6 +323,39 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
             <span className={styles.cardValue}>{pipeline.totalAttempted.toLocaleString()}</span>
           </div>
         </div>
+      </section>
+
+      {/* Per-Stage Timing */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Per-Stage Timing ({rangeLabel})</h2>
+        {stageTiming.length === 0 ? (
+          <p className={styles.empty}>No stage completion data yet.</p>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.recentTable}>
+              <thead>
+                <tr>
+                  <th>Stage</th>
+                  <th>Avg</th>
+                  <th>p50</th>
+                  <th>p95</th>
+                  <th>Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stageTiming.map((s) => (
+                  <tr key={s.stage}>
+                    <td>{s.stage}</td>
+                    <td className={styles.elapsedCell}>{formatSeconds(s.avgSeconds)}</td>
+                    <td className={styles.elapsedCell}>{formatSeconds(s.p50Seconds)}</td>
+                    <td className={styles.elapsedCell}>{formatSeconds(s.p95Seconds)}</td>
+                    <td>{s.count.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* In Progress */}

@@ -146,6 +146,10 @@ vi.mock('@/lib/tts-tag-converter', () => ({
   convertTurnsForProvider: vi.fn().mockImplementation((turns: unknown[]) => Promise.resolve(turns)),
 }));
 
+vi.mock('@/lib/pipeline-events', () => ({
+  logPipelineStageComplete: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     info: vi.fn(),

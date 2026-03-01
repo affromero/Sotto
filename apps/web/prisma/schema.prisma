@@ -909,7 +909,7 @@ model PipelineEvent {
   podcastId String
   createdAt DateTime @default(now())
   stage     String   // queue name: 'audio-generation', 'script-verification', etc.
-  type      String   // 'error' | 'warning' | 'retry'
+  type      String   // 'error' | 'warning' | 'retry' | 'complete'
   message   String   @db.Text
   metadata  Json?    // { segmentId?, jobId?, attemptNumber?, errorKind? }
 
