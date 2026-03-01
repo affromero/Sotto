@@ -330,6 +330,45 @@
   font-weight: 500;
 }
 
+.providerPills {
+  display: flex;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.pill {
+  padding: var(--spacing-xs) var(--spacing-md);
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pill:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: rgba(217, 119, 6, 0.05);
+}
+
+.pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pillActive {
+  color: var(--color-surface);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.pillActive:hover:not(:disabled) {
+  color: var(--color-surface);
+  background: var(--color-primary);
+}
+
 .inputTabs {
   display: flex;
   gap: var(--spacing-xs);
