@@ -24,7 +24,6 @@ interface ConfigFormProps {
     ttsModel: string;
     sttProvider: string;
     sttModel: string;
-    generationLimit: number;
     dailyGenerationLimit: number;
     aiAllocations: Allocation[];
     ttsAllocations: Allocation[];
@@ -41,7 +40,6 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
   const [ttsModel, setTtsModel] = useState(initialConfig.ttsModel);
   const [sttProvider, setSttProvider] = useState(initialConfig.sttProvider);
   const [sttModel, setSttModel] = useState(initialConfig.sttModel);
-  const [generationLimit, setGenerationLimit] = useState(initialConfig.generationLimit);
   const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
   const [useAiAllocations, setUseAiAllocations] = useState(initialConfig.aiAllocations.length > 0);
   const [aiAllocations, setAiAllocations] = useState<Allocation[]>(initialConfig.aiAllocations);
@@ -92,7 +90,6 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           aiProvider, aiModel,
           ttsProvider, ttsModel,
           sttProvider, sttModel,
-          generationLimit,
           dailyGenerationLimit,
           aiAllocations: useAiAllocations ? aiAllocations : [],
           ttsAllocations: useTtsAllocations ? ttsAllocations : [],
@@ -230,22 +227,6 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
       </div>
 
       <div className={styles.field}>
-        <label className={styles.label} htmlFor="generationLimit">
-          Free Generation Limit
-        </label>
-        <input
-          id="generationLimit"
-          type="number"
-          className={styles.input}
-          value={generationLimit}
-          onChange={(e) => setGenerationLimit(parseInt(e.target.value, 10) || 0)}
-          min={0}
-          max={100}
-        />
-        <span className={styles.hint}>Max free podcasts per user before requiring BYOK keys</span>
-      </div>
-
-      <div className={styles.field}>
         <label className={styles.label} htmlFor="dailyGenerationLimit">
           Daily Generation Limit
         </label>
@@ -284,7 +265,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           providers={aiProviders}
           allocations={aiAllocations}
           onChange={setAiAllocations}
-          generationLimit={generationLimit}
+          dailyGenerationLimit={dailyGenerationLimit}
         />
       )}
 
@@ -311,7 +292,7 @@ export function ConfigForm({ initialConfig, aiProviders, ttsProviders, sttProvid
           providers={ttsProviders}
           allocations={ttsAllocations}
           onChange={setTtsAllocations}
-          generationLimit={generationLimit}
+          dailyGenerationLimit={dailyGenerationLimit}
         />
       )}
 

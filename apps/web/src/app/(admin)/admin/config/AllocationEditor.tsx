@@ -25,7 +25,7 @@ interface AllocationEditorProps {
   providers: ProviderOption[];
   allocations: Allocation[];
   onChange: (allocations: Allocation[]) => void;
-  generationLimit: number;
+  dailyGenerationLimit: number;
 }
 
 export function AllocationEditor({
@@ -33,10 +33,10 @@ export function AllocationEditor({
   providers,
   allocations,
   onChange,
-  generationLimit,
+  dailyGenerationLimit,
 }: AllocationEditorProps) {
   const quotaSum = allocations.reduce((sum, a) => sum + a.quota, 0);
-  const isOver = quotaSum > generationLimit;
+  const isOver = quotaSum > dailyGenerationLimit;
 
   const handleAdd = () => {
     const usedProviders = new Set(allocations.map((a) => a.provider));
@@ -83,7 +83,7 @@ export function AllocationEditor({
       <div className={styles.sectionHeader}>
         <h4 className={styles.sectionTitle}>{label} Allocations</h4>
         <span className={`${styles.quotaSummary} ${isOver ? styles.quotaOver : ''}`}>
-          {quotaSum} / {generationLimit} allocated
+          {quotaSum} / {dailyGenerationLimit} allocated
         </span>
       </div>
 

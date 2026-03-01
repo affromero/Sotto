@@ -66,7 +66,7 @@ vi.mock('@/lib/tweet-parser', () => ({
   resolveModelFromTweet: (...args: unknown[]) => mockResolveModelFromTweet(...args),
 }));
 
-const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
 const mockTryIncrementFreeGeneration = vi.fn().mockResolvedValue(true);
 
 vi.mock('@/lib/generation-gate', () => ({
@@ -74,7 +74,7 @@ vi.mock('@/lib/generation-gate', () => ({
   tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
 }));
 
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', generationLimit: 3, ttsAllocations: [], aiAllocations: [] });
+const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', dailyGenerationLimit: 3, ttsAllocations: [], aiAllocations: [] });
 
 vi.mock('@/lib/free-tier-config', () => ({
   getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
@@ -208,7 +208,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -248,7 +248,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',
@@ -287,7 +287,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       const mockParseResult: TweetParseResult = {
         topic: 'Quantum Physics',
         title: 'Understanding Quantum Mechanics',
@@ -399,7 +399,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: false });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_provider', isByokUser: false });
       mockPrismaTweetMentionCreate.mockResolvedValue({ id: 'mention-001' });
 
       const job = createMockJob({});
@@ -488,7 +488,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockGetTweet.mockResolvedValue({ tweet: parentTweet, mediaByKey: new Map() });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'AI',
@@ -532,7 +532,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockParseTweetIntent.mockResolvedValue({
         topic: 'Test',
         title: 'Test',
@@ -582,7 +582,7 @@ describe('processTwitterMentions', () => {
         preferredAiProvider: null,
         preferredAiModel: null,
       });
-      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+      mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
       mockSelectVoicePair.mockReturnValue({
         host: { id: 'voice-host-1' },
         expert: { id: 'voice-expert-1' },

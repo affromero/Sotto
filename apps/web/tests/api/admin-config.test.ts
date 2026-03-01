@@ -64,7 +64,7 @@ describe('GET /api/admin/config', () => {
       aiProvider: 'anthropic',
       aiModel: 'claude-sonnet-4-6',
       ttsProvider: 'elevenlabs',
-      generationLimit: 10,
+      dailyGenerationLimit: 10,
     };
     mockGetFreeTierConfig.mockResolvedValue(mockConfig);
 
@@ -119,7 +119,7 @@ describe('PATCH /api/admin/config', () => {
       aiProvider: 'openai',
       aiModel: 'gpt-4',
       ttsProvider: 'elevenlabs',
-      generationLimit: 5,
+      dailyGenerationLimit: 5,
     };
     mockGetFreeTierConfig.mockResolvedValue(updatedConfig);
 
@@ -134,10 +134,10 @@ describe('PATCH /api/admin/config', () => {
   it('accepts valid allocations', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockSetFreeTierConfig.mockResolvedValue(undefined);
-    mockGetFreeTierConfig.mockResolvedValue({ generationLimit: 5 });
+    mockGetFreeTierConfig.mockResolvedValue({ dailyGenerationLimit: 5 });
 
     const request = createPatchRequest({
-      generationLimit: 5,
+      dailyGenerationLimit: 5,
       ttsAllocations: [
         { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
         { provider: 'openai', model: 'tts-1-hd', quota: 3 },
@@ -161,7 +161,7 @@ describe('PATCH /api/admin/config', () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const request = createPatchRequest({
-      generationLimit: 3,
+      dailyGenerationLimit: 3,
       ttsAllocations: [
         { provider: 'elevenlabs', model: 'eleven_v3', quota: 2 },
         { provider: 'openai', model: 'tts-1-hd', quota: 3 },
@@ -171,14 +171,14 @@ describe('PATCH /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toContain('TTS allocation quotas (5) exceed generation limit (3)');
+    expect(body.error).toContain('TTS allocation quotas (5) exceed daily generation limit (3)');
   });
 
   it('rejects AI allocations exceeding generation limit', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const request = createPatchRequest({
-      generationLimit: 2,
+      dailyGenerationLimit: 2,
       aiAllocations: [
         { provider: 'anthropic', model: 'claude-haiku-4-5-20251001', quota: 3 },
       ],
@@ -187,14 +187,14 @@ describe('PATCH /api/admin/config', () => {
     const body = await response.json();
 
     expect(response.status).toBe(400);
-    expect(body.error).toContain('AI allocation quotas (3) exceed generation limit (2)');
+    expect(body.error).toContain('AI allocation quotas (3) exceed daily generation limit (2)');
   });
 
   it('rejects allocation with missing fields', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const request = createPatchRequest({
-      generationLimit: 5,
+      dailyGenerationLimit: 5,
       ttsAllocations: [{ provider: 'elevenlabs' }],
     });
     const response = await PATCH(request);
@@ -205,10 +205,10 @@ describe('PATCH /api/admin/config', () => {
   it('clears allocations when empty arrays are sent', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
     mockSetFreeTierConfig.mockResolvedValue(undefined);
-    mockGetFreeTierConfig.mockResolvedValue({ generationLimit: 5 });
+    mockGetFreeTierConfig.mockResolvedValue({ dailyGenerationLimit: 5 });
 
     const request = createPatchRequest({
-      generationLimit: 5,
+      dailyGenerationLimit: 5,
       aiAllocations: [],
       ttsAllocations: [],
     });

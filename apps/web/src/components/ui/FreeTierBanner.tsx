@@ -175,7 +175,7 @@ export function FreeTierBanner({
           <p className={styles.description}>
             {exhausted
               ? 'Upgrade to Pro for unlimited generation, or add your own API keys (BYOK).'
-              : 'Free tier: 1 podcast per day, platform AI and voices included.'}
+              : `Free tier: ${dailyLimit} podcast${dailyLimit !== 1 ? 's' : ''} per day, platform AI and voices included.`}
           </p>
         </div>
         <div className={styles.actions}>

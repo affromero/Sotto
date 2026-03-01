@@ -49,7 +49,7 @@ const autoModelDefaults = {
 };
 
 const baseFreeTierConfig = {
-  generationLimit: 3,
+  dailyGenerationLimit: 3,
   ttsAllocations: [],
   aiAllocations: [],
 };

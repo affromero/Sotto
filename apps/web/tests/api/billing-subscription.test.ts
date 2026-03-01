@@ -81,9 +81,6 @@ describe('GET /api/billing/subscription', () => {
     mockListByokProviders.mockResolvedValue([{ provider: 'elevenlabs', isValid: true }]);
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
     mockGetFreeTierStatus.mockResolvedValue({
-      freeGenerationsUsed: 2,
-      freeGenerationsLimit: 5,
-      freeGenerationsRemaining: 3,
       isByokUser: true,
     });
 
@@ -95,12 +92,7 @@ describe('GET /api/billing/subscription', () => {
     expect(body.status).toBe('ACTIVE');
     expect(body.byok.ai).toEqual([{ provider: 'anthropic', isValid: true }]);
     expect(body.byok.tts).toEqual([{ provider: 'elevenlabs', isValid: true }]);
-    expect(body.freeTier).toEqual({
-      used: 2,
-      limit: 5,
-      remaining: 3,
-      isByokUser: true,
-    });
+    expect(body.freeTier.isByokUser).toBe(true);
     expect(body.limits).toBeDefined();
   });
 

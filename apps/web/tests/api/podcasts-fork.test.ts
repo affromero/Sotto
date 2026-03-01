@@ -176,7 +176,7 @@ const mockSourcePodcast = {
 function setupSuccessMocks(userId = 'user-1') {
   mockAuthenticateRequest.mockResolvedValue({ userId });
   mockUserFindUnique.mockResolvedValue({ name: 'Alice' });
-  mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+  mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
   mockPodcastFindUnique.mockResolvedValue(mockSourcePodcast);
   mockAddJob.mockResolvedValue(undefined);
   mockPodcastUpdate.mockResolvedValue({});
@@ -232,7 +232,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 404 when source podcast does not exist', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue(null);
 
     const request = createRequest();
@@ -247,7 +247,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 403 when source podcast is not PUBLIC', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       visibility: 'PRIVATE',
@@ -265,7 +265,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 403 when source podcast is UNLISTED', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       visibility: 'UNLISTED',
@@ -283,7 +283,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 400 when source podcast status is not READY', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       status: 'PENDING',
@@ -301,7 +301,7 @@ describe('POST /api/podcasts/[podcastId]/fork', () => {
 
   it('returns 400 when source podcast is GENERATING_AUDIO', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
-    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', freeGenerationsUsed: 0, freeGenerationsLimit: 3, isByokUser: true });
+    mockCheckGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
     mockPodcastFindUnique.mockResolvedValue({
       ...mockSourcePodcast,
       status: 'GENERATING_AUDIO',
