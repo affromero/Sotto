@@ -4,3 +4,7 @@
 2026-03-01 * "Hume" "AI subscription — March 2026"
   Expenses:TTS:Hume                              6.16 USD
   Assets:Current:Cash:Bank                      -6.16 USD
+
+2026-03-01 * "Fal" "API credits — March 2026"
+  Expenses:AI:FAL                              20.00 USD
+  Assets:Current:Cash:Bank                    -20.00 USD

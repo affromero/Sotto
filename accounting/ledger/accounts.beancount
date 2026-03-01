@@ -86,6 +86,9 @@
 2026-01-01 open Expenses:AI:Claude:TweetParsing                 USD
 2026-01-01 open Expenses:AI:Claude:Other                        USD
 
+; Fal.ai — AI image/video generation
+2026-01-01 open Expenses:AI:FAL                                 USD
+
 ; ============================================================
 ; EXPENSES — TTS (Text-to-Speech)
 ; ============================================================
