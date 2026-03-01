@@ -1,22 +1,16 @@
 ; Sotto — February 2026 Transactions
 ; Monthly operational expenses and revenue
 
-; ============================================================
 ; Infrastructure — Hetzner VPS
-; ============================================================
 
 ; Hetzner not yet provisioned — add transactions when VPS is started
 ; Expected: CX32 ~EUR 6.80/mo + 20% backups
 
-; ============================================================
 ; Infrastructure — Cloudflare (free tier)
-; ============================================================
 
 ; Cloudflare DNS + CDN + R2 — free tier, $0
 
-; ============================================================
 ; Shared / Free Resources (no Sotto-specific cost)
-; ============================================================
 
 ; Claude Code — $200/mo personal subscription (flat rate, shared across all projects)
 ; Not allocated to Sotto — cost doesn't change with Sotto usage
@@ -24,9 +18,7 @@
 ; ElevenLabs — Pro plan ($99/mo monthly billing)
 ; Upgraded from free tier February 2026
 
-; ============================================================
 ; API Usage Costs
-; ============================================================
 
 ; API costs are imported from ApiUsageLog via:
 ;   uv run import-api-usage --month 2026-02
@@ -43,9 +35,7 @@
 ;   openai/tts             → Expenses:TTS:OpenAI:Standard
 ;   ffmpeg/*               → (compute cost, negligible, tracked but not billed)
 
-; ============================================================
 ; Stripe Revenue
-; ============================================================
 
 ; Stripe revenue is imported via:
 ;   uv run import-stripe --month 2026-02
