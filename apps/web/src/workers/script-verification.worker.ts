@@ -21,12 +21,13 @@ import { createSegmentsAndQueueAudio } from '@/lib/segment-creator';
 import { convertTurnsForProvider } from '@/lib/tts-tag-converter';
 import { logUsage } from '@/lib/usage-logger';
 import { getAiKey, getByokKey, hasByokKey } from '@/lib/byok';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { assignVoicesForPodcast } from '@/lib/voice-assigner';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import { getTierFeatures } from '@/lib/tier-features';
 import { logger } from '@/lib/logger';
+import { logPipelineStageComplete } from '@/lib/pipeline-events';
 
 const MAX_VERIFICATION_ATTEMPTS = 3;
 
@@ -70,6 +71,10 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     plan: userPlan.plan as 'FREE' | 'PRO',
   });
 
+  // Use cheapest model for structured verification (fact-check analysis) — save the
+  // full model for creative regeneration tasks where quality matters more.
+  const verificationModel = getCheapestModelForProvider(provider as AiProviderId) ?? model;
+
   const requestedDuration = discovery.durationTarget || 10;
   const maxDurationMinutes = isFinite(tierFeatures.maxDurationMinutes)
     ? Math.min(requestedDuration, tierFeatures.maxDurationMinutes)
@@ -102,7 +107,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     maxDurationMinutes,
     previousFeedback: script.verificationFeedback || undefined,
     apiKeyOverride: aiKey?.apiKey,
-    model,
+    model: verificationModel,
     previousClaims: previousClaims.length > 0 ? previousClaims : undefined,
     verificationMode,
   });
@@ -296,6 +301,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       }
     }
 
+    await logPipelineStageComplete(podcastId, 'script-verification');
     await job.updateProgress(100);
     return;
   }
