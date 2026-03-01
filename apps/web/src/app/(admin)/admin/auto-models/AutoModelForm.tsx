@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import styles from './AutoModelForm.module.css';
 
 interface ModelOption {
@@ -36,6 +36,10 @@ interface AutoModelFormProps {
     platform: PlatformConfig;
     freeIncludedModels: string[] | null;
     proIncludedModels: string[] | null;
+    freeIncludedTtsModels: string[] | null;
+    proIncludedTtsModels: string[] | null;
+    freeIncludedSttModels: string[] | null;
+    proIncludedSttModels: string[] | null;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -193,33 +197,39 @@ function PlanSection({
 }
 
 function IncludedModelsEditor({
-  aiProviders,
+  title,
+  description,
+  providers,
   freeIncluded,
   proIncluded,
   freeDefault,
   proDefault,
+  compositeIds,
   onFreeChange,
   onProChange,
   onClear,
 }: {
-  aiProviders: ProviderOption[];
+  title: string;
+  description: string;
+  providers: ProviderOption[];
   freeIncluded: Set<string>;
   proIncluded: Set<string>;
   freeDefault: string;
   proDefault: string;
+  compositeIds?: boolean;
   onFreeChange: (modelId: string, checked: boolean) => void;
   onProChange: (modelId: string, checked: boolean) => void;
   onClear: () => void;
 }) {
   const hasOverrides = freeIncluded.size > 0 || proIncluded.size > 0;
 
+  const modelKey = (providerId: string, modelId: string) =>
+    compositeIds ? `${providerId}:${modelId}` : modelId;
+
   return (
     <fieldset className={styles.section}>
-      <legend className={styles.sectionTitle}>Included Models</legend>
-      <p className={styles.platformDescription}>
-        Control which AI models appear in the picker for non-BYOK users.
-        Free models are always included in the Pro tier.
-      </p>
+      <legend className={styles.sectionTitle}>{title}</legend>
+      <p className={styles.platformDescription}>{description}</p>
 
       {!hasOverrides && (
         <p className={styles.defaultsHint}>
@@ -234,15 +244,16 @@ function IncludedModelsEditor({
           <span className={styles.checkboxHeader}>Pro</span>
         </div>
 
-        {aiProviders.map((provider) => (
+        {providers.map((provider) => (
           <div key={provider.id}>
             <div className={styles.providerGroup}>{provider.displayName}</div>
             {provider.models.map((model) => {
-              const isFreDefault = model.id === freeDefault;
-              const isProDefault = model.id === proDefault;
+              const key = modelKey(provider.id, model.id);
+              const isFreDefault = key === freeDefault;
+              const isProDefault = key === proDefault;
 
               return (
-                <div key={model.id} className={styles.modelRow}>
+                <div key={key} className={styles.modelRow}>
                   <span className={styles.modelName}>
                     {model.displayName}
                     {(isFreDefault || isProDefault) && (
@@ -255,16 +266,16 @@ function IncludedModelsEditor({
                     <input
                       type="checkbox"
                       className={styles.checkbox}
-                      checked={freeIncluded.has(model.id)}
-                      onChange={(e) => onFreeChange(model.id, e.target.checked)}
+                      checked={freeIncluded.has(key)}
+                      onChange={(e) => onFreeChange(key, e.target.checked)}
                     />
                   </label>
                   <label className={styles.checkboxCell}>
                     <input
                       type="checkbox"
                       className={styles.checkbox}
-                      checked={proIncluded.has(model.id)}
-                      onChange={(e) => onProChange(model.id, e.target.checked)}
+                      checked={proIncluded.has(key)}
+                      onChange={(e) => onProChange(key, e.target.checked)}
                     />
                   </label>
                 </div>
@@ -296,11 +307,28 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const freeState = usePlanState(initialConfig.free, providers);
   const proState = usePlanState(initialConfig.pro, providers);
 
+  // AI included models state
   const [freeIncluded, setFreeIncluded] = useState<Set<string>>(
     new Set(initialConfig.freeIncludedModels ?? [])
   );
   const [proIncluded, setProIncluded] = useState<Set<string>>(
     new Set(initialConfig.proIncludedModels ?? [])
+  );
+
+  // TTS included models state
+  const [freeIncludedTts, setFreeIncludedTts] = useState<Set<string>>(
+    new Set(initialConfig.freeIncludedTtsModels ?? [])
+  );
+  const [proIncludedTts, setProIncludedTts] = useState<Set<string>>(
+    new Set(initialConfig.proIncludedTtsModels ?? [])
+  );
+
+  // STT included models state
+  const [freeIncludedStt, setFreeIncludedStt] = useState<Set<string>>(
+    new Set(initialConfig.freeIncludedSttModels ?? [])
+  );
+  const [proIncludedStt, setProIncludedStt] = useState<Set<string>>(
+    new Set(initialConfig.proIncludedSttModels ?? [])
   );
 
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
@@ -315,42 +343,52 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     }
   };
 
-  const handleFreeChange = useCallback((modelId: string, checked: boolean) => {
-    setFreeIncluded((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(modelId);
-        // Checking Free auto-checks Pro
-        setProIncluded((p) => new Set(p).add(modelId));
-      } else {
-        next.delete(modelId);
-      }
-      return next;
-    });
-  }, []);
+  // Generic included model handlers (reusable for AI, TTS, STT)
+  function makeIncludedHandlers(
+    setFree: React.Dispatch<React.SetStateAction<Set<string>>>,
+    setPro: React.Dispatch<React.SetStateAction<Set<string>>>
+  ) {
+    const onFreeChange = (modelId: string, checked: boolean) => {
+      setFree((prev) => {
+        const next = new Set(prev);
+        if (checked) {
+          next.add(modelId);
+          setPro((p) => new Set(p).add(modelId));
+        } else {
+          next.delete(modelId);
+        }
+        return next;
+      });
+    };
 
-  const handleProChange = useCallback((modelId: string, checked: boolean) => {
-    setProIncluded((prev) => {
-      const next = new Set(prev);
-      if (checked) {
-        next.add(modelId);
-      } else {
-        next.delete(modelId);
-        // Unchecking Pro auto-unchecks Free
-        setFreeIncluded((f) => {
-          const nf = new Set(f);
-          nf.delete(modelId);
-          return nf;
-        });
-      }
-      return next;
-    });
-  }, []);
+    const onProChange = (modelId: string, checked: boolean) => {
+      setPro((prev) => {
+        const next = new Set(prev);
+        if (checked) {
+          next.add(modelId);
+        } else {
+          next.delete(modelId);
+          setFree((f) => {
+            const nf = new Set(f);
+            nf.delete(modelId);
+            return nf;
+          });
+        }
+        return next;
+      });
+    };
 
-  const handleClearIncluded = useCallback(() => {
-    setFreeIncluded(new Set());
-    setProIncluded(new Set());
-  }, []);
+    const onClear = () => {
+      setFree(new Set());
+      setPro(new Set());
+    };
+
+    return { onFreeChange, onProChange, onClear };
+  }
+
+  const aiHandlers = makeIncludedHandlers(setFreeIncluded, setProIncluded);
+  const ttsHandlers = makeIncludedHandlers(setFreeIncludedTts, setProIncludedTts);
+  const sttHandlers = makeIncludedHandlers(setFreeIncludedStt, setProIncludedStt);
 
   const handleSave = async () => {
     setSaving(true);
@@ -367,6 +405,10 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
           freeIncludedModels: freeIncluded.size > 0 ? [...freeIncluded] : null,
           proIncludedModels: proIncluded.size > 0 ? [...proIncluded] : null,
+          freeIncludedTtsModels: freeIncludedTts.size > 0 ? [...freeIncludedTts] : null,
+          proIncludedTtsModels: proIncludedTts.size > 0 ? [...proIncludedTts] : null,
+          freeIncludedSttModels: freeIncludedStt.size > 0 ? [...freeIncludedStt] : null,
+          proIncludedSttModels: proIncludedStt.size > 0 ? [...proIncludedStt] : null,
         }),
       });
 
@@ -403,14 +445,44 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
       />
 
       <IncludedModelsEditor
-        aiProviders={aiProviders}
+        title="Included AI Models"
+        description="Control which AI models appear in the picker for non-BYOK users. Free models are always included in the Pro tier."
+        providers={aiProviders}
         freeIncluded={freeIncluded}
         proIncluded={proIncluded}
         freeDefault={freeState.aiModel}
         proDefault={proState.aiModel}
-        onFreeChange={handleFreeChange}
-        onProChange={handleProChange}
-        onClear={handleClearIncluded}
+        onFreeChange={aiHandlers.onFreeChange}
+        onProChange={aiHandlers.onProChange}
+        onClear={aiHandlers.onClear}
+      />
+
+      <IncludedModelsEditor
+        title="Included TTS Models"
+        description="Control which TTS models are available to non-BYOK users. Free models are always included in the Pro tier."
+        providers={ttsProviders}
+        freeIncluded={freeIncludedTts}
+        proIncluded={proIncludedTts}
+        freeDefault={`${freeState.ttsProvider}:${freeState.ttsModel}`}
+        proDefault={`${proState.ttsProvider}:${proState.ttsModel}`}
+        compositeIds
+        onFreeChange={ttsHandlers.onFreeChange}
+        onProChange={ttsHandlers.onProChange}
+        onClear={ttsHandlers.onClear}
+      />
+
+      <IncludedModelsEditor
+        title="Included STT Models"
+        description="Control which STT models are available to non-BYOK users. Free models are always included in the Pro tier."
+        providers={sttProviders}
+        freeIncluded={freeIncludedStt}
+        proIncluded={proIncludedStt}
+        freeDefault={`${freeState.sttProvider}:${freeState.sttModel}`}
+        proDefault={`${proState.sttProvider}:${proState.sttModel}`}
+        compositeIds
+        onFreeChange={sttHandlers.onFreeChange}
+        onProChange={sttHandlers.onProChange}
+        onClear={sttHandlers.onClear}
       />
 
       <fieldset className={styles.section}>
