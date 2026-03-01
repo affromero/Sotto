@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './llm';
+import { createAIProvider } from './providers/ai';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 import { hashTurn, matchClaimsToTurns } from './turn-diff';
 import { loadPrompt, loadAndRender } from './prompt-loader';
@@ -44,13 +44,14 @@ const PARSE_FAILURE_FEEDBACK = 'Script verification failed: could not parse AI r
 async function retryParseWithStricterPrompt(
   systemPrompt: string,
   userMessage: string,
-  opts: { maxTokens: number; apiKeyOverride?: string; model?: string },
+  opts: { maxTokens: number; apiKeyOverride?: string; model?: string; provider?: string },
 ): Promise<{ parsed: Record<string, unknown>; inputTokens: number; outputTokens: number; model: string } | null> {
   try {
-    const response = await generateResponse(
+    const ai = createAIProvider(opts.provider);
+    const response = await ai.generateResponse(
       systemPrompt + '\n\nCRITICAL: You MUST respond with ONLY a valid JSON object. No prose, no markdown fences, no explanation. Start with { and end with }.',
       [{ role: 'user', content: userMessage + '\n\nRespond with ONLY valid JSON.' }],
-      { ...opts, tools: [WEB_SEARCH_TOOL], skipModeration: true },
+      { maxTokens: opts.maxTokens, apiKeyOverride: opts.apiKeyOverride, model: opts.model, useWebSearch: true, skipModeration: true },
     );
     const parsed = JSON.parse(extractFirstJsonObject(response.content));
     return { parsed, inputTokens: response.inputTokens, outputTokens: response.outputTokens, model: response.model };
@@ -382,6 +383,7 @@ export async function verifyScript(params: {
   previousFeedback?: string;
   apiKeyOverride?: string;
   model?: string;
+  provider?: string;
   previousClaims?: ClaimAnalysis[];
   verificationMode?: string;
 }): Promise<VerificationVerdict> {
@@ -444,11 +446,12 @@ ${referencesText}
 
 Analyze ONLY the changed turns listed in the system instructions. Return JSON only.`;
 
-    const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+    const ai = createAIProvider(params.provider);
+    const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
       maxTokens: 8192,
       apiKeyOverride: params.apiKeyOverride,
       model: params.model,
-      tools: [WEB_SEARCH_TOOL],
+      useWebSearch: true,
       skipModeration: true,
     });
 
@@ -460,7 +463,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
       const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-        maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model,
+        maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
       });
       if (retry) {
         parsed = retry.parsed as typeof parsed;
@@ -529,11 +532,12 @@ ${referencesText}
 
 Analyze every factual claim. Return JSON only.`;
 
-  const response = await generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
+  const ai = createAIProvider(params.provider);
+  const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
     maxTokens: 8192,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
-    tools: [WEB_SEARCH_TOOL],
+    useWebSearch: true,
     skipModeration: true,
   });
 
@@ -545,7 +549,7 @@ Analyze every factual claim. Return JSON only.`;
     parsed = JSON.parse(extractFirstJsonObject(response.content));
   } catch {
     const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-      maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model,
+      maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
     });
     if (retry) {
       parsed = retry.parsed as typeof parsed;
