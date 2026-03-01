@@ -154,6 +154,21 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     ? podcastVoice.voiceId
     : provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
+  // Persist resolved voice for retry consistency and analytics
+  if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+    try {
+      await prisma.podcastVoice.upsert({
+        where: { podcastId_speaker: { podcastId, speaker } },
+        update: { voiceId, provider: providerId },
+        create: { podcastId, speaker, voiceId, provider: providerId },
+      });
+    } catch (err) {
+      logger.warn('Failed to persist voice assignment', {
+        podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // Resolve the raw API key for concurrency lookups
   const resolvedApiKey = await getByokKey(podcast.userId, providerId)
     || (providerId === 'elevenlabs' ? process.env.ELEVENLABS_API_KEY

@@ -117,6 +117,21 @@ export async function processVoiceTrackAudio(job: Job<GenerateVoiceTrackAudioPay
     ? trackVoice.voiceId
     : provider.getVoiceId(speaker, podcastId);
 
+  // Persist resolved voice for retry consistency
+  if (!trackVoice || trackVoice.provider !== providerId || trackVoice.voiceId !== voiceId) {
+    try {
+      await prisma.voiceTrackVoice.upsert({
+        where: { voiceTrackId_speaker: { voiceTrackId, speaker } },
+        update: { voiceId, provider: providerId },
+        create: { voiceTrackId, speaker, voiceId, provider: providerId },
+      });
+    } catch (err) {
+      logger.warn('Failed to persist voice track voice assignment', {
+        podcastId, voiceTrackId, speaker, error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // Resolve the raw API key for concurrency lookups
   const resolvedApiKey = await getByokKey(userId, providerId)
     || (providerId === 'elevenlabs' ? process.env.ELEVENLABS_API_KEY
