@@ -33,7 +33,7 @@ describe('Sidebar', () => {
     expect(screen.getByText('Discover')).toBeInTheDocument();
     expect(screen.getByText('API Keys')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
-    // Voices, Analytics, Team are CREATOR/ADMIN only
+    // Voices, Analytics require hasPodcasts or ADMIN
     expect(screen.queryByText('Voices')).not.toBeInTheDocument();
     expect(screen.queryByText('Analytics')).not.toBeInTheDocument();
   });
@@ -62,9 +62,8 @@ describe('Sidebar', () => {
     expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings');
   });
 
-  it('shows creator/admin nav items when role is CREATOR', () => {
-    const creatorUser = { ...mockUser, role: 'CREATOR' };
-    render(<Sidebar currentPath="/dashboard" user={creatorUser} hasPodcasts />);
+  it('shows Voices and Analytics when user has podcasts', () => {
+    render(<Sidebar currentPath="/dashboard" user={mockUser} hasPodcasts />);
 
     expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getByText('Voices')).toBeInTheDocument();

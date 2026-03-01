@@ -26,7 +26,8 @@ export async function DashboardStats({ userId, userEmail, userRole }: DashboardS
     }),
   ]);
 
-  const isCreatorOrAdmin = userRole === 'CREATOR' || userRole === 'ADMIN';
+  const hasPodcasts = podcastStats._count > 0;
+  const isCreatorOrAdmin = hasPodcasts || userRole === 'ADMIN';
   const totalListens = podcastStats._sum.playCount ?? 0;
   const totalForks = podcastStats._sum.forkCount ?? 0;
   const totalLikes = podcastStats._sum.likeCount ?? 0;

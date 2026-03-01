@@ -229,12 +229,6 @@ describe('Middleware Security Tests', () => {
       expect(getRedirectLocation(res)).toBe('/dashboard');
     });
 
-    it('blocks CREATOR from /admin', async () => {
-      mockGetToken.mockResolvedValue({ sub: 'user-2', role: 'CREATOR' });
-      const res = await middleware(createRequest('/admin'));
-      expect(getRedirectLocation(res)).toBe('/dashboard');
-    });
-
     it('blocks user with no role from /admin', async () => {
       mockGetToken.mockResolvedValue({ sub: 'user-3' });
       const res = await middleware(createRequest('/admin'));

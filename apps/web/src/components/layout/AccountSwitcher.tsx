@@ -70,7 +70,6 @@ export function AccountSwitcher({ variant = 'dashboard', hasActivePlayer = false
         <div className={styles.userInfo}>
           <div className={styles.userNameRow}>
             <span className={styles.userName}>{displayName}</span>
-            {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
           </div>
           <button
             className={styles.signOut}
