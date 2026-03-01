@@ -721,9 +721,8 @@ describe('processAudioStitching', () => {
   });
 
   describe('error handling', () => {
-    it('marks podcast as FAILED when stitching fails', async () => {
+    it('re-throws error without marking podcast failed (centralized handler does that)', async () => {
       mockStitchWithEffects.mockReset().mockRejectedValue(new Error('FFmpeg error'));
-      // Need to provide segment data since stitching happens after segment fetch
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
@@ -733,9 +732,8 @@ describe('processAudioStitching', () => {
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
-      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
-        technicalError: 'FFmpeg error',
-      });
+      // markPodcastFailed is NOT called in the catch block — centralized handler handles it
+      expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
     });
 
     it('propagates error from downloadFile', async () => {
@@ -747,7 +745,6 @@ describe('processAudioStitching', () => {
 
     it('propagates error from uploadPodcastAudio', async () => {
       mockUploadPodcastAudio.mockReset().mockRejectedValue(new Error('R2 upload failed'));
-      // Need to provide segment data since upload happens after segment processing
       mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
         { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
         { id: 'seg-2', audioUrl: 'https://r2.example.com/seg-2.mp3', order: 1, duration: 100 },
@@ -758,7 +755,7 @@ describe('processAudioStitching', () => {
       await expect(processAudioStitching(job)).rejects.toThrow('R2 upload failed');
     });
 
-    it('queues Twitter failure reply when Twitter-sourced podcast fails', async () => {
+    it('does not queue Twitter failure reply in catch block (centralized handler does that)', async () => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
         userId: 'user-1',
         title: 'Test Podcast',
@@ -768,22 +765,80 @@ describe('processAudioStitching', () => {
         audioUrl: null,
         user: { telegramEnabled: false, telegramChatId: null },
       });
-      mockPrismaTweetMentionFindFirst.mockResolvedValue({
-        id: 'mention-1',
-        tweetId: 'tweet-123',
-        status: 'GENERATING',
-      });
       mockStitchWithEffects.mockRejectedValue(new Error('FFmpeg error'));
+      mockPrismaSegmentFindMany.mockReset().mockResolvedValueOnce([
+        { id: 'seg-1', audioUrl: 'https://r2.example.com/seg-1.mp3', order: 0, duration: 100 },
+      ]);
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow('FFmpeg error');
 
+      // No twitter-reply job queued from catch block
+      const replyJobCall = mockAddJob.mock.calls.find((call) => call[1] === 'reply_twitter');
+      expect(replyJobCall).toBeUndefined();
+    });
+  });
+
+  describe('retry-after-failure success path', () => {
+    it('finds TweetMention in FAILED status on successful retry', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Retried Podcast',
+        source: 'TWITTER',
+        sourceTweetId: 'tweet-retry',
+        currentVersion: 0,
+        audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
+      });
+      mockPrismaTweetMentionFindFirst.mockResolvedValue({
+        id: 'mention-failed',
+        tweetId: 'tweet-retry',
+        status: 'FAILED',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith({ name: 'twitter-reply' }, 'reply_twitter', {
+        podcastId: 'podcast-001',
+        tweetMentionId: 'mention-failed',
+        originalTweetId: 'tweet-retry',
+      });
+    });
+  });
+
+  describe('duration-exceeded failure replies', () => {
+    it('queues Twitter failure reply on duration-exceeded for Twitter-sourced podcast', async () => {
+      mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
+        userId: 'user-1',
+        title: 'Long Podcast',
+        source: 'TWITTER',
+        sourceTweetId: 'tweet-long',
+        currentVersion: 0,
+        audioUrl: null,
+        user: { telegramEnabled: false, telegramChatId: null },
+      });
+      mockPrismaTweetMentionFindFirst.mockResolvedValue({
+        id: 'mention-long',
+        tweetId: 'tweet-long',
+        status: 'GENERATING',
+      });
+      // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
+      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', expect.objectContaining({
+        technicalError: expect.stringContaining('exceeded max'),
+      }));
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'twitter-reply' },
         'reply_twitter',
         expect.objectContaining({
           podcastId: 'podcast-001',
-          tweetMentionId: 'mention-1',
+          tweetMentionId: 'mention-long',
+          originalTweetId: 'tweet-long',
         })
       );
     });
