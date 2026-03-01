@@ -20,6 +20,8 @@ import { logger } from '@/lib/logger';
 import { capturePodcastPayments } from '@/lib/voice-pricing';
 import { generateFingerprint } from '@/lib/audio-fingerprint';
 import { verifyReferral } from '@/lib/referrals';
+import { consumeFreeGeneration } from '@/lib/generation-gate';
+import { hasByokKey } from '@/lib/byok';
 
 import * as path from 'path';
 import * as os from 'os';
@@ -267,6 +269,23 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         currentVersion: newVersion,
       },
     });
+
+    // Consume free-tier quota on successful generation (not at creation time)
+    const podcastUser = await prisma.user.findUniqueOrThrow({
+      where: { id: podcast.userId },
+      select: { role: true, plan: true },
+    });
+    const isByok = await hasByokKey(podcast.userId);
+    const isPrivileged = podcastUser.role === 'ADMIN' || podcastUser.role === 'SYSTEM';
+    if (!isByok && podcastUser.plan !== 'PRO' && !isPrivileged) {
+      await consumeFreeGeneration(podcast.userId).catch((err) => {
+        logger.warn('Failed to consume free generation', {
+          podcastId,
+          userId: podcast.userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
 
     // Record pipeline completion event for accurate timing metrics
     await prisma.pipelineEvent.create({

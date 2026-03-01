@@ -10,8 +10,8 @@ import { loadAndRender } from '@/lib/prompt-loader';
 import { getAiKey } from '@/lib/byok';
 import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
 import { getLanguageLabel } from '@sotto/shared';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
-import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
+import { checkGenerationGate } from '@/lib/generation-gate';
+
 import { checkRateLimit } from '@/lib/redis';
 import type { RegenerateSegmentPayload } from '@/lib/queue';
 
@@ -65,17 +65,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
     return errorResponse(msg, 403, { code: gate.reason });
   }
 
-  // Atomically increment free tier counter before any state mutations
-  if (!gate.isByokUser) {
-    const selected = await selectFreeTierProviders(userId);
-    const ok = await tryIncrementFreeGeneration(userId, gate.dailyLimit, {
-      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
-      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
-    });
-    if (!ok) {
-      return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
-    }
-  }
+  // Quota consumed on success by workers — no increment here
 
   if (interaction.podcast.source === 'IMPORT') {
     return errorResponse('Incorporation not yet supported for imported podcasts', 400);
