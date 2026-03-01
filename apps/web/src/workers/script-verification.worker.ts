@@ -313,6 +313,24 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       technicalError: `Verification failed ${attemptNumber}/${MAX_VERIFICATION_ATTEMPTS}: ${verdict.feedback}`,
     });
 
+    await prisma.pipelineEvent.create({
+      data: {
+        podcastId,
+        stage: 'script-verification',
+        type: 'error',
+        message: `Verification failed after ${attemptNumber} attempts. Score: ${verdict.score}. ${verdict.feedback}`,
+        metadata: {
+          attemptNumber,
+          score: verdict.score,
+          totalClaims: verdict.totalClaims,
+          unsupported: verdict.unsupportedClaims.length,
+        },
+      },
+    }).catch(err => logger.error('Failed to write PipelineEvent', {
+      podcastId,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+
     await prisma.script.update({
       where: { podcastId },
       data: {
