@@ -41,30 +41,21 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     return;
   }
 
-  const [aiKey, hasTts, user] = await Promise.all([
+  const [aiKey, hasTts, user, podcast, discovery] = await Promise.all([
     useAdminCredits ? Promise.resolve(null) : getAiKey(userId),
     useAdminCredits ? Promise.resolve(true) : hasByokKey(userId),
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true, role: true } }),
+    prisma.podcast.findUniqueOrThrow({ where: { id: podcastId }, select: { aiModel: true } }),
+    prisma.discovery.findUniqueOrThrow({ where: { id: discoveryId } }),
   ]);
 
   const tierFeatures = getTierFeatures(user.plan as 'FREE' | 'PRO', hasTts, user.role);
-
-  // Read podcast's aiModel preference
-  const podcast = await prisma.podcast.findUniqueOrThrow({
-    where: { id: podcastId },
-    select: { aiModel: true },
-  });
 
   // Model + provider resolved together — prevents sending e.g. gpt-5-mini to Anthropic
   const { model, provider } = await resolveAiModelAndProvider({
     podcastAiModel: podcast.aiModel,
     aiKey,
     plan: user.plan as 'FREE' | 'PRO',
-  });
-
-  // Get discovery metadata
-  const discovery = await prisma.discovery.findUniqueOrThrow({
-    where: { id: discoveryId },
   });
 
   const sourceMetadata = discovery.sourceMetadata as SourceMetadata | null;
@@ -148,7 +139,9 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     logger.info('References saved', { podcastId, count: String(result.references.length) });
   }
 
-  // Auto-assign audience tag
+  // Collect all tag slugs upfront for a single batched lookup
+  const allTagSlugs = new Set<string>();
+
   const audienceSlugMap: Record<string, string> = {
     kids: 'kids',
     teens: 'teens',
@@ -157,45 +150,17 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     mature: 'mature-topics',
   };
   const audienceSlug = audienceSlugMap[discovery.audience || 'general'];
-  if (audienceSlug) {
-    const audienceTag = await prisma.tag.findUnique({ where: { slug: audienceSlug } });
-    if (audienceTag) {
-      await prisma.podcastTag.upsert({
-        where: { podcastId_tagId: { podcastId, tagId: audienceTag.id } },
-        update: {},
-        create: { podcastId, tagId: audienceTag.id },
-      });
-    }
-  }
+  if (audienceSlug) allTagSlugs.add(audienceSlug);
 
   // Detect language from script text
   const fullText = result.turns.map((t: { text: string }) => t.text).join(' ');
   const detectedLanguage = detectLanguage(fullText);
+  if (detectedLanguage) allTagSlugs.add(`lang-${detectedLanguage}`);
 
-  // Auto-assign language tag
-  if (detectedLanguage) {
-    const langSlug = `lang-${detectedLanguage}`;
-    const langTag = await prisma.tag.findUnique({ where: { slug: langSlug } });
-    if (langTag) {
-      await prisma.podcastTag.upsert({
-        where: { podcastId_tagId: { podcastId, tagId: langTag.id } },
-        update: {},
-        create: { podcastId, tagId: langTag.id },
-      });
-    }
-  }
+  // Production tag
+  allTagSlugs.add('prod-ai-generated');
 
-  // Auto-assign production tag
-  const prodTag = await prisma.tag.findUnique({ where: { slug: 'prod-ai-generated' } });
-  if (prodTag) {
-    await prisma.podcastTag.upsert({
-      where: { podcastId_tagId: { podcastId, tagId: prodTag.id } },
-      update: {},
-      create: { podcastId, tagId: prodTag.id },
-    });
-  }
-
-  // Auto-assign episode type tag from discovery depth
+  // Episode type tag from discovery depth
   const depthToTypeSlug: Record<string, string> = {
     eli5: 'type-eli5',
     quick_overview: 'type-quick-overview',
@@ -203,36 +168,40 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     deep_dive: 'type-deep-dive',
   };
   const typeSlug = depthToTypeSlug[discovery.depth || 'standard'];
-  if (typeSlug) {
-    const typeTag = await prisma.tag.findUnique({ where: { slug: typeSlug } });
-    if (typeTag) {
-      await prisma.podcastTag.upsert({
-        where: { podcastId_tagId: { podcastId, tagId: typeTag.id } },
-        update: {},
-        create: { podcastId, tagId: typeTag.id },
-      });
-    }
-  }
+  if (typeSlug) allTagSlugs.add(typeSlug);
 
-  // Auto-assign topic tags from discovery metadata
+  // Topic tags + parents
   const topicSlugs = matchTopicTags({
     topic: discovery.topic || '',
     focusAreas: discovery.focusAreas ?? [],
   });
   for (const slug of topicSlugs) {
+    allTagSlugs.add(slug);
     const parent = TAG_PARENT_MAP[slug];
-    const slugsToAssign = parent ? [slug, parent] : [slug];
-    for (const s of slugsToAssign) {
-      const tag = await prisma.tag.findUnique({ where: { slug: s } });
-      if (tag) {
-        await prisma.podcastTag.upsert({
-          where: { podcastId_tagId: { podcastId, tagId: tag.id } },
+    if (parent) allTagSlugs.add(parent);
+  }
+
+  // Single batched DB lookup for all tags
+  const allTags = await prisma.tag.findMany({
+    where: { slug: { in: [...allTagSlugs] } },
+  });
+  const tagsBySlug = new Map(allTags.map((t) => [t.slug, t.id]));
+
+  // Upsert all matching tags in parallel
+  const tagUpserts: Promise<unknown>[] = [];
+  for (const slug of allTagSlugs) {
+    const tagId = tagsBySlug.get(slug);
+    if (tagId) {
+      tagUpserts.push(
+        prisma.podcastTag.upsert({
+          where: { podcastId_tagId: { podcastId, tagId } },
           update: {},
-          create: { podcastId, tagId: tag.id },
-        });
-      }
+          create: { podcastId, tagId },
+        }),
+      );
     }
   }
+  await Promise.all(tagUpserts);
 
   // Route to script verification (handles both with and without references)
   await prisma.podcast.update({
