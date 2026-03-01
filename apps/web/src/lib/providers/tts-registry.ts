@@ -185,7 +185,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
 
   fal: {
     id: 'fal',
-    displayName: 'Fal (Qwen3-TTS)',
+    displayName: 'Fal',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     supportsSfx: false,
     supportsVoiceCloning: true,
@@ -249,7 +249,7 @@ const TTS_PROVIDERS: Record<TtsProviderId, TtsProviderMeta> = {
 
   replicate: {
     id: 'replicate',
-    displayName: 'Replicate (Qwen3-TTS)',
+    displayName: 'Replicate',
     getApiKeyUrl: 'https://replicate.com/account/api-tokens',
     supportsSfx: false,
     supportsVoiceCloning: false,
