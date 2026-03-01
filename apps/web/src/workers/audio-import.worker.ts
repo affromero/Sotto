@@ -9,6 +9,7 @@ import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
 import { generateImportMetadata, isMetadataDifferent } from '@/lib/import-metadata-generator';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getAiKey } from '@/lib/byok';
+import { resolveAiModelAndProvider, getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 import { detectLanguage } from '@/lib/language-detect';
 import { getSttProviderMeta } from '@/lib/providers/stt-registry';
 import { logUsage } from '@/lib/usage-logger';
@@ -75,8 +76,10 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     }
 
     // Resolve user's BYOK AI key for diarization + metadata generation
-    const aiKey = await getAiKey(userId, 'anthropic') ?? await getAiKey(userId, 'openai');
-    const aiApiKey = aiKey?.apiKey;
+    const aiKey = await getAiKey(userId);
+    const userPlan = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { plan: true } });
+    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({ aiKey, plan: userPlan.plan as 'FREE' | 'PRO' });
+    const cheapModel = getCheapestModelForProvider(aiProvider as AiProviderId) ?? aiModel;
 
     await prisma.podcast.update({
       where: { id: podcastId },
@@ -150,7 +153,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
           end: s.endTime ?? 0,
           text: s.text,
         }));
-        segments = await diarizeSpeakers(whisperSegments, aiApiKey);
+        segments = await diarizeSpeakers(whisperSegments, aiKey?.apiKey, cheapModel, aiProvider);
       }
     } else {
       logger.info('Transcribing audio', { provider: sttProvider ?? 'openai', model: sttModel ?? 'default' });
@@ -176,7 +179,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
       await job.updateProgress(70);
 
       logger.info('Running speaker diarization');
-      segments = await diarizeSpeakers(transcription.segments, aiApiKey);
+      segments = await diarizeSpeakers(transcription.segments, aiKey?.apiKey, cheapModel, aiProvider);
     }
 
     await job.updateProgress(75);
@@ -184,7 +187,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     // Always generate AI metadata from transcript
     try {
       const fullText = segments.map((s) => s.text).join(' ');
-      const metadata = await generateImportMetadata(fullText, aiApiKey);
+      const metadata = await generateImportMetadata(fullText, aiKey?.apiKey, cheapModel, aiProvider);
 
       if (generateMetadata) {
         // User didn't provide title — apply AI metadata directly

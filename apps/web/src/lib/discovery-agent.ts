@@ -56,8 +56,17 @@ export function parseMetadata(
 export async function getDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  providerType?: string,
 ): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
+  if (providerType && providerType !== 'anthropic' && providerType !== 'claude-code') {
+    const provider = createAIProvider(providerType);
+    return provider.generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
+      maxTokens: 2048,
+      apiKeyOverride,
+      model,
+    });
+  }
   return generateResponse(DISCOVERY_SYSTEM_PROMPT, messages, {
     maxTokens: 2048,
     apiKeyOverride,

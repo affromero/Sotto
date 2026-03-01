@@ -1,4 +1,4 @@
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -207,7 +207,8 @@ function extractFirstJsonArray(text: string): string {
 export async function diarizeSpeakers(
   segments: TranscriptionResult['segments'],
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  provider?: string
 ): Promise<ParsedSegment[]> {
   if (segments.length === 0) {
     return [];
@@ -219,14 +220,15 @@ export async function diarizeSpeakers(
 
   const userPrompt = `Transcript segments:\n${transcriptText}\n\nAssign each segment index to either HOST or EXPERT as a JSON array.`;
 
-  const response = await generateResponse(DIARIZATION_SYSTEM_PROMPT, [{ role: 'user', content: userPrompt }], {
+  const ai = createAIProvider(provider);
+  const response = await ai.generateResponse(DIARIZATION_SYSTEM_PROMPT, [{ role: 'user', content: userPrompt }], {
     maxTokens: 4096,
     apiKeyOverride,
     model,
   });
 
   logUsage({
-    service: 'anthropic',
+    service: provider ?? 'anthropic',
     model: response.model,
     category: 'diarization',
     inputTokens: response.inputTokens,

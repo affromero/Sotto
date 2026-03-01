@@ -8,7 +8,7 @@
 
 import { prisma } from './prisma';
 import { getVoiceCatalog, type CatalogVoice } from './voice-catalog';
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { resolveAutoModel } from './auto-model-config';
@@ -176,7 +176,7 @@ async function llmAssignVoices(
 
   const autoConfig = await resolveAutoModel('PLATFORM');
 
-  const response = await generateResponse(
+  const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
     prompt,
     [{ role: 'user', content: 'Assign voices now.' }],
     {
@@ -187,7 +187,7 @@ async function llmAssignVoices(
   );
 
   await logUsage({
-    service: 'anthropic',
+    service: autoConfig.aiProvider,
     model: response.model,
     category: 'voice_assignment',
     inputTokens: response.inputTokens,

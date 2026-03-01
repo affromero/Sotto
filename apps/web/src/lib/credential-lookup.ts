@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { logUsage } from './usage-logger';
@@ -50,20 +50,20 @@ export async function lookupParticipantCredentials(
   try {
     const autoConfig = await resolveAutoModel('PLATFORM');
 
-    const response = await generateResponse(
+    const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
       SYSTEM_PROMPT,
       [{ role: 'user', content: userMessage }],
       {
         maxTokens: 2048,
         model: autoConfig.aiModel,
         apiKeyOverride,
-        tools: [WEB_SEARCH_TOOL],
+        useWebSearch: true,
         skipModeration: true,
       }
     );
 
     logUsage({
-      service: 'anthropic',
+      service: autoConfig.aiProvider,
       model: response.model,
       category: 'credential_lookup',
       inputTokens: response.inputTokens,

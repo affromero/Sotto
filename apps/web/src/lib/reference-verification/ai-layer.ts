@@ -1,4 +1,4 @@
-import { generateResponse, WEB_SEARCH_TOOL } from '@/lib/llm';
+import { createAIProvider } from '@/lib/providers/ai';
 import { loadPrompt } from '@/lib/prompt-loader';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
@@ -37,7 +37,8 @@ export async function aiEvaluateWithDomainContext(
   refsWithDomain: RefWithDomain[],
   topic: string,
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  provider?: string
 ): Promise<Map<string, VerificationCheck>> {
   const results = new Map<string, VerificationCheck>();
 
@@ -77,20 +78,28 @@ ${refsContext}
 
 Evaluate each reference according to its domain instructions. Return JSON only.`;
 
+  const AI_TIMEOUT_MS = 90_000;
+
   try {
-    const response = await generateResponse(
-      systemPrompt,
-      [{ role: 'user', content: userMessage }],
-      {
-        maxTokens: 4096,
-        apiKeyOverride,
-        model,
-        tools: [WEB_SEARCH_TOOL],
-      }
-    );
+    const ai = createAIProvider(provider);
+    const response = await Promise.race([
+      ai.generateResponse(
+        systemPrompt,
+        [{ role: 'user', content: userMessage }],
+        {
+          maxTokens: 4096,
+          apiKeyOverride,
+          model,
+          useWebSearch: true,
+        }
+      ),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('AI evaluation timed out after 90s')), AI_TIMEOUT_MS)
+      ),
+    ]);
 
     logUsage({
-      service: 'anthropic',
+      service: provider ?? 'anthropic',
       model: response.model,
       category: 'reference_validation',
       inputTokens: response.inputTokens,

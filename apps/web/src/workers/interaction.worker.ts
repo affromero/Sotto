@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { ProcessInteractionPayload } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { generateResponse } from '@/lib/llm';
+import { createAIProvider } from '@/lib/providers/ai';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS, INPUT_SANITIZATION_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
@@ -107,7 +107,8 @@ export async function processInteraction(job: Job<ProcessInteractionPayload>): P
 
   let response;
   try {
-    response = await generateResponse(systemPrompt, [
+    const ai = createAIProvider(provider);
+    response = await ai.generateResponse(systemPrompt, [
       {
         role: 'user',
         content: `Recent podcast context:\n${recentContext}\n\nUser's question: ${question}`,

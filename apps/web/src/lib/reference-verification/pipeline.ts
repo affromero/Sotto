@@ -61,7 +61,8 @@ export async function runReferenceVerification(
   scriptTurns: Array<{ speaker: string; text: string }>,
   topic: string,
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  provider?: string
 ): Promise<{ results: Map<string, VerificationResult>; rejectedRefIds: Set<string> }> {
   const results = new Map<string, VerificationResult>();
   const rejectedRefIds = new Set<string>();
@@ -97,23 +98,19 @@ export async function runReferenceVerification(
 
   const layerTasks = acceptedRefs.map((ref) => async () => {
     const domain = domainMap.get(ref.id)!;
-    const checks: VerificationCheck[] = [];
 
-    // URL: run for all domains
-    const urlCheck = await verifyUrl(ref);
-    checks.push(urlCheck);
+    // Run applicable checks in parallel — each is independent with its own timeout
+    const checkPromises: Promise<VerificationCheck>[] = [verifyUrl(ref)];
 
-    // DOI: only for ACADEMIC
     if (domain === 'ACADEMIC') {
-      const doiCheck = await verifyDoi(ref);
-      checks.push(doiCheck);
+      checkPromises.push(verifyDoi(ref));
     }
 
-    // Title search: ACADEMIC and GENERAL
     if (domain === 'ACADEMIC' || domain === 'GENERAL') {
-      const titleCheck = await searchTitle(ref);
-      checks.push(titleCheck);
+      checkPromises.push(searchTitle(ref));
     }
+
+    const checks = await Promise.all(checkPromises);
 
     return { id: ref.id, checks };
   });
@@ -149,7 +146,7 @@ export async function runReferenceVerification(
   // AI layer: single batch call with per-ref domain instructions
   let aiResults: Map<string, VerificationCheck>;
   try {
-    aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, apiKeyOverride, model);
+    aiResults = await aiEvaluateWithDomainContext(refsWithDomain, topic, apiKeyOverride, model, provider);
   } catch (error) {
     logger.warn('AI evaluation failed, using external checks only', {
       error: error instanceof Error ? error.message : 'Unknown',

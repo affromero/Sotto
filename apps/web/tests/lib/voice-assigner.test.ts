@@ -21,8 +21,8 @@ vi.mock('@/lib/voice-catalog', () => ({
   getVoiceCatalog: (...args: unknown[]) => mockGetVoiceCatalog(...args),
 }));
 
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({ generateResponse: (...args: unknown[]) => mockGenerateResponse(...args) }),
 }));
 
 vi.mock('@/lib/prompt-loader', () => ({

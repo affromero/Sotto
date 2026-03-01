@@ -18,8 +18,10 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
 
-vi.mock('@/lib/llm', () => ({
-  generateResponse: vi.fn().mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1 }),
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({
+    generateResponse: vi.fn().mockResolvedValue({ content: 'OK', inputTokens: 5, outputTokens: 1, model: 'claude-haiku-4-5-20251001' }),
+  }),
 }));
 
 vi.mock('@/lib/redis', () => ({
