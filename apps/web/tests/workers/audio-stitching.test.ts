@@ -702,6 +702,24 @@ describe('processAudioStitching', () => {
     });
   });
 
+  describe('duration limit failure', () => {
+    it('sends PODCAST_FAILED notification when duration exceeds limit', async () => {
+      // LIMITS.maxDurationMinutes is 30, so max with 10% grace = 1980s
+      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', expect.objectContaining({
+        technicalError: expect.stringContaining('exceeded max'),
+      }));
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'notifications' },
+        'send_notification',
+        expect.objectContaining({ type: 'PODCAST_FAILED', title: 'Podcast generation failed' })
+      );
+    });
+  });
+
   describe('error handling', () => {
     it('marks podcast as FAILED when stitching fails', async () => {
       mockStitchWithEffects.mockReset().mockRejectedValue(new Error('FFmpeg error'));

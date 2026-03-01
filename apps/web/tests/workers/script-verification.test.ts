@@ -10,6 +10,7 @@ const mockPrismaReferenceDeleteMany = vi.fn().mockResolvedValue({});
 const mockPrismaReferenceCreateMany = vi.fn().mockResolvedValue({});
 const mockPrismaPodcastFindUniqueOrThrow = vi.fn();
 const mockPrismaPodcastUpdate = vi.fn().mockResolvedValue({});
+const mockPrismaPipelineEventCreate = vi.fn().mockResolvedValue({});
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
@@ -33,7 +34,7 @@ vi.mock('@/lib/prisma', () => {
       update: (...args: unknown[]) => mockPrismaPodcastUpdate(...args),
     },
     pipelineEvent: {
-      create: vi.fn().mockResolvedValue({}),
+      create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
@@ -709,8 +710,26 @@ describe('processScriptVerification', () => {
       expect(mockAddJob).toHaveBeenCalledWith(
         { name: 'notifications' },
         'send_notification',
-        expect.objectContaining({ userId: 'user-001', type: 'PODCAST_READY' })
+        expect.objectContaining({ userId: 'user-001', type: 'PODCAST_FAILED' })
       );
+    });
+
+    it('writes PipelineEvent with error details', async () => {
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockPrismaPipelineEventCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          podcastId: 'podcast-001',
+          stage: 'script-verification',
+          type: 'error',
+          message: expect.stringContaining('Verification failed after 3 attempts'),
+          metadata: expect.objectContaining({
+            attemptNumber: 3,
+            score: failedVerdict.score,
+          }),
+        }),
+      });
     });
 
     it('does not regenerate script on max failure', async () => {
