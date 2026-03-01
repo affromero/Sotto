@@ -95,8 +95,12 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
 
   useEffect(() => {
     async function load() {
+      setLoaded(false);
       try {
-        const res = await fetch('/api/voices');
+        const params = new URLSearchParams();
+        if (ttsProvider) params.set('provider', ttsProvider);
+        const url = `/api/voices${params.size ? `?${params}` : ''}`;
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           setPoolVoices(data.poolVoices || []);
@@ -110,7 +114,7 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
       }
     }
     load();
-  }, []);
+  }, [ttsProvider]);
 
   useEffect(() => {
     if (!customMode) {
@@ -265,57 +269,69 @@ export function VoicePicker({ onSelectionChange, maxSpeakers = 2, ttsProvider }:
               </>
             ) : (
               <>
-                {userClones.length > 0 && (
-                  <>
-                    <span className={styles.clonesLabel}>Your Voices</span>
-                    <div className={styles.voiceGrid}>
-                      {userClones.map((clone) => (
-                        <VoiceCard
-                          key={clone.externalVoiceId}
-                          voiceId={clone.externalVoiceId}
-                          name={clone.name}
-                          accent="custom"
-                          character="Cloned voice"
-                          isSelected={selectedVoiceId === clone.externalVoiceId}
-                          onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
-                        />
-                      ))}
-                    </div>
-                    <div className={styles.separator} />
-                  </>
-                )}
-                {sharedVoices.length > 0 && (
-                  <>
-                    <span className={styles.clonesLabel}>Shared With You</span>
-                    <div className={styles.voiceGrid}>
-                      {sharedVoices.map((voice) => (
-                        <VoiceCard
-                          key={voice.externalVoiceId}
-                          voiceId={voice.externalVoiceId}
-                          name={voice.name}
-                          accent="shared"
-                          character={`by ${voice.owner.name || 'Unknown'}`}
-                          isSelected={selectedVoiceId === voice.externalVoiceId}
-                          onSelect={() => handleSelectVoice(speaker.name, voice.externalVoiceId)}
-                        />
-                      ))}
-                    </div>
-                    <div className={styles.separator} />
-                  </>
-                )}
-                <div className={styles.voiceGrid}>
-                  {poolVoices.map((voice) => (
-                    <VoiceCard
-                      key={voice.id}
-                      voiceId={voice.id}
-                      name={voice.name}
-                      accent={voice.accent}
-                      character={voice.character}
-                      isSelected={selectedVoiceId === voice.id}
-                      onSelect={() => handleSelectVoice(speaker.name, voice.id)}
-                    />
-                  ))}
-                </div>
+                {(() => {
+                  const providerClones = ttsProvider
+                    ? userClones.filter((c) => c.provider === ttsProvider)
+                    : userClones;
+                  const providerShared = ttsProvider
+                    ? sharedVoices.filter((v) => v.provider === ttsProvider)
+                    : sharedVoices;
+                  return (
+                    <>
+                      {providerClones.length > 0 && (
+                        <>
+                          <span className={styles.clonesLabel}>Your Voices</span>
+                          <div className={styles.voiceGrid}>
+                            {providerClones.map((clone) => (
+                              <VoiceCard
+                                key={clone.externalVoiceId}
+                                voiceId={clone.externalVoiceId}
+                                name={clone.name}
+                                accent="custom"
+                                character="Cloned voice"
+                                isSelected={selectedVoiceId === clone.externalVoiceId}
+                                onSelect={() => handleSelectVoice(speaker.name, clone.externalVoiceId)}
+                              />
+                            ))}
+                          </div>
+                          <div className={styles.separator} />
+                        </>
+                      )}
+                      {providerShared.length > 0 && (
+                        <>
+                          <span className={styles.clonesLabel}>Shared With You</span>
+                          <div className={styles.voiceGrid}>
+                            {providerShared.map((voice) => (
+                              <VoiceCard
+                                key={voice.externalVoiceId}
+                                voiceId={voice.externalVoiceId}
+                                name={voice.name}
+                                accent="shared"
+                                character={`by ${voice.owner.name || 'Unknown'}`}
+                                isSelected={selectedVoiceId === voice.externalVoiceId}
+                                onSelect={() => handleSelectVoice(speaker.name, voice.externalVoiceId)}
+                              />
+                            ))}
+                          </div>
+                          <div className={styles.separator} />
+                        </>
+                      )}
+                      <div className={styles.voiceGrid}>
+                        {poolVoices.map((voice) => (
+                          <VoiceCard
+                            key={voice.id}
+                            voiceId={voice.id}
+                            name={voice.name}
+                            accent={voice.accent}
+                            character={voice.character}
+                            isSelected={selectedVoiceId === voice.id}
+                            onSelect={() => handleSelectVoice(speaker.name, voice.id)}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()}
               </>
             )}
           </div>
