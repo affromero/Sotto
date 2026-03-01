@@ -79,6 +79,27 @@ export const FAL_VOICE_POOL: ProviderVoice[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// MiniMax Speech-02 HD voices — 12 curated from 17 presets (6 male, 6 female)
+// ---------------------------------------------------------------------------
+
+export const MINIMAX_VOICE_POOL: ProviderVoice[] = [
+  // Male voices
+  { id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' },
+  { id: 'Casual_Guy', name: 'Casual Guy', gender: 'male', character: 'casual and curious' },
+  { id: 'Patient_Man', name: 'Patient Man', gender: 'male', character: 'warm narrator' },
+  { id: 'Elegant_Man', name: 'Elegant Man', gender: 'male', character: 'polished professional' },
+  { id: 'Young_Knight', name: 'Young Knight', gender: 'male', character: 'confident presenter' },
+  { id: 'Determined_Man', name: 'Determined Man', gender: 'male', character: 'enthusiastic explainer' },
+  // Female voices
+  { id: 'Wise_Woman', name: 'Wise Woman', gender: 'female', character: 'warm narrator' },
+  { id: 'Calm_Woman', name: 'Calm Woman', gender: 'female', character: 'calm and authoritative' },
+  { id: 'Lively_Girl', name: 'Lively Girl', gender: 'female', character: 'engaging storyteller' },
+  { id: 'Inspirational_girl', name: 'Inspirational Girl', gender: 'female', character: 'enthusiastic explainer' },
+  { id: 'Friendly_Person', name: 'Friendly Person', gender: 'female', character: 'friendly conversationalist' },
+  { id: 'Lovely_Girl', name: 'Lovely Girl', gender: 'female', character: 'polished professional' },
+];
+
+// ---------------------------------------------------------------------------
 // Provider voice scoring (tone-character only, no ageRange/accent)
 // ---------------------------------------------------------------------------
 

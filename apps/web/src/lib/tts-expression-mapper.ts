@@ -37,11 +37,17 @@ export interface OpenAIExpression {
   instructions: string;
 }
 
+export interface MinimaxExpression {
+  /** MiniMax emotion value: happy | sad | angry | fearful | disgusted | surprised | neutral */
+  emotion?: 'happy' | 'sad' | 'angry' | 'fearful' | 'disgusted' | 'surprised' | 'neutral';
+}
+
 export interface TtsExpressionParams {
   elevenlabs?: ElevenLabsExpression;
   cartesia?: CartesiaExpression;
   hume?: HumeExpression;
   openai?: OpenAIExpression;
+  minimax?: MinimaxExpression;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +59,7 @@ interface DirectionMapping {
   cartesia: CartesiaExpression;
   hume: { description: string };
   openai: { instructions: string };
+  minimax: MinimaxExpression;
 }
 
 /**
@@ -65,120 +72,140 @@ const DIRECTION_MAP: Record<string, DirectionMapping> = {
     cartesia: { emotion: 'excited' },
     hume: { description: 'energetic, enthusiastic, high-energy delivery' },
     openai: { instructions: 'Speak with high energy and enthusiasm, like an excited podcast host.' },
+    minimax: { emotion: 'happy' },
   },
   excited: {
     elevenlabs: { audioTagPrefix: '[excited] ', stability: 0.0 },
     cartesia: { emotion: 'excited' },
     hume: { description: 'excited, enthusiastic' },
     openai: { instructions: 'Speak with genuine excitement and enthusiasm.' },
+    minimax: { emotion: 'happy' },
   },
   thoughtful: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5 },
     cartesia: { emotion: 'contemplative' },
     hume: { description: 'thoughtful, measured, reflective' },
     openai: { instructions: 'Speak thoughtfully with a measured, reflective pace.' },
+    minimax: { emotion: 'neutral' },
   },
   serious: {
     elevenlabs: { stability: 1.0 },
     cartesia: { emotion: 'determined' },
     hume: { description: 'serious, grave, measured' },
     openai: { instructions: 'Speak in a serious, measured tone with gravitas.' },
+    minimax: { emotion: 'neutral' },
   },
   playful: {
     elevenlabs: { audioTagPrefix: '[playfully] ', stability: 0.0 },
     cartesia: { emotion: 'happy' },
     hume: { description: 'playful, light-hearted, fun' },
     openai: { instructions: 'Speak playfully and light-heartedly, with a smile in your voice.' },
+    minimax: { emotion: 'happy' },
   },
   sarcastic: {
     elevenlabs: { audioTagPrefix: '[sarcastic] ', stability: 0.5 },
     cartesia: { emotion: 'sarcastic' },
     hume: { description: 'sarcastic, dry, deadpan' },
     openai: { instructions: 'Speak with dry sarcasm and a slightly flat affect.' },
+    minimax: { emotion: 'neutral' },
   },
   warm: {
     elevenlabs: { stability: 0.5 },
     cartesia: { emotion: 'affectionate' },
     hume: { description: 'warm, inviting, friendly' },
     openai: { instructions: 'Speak warmly and invitingly, like welcoming a friend.' },
+    minimax: { emotion: 'neutral' },
   },
   urgent: {
     elevenlabs: { audioTagPrefix: '[rushed] ', stability: 0.0 },
     cartesia: { emotion: 'agitated' },
     hume: { description: 'urgent, fast-paced, pressing' },
     openai: { instructions: 'Speak with urgency, slightly faster pace, conveying importance.' },
+    minimax: { emotion: 'angry' },
   },
   hesitant: {
     elevenlabs: { audioTagPrefix: '[hesitantly] ', stability: 0.5 },
     cartesia: { emotion: 'hesitant' },
     hume: { description: 'hesitant, uncertain, searching for words' },
     openai: { instructions: 'Speak hesitantly, as if carefully choosing your words.' },
+    minimax: { emotion: 'fearful' },
   },
   confident: {
     elevenlabs: { stability: 1.0 },
     cartesia: { emotion: 'confident' },
     hume: { description: 'confident, assured, authoritative' },
     openai: { instructions: 'Speak with confidence and authority.' },
+    minimax: { emotion: 'neutral' },
   },
   nostalgic: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 0.5 },
     cartesia: { emotion: 'nostalgic' },
     hume: { description: 'nostalgic, wistful, reminiscing' },
     openai: { instructions: 'Speak with nostalgia, as if fondly remembering the past.' },
+    minimax: { emotion: 'sad' },
   },
   dramatic: {
     elevenlabs: { audioTagPrefix: '[dramatic] ', stability: 0.0 },
     cartesia: { emotion: 'amazed' },
     hume: { description: 'dramatic, building tension' },
     openai: { instructions: 'Speak dramatically, building tension and suspense.' },
+    minimax: { emotion: 'surprised' },
   },
   calm: {
     elevenlabs: { audioTagPrefix: '[calm] ', stability: 1.0 },
     cartesia: { emotion: 'calm' },
     hume: { description: 'calm, serene, measured' },
     openai: { instructions: 'Speak calmly and serenely, with a measured pace.' },
+    minimax: { emotion: 'neutral' },
   },
   curious: {
     elevenlabs: { audioTagPrefix: '[curious] ', stability: 0.5 },
     cartesia: { emotion: 'curious' },
     hume: { description: 'curious, inquisitive, wondering' },
     openai: { instructions: 'Speak with curiosity and genuine interest, slightly questioning.' },
+    minimax: { emotion: 'neutral' },
   },
   laughing: {
     elevenlabs: { audioTagPrefix: '[laughs] ', stability: 0.0 },
     cartesia: { emotion: 'happy' },
     hume: { description: 'amused, laughing, light-hearted' },
     openai: { instructions: 'Speak while lightly laughing, amused and cheerful.' },
+    minimax: { emotion: 'happy' },
   },
   whispering: {
     elevenlabs: { audioTagPrefix: '[whispers] ', stability: 0.5 },
     cartesia: {},
     hume: { description: 'whispering, hushed, secretive' },
     openai: { instructions: 'Whisper softly, as if sharing a secret.' },
+    minimax: { emotion: 'neutral' },
   },
   frustrated: {
     elevenlabs: { audioTagPrefix: '[frustrated] ', stability: 0.0 },
     cartesia: { emotion: 'frustrated' },
     hume: { description: 'frustrated, exasperated' },
     openai: { instructions: 'Speak with frustration and exasperation.' },
+    minimax: { emotion: 'angry' },
   },
   surprised: {
     elevenlabs: { audioTagPrefix: '[gasps] ', stability: 0.0 },
     cartesia: { emotion: 'surprised' },
     hume: { description: 'surprised, astonished' },
     openai: { instructions: 'Speak with genuine surprise and astonishment.' },
+    minimax: { emotion: 'surprised' },
   },
   sad: {
     elevenlabs: { audioTagPrefix: '[sighs] ', stability: 0.5 },
     cartesia: { emotion: 'sad' },
     hume: { description: 'sad, somber, heavy-hearted' },
     openai: { instructions: 'Speak with sadness, a heavy tone, slightly slower.' },
+    minimax: { emotion: 'sad' },
   },
   skeptical: {
     elevenlabs: { stability: 0.5 },
     cartesia: { emotion: 'skeptical' },
     hume: { description: 'skeptical, doubtful, questioning' },
     openai: { instructions: 'Speak with skepticism, as if not entirely convinced.' },
+    minimax: { emotion: 'neutral' },
   },
 };
 
@@ -262,6 +289,12 @@ export function mapDirectionToExpression(
         params.openai = { instructions: `Speak with a ${normalizedDirection} tone.` };
       } else {
         params.openai = { instructions: baseline.openai };
+      }
+      break;
+    }
+    case 'minimax': {
+      if (mapping?.minimax.emotion) {
+        params.minimax = mapping.minimax;
       }
       break;
     }

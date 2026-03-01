@@ -16,6 +16,7 @@ import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
   FAL_VOICE_POOL,
+  MINIMAX_VOICE_POOL,
   type ProviderVoice,
 } from './providers/tts-voices';
 import { cache } from './redis';
@@ -231,6 +232,9 @@ export async function getVoiceCatalog(
     case 'fal':
     case 'replicate':
       return providerVoiceToCatalog(FAL_VOICE_POOL);
+
+    case 'minimax':
+      return providerVoiceToCatalog(MINIMAX_VOICE_POOL);
 
     case 'kittentts':
       return KITTENTTS_VOICE_POOL.map((v) => ({

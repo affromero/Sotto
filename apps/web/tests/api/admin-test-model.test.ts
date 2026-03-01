@@ -37,6 +37,7 @@ vi.mock('@/lib/providers/tts-voices', () => ({
   CARTESIA_VOICE_POOL: [{ id: 'cartesia-test-voice', name: 'Barbershop Man', gender: 'male', character: 'warm' }],
   HUME_VOICE_POOL: [{ id: 'ITO', name: 'Ito', gender: 'female', character: 'warm' }],
   FAL_VOICE_POOL: [{ id: 'Vivian', name: 'Vivian', gender: 'female', character: 'warm' }],
+  MINIMAX_VOICE_POOL: [{ id: 'Deep_Voice_Man', name: 'Deep Voice Man', gender: 'male', character: 'authoritative expert' }],
 }));
 
 import { POST } from '@/app/api/admin/test-model/route';
