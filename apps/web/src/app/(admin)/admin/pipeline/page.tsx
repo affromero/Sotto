@@ -142,7 +142,7 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     getPerStageTiming(since),
   ]);
 
-  const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
+  const funnelMax = Math.max(funnel.freeGenUsers, funnel.byokUsers, 1);
   const maxAi = Math.max(...adoption.ai.map((a) => a.count), 1);
   const maxTts = Math.max(...adoption.tts.map((t) => t.count), 1);
   const maxDay = Math.max(...errorStats.daily.map((d) => d.total), 1);
@@ -215,26 +215,21 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
         <h2 className={styles.sectionTitle}>BYOK Conversion Funnel</h2>
         <div className={styles.grid}>
           <div className={styles.card}>
-            <span className={styles.cardLabel}>Free Tier Users</span>
+            <span className={styles.cardLabel}>Users with Podcasts</span>
             <span className={styles.cardValue}>{funnel.freeGenUsers.toLocaleString()}</span>
-          </div>
-          <div className={styles.card}>
-            <span className={styles.cardLabel}>Exhausted Free Tier</span>
-            <span className={styles.cardValue}>{funnel.exhaustedUsers.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
             <span className={styles.cardLabel}>BYOK Converted</span>
             <span className={styles.cardValue}>{funnel.byokUsers.toLocaleString()}</span>
           </div>
           <div className={styles.card}>
-            <span className={styles.cardLabel}>Conversion Rate</span>
-            <span className={styles.cardValue}>{Math.round(funnel.conversionRate * 100)}%</span>
+            <span className={styles.cardLabel}>BYOK Conversion Rate</span>
+            <span className={styles.cardValue}>{Math.round(funnel.byokConversionRate * 100)}%</span>
           </div>
         </div>
         <div className={styles.funnelContainer}>
           {[
-            { label: 'Used free tier', value: funnel.freeGenUsers },
-            { label: 'Exhausted limit', value: funnel.exhaustedUsers },
+            { label: 'Created podcasts', value: funnel.freeGenUsers },
             { label: 'Added BYOK keys', value: funnel.byokUsers },
           ].map((step) => (
             <div key={step.label} className={styles.funnelStep}>

@@ -34,9 +34,6 @@ interface ProviderQuota {
 }
 
 interface FreeTierInfo {
-  used: number;
-  limit: number;
-  remaining: number;
   dailyUsed: number;
   dailyLimit: number;
   dailyRemaining: number;
@@ -399,8 +396,6 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
               <h1 className={styles.title}>{getTitle()}</h1>
               {(freeTier || isProUser) && (
                 <FreeTierCounter
-                  used={freeTier?.used ?? 0}
-                  limit={freeTier?.limit ?? 1}
                   dailyUsed={freeTier?.dailyUsed ?? 0}
                   dailyLimit={freeTier?.dailyLimit ?? 1}
                   isByokUser={isByokUser ?? false}

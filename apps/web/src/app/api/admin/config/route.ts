@@ -27,7 +27,6 @@ const updateConfigSchema = z.object({
   ttsModel: z.string().min(1).optional(),
   sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().min(1).optional(),
-  generationLimit: z.number().int().min(0).max(100).optional(),
   dailyGenerationLimit: z.number().int().min(0).max(100).optional(),
   aiAllocations: z.array(providerAllocationSchema).optional(),
   ttsAllocations: z.array(providerAllocationSchema).optional(),
@@ -45,17 +44,17 @@ export async function PATCH(request: NextRequest) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
-  // Validate allocation quota sums against generationLimit
-  const generationLimit = parsed.data.generationLimit;
-  if (generationLimit !== undefined) {
+  // Validate allocation quota sums against dailyGenerationLimit
+  const dailyLimit = parsed.data.dailyGenerationLimit;
+  if (dailyLimit !== undefined && dailyLimit > 0) {
     const aiSum = parsed.data.aiAllocations?.reduce((sum, a) => sum + a.quota, 0) ?? 0;
     const ttsSum = parsed.data.ttsAllocations?.reduce((sum, a) => sum + a.quota, 0) ?? 0;
 
-    if (aiSum > 0 && aiSum > generationLimit) {
-      return errorResponse(`AI allocation quotas (${aiSum}) exceed generation limit (${generationLimit})`, 400);
+    if (aiSum > 0 && aiSum > dailyLimit) {
+      return errorResponse(`AI allocation quotas (${aiSum}) exceed daily generation limit (${dailyLimit})`, 400);
     }
-    if (ttsSum > 0 && ttsSum > generationLimit) {
-      return errorResponse(`TTS allocation quotas (${ttsSum}) exceed generation limit (${generationLimit})`, 400);
+    if (ttsSum > 0 && ttsSum > dailyLimit) {
+      return errorResponse(`TTS allocation quotas (${ttsSum}) exceed daily generation limit (${dailyLimit})`, 400);
     }
   }
 

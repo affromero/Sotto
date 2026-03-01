@@ -127,7 +127,6 @@ model User {
   podcastIdeas PodcastIdea[]
 
   // Free tier
-  freeGenerationsUsed      Int  @default(0)
   dailyGenerationOverride  Int? // null = use global, 0 = unlimited, N = custom daily limit
 
   // Subscription plan
@@ -1642,7 +1641,6 @@ model FreeTierConfig {
   ttsModel              String   @default("kitten-tts-mini-0.8")
   sttProvider           String   @default("groq")
   sttModel              String   @default("whisper-large-v3-turbo")
-  generationLimit       Int      @default(3)
   dailyGenerationLimit  Int      @default(1)
   aiAllocations         Json?
   ttsAllocations        Json?

@@ -3,8 +3,6 @@
 import styles from './FreeTierCounter.module.css';
 
 interface FreeTierCounterProps {
-  used?: number;
-  limit?: number;
   dailyUsed: number;
   dailyLimit: number;
   isByokUser: boolean;

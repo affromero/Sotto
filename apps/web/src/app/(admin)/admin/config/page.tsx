@@ -42,9 +42,6 @@ export default async function AdminConfigPage() {
   }));
 
   const totalUsers = await prisma.user.count();
-  const freeUsers = await prisma.user.count({
-    where: { freeGenerationsUsed: { gt: 0 } },
-  });
 
   return (
     <div className={styles.container}>
@@ -52,7 +49,7 @@ export default async function AdminConfigPage() {
         <div>
           <h1 className={styles.title}>Free Tier Config</h1>
           <p className={styles.subtitle}>
-            {freeUsers} of {totalUsers} users have used free generations
+            {totalUsers} registered users
           </p>
         </div>
       </div>
