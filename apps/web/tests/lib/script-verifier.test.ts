@@ -304,7 +304,8 @@ describe('verifyScript', () => {
     expect(result.durationFeedback).toBeNull();
   });
 
-  it('handles unparseable AI response', async () => {
+  it('handles unparseable AI response after retry', async () => {
+    // Both calls return non-JSON — first attempt and stricter retry both fail
     mockGenerateResponse.mockResolvedValue({
       content: 'This is not valid JSON at all',
       inputTokens: 400,
@@ -322,6 +323,60 @@ describe('verifyScript', () => {
 
     expect(result.passed).toBe(false);
     expect(result.feedback).toContain('could not parse');
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries with stricter prompt when first response is not JSON, succeeds on retry', async () => {
+    // First call returns prose, second returns valid JSON
+    mockGenerateResponse
+      .mockResolvedValueOnce({
+        content: 'Here is my analysis of the script...',
+        inputTokens: 400,
+        outputTokens: 100,
+        model: 'claude-haiku-4-5-20251001',
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          claims: [
+            {
+              claimText: 'Water boils at 100C',
+              turnIndex: 0,
+              speaker: 'HOST',
+              isCommonKnowledge: true,
+              existingCitations: [],
+              needsMoreCitations: false,
+              hasUnreliableSource: false,
+              verificationNote: 'Common knowledge',
+            },
+          ],
+          overallScore: 1.0,
+          feedback: '',
+        }),
+        inputTokens: 500,
+        outputTokens: 300,
+        model: 'claude-haiku-4-5-20251001',
+      });
+
+    const result = await verifyScript({
+      topic: 'Water Properties',
+      turns: [{ speaker: 'HOST', text: 'Water boils at 100C.' }],
+      references: makePaperRefs(5),
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
+    // Second call should have stricter JSON instructions
+    const secondSystemPrompt = mockGenerateResponse.mock.calls[1][0];
+    expect(secondSystemPrompt).toContain('CRITICAL');
+    // Result should have proper claims (not fallback)
+    expect(result.passed).toBe(true);
+    expect(result.totalClaims).toBe(1);
+    expect(result.commonKnowledgeClaims).toBe(1);
+    // Token counts should sum both calls
+    expect(result.inputTokens).toBe(900); // 400 + 500
+    expect(result.outputTokens).toBe(400); // 100 + 300
   });
 
   it('includes credential claim scrutiny in system prompt', async () => {
