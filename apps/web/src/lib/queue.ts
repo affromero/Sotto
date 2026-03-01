@@ -504,11 +504,11 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         });
       }
 
-      // Notify all admins: in-app bell + Telegram
+      // Notify admins (skip the podcast owner — they already got PODCAST_FAILED above)
       const podcastLabel = podcast.title || podcastId;
       const techError = args.failedReason || 'Unknown error';
       const adminUsers = await prisma.user.findMany({
-        where: { role: 'ADMIN' },
+        where: { role: 'ADMIN', id: { not: podcast.userId } },
         select: { id: true, telegramChatId: true },
       });
       const adminMessage = `[${queueName}] ${podcastLabel} — ${errorKind}`;
