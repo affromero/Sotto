@@ -63,7 +63,13 @@ export function DashboardShell({ user, hasPodcasts = false, children }: Dashboar
         <div key={pathname} className={styles.content}>
           {pushState === 'prompt' && !pushDismissed && (
             <PushPrompt
-              onEnable={subscribe}
+              onEnable={async () => {
+                const ok = await subscribe();
+                if (ok) {
+                  localStorage.setItem('sotto:push-prompt-dismissed', 'true');
+                  setPushDismissed(true);
+                }
+              }}
               onDismiss={() => {
                 localStorage.setItem('sotto:push-prompt-dismissed', 'true');
                 setPushDismissed(true);

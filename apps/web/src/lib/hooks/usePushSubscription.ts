@@ -39,38 +39,46 @@ export function usePushSubscription() {
   const [stateOverride, setStateOverride] = useState<PushState | null>(null);
   const pushState = stateOverride ?? browserState;
 
-  const subscribe = useCallback(async () => {
+  const subscribe = useCallback(async (): Promise<boolean> => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      return;
+      return false;
     }
 
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapidKey) return;
+    if (!vapidKey) return false;
 
-    const registration = await navigator.serviceWorker.register('/sw.js');
-    await navigator.serviceWorker.ready;
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
 
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
-    });
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
+      });
 
-    const json = subscription.toJSON();
-    if (!json.endpoint || !json.keys) return;
+      const json = subscription.toJSON();
+      if (!json.endpoint || !json.keys) return false;
 
-    await fetch('/api/notifications/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        endpoint: json.endpoint,
-        keys: {
-          p256dh: json.keys.p256dh,
-          auth: json.keys.auth,
-        },
-      }),
-    });
+      await fetch('/api/notifications/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: {
+            p256dh: json.keys.p256dh,
+            auth: json.keys.auth,
+          },
+        }),
+      });
 
-    setStateOverride('granted');
+      setStateOverride('granted');
+      return true;
+    } catch {
+      if (Notification.permission === 'denied') {
+        setStateOverride('denied');
+      }
+      return false;
+    }
   }, []);
 
   const unsubscribe = useCallback(async () => {
