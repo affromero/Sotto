@@ -30,43 +30,17 @@ const platformSchema = z.object({
 
 const includedModelsField = z.array(z.string().min(1)).nullable().optional();
 
-function validateSubset(
-  freeList: string[] | null | undefined,
-  proList: string[] | null | undefined,
-  freePath: string,
-  ctx: z.RefinementCtx
-) {
-  if (freeList && proList) {
-    const proSet = new Set(proList);
-    for (const modelId of freeList) {
-      if (!proSet.has(modelId)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Free model "${modelId}" must also be in ${freePath.replace('free', 'pro')}`,
-          path: [freePath],
-        });
-      }
-    }
-  }
-}
-
-const updateSchema = z
-  .object({
-    free: planModelSchema.optional(),
-    pro: planModelSchema.optional(),
-    platform: platformSchema.optional(),
-    freeIncludedModels: includedModelsField,
-    proIncludedModels: includedModelsField,
-    freeIncludedTtsModels: includedModelsField,
-    proIncludedTtsModels: includedModelsField,
-    freeIncludedSttModels: includedModelsField,
-    proIncludedSttModels: includedModelsField,
-  })
-  .superRefine((data, ctx) => {
-    validateSubset(data.freeIncludedModels, data.proIncludedModels, 'freeIncludedModels', ctx);
-    validateSubset(data.freeIncludedTtsModels, data.proIncludedTtsModels, 'freeIncludedTtsModels', ctx);
-    validateSubset(data.freeIncludedSttModels, data.proIncludedSttModels, 'freeIncludedSttModels', ctx);
-  });
+const updateSchema = z.object({
+  free: planModelSchema.optional(),
+  pro: planModelSchema.optional(),
+  platform: platformSchema.optional(),
+  freeIncludedModels: includedModelsField,
+  proIncludedModels: includedModelsField,
+  freeIncludedTtsModels: includedModelsField,
+  proIncludedTtsModels: includedModelsField,
+  freeIncludedSttModels: includedModelsField,
+  proIncludedSttModels: includedModelsField,
+});
 
 export async function PATCH(request: NextRequest) {
   const adminId = await requireAdmin();
