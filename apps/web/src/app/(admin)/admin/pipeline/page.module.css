@@ -341,3 +341,34 @@
 .thSortLink:hover {
   color: var(--color-primary);
 }
+
+/* ── In-Progress / Succeeded badges ────────────────────────────── */
+
+.badgeActive {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.badgeSuccess {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font: var(--text-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.elapsedCell {
+  font-family: monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}

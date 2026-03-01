@@ -2,6 +2,9 @@ import {
   getFreeTierFunnel,
   getByokAdoption,
   getPipelineHealth,
+  getInProgressPipelines,
+  getRecentlySucceeded,
+  getDraftAbandonmentMetrics,
 } from '@/lib/funnel-metrics';
 import {
   getRecentPipelineErrors,
@@ -71,6 +74,26 @@ function kindLabel(kind: string): string {
   return KIND_OPTIONS.find((k) => k.value === kind)?.label ?? kind;
 }
 
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const mins = Math.floor(seconds / 60);
+  if (mins < 60) return `${mins}m ${seconds % 60}s`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ${mins % 60}m`;
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === 'SCRIPT_READY') return styles.badgeWarning;
+  if (status === 'DRAFT') return styles.badgeInfo;
+  if (status === 'FAILED') return styles.badgeError;
+  if (status === 'READY') return styles.badgeSuccess;
+  return styles.badgeActive;
+}
+
+function statusLabel(status: string): string {
+  return status.replace(/_/g, ' ');
+}
+
 function sortIndicator(active: boolean, dir: 'asc' | 'desc'): string {
   if (!active) return ' ⇅';
   return dir === 'desc' ? ' ↓' : ' ↑';
@@ -98,15 +121,20 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
     : 'createdAt';
   const pSortDir = params.psortdir === 'asc' ? 'asc' : ('desc' as const);
 
-  const [funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats] =
-    await Promise.all([
-      getFreeTierFunnel(),
-      getByokAdoption(),
-      getPipelineHealth(since),
-      getRecentPipelineErrors(20, since, until, pSortCol, pSortDir),
-      getRecentDiscoveryChatErrors(50, kindFilter || undefined, sort, since, until, dSortCol),
-      getDiscoveryChatErrorStats(since, until),
-    ]);
+  const [
+    funnel, adoption, pipeline, recentErrors, discoveryChatErrors, errorStats,
+    inProgress, recentlySucceeded, draftAbandonment,
+  ] = await Promise.all([
+    getFreeTierFunnel(),
+    getByokAdoption(),
+    getPipelineHealth(since),
+    getRecentPipelineErrors(20, since, until, pSortCol, pSortDir),
+    getRecentDiscoveryChatErrors(50, kindFilter || undefined, sort, since, until, dSortCol),
+    getDiscoveryChatErrorStats(since, until),
+    getInProgressPipelines(),
+    getRecentlySucceeded(since, until),
+    getDraftAbandonmentMetrics(since, until),
+  ]);
 
   const funnelMax = Math.max(funnel.freeGenUsers, funnel.exhaustedUsers, funnel.byokUsers, 1);
   const maxAi = Math.max(...adoption.ai.map((a) => a.count), 1);
@@ -286,6 +314,108 @@ export default async function AdminPipelinePage({ searchParams }: PageProps) {
           <div className={styles.card}>
             <span className={styles.cardLabel}>Total Attempted</span>
             <span className={styles.cardValue}>{pipeline.totalAttempted.toLocaleString()}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* In Progress */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>In Progress ({inProgress.length})</h2>
+        {inProgress.length === 0 ? (
+          <p className={styles.empty}>No pipelines currently running.</p>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.recentTable}>
+              <thead>
+                <tr>
+                  <th>Podcast</th>
+                  <th>Status</th>
+                  <th>User</th>
+                  <th>Elapsed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inProgress.map((p) => (
+                  <tr key={p.id}>
+                    <td>
+                      <Link href={`/podcast/${p.id}`} className={styles.podcastLink}>
+                        {p.title}
+                      </Link>
+                    </td>
+                    <td>
+                      <span className={statusBadgeClass(p.status)}>{statusLabel(p.status)}</span>
+                    </td>
+                    <td>{p.userName ?? p.userEmail ?? '—'}</td>
+                    <td className={styles.elapsedCell}>{formatElapsed(p.elapsedSeconds)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Recently Succeeded */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Recently Succeeded ({rangeLabel})</h2>
+        {recentlySucceeded.length === 0 ? (
+          <p className={styles.empty}>No completed podcasts in this period.</p>
+        ) : (
+          <div className={styles.tableContainer}>
+            <table className={styles.recentTable}>
+              <thead>
+                <tr>
+                  <th>Podcast</th>
+                  <th>User</th>
+                  <th>Generation Time</th>
+                  <th>Completed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentlySucceeded.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <Link href={`/podcast/${s.podcastId}`} className={styles.podcastLink}>
+                        {s.podcastTitle}
+                      </Link>
+                    </td>
+                    <td>{s.userName ?? s.userEmail ?? '—'}</td>
+                    <td className={styles.elapsedCell}>{formatSeconds(s.generationSeconds)}</td>
+                    <td className={styles.dateCell}>
+                      {new Date(s.completedAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Draft Abandonment */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Draft Abandonment ({rangeLabel})</h2>
+        <div className={styles.grid}>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>Total Created</span>
+            <span className={styles.cardValue}>{draftAbandonment.totalDrafts.toLocaleString()}</span>
+          </div>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>Still Draft</span>
+            <span className={styles.cardValue}>{draftAbandonment.stillDraft.toLocaleString()}</span>
+          </div>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>Paused at Script Ready</span>
+            <span className={styles.cardValue}>{draftAbandonment.pausedAtScriptReady.toLocaleString()}</span>
+          </div>
+          <div className={styles.card}>
+            <span className={styles.cardLabel}>Abandonment Rate</span>
+            <span className={styles.cardValue}>{Math.round(draftAbandonment.abandonmentRate * 100)}%</span>
           </div>
         </div>
       </section>

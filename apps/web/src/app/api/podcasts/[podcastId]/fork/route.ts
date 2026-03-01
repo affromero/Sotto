@@ -134,7 +134,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const skipPaidVoices = body.skipPaidVoices === true;
   let forkVoices = sourcePodcast.voices.map(v => ({ speaker: v.speaker, voiceId: v.voiceId, provider: v.provider }));
   const forkVoicesWithIds = forkVoices.filter(
-    (v): v is { speaker: string; voiceId: string } => !!v.voiceId
+    (v): v is { speaker: string; voiceId: string; provider: string | null } => !!v.voiceId
   );
 
   if (!skipPaidVoices && !paymentIntentIds && forkVoicesWithIds.length > 0) {
