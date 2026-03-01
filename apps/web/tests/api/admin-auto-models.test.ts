@@ -203,7 +203,7 @@ describe('PATCH /api/admin/auto-models', () => {
     );
   });
 
-  it('rejects when free models are not a subset of pro models', async () => {
+  it('accepts free models that are not a subset of pro models', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const response = await PATCH(
@@ -213,8 +213,11 @@ describe('PATCH /api/admin/auto-models', () => {
       })
     );
 
-    expect(response.status).toBe(400);
-    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedModels: ['model-a', 'model-c'], proIncludedModels: ['model-a', 'model-b'] },
+      'admin-1'
+    );
   });
 
   it('accepts null to clear included model overrides', async () => {
@@ -288,7 +291,7 @@ describe('PATCH /api/admin/auto-models', () => {
     );
   });
 
-  it('rejects when free TTS models are not a subset of pro TTS models', async () => {
+  it('accepts free TTS models that are not a subset of pro TTS models', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const response = await PATCH(
@@ -298,11 +301,14 @@ describe('PATCH /api/admin/auto-models', () => {
       })
     );
 
-    expect(response.status).toBe(400);
-    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'], proIncludedTtsModels: ['elevenlabs:eleven_v3'] },
+      'admin-1'
+    );
   });
 
-  it('rejects when free STT models are not a subset of pro STT models', async () => {
+  it('accepts free STT models that are not a subset of pro STT models', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 
     const response = await PATCH(
@@ -312,8 +318,11 @@ describe('PATCH /api/admin/auto-models', () => {
       })
     );
 
-    expect(response.status).toBe(400);
-    expect(mockSetAutoModelConfig).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { freeIncludedSttModels: ['openai:whisper-1'], proIncludedSttModels: ['groq:whisper-large-v3-turbo'] },
+      'admin-1'
+    );
   });
 
   it('accepts null to clear TTS and STT included model overrides', async () => {
