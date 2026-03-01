@@ -28,31 +28,44 @@ const platformSchema = z.object({
   aiModel: z.string().min(1).optional(),
 });
 
+const includedModelsField = z.array(z.string().min(1)).nullable().optional();
+
+function validateSubset(
+  freeList: string[] | null | undefined,
+  proList: string[] | null | undefined,
+  freePath: string,
+  ctx: z.RefinementCtx
+) {
+  if (freeList && proList) {
+    const proSet = new Set(proList);
+    for (const modelId of freeList) {
+      if (!proSet.has(modelId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Free model "${modelId}" must also be in ${freePath.replace('free', 'pro')}`,
+          path: [freePath],
+        });
+      }
+    }
+  }
+}
+
 const updateSchema = z
   .object({
     free: planModelSchema.optional(),
     pro: planModelSchema.optional(),
     platform: platformSchema.optional(),
-    freeIncludedModels: z.array(z.string().min(1)).nullable().optional(),
-    proIncludedModels: z.array(z.string().min(1)).nullable().optional(),
+    freeIncludedModels: includedModelsField,
+    proIncludedModels: includedModelsField,
+    freeIncludedTtsModels: includedModelsField,
+    proIncludedTtsModels: includedModelsField,
+    freeIncludedSttModels: includedModelsField,
+    proIncludedSttModels: includedModelsField,
   })
   .superRefine((data, ctx) => {
-    const freeList = data.freeIncludedModels;
-    const proList = data.proIncludedModels;
-
-    // Cross-field: free models must be a subset of pro models (when both are non-null)
-    if (freeList && proList) {
-      const proSet = new Set(proList);
-      for (const modelId of freeList) {
-        if (!proSet.has(modelId)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `Free model "${modelId}" must also be in proIncludedModels`,
-            path: ['freeIncludedModels'],
-          });
-        }
-      }
-    }
+    validateSubset(data.freeIncludedModels, data.proIncludedModels, 'freeIncludedModels', ctx);
+    validateSubset(data.freeIncludedTtsModels, data.proIncludedTtsModels, 'freeIncludedTtsModels', ctx);
+    validateSubset(data.freeIncludedSttModels, data.proIncludedSttModels, 'freeIncludedSttModels', ctx);
   });
 
 export async function PATCH(request: NextRequest) {
