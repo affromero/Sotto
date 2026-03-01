@@ -16,7 +16,6 @@ datasource db {
 
 enum UserRole {
   USER
-  CREATOR
   ADMIN
   SYSTEM
 }

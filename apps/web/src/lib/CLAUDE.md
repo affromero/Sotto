@@ -9,7 +9,7 @@ All shared business logic and external service integrations live here.
 | `prisma.ts` | Database client (PostgreSQL) | Prisma ORM |
 | `redis.ts` | Redis connections, cache helpers, rate limiting | Redis / ioredis |
 | `queue.ts` | BullMQ job queues (24 types), worker creation | BullMQ + Redis |
-| `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/CREATOR/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
+| `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
 | `admin-emails.ts` | Admin email list loader from `config/admins.json`, `isAdminEmail()` check | Filesystem |
 | `auth-guards.ts` | Suspension check for write-path API routes (`checkSuspension()`) | Pure utility |
 | `llm.ts` | Anthropic LLM client (streaming + non-streaming), with auto-routing guardrail for non-Anthropic models | Anthropic API / Claude CLI |

@@ -49,8 +49,8 @@ function getNavItems(role: string, hasPodcasts: boolean): NavItem[] {
     items.push({ href: '/analytics', label: 'Analytics', icon: BarChart2 });
   }
 
-  // Voices - CREATOR and ADMIN
-  if (role === 'CREATOR' || role === 'ADMIN') {
+  // Voices - users with podcasts or ADMIN
+  if (hasPodcasts || role === 'ADMIN') {
     items.push({ href: '/settings/voices', label: 'Voices', icon: Mic });
   }
 
