@@ -10,8 +10,8 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
   openai: { label: 'OpenAI TTS', shortLabel: 'OpenAI' },
   cartesia: { label: 'Cartesia', shortLabel: 'Cartesia' },
   hume: { label: 'Hume AI', shortLabel: 'Hume' },
-  fal: { label: 'Fal (Qwen3-TTS)', shortLabel: 'Fal' },
-  replicate: { label: 'Replicate (Qwen3-TTS)', shortLabel: 'Replicate' },
+  fal: { label: 'Fal', shortLabel: 'Fal' },
+  replicate: { label: 'Replicate', shortLabel: 'Replicate' },
 };
 
 export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {

@@ -296,7 +296,7 @@ export async function POST(request: NextRequest) {
 
       const audioBuffer = await withTimeout(
         ttsProvider.generateSpeech({ text: 'Sotto — where podcasts get social.', voiceId }),
-        15_000
+        30_000
       );
 
       const base64 = audioBuffer.toString('base64');
