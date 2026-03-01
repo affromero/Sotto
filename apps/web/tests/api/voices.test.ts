@@ -16,6 +16,7 @@ const mockCloneVoice = vi.fn();
 const mockDeleteClonedVoice = vi.fn();
 const mockGenerateSpeech = vi.fn();
 const mockCheckRateLimit = vi.fn();
+const mockGetVoiceCatalog = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
@@ -59,31 +60,18 @@ vi.mock('@/lib/stripe', () => ({
 }));
 
 vi.mock('@/lib/elevenlabs', () => ({
-  VOICE_POOL: [
-    {
-      id: 'voice-1',
-      name: 'Adam',
-      gender: 'male',
-      accent: 'american',
-      ageRange: 'middle',
-      character: 'warm narrator',
-    },
-    {
-      id: 'voice-2',
-      name: 'Bella',
-      gender: 'female',
-      accent: 'american',
-      ageRange: 'young',
-      character: 'engaging storyteller',
-    },
-  ],
   cloneVoice: (...args: unknown[]) => mockCloneVoice(...args),
   deleteClonedVoice: (...args: unknown[]) => mockDeleteClonedVoice(...args),
   generateSpeech: (...args: unknown[]) => mockGenerateSpeech(...args),
 }));
 
+vi.mock('@/lib/voice-catalog', () => ({
+  getVoiceCatalog: (...args: unknown[]) => mockGetVoiceCatalog(...args),
+}));
+
 vi.mock('@/lib/redis', () => ({
   checkRateLimit: (...args: unknown[]) => mockCheckRateLimit(...args),
+  cache: { get: vi.fn(), set: vi.fn() },
 }));
 
 const mockUploadFile = vi.fn().mockResolvedValue('https://r2.example.com/sample.mp3');
@@ -186,6 +174,10 @@ describe('GET /api/voices', () => {
     });
     mockVoiceAllowlistFindMany.mockResolvedValue([]);
     mockVoiceRequestFindMany.mockResolvedValue([]);
+    mockGetVoiceCatalog.mockResolvedValue([
+      { id: 'voice-1', name: 'Adam', gender: 'male', accent: 'american', age: 'middle', description: 'warm narrator' },
+      { id: 'voice-2', name: 'Bella', gender: 'female', accent: 'american', age: 'young', description: 'engaging storyteller' },
+    ]);
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -202,7 +194,7 @@ describe('GET /api/voices', () => {
   it('returns voice pool, user clones, and maxVoiceClones for authenticated user', async () => {
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockVoiceCloneFindMany.mockResolvedValue([
-      { ...mockVoiceClone, description: null, requestable: false, priceInCents: null, voicePurchases: [] },
+      { ...mockVoiceClone, provider: 'elevenlabs', description: null, requestable: false, priceInCents: null, voicePurchases: [] },
     ]);
 
     const request = createRequest();
@@ -226,6 +218,7 @@ describe('GET /api/voices', () => {
         name: 'My Voice',
         externalVoiceId: 'el-voice-1',
         sourceType: 'UPLOAD',
+        provider: 'elevenlabs',
         description: null,
         requestable: false,
         priceInCents: null,
@@ -237,6 +230,7 @@ describe('GET /api/voices', () => {
         name: 'Another Voice',
         externalVoiceId: 'el-voice-2',
         sourceType: 'RECORD',
+        provider: 'elevenlabs',
         description: null,
         requestable: false,
         priceInCents: null,
@@ -255,6 +249,7 @@ describe('GET /api/voices', () => {
       name: 'My Voice',
       externalVoiceId: 'el-voice-1',
       sourceType: 'UPLOAD',
+      provider: 'elevenlabs',
     });
   });
 
@@ -269,6 +264,7 @@ describe('GET /api/voices', () => {
           name: 'Shared Voice',
           externalVoiceId: 'el-shared-1',
           sourceType: 'UPLOAD',
+          provider: 'elevenlabs',
           createdAt: new Date('2026-01-10T00:00:00Z'),
           user: { id: 'user-other', name: 'Other User' },
         },
@@ -281,7 +277,50 @@ describe('GET /api/voices', () => {
 
     expect(body.sharedVoices).toHaveLength(1);
     expect(body.sharedVoices[0].name).toBe('Shared Voice');
+    expect(body.sharedVoices[0].provider).toBe('elevenlabs');
     expect(body.sharedVoices[0].owner.id).toBe('user-other');
+  });
+
+  it('returns provider-specific pool voices when ?provider= is set', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockVoiceCloneFindMany.mockResolvedValue([]);
+    mockGetVoiceCatalog.mockResolvedValue([
+      { id: 'cartesia-1', name: 'Cartesia Voice', gender: 'female', accent: 'british', age: 'young', description: 'clear speaker' },
+    ]);
+
+    const request = createRequest('http://localhost:3000/api/voices?provider=cartesia');
+    const response = await GET(request);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockGetVoiceCatalog).toHaveBeenCalledWith('cartesia');
+    expect(body.poolVoices).toHaveLength(1);
+    expect(body.poolVoices[0]).toMatchObject({
+      id: 'cartesia-1',
+      name: 'Cartesia Voice',
+      ageRange: 'young',
+      character: 'clear speaker',
+    });
+  });
+
+  it('defaults to elevenlabs when provider param is missing', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockVoiceCloneFindMany.mockResolvedValue([]);
+
+    const request = createRequest();
+    await GET(request);
+
+    expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
+  });
+
+  it('falls back to elevenlabs for invalid provider param', async () => {
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockVoiceCloneFindMany.mockResolvedValue([]);
+
+    const request = createRequest('http://localhost:3000/api/voices?provider=invalid');
+    await GET(request);
+
+    expect(mockGetVoiceCatalog).toHaveBeenCalledWith('elevenlabs');
   });
 });
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
-import { VOICE_POOL } from '@/lib/elevenlabs';
+import { getVoiceCatalog } from '@/lib/voice-catalog';
+import { isValidProviderId, type TtsProviderId } from '@/lib/providers/tts-registry';
 import { LIMITS } from '@/lib/stripe';
 
 import { errorResponse } from '@/lib/api-response';
@@ -11,11 +12,15 @@ export async function GET(request: NextRequest) {
     return errorResponse('Unauthorized', 401);
   }
 
-  const [user, userClones, approvedRequests, allowlistEntries] = await Promise.all([
+  const providerParam = request.nextUrl.searchParams.get('provider');
+  const provider: TtsProviderId = (providerParam && isValidProviderId(providerParam)) ? providerParam : 'elevenlabs';
+
+  const [user, catalogVoices, userClones, approvedRequests, allowlistEntries] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: authResult.userId },
       select: { stripeAccountId: true, stripeOnboarded: true },
     }),
+    getVoiceCatalog(provider),
     prisma.voiceClone.findMany({
       where: { userId: authResult.userId },
       select: {
@@ -23,6 +28,7 @@ export async function GET(request: NextRequest) {
         name: true,
         externalVoiceId: true,
         sourceType: true,
+        provider: true,
         description: true,
         requestable: true,
         priceInCents: true,
@@ -50,6 +56,7 @@ export async function GET(request: NextRequest) {
             name: true,
             externalVoiceId: true,
             sourceType: true,
+            provider: true,
             createdAt: true,
             user: { select: { id: true, name: true } },
           },
@@ -70,6 +77,7 @@ export async function GET(request: NextRequest) {
             name: true,
             externalVoiceId: true,
             sourceType: true,
+            provider: true,
             createdAt: true,
             user: { select: { id: true, name: true } },
           },
@@ -89,6 +97,7 @@ export async function GET(request: NextRequest) {
       name: clone.name,
       externalVoiceId: clone.externalVoiceId,
       sourceType: clone.sourceType,
+      provider: clone.provider,
       description: clone.description,
       requestable: clone.requestable,
       priceInCents: clone.priceInCents,
@@ -106,6 +115,7 @@ export async function GET(request: NextRequest) {
     name: string;
     externalVoiceId: string;
     sourceType: string;
+    provider: string;
     createdAt: Date;
     owner: { id: string; name: string | null };
   }> = [];
@@ -118,6 +128,7 @@ export async function GET(request: NextRequest) {
         name: r.voiceClone.name,
         externalVoiceId: r.voiceClone.externalVoiceId,
         sourceType: r.voiceClone.sourceType,
+        provider: r.voiceClone.provider,
         createdAt: r.voiceClone.createdAt,
         owner: r.voiceClone.user,
       });
@@ -132,6 +143,7 @@ export async function GET(request: NextRequest) {
         name: a.voiceClone.name,
         externalVoiceId: a.voiceClone.externalVoiceId,
         sourceType: a.voiceClone.sourceType,
+        provider: a.voiceClone.provider,
         createdAt: a.voiceClone.createdAt,
         owner: a.voiceClone.user,
       });
@@ -139,7 +151,14 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
-    poolVoices: VOICE_POOL,
+    poolVoices: catalogVoices.map((v) => ({
+      id: v.id,
+      name: v.name,
+      gender: v.gender ?? '',
+      accent: v.accent ?? '',
+      ageRange: v.age ?? '',
+      character: v.description ?? '',
+    })),
     userClones: enrichedClones,
     sharedVoices,
     maxVoiceClones: LIMITS.maxVoiceClones,
