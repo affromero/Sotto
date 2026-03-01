@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { cache } from './redis';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -92,7 +92,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
 
     const autoConfig = await resolveAutoModel('PLATFORM');
 
-    const handleResponse = await generateResponse(
+    const handleResponse = await createAIProvider(autoConfig.aiProvider).generateResponse(
       'Classify the word into exactly one category. Answer with a single word: NAME, OFFENSIVE, or OK. Nothing else.',
       [
         {
@@ -104,7 +104,7 @@ export async function checkHandleContent(handle: string, apiKeyOverride?: string
     );
 
     logUsage({
-      service: 'anthropic',
+      service: autoConfig.aiProvider,
       model: handleResponse.model,
       category: 'handle_screening',
       inputTokens: handleResponse.inputTokens,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { segmentRegenerationQueue, addJob, JobType } from '@/lib/queue';
-import { generateResponse } from '@/lib/llm';
+import { createAIProvider } from '@/lib/providers/ai';
 import { logUsage } from '@/lib/usage-logger';
 import { CONTENT_SAFETY_INSTRUCTIONS } from '@/lib/safety-prompts';
 import { VOICE_REALISM_SHORT } from '@/lib/voice-realism-prompts';
@@ -122,10 +122,10 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   // Resolve user's AI key for BYOK passthrough
   const aiKey = await getAiKey(userId);
 
-  // Resolve model from podcast's creation-time selection
-  const { model: resolvedModel } = await resolveAiModelAndProvider({
+  // Resolve model + provider from podcast's creation-time selection
+  const { model: resolvedModel, provider } = await resolveAiModelAndProvider({
     podcastAiModel: interaction.podcast.aiModel,
-    aiKey: aiKey ? { provider: 'anthropic', apiKey: aiKey.apiKey } : null,
+    aiKey,
   });
 
   // Generate the explanation segment text via Claude
@@ -135,7 +135,8 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
 
   const systemPrompt = loadAndRender('interaction/incorporate-segment.md', { ACTIVE_SPEAKER: activeSpeaker, LANGUAGE_LABEL: languageLabel }) + VOICE_REALISM_SHORT + CONTENT_SAFETY_INSTRUCTIONS;
 
-  const response = await generateResponse(systemPrompt, [
+  const ai = createAIProvider(provider);
+  const response = await ai.generateResponse(systemPrompt, [
     {
       role: 'user',
       content: `Podcast context around timestamp ${interaction.timestamp}s:\n${contextSegments}\n\nListener's question: ${interaction.question}\n\nAI's answer: ${interaction.answer}\n\nWrite a natural podcast segment that addresses this question and answer.`,
@@ -143,7 +144,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
   ], { apiKeyOverride: aiKey?.apiKey, model: resolvedModel });
 
   await logUsage({
-    service: 'anthropic',
+    service: provider,
     model: response.model,
     category: 'incorporation',
     inputTokens: response.inputTokens,

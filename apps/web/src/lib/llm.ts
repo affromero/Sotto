@@ -109,11 +109,15 @@ export async function generateResponse(
     if (ownerProvider && ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
+      const hasWebSearch = options.tools?.some(
+        (t) => (t as { type: string }).type === 'web_search_20250305',
+      );
       return ai.generateResponse(systemPrompt, messages, {
         maxTokens: options.maxTokens,
         model: options.model,
         apiKeyOverride: options.apiKeyOverride,
         skipModeration: options.skipModeration,
+        ...(hasWebSearch ? { useWebSearch: true } : {}),
       });
     }
   }
@@ -216,11 +220,15 @@ export async function* streamResponse(
     if (ownerProvider && ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
+      const hasWebSearch = options.tools?.some(
+        (t) => (t as { type: string }).type === 'web_search_20250305',
+      );
       yield* ai.streamResponse(systemPrompt, messages, {
         maxTokens: options.maxTokens,
         model: options.model,
         apiKeyOverride: options.apiKeyOverride,
         skipModeration: options.skipModeration,
+        ...(hasWebSearch ? { useWebSearch: true } : {}),
       });
       return;
     }

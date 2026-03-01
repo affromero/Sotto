@@ -106,7 +106,7 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
       logger.info('Running topic feasibility check', { podcastId });
 
       const aiKey = useAdminCredits ? null : await getAiKey(userId);
-      const { model } = await resolveAiModelAndProvider({ aiKey, plan: 'FREE' });
+      const { model, provider } = await resolveAiModelAndProvider({ aiKey, plan: 'FREE' });
 
       const assessment = await assessTopicFeasibility({
         topic: discoveryMeta.topic,
@@ -114,10 +114,11 @@ export async function processContentExtraction(job: Job<ExtractContentPayload>):
         depth: discoveryMeta.depth || undefined,
         apiKeyOverride: aiKey?.apiKey,
         model,
+        provider,
       });
 
       await logUsage({
-        service: 'anthropic',
+        service: provider,
         model: assessment.model,
         category: 'topic_assessment',
         inputTokens: assessment.inputTokens,
