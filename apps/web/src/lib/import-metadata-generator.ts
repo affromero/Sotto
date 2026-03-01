@@ -1,4 +1,4 @@
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { loadPrompt } from './prompt-loader';
 import { logUsage } from './usage-logger';
 import { logger } from './logger';
@@ -32,18 +32,20 @@ function extractFirstJsonObject(text: string): string {
 export async function generateImportMetadata(
   transcriptText: string,
   apiKeyOverride?: string,
-  model?: string
+  model?: string,
+  provider?: string
 ): Promise<{ title: string; topic: string }> {
   const truncated = transcriptText.slice(0, MAX_TRANSCRIPT_LENGTH);
 
-  const response = await generateResponse(
+  const ai = createAIProvider(provider);
+  const response = await ai.generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content: `Transcript:\n${truncated}` }],
     { maxTokens: 256, apiKeyOverride, model }
   );
 
   logUsage({
-    service: 'anthropic',
+    service: provider ?? 'anthropic',
     model: response.model,
     category: 'import_metadata',
     inputTokens: response.inputTokens,
