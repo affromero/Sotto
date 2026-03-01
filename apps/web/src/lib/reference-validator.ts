@@ -91,6 +91,20 @@ const TRUSTED_PATTERNS = [
   'cambridge.org',
   'oxford.org',
   'oxfordacademic.com',
+  // Educational platforms
+  'khanacademy.org',
+  'openstax.org',
+  'coursera.org',
+  'edx.org',
+  'brilliant.org',
+  'ck12.org',
+  'nctm.org',
+  'corestandards.org',
+  'mathworld.wolfram.com',
+  'ted.com',
+  'duolingo.com',
+  'codecademy.com',
+  'phet.colorado.edu',
 ];
 
 export function assessSourceQuality(ref: ReferenceInput): {
