@@ -11,7 +11,11 @@ import { logUsage } from '@/lib/usage-logger';
 import { uploadFile } from '@/lib/r2';
 import { addJob, voiceVerificationQueue, JobType } from '@/lib/queue';
 
+import { transcodeToMp3, getExtensionFromMime } from '@/lib/audio-transcode';
 import { errorResponse } from '@/lib/api-response';
+
+const MAX_AUDIO_SIZE = 5 * 1024 * 1024; // 5MB
+
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -57,6 +61,16 @@ export async function POST(request: NextRequest) {
   const arrayBuffer = await audioFile.arrayBuffer();
   const audioBuffer = Buffer.from(arrayBuffer);
 
+  if (audioBuffer.length > MAX_AUDIO_SIZE) {
+    return errorResponse('Audio file too large. Maximum size is 5MB.', 400);
+  }
+
+  // Transcode to MP3 for provider compatibility (skip if already MP3)
+  const mime = audioFile.type || 'audio/mpeg';
+  const ext = getExtensionFromMime(mime);
+  const isMp3 = mime === 'audio/mpeg' || mime === 'audio/mp3';
+  const cloneBuffer = isMp3 ? audioBuffer : await transcodeToMp3(audioBuffer, ext);
+
   let externalVoiceId: string;
 
   if (provider === 'fal') {
@@ -64,10 +78,10 @@ export async function POST(request: NextRequest) {
     if (!falKey) {
       return errorResponse('Fal API key required for voice cloning. Add it in Settings.', 400);
     }
-    const { embeddingUrl } = await cloneVoiceViaFal(falKey, audioBuffer);
+    const { embeddingUrl } = await cloneVoiceViaFal(falKey, cloneBuffer);
     externalVoiceId = embeddingUrl;
   } else {
-    const { voiceId } = await cloneVoice(parsed.data.name, [audioBuffer]);
+    const { voiceId } = await cloneVoice(parsed.data.name, [cloneBuffer]);
     externalVoiceId = voiceId;
   }
 
@@ -79,9 +93,9 @@ export async function POST(request: NextRequest) {
     metadata: { audioSizeBytes: audioBuffer.length },
   });
 
-  // Upload sample audio to R2 for voiceprint extraction
-  const sampleKey = `voice-clones/samples/${session.user.id}/${Date.now()}.mp3`;
-  const sampleUrl = await uploadFile(sampleKey, audioBuffer, 'audio/mpeg');
+  // Upload original sample audio to R2 for voiceprint extraction
+  const sampleKey = `voice-clones/samples/${session.user.id}/${Date.now()}.${ext}`;
+  const sampleUrl = await uploadFile(sampleKey, audioBuffer, mime);
 
   const voiceClone = await prisma.voiceClone.create({
     data: {
