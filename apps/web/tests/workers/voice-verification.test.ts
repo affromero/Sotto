@@ -176,22 +176,31 @@ describe('processVoiceVerification', () => {
       );
     });
 
-    it('throws when no sample audio exists', async () => {
+    it('auto-verifies imported voice with no sample audio', async () => {
       mockPrismaVoiceCloneFindUnique.mockResolvedValue({ sampleUrl: null });
       const job = createMockJob(payload);
 
-      await expect(processVoiceVerification(job)).rejects.toThrow(
-        'No sample audio for voice clone clone-1'
-      );
+      await processVoiceVerification(job);
+
+      expect(mockPrismaVoiceCloneUpdate).toHaveBeenCalledWith({
+        where: { id: 'clone-1' },
+        data: { verificationStatus: 'ADMIN_VERIFIED' },
+      });
+      expect(mockExtractVoiceprint).not.toHaveBeenCalled();
+      expect(mockAddJob).not.toHaveBeenCalled();
     });
 
-    it('throws when voice clone does not exist', async () => {
+    it('auto-verifies when voice clone does not exist', async () => {
       mockPrismaVoiceCloneFindUnique.mockResolvedValue(null);
       const job = createMockJob(payload);
 
-      await expect(processVoiceVerification(job)).rejects.toThrow(
-        'No sample audio for voice clone clone-1'
-      );
+      await processVoiceVerification(job);
+
+      expect(mockPrismaVoiceCloneUpdate).toHaveBeenCalledWith({
+        where: { id: 'clone-1' },
+        data: { verificationStatus: 'ADMIN_VERIFIED' },
+      });
+      expect(mockExtractVoiceprint).not.toHaveBeenCalled();
     });
   });
 

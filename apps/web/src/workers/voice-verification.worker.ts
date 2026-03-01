@@ -35,7 +35,13 @@ async function handleExtractFingerprint(voiceCloneId: string, userId: string) {
   });
 
   if (!voiceClone?.sampleUrl) {
-    throw new Error(`No sample audio for voice clone ${voiceCloneId}`);
+    // Imported voices (e.g. Hume) have no sample audio — mark as verified
+    await prisma.voiceClone.update({
+      where: { id: voiceCloneId },
+      data: { verificationStatus: 'ADMIN_VERIFIED' },
+    });
+    logger.info('Imported voice auto-verified (no sample)', { voiceCloneId });
+    return;
   }
 
   const audioBuffer = await downloadFile(voiceClone.sampleUrl);

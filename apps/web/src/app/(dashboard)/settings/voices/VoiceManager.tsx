@@ -10,7 +10,7 @@ interface VoiceClone {
   name: string;
   description: string | null;
   externalVoiceId: string;
-  sourceType: 'UPLOAD' | 'RECORD';
+  sourceType: 'UPLOAD' | 'RECORD' | 'IMPORT';
   requestable: boolean;
   priceInCents: number | null;
   verificationStatus: string;
@@ -74,6 +74,9 @@ export function VoiceManager() {
   const [priceDraft, setPriceDraft] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
   const [inputTab, setInputTab] = useState<'upload' | 'record'>('upload');
+  const [humeVoiceId, setHumeVoiceId] = useState('');
+  const [humeName, setHumeName] = useState('');
+  const [importingHume, setImportingHume] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recorder = useAudioRecorder({ maxSeconds: 60, minSeconds: 5 });
@@ -347,6 +350,40 @@ export function VoiceManager() {
       setError(err instanceof Error ? err.message : 'Failed to clone voice');
     } finally {
       setCloning(false);
+    }
+  }
+
+  async function handleImportHume(e: React.FormEvent) {
+    e.preventDefault();
+    if (!humeName.trim() || !humeVoiceId.trim()) return;
+
+    try {
+      setImportingHume(true);
+      setError(null);
+
+      const formData = new FormData();
+      formData.append('name', humeName.trim());
+      formData.append('provider', 'hume');
+      formData.append('externalVoiceId', humeVoiceId.trim());
+      formData.append('sourceType', 'IMPORT');
+
+      const response = await fetch('/api/voices/clone', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to import voice');
+      }
+
+      setHumeName('');
+      setHumeVoiceId('');
+      await fetchVoices();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import voice');
+    } finally {
+      setImportingHume(false);
     }
   }
 
@@ -1027,6 +1064,60 @@ export function VoiceManager() {
               </>
             ) : (
               'Clone Voice'
+            )}
+          </button>
+        </form>
+      </section>
+
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Import Hume Voice</h3>
+        <p className={styles.hint}>
+          Paste a Hume custom voice ID to import it. No audio upload needed.
+        </p>
+        <form onSubmit={handleImportHume} className={styles.uploadForm}>
+          <div className={styles.formGroup}>
+            <label htmlFor="hume-name" className={styles.label}>
+              Voice Name
+            </label>
+            <input
+              id="hume-name"
+              type="text"
+              className={styles.nameInput}
+              value={humeName}
+              onChange={(e) => setHumeName(e.target.value)}
+              placeholder="My Hume Voice"
+              required
+              disabled={importingHume}
+              maxLength={100}
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label htmlFor="hume-voice-id" className={styles.label}>
+              Hume Voice ID
+            </label>
+            <input
+              id="hume-voice-id"
+              type="text"
+              className={styles.nameInput}
+              value={humeVoiceId}
+              onChange={(e) => setHumeVoiceId(e.target.value)}
+              placeholder="e.g. 9e068547-5ba4-..."
+              required
+              disabled={importingHume}
+              maxLength={200}
+            />
+          </div>
+          <button
+            type="submit"
+            className={styles.cloneButton}
+            disabled={importingHume || !humeName.trim() || !humeVoiceId.trim()}
+          >
+            {importingHume ? (
+              <>
+                <span className={styles.spinnerSmall} /> Importing...
+              </>
+            ) : (
+              'Import Voice'
             )}
           </button>
         </form>
