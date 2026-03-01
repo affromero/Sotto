@@ -4,6 +4,7 @@ import { addJob, voiceVerificationQueue, notificationQueue, JobType } from '@/li
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { downloadFile, deleteFile } from '@/lib/r2';
 import { deleteClonedVoice } from '@/lib/elevenlabs';
+import { deleteCartesiaVoice } from '@/lib/cartesia-voice-clone';
 import { extractVoiceprint, findDuplicateVoiceprints, verifyChallenge } from '@/lib/voice-fingerprint';
 import { generateChallengePhrase, CHALLENGE_EXPIRY_MS, MAX_CHALLENGE_ATTEMPTS } from '@/lib/voice-challenge-phrases';
 import { getByokKey } from '@/lib/byok';
@@ -104,6 +105,13 @@ async function handleCheckDuplicates(voiceCloneId: string, userId: string) {
         await deleteClonedVoice(voiceClone.externalVoiceId, byokKey ?? undefined).catch((err) =>
           logger.error('Failed to delete blocked voice from ElevenLabs', { error: err.message })
         );
+      } else if (voiceClone.provider === 'cartesia') {
+        const cartesiaKey = await getByokKey(voiceClone.userId, 'cartesia') ?? process.env.CARTESIA_API_KEY;
+        if (cartesiaKey) {
+          await deleteCartesiaVoice(cartesiaKey, voiceClone.externalVoiceId).catch((err) =>
+            logger.error('Failed to delete blocked voice from Cartesia', { error: err.message })
+          );
+        }
       }
       if (voiceClone.sampleUrl) {
         await deleteFile(voiceClone.sampleUrl).catch((err) =>
@@ -264,6 +272,13 @@ async function handleVerifyChallenge(voiceCloneId: string, userId: string, chall
       await deleteClonedVoice(voiceClone.externalVoiceId, byokKey ?? undefined).catch((err) =>
         logger.error('Failed to delete rejected voice from ElevenLabs', { error: err.message })
       );
+    } else if (voiceClone.provider === 'cartesia') {
+      const cartesiaKey = await getByokKey(voiceClone.userId, 'cartesia') ?? process.env.CARTESIA_API_KEY;
+      if (cartesiaKey) {
+        await deleteCartesiaVoice(cartesiaKey, voiceClone.externalVoiceId).catch((err) =>
+          logger.error('Failed to delete rejected voice from Cartesia', { error: err.message })
+        );
+      }
     }
     if (voiceClone.sampleUrl) {
       await deleteFile(voiceClone.sampleUrl).catch((err) =>

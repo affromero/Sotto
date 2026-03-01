@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { cloneVoice, deleteClonedVoice } from '@/lib/elevenlabs';
 import { cloneVoiceViaFal } from '@/lib/fal-voice-clone';
+import { cloneVoiceViaCartesia } from '@/lib/cartesia-voice-clone';
 import { getByokKey, hasByokKey } from '@/lib/byok';
 import { cloneVoiceSchema } from '@/lib/validations';
 import { LIMITS } from '@/lib/stripe';
@@ -80,6 +81,13 @@ export async function POST(request: NextRequest) {
     }
     const { embeddingUrl } = await cloneVoiceViaFal(falKey, cloneBuffer);
     externalVoiceId = embeddingUrl;
+  } else if (provider === 'cartesia') {
+    const cartesiaKey = await getByokKey(session.user.id, 'cartesia') ?? process.env.CARTESIA_API_KEY;
+    if (!cartesiaKey) {
+      return errorResponse('Cartesia API key required', 400);
+    }
+    const { voiceId } = await cloneVoiceViaCartesia(cartesiaKey, cloneBuffer, parsed.data.name);
+    externalVoiceId = voiceId;
   } else {
     const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
     const { voiceId } = await cloneVoice(parsed.data.name, [cloneBuffer], {
@@ -215,10 +223,16 @@ export async function DELETE(request: NextRequest) {
     return errorResponse('Forbidden', 403);
   }
 
-  // Only call ElevenLabs delete API for ElevenLabs voices
+  // Delete from external provider
   if (!voiceClone.provider || voiceClone.provider === 'elevenlabs') {
     const elevenLabsKey = await getByokKey(session.user.id, 'elevenlabs');
     await deleteClonedVoice(voiceClone.externalVoiceId, elevenLabsKey ?? undefined);
+  } else if (voiceClone.provider === 'cartesia') {
+    const cartesiaKey = await getByokKey(session.user.id, 'cartesia') ?? process.env.CARTESIA_API_KEY;
+    if (cartesiaKey) {
+      const { deleteCartesiaVoice } = await import('@/lib/cartesia-voice-clone');
+      await deleteCartesiaVoice(cartesiaKey, voiceClone.externalVoiceId);
+    }
   }
 
   // Clean up voice requests for this clone
