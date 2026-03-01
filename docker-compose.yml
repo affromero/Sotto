@@ -44,6 +44,30 @@ services:
       retries: 10
       start_period: 60s
 
+  pinchtab:
+    image: pinchtab/pinchtab
+    container_name: sotto-pinchtab
+    ports:
+      - '9867:9867'
+    environment:
+      BRIDGE_BIND: '0.0.0.0'
+      BRIDGE_PORT: '9867'
+      BRIDGE_HEADLESS: 'true'
+      BRIDGE_STEALTH: 'full'
+      BRIDGE_BLOCK_IMAGES: 'true'
+      BRIDGE_BLOCK_ADS: 'true'
+      BRIDGE_BLOCK_MEDIA: 'true'
+      BRIDGE_NAV_TIMEOUT: '25'
+    shm_size: '1gb'
+    security_opt:
+      - seccomp:unconfined
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q --spider http://localhost:9867/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 volumes:
   sotto_postgres_data:
   sotto_redis_data:

@@ -18,5 +18,5 @@ export interface ExtractedContent {
   /** Source type: html, pdf, youtube, video */
   sourceType: 'html' | 'pdf' | 'youtube' | 'video';
   /** Which extraction method succeeded */
-  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core';
+  extractionMethod: 'readability' | 'cheerio-fallback' | 'pdf-parse' | 'youtube-transcript' | 'summarize-core' | 'pinchtab';
 }
