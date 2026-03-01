@@ -15,7 +15,7 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- Import under test ----
 
-import { getAutoModelConfig, setAutoModelConfig, resolveAutoModel, resolveIncludedModels } from '@/lib/auto-model-config';
+import { getAutoModelConfig, setAutoModelConfig, resolveAutoModel, resolveIncludedModels, resolveTtsIncludedModels, resolveSttIncludedModels } from '@/lib/auto-model-config';
 
 // ---- Default row ----
 
@@ -37,6 +37,10 @@ const defaultRow = {
   platformAiModel: 'claude-haiku-4-5-20251001',
   freeIncludedModels: null,
   proIncludedModels: null,
+  freeIncludedTtsModels: null,
+  proIncludedTtsModels: null,
+  freeIncludedSttModels: null,
+  proIncludedSttModels: null,
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -76,6 +80,10 @@ describe('getAutoModelConfig', () => {
       },
       freeIncludedModels: null,
       proIncludedModels: null,
+      freeIncludedTtsModels: null,
+      proIncludedTtsModels: null,
+      freeIncludedSttModels: null,
+      proIncludedSttModels: null,
     });
   });
 
@@ -84,12 +92,20 @@ describe('getAutoModelConfig', () => {
       ...defaultRow,
       freeIncludedModels: ['model-a'],
       proIncludedModels: ['model-a', 'model-b'],
+      freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
+      proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+      freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+      proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
     });
 
     const result = await getAutoModelConfig();
 
     expect(result.freeIncludedModels).toEqual(['model-a']);
     expect(result.proIncludedModels).toEqual(['model-a', 'model-b']);
+    expect(result.freeIncludedTtsModels).toEqual(['elevenlabs:eleven_v3']);
+    expect(result.proIncludedTtsModels).toEqual(['elevenlabs:eleven_v3', 'openai:tts-1-hd']);
+    expect(result.freeIncludedSttModels).toEqual(['groq:whisper-large-v3-turbo']);
+    expect(result.proIncludedSttModels).toEqual(['groq:whisper-large-v3-turbo', 'openai:whisper-1']);
   });
 
   it('falls back to null for malformed JSON in included models', async () => {
@@ -97,12 +113,20 @@ describe('getAutoModelConfig', () => {
       ...defaultRow,
       freeIncludedModels: 'not-an-array',
       proIncludedModels: 123,
+      freeIncludedTtsModels: 'bad',
+      proIncludedTtsModels: 42,
+      freeIncludedSttModels: {},
+      proIncludedSttModels: true,
     });
 
     const result = await getAutoModelConfig();
 
     expect(result.freeIncludedModels).toBeNull();
     expect(result.proIncludedModels).toBeNull();
+    expect(result.freeIncludedTtsModels).toBeNull();
+    expect(result.proIncludedTtsModels).toBeNull();
+    expect(result.freeIncludedSttModels).toBeNull();
+    expect(result.proIncludedSttModels).toBeNull();
   });
 
   it('calls upsert with singleton id and empty update', async () => {
@@ -187,6 +211,24 @@ describe('setAutoModelConfig', () => {
     expect(call.update.proIncludedModels).toEqual(['model-a', 'model-b']);
   });
 
+  it('persists TTS and STT included models when provided', async () => {
+    await setAutoModelConfig(
+      {
+        freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
+        proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+        freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+        proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+      },
+      'admin-1'
+    );
+
+    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
+    expect(call.update.freeIncludedTtsModels).toEqual(['elevenlabs:eleven_v3']);
+    expect(call.update.proIncludedTtsModels).toEqual(['elevenlabs:eleven_v3', 'openai:tts-1-hd']);
+    expect(call.update.freeIncludedSttModels).toEqual(['groq:whisper-large-v3-turbo']);
+    expect(call.update.proIncludedSttModels).toEqual(['groq:whisper-large-v3-turbo', 'openai:whisper-1']);
+  });
+
   it('persists null to clear included model overrides', async () => {
     await setAutoModelConfig(
       { freeIncludedModels: null, proIncludedModels: null },
@@ -198,12 +240,34 @@ describe('setAutoModelConfig', () => {
     expect(call.update.proIncludedModels).toBeNull();
   });
 
+  it('persists null to clear TTS and STT included model overrides', async () => {
+    await setAutoModelConfig(
+      {
+        freeIncludedTtsModels: null,
+        proIncludedTtsModels: null,
+        freeIncludedSttModels: null,
+        proIncludedSttModels: null,
+      },
+      'admin-1'
+    );
+
+    const call = mockAutoModelConfigUpsert.mock.calls[0][0];
+    expect(call.update.freeIncludedTtsModels).toBeNull();
+    expect(call.update.proIncludedTtsModels).toBeNull();
+    expect(call.update.freeIncludedSttModels).toBeNull();
+    expect(call.update.proIncludedSttModels).toBeNull();
+  });
+
   it('does not include included model fields when not provided', async () => {
     await setAutoModelConfig({ free: { aiModel: 'gpt-4o-mini' } }, 'admin-1');
 
     const call = mockAutoModelConfigUpsert.mock.calls[0][0];
     expect(call.update).not.toHaveProperty('freeIncludedModels');
     expect(call.update).not.toHaveProperty('proIncludedModels');
+    expect(call.update).not.toHaveProperty('freeIncludedTtsModels');
+    expect(call.update).not.toHaveProperty('proIncludedTtsModels');
+    expect(call.update).not.toHaveProperty('freeIncludedSttModels');
+    expect(call.update).not.toHaveProperty('proIncludedSttModels');
   });
 
   it('uses singleton id for upsert', async () => {
@@ -236,6 +300,10 @@ describe('resolveIncludedModels', () => {
     platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
     freeIncludedModels: null,
     proIncludedModels: null,
+    freeIncludedTtsModels: null,
+    proIncludedTtsModels: null,
+    freeIncludedSttModels: null,
+    proIncludedSttModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -279,6 +347,144 @@ describe('resolveIncludedModels', () => {
 
     const sharedCount = result.proModels.filter((m) => m === 'shared-model').length;
     expect(sharedCount).toBe(1);
+  });
+});
+
+describe('resolveTtsIncludedModels', () => {
+  const baseConfig: Parameters<typeof resolveTtsIncludedModels>[0] = {
+    free: {
+      aiProvider: 'groq' as const,
+      aiModel: 'llama-3.1-8b-instant',
+      ttsProvider: 'kittentts' as const,
+      ttsModel: 'kitten-tts-mini-0.8',
+      sttProvider: 'groq' as const,
+      sttModel: 'whisper-large-v3-turbo',
+    },
+    pro: {
+      aiProvider: 'anthropic' as const,
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'elevenlabs' as const,
+      ttsModel: 'eleven_v3',
+      sttProvider: 'groq' as const,
+      sttModel: 'whisper-large-v3-turbo',
+    },
+    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
+    freeIncludedModels: null,
+    proIncludedModels: null,
+    freeIncludedTtsModels: null,
+    proIncludedTtsModels: null,
+    freeIncludedSttModels: null,
+    proIncludedSttModels: null,
+  };
+
+  it('derives from auto defaults when lists are null', () => {
+    const result = resolveTtsIncludedModels(baseConfig);
+
+    expect(result.freeTtsModels).toEqual(['kittentts:kitten-tts-mini-0.8']);
+    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
+    expect(result.proTtsModels).toContain('kittentts:kitten-tts-mini-0.8');
+  });
+
+  it('returns explicit lists when set', () => {
+    const result = resolveTtsIncludedModels({
+      ...baseConfig,
+      freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
+      proIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8', 'elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+    });
+
+    expect(result.freeTtsModels).toEqual(['kittentts:kitten-tts-mini-0.8']);
+    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
+    expect(result.proTtsModels).toContain('openai:tts-1-hd');
+  });
+
+  it('always includes free TTS models in pro output', () => {
+    const result = resolveTtsIncludedModels({
+      ...baseConfig,
+      freeIncludedTtsModels: ['kittentts:kitten-tts-mini-0.8'],
+      proIncludedTtsModels: ['elevenlabs:eleven_v3'],
+    });
+
+    expect(result.proTtsModels).toContain('kittentts:kitten-tts-mini-0.8');
+    expect(result.proTtsModels).toContain('elevenlabs:eleven_v3');
+  });
+
+  it('deduplicates when free model is already in pro list', () => {
+    const result = resolveTtsIncludedModels({
+      ...baseConfig,
+      freeIncludedTtsModels: ['elevenlabs:eleven_v3'],
+      proIncludedTtsModels: ['elevenlabs:eleven_v3', 'openai:tts-1-hd'],
+    });
+
+    const count = result.proTtsModels.filter((m) => m === 'elevenlabs:eleven_v3').length;
+    expect(count).toBe(1);
+  });
+});
+
+describe('resolveSttIncludedModels', () => {
+  const baseConfig: Parameters<typeof resolveSttIncludedModels>[0] = {
+    free: {
+      aiProvider: 'groq' as const,
+      aiModel: 'llama-3.1-8b-instant',
+      ttsProvider: 'kittentts' as const,
+      ttsModel: 'kitten-tts-mini-0.8',
+      sttProvider: 'groq' as const,
+      sttModel: 'whisper-large-v3-turbo',
+    },
+    pro: {
+      aiProvider: 'anthropic' as const,
+      aiModel: 'claude-haiku-4-5-20251001',
+      ttsProvider: 'elevenlabs' as const,
+      ttsModel: 'eleven_v3',
+      sttProvider: 'groq' as const,
+      sttModel: 'whisper-large-v3-turbo',
+    },
+    platform: { aiProvider: 'anthropic' as const, aiModel: 'claude-haiku-4-5-20251001' },
+    freeIncludedModels: null,
+    proIncludedModels: null,
+    freeIncludedTtsModels: null,
+    proIncludedTtsModels: null,
+    freeIncludedSttModels: null,
+    proIncludedSttModels: null,
+  };
+
+  it('derives from auto defaults when lists are null', () => {
+    const result = resolveSttIncludedModels(baseConfig);
+
+    expect(result.freeSttModels).toEqual(['groq:whisper-large-v3-turbo']);
+    expect(result.proSttModels).toContain('groq:whisper-large-v3-turbo');
+  });
+
+  it('returns explicit lists when set', () => {
+    const result = resolveSttIncludedModels({
+      ...baseConfig,
+      freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+      proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+    });
+
+    expect(result.freeSttModels).toEqual(['groq:whisper-large-v3-turbo']);
+    expect(result.proSttModels).toContain('openai:whisper-1');
+  });
+
+  it('always includes free STT models in pro output', () => {
+    const result = resolveSttIncludedModels({
+      ...baseConfig,
+      freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+      proIncludedSttModels: ['openai:whisper-1'],
+    });
+
+    expect(result.proSttModels).toContain('groq:whisper-large-v3-turbo');
+    expect(result.proSttModels).toContain('openai:whisper-1');
+  });
+
+  it('deduplicates when free model is already in pro list', () => {
+    const result = resolveSttIncludedModels({
+      ...baseConfig,
+      freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+      proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+    });
+
+    const count = result.proSttModels.filter((m) => m === 'groq:whisper-large-v3-turbo').length;
+    expect(count).toBe(1);
   });
 });
 
