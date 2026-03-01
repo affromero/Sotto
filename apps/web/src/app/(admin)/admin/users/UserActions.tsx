@@ -182,7 +182,6 @@ export function UserActions({
         aria-label="User role"
       >
         <option value="USER">User</option>
-        <option value="CREATOR">Creator</option>
         <option value="ADMIN">Admin</option>
       </select>
       {!isOwnUser && !isAdmin && (

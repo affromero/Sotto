@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { errorResponse } from '@/lib/api-response';
 const updateRoleSchema = z.object({
-  role: z.enum(['USER', 'CREATOR', 'ADMIN']),
+  role: z.enum(['USER', 'ADMIN']),
 });
 
 export async function PATCH(

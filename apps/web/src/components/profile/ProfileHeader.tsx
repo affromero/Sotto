@@ -91,7 +91,6 @@ export function ProfileHeader({
           <h1 className={styles.name}>
             <span>{user.name || 'Anonymous'}</span>
             {user.role === 'SYSTEM' && <Badge variant="system">Sotto</Badge>}
-            {user.role === 'CREATOR' && <Badge variant="creator">Creator</Badge>}
             {user.role === 'ADMIN' && <Badge variant="admin">Admin</Badge>}
             {isEarlyAccess && <Badge variant="earlyAccess">Early Access</Badge>}
           </h1>

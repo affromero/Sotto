@@ -45,7 +45,7 @@ interface SettingsFormProps {
   initialHandle: string;
   email: string;
   image: string | null;
-  role: 'USER' | 'CREATOR' | 'ADMIN' | 'SYSTEM';
+  role: 'USER' | 'ADMIN' | 'SYSTEM';
   connectedProviders: string[];
   twitterHandle: string | null;
   twitterEnabled: boolean;
