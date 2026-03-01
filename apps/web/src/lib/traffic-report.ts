@@ -142,11 +142,9 @@ export interface ContentSection {
 }
 
 export interface FreeTierSection {
-  config: { aiProvider: string; aiModel: string; ttsProvider: string; generationLimit: number };
+  config: { aiProvider: string; aiModel: string; ttsProvider: string; dailyGenerationLimit: number };
   autoModelConfig: AutoModelConfigData;
-  usersWithFreeGenerations: number;
-  avgFreeGenerationsUsed: number;
-  usersExhaustedFreeTier: number;
+  usersWithPodcasts: number;
   byokUsersCount: number;
 }
 
@@ -328,12 +326,10 @@ export async function buildTrafficReport(
     durationAccuracyWithinTarget,
     durationAccuracyStats,
 
-    // === Free Tier (6) ===
+    // === Free Tier (4) ===
     freeTierConfig,
     autoModelConfig,
-    usersWithFreeGen,
-    avgFreeGenUsed,
-    usersExhausted,
+    usersWithPodcasts,
     byokUsersCount,
 
     // === Pipeline (5) ===
@@ -730,18 +726,7 @@ export async function buildTrafficReport(
     // -----------------------------------------------------------------------
     getFreeTierConfig(),
     getAutoModelConfig(),
-    prisma.user.count({ where: { freeGenerationsUsed: { gt: 0 } } }),
-    prisma.user.aggregate({
-      where: { freeGenerationsUsed: { gt: 0 } },
-      _avg: { freeGenerationsUsed: true },
-    }),
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*)::bigint AS count
-      FROM "User" u
-      CROSS JOIN "FreeTierConfig" f
-      WHERE f."id" = 'singleton'
-        AND u."freeGenerationsUsed" >= f."generationLimit"
-    `,
+    prisma.user.count({ where: { podcasts: { some: {} } } }),
     prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(DISTINCT ak."userId")::bigint AS count
       FROM "UserAiKey" ak
@@ -1113,9 +1098,7 @@ export async function buildTrafficReport(
     freeTier: {
       config: freeTierConfig,
       autoModelConfig,
-      usersWithFreeGenerations: usersWithFreeGen,
-      avgFreeGenerationsUsed: avgFreeGenUsed._avg.freeGenerationsUsed ?? 0,
-      usersExhaustedFreeTier: n(usersExhausted[0]?.count ?? 0n),
+      usersWithPodcasts: usersWithPodcasts,
       byokUsersCount: n(byokUsersCount[0]?.count ?? 0n),
     },
 

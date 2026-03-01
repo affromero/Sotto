@@ -7,21 +7,15 @@ import { prisma } from './prisma';
 
 export interface FreeTierFunnel {
   freeGenUsers: number;
-  exhaustedUsers: number;
   byokUsers: number;
-  conversionRate: number;
+  byokConversionRate: number;
 }
 
 export async function getFreeTierFunnel(): Promise<FreeTierFunnel> {
-  const [freeGenUsers, exhaustedRows, byokRows] = await Promise.all([
-    prisma.user.count({ where: { freeGenerationsUsed: { gt: 0 } } }),
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*)::bigint AS count
-      FROM "User" u
-      CROSS JOIN "FreeTierConfig" f
-      WHERE f."id" = 'singleton'
-        AND u."freeGenerationsUsed" >= f."generationLimit"
-    `,
+  const [freeGenUsers, byokRows] = await Promise.all([
+    prisma.user.count({
+      where: { podcasts: { some: {} } },
+    }),
     prisma.$queryRaw<[{ count: bigint }]>`
       SELECT COUNT(DISTINCT ak."userId")::bigint AS count
       FROM "UserAiKey" ak
@@ -30,15 +24,13 @@ export async function getFreeTierFunnel(): Promise<FreeTierFunnel> {
     `,
   ]);
 
-  const exhaustedUsers = Number(exhaustedRows[0]?.count ?? 0);
   const byokUsers = Number(byokRows[0]?.count ?? 0);
-  const conversionRate = exhaustedUsers > 0 ? byokUsers / exhaustedUsers : 0;
+  const byokConversionRate = freeGenUsers > 0 ? byokUsers / freeGenUsers : 0;
 
   return {
     freeGenUsers,
-    exhaustedUsers,
     byokUsers,
-    conversionRate,
+    byokConversionRate,
   };
 }
 

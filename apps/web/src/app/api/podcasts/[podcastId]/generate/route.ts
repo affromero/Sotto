@@ -62,13 +62,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Generation gate: BYOK or free tier (skip for admins)
   const gate = isAdmin
-    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, isProUser: true, freeGenerationsUsed: 0, freeGenerationsLimit: 0, dailyLimit: 0 }
+    ? { allowed: true as const, reason: 'admin' as const, isByokUser: true, isProUser: true, dailyUsed: 0, dailyLimit: 0 }
     : await checkGenerationGate(authResult.userId);
   if (!gate.allowed) {
-    const msg =
-      gate.reason === 'free_tier_exhausted'
-        ? 'Free generations used. Add your own API keys to continue.'
-        : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
+    const msg = gate.reason === 'generation_in_progress'
+      ? 'A podcast is already generating. Wait for it to finish before starting another.'
+      : 'No voice provider available. Add a TTS key in Settings for unlimited generation.';
     return errorResponse(msg, 403, { code: gate.reason });
   }
 

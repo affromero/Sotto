@@ -130,8 +130,8 @@ export function InterruptChatPanel({
             setState('incorporated');
           } else {
             const incData = await incRes.json().catch(() => ({}));
-            if (incData.code === 'free_tier_exhausted') {
-              setError('Free generations used. Add your own API keys to keep creating.');
+            if (incData.code === 'daily_limit_reached') {
+              setError('Daily limit reached. Try again tomorrow or add your own API keys.');
             }
             setState('resolved');
           }

@@ -36,9 +36,6 @@ export async function GET(_request: NextRequest) {
         tts: ttsKeys.map((k) => ({ provider: k.provider, isValid: k.isValid })),
       },
       freeTier: {
-        used: freeTier.freeGenerationsUsed,
-        limit: freeTier.freeGenerationsLimit,
-        remaining: freeTier.freeGenerationsRemaining,
         isByokUser: freeTier.isByokUser,
         aiQuotas: freeTier.aiQuotas,
         ttsQuotas: freeTier.ttsQuotas,

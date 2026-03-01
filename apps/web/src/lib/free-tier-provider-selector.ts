@@ -44,10 +44,10 @@ export async function selectFreeTierProviders(userId: string): Promise<SelectedF
     return {
       aiProvider: autoFree.aiProvider,
       aiModel: autoFree.aiModel,
-      aiQuota: config.generationLimit,
+      aiQuota: config.dailyGenerationLimit,
       ttsProvider: autoFree.ttsProvider,
       ttsModel: autoFree.ttsModel,
-      ttsQuota: config.generationLimit,
+      ttsQuota: config.dailyGenerationLimit,
     };
   }
 
@@ -77,11 +77,11 @@ export async function selectFreeTierProviders(userId: string): Promise<SelectedF
 function selectTtsProvider(
   allocations: ProviderAllocation[],
   usageMap: Map<string, number>,
-  config: { generationLimit: number },
+  config: { dailyGenerationLimit: number },
   autoFree: PlanModelConfig
 ): { provider: string; model: string; quota: number } {
   if (allocations.length === 0) {
-    return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.generationLimit };
+    return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.dailyGenerationLimit };
   }
 
   // Filter to allocations with remaining quota AND a platform API key available
@@ -108,17 +108,17 @@ function selectTtsProvider(
   }
 
   // All allocations exhausted — fall back to auto model config
-  return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.generationLimit };
+  return { provider: autoFree.ttsProvider, model: autoFree.ttsModel, quota: config.dailyGenerationLimit };
 }
 
 function selectAiProvider(
   allocations: ProviderAllocation[],
   usageMap: Map<string, number>,
-  config: { generationLimit: number },
+  config: { dailyGenerationLimit: number },
   autoFree: PlanModelConfig
 ): { provider: string; model: string; quota: number } {
   if (allocations.length === 0) {
-    return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.generationLimit };
+    return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.dailyGenerationLimit };
   }
 
   // Filter to allocations with remaining quota
@@ -139,7 +139,7 @@ function selectAiProvider(
   }
 
   // All allocations exhausted — fall back to auto model config
-  return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.generationLimit };
+  return { provider: autoFree.aiProvider, model: autoFree.aiModel, quota: config.dailyGenerationLimit };
 }
 
 function getModelTier(provider: string, modelId: string): string {

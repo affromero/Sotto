@@ -79,7 +79,7 @@ export function ForkRemixModal({ isOpen, onClose, podcastId, podcastTitle }: For
 
       if (!response.ok) {
         const data = await response.json();
-        if (data.code === 'free_tier_exhausted') {
+        if (data.code === 'daily_limit_reached') {
           router.push('/onboarding?step=keys');
           onClose();
           return;
