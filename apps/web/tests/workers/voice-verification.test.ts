@@ -51,6 +51,12 @@ vi.mock('@/lib/elevenlabs', () => ({
   deleteClonedVoice: (...args: unknown[]) => mockDeleteClonedVoice(...args),
 }));
 
+const mockDeleteCartesiaVoice = vi.fn().mockResolvedValue(undefined);
+
+vi.mock('@/lib/cartesia-voice-clone', () => ({
+  deleteCartesiaVoice: (...args: unknown[]) => mockDeleteCartesiaVoice(...args),
+}));
+
 const mockGetByokKey = vi.fn().mockResolvedValue(null);
 
 vi.mock('@/lib/byok', () => ({
