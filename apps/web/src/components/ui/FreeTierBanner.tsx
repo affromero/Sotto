@@ -86,8 +86,8 @@ export function FreeTierBanner({
   if (isProUser) return null;
   if (dismissed) return null;
 
-  // BYOK+Free users see a subtle Pro upsell
-  if (isByokUser) {
+  // BYOK users and admin-granted unlimited (dailyLimit === 0) see a subtle Pro upsell
+  if (isByokUser || dailyLimit === 0) {
     return (
       <div
         className={`${styles.banner} ${styles.info}`}
