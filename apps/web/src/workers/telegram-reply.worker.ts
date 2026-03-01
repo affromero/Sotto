@@ -36,6 +36,14 @@ export async function processTelegramReply(job: Job<ReplyTelegramPayload>): Prom
     return;
   }
 
+  if (podcast.status !== 'READY') {
+    // Podcast is mid-generation (retry in progress) — skip, reply will be queued when done
+    logger.info('Skipping Telegram reply — podcast not in terminal state', {
+      podcastId, status: podcast.status,
+    });
+    return;
+  }
+
   await job.updateProgress(30);
 
   const durationMin = podcast.duration ? Math.round(podcast.duration / 60) : 0;
