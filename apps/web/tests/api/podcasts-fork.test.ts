@@ -111,10 +111,8 @@ vi.mock('@/lib/stripe', () => ({
 
 // Mock generation gate
 const mockCheckGenerationGate = vi.fn();
-const mockTryIncrementFreeGeneration = vi.fn();
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
-  tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
 }));
 
 const mockGetFreeTierConfig = vi.fn();

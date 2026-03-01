@@ -3,7 +3,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { prisma } from '@/lib/prisma';
 import { forkBodySchema } from '@/lib/validations';
 import { contentExtractionQueue, notificationQueue, addJob, JobType } from '@/lib/queue';
-import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
+import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
@@ -71,19 +71,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
-  // Atomically increment free tier counter BEFORE creating anything (avoids TOCTOU race)
+  // Auto-resolve providers for free-tier users (quota consumed on success by workers)
   let freeTierTtsProvider: string | undefined;
   let freeTierTtsModel: string | undefined;
   let freeTierAiModel: string | undefined;
   if (!gate.isByokUser) {
     const selected = await selectFreeTierProviders(userId);
-    const ok = await tryIncrementFreeGeneration(userId, gate.dailyLimit, {
-      ai: { provider: selected.aiProvider, quota: selected.aiQuota },
-      tts: { provider: selected.ttsProvider, quota: selected.ttsQuota },
-    });
-    if (!ok) {
-      return errorResponse('Free generations used.', 403, { code: 'free_tier_exhausted' });
-    }
     freeTierTtsProvider = selected.ttsProvider;
     freeTierTtsModel = selected.ttsModel;
     freeTierAiModel = selected.aiModel;

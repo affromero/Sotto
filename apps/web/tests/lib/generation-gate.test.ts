@@ -6,12 +6,16 @@ const mockUser = vi.fn();
 const mockUserUpdate = vi.fn().mockResolvedValue({});
 const mockFreeProviderUsageFindMany = vi.fn();
 const mockExecuteRaw = vi.fn();
+const mockPodcastCount = vi.fn().mockResolvedValue(0);
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     user: {
       findUniqueOrThrow: (...args: unknown[]) => mockUser(...args),
       update: (...args: unknown[]) => mockUserUpdate(...args),
+    },
+    podcast: {
+      count: (...args: unknown[]) => mockPodcastCount(...args),
     },
     freeProviderUsage: {
       findMany: (...args: unknown[]) => mockFreeProviderUsageFindMany(...args),
@@ -54,7 +58,7 @@ vi.mock('@/lib/referrals', () => ({
 }));
 
 // ---- Import under test ----
-import { checkGenerationGate, tryIncrementFreeGeneration, getFreeTierStatus } from '@/lib/generation-gate';
+import { checkGenerationGate, tryIncrementFreeGeneration, consumeFreeGeneration, getFreeTierStatus } from '@/lib/generation-gate';
 
 // ---- Helpers ----
 
@@ -256,6 +260,45 @@ describe('checkGenerationGate', () => {
     expect(result.dailyLimit).toBe(6); // 1 base + 5 cap
   });
 
+  it('blocks free user with an in-flight generation', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockPodcastCount.mockResolvedValue(1); // 1 non-terminal podcast in last 24h
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('generation_in_progress');
+    // Should not check Redis daily counter when in-flight check blocks
+    expect(mockRedisGet).not.toHaveBeenCalled();
+  });
+
+  it('allows free user when no in-flight generation exists', async () => {
+    mockHasByokKey.mockResolvedValue(false);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+    mockPodcastCount.mockResolvedValue(0); // no in-flight podcasts
+    mockRedisGet.mockResolvedValue('0');
+    mockRedisTtl.mockResolvedValue(-1);
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toBe('ok');
+  });
+
+  it('BYOK users bypass in-flight check', async () => {
+    mockHasByokKey.mockResolvedValue(true);
+    mockGetFreeTierConfig.mockResolvedValue(baseConfig);
+    mockUser.mockResolvedValue({ freeGenerationsUsed: 0, role: 'USER', plan: 'FREE', dailyGenerationOverride: null });
+
+    const result = await checkGenerationGate('user-1');
+
+    expect(result.allowed).toBe(true);
+    expect(mockPodcastCount).not.toHaveBeenCalled();
+  });
+
   it('falls through to global config when dailyGenerationOverride is null', async () => {
     mockHasByokKey.mockResolvedValue(false);
     mockGetFreeTierConfig.mockResolvedValue(baseConfig); // global = 1/day
@@ -317,6 +360,47 @@ describe('tryIncrementFreeGeneration', () => {
     });
 
     expect(result).toBe(false);
+    expect(mockExecuteRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('consumeFreeGeneration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserUpdate.mockResolvedValue({});
+    mockExecuteRaw.mockResolvedValue(1);
+    mockRedisEval.mockResolvedValue(1);
+  });
+
+  it('increments Redis daily counter unconditionally', async () => {
+    await consumeFreeGeneration('user-1');
+
+    expect(mockRedisEval).toHaveBeenCalledTimes(1);
+  });
+
+  it('increments lifetime freeGenerationsUsed counter', async () => {
+    await consumeFreeGeneration('user-1');
+
+    expect(mockUserUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-1' },
+        data: { freeGenerationsUsed: { increment: 1 } },
+      })
+    );
+  });
+
+  it('tracks per-provider usage when providerUsage is given', async () => {
+    await consumeFreeGeneration('user-1', {
+      ai: { provider: 'anthropic', quota: 3 },
+      tts: { provider: 'elevenlabs', quota: 2 },
+    });
+
+    expect(mockExecuteRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('works without providerUsage', async () => {
+    await consumeFreeGeneration('user-1');
+
     expect(mockExecuteRaw).not.toHaveBeenCalled();
   });
 });
