@@ -36,7 +36,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
       userId,
       discoveryId,
       useAdminCredits,
-    }, { jobId: `verify-${podcastId}-1` });
+    }, { jobId: `verify-${podcastId}-${Date.now()}-1` });
 
     await job.updateProgress(100);
     return;
@@ -220,7 +220,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     userId,
     discoveryId,
     useAdminCredits,
-  }, { jobId: `verify-${podcastId}-1` });
+  }, { jobId: `verify-${podcastId}-${Date.now()}-1` });
 
   logger.info('Script queued for verification', {
     podcastId,

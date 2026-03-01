@@ -553,7 +553,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
               podcastId,
               tweetMentionId: mention.id,
               originalTweetId: mention.tweetId,
-            }, { jobId: `twitter-fail-${podcastId}` }).catch(() => {});
+            }, { jobId: `twitter-fail-${podcastId}-${Date.now()}` }).catch(() => {});
           }
         }
       }
@@ -570,7 +570,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             podcastId,
             telegramMessageId: tgMsg?.id,
             chatId: tgMsg?.chatId ?? podcast.user.telegramChatId,
-          }, { jobId: `telegram-fail-${podcastId}` }).catch(() => {});
+          }, { jobId: `telegram-fail-${podcastId}-${Date.now()}` }).catch(() => {});
         }
       }
 
