@@ -74,6 +74,7 @@ export function VoiceManager() {
   const [priceDraft, setPriceDraft] = useState('');
   const [savingPrice, setSavingPrice] = useState(false);
   const [inputTab, setInputTab] = useState<'upload' | 'record'>('upload');
+  const [cloneProvider, setCloneProvider] = useState<'elevenlabs' | 'cartesia' | 'hume'>('elevenlabs');
   const [humeVoiceId, setHumeVoiceId] = useState('');
   const [humeName, setHumeName] = useState('');
   const [importingHume, setImportingHume] = useState(false);
@@ -331,6 +332,7 @@ export function VoiceManager() {
         formData.append('sourceType', 'UPLOAD');
       }
       formData.append('name', cloneName.trim());
+      formData.append('provider', cloneProvider);
 
       const response = await fetch('/api/voices/clone', {
         method: 'POST',
@@ -930,6 +932,75 @@ export function VoiceManager() {
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Add New Voice</h3>
+
+        <div className={styles.providerPills} role="tablist" aria-label="Voice provider">
+          {(['elevenlabs', 'cartesia', 'hume'] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              role="tab"
+              aria-selected={cloneProvider === p}
+              className={`${styles.pill} ${cloneProvider === p ? styles.pillActive : ''}`}
+              onClick={() => setCloneProvider(p)}
+              disabled={cloning || importingHume}
+            >
+              {p === 'elevenlabs' ? 'ElevenLabs' : p === 'cartesia' ? 'Cartesia' : 'Hume'}
+            </button>
+          ))}
+        </div>
+
+        {cloneProvider === 'hume' ? (
+          <form onSubmit={handleImportHume} className={styles.uploadForm}>
+            <p className={styles.hint}>
+              Paste a Hume custom voice ID to import it. No audio upload needed.
+            </p>
+            <div className={styles.formGroup}>
+              <label htmlFor="hume-name" className={styles.label}>
+                Voice Name
+              </label>
+              <input
+                id="hume-name"
+                type="text"
+                className={styles.nameInput}
+                value={humeName}
+                onChange={(e) => setHumeName(e.target.value)}
+                placeholder="My Hume Voice"
+                required
+                disabled={importingHume}
+                maxLength={100}
+              />
+            </div>
+            <div className={styles.formGroup}>
+              <label htmlFor="hume-voice-id" className={styles.label}>
+                Hume Voice ID
+              </label>
+              <input
+                id="hume-voice-id"
+                type="text"
+                className={styles.nameInput}
+                value={humeVoiceId}
+                onChange={(e) => setHumeVoiceId(e.target.value)}
+                placeholder="e.g. 9e068547-5ba4-..."
+                required
+                disabled={importingHume}
+                maxLength={200}
+              />
+            </div>
+            <button
+              type="submit"
+              className={styles.cloneButton}
+              disabled={importingHume || !humeName.trim() || !humeVoiceId.trim()}
+            >
+              {importingHume ? (
+                <>
+                  <span className={styles.spinnerSmall} /> Importing...
+                </>
+              ) : (
+                'Import Voice'
+              )}
+            </button>
+          </form>
+        ) : (
         <form onSubmit={handleClone} className={styles.uploadForm}>
           <div className={styles.formGroup}>
             <label htmlFor="voice-name" className={styles.label}>
@@ -1067,60 +1138,7 @@ export function VoiceManager() {
             )}
           </button>
         </form>
-      </section>
-
-      <section className={styles.section}>
-        <h3 className={styles.sectionTitle}>Import Hume Voice</h3>
-        <p className={styles.hint}>
-          Paste a Hume custom voice ID to import it. No audio upload needed.
-        </p>
-        <form onSubmit={handleImportHume} className={styles.uploadForm}>
-          <div className={styles.formGroup}>
-            <label htmlFor="hume-name" className={styles.label}>
-              Voice Name
-            </label>
-            <input
-              id="hume-name"
-              type="text"
-              className={styles.nameInput}
-              value={humeName}
-              onChange={(e) => setHumeName(e.target.value)}
-              placeholder="My Hume Voice"
-              required
-              disabled={importingHume}
-              maxLength={100}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="hume-voice-id" className={styles.label}>
-              Hume Voice ID
-            </label>
-            <input
-              id="hume-voice-id"
-              type="text"
-              className={styles.nameInput}
-              value={humeVoiceId}
-              onChange={(e) => setHumeVoiceId(e.target.value)}
-              placeholder="e.g. 9e068547-5ba4-..."
-              required
-              disabled={importingHume}
-              maxLength={200}
-            />
-          </div>
-          <button
-            type="submit"
-            className={styles.cloneButton}
-            disabled={importingHume || !humeName.trim() || !humeVoiceId.trim()}
-          >
-            {importingHume ? (
-              <>
-                <span className={styles.spinnerSmall} /> Importing...
-              </>
-            ) : (
-              'Import Voice'
-            )}
-          </button>
-        </form>
+        )}
       </section>
 
       {verifyingVoice && (
