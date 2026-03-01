@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { getAiKey, getByokKey } from '@/lib/byok';
+import { getAutoModelConfig, resolveSttIncludedModels } from '@/lib/auto-model-config';
+import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 
 interface SttProviderInfo {
   id: string;
@@ -41,10 +43,18 @@ const STT_PROVIDERS: SttProviderInfo[] = [
   },
 ];
 
+interface SttModelOption {
+  id: string;
+  displayName: string;
+  tier: string;
+  requiredPlan: 'FREE' | 'PRO';
+}
+
 export async function GET() {
   const session = await auth();
 
   const configuredProviders: string[] = [];
+  let isByok = false;
 
   if (session?.user?.id) {
     const userId = session.user.id;
@@ -85,6 +95,42 @@ export async function GET() {
       (await getAiKey(userId, 'assemblyai')) !== null ||
       (isAdmin && !!process.env.ASSEMBLYAI_API_KEY);
     if (hasAssemblyAi) configuredProviders.push('assemblyai');
+
+    // Check if any BYOK keys exist (AI keys that double as STT keys)
+    isByok = [hasOpenAi, hasElevenLabs, hasGroq, hasTogether, hasDeepgram, hasAssemblyAi].some(
+      (v) => v && !isAdmin
+    );
+
+    // Non-BYOK, non-admin: include STT models filtered by included lists
+    if (!isByok && !isAdmin) {
+      const userPlan = (session.user.plan ?? 'FREE') as 'FREE' | 'PRO';
+      const autoConfig = await getAutoModelConfig();
+      const { freeSttModels, proSttModels } = resolveSttIncludedModels(autoConfig);
+      const freeSet = new Set(freeSttModels);
+      const proSet = new Set(proSttModels);
+
+      const includedModels: SttModelOption[] = [];
+      for (const provider of getAllSttProviderMeta()) {
+        for (const model of provider.models) {
+          const compositeId = `${provider.id}:${model.id}`;
+          if (!proSet.has(compositeId)) continue;
+          includedModels.push({
+            id: compositeId,
+            displayName: `${provider.displayName} ${model.displayName}`,
+            tier: model.tier,
+            requiredPlan: freeSet.has(compositeId) ? 'FREE' : 'PRO',
+          });
+        }
+      }
+
+      return NextResponse.json({
+        providers: STT_PROVIDERS,
+        configuredProviders,
+        userPlan,
+        isByok: false,
+        includedModels,
+      });
+    }
   }
 
   return NextResponse.json({ providers: STT_PROVIDERS, configuredProviders });

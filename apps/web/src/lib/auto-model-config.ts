@@ -24,6 +24,10 @@ export interface AutoModelConfigData {
   platform: PlatformAiConfig;
   freeIncludedModels: string[] | null;
   proIncludedModels: string[] | null;
+  freeIncludedTtsModels: string[] | null;
+  proIncludedTtsModels: string[] | null;
+  freeIncludedSttModels: string[] | null;
+  proIncludedSttModels: string[] | null;
 }
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
@@ -62,6 +66,10 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     },
     freeIncludedModels: includedModelsSchema.parse(row.freeIncludedModels),
     proIncludedModels: includedModelsSchema.parse(row.proIncludedModels),
+    freeIncludedTtsModels: includedModelsSchema.parse(row.freeIncludedTtsModels),
+    proIncludedTtsModels: includedModelsSchema.parse(row.proIncludedTtsModels),
+    freeIncludedSttModels: includedModelsSchema.parse(row.freeIncludedSttModels),
+    proIncludedSttModels: includedModelsSchema.parse(row.proIncludedSttModels),
   };
 }
 
@@ -75,6 +83,10 @@ export async function setAutoModelConfig(
     platform?: Partial<PlatformAiConfig>;
     freeIncludedModels?: string[] | null;
     proIncludedModels?: string[] | null;
+    freeIncludedTtsModels?: string[] | null;
+    proIncludedTtsModels?: string[] | null;
+    freeIncludedSttModels?: string[] | null;
+    proIncludedSttModels?: string[] | null;
   },
   adminId: string
 ): Promise<void> {
@@ -111,6 +123,22 @@ export async function setAutoModelConfig(
     update.proIncludedModels = data.proIncludedModels;
   }
 
+  if (data.freeIncludedTtsModels !== undefined) {
+    update.freeIncludedTtsModels = data.freeIncludedTtsModels;
+  }
+
+  if (data.proIncludedTtsModels !== undefined) {
+    update.proIncludedTtsModels = data.proIncludedTtsModels;
+  }
+
+  if (data.freeIncludedSttModels !== undefined) {
+    update.freeIncludedSttModels = data.freeIncludedSttModels;
+  }
+
+  if (data.proIncludedSttModels !== undefined) {
+    update.proIncludedSttModels = data.proIncludedSttModels;
+  }
+
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
     create: { id: 'singleton', ...update },
@@ -132,6 +160,40 @@ export function resolveIncludedModels(config: AutoModelConfigData): {
     ...freeModels,
   ]);
   return { freeModels, proModels: [...proSet] };
+}
+
+/**
+ * Resolve effective included TTS models per tier.
+ * IDs use provider:model format (e.g. "elevenlabs:eleven_v3").
+ * When lists are null (unconfigured), derive from auto defaults.
+ */
+export function resolveTtsIncludedModels(config: AutoModelConfigData): {
+  freeTtsModels: string[];
+  proTtsModels: string[];
+} {
+  const freeTtsModels = config.freeIncludedTtsModels ?? [`${config.free.ttsProvider}:${config.free.ttsModel}`];
+  const proSet = new Set([
+    ...(config.proIncludedTtsModels ?? [`${config.pro.ttsProvider}:${config.pro.ttsModel}`]),
+    ...freeTtsModels,
+  ]);
+  return { freeTtsModels, proTtsModels: [...proSet] };
+}
+
+/**
+ * Resolve effective included STT models per tier.
+ * IDs use provider:model format (e.g. "groq:whisper-large-v3-turbo").
+ * When lists are null (unconfigured), derive from auto defaults.
+ */
+export function resolveSttIncludedModels(config: AutoModelConfigData): {
+  freeSttModels: string[];
+  proSttModels: string[];
+} {
+  const freeSttModels = config.freeIncludedSttModels ?? [`${config.free.sttProvider}:${config.free.sttModel}`];
+  const proSet = new Set([
+    ...(config.proIncludedSttModels ?? [`${config.pro.sttProvider}:${config.pro.sttModel}`]),
+    ...freeSttModels,
+  ]);
+  return { freeSttModels, proSttModels: [...proSet] };
 }
 
 /**
