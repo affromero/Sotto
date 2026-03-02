@@ -71,6 +71,7 @@ export interface PodcastDetail extends PodcastSummary {
   remixNote: string | null;
   failureReason: string | null;
   failedAtStatus?: string | null;
+  errorId?: string | null;
   verificationMode?: string;
   forkedFrom: ForkedFromInfo | null;
   forks: ForkSummary[];

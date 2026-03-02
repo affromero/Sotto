@@ -314,6 +314,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     remixNote: podcast.remixNote,
     failureReason: podcast.failureReason,
     failedAtStatus: podcast.failedAtStatus,
+    errorId: podcast.errorId,
     verificationMode: podcast.verificationMode,
     currentVersion: podcast.currentVersion,
     user: podcast.user,
