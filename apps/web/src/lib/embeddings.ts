@@ -2,6 +2,7 @@ import { logger } from './logger';
 import { logUsage } from './usage-logger';
 
 const EMBEDDING_DIM = 384;
+const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
 
 /**
  * Abstraction layer for embedding generation.
@@ -72,7 +73,7 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
         Authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify({
-        model: 'text-embedding-3-small',
+        model: EMBEDDING_MODEL,
         input: texts,
         dimensions: EMBEDDING_DIM,
       }),
@@ -91,7 +92,7 @@ class OpenAIEmbeddingProvider implements EmbeddingProvider {
     if (data.usage) {
       logUsage({
         service: 'openai',
-        model: 'text-embedding-3-small',
+        model: EMBEDDING_MODEL,
         category: 'embedding',
         inputTokens: data.usage.total_tokens,
         totalCost: (data.usage.total_tokens / 1_000_000) * 0.02,

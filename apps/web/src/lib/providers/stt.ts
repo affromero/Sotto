@@ -1,4 +1,5 @@
 import { logger } from '../logger';
+import { getSttProviderMeta } from './stt-registry';
 
 /**
  * Speech-to-text transcription result
@@ -33,21 +34,21 @@ interface WhisperProviderConfig {
 }
 
 const OPENAI_WHISPER_CONFIG: WhisperProviderConfig = {
-  model: 'whisper-1',
+  model: getSttProviderMeta('openai').defaultModel,
   envVar: 'OPENAI_API_KEY',
   name: 'OpenAI Whisper',
 };
 
 const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
   baseURL: 'https://api.groq.com/openai/v1',
-  model: 'whisper-large-v3-turbo',
+  model: getSttProviderMeta('groq').defaultModel,
   envVar: 'GROQ_API_KEY',
   name: 'Groq Whisper',
 };
 
 const TOGETHER_WHISPER_CONFIG: WhisperProviderConfig = {
   baseURL: 'https://api.together.xyz/v1',
-  model: 'openai/whisper-large-v3',
+  model: getSttProviderMeta('together').defaultModel,
   envVar: 'TOGETHER_API_KEY',
   name: 'Together AI Whisper',
 };

@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
-import type { AiProviderId } from './providers/ai-registry';
-import type { TtsProviderId } from './providers/tts-registry';
+import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
+import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
+import { getSttProviderMeta } from './providers/stt-registry';
 import type { SttProviderId } from '@sotto/shared';
 
 export interface ProviderAllocation {
@@ -23,11 +24,11 @@ export interface FreeTierConfig {
 
 const DEFAULTS: Omit<FreeTierConfig, 'aiAllocations' | 'ttsAllocations'> = {
   aiProvider: 'groq',
-  aiModel: 'llama-3.1-8b-instant',
+  aiModel: getAiProviderMeta('groq').defaultModel,
   ttsProvider: 'kittentts',
-  ttsModel: 'kitten-tts-mini-0.8',
+  ttsModel: getProviderMeta('kittentts').defaultModel,
   sttProvider: 'groq',
-  sttModel: 'whisper-large-v3-turbo',
+  sttModel: getSttProviderMeta('groq').defaultModel,
   dailyGenerationLimit: 1,
 };
 

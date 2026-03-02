@@ -1,7 +1,7 @@
 import { moderateOrThrow } from '../moderation';
 import { logger } from '../logger';
 import { getAiKey, hasAiKey } from '../byok';
-import type { AiProviderId } from './ai-registry';
+import { getAiProviderMeta, type AiProviderId } from './ai-registry';
 
 export interface TextContentPart { type: 'text'; text: string }
 export interface ImageContentPart { type: 'image_url'; url: string }
@@ -359,8 +359,10 @@ export async function resolveAiProvider(
 
   // 2. Groq platform key (primary platform LLM)
   if (process.env.GROQ_API_KEY) {
-    const model =
-      plan === 'PRO' ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
+    const groqMeta = getAiProviderMeta('groq');
+    const model = plan === 'PRO'
+      ? (groqMeta.models.find(m => m.tier === 'best')?.id ?? groqMeta.defaultModel)
+      : (groqMeta.models.find(m => m.tier === 'fast')?.id ?? groqMeta.defaultModel);
     return { provider: 'groq', source: 'platform', model };
   }
 

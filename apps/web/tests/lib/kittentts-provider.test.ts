@@ -9,7 +9,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderMeta: vi.fn(),
+  getProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'kitten-tts-mini-0.8' }),
   compareQuality: vi.fn(),
 }));
 
