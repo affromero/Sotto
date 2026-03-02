@@ -327,6 +327,97 @@ describe('verifyScript', () => {
     expect(mockGenerateResponse).toHaveBeenCalledTimes(2);
   });
 
+  it('passes jsonSchema to provider generateResponse', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [],
+        overallScore: 1.0,
+        feedback: '',
+      }),
+      inputTokens: 400,
+      outputTokens: 200,
+    });
+
+    await verifyScript({
+      topic: 'Schema Test',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        jsonSchema: expect.objectContaining({
+          name: 'verification_result',
+          schema: expect.objectContaining({
+            type: 'object',
+            required: expect.arrayContaining(['claims', 'overallScore', 'feedback']),
+          }),
+        }),
+      })
+    );
+  });
+
+  it('sets failureType to parse_error on unparseable response', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: 'Not JSON at all — just prose',
+      inputTokens: 400,
+      outputTokens: 100,
+      model: 'test-model',
+    });
+
+    const result = await verifyScript({
+      topic: 'Parse Error',
+      turns: [{ speaker: 'HOST', text: 'Hello.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(result.failureType).toBe('parse_error');
+    expect(result.feedback).toMatch(/^PARSE_ERROR:/);
+  });
+
+  it('does not set failureType on genuine verification failure', async () => {
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify({
+        claims: [
+          {
+            claimText: 'Unsourced stat',
+            turnIndex: 0,
+            speaker: 'HOST',
+            isCommonKnowledge: false,
+            existingCitations: [],
+            needsMoreCitations: true,
+            hasUnreliableSource: false,
+            verificationNote: 'No citation',
+          },
+        ],
+        overallScore: 0.3,
+        feedback: 'Add citations.',
+      }),
+      inputTokens: 600,
+      outputTokens: 400,
+    });
+
+    const result = await verifyScript({
+      topic: 'Real Failure',
+      turns: [{ speaker: 'HOST', text: 'Some unsourced claim.' }],
+      references: [],
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      attemptNumber: 1,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.failureType).toBeUndefined();
+  });
+
   it('retries with stricter prompt when first response is not JSON, succeeds on retry', async () => {
     // First call returns prose, second returns valid JSON
     mockGenerateResponse
