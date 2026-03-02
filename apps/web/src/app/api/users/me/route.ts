@@ -6,7 +6,7 @@ import { handleSchema, customTagSchema, deleteAccountSchema } from '@/lib/valida
 import { generateTagSlug } from '@/lib/slugify';
 import { deleteFile, listFiles } from '@/lib/r2';
 import { logger } from '@/lib/logger';
-import { getProviderForModel } from '@/lib/providers/ai-registry';
+import { getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { errorResponse } from '@/lib/api-response';
 import { z } from 'zod';
 
@@ -95,6 +95,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { interests, customTags, handle, voicePreferences, preferredAiModel, ...data } = validation.data;
+
+    // Validate preferredAiModel against registry (claude-code:* models are exempt)
+    if (preferredAiModel && !preferredAiModel.startsWith('claude-code:')) {
+      if (!isValidModelId(preferredAiModel)) {
+        return errorResponse(`Unknown AI model: "${preferredAiModel}". Check /api/ai-models for available models.`, 400);
+      }
+    }
 
     // Derive preferredAiProvider from preferredAiModel
     if (preferredAiModel !== undefined) {
