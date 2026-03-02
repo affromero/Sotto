@@ -5,6 +5,7 @@ import type { DiscoveryMessage } from '@/types/discovery';
 import type { DiscoveryMetadata } from '@/types/discovery';
 import { useDiscovery } from '@/lib/hooks/useDiscovery';
 import { SuggestionChips } from './SuggestionChips';
+import { LanguageBanner } from './LanguageBanner';
 import { LlmModelDropdown } from '@/components/create/LlmModelDropdown';
 import styles from './DiscoveryChat.module.css';
 
@@ -31,9 +32,10 @@ const GREETING: DiscoveryMessage = {
 };
 
 export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, onAiModelChange, initialDraftId, initialMessages, onDraftCreated, maxDuration }: DiscoveryChatProps) {
-  const { messages, metadata, isLoading, sendMessage, draftId } = useDiscovery(initialDraftId, initialMessages, maxDuration);
+  const { messages, metadata, isLoading, sendMessage, draftId, detectedLanguage } = useDiscovery(initialDraftId, initialMessages, maxDuration);
   const prevDraftIdRef = useRef<string | null>(initialDraftId ?? null);
   const [inputValue, setInputValue] = useState('');
+  const [languageBannerDismissed, setLanguageBannerDismissed] = useState(false);
   const initialTopicSentRef = useRef(false);
   const prevIsLoadingRef = useRef(isLoading);
 
@@ -201,6 +203,14 @@ export function DiscoveryChat({ podcastId, onComplete, initialTopic, aiModel, on
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Language detection banner */}
+      {detectedLanguage && !languageBannerDismissed && (
+        <LanguageBanner
+          detectedLanguage={detectedLanguage}
+          onDismiss={() => setLanguageBannerDismissed(true)}
+        />
+      )}
 
       {/* Generate CTA */}
       {metadata?.ready && (
