@@ -78,6 +78,9 @@ export interface AIOptions {
   apiKeyOverride?: string;
   /** Enable web search for this call. Each provider handles it natively. */
   useWebSearch?: boolean;
+  /** Request structured JSON output conforming to a JSON Schema. Provider-mapped:
+   *  Anthropic → output_config, OpenAI → response_format, Groq → response_format (json_object only). */
+  jsonSchema?: { name: string; schema: Record<string, unknown> };
 }
 
 export interface AIResponse {
@@ -113,6 +116,7 @@ class AnthropicProvider implements AIProvider {
       apiKeyOverride: opts?.apiKeyOverride,
       skipModeration: opts?.skipModeration,
       ...(tools ? { tools } : {}),
+      ...(opts?.jsonSchema ? { jsonSchema: opts.jsonSchema } : {}),
     });
   }
 
@@ -182,6 +186,12 @@ class OpenAIProvider implements AIProvider {
       max_completion_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
+      ...(opts?.jsonSchema ? {
+        response_format: {
+          type: 'json_schema' as const,
+          json_schema: { name: opts.jsonSchema.name, schema: opts.jsonSchema.schema, strict: true },
+        },
+      } : {}),
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -275,6 +285,7 @@ class GroqProvider implements AIProvider {
       max_tokens: opts?.maxTokens || 4096,
       temperature: opts?.temperature,
       messages: toGroqMessages(system, messages),
+      ...(opts?.jsonSchema ? { response_format: { type: 'json_object' as const } } : {}),
     });
 
     const content = response.choices[0]?.message?.content || '';
