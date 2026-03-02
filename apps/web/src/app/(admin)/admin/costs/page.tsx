@@ -1,5 +1,6 @@
 import { getCostBreakdown, getDailyCostTrend, checkCostThresholds } from '@/lib/cost-monitor';
 import { prisma } from '@/lib/prisma';
+import { getAiProviderIdsWithPricing } from '@/lib/providers/ai-registry';
 import { subDays, startOfDay } from 'date-fns';
 import styles from './page.module.css';
 
@@ -47,7 +48,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
     getCostPerPodcast(since),
   ]);
 
-  const AI_SERVICES = new Set(['anthropic', 'openai']);
+  const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
   const SYSTEM_SERVICES = new Set(['ffmpeg']);
 
   const aiCost = breakdown.providers

@@ -3,6 +3,9 @@ export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: st
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
   groq: { label: 'Groq', shortLabel: 'Groq' },
   'claude-code': { label: 'Claude Code (Local)', shortLabel: 'Claude' },
+  together: { label: 'Together AI', shortLabel: 'Together' },
+  deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
+  assemblyai: { label: 'AssemblyAI', shortLabel: 'AssemblyAI' },
 };
 
 export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
@@ -63,6 +66,8 @@ export const AI_MODEL_DISPLAY: Record<string, string> = {
   'gpt-5-mini': 'GPT-5 Mini',
   'gpt-5': 'GPT-5',
   'gpt-5.2': 'GPT-5.2',
+  'llama-3.1-8b-instant': 'Llama 3.1 8B (Fast)',
+  'llama-3.3-70b-versatile': 'Llama 3.3 70B (Best)',
   'claude-code:haiku': 'Claude Haiku 4.5 (Local)',
   'claude-code:sonnet': 'Claude Sonnet 4.6 (Local)',
   'claude-code:opus': 'Claude Opus 4.6 (Local)',
@@ -76,6 +81,8 @@ export const AI_MODEL_SHORT_DISPLAY: Record<string, string> = {
   'gpt-5-mini': '5 Mini',
   'gpt-5': '5',
   'gpt-5.2': '5.2',
+  'llama-3.1-8b-instant': '3.1 8B',
+  'llama-3.3-70b-versatile': '3.3 70B',
   'claude-code:haiku': 'Haiku 4.5',
   'claude-code:sonnet': 'Sonnet 4.6',
   'claude-code:opus': 'Opus 4.6',

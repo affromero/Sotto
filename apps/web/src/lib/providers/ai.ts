@@ -1,7 +1,6 @@
 import { moderateOrThrow } from '../moderation';
-import { logger } from '../logger';
 import { getAiKey, hasAiKey } from '../byok';
-import { getAiProviderMeta, type AiProviderId } from './ai-registry';
+import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from './ai-registry';
 
 export interface TextContentPart { type: 'text'; text: string }
 export interface ImageContentPart { type: 'image_url'; url: string }
@@ -319,14 +318,14 @@ class GroqProvider implements AIProvider {
 export function createAIProvider(type?: string): AIProvider {
   switch (type) {
     case 'anthropic':
+    case undefined:          // getProviders() singleton — default to Anthropic
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
     case 'groq':
       return new GroqProvider();
     default:
-      if (type) logger.warn(`Unknown AI provider type "${type}", falling back to anthropic`);
-      return new AnthropicProvider();
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, groq`);
   }
 }
 
@@ -366,12 +365,12 @@ export async function resolveAiProvider(
     return { provider: 'groq', source: 'platform', model };
   }
 
-  // 3. Legacy platform keys
-  if (process.env.ANTHROPIC_API_KEY) {
-    return { provider: 'anthropic', source: 'platform' };
-  }
-  if (process.env.OPENAI_API_KEY) {
-    return { provider: 'openai', source: 'platform' };
+  // 3. Legacy platform keys — derive from registry
+  for (const p of getAllAiProviderMeta()) {
+    if (p.id === 'groq') continue; // already handled above
+    if (p.platformEnvKey && process.env[p.platformEnvKey]) {
+      return { provider: p.id, source: 'platform' };
+    }
   }
 
   throw new Error('No AI provider available. Configure an API key in settings.');
@@ -382,8 +381,8 @@ export async function resolveAiProvider(
  */
 export async function canResolveAi(userId: string): Promise<boolean> {
   if (await hasAiKey(userId)) return true;
-  if (process.env.GROQ_API_KEY) return true;
-  if (process.env.ANTHROPIC_API_KEY) return true;
-  if (process.env.OPENAI_API_KEY) return true;
+  for (const p of getAllAiProviderMeta()) {
+    if (p.platformEnvKey && process.env[p.platformEnvKey]) return true;
+  }
   return false;
 }

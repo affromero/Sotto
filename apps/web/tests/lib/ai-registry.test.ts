@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getCheapestModelForProvider, isValidModelId, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { getCheapestModelForProvider, getAiProviderIdsWithPricing, isValidModelId, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -63,6 +63,19 @@ describe('isValidModelId', () => {
 
   it('returns false for empty string', () => {
     expect(isValidModelId('')).toBe(false);
+  });
+});
+
+describe('getAiProviderIdsWithPricing', () => {
+  it('returns only providers whose models have pricing data', () => {
+    const ids = getAiProviderIdsWithPricing();
+    expect(ids).toContain('anthropic');
+    expect(ids).toContain('openai');
+    expect(ids).not.toContain('groq');
+    expect(ids).not.toContain('claude-code');
+    expect(ids).not.toContain('together');
+    expect(ids).not.toContain('deepgram');
+    expect(ids).not.toContain('assemblyai');
   });
 });
 

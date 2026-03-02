@@ -33,6 +33,9 @@ vi.mock('@/lib/providers/ai', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   getProviderForModel: () => null,
+  getAllAiProviderMeta: vi.fn(() => []),
+  getAiProviderMeta: vi.fn(() => ({ models: [] })),
+  getAiProviderIdsWithPricing: vi.fn(() => []),
 }));
 
 vi.mock('@/lib/logger', () => ({

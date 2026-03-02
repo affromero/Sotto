@@ -3,7 +3,9 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { getAutoModelConfig, setAutoModelConfig } from '@/lib/auto-model-config';
 import { z } from 'zod';
 import { errorResponse } from '@/lib/api-response';
-import { isValidModelId } from '@/lib/providers/ai-registry';
+import { type AiProviderId, getAiProviderIds, isValidModelId } from '@/lib/providers/ai-registry';
+
+const aiProviderEnum = getAiProviderIds().filter(id => id !== 'claude-code') as [AiProviderId, ...AiProviderId[]];
 
 export async function GET() {
   const adminId = await requireAdmin();
@@ -16,7 +18,7 @@ export async function GET() {
 }
 
 const planModelSchema = z.object({
-  aiProvider: z.enum(['anthropic', 'openai', 'groq', 'together']).optional(),
+  aiProvider: z.enum(aiProviderEnum).optional(),
   aiModel: z.string().min(1).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'kittentts']).optional(),
   ttsModel: z.string().min(1).optional(),
@@ -25,7 +27,7 @@ const planModelSchema = z.object({
 });
 
 const platformSchema = z.object({
-  aiProvider: z.enum(['anthropic', 'openai', 'groq', 'together']).optional(),
+  aiProvider: z.enum(aiProviderEnum).optional(),
   aiModel: z.string().min(1).optional(),
 });
 
