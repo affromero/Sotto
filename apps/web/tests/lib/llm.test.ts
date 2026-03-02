@@ -182,6 +182,16 @@ describe('claude', () => {
       ).rejects.toThrow('Rate limit exceeded');
     });
 
+    it('throws on unknown model ID instead of sending to Anthropic', async () => {
+      const { generateResponse } = await import('@/lib/llm');
+
+      await expect(
+        generateResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+          model: 'nonexistent-model-xyz',
+        })
+      ).rejects.toThrow('Unknown AI model ID: "nonexistent-model-xyz"');
+    });
+
     it('accepts tools option without error', async () => {
       const { generateResponse, WEB_SEARCH_TOOL } = await import('@/lib/llm');
 
@@ -330,6 +340,16 @@ describe('claude', () => {
       const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }]);
 
       await expect(generator.next()).rejects.toThrow('Stream interrupted');
+    });
+
+    it('throws on unknown model ID instead of sending to Anthropic', async () => {
+      const { streamResponse } = await import('@/lib/llm');
+
+      const generator = streamResponse('System prompt', [{ role: 'user', content: 'Test' }], {
+        model: 'nonexistent-model-xyz',
+      });
+
+      await expect(generator.next()).rejects.toThrow('Unknown AI model ID: "nonexistent-model-xyz"');
     });
 
     it('streams text when tools option is provided', async () => {
