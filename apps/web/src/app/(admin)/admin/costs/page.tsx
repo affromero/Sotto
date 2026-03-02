@@ -48,7 +48,7 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
     getCostPerPodcast(since),
   ]);
 
-  const AI_SERVICES = new Set(getAiProviderIdsWithPricing());
+  const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
   const SYSTEM_SERVICES = new Set(['ffmpeg']);
 
   const aiCost = breakdown.providers

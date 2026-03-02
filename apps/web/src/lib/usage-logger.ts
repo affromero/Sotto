@@ -7,7 +7,7 @@ import { getAiCost } from './pricing';
 import { logger } from './logger';
 import { getAiProviderIdsWithPricing } from './providers/ai-registry';
 
-const AI_SERVICES = new Set(getAiProviderIdsWithPricing());
+const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
 
 export async function logUsage(params: {
   service: string;

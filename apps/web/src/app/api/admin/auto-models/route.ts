@@ -3,9 +3,9 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { getAutoModelConfig, setAutoModelConfig } from '@/lib/auto-model-config';
 import { z } from 'zod';
 import { errorResponse } from '@/lib/api-response';
-import { getAiProviderIds, isValidModelId } from '@/lib/providers/ai-registry';
+import { type AiProviderId, getAiProviderIds, isValidModelId } from '@/lib/providers/ai-registry';
 
-const aiProviderEnum = getAiProviderIds().filter(id => id !== 'claude-code') as [string, ...string[]];
+const aiProviderEnum = getAiProviderIds().filter(id => id !== 'claude-code') as [AiProviderId, ...AiProviderId[]];
 
 export async function GET() {
   const adminId = await requireAdmin();

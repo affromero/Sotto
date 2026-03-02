@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { getFreeTierConfig, setFreeTierConfig } from '@/lib/free-tier-config';
-import { getAiProviderIds, getAiProviderMeta } from '@/lib/providers/ai-registry';
+import { type AiProviderId, getAiProviderIds, getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { z } from 'zod';
 
 import { errorResponse } from '@/lib/api-response';
@@ -10,7 +10,7 @@ import { errorResponse } from '@/lib/api-response';
 const platformLlmProviderIds = getAiProviderIds().filter(id => {
   const meta = getAiProviderMeta(id);
   return meta.platformEnvKey && meta.models.length > 0 && id !== 'claude-code';
-}) as [string, ...string[]];
+}) as [AiProviderId, ...AiProviderId[]];
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
