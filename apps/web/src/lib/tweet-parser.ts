@@ -1,7 +1,7 @@
 import { logUsage } from './usage-logger';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
-import { getAllAiProviderMeta } from './providers/ai-registry';
+import { getAiProviderMeta, getAllAiProviderMeta } from './providers/ai-registry';
 import { createAIProvider, resolveAiProvider, type AIProvider, type ContentPart } from './providers/ai';
 import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
@@ -208,24 +208,22 @@ export function resolveModelFromTweet(parsed: TweetParseResult): {
 }
 
 const AI_MODEL_ALIASES: Record<string, string> = {
-  // Anthropic
-  opus: 'claude-opus-4-6',
-  'claude opus': 'claude-opus-4-6',
-  sonnet: 'claude-sonnet-4-6',
-  'claude sonnet': 'claude-sonnet-4-6',
-  haiku: 'claude-haiku-4-5-20251001',
-  'claude haiku': 'claude-haiku-4-5-20251001',
-  claude: 'claude-sonnet-4-6',
+  // Anthropic — resolve from registry tiers
+  opus: getAiProviderMeta('anthropic').models.find(m => m.tier === 'best')!.id,
+  'claude opus': getAiProviderMeta('anthropic').models.find(m => m.tier === 'best')!.id,
+  sonnet: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')!.id,
+  'claude sonnet': getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')!.id,
+  haiku: getAiProviderMeta('anthropic').models.find(m => m.tier === 'fast')!.id,
+  'claude haiku': getAiProviderMeta('anthropic').models.find(m => m.tier === 'fast')!.id,
+  claude: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')!.id,
   // OpenAI
-  'gpt-5': 'gpt-5',
-  'gpt5': 'gpt-5',
-  'gpt-5-mini': 'gpt-5-mini',
-  'gpt-5.2': 'gpt-5.2',
-  chatgpt: 'gpt-5',
-  openai: 'gpt-5',
+  'gpt-5': getAiProviderMeta('openai').defaultModel,
+  'gpt5': getAiProviderMeta('openai').defaultModel,
+  chatgpt: getAiProviderMeta('openai').defaultModel,
+  openai: getAiProviderMeta('openai').defaultModel,
   // Groq / Llama
-  llama: 'llama-3.3-70b-versatile',
-  groq: 'llama-3.3-70b-versatile',
+  llama: getAiProviderMeta('groq').defaultModel,
+  groq: getAiProviderMeta('groq').defaultModel,
 };
 
 function resolveAiModel(raw: string): string | null {

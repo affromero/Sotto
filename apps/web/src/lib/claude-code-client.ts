@@ -2,6 +2,9 @@ import { spawn } from 'child_process';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { logger } from './logger';
+import { getAiProviderMeta } from './providers/ai-registry';
+
+const CLAUDE_CODE_DEFAULT_MODEL = getAiProviderMeta('claude-code').defaultModel;
 
 /**
  * Check whether the `claude` CLI is installed and reachable.
@@ -118,7 +121,7 @@ export async function executeClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): Promise<ClaudeCodeResponse> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || CLAUDE_CODE_DEFAULT_MODEL;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
   const args = buildArgs(model, systemPrompt, opts);
@@ -193,7 +196,7 @@ export async function* streamClaudeCode(
   prompt: string,
   opts?: ClaudeCodeOptions
 ): AsyncGenerator<string> {
-  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+  const model = opts?.model || process.env.CLAUDE_CODE_MODEL || CLAUDE_CODE_DEFAULT_MODEL;
   const timeoutMs = opts?.timeoutMs || 600_000;
 
   const args = ['-p', '--model', model, '--output-format', 'stream-json', '--verbose'];

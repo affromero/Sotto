@@ -6,7 +6,7 @@
  */
 import { logger } from '../../logger';
 import type { TtsProvider, SpeechParams } from '../tts';
-import type { TtsProviderId } from '../tts-registry';
+import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { FAL_VOICE_POOL, selectVoicePairFromPool } from '../tts-voices';
 
 // HOST/GUEST → host voice slot; EXPERT/SKEPTIC → expert slot.
@@ -29,7 +29,7 @@ export class FalProvider implements TtsProvider {
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
-    this.model = model ?? 'qwen3-tts-1.7b';
+    this.model = model ?? getProviderMeta('fal').defaultModel;
   }
 
   async generateSpeech(params: SpeechParams): Promise<Buffer> {

@@ -3,6 +3,7 @@
  * All costs are per 1 million tokens.
  */
 import { logger } from './logger';
+import { getCheapestModelForProvider } from './providers/ai-registry';
 
 interface ModelPricing {
   inputPerMTok: number;
@@ -55,5 +56,5 @@ export function getCheapestModel(): string {
       cheapest = { model, cost: totalCost };
     }
   }
-  return cheapest?.model ?? 'claude-haiku-4-5-20251001';
+  return cheapest?.model ?? getCheapestModelForProvider('anthropic') ?? 'claude-haiku-4-5-20251001';
 }
