@@ -40,6 +40,9 @@ function extractFirstJsonObject(text: string): string {
   throw new Error('Unbalanced JSON object in response');
 }
 
+/** Token budget for verification output — must accommodate 30+ claims with detailed notes. */
+const VERIFICATION_MAX_TOKENS = 16384;
+
 const PARSE_FAILURE_FEEDBACK = 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
 
 export const VERIFICATION_JSON_SCHEMA = {
@@ -487,7 +490,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
 
     const ai = createAIProvider(params.provider);
     const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-      maxTokens: 8192,
+      maxTokens: VERIFICATION_MAX_TOKENS,
       apiKeyOverride: params.apiKeyOverride,
       model: params.model,
       useWebSearch: true,
@@ -503,16 +506,20 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       parsed = JSON.parse(extractFirstJsonObject(response.content));
     } catch {
       const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-        maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
+        maxTokens: VERIFICATION_MAX_TOKENS, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
       });
       if (retry) {
         parsed = retry.parsed as typeof parsed;
         extraInputTokens = retry.inputTokens;
         extraOutputTokens = retry.outputTokens;
       } else {
+        const likelyTruncated = response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
         logger.error('Script verification parse failure (incremental path)', {
           provider: params.provider ?? 'default',
           model: response.model,
+          outputTokens: String(response.outputTokens),
+          maxTokens: String(VERIFICATION_MAX_TOKENS),
+          likelyTruncated: String(likelyTruncated),
           responsePreview: response.content.slice(0, 500),
         });
         return {
@@ -580,7 +587,7 @@ Analyze every factual claim. Return JSON only.`;
 
   const ai = createAIProvider(params.provider);
   const response = await ai.generateResponse(systemPrompt, [{ role: 'user', content: userMessage }], {
-    maxTokens: 8192,
+    maxTokens: VERIFICATION_MAX_TOKENS,
     apiKeyOverride: params.apiKeyOverride,
     model: params.model,
     useWebSearch: true,
@@ -596,16 +603,20 @@ Analyze every factual claim. Return JSON only.`;
     parsed = JSON.parse(extractFirstJsonObject(response.content));
   } catch {
     const retry = await retryParseWithStricterPrompt(systemPrompt, userMessage, {
-      maxTokens: 8192, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
+      maxTokens: VERIFICATION_MAX_TOKENS, apiKeyOverride: params.apiKeyOverride, model: params.model, provider: params.provider,
     });
     if (retry) {
       parsed = retry.parsed as typeof parsed;
       extraInputTokens = retry.inputTokens;
       extraOutputTokens = retry.outputTokens;
     } else {
+      const likelyTruncated = response.outputTokens >= VERIFICATION_MAX_TOKENS * 0.95;
       logger.error('Script verification parse failure (full path)', {
         provider: params.provider ?? 'default',
         model: response.model,
+        outputTokens: String(response.outputTokens),
+        maxTokens: String(VERIFICATION_MAX_TOKENS),
+        likelyTruncated: String(likelyTruncated),
         responsePreview: response.content.slice(0, 500),
       });
       return {
