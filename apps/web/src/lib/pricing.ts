@@ -1,31 +1,36 @@
 /**
  * Centralized AI model pricing lookup.
  * All costs are per 1 million tokens.
+ *
+ * Pricing is derived from the AI registry (single source of truth).
+ * Only embeddings are hardcoded here — they're not LLM models.
  */
 import { logger } from './logger';
-import { getCheapestModelForProvider } from './providers/ai-registry';
+import { getAllAiProviderMeta, getAiProviderMeta, getCheapestModelForProvider } from './providers/ai-registry';
 
 interface ModelPricing {
   inputPerMTok: number;
   outputPerMTok: number;
 }
 
-const AI_PRICING: Record<string, ModelPricing> = {
-  // Anthropic
-  'claude-sonnet-4-6': { inputPerMTok: 3.0, outputPerMTok: 15.0 },
-  'claude-haiku-4-5-20251001': { inputPerMTok: 0.8, outputPerMTok: 4.0 },
-  'claude-opus-4-6': { inputPerMTok: 15.0, outputPerMTok: 75.0 },
-  // OpenAI
-  'gpt-5-mini': { inputPerMTok: 0.3, outputPerMTok: 1.0 },
-  'gpt-5': { inputPerMTok: 1.25, outputPerMTok: 10.0 },
-  'gpt-5.2': { inputPerMTok: 1.75, outputPerMTok: 14.0 },
-  // Embeddings
-  'text-embedding-3-small': { inputPerMTok: 0.02, outputPerMTok: 0 },
-  // Claude Code (local CLI — no API cost)
-  'claude-code:haiku': { inputPerMTok: 0, outputPerMTok: 0 },
-  'claude-code:sonnet': { inputPerMTok: 0, outputPerMTok: 0 },
-  'claude-code:opus': { inputPerMTok: 0, outputPerMTok: 0 },
-};
+function buildPricingMap(): Record<string, ModelPricing> {
+  const map: Record<string, ModelPricing> = {};
+  for (const provider of getAllAiProviderMeta()) {
+    for (const model of provider.models) {
+      if (model.pricing) map[model.id] = model.pricing;
+    }
+  }
+  // Claude Code — zero-cost local CLI (derived from registry, no pricing field)
+  const ccMeta = getAiProviderMeta('claude-code');
+  for (const m of ccMeta.models) {
+    map[`claude-code:${m.id}`] = { inputPerMTok: 0, outputPerMTok: 0 };
+  }
+  // Embeddings — not in AI registry (not an LLM model)
+  map['text-embedding-3-small'] = { inputPerMTok: 0.02, outputPerMTok: 0 };
+  return map;
+}
+
+const AI_PRICING = buildPricingMap();
 
 // Default fallback: Sonnet 4.6 pricing (matches prior hardcoded behavior)
 const FALLBACK_PRICING: ModelPricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 };

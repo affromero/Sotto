@@ -27,6 +27,7 @@ vi.mock('@/lib/auto-model-config', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   isValidModelId: vi.fn(() => true),
+  getAiProviderIds: vi.fn(() => ['anthropic', 'openai', 'groq', 'claude-code', 'together', 'deepgram', 'assemblyai']),
 }));
 
 vi.mock('@/lib/api-response', () => ({
