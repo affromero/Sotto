@@ -25,6 +25,10 @@ vi.mock('@/lib/auto-model-config', () => ({
   setAutoModelConfig: (...args: unknown[]) => mockSetAutoModelConfig(...args),
 }));
 
+vi.mock('@/lib/providers/ai-registry', () => ({
+  isValidModelId: vi.fn(() => true),
+}));
+
 vi.mock('@/lib/api-response', () => ({
   errorResponse: (message: unknown, status: number) =>
     new Response(JSON.stringify({ error: message }), {

@@ -252,6 +252,7 @@ model Podcast {
   failedAtStatus String?
   failureReason  String?       @db.Text
   technicalError String?       @db.Text
+  errorId        String?
   failedAt       DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt

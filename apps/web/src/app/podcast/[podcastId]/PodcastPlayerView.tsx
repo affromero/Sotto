@@ -544,9 +544,16 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {liveStatus === 'FAILED' && (isOwner || isAdmin) && (
         <div className={styles.failedState}>
           {!retrying && (
-            <p className={styles.failedText}>
-              {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
-            </p>
+            <>
+              <p className={styles.failedText}>
+                {podcast.failureReason || 'Generation failed.'} You can retry or delete this podcast.
+              </p>
+              {podcast.errorId && (
+                <p className={styles.errorId}>
+                  Error reference: <code>{podcast.errorId}</code>
+                </p>
+              )}
+            </>
           )}
           {isAdmin && (
             <Link href={`/admin/podcasts?search=${podcast.id}`} className={styles.adminLink}>

@@ -106,7 +106,10 @@ export async function generateResponse(
   if (options?.model) {
     const { getProviderForModel } = await import('./providers/ai-registry');
     const ownerProvider = getProviderForModel(options.model);
-    if (ownerProvider && ownerProvider !== 'anthropic') {
+    if (ownerProvider === null) {
+      throw new Error(`Unknown AI model ID: "${options.model}" — not registered with any provider`);
+    }
+    if (ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
       const hasWebSearch = options.tools?.some(
@@ -217,7 +220,10 @@ export async function* streamResponse(
   if (options?.model) {
     const { getProviderForModel } = await import('./providers/ai-registry');
     const ownerProvider = getProviderForModel(options.model);
-    if (ownerProvider && ownerProvider !== 'anthropic') {
+    if (ownerProvider === null) {
+      throw new Error(`Unknown AI model ID: "${options.model}" — not registered with any provider`);
+    }
+    if (ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
       const hasWebSearch = options.tools?.some(
