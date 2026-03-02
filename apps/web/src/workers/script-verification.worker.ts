@@ -137,7 +137,29 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
     refCountPassed: String(verdict.referenceQuality.countPassed),
     refSeriousRatio: String(verdict.referenceQuality.seriousRatio.toFixed(2)),
     refQualityScore: String(verdict.referenceQuality.qualityScore.toFixed(2)),
+    ...(verdict.failureType ? { failureType: verdict.failureType } : {}),
   });
+
+  // Parse errors are a provider output issue, not a script quality issue.
+  // Retry once without counting as a verification attempt. If consecutive,
+  // fall through to the normal failure path.
+  if (verdict.failureType === 'parse_error') {
+    const previousWasParseError = script.verificationFeedback?.startsWith('PARSE_ERROR');
+    if (!previousWasParseError) {
+      logger.warn('Parse error on verification — retrying without incrementing attempts', { podcastId });
+      await prisma.script.update({
+        where: { podcastId },
+        data: { verificationFeedback: verdict.feedback },
+      });
+      await addJob(scriptVerificationQueue, JobType.VERIFY_SCRIPT,
+        { podcastId, userId, discoveryId, useAdminCredits },
+        { jobId: `verify-${podcastId}-${Date.now()}-parse-retry` });
+      await job.updateProgress(100);
+      return;
+    }
+    // Consecutive parse errors — fall through to normal failure path
+    logger.error('Consecutive parse errors on verification — treating as failure', { podcastId });
+  }
 
   if (verdict.passed) {
     await prisma.script.update({
@@ -309,8 +331,13 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
 
   // Script failed verification
   if (attemptNumber >= MAX_VERIFICATION_ATTEMPTS) {
+    const isParseError = verdict.failureType === 'parse_error';
+    const userMessage = isParseError
+      ? 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.'
+      : "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.";
+
     await markPodcastFailed(podcastId, {
-      failureReason: "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
+      failureReason: userMessage,
       technicalError: `Verification failed ${attemptNumber}/${MAX_VERIFICATION_ATTEMPTS}: ${verdict.feedback}`,
     });
 
@@ -325,6 +352,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
           score: verdict.score,
           totalClaims: verdict.totalClaims,
           unsupported: verdict.unsupportedClaims.length,
+          ...(isParseError ? { failureType: 'parse_error' } : {}),
         },
       },
     }).catch(err => logger.error('Failed to write PipelineEvent', {
@@ -345,8 +373,7 @@ export async function processScriptVerification(job: Job<VerifyScriptPayload>): 
       userId,
       type: 'PODCAST_FAILED',
       title: 'Podcast generation failed',
-      message:
-        "Our fact-checker found issues that couldn't be resolved after 3 attempts. Please try again with a different topic or approach.",
+      message: userMessage,
       data: { podcastId },
     });
 

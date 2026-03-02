@@ -78,6 +78,7 @@ export async function generateResponse(
     apiKeyOverride?: string;
     tools?: Anthropic.MessageCreateParams['tools'];
     skipModeration?: boolean;
+    jsonSchema?: { name: string; schema: Record<string, unknown> };
   }
 ): Promise<{ content: string; inputTokens: number; outputTokens: number; model: string }> {
   // Screen user input before sending to LLM
@@ -121,6 +122,7 @@ export async function generateResponse(
         apiKeyOverride: options.apiKeyOverride,
         skipModeration: options.skipModeration,
         ...(hasWebSearch ? { useWebSearch: true } : {}),
+        ...(options.jsonSchema ? { jsonSchema: options.jsonSchema } : {}),
       });
     }
   }
@@ -149,6 +151,11 @@ export async function generateResponse(
       system: systemPrompt,
       messages: anthropicMessages,
       ...(options?.tools?.length ? { tools: options.tools } : {}),
+      ...(options?.jsonSchema ? {
+        output_config: {
+          format: { type: 'json_schema' as const, schema: options.jsonSchema.schema },
+        },
+      } : {}),
     })
   );
 
