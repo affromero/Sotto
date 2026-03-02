@@ -31,6 +31,9 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   isValidModelId: vi.fn((id: string) =>
     id.includes('claude') || id.includes('gpt') || id.includes('llama')
   ),
+  getAllAiProviderMeta: vi.fn(() => []),
+  getAiProviderMeta: vi.fn(() => ({ models: [] })),
+  getAiProviderIdsWithPricing: vi.fn(() => []),
 }));
 
 vi.mock('@/lib/prisma', () => {

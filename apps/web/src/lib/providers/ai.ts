@@ -1,5 +1,4 @@
 import { moderateOrThrow } from '../moderation';
-import { logger } from '../logger';
 import { getAiKey, hasAiKey } from '../byok';
 import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from './ai-registry';
 
