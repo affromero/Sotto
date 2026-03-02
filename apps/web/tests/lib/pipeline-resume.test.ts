@@ -65,6 +65,7 @@ describe('markPodcastFailed', () => {
         failedAtStatus: 'GENERATING_AUDIO',
         failureReason: null,
         technicalError: null,
+        errorId: null,
         failedAt: expect.any(Date),
       },
     });
@@ -102,6 +103,42 @@ describe('markPodcastFailed', () => {
     expect(mockPodcastUpdate).not.toHaveBeenCalled();
   });
 
+  it('persists errorId when provided', async () => {
+    mockPodcastFindUnique.mockResolvedValue({ status: 'GENERATING_AUDIO' });
+    mockPodcastUpdate.mockResolvedValue({});
+
+    await markPodcastFailed('podcast-003', {
+      failureReason: 'TTS provider error',
+      errorId: 'err_abc123def456',
+    });
+
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'podcast-003' },
+      data: {
+        status: 'FAILED',
+        failedAtStatus: 'GENERATING_AUDIO',
+        failureReason: 'TTS provider error',
+        technicalError: null,
+        errorId: 'err_abc123def456',
+        failedAt: expect.any(Date),
+      },
+    });
+  });
+
+  it('sets errorId to null when not provided', async () => {
+    mockPodcastFindUnique.mockResolvedValue({ status: 'SCRIPTING' });
+    mockPodcastUpdate.mockResolvedValue({});
+
+    await markPodcastFailed('podcast-004', { failureReason: 'Script error' });
+
+    expect(mockPodcastUpdate).toHaveBeenCalledWith({
+      where: { id: 'podcast-004' },
+      data: expect.objectContaining({
+        errorId: null,
+      }),
+    });
+  });
+
   it('records STITCHING as failedAtStatus when failing during stitching', async () => {
     mockPodcastFindUnique.mockResolvedValue({ status: 'STITCHING' });
     mockPodcastUpdate.mockResolvedValue({});
@@ -115,6 +152,7 @@ describe('markPodcastFailed', () => {
         failedAtStatus: 'STITCHING',
         failureReason: null,
         technicalError: null,
+        errorId: null,
         failedAt: expect.any(Date),
       },
     });

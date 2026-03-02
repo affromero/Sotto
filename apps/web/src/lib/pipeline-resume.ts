@@ -19,6 +19,7 @@ export type ResumePoint =
 interface MarkFailedOptions {
   failureReason?: string;
   technicalError?: string;
+  errorId?: string;
 }
 
 /**
@@ -48,6 +49,7 @@ export async function markPodcastFailed(
       failedAtStatus: podcast.status,
       failureReason: opts.failureReason ?? null,
       technicalError: opts.technicalError ?? null,
+      errorId: opts.errorId ?? null,
       failedAt: new Date(),
     },
   });
