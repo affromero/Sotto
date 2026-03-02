@@ -1,6 +1,6 @@
 # CLAUDE.md — Sotto
 
-> **Sotto** — Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.
+> **Sotto** — Every voice. Every topic. One feed. Canonical brand copy lives in `packages/shared/src/brand.ts`.
 
 ## What is Sotto?
 
