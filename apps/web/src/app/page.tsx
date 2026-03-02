@@ -1536,7 +1536,7 @@ export default function LandingPage() {
             Start creating <em>today.</em>
           </h2>
           <p className={styles.ctaSub}>
-            AI or human &mdash; create, discover, interrupt, fork, and remix.
+            {BRAND.subline}
           </p>
           <AuthCTA source="cta" />
         </div>

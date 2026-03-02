@@ -49,7 +49,7 @@ After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmp
 
 ### Positioning Statement
 
-> **Sotto** — Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.
+> **Sotto** — Every voice. Every topic. One feed. Create AI podcasts, compare voices side-by-side, remix anything.
 
 ---
 
