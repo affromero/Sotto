@@ -4,7 +4,7 @@
 
 After building the drifting-models narrated video (ElevenLabs TTS + Manim + FFmpeg), the user wants to turn the **video/voice creation pipeline** into an independent SaaS product. Modeled after the Quvo company creator at `~/Code/Quvo` (Next.js 14, Prisma, BullMQ, Stripe, CSS Modules).
 
-**Sotto** (from "sotto voce" — soft voice in Italian) is an interactive podcast platform where:
+**Sotto** (from "sotto voce" — soft voice in Italian) — every voice, every topic, one feed. An interactive podcast platform where:
 
 1. User provides a topic/URL/PDF → AI generates a 2-voice conversational podcast
 2. User can **interrupt mid-playback** to ask questions → AI answers in context
