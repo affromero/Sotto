@@ -20,6 +20,7 @@ let hookState = {
   isLoading: false,
   isComplete: false,
   linkPreview: null,
+  detectedLanguage: null as string | null,
   sendMessage: mockSendMessage,
   reset: mockReset,
 };
@@ -30,6 +31,13 @@ vi.mock('@/lib/hooks/useDiscovery', () => ({
 
 vi.mock('@/components/create/LlmModelDropdown', () => ({
   LlmModelDropdown: () => null,
+}));
+
+vi.mock('@sotto/shared', () => ({
+  getLanguageLabel: (code: string) => {
+    const map: Record<string, string> = { es: 'Spanish', fr: 'French', de: 'German' };
+    return map[code] ?? code.toUpperCase();
+  },
 }));
 
 // Mock EventProvider (useTrack is used by useDiscovery, but since we mock the whole hook it's not needed —
@@ -58,6 +66,7 @@ describe('DiscoveryChat', () => {
       isLoading: false,
       isComplete: false,
       linkPreview: null,
+      detectedLanguage: null,
       sendMessage: mockSendMessage,
       reset: mockReset,
     };
@@ -293,5 +302,33 @@ describe('DiscoveryChat', () => {
 
     const input = screen.getByLabelText('Chat message input');
     expect(document.activeElement).toBe(input);
+  });
+
+  it('does not show language banner when detectedLanguage is null', () => {
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    expect(screen.queryByRole('status', { name: 'Language suggestion' })).not.toBeInTheDocument();
+  });
+
+  it('shows language banner when detectedLanguage is set', () => {
+    hookState.detectedLanguage = 'es';
+
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    expect(screen.getByRole('status', { name: 'Language suggestion' })).toBeInTheDocument();
+    expect(screen.getByText(/Switch to Spanish/)).toBeInTheDocument();
+  });
+
+  it('hides language banner after dismiss', async () => {
+    hookState.detectedLanguage = 'es';
+    const user = userEvent.setup();
+
+    render(<DiscoveryChat onComplete={vi.fn()} />);
+
+    expect(screen.getByRole('status', { name: 'Language suggestion' })).toBeInTheDocument();
+
+    await user.click(screen.getByText('Keep English'));
+
+    expect(screen.queryByRole('status', { name: 'Language suggestion' })).not.toBeInTheDocument();
   });
 });

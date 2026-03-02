@@ -20,6 +20,7 @@ interface UseDiscoveryReturn {
   isComplete: boolean;
   linkPreview: LinkPreviewData | null;
   draftId: string | null;
+  detectedLanguage: string | null;
   sendMessage: (content: string, podcastId?: string, isChipBased?: boolean, model?: string) => Promise<void>;
   reset: () => void;
 }
@@ -44,6 +45,7 @@ export function useDiscovery(
   });
   const [linkPreview, setLinkPreview] = useState<LinkPreviewData | null>(null);
   const [draftId, setDraftId] = useState<string | null>(initialDraftId ?? null);
+  const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const track = useTrack();
   const messageIndexRef = useRef(initialMessages ? initialMessages.length : 0);
@@ -193,6 +195,7 @@ export function useDiscovery(
                 metadata?: Partial<DiscoveryMetadata>;
                 done?: boolean;
                 error?: string;
+                detectedLanguage?: string;
               };
 
               // Handle error events from the server
@@ -225,6 +228,9 @@ export function useDiscovery(
 
               // Handle completion with chips and metadata
               if (parsed.done) {
+                if (parsed.detectedLanguage) {
+                  setDetectedLanguage(parsed.detectedLanguage);
+                }
                 // Strip raw [METADATA]...[/METADATA] and [chips:...] blocks from displayed text
                 const stripMarkup = (text: string) =>
                   text
@@ -457,6 +463,7 @@ export function useDiscovery(
     messageIndexRef.current = 0;
     setState(initialState);
     setLinkPreview(null);
+    setDetectedLanguage(null);
   }, []);
 
   return {
@@ -466,6 +473,7 @@ export function useDiscovery(
     isComplete: state.isComplete,
     linkPreview,
     draftId,
+    detectedLanguage,
     sendMessage,
     reset,
   };
