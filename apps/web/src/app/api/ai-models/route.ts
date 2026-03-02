@@ -15,11 +15,11 @@ const TIER_GROUP_LABELS: Record<string, string> = {
   max: 'Max',
 };
 
-// Env var names for each platform-level AI provider key
-const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'ANTHROPIC_API_KEY',
-  openai: 'OPENAI_API_KEY',
-};
+// Derive env var names from registry — no manual map needed
+const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {};
+for (const p of getAllAiProviderMeta()) {
+  if (p.platformEnvKey) PLATFORM_PROVIDER_ENV[p.id] = p.platformEnvKey;
+}
 
 const CLAUDE_CODE_MODELS = getAiProviderMeta('claude-code').models.map(m => ({
   id: `claude-code:${m.id}`,
