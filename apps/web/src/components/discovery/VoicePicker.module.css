@@ -217,6 +217,8 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--spacing-sm);
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 /* Clones section */
