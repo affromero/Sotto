@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guards';
 import { getFreeTierConfig, setFreeTierConfig } from '@/lib/free-tier-config';
+import { getAiProviderIds, getAiProviderMeta } from '@/lib/providers/ai-registry';
 import { z } from 'zod';
 
 import { errorResponse } from '@/lib/api-response';
+
+// Platform-hosted LLM providers (have an env key + models, exclude claude-code)
+const platformLlmProviderIds = getAiProviderIds().filter(id => {
+  const meta = getAiProviderMeta(id);
+  return meta.platformEnvKey && meta.models.length > 0 && id !== 'claude-code';
+}) as [string, ...string[]];
 export async function GET() {
   const adminId = await requireAdmin();
   if (!adminId) {
@@ -21,7 +28,7 @@ const providerAllocationSchema = z.object({
 });
 
 const updateConfigSchema = z.object({
-  aiProvider: z.enum(['anthropic', 'openai']).optional(),
+  aiProvider: z.enum(platformLlmProviderIds).optional(),
   aiModel: z.string().min(1).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate']).optional(),
   ttsModel: z.string().min(1).optional(),
