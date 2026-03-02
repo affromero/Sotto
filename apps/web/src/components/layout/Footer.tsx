@@ -1,3 +1,4 @@
+import { BRAND } from '@sotto/shared';
 import styles from './Footer.module.css';
 
 export function Footer() {
@@ -5,8 +6,8 @@ export function Footer() {
     <footer className={styles.footer}>
       <div className={styles.inner}>
         <div className={styles.brand}>
-          <span className={styles.logo}>Sotto</span>
-          <p>Where podcasts get social.</p>
+          <span className={styles.logo}>{BRAND.name}</span>
+          <p>{BRAND.tagline}</p>
         </div>
         <div className={styles.links}>
           <div>

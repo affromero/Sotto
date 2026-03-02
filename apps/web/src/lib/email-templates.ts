@@ -1,6 +1,7 @@
 import crypto from 'crypto';
+import { BRAND } from '@sotto/shared';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || BRAND.url;
 
 export function generateUserUnsubscribeUrl(userId: string): string {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || '';
@@ -80,8 +81,8 @@ export function buildWaitlistWelcomeEmail(email: string): { subject: string; htm
           You&apos;re in.
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          Thanks for joining the Sotto waitlist. We&apos;re building the social podcast network
-          &mdash; AI or human, create, discover, interrupt, fork, and remix.
+          Thanks for joining the Sotto waitlist. ${BRAND.tagline}
+          ${BRAND.subline}
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
           We&apos;ll send you updates as we launch new features. In the meantime, check out
@@ -175,8 +176,8 @@ export function buildWelcomeEmail(name: string): { subject: string; html: string
           Welcome, ${name}!
         </h2>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 16px;">
-          You&apos;re all set. Sotto is where podcasts get social &mdash; AI or human,
-          create, discover, interrupt, fork, and remix.
+          You&apos;re all set. ${BRAND.tagline}
+          ${BRAND.subline}
         </p>
         <p style="font-size:14px; line-height:1.7; color:#6B7280; margin:0 0 24px;">
           Create your first podcast in minutes &mdash; just describe what you want to learn
