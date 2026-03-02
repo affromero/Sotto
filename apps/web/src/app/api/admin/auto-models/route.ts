@@ -3,6 +3,7 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { getAutoModelConfig, setAutoModelConfig } from '@/lib/auto-model-config';
 import { z } from 'zod';
 import { errorResponse } from '@/lib/api-response';
+import { isValidModelId } from '@/lib/providers/ai-registry';
 
 export async function GET() {
   const adminId = await requireAdmin();
@@ -52,6 +53,13 @@ export async function PATCH(request: NextRequest) {
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(parsed.error.flatten(), 400);
+  }
+
+  // Validate aiModel fields against registry
+  for (const block of [parsed.data.free, parsed.data.pro, parsed.data.platform]) {
+    if (block?.aiModel && !isValidModelId(block.aiModel)) {
+      return errorResponse(`Unknown AI model: "${block.aiModel}". Check /api/ai-models for available models.`, 400);
+    }
   }
 
   await setAutoModelConfig(parsed.data, adminId);
