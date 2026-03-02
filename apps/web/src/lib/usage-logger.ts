@@ -5,8 +5,9 @@
 import { prisma } from './prisma';
 import { getAiCost } from './pricing';
 import { logger } from './logger';
+import { getAiProviderIdsWithPricing } from './providers/ai-registry';
 
-const AI_SERVICES = new Set(['anthropic', 'openai']);
+const AI_SERVICES = new Set(getAiProviderIdsWithPricing());
 
 export async function logUsage(params: {
   service: string;
