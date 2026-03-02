@@ -9,6 +9,8 @@ const mockStreamFallbackDiscoveryResponse = vi.fn();
 const mockParseChips = vi.fn();
 const mockParseMetadata = vi.fn();
 const mockGetAiKey = vi.fn();
+const mockUserFindUnique = vi.fn();
+const mockDetectLanguage = vi.fn();
 
 vi.mock('@/lib/auth', () => ({
   auth: () => mockAuth(),
@@ -20,6 +22,9 @@ vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     discovery: {
       findUniqueOrThrow: (...args: unknown[]) => mockDiscoveryFindUniqueOrThrow(...args),
+    },
+    user: {
+      findUnique: (...args: unknown[]) => mockUserFindUnique(...args),
     },
     userAiKey: {
       updateMany: (...args: unknown[]) => mockUserAiKeyUpdateMany(...args),
@@ -45,6 +50,10 @@ vi.mock('@/lib/discovery-agent', () => ({
   parseChips: (...args: unknown[]) => mockParseChips(...args),
   parseMetadata: (...args: unknown[]) => mockParseMetadata(...args),
   detectUrls: () => [],
+}));
+
+vi.mock('@/lib/language-detect', () => ({
+  detectLanguage: (...args: unknown[]) => mockDetectLanguage(...args),
 }));
 
 vi.mock('@/lib/extractors', () => ({
@@ -139,6 +148,8 @@ describe('POST /api/discovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key' });
+    mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: null });
+    mockDetectLanguage.mockReturnValue(null);
   });
 
   describe('Authentication', () => {
@@ -705,6 +716,87 @@ describe('POST /api/discovery', () => {
       const response = await POST(request);
 
       expect(response.status).toBe(200);
+    });
+  });
+
+  describe('Language detection', () => {
+    it('includes detectedLanguage in done event when first message is non-English and no preferredLanguage', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockDetectLanguage.mockReturnValue('es');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Quiero aprender sobre la historia de España y su cultura mediterránea' });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const finalEvent = events[events.length - 1];
+      const finalData = JSON.parse(finalEvent);
+
+      expect(finalData.done).toBe(true);
+      expect(finalData.detectedLanguage).toBe('es');
+    });
+
+    it('does not include detectedLanguage when preferredLanguage is already set', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: 'es' });
+      mockDetectLanguage.mockReturnValue('es');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Quiero aprender sobre la historia de España y su cultura mediterránea' });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const finalEvent = events[events.length - 1];
+      const finalData = JSON.parse(finalEvent);
+
+      expect(finalData.done).toBe(true);
+      expect(finalData.detectedLanguage).toBeUndefined();
+    });
+
+    it('does not include detectedLanguage when history is present (not first message)', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockDetectLanguage.mockReturnValue('es');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({
+        message: 'Cuéntame más sobre este tema de la historia española',
+        history: [
+          { role: 'user', content: 'Hola' },
+          { role: 'assistant', content: 'Hola, ¿qué te gustaría explorar?' },
+        ],
+      });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const finalEvent = events[events.length - 1];
+      const finalData = JSON.parse(finalEvent);
+
+      expect(finalData.done).toBe(true);
+      expect(finalData.detectedLanguage).toBeUndefined();
+    });
+
+    it('does not include detectedLanguage when language is English', async () => {
+      mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+      mockDetectLanguage.mockReturnValue('en');
+      mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
+      mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
+      mockParseMetadata.mockReturnValue(null);
+
+      const request = createPostRequest({ message: 'Tell me about quantum computing and its applications in modern science' });
+      const response = await POST(request);
+      const events = await readSSEStream(response);
+
+      const finalEvent = events[events.length - 1];
+      const finalData = JSON.parse(finalEvent);
+
+      expect(finalData.done).toBe(true);
+      expect(finalData.detectedLanguage).toBeUndefined();
     });
   });
 
