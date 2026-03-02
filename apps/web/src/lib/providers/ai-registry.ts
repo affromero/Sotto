@@ -16,14 +16,22 @@ export interface AiProviderAuthField {
 export interface AiModelOption {
   id: string;
   displayName: string;
+  /** Short name without provider prefix, e.g. 'Haiku 4.5', '5 Mini'. */
+  shortDisplayName: string;
   tier: 'fast' | 'balanced' | 'best' | 'max';
   /** Minimum plan required to use this model on platform credits (BYOK bypasses). */
   requiredPlan: 'FREE' | 'PRO';
+  /** Per-million-token pricing. Omit for zero-cost or non-metered models. */
+  pricing?: { inputPerMTok: number; outputPerMTok: number };
 }
 
 export interface AiProviderMeta {
   id: AiProviderId;
   displayName: string;
+  /** Short label for badges, e.g. 'Claude', 'GPT', 'Groq'. */
+  shortLabel: string;
+  /** Env var name for the platform API key, e.g. 'ANTHROPIC_API_KEY'. Omit for STT-only or local-CLI providers. */
+  platformEnvKey?: string;
   defaultModel: string;
   getApiKeyUrl: string;
   models: AiModelOption[];
@@ -37,12 +45,14 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   anthropic: {
     id: 'anthropic',
     displayName: 'Anthropic (Claude)',
+    shortLabel: 'Claude',
+    platformEnvKey: 'ANTHROPIC_API_KEY',
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', tier: 'best', requiredPlan: 'PRO' },
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', pricing: { inputPerMTok: 0.8, outputPerMTok: 4.0 } },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', pricing: { inputPerMTok: 3.0, outputPerMTok: 15.0 } },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', pricing: { inputPerMTok: 15.0, outputPerMTok: 75.0 } },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -72,12 +82,14 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   openai: {
     id: 'openai',
     displayName: 'OpenAI',
+    shortLabel: 'GPT',
+    platformEnvKey: 'OPENAI_API_KEY',
     defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'gpt-5', displayName: 'GPT-5', tier: 'balanced', requiredPlan: 'PRO' },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', tier: 'best', requiredPlan: 'PRO' },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', pricing: { inputPerMTok: 0.3, outputPerMTok: 1.0 } },
+      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -97,11 +109,13 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   groq: {
     id: 'groq',
     displayName: 'Groq',
+    shortLabel: 'Groq',
+    platformEnvKey: 'GROQ_API_KEY',
     defaultModel: 'llama-3.3-70b-versatile',
     getApiKeyUrl: 'https://console.groq.com/keys',
     models: [
-      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', tier: 'best', requiredPlan: 'PRO' },
+      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', shortDisplayName: '3.1 8B', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', shortDisplayName: '3.3 70B', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
@@ -121,12 +135,13 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   'claude-code': {
     id: 'claude-code',
     displayName: 'Claude Code (CLI)',
+    shortLabel: 'Claude',
     defaultModel: 'opus',
     getApiKeyUrl: '',
     models: [
-      { id: 'haiku', displayName: 'Haiku', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'sonnet', displayName: 'Sonnet', tier: 'balanced', requiredPlan: 'PRO' },
-      { id: 'opus', displayName: 'Opus', tier: 'best', requiredPlan: 'PRO' },
+      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' },
+      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' },
+      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO' },
     ],
     auth: {
       fields: [],
@@ -137,6 +152,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   together: {
     id: 'together',
     displayName: 'Together AI',
+    shortLabel: 'Together',
     defaultModel: '',
     getApiKeyUrl: 'https://api.together.xyz/settings/api-keys',
     models: [],
@@ -158,6 +174,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   deepgram: {
     id: 'deepgram',
     displayName: 'Deepgram (STT)',
+    shortLabel: 'Deepgram',
     defaultModel: '',
     getApiKeyUrl: 'https://console.deepgram.com/',
     models: [],
@@ -179,6 +196,7 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
   assemblyai: {
     id: 'assemblyai',
     displayName: 'AssemblyAI (STT)',
+    shortLabel: 'AssemblyAI',
     defaultModel: '',
     getApiKeyUrl: 'https://www.assemblyai.com/app',
     models: [],
@@ -222,6 +240,12 @@ export function getAllAiProviderMeta(): AiProviderMeta[] {
 
 export function getAiProviderIds(): AiProviderId[] {
   return Object.keys(AI_PROVIDERS) as AiProviderId[];
+}
+
+export function getAiProviderIdsWithPricing(): AiProviderId[] {
+  return getAiProviderIds().filter(id =>
+    AI_PROVIDERS[id].models.some(m => m.pricing)
+  );
 }
 
 export function isValidAiProviderId(id: string): id is AiProviderId {
