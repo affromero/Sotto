@@ -6,6 +6,7 @@ import {
   type VoicePoolEntry,
   type VoiceMatchMetadata,
 } from './voice-pool';
+import { getProviderMeta } from './providers/tts-registry';
 
 const ELEVENLABS_BASE_URL = 'https://api.elevenlabs.io/v1';
 
@@ -101,7 +102,7 @@ export async function generateSpeech(params: {
     throw new Error('ElevenLabs API key not configured — set ELEVENLABS_API_KEY');
   }
 
-  const modelId = params.modelId || 'eleven_v3';
+  const modelId = params.modelId || getProviderMeta('elevenlabs').defaultModel;
   const supportsContext = !modelId.startsWith('eleven_v3');
 
   const rawStability = params.stability ?? 0.45;

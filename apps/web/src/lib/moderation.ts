@@ -6,7 +6,7 @@ import { logger } from './logger';
 
 const OPENAI_MODERATION_KEY = process.env.OPENAI_MODERATION_KEY;
 const MODERATION_API_URL = 'https://api.openai.com/v1/moderations';
-const MODERATION_MODEL = 'omni-moderation-latest';
+const MODERATION_MODEL = process.env.OPENAI_MODERATION_MODEL || 'omni-moderation-latest';
 const MODERATION_TIMEOUT_MS = 3000;
 const CACHE_TTL_SECONDS = 600; // 10 minutes
 const MAX_INPUT_LENGTH = 32000; // API limit ~32K chars

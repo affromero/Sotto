@@ -1,5 +1,6 @@
 import type { AIProvider, AIOptions, AIResponse, ChatMessage, TextContentPart } from './ai';
 import { executeClaudeCode, streamClaudeCode, serializeMessages } from '../claude-code-client';
+import { getAiProviderMeta } from './ai-registry';
 
 /** Extract plain text from ChatMessage content (string or ContentPart[]). */
 function textOf(content: ChatMessage['content']): string {
@@ -17,7 +18,7 @@ export class ClaudeCodeProvider implements AIProvider {
     messages: ChatMessage[],
     opts?: AIOptions
   ): Promise<AIResponse> {
-    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus';
+    const ccModel = opts?.model || process.env.CLAUDE_CODE_MODEL || getAiProviderMeta('claude-code').defaultModel;
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     const result = await executeClaudeCode(system, serializeMessages(textMessages), {
       model: ccModel,
@@ -33,7 +34,7 @@ export class ClaudeCodeProvider implements AIProvider {
   ): AsyncGenerator<string> {
     const textMessages = messages.map((m) => ({ role: m.role, content: textOf(m.content) }));
     yield* streamClaudeCode(system, serializeMessages(textMessages), {
-      model: opts?.model || process.env.CLAUDE_CODE_MODEL || 'opus',
+      model: opts?.model || process.env.CLAUDE_CODE_MODEL || getAiProviderMeta('claude-code').defaultModel,
       useWebSearch: opts?.useWebSearch,
     });
   }

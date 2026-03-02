@@ -11,7 +11,7 @@
  * @tts-research-date 2026-02-27 — v3 audio tags, voice_settings, SSML, prosody context
  */
 import type { TtsProvider, SpeechParams, SfxParams } from '../tts';
-import type { TtsProviderId } from '../tts-registry';
+import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { VOICE_POOL, selectVoicePair, resolveVoiceId, type VoiceMatchMetadata } from '../../voice-pool';
 import { mapDirectionToExpression } from '../../tts-expression-mapper';
 
@@ -27,7 +27,7 @@ export class ElevenLabsProvider implements TtsProvider {
 
   constructor(byokApiKey?: string, model?: string) {
     this.byokApiKey = byokApiKey;
-    this.model = model ?? 'eleven_v3';
+    this.model = model ?? getProviderMeta('elevenlabs').defaultModel;
   }
 
   private async getClient() {
