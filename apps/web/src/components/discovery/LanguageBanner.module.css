@@ -1,0 +1,135 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-xl);
+  background: var(--color-warning-lighter);
+  border: 1px solid var(--color-warning-light);
+  animation: slideIn var(--transition-normal) ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
+}
+
+.message {
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-xs);
+}
+
+.switchButton {
+  appearance: none;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  transition:
+    background var(--transition-fast),
+    opacity var(--transition-fast);
+}
+
+.switchButton:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.switchButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.keepButton {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  font: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  transition: color var(--transition-fast);
+}
+
+.keepButton:hover {
+  color: var(--color-text-primary);
+}
+
+.dismissButton {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: var(--spacing-xs);
+  cursor: pointer;
+  color: var(--color-text-tertiary);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.dismissButton:hover {
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+@media (min-width: 600px) {
+  .banner {
+    align-items: center;
+  }
+
+  .content {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .actions {
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+}

@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 import { auth } from '@/lib/auth';
 import { checkSuspension } from '@/lib/auth-guards';
+import { detectLanguage } from '@/lib/language-detect';
 
 /**
  * Streaming filter that suppresses [METADATA]...[/METADATA] and [chips:...] blocks
@@ -147,6 +148,12 @@ export async function POST(request: NextRequest) {
     ? (await getAiKey(authed.userId, modelProvider)) ?? (await getAiKey(authed.userId))
     : await getAiKey(authed.userId);
 
+  // Fetch user for plan gating and language detection
+  const user = await prisma.user.findUnique({
+    where: { id: authed.userId },
+    select: { plan: true, preferredLanguage: true },
+  });
+
   // Model plan gating — block expensive models for free non-BYOK users
   if (typeof model === 'string' && !model.startsWith('claude-code:')) {
     const requiredPlan = getModelRequiredPlan(model);
@@ -154,10 +161,6 @@ export async function POST(request: NextRequest) {
       const session = await auth();
       const role = session?.user?.role;
       const isByok = !!aiKey;
-      const user = await prisma.user.findUnique({
-        where: { id: authed.userId },
-        select: { plan: true },
-      });
       const userPlan = user?.plan ?? 'FREE';
       if (!isModelAllowedForUser(requiredPlan, userPlan as 'FREE' | 'PRO', isByok, role)) {
         return errorResponse('This model requires a Pro subscription.', 403, { code: 'model_requires_pro' });
@@ -190,6 +193,19 @@ export async function POST(request: NextRequest) {
           url: detectedUrls[0],
           error: (err as Error).message,
         });
+      }
+    }
+  }
+
+  // Detect language on first message for non-English speakers without a preference set
+  let detectedLanguage: string | null = null;
+  const isFirstMessage = !Array.isArray(history) || history.length === 0;
+  if (isFirstMessage && !user?.preferredLanguage) {
+    const rawMessage = message ?? content;
+    if (typeof rawMessage === 'string') {
+      const lang = detectLanguage(rawMessage);
+      if (lang && lang !== 'en') {
+        detectedLanguage = lang;
       }
     }
   }
@@ -339,7 +355,7 @@ export async function POST(request: NextRequest) {
           // Send chips parsed from the fallback response (if any)
           const { chips: fallbackChips } = parseChips(fallbackText);
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ done: true, chips: fallbackChips })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ done: true, chips: fallbackChips, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
           );
           return; // no controller.close() here — finally handles it for all paths
         }
@@ -363,7 +379,7 @@ export async function POST(request: NextRequest) {
           : null;
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
         );
       } catch (error) {
         const status = (error as { status?: number }).status;
