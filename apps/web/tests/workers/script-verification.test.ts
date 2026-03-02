@@ -210,6 +210,18 @@ const failedVerdict = {
   unsupportedClaims: ['claim-a', 'claim-b'],
 };
 
+const parseErrorVerdict = {
+  ...passedVerdict,
+  passed: false,
+  score: 0,
+  feedback: 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.',
+  failureType: 'parse_error' as const,
+  totalClaims: 0,
+  unsupportedClaims: [],
+  unreliableSourceClaims: [],
+  allClaims: [],
+};
+
 const revisedScriptResult = {
   turns: [{ speaker: 'HOST', text: 'Revised welcome.' }, { speaker: 'EXPERT', text: 'Revised expert turn.' }],
   references: [],
@@ -838,6 +850,80 @@ describe('processScriptVerification', () => {
       const job = createMockJob(defaultPayload);
 
       await expect(processScriptVerification(job)).rejects.toThrow('Database write failed');
+    });
+  });
+
+  describe('parse error handling', () => {
+    it('retries without incrementing attempts on first parse error', async () => {
+      mockVerifyScript.mockResolvedValue(parseErrorVerdict);
+      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({
+        ...defaultScript,
+        verificationAttempts: 0,
+        verificationFeedback: null,
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      // Should NOT increment verificationAttempts — only save feedback
+      expect(mockPrismaScriptUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { podcastId: 'podcast-001' },
+          data: { verificationFeedback: parseErrorVerdict.feedback },
+        })
+      );
+
+      // Should re-queue for verification (parse retry)
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'script-verification' },
+        'verify_script',
+        { podcastId: 'podcast-001', userId: 'user-001', discoveryId: 'discovery-001', useAdminCredits: undefined },
+        { jobId: expect.stringMatching(/parse-retry$/) }
+      );
+
+      // Should NOT regenerate the script
+      expect(mockGenerateScriptWithFeedback).not.toHaveBeenCalled();
+    });
+
+    it('falls through to failure on consecutive parse errors', async () => {
+      mockVerifyScript.mockResolvedValue(parseErrorVerdict);
+      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({
+        ...defaultScript,
+        verificationAttempts: 0,
+        verificationFeedback: 'PARSE_ERROR: previous parse failure',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      // Consecutive parse error → falls through to revision loop (not parse retry)
+      // The script should be regenerated since attemptNumber (1) < MAX_VERIFICATION_ATTEMPTS (3)
+      expect(mockGenerateScriptWithFeedback).toHaveBeenCalled();
+    });
+
+    it('uses processing issue message when max attempts exhausted by parse errors', async () => {
+      mockVerifyScript.mockResolvedValue(parseErrorVerdict);
+      mockPrismaScriptFindUniqueOrThrow.mockResolvedValue({
+        ...defaultScript,
+        verificationAttempts: 2,
+        verificationFeedback: 'PARSE_ERROR: previous parse failure',
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processScriptVerification(job);
+
+      expect(mockMarkPodcastFailed).toHaveBeenCalledWith('podcast-001', {
+        failureReason: 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.',
+        technicalError: expect.stringContaining('Verification failed 3/3'),
+      });
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'notifications' },
+        'send_notification',
+        expect.objectContaining({
+          message: 'We encountered a temporary processing issue while fact-checking your podcast. Please try generating again.',
+        })
+      );
     });
   });
 });
