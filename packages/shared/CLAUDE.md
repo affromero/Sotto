@@ -22,6 +22,7 @@ src/
 │   ├── import.ts         # ImportPodcastRequest, ImportProgress
 │   ├── events.ts         # EventPayload (23 event types), EventContext
 │   └── pitch.ts          # PitchDocument, PitchVersion, PitchManifest
+├── brand.ts              # BRAND constant — single source of truth for product tagline, descriptions, and pitch copy
 ├── content-badge.ts      # getContentBadgeLabel(), getPodcastBadges() — content/AI/TTS/language badge logic
 ├── provider-display.ts   # AI_PROVIDER_DISPLAY, TTS_PROVIDER_DISPLAY, AI_MODEL_DISPLAY, LANGUAGE_DISPLAY maps + label helpers
 ├── generation-messages.ts # STAGE_MESSAGES pools + resolveMessage() — rotating sub-messages for pipeline generation stages

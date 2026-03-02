@@ -1,6 +1,6 @@
 # @sotto/mcp
 
-MCP server for [Sotto](https://sotto.fm) — where podcasts get social. Create, manage, and discover AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
+MCP server for [Sotto](https://sotto.fm) — every voice, every topic, one feed. Create, manage, and discover AI podcasts from any MCP-compatible client (Claude Desktop, Claude Code, Cursor).
 
 ## Setup
 
