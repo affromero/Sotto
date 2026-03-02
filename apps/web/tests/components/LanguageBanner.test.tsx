@@ -16,7 +16,7 @@ describe('LanguageBanner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn().mockResolvedValue({ ok: true });
-    global.fetch = mockFetch;
+    global.fetch = mockFetch as unknown as typeof fetch;
   });
 
   it('renders with correct language name', () => {

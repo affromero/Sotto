@@ -42,7 +42,7 @@ vi.mock('@/lib/voice-pool', () => ({
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
-  getProviderMeta: vi.fn(),
+  getProviderMeta: vi.fn().mockReturnValue({ defaultModel: 'test-model' }),
   compareQuality: vi.fn(),
 }));
 
