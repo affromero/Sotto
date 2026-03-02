@@ -6,7 +6,7 @@
     "apps/*",
     "packages/*"
   ],
-  "description": "Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.",
+  "description": "Every voice. Every topic. One feed. Create AI podcasts, compare voices side-by-side, remix anything.",
   "scripts": {
     "build": "npm run build --workspace=@sotto/web",
     "ci": "npm run ci --workspace=@sotto/web",
