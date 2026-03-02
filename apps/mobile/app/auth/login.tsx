@@ -17,7 +17,7 @@ import {
   isErrorWithCode,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
-import { colors, spacing, typography, borderRadius } from '@sotto/shared';
+import { BRAND, colors, spacing, typography, borderRadius } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setToken, notifyAuthSuccess } from '../../lib/auth';
 
@@ -242,8 +242,8 @@ export default function LoginScreen() {
       >
         {/* Branding */}
         <View style={styles.brandSection}>
-          <Text style={styles.logo}>Sotto</Text>
-          <Text style={styles.tagline}>Where Podcasts Get Social</Text>
+          <Text style={styles.logo}>{BRAND.name}</Text>
+          <Text style={styles.tagline}>{BRAND.tagline}</Text>
         </View>
 
         {IS_DEV ? (
