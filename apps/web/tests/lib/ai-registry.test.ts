@@ -1,5 +1,20 @@
-import { describe, it, expect } from 'vitest';
-import { getCheapestModelForProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { describe, it, expect, vi } from 'vitest';
+import { getCheapestModelForProvider, isValidModelId, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'groq',
+    sttModel: 'whisper-large-v3-turbo',
+  }),
+}));
 
 describe('getCheapestModelForProvider', () => {
   it('returns fast-tier model for anthropic', () => {
@@ -26,5 +41,59 @@ describe('getCheapestModelForProvider', () => {
 
   it('returns null for unknown provider', () => {
     expect(getCheapestModelForProvider('nonexistent' as AiProviderId)).toBeNull();
+  });
+});
+
+describe('isValidModelId', () => {
+  it('returns true for known Anthropic model', () => {
+    expect(isValidModelId('claude-sonnet-4-6')).toBe(true);
+  });
+
+  it('returns true for known OpenAI model', () => {
+    expect(isValidModelId('gpt-5-mini')).toBe(true);
+  });
+
+  it('returns true for known Groq model', () => {
+    expect(isValidModelId('llama-3.3-70b-versatile')).toBe(true);
+  });
+
+  it('returns false for unknown model', () => {
+    expect(isValidModelId('gpt-99-turbo')).toBe(false);
+  });
+
+  it('returns false for empty string', () => {
+    expect(isValidModelId('')).toBe(false);
+  });
+});
+
+describe('resolveAiModelAndProvider — unknown model fallthrough', () => {
+  it('falls through to BYOK key when podcastAiModel is not in registry', async () => {
+    const result = await resolveAiModelAndProvider({
+      podcastAiModel: 'nonexistent-model-xyz',
+      aiKey: { provider: 'openai', apiKey: 'sk-test' },
+    });
+
+    // Should fall through to BYOK default model, NOT pair unknown model with 'anthropic'
+    expect(result.provider).toBe('openai');
+    expect(result.model).toBe('gpt-5');
+  });
+
+  it('falls through to auto-model when podcastAiModel is unknown and no BYOK key', async () => {
+    const result = await resolveAiModelAndProvider({
+      podcastAiModel: 'nonexistent-model-xyz',
+    });
+
+    // Should fall through to auto-model config
+    expect(result.provider).toBe('anthropic');
+    expect(result.model).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('returns known model with its provider when podcastAiModel is valid', async () => {
+    const result = await resolveAiModelAndProvider({
+      podcastAiModel: 'gpt-5-mini',
+    });
+
+    expect(result.provider).toBe('openai');
+    expect(result.model).toBe('gpt-5-mini');
   });
 });

@@ -297,6 +297,13 @@ export function getProviderForModel(modelId: string): AiProviderId | null {
 }
 
 /**
+ * Check whether a model ID is registered with any known AI provider.
+ */
+export function isValidModelId(modelId: string): boolean {
+  return getProviderForModel(modelId) !== null;
+}
+
+/**
  * Resolve the AI model and its owning provider, keeping them in sync.
  *
  * Priority:
@@ -313,13 +320,15 @@ export async function resolveAiModelAndProvider(opts: {
 }): Promise<{ model: string; provider: string }> {
   const { resolveAutoModel } = await import('../auto-model-config');
 
-  // 1. Podcast-level model override
+  // 1. Podcast-level model override — only use if the model is in the registry
   if (opts.podcastAiModel) {
     const owner = getProviderForModel(opts.podcastAiModel);
-    return {
+    if (owner) {
+      return { model: opts.podcastAiModel, provider: owner };
+    }
+    logger.warn('resolveAiModelAndProvider: unknown model, falling through', {
       model: opts.podcastAiModel,
-      provider: owner ?? opts.aiKey?.provider ?? 'anthropic',
-    };
+    });
   }
 
   // 2. BYOK key → provider's default model
