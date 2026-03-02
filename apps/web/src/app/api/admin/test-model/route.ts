@@ -10,6 +10,7 @@ import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { getAiKey, getByokKey } from '@/lib/byok';
 import { logUsage } from '@/lib/usage-logger';
 import { errorResponse } from '@/lib/api-response';
+import { BRAND } from '@sotto/shared';
 import {
   CARTESIA_VOICE_POOL,
   HUME_VOICE_POOL,
@@ -104,7 +105,7 @@ async function generateTestAudio(): Promise<{ audio: Buffer; provider: string } 
       const tts = await createTtsProviderAsync(id, apiKey, extraData);
       const voiceId = TTS_TEST_VOICES[id] ?? 'alloy';
       const audio = await withTimeout(
-        tts.generateSpeech({ text: 'Sotto — where podcasts get social.', voiceId }),
+        tts.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
         5_000,
       );
       return { audio, provider: id };
@@ -295,7 +296,7 @@ export async function POST(request: NextRequest) {
       );
 
       const audioBuffer = await withTimeout(
-        ttsProvider.generateSpeech({ text: 'Sotto — where podcasts get social.', voiceId }),
+        ttsProvider.generateSpeech({ text: `${BRAND.name} — ${BRAND.tagline}`, voiceId }),
         30_000
       );
 

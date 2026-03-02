@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useSyncExternalStore } from 'react';
+import { BRAND } from '@sotto/shared';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import styles from './ReferralSharePrompt.module.css';
@@ -41,7 +42,7 @@ export function ReferralSharePrompt({ handle, hasFirstReadyPodcast }: ReferralSh
   if (!hasFirstReadyPodcast || dismissed) return null;
 
   const referralUrl = `https://sotto.fm/ref/${handle}`;
-  const twitterText = encodeURIComponent('I just created my first podcast on @SottoFM — where podcasts get social. Check it out:');
+  const twitterText = encodeURIComponent(`I just created my first podcast on ${BRAND.twitter} — ${BRAND.tagline} Check it out:`);
   const twitterShareUrl = `https://twitter.com/intent/tweet?text=${twitterText}&url=${encodeURIComponent(referralUrl)}`;
 
   function dismiss() {

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DM_Serif_Display, Inter } from 'next/font/google';
+import { BRAND } from '@sotto/shared';
 import { SessionProvider } from '@/components/providers/SessionProvider';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { EventProvider } from '@/components/providers/EventProvider';
@@ -27,31 +28,29 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://sotto.fm'),
+  metadataBase: new URL(BRAND.url),
   title: {
-    default: 'Sotto — Create. Fork. Share.',
-    template: '%s | Sotto',
+    default: `${BRAND.name} — ${BRAND.cta}`,
+    template: `%s | ${BRAND.name}`,
   },
-  description:
-    'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
+  description: BRAND.description,
   keywords: ['podcast', 'AI', 'social', 'remix', 'fork', 'import', 'interactive', 'learning'],
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'Sotto — Where Podcasts Get Social',
-    description:
-      'AI or human — create, discover, interrupt, fork, and remix.',
+    title: BRAND.title,
+    description: BRAND.subline,
     type: 'website',
     locale: 'en_US',
-    siteName: 'Sotto',
-    url: 'https://sotto.fm',
+    siteName: BRAND.name,
+    url: BRAND.url,
   },
   twitter: {
     card: 'summary_large_image',
-    site: '@SottoFM',
-    title: 'Sotto — Create. Fork. Share.',
-    description: 'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
+    site: BRAND.twitter,
+    title: BRAND.title,
+    description: BRAND.description,
   },
   manifest: '/manifest.json',
   themeColor: '#D97706',

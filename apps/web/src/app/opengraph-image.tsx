@@ -1,7 +1,8 @@
 import { ImageResponse } from 'next/og';
+import { BRAND } from '@sotto/shared';
 
 export const runtime = 'nodejs';
-export const alt = 'Sotto — Where Podcasts Get Social';
+export const alt = BRAND.title;
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
@@ -84,7 +85,7 @@ export default function OgImage() {
           }}
         />
         <span style={{ fontSize: 20, color: '#6B7280', letterSpacing: '0.05em' }}>
-          Where Podcasts Get Social
+          {BRAND.tagline}
         </span>
       </div>
 
@@ -108,7 +109,7 @@ export default function OgImage() {
           }}
         >
           Create. Fork.{' '}
-          <span style={{ color: '#D97706', fontStyle: 'italic' }}>Share.</span>
+          <span style={{ color: '#D97706', fontStyle: 'italic' }}>Remix. Share.</span>
         </h1>
         <p
           style={{
@@ -119,7 +120,7 @@ export default function OgImage() {
             maxWidth: '75%',
           }}
         >
-          AI or human — create, discover, interrupt, fork, and remix.
+          {BRAND.subline}
         </p>
       </div>
 

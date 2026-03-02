@@ -1,11 +1,11 @@
+import { BRAND } from '@sotto/shared';
 import { PublicNav } from '@/components/layout/PublicNav';
 import { Footer } from '@/components/layout/Footer';
 import styles from './page.module.css';
 
 export const metadata = {
-  title: 'About — Sotto',
-  description:
-    'Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.',
+  title: `About — ${BRAND.name}`,
+  description: BRAND.description,
 };
 
 export default function AboutPage() {
@@ -15,7 +15,7 @@ export default function AboutPage() {
       <main className={styles.main}>
         <div className={styles.container}>
           <header className={styles.hero}>
-            <h1 className={styles.heroTitle}>Where Podcasts Get Social</h1>
+            <h1 className={styles.heroTitle}>{BRAND.tagline}</h1>
             <p className={styles.heroSubtitle}>
               Sotto turns any topic into a conversational podcast you
               can interrupt, remix, and share. Built for curious minds who learn

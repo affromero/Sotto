@@ -125,6 +125,10 @@ export {
 
 export type { PitchDocument, PitchVersion, PitchManifest } from './types/pitch';
 
+// Brand copy (single source of truth)
+export { BRAND } from './brand';
+export type { Brand } from './brand';
+
 // Theme / design tokens
 export { colors, spacing, typography, borderRadius } from './theme';
 

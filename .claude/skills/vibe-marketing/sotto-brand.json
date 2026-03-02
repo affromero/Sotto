@@ -1,9 +1,9 @@
 {
   "brand": {
     "name": "Sotto",
-    "tagline": "Where podcasts get social. AI or human — create, discover, interrupt, fork, and remix.",
+    "tagline": "Every voice. Every topic. One feed.",
     "origin": "From 'sotto voce' — soft voice in Italian",
-    "elevator_pitch": "The social podcast network. Create AI podcasts or import human ones. Interrupt to ask questions. Fork and remix anyone's episode. Bring your own AI keys — everything's free.",
+    "elevator_pitch": "The social podcast network. Create AI podcasts or import human ones, compare 8+ voice providers side-by-side, fork and remix anything. Bring your own API keys — unlimited and free.",
     "url": "https://sotto.fm",
     "twitter_handle": "@sottofm",
     "twitter_bot": "@sottofm",
@@ -46,7 +46,7 @@
       "Don't use 'users' — say 'listeners', 'creators', 'people', or 'you'"
     ],
     "signature_phrases": [
-      "Where podcasts get social",
+      "Every voice. Every topic. One feed.",
       "What if your podcast could answer questions?",
       "Turn any idea into a conversation worth hearing",
       "Knowledge you can interrupt",
