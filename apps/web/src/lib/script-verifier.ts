@@ -2,6 +2,7 @@ import { createAIProvider } from './providers/ai';
 import type { ScriptTurn, GeneratedReference } from './script-generator';
 import { hashTurn, matchClaimsToTurns } from './turn-diff';
 import { loadPrompt, loadAndRender } from './prompt-loader';
+import { logger } from './logger';
 
 /**
  * Extract the first complete JSON object from a string that may contain
@@ -39,7 +40,43 @@ function extractFirstJsonObject(text: string): string {
   throw new Error('Unbalanced JSON object in response');
 }
 
-const PARSE_FAILURE_FEEDBACK = 'Script verification failed: could not parse AI response. Will retry.';
+const PARSE_FAILURE_FEEDBACK = 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
+
+export const VERIFICATION_JSON_SCHEMA = {
+  name: 'verification_result',
+  schema: {
+    type: 'object',
+    properties: {
+      claims: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            claimText: { type: 'string' },
+            turnIndex: { type: 'integer' },
+            speaker: { type: 'string' },
+            isCommonKnowledge: { type: 'boolean' },
+            existingCitations: { type: 'array', items: { type: 'integer' } },
+            needsMoreCitations: { type: 'boolean' },
+            hasUnreliableSource: { type: 'boolean' },
+            hasMisattribution: { type: 'boolean' },
+            verificationNote: { type: 'string' },
+          },
+          required: [
+            'claimText', 'turnIndex', 'speaker', 'isCommonKnowledge',
+            'existingCitations', 'needsMoreCitations', 'hasUnreliableSource',
+            'hasMisattribution', 'verificationNote',
+          ],
+          additionalProperties: false,
+        },
+      },
+      overallScore: { type: 'number' },
+      feedback: { type: 'string' },
+    },
+    required: ['claims', 'overallScore', 'feedback'],
+    additionalProperties: false,
+  },
+} as const;
 
 async function retryParseWithStricterPrompt(
   systemPrompt: string,
@@ -86,6 +123,8 @@ export interface VerificationVerdict {
   referenceQuality: ReferenceQualityAssessment;
   durationFeedback: string | null;
   feedback: string;
+  /** Set to 'parse_error' when the AI returned unparseable output (not a verification failure). */
+  failureType?: 'parse_error';
   inputTokens: number;
   outputTokens: number;
   model: string;
@@ -453,6 +492,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
       model: params.model,
       useWebSearch: true,
       skipModeration: true,
+      jsonSchema: VERIFICATION_JSON_SCHEMA,
     });
 
     let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
@@ -470,6 +510,11 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
         extraInputTokens = retry.inputTokens;
         extraOutputTokens = retry.outputTokens;
       } else {
+        logger.error('Script verification parse failure (incremental path)', {
+          provider: params.provider ?? 'default',
+          model: response.model,
+          responsePreview: response.content.slice(0, 500),
+        });
         return {
           passed: false,
           score: 0,
@@ -493,6 +538,7 @@ Analyze ONLY the changed turns listed in the system instructions. Return JSON on
           },
           durationFeedback: null,
           feedback: PARSE_FAILURE_FEEDBACK,
+          failureType: 'parse_error',
           allClaims: [],
           inputTokens: response.inputTokens,
           outputTokens: response.outputTokens,
@@ -539,6 +585,7 @@ Analyze every factual claim. Return JSON only.`;
     model: params.model,
     useWebSearch: true,
     skipModeration: true,
+    jsonSchema: VERIFICATION_JSON_SCHEMA,
   });
 
   let parsed: { claims: Array<Record<string, unknown>>; overallScore: number; feedback: string };
@@ -556,6 +603,11 @@ Analyze every factual claim. Return JSON only.`;
       extraInputTokens = retry.inputTokens;
       extraOutputTokens = retry.outputTokens;
     } else {
+      logger.error('Script verification parse failure (full path)', {
+        provider: params.provider ?? 'default',
+        model: response.model,
+        responsePreview: response.content.slice(0, 500),
+      });
       return {
         passed: false,
         score: 0,
@@ -579,6 +631,7 @@ Analyze every factual claim. Return JSON only.`;
         },
         durationFeedback: null,
         feedback: PARSE_FAILURE_FEEDBACK,
+        failureType: 'parse_error',
         allClaims: [],
         inputTokens: response.inputTokens,
         outputTokens: response.outputTokens,
