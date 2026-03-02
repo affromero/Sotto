@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Data Moat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* === Design Tokens === */
+    :root {
+      --primary: #D97706;
+      --accent: #1E3A5F;
+      --bg: #FEFCF8;
+      --surface: #FFFFFF;
+      --text: #1A1A1A;
+      --muted: #6B7280;
+      --heading-font: 'DM Serif Display', Georgia, serif;
+      --body-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --code-bg: #F3F4F6;
+      --code-border: #E5E7EB;
+      --table-stripe: #F9FAFB;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+      --radius: 4px;
+    }
+
+    /* === Reset & Base === */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      font-size: 16px;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--body-font);
+      font-size: 1rem;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* === Document Container === */
+    article.document {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* === Title Page === */
+    header.title-page {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+    }
+
+    header.title-page h1 {
+      font-family: var(--heading-font);
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 0.5rem;
+      line-height: 1.2;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    header.title-page h1::after {
+      content: '';
+      display: block;
+      width: 40%;
+      height: 2px;
+      background: var(--primary);
+      margin: 0.75rem auto 0;
+    }
+
+    header.title-page .subtitle {
+      font-size: 1.125rem;
+      color: var(--muted);
+      margin: 0.75rem 0 0;
+    }
+
+    header.title-page .author {
+      font-size: 0.9375rem;
+      color: var(--accent);
+      margin: 1rem 0 0;
+    }
+
+    header.title-page .date {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin: 0.5rem 0 0;
+    }
+
+    /* === Abstract === */
+    .abstract {
+      background: color-mix(in srgb, var(--primary) 7%, var(--surface));
+      border: 0.5px solid color-mix(in srgb, var(--primary) 40%, transparent);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .abstract .abstract-title {
+      font-family: var(--heading-font);
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 0 0 0.5rem;
+    }
+
+    .abstract p {
+      font-size: 0.9375rem;
+      margin: 0;
+    }
+
+    /* === Headings === */
+    h1 {
+      font-family: var(--heading-font);
+      font-size: 1.875rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 2.5rem 0 0.5rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid var(--primary);
+      line-height: 1.3;
+    }
+
+    h2 {
+      font-family: var(--heading-font);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin: 2rem 0 0.5rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+      line-height: 1.3;
+    }
+
+    h3 {
+      font-family: var(--heading-font);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 1.5rem 0 0.5rem;
+      line-height: 1.4;
+    }
+
+    h4, h5, h6 {
+      font-family: var(--body-font);
+      font-size: 1.0625rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 1.25rem 0 0.5rem;
+      line-height: 1.4;
+    }
+
+    /* === Paragraphs & Text === */
+    p {
+      margin: 0 0 1rem;
+      text-align: justify;
+      hyphens: auto;
+    }
+
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+
+    /* === Links === */
+    a {
+      color: var(--primary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    a:hover {
+      color: color-mix(in srgb, var(--primary) 80%, black);
+    }
+
+    /* === Lists === */
+    ul, ol {
+      margin: 0 0 1rem;
+      padding-left: 1.75rem;
+    }
+
+    ul ul, ol ol, ul ol, ol ul {
+      margin-bottom: 0;
+    }
+
+    li {
+      margin-bottom: 0.25rem;
+    }
+
+    li::marker {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    /* === Definition Lists === */
+    dl {
+      margin: 0 0 1rem;
+    }
+
+    dt {
+      font-weight: 700;
+      margin-top: 0.75rem;
+    }
+
+    dd {
+      margin-left: 1.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    /* === Blockquotes === */
+    blockquote {
+      margin: 1rem 0;
+      padding: 0.75rem 1.25rem;
+      border-left: 3px solid var(--primary);
+      background: color-mix(in srgb, var(--primary) 5%, var(--surface));
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+
+    blockquote p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* === Code === */
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+      font-size: 0.875em;
+      background: var(--code-bg);
+      padding: 0.15em 0.35em;
+      border-radius: 2px;
+    }
+
+    pre {
+      margin: 1rem 0;
+      padding: 1rem;
+      background: var(--code-bg);
+      border: 0.5px solid var(--code-border);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: 0.8125rem;
+    }
+
+    /* Pandoc syntax highlighting */
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+
+    /* === Tables === */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9375rem;
+    }
+
+    thead th {
+      background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+      color: var(--accent);
+      font-weight: 700;
+      text-align: left;
+      padding: 0.625rem 0.75rem;
+      border: 0.5px solid var(--code-border);
+    }
+
+    tbody td {
+      padding: 0.5rem 0.75rem;
+      border: 0.5px solid var(--code-border);
+    }
+
+    tbody tr:nth-child(odd) {
+      background: var(--table-stripe);
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--surface);
+    }
+
+    /* === Images === */
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 1rem auto;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+    }
+
+    figure {
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+
+    figcaption {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+
+    /* === Horizontal Rule === */
+    hr {
+      border: none;
+      border-top: 0.5px solid #D1D5DB;
+      margin: 2rem 0;
+    }
+
+    /* === MathML === */
+    math {
+      font-size: 1.1em;
+    }
+
+    math[display="block"] {
+      display: block;
+      text-align: center;
+      margin: 1.25rem 0;
+      overflow-x: auto;
+    }
+
+    /* === Footnotes === */
+    .footnotes {
+      margin-top: 3rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--code-border);
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    .footnote-ref { font-size: 0.75em; vertical-align: super; }
+    .footnote-back { margin-left: 0.25em; text-decoration: none; }
+
+    /* === References / Citations === */
+    .references {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 2px solid var(--primary);
+    }
+
+    .references::before {
+      content: 'References';
+      display: block;
+      font-family: var(--heading-font);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 1rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .csl-entry {
+      margin-bottom: 0.75rem;
+      padding: 0.625rem 0.875rem;
+      background: var(--surface);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 0.9375rem;
+      line-height: 1.5;
+    }
+
+    .csl-entry:hover {
+      background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+    }
+
+    /* === Table of Contents === */
+    nav#TOC {
+      background: var(--surface);
+      border: 0.5px solid var(--code-border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    nav#TOC ul {
+      list-style: none;
+      padding-left: 1rem;
+    }
+
+    nav#TOC > ul {
+      padding-left: 0;
+    }
+
+    nav#TOC li {
+      margin-bottom: 0.35rem;
+    }
+
+    nav#TOC a {
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    nav#TOC a:hover {
+      color: var(--primary);
+    }
+
+    /* === Link & Citation Popups (pure HTML <details>, zero JS) === */
+
+    /* Link info toggle */
+    details.link-popup {
+      display: inline;
+    }
+
+    details.link-popup > summary {
+      display: inline;
+      list-style: none;
+      cursor: pointer;
+      font-size: 0.7em;
+      vertical-align: super;
+      color: var(--primary);
+      margin-left: 2px;
+      opacity: 0.65;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    details.link-popup > summary::-webkit-details-marker { display: none; }
+    details.link-popup > summary::marker { content: ''; display: none; }
+
+    details.link-popup[open] > summary {
+      opacity: 1;
+    }
+
+    /* Citation inline popup (checkbox toggle — tap to open, tap again to close) */
+    .cite-wrap {
+      display: inline;
+      position: relative;
+    }
+
+    .cite-toggle {
+      display: none;
+    }
+
+    .cite-label {
+      cursor: pointer;
+      border-bottom: 1px dotted var(--accent);
+    }
+
+    .cite-toggle:checked + .cite-label {
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
+      border-radius: 2px;
+    }
+
+    .cite-bubble {
+      display: none;
+      position: absolute;
+      right: 0;
+      left: auto;
+      top: calc(100% + 4px);
+      z-index: 100;
+      width: 340px;
+      max-width: 90vw;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--code-border);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
+      font-size: 0.875rem;
+      line-height: 1.5;
+      white-space: normal;
+      text-align: left;
+      font-weight: normal;
+      font-style: normal;
+      color: var(--text);
+    }
+
+    .cite-bubble a {
+      color: var(--primary);
+      text-decoration: underline;
+      pointer-events: auto;
+    }
+
+    .cite-toggle:checked ~ .cite-bubble {
+      display: block;
+    }
+
+    /* Shared popup content card */
+    .popup-content {
+      display: block;
+      margin: 0.5rem 0;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--code-border);
+      border-left: 3px solid var(--primary);
+      border-radius: 0 8px 8px 0;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.05);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    .popup-content .popup-title {
+      font-weight: 700;
+      font-size: 0.9375rem;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+
+    .popup-content .popup-desc {
+      color: var(--muted);
+      font-size: 0.8125rem;
+      margin-bottom: 0.375rem;
+    }
+
+    .popup-content .popup-domain {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .popup-content .popup-cite-text {
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+
+    .popup-content .popup-link {
+      display: inline-block;
+      margin-top: 0.375rem;
+      padding: 0.25rem 0.625rem;
+      background: var(--primary);
+      color: #fff;
+      border-radius: var(--radius);
+      text-decoration: none;
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
+    .popup-content .popup-link:hover {
+      background: color-mix(in srgb, var(--primary) 85%, black);
+      color: #fff;
+    }
+
+    /* === Page screenshot preview in link popups === */
+    .popup-preview {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+      background: var(--code-bg);
+      border: 0.5px solid var(--code-border);
+    }
+
+    /* === Video Embeds (details/summary for inline playback, zero JS) === */
+    .video-embed {
+      position: relative;
+      width: 100%;
+      margin: 1rem 0;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    details.video-details {
+      display: block;
+    }
+
+    details.video-details > summary {
+      display: block;
+      list-style: none;
+      cursor: pointer;
+      position: relative;
+    }
+
+    details.video-details > summary::-webkit-details-marker { display: none; }
+    details.video-details > summary::marker { content: ''; display: none; }
+
+    .video-thumb {
+      width: 100%;
+      height: auto;
+      display: block;
+      border-radius: 8px 8px 0 0;
+      margin: 0;
+      box-shadow: none;
+    }
+
+    .video-play-btn {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 64px;
+      height: 64px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 50%;
+      color: #fff;
+      font-size: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-left: 4px;
+      pointer-events: none;
+    }
+
+    .video-caption {
+      padding: 0.5rem 0.75rem;
+      background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+      font-size: 0.8125rem;
+      color: var(--accent);
+      font-weight: 600;
+      text-align: center;
+    }
+
+    /* When open: dim the thumbnail, hide play button */
+    details.video-details[open] > summary .video-play-btn {
+      display: none;
+    }
+
+    details.video-details[open] > summary .video-caption {
+      display: none;
+    }
+
+    details.video-details[open] > summary .video-thumb {
+      opacity: 0.3;
+      border-radius: 8px 8px 0 0;
+    }
+
+    .video-player iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: none;
+      display: block;
+    }
+
+    .video-open-link {
+      display: block;
+      padding: 0.75rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.9375rem;
+      text-align: center;
+      text-decoration: none;
+      border-radius: 0 0 8px 8px;
+    }
+
+    .video-open-link:hover {
+      background: color-mix(in srgb, var(--accent) 85%, black);
+      color: #fff;
+    }
+
+    .video-fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 2rem;
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .video-fallback .video-play-btn {
+      position: static;
+      transform: none;
+      width: 48px;
+      height: 48px;
+      font-size: 22px;
+    }
+
+    .video-embed video {
+      width: 100%;
+      display: block;
+      border-radius: 8px;
+    }
+
+    /* === Responsive === */
+    @media (max-width: 640px) {
+      article.document {
+        padding: 1rem 1rem 3rem;
+      }
+
+      header.title-page h1 {
+        font-size: 1.625rem;
+      }
+
+      h1 { font-size: 1.3125rem; }
+      h2 { font-size: 1.125rem; }
+
+      table {
+        font-size: 0.8125rem;
+      }
+
+      thead th, tbody td {
+        padding: 0.375rem 0.5rem;
+      }
+
+      /* Citation popup as bottom sheet on mobile */
+      .cite-bubble {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        width: 100%;
+        max-width: 100%;
+        border-radius: 12px 12px 0 0;
+        border-left: none;
+        border-top: 3px solid var(--primary);
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        z-index: 200;
+        padding: 1rem 1.25rem 1.5rem;
+      }
+    }
+
+    /* === Print === */
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      article.document {
+        max-width: none;
+        padding: 0;
+      }
+
+      details.link-popup { display: none; }
+      .popup-preview { display: none; }
+      .cite-label { border-bottom: none; cursor: default; }
+      .cite-bubble { display: none !important; }
+      .cite-toggle { display: none; }
+      .video-play-btn { display: none; }
+      .video-caption { display: none; }
+      .video-embed video { display: none; }
+      .video-fallback::after {
+        content: ' (view in browser)';
+        font-style: italic;
+      }
+
+      a[href]::after {
+        content: " (" attr(href) ")";
+        font-size: 0.75em;
+        color: var(--muted);
+      }
+
+      nav#TOC a[href]::after {
+        content: none;
+      }
+
+      h1, h2, h3 { break-after: avoid; }
+      pre, table, figure { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <article class="document">
+    <header class="title-page">
+      <h1>The Data Moat</h1>
+      <p class="subtitle">Why Sotto Gets Smarter With Every Podcast</p>
+      <p class="date">March 2026</p>
+    </header>
+    <div class="abstract">
+      <div class="abstract-title">Abstract</div>
+      <p>Every AI company generates content. Only one knows which voice
+wins. This document outlines the six compounding data flywheels that
+make Sotto’s platform more defensible with every podcast generated,
+every listen completed, and every question asked.</p>
+    </div>
+    <nav id="TOC" role="doc-toc">
+      <ul>
+      <li><a href="#the-insight-nobody-else-has"
+      id="toc-the-insight-nobody-else-has">The Insight Nobody Else
+      Has</a></li>
+      <li><a href="#six-data-flywheels" id="toc-six-data-flywheels">Six
+      Data Flywheels</a>
+      <ul>
+      <li><a href="#voice-provider-intelligence"
+      id="toc-voice-provider-intelligence">1. Voice Provider
+      Intelligence</a></li>
+      <li><a href="#listening-behavior-at-segment-granularity"
+      id="toc-listening-behavior-at-segment-granularity">2. Listening
+      Behavior at Segment Granularity</a></li>
+      <li><a href="#the-interaction-graph"
+      id="toc-the-interaction-graph">3. The Interaction Graph</a></li>
+      <li><a href="#byok-provider-adoption-map"
+      id="toc-byok-provider-adoption-map">4. BYOK Provider Adoption
+      Map</a></li>
+      <li><a href="#content-market-fit" id="toc-content-market-fit">5.
+      Content Market Fit</a></li>
+      <li><a href="#the-recommendation-feedback-loop"
+      id="toc-the-recommendation-feedback-loop">6. The Recommendation
+      Feedback Loop</a></li>
+      </ul></li>
+      <li><a href="#why-competitors-cant-replicate-this"
+      id="toc-why-competitors-cant-replicate-this">Why Competitors Can’t
+      Replicate This</a></li>
+      <li><a href="#the-business-this-enables"
+      id="toc-the-business-this-enables">The Business This Enables</a>
+      <ul>
+      <li><a href="#today-consumer-product"
+      id="toc-today-consumer-product">Today (consumer product)</a></li>
+      <li><a href="#tomorrow-data-products"
+      id="toc-tomorrow-data-products">Tomorrow (data products)</a></li>
+      <li><a href="#the-network-effect" id="toc-the-network-effect">The
+      network effect</a></li>
+      </ul></li>
+      <li><a
+      href="#what-were-tracking-today-infrastructure-already-built"
+      id="toc-what-were-tracking-today-infrastructure-already-built">What
+      We’re Tracking Today (Infrastructure Already Built)</a></li>
+      <li><a href="#the-pitch-in-one-paragraph"
+      id="toc-the-pitch-in-one-paragraph">The Pitch in One
+      Paragraph</a></li>
+      </ul>
+    </nav>
+    <h2 id="the-insight-nobody-else-has">The Insight Nobody Else
+    Has</h2>
+    <p>The AI voice market hit $4B in 2025 and is growing 28% annually.
+    Eight major providers — ElevenLabs, OpenAI, Hume, Cartesia, Fal,
+    MiniMax, Replicate, and more — are competing on quality, cost, and
+    features. And they’re all converging: MOS scores went from 3.2
+    (obviously robotic) in 2020 to 4.6 (indistinguishable from human) in
+    2026.</p>
+    <p>Here’s the problem: <strong>nobody knows which voice
+    wins.</strong></p>
+    <p>Not for a specific topic. Not for a specific audience. Not for a
+    specific language or tone. Every provider benchmarks against
+    themselves. Users pick a provider and stick with it. There’s no
+    cross-provider comparison data at scale.</p>
+    <p><strong>Sotto is building that dataset — as a byproduct of
+    running a podcast platform.</strong></p>
+    <p>Every podcast on Sotto records which AI model wrote the script,
+    which TTS provider generated the audio, which voice was used, and
+    then tracks what happened: Did the listener finish? Where did they
+    pause? Did they interrupt to ask questions? Did they fork it? Rate
+    it? Share it?</p>
+    <p>This isn’t a research project. It’s an operational database
+    powering a real product. And it gets more valuable with every
+    podcast generated.</p>
+    <h2 id="six-data-flywheels">Six Data Flywheels</h2>
+    <h3 id="voice-provider-intelligence">1. Voice Provider
+    Intelligence</h3>
+    <p>Sotto is the only platform where identical content runs through
+    multiple voice providers. The same script, same topic, same audience
+    — different voices.</p>
+    <p><strong>What we track per generation:</strong> - TTS provider and
+    model (<code>elevenlabs/eleven_v3</code>,
+    <code>hume/octave-v1</code>, <code>cartesia/sonic-3</code>, etc.) -
+    Cost per 1,000 characters (ranges from $0 for open-source to $0.25
+    for ultra-premium) - 4-dimension human ratings: voice naturalness,
+    content accuracy, conversation flow, overall satisfaction</p>
+    <p><strong>What this enables:</strong> -
+    <code>getBestModelByTopic()</code> — “Hume Octave produces the
+    highest-rated science content; ElevenLabs wins for storytelling.” No
+    individual provider has this data. - Provider adoption heatmaps —
+    which providers are users choosing, and for what? We track every
+    BYOK key users bring, by provider. - Quality-to-cost efficiency
+    curves — is ElevenLabs at $0.17/KChar worth 6x more than Cartesia at
+    $0.04? The data says it depends on the topic.</p>
+    <p><strong>Why it’s defensible:</strong> This data only exists
+    because users generate real content and listeners provide real
+    engagement signals. A provider benchmarking their own voices against
+    competitors in a lab doesn’t capture real-world listening
+    behavior.</p>
+    <h3 id="listening-behavior-at-segment-granularity">2. Listening
+    Behavior at Segment Granularity</h3>
+    <p>Most podcast platforms know if someone pressed play. Sotto knows
+    <em>exactly what happened during the listen.</em></p>
+    <p><strong>Per-session data:</strong> - Play, pause, seek, speed
+    changes — timestamped to the second - Heartbeat every 30 seconds
+    with cumulative listen time - Segment transitions (which
+    speaker-turn boundaries cause engagement vs. dropout) - Completion
+    rate, abandon position, and abandon reason patterns</p>
+    <p><strong>Pre-aggregated analytics:</strong> -
+    <code>abandonmentCurve</code> — a 5%-granularity dropout curve per
+    podcast showing exactly where listeners leave -
+    <code>seekHotspots</code> — where listeners jump <em>to</em>,
+    revealing what they want more of - <code>dropoffPoints</code> —
+    where they jump <em>away from</em>, revealing what doesn’t work -
+    <code>questionDensityByPosition</code> — where listeners interrupt
+    to ask questions (the content they’re most engaged with)</p>
+    <p><strong>Why it matters:</strong> This data feeds back into script
+    generation. If we know that 70% of listeners drop off during a
+    3-minute monologue about methodology, the script generator can
+    adapt. The 1,000th podcast on a topic is structurally better than
+    the first — because we know what listeners actually want.</p>
+    <h3 id="the-interaction-graph">3. The Interaction Graph</h3>
+    <p>Sotto’s core differentiator is that listeners can interrupt a
+    podcast to ask questions — and the answer gets permanently baked
+    into the episode for all future listeners.</p>
+    <p><strong>Per-interaction data:</strong> - Question text, playback
+    position when asked, and context (what was playing) - Whether the
+    listener continued after the answer or abandoned - Whether the
+    Q&amp;A-enhanced version gets higher completion rates than the
+    original</p>
+    <p><strong>What this builds over time:</strong> - A map of knowledge
+    gaps by topic — “When people listen to podcasts about quantum
+    computing, they consistently ask about wave-particle duality at the
+    4-minute mark.” - Content improvement signals — interaction density
+    correlates with engagement, creating a feedback loop: more questions
+    → better content → more listeners → more questions.</p>
+    <p><strong>Why it’s defensible:</strong> Every interaction is a user
+    voluntarily revealing what they don’t understand. This is the
+    highest-signal dataset for “what do people actually want to learn
+    about [topic]?” — and it only exists because the product
+    incentivizes asking.</p>
+    <h3 id="byok-provider-adoption-map">4. BYOK Provider Adoption
+    Map</h3>
+    <p>Sotto’s “bring your own key” model means users connect their own
+    ElevenLabs, OpenAI, Anthropic, Hume, Cartesia, or Fal API keys. This
+    is a feature for users — but it’s market intelligence for Sotto.</p>
+    <p><strong>What we know:</strong> - Which providers users bring keys
+    for, segmented by user type (free, pro, creator) - Key validity over
+    time — when keys get invalidated (credit exhaustion, cancellation) -
+    Provider switching patterns — which users try one provider and then
+    switch to another - Usage patterns — which BYOK users generate more,
+    on which topics, with which voices</p>
+    <p><strong>Why this is valuable:</strong> Voice AI providers have
+    limited visibility into how their product compares to competitors
+    <em>in the same context</em>. Sotto can tell ElevenLabs: “Your users
+    generate 3x more science content than Hume users, but Hume users
+    have 20% higher completion rates on storytelling.” That’s B2B
+    intelligence no one else has.</p>
+    <h3 id="content-market-fit">5. Content Market Fit</h3>
+    <p>Sotto tracks demand and supply per topic in real-time.</p>
+    <p><strong>The <code>getContentMarketFit()</code> query
+    measures:</strong> - <strong>Demand:</strong> How many times a topic
+    is surfaced in recommendations (impressions) -
+    <strong>Supply:</strong> How many podcasts exist on that topic -
+    <strong>Gap ratio:</strong> Where demand exceeds supply</p>
+    <p>This answers: “What do people want to listen to that doesn’t
+    exist yet?” — a signal that feeds back into content suggestions,
+    trending topics, and the discovery algorithm.</p>
+    <p><strong>Additional intelligence:</strong> -
+    <code>getOptimalDurationByTopic()</code> — 8-minute podcasts work
+    best for tech news; 15-minute for academic deep dives -
+    <code>getPeakUsageHeatmap()</code> — 24x7 listening pattern showing
+    when each topic peaks - <code>getGenerationToListenRatio()</code> —
+    what percentage of generated podcasts actually get listened to
+    (content quality signal)</p>
+    <h3 id="the-recommendation-feedback-loop">6. The Recommendation
+    Feedback Loop</h3>
+    <p>Sotto’s recommendation engine doesn’t just serve content — it
+    learns from every interaction.</p>
+    <p><strong>Per-recommendation data:</strong> - ML scoring signals:
+    <code>relevance</code>, <code>collaborative</code>,
+    <code>quality</code>, <code>freshness</code>, <code>novelty</code> -
+    Outcome tracking: was it shown? clicked? queued? What % was
+    listened? - Position bias: CTR by list position (are good
+    recommendations buried?)</p>
+    <p><strong>User and podcast feature vectors (pgvector,
+    384-dimensional):</strong> - <code>UserFeature</code> — inferred
+    preferences for depth, tone, audience level, duration, topic
+    affinities, voice affinities, behavioral archetype (deep_listener /
+    skimmer / explorer / completer / social_learner) -
+    <code>PodcastFeature</code> — quality scores, engagement ratios,
+    abandonment curves, content metadata</p>
+    <p>Each listen tightens these embeddings. User 1’s 10th podcast
+    recommendation is meaningfully better than their 1st. This is a
+    classic data flywheel: more users → better recommendations → more
+    engagement → more data → better recommendations.</p>
+    <h2 id="why-competitors-cant-replicate-this">Why Competitors Can’t
+    Replicate This</h2>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th style="text-align: left;">Competitor</th>
+    <th style="text-align: left;">What they have</th>
+    <th style="text-align: left;">What they’re missing</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td style="text-align: left;"><strong>NotebookLM</strong></td>
+    <td style="text-align: left;">Massive user base, Google
+    resources</td>
+    <td style="text-align: left;">No social feed, no cross-user data, no
+    voice choice, fixed voices, no interaction tracking</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><strong>ElevenLabs</strong></td>
+    <td style="text-align: left;">Best TTS quality, voice cloning</td>
+    <td style="text-align: left;">Infrastructure company — no listening
+    behavior data, no content intelligence, no cross-provider
+    comparison</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><strong>Hume /
+    Chatterbox</strong></td>
+    <td style="text-align: left;">Real-time interaction, emotion AI</td>
+    <td style="text-align: left;">Ephemeral conversations — no
+    persistent content, no engagement analytics over time, no social
+    graph</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><strong>Wondercraft</strong></td>
+    <td style="text-align: left;">Enterprise podcast production</td>
+    <td style="text-align: left;">B2B tool — no consumer behavior data,
+    no social signals, no recommendation engine</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><strong>Spotify / Apple</strong></td>
+    <td style="text-align: left;">Billions of listening hours</td>
+    <td style="text-align: left;">Human podcast data only — no AI
+    generation pipeline, no voice provider comparison, no interaction
+    data</td>
+    </tr>
+    </tbody>
+    </table>
+    <p>The key insight: <strong>Sotto’s data moat doesn’t come from one
+    feature — it comes from the intersection of generation + listening +
+    interaction + social, all on the same platform.</strong> No
+    competitor sits at this intersection.</p>
+    <h2 id="the-business-this-enables">The Business This Enables</h2>
+    <h3 id="today-consumer-product">Today (consumer product)</h3>
+    <ul>
+    <li><strong>Voice marketplace</strong> — 10% take rate on voice
+    clone sales. Creators list their cloned voices; other users pay to
+    use them. Already implemented with Stripe Connect, manual-capture
+    PaymentIntents.</li>
+    <li><strong>Pro subscriptions</strong> — increased generation
+    limits, priority processing, premium voices.</li>
+    <li><strong>BYOK pass-through</strong> — heaviest users bring their
+    own keys. They cost Sotto nothing to serve but generate the most
+    valuable data (power users reveal provider preferences, quality
+    thresholds, topic interests).</li>
+    </ul>
+    <h3 id="tomorrow-data-products">Tomorrow (data products)</h3>
+    <ul>
+    <li><strong>Voice Provider Dashboard</strong> — “Sotto for
+    Providers.” Sell anonymized, aggregated quality and adoption data to
+    ElevenLabs, Hume, Cartesia, OpenAI. They’ll pay for competitive
+    intelligence they can’t get elsewhere.</li>
+    <li><strong>Content Intelligence API</strong> — “What does the world
+    want to learn about right now?” Topic demand signals for publishers,
+    educators, content creators.</li>
+    <li><strong>Enterprise Voice Testing</strong> — Brands choosing a
+    TTS provider can run A/B tests on Sotto’s platform with real
+    listener engagement data, instead of internal subjective
+    reviews.</li>
+    </ul>
+    <h3 id="the-network-effect">The network effect</h3>
+    <p>Every podcast generated adds to the content supply. Every listen
+    adds to the behavioral dataset. Every interaction reveals a
+    knowledge gap. Every fork creates a content lineage graph. Every
+    BYOK key reveals provider preference.</p>
+    <p><strong>None of these data sources exist in isolation elsewhere.
+    All of them compound on Sotto.</strong></p>
+    <h2 id="what-were-tracking-today-infrastructure-already-built">What
+    We’re Tracking Today (Infrastructure Already Built)</h2>
+    <p>This isn’t a roadmap — these systems are live in production:</p>
+    <table>
+    <colgroup>
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    <col style="width: 33%" />
+    </colgroup>
+    <thead>
+    <tr>
+    <th style="text-align: left;">System</th>
+    <th style="text-align: left;">Status</th>
+    <th style="text-align: left;">Key metric</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr>
+    <td style="text-align: left;"><code>ApiUsageLog</code> —
+    per-generation cost tracking by provider/model/category</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Exact unit economics per podcast</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>PodcastVoice</code> — voice
+    assignment + provider tracking</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Voice popularity by provider and
+    topic</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>BehavioralEvent</code> — 23
+    event types, client-side buffering, server-side aggregation</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Segment-granularity listening
+    behavior</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>PlaybackSession</code> —
+    pre-aggregated listen sessions</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Completion rates, abandon
+    patterns</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>UserFeature</code> /
+    <code>PodcastFeature</code> — ML feature store with pgvector
+    embeddings</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Personalization vectors for
+    recommendations</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>RecommendationLog</code> — ML
+    scoring + outcome tracking</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">CTR by surface, position, and signal
+    weights</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>VoiceClone</code> +
+    <code>VoicePurchase</code> — marketplace with Stripe Connect</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Creator economy revenue</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>UserTtsKey</code> /
+    <code>UserAiKey</code> — BYOK key tracking</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Provider adoption by user segment</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>PipelineEvent</code> — per-stage
+    timing and failure rates</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">p50/p95 generation latency by
+    stage</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;"><code>ContentFlag</code> +
+    <code>Report</code> + <code>ModerationAction</code> — safety
+    pipeline</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Auto + human moderation</td>
+    </tr>
+    <tr>
+    <td style="text-align: left;">28 admin dashboards across costs,
+    engagement, retention, quality, intelligence</td>
+    <td style="text-align: left;">Live</td>
+    <td style="text-align: left;">Full operational visibility</td>
+    </tr>
+    </tbody>
+    </table>
+    <h2 id="the-pitch-in-one-paragraph">The Pitch in One Paragraph</h2>
+    <p>Every AI company generates content. Google, OpenAI, ElevenLabs,
+    Hume — they’re all racing to produce AI audio. But none of them know
+    which voice wins for which topic, where listeners drop off, what
+    questions people ask at the 4-minute mark of a quantum computing
+    episode, or which TTS provider users prefer when they can choose
+    freely. Sotto does — because we’re the only platform where
+    generation, listening, interaction, and social happen in the same
+    place. Our data gets more valuable with every podcast, every listen,
+    and every interrupted question. That’s not a feature — it’s a
+    compounding moat.</p>
+  </article>
+</body>
+</html>
