@@ -40,6 +40,20 @@ export const LANGUAGE_DISPLAY: Record<string, string> = {
   sv: 'Swedish',
   pl: 'Polish',
   tr: 'Turkish',
+  da: 'Danish',
+  fi: 'Finnish',
+  no: 'Norwegian',
+  cs: 'Czech',
+  ro: 'Romanian',
+  hu: 'Hungarian',
+  el: 'Greek',
+  he: 'Hebrew',
+  th: 'Thai',
+  vi: 'Vietnamese',
+  id: 'Indonesian',
+  ms: 'Malay',
+  uk: 'Ukrainian',
+  ca: 'Catalan',
 };
 
 export const AI_MODEL_DISPLAY: Record<string, string> = {
