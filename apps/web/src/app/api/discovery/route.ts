@@ -5,7 +5,7 @@ import { logUsage } from '@/lib/usage-logger';
 import { extractContent } from '@/lib/extractors';
 import { checkRateLimit } from '@/lib/redis';
 import { getAiKey } from '@/lib/byok';
-import { getAllAiProviderMeta, getModelRequiredPlan } from '@/lib/providers/ai-registry';
+import { getAllAiProviderMeta, getModelRequiredPlan, isValidModelId } from '@/lib/providers/ai-registry';
 import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { isModelAllowedForUser } from '@/lib/tier-features';
 import { prisma } from '@/lib/prisma';
@@ -105,6 +105,13 @@ export async function POST(request: NextRequest) {
     const sess = await auth();
     if (sess?.user?.role !== 'ADMIN') {
       return errorResponse('Forbidden', 403);
+    }
+  }
+
+  // Validate model ID against registry (claude-code:* models are exempt)
+  if (typeof model === 'string' && !model.startsWith('claude-code:')) {
+    if (!isValidModelId(model)) {
+      return errorResponse(`Unknown AI model: "${model}". Check /api/ai-models for available models.`, 400);
     }
   }
 

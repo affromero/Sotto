@@ -488,9 +488,13 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         }
       }
 
+      const errorId = `err_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
+        .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+
       await markPodcastFailed(podcastId, {
         failureReason,
         technicalError: args.failedReason ?? undefined,
+        errorId,
       });
 
       // Queue a podcast failure notification
@@ -499,7 +503,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           userId: podcast.userId,
           type: 'PODCAST_FAILED',
           title: 'Generation Failed',
-          message: failureReason,
+          message: `${failureReason} (ref: ${errorId})`,
           data: { podcastId },
         });
       }
@@ -532,6 +536,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             `*Queue:* ${queueName}`,
             `*Podcast:* ${podcastLabel}`,
             `*Error:* ${errorKind}`,
+            `*Ref:* \`${errorId}\``,
             `\`${techError.substring(0, 500)}\``,
           ].join('\n');
           sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {

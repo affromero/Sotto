@@ -9,7 +9,7 @@ import { checkGenerationGate } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { resolveAutoModel } from '@/lib/auto-model-config';
 import { getTierFeatures, getJobPriority, isModelAllowedForUser } from '@/lib/tier-features';
-import { getModelRequiredPlan, getProviderForModel } from '@/lib/providers/ai-registry';
+import { getModelRequiredPlan, getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { checkSuspension, requireAdmin } from '@/lib/auth-guards';
 import { generatePodcastSlug } from '@/lib/slugify';
@@ -85,6 +85,13 @@ export async function POST(request: NextRequest) {
     const sess = await auth();
     if (sess?.user?.role !== 'ADMIN') {
       return errorResponse('Forbidden', 403);
+    }
+  }
+
+  // Validate model ID against registry (claude-code:* models are exempt)
+  if (parsed.data.aiModel && !parsed.data.aiModel.startsWith('claude-code:')) {
+    if (!isValidModelId(parsed.data.aiModel)) {
+      return errorResponse(`Unknown AI model: "${parsed.data.aiModel}". Check /api/ai-models for available models.`, 400);
     }
   }
 

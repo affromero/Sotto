@@ -219,6 +219,11 @@ export function ImportProgress({ podcastId, isAdmin }: ImportProgressProps) {
             <p className={styles.failedMessage}>
               {podcast.failureReason || 'Import failed. Please try again or contact support if the problem persists.'}
             </p>
+            {podcast.errorId && (
+              <p className={styles.errorId}>
+                Error reference: <code>{podcast.errorId}</code>
+              </p>
+            )}
             {isAdmin && (
               <Link href={`/admin/podcasts?search=${podcast.id}`} className={styles.adminLink}>
                 <Shield size={14} />
