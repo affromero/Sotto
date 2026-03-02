@@ -8,7 +8,7 @@
  */
 import { spawn } from 'child_process';
 import type { TtsProvider, SpeechParams } from '../tts';
-import type { TtsProviderId } from '../tts-registry';
+import { getProviderMeta, type TtsProviderId } from '../tts-registry';
 import { selectKittenVoicePair } from '../../voice-pool';
 import { logger } from '../../logger';
 
@@ -85,6 +85,6 @@ export class KittenTtsProvider implements TtsProvider {
   }
 
   getModelId(): string {
-    return 'kitten-tts-mini-0.8';
+    return getProviderMeta('kittentts').defaultModel;
   }
 }

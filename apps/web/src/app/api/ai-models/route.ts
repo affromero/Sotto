@@ -21,11 +21,14 @@ const PLATFORM_PROVIDER_ENV: Partial<Record<AiProviderId, string>> = {
   openai: 'OPENAI_API_KEY',
 };
 
-const CLAUDE_CODE_MODELS = [
-  { id: 'claude-code:haiku', displayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' as const, isDefault: false, group: 'Claude Code (Local)' },
-  { id: 'claude-code:sonnet', displayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' as const, isDefault: false, group: 'Claude Code (Local)' },
-  { id: 'claude-code:opus', displayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO' as const, isDefault: false, group: 'Claude Code (Local)' },
-];
+const CLAUDE_CODE_MODELS = getAiProviderMeta('claude-code').models.map(m => ({
+  id: `claude-code:${m.id}`,
+  displayName: m.displayName,
+  tier: m.tier,
+  requiredPlan: m.requiredPlan,
+  isDefault: false,
+  group: 'Claude Code (Local)',
+}));
 
 export async function GET(request: NextRequest) {
   const authResult = await authenticateRequest(request);
