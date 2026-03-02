@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BRAND } from '@sotto/shared';
 import { LandingShell } from '@/components/landing/LandingShell';
 import { LandingNav } from '@/components/landing/LandingNav';
 import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
@@ -31,16 +32,15 @@ export default function LandingPage() {
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
-            Where Podcasts Get Social
+            {BRAND.tagline}
           </div>
           <h1 className={styles.heroTitle}>
             Create. Fork.
             <br />
-            <em>Share.</em>
+            <em>Remix. Share.</em>
           </h1>
           <p className={styles.heroSub}>
-            AI or human &mdash; create, discover, interrupt, fork, and remix.
-            The social podcast network.
+            {BRAND.subline}
           </p>
           <AuthCTA source="hero" />
         </div>
@@ -1554,8 +1554,8 @@ export default function LandingPage() {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerBrand}>
-            <span className={styles.footerLogo}>Sotto</span>
-            <p>Where podcasts get social.</p>
+            <span className={styles.footerLogo}>{BRAND.name}</span>
+            <p>{BRAND.tagline}</p>
           </div>
           <div className={styles.footerCols}>
             <div>
