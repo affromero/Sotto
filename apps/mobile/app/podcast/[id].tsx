@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import type { PodcastDetail, SegmentData } from '@sotto/shared';
 import { api } from '../../lib/api';
 import { setupPlayer, loadTrack } from '../../lib/audio-player';
 import { formatTime } from '../../lib/formatters';
+import { usePlaybackTelemetry } from '../../lib/usePlaybackTelemetry';
+import type { PlaybackSnapshot } from '../../lib/usePlaybackTelemetry';
 
 const PLAYBACK_SPEEDS = [0.5, 1, 1.25, 1.5, 2] as const;
 
@@ -48,6 +50,8 @@ export default function PodcastScreen() {
   const [questionText, setQuestionText] = useState('');
   const [progressBarWidth, setProgressBarWidth] = useState(0);
   const [teleprompterEnabled, setTeleprompterEnabled] = useState(false);
+  const lastSeekFromRef = useRef<number | undefined>(undefined);
+  const interactionCountRef = useRef(0);
 
   const { position, duration: trackDuration } = useProgress(1000);
   const playbackState = usePlaybackState();
@@ -104,6 +108,8 @@ export default function PodcastScreen() {
       setQuestionText('');
       Alert.alert('Answer', data.answer ?? 'Your question is being processed.');
       queryClient.invalidateQueries({ queryKey: ['podcast', id] });
+      interactionCountRef.current++;
+      incrementInteraction();
     },
     onError: () => {
       Alert.alert('Error', 'Failed to submit your question. Please try again.');
@@ -141,11 +147,13 @@ export default function PodcastScreen() {
 
   const handleSkipForward = useCallback(async () => {
     const current = await TrackPlayer.getProgress();
+    lastSeekFromRef.current = current.position;
     await TrackPlayer.seekTo(current.position + 15);
   }, []);
 
   const handleSkipBackward = useCallback(async () => {
     const current = await TrackPlayer.getProgress();
+    lastSeekFromRef.current = current.position;
     await TrackPlayer.seekTo(Math.max(0, current.position - 15));
   }, []);
 
@@ -159,10 +167,11 @@ export default function PodcastScreen() {
     async (ratio: number) => {
       const totalDuration = podcast?.duration ?? trackDuration;
       if (totalDuration > 0) {
+        lastSeekFromRef.current = position;
         await TrackPlayer.seekTo(ratio * totalDuration);
       }
     },
-    [podcast?.duration, trackDuration],
+    [podcast?.duration, trackDuration, position],
   );
 
   const handleAskQuestion = useCallback(async () => {
@@ -173,6 +182,23 @@ export default function PodcastScreen() {
       timestamp: position,
     });
   }, [questionText, position, interactMutation]);
+
+  // Playback telemetry
+  const playbackSnapshot: PlaybackSnapshot = useMemo(() => ({
+    podcastId: id,
+    isPlaying,
+    position,
+    duration: podcast?.duration ?? trackDuration,
+    playbackRate: PLAYBACK_SPEEDS[speedIndex],
+    lastSeekFrom: lastSeekFromRef.current,
+    interactionCount: interactionCountRef.current,
+  }), [id, isPlaying, position, podcast?.duration, trackDuration, speedIndex]);
+
+  const clearLastSeekFrom = useCallback(() => {
+    lastSeekFromRef.current = undefined;
+  }, []);
+
+  const { incrementInteraction } = usePlaybackTelemetry(playbackSnapshot, clearLastSeekFrom);
 
   const totalDuration = podcast?.duration ?? trackDuration;
   const progressRatio = totalDuration > 0 ? position / totalDuration : 0;
