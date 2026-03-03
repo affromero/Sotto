@@ -23,6 +23,18 @@ export const setDefaultTrackSchema = z.object({
   voiceTrackId: z.string().nullable(),
 });
 
+export const voiceForkBodySchema = z.object({
+  name: z.string().min(1).max(100),
+  ttsProvider: z.string().optional(),
+  ttsModel: z.string().optional(),
+  voices: z.array(z.object({
+    speaker: z.string(),
+    voiceId: z.string(),
+  })).min(1),
+  paymentIntentIds: z.array(z.string()).optional(),
+  skipPaidVoices: z.boolean().optional(),
+});
+
 /**
  * Discovery chat message validation
  */
