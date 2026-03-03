@@ -15,6 +15,7 @@ export type {
   VoiceCloneSource,
   VoiceRequestStatus,
   VoiceTrackStatus,
+  ProposalStatus,
   FeedbackType,
   FeedbackStatus,
 } from './types/enums';
@@ -34,6 +35,7 @@ export type {
   ScriptTurn,
   VoiceProfile,
   VoiceTrackSummary,
+  VoiceTrackContributor,
 } from './types/podcast';
 
 export type { ReferenceData, VerificationLayerResult } from './types/reference';

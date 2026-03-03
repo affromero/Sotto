@@ -8,6 +8,7 @@ import {
   Heart,
   Bookmark,
   GitFork,
+  Mic,
   Play,
   FileText,
   Download,
@@ -32,6 +33,9 @@ import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
 import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
+import { VoiceRenditionForkModal } from '@/components/player/VoiceRenditionForkModal';
+import { ProposeRenditionButton } from '@/components/player/ProposeRenditionButton';
+import { Contributors } from '@/components/player/Contributors';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
@@ -148,6 +152,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showForkRemix, setShowForkRemix] = useState(
     searchParams.get('fork') === '1' && !isOwner && isAuthenticated
   );
+  const [showReVoice, setShowReVoice] = useState(false);
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [liveStatus, setLiveStatus] = useState(podcast.status);
   const [retrying, setRetrying] = useState(false);
@@ -173,9 +178,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       title: string;
       user: { name: string | null; handle: string | null };
     }>;
-    descendants: Array<{
+    forks: Array<{
       id: string;
       title: string;
+      isVoiceOnlyFork?: boolean;
       user: { name: string | null; handle: string | null };
     }>;
   } | null>(null);
@@ -653,6 +659,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               isOwner={isOwner}
             />
           )}
+          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
+            podcast.voiceTracks.some(t => t.status === 'READY') && (
+            <ProposeRenditionButton
+              podcastId={podcast.id}
+              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
+              originalPodcastId={podcast.forkedFrom.id}
+              originalTitle={podcast.forkedFrom.title}
+            />
+          )}
         </section>
       )}
 
@@ -709,6 +724,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             >
               <GitFork size={18} />
               <span>Fork</span>
+            </button>
+          )}
+          {!isOwner && isAuthenticated && isReady && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => setShowReVoice(true)}
+              aria-label="Re-voice this podcast"
+              type="button"
+            >
+              <Mic size={18} />
+              <span>Re-voice</span>
             </button>
           )}
           <button
@@ -794,6 +820,23 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           )}
         </div>
       </div>
+
+      {/* Contributors (from accepted re-voice proposals) */}
+      {(() => {
+        const contributorMap = new Map<string, { contributor: NonNullable<(typeof podcast.voiceTracks)[0]['contributor']>; count: number }>();
+        for (const t of podcast.voiceTracks) {
+          if (t.contributor && t.proposalStatus === 'ACCEPTED') {
+            const existing = contributorMap.get(t.contributor.id);
+            if (existing) {
+              existing.count++;
+            } else {
+              contributorMap.set(t.contributor.id, { contributor: t.contributor, count: 1 });
+            }
+          }
+        }
+        const contributors = Array.from(contributorMap.values());
+        return contributors.length > 0 ? <Contributors contributors={contributors} /> : null;
+      })()}
 
       {/* Interrupt */}
       {isReady && isAuthenticated && (
@@ -897,7 +940,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Fork Lineage */}
       {(podcast.forkedFrom || podcast.forks.length > 0) && (
         <section className={styles.lineageSection}>
-          {lineageData && lineageData.ancestors.length + lineageData.descendants.length >= 3 ? (
+          {lineageData && lineageData.ancestors.length + lineageData.forks.length >= 3 ? (
             <ForkGraph
               ancestors={lineageData.ancestors}
               current={{
@@ -905,7 +948,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 title: podcast.title,
                 user: { name: podcast.user.name, handle: podcast.user.handle ?? null },
               }}
-              forks={lineageData.descendants}
+              forks={lineageData.forks}
             />
           ) : (
             <ForkLineage
@@ -941,6 +984,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         onClose={() => setShowForkRemix(false)}
         podcastId={podcast.id}
         podcastTitle={podcast.title}
+      />
+
+      {/* Re-voice Modal */}
+      <VoiceRenditionForkModal
+        isOpen={showReVoice}
+        onClose={() => setShowReVoice(false)}
+        podcastId={podcast.id}
+        podcastTitle={podcast.title}
+        speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
       />
 
       {/* Add to Collection Modal */}

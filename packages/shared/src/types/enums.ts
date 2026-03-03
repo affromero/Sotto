@@ -133,6 +133,8 @@ export type VoiceTrackStatus =
   | 'FAILED'
   | 'STALE';
 
+export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
+
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
 export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'ARCHIVED';

@@ -44,6 +44,7 @@ function resultToPodcastSummary(result: ExploreResult): PodcastSummary {
     source: 'WEB',
     isHumanContent: false,
     forkedFromId: null,
+    isVoiceOnlyFork: false,
     ownerIsPro: result.ownerIsPro ?? false,
     user: {
       ...result.user,
