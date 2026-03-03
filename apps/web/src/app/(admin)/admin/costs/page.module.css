@@ -29,6 +29,12 @@
   }
 }
 
+/* Numeric cells right-aligned */
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Page-specific */
 
 .warningCard {
