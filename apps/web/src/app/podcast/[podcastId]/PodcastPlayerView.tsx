@@ -8,6 +8,7 @@ import {
   Heart,
   Bookmark,
   GitFork,
+  Mic,
   Play,
   FileText,
   Download,
@@ -32,6 +33,7 @@ import { ForkAttribution } from '@/components/player/ForkAttribution';
 import { ForkLineage } from '@/components/player/ForkLineage';
 import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
+import { VoiceRenditionForkModal } from '@/components/player/VoiceRenditionForkModal';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
@@ -148,6 +150,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showForkRemix, setShowForkRemix] = useState(
     searchParams.get('fork') === '1' && !isOwner && isAuthenticated
   );
+  const [showReVoice, setShowReVoice] = useState(false);
   const [showAddToCollection, setShowAddToCollection] = useState(false);
   const [liveStatus, setLiveStatus] = useState(podcast.status);
   const [retrying, setRetrying] = useState(false);
@@ -711,6 +714,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <span>Fork</span>
             </button>
           )}
+          {!isOwner && isAuthenticated && isReady && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => setShowReVoice(true)}
+              aria-label="Re-voice this podcast"
+              type="button"
+            >
+              <Mic size={18} />
+              <span>Re-voice</span>
+            </button>
+          )}
           <button
             className={`${styles.actionBtn} ${saved ? styles.actionBtnActive : ''}`}
             onClick={handleSave}
@@ -941,6 +955,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         onClose={() => setShowForkRemix(false)}
         podcastId={podcast.id}
         podcastTitle={podcast.title}
+      />
+
+      {/* Re-voice Modal */}
+      <VoiceRenditionForkModal
+        isOpen={showReVoice}
+        onClose={() => setShowReVoice(false)}
+        podcastId={podcast.id}
+        podcastTitle={podcast.title}
+        speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
       />
 
       {/* Add to Collection Modal */}
