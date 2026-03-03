@@ -99,7 +99,7 @@ export interface PrefixBreakdown {
 
 export async function getLatestPrefixBreakdown(): Promise<PrefixBreakdown[]> {
   const snapshot = await prisma.r2UsageSnapshot.findFirst({
-    where: { prefixBreakdown: { not: null } },
+    where: { prefixBreakdown: { not: { equals: undefined } } },
     orderBy: { createdAt: 'desc' },
     select: { prefixBreakdown: true },
   });
