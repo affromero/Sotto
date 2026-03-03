@@ -78,15 +78,6 @@ describe('AI Providers', () => {
     });
   });
 
-  describe('Groq', () => {
-    it.skipIf(!process.env.GROQ_API_KEY)('validates credentials', async () => {
-      const { validateAiProviderCredentials } = await import('@/lib/providers/ai-registry');
-      const valid = await validateAiProviderCredentials('groq', {
-        apiKey: process.env.GROQ_API_KEY!,
-      });
-      expect(valid).toBe(true);
-    });
-  });
 });
 
 // ---------------------------------------------------------------------------

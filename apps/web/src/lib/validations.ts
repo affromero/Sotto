@@ -345,7 +345,7 @@ export const importPodcastSchema = z.object({
   topic: z.string().max(5000).optional(),
   isHumanContent: z.boolean().default(false),
   sourcePlatform: z.string().min(1).max(50),
-  sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().max(100).optional(),
 });
 

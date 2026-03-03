@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     // Admins see all platform-configured API providers (from env vars) + Claude Code local
     if (isAdmin) {
       const platformModels = getAllAiProviderMeta()
-        .filter((p) => p.id !== 'groq' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
+        .filter((p) => process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
         .flatMap((p) =>
           p.models.map((m) => ({
             id: m.id,
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
     const proSet = new Set(proModels);
 
     const platformModels = getAllAiProviderMeta()
-      .filter((p) => p.id !== 'groq' && p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
+      .filter((p) => p.id !== 'claude-code' && process.env[PLATFORM_PROVIDER_ENV[p.id] ?? ''])
       .flatMap((p) =>
         p.models
           .filter((m) => proSet.has(m.id))
@@ -111,10 +111,10 @@ export async function GET(request: NextRequest) {
   }
 
   // BYOK keys present — show models for every valid provider, grouped by quality tier
-  // Deduplicate by provider (take first valid key per provider) and exclude Groq (STT-only)
+  // Deduplicate by provider (take first valid key per provider)
   const seenProviders = new Set<string>();
   const uniqueKeys = validKeys.filter((key) => {
-    if (key.provider === 'groq' || seenProviders.has(key.provider)) return false;
+    if (seenProviders.has(key.provider)) return false;
     seenProviders.add(key.provider);
     return true;
   });

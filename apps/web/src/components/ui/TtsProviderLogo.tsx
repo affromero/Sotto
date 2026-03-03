@@ -4,7 +4,7 @@
  */
 
 interface TtsProviderLogoProps {
-  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'anthropic' | 'groq' | 'together' | 'deepgram' | 'assemblyai';
+  provider: 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate' | 'minimax' | 'anthropic' | 'together' | 'deepgram' | 'assemblyai';
   size?: number;
   className?: string;
 }
@@ -105,19 +105,6 @@ export function TtsProviderLogo({ provider, size = 24, className }: TtsProviderL
           />
         </svg>
       );
-    case 'groq':
-      return (
-        <svg {...props}>
-          <rect width="24" height="24" rx="4" fill="#F55036" />
-          <path
-            d="M7 12h3l1.5-4 3 8 1.5-4h3"
-            stroke="#fff"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      );
     case 'together':
       return (
         <svg {...props}>
@@ -153,7 +140,6 @@ const PROVIDER_NAMES: Record<string, string> = {
   replicate: 'Replicate',
   minimax: 'MiniMax',
   anthropic: 'Anthropic',
-  groq: 'Groq',
   together: 'Together AI',
   deepgram: 'Deepgram',
   assemblyai: 'AssemblyAI',

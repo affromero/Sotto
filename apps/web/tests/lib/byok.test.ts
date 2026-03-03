@@ -93,13 +93,6 @@ describe('byok encryption/decryption', () => {
       expect(decrypted).toBe(key);
     });
 
-    it('preserves Groq key format (gsk_...)', () => {
-      const key = 'gsk_abc123def456ghi789jkl012mno345pqr678stu901';
-      const decrypted = decryptApiKey(encryptApiKey(key));
-
-      expect(decrypted).toBe(key);
-    });
-
     it('preserves very long keys (500 chars)', () => {
       const key = 'sk-' + 'a'.repeat(497);
       const decrypted = decryptApiKey(encryptApiKey(key));

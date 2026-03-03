@@ -49,8 +49,8 @@ vi.mock('@/lib/auto-model-config', () => ({
     aiModel: 'claude-test-model',
     ttsProvider: 'kittentts',
     ttsModel: 'kitten-tts-mini-0.8',
-    sttProvider: 'groq',
-    sttModel: 'whisper-large-v3-turbo',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
   }),
 }));
 

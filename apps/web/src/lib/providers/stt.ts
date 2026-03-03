@@ -39,13 +39,6 @@ const OPENAI_WHISPER_CONFIG: WhisperProviderConfig = {
   name: 'OpenAI Whisper',
 };
 
-const GROQ_WHISPER_CONFIG: WhisperProviderConfig = {
-  baseURL: 'https://api.groq.com/openai/v1',
-  model: getSttProviderMeta('groq').defaultModel,
-  envVar: 'GROQ_API_KEY',
-  name: 'Groq Whisper',
-};
-
 const TOGETHER_WHISPER_CONFIG: WhisperProviderConfig = {
   baseURL: 'https://api.together.xyz/v1',
   model: getSttProviderMeta('together').defaultModel,
@@ -532,17 +525,11 @@ import type { SttProviderId } from '@sotto/shared';
  * Create an STT provider instance
  */
 export function createSttProvider(provider?: SttProviderId, apiKey?: string, model?: string): SttProvider {
-  const target = provider ?? 'groq';
+  const target = provider ?? 'openai';
 
   switch (target) {
     case 'elevenlabs':
       return new ElevenLabsScribeProvider(apiKey, model);
-    case 'groq': {
-      const config = model
-        ? { ...GROQ_WHISPER_CONFIG, model }
-        : GROQ_WHISPER_CONFIG;
-      return new OpenAIWhisperProvider(apiKey, config);
-    }
     case 'together': {
       const config = model
         ? { ...TOGETHER_WHISPER_CONFIG, model }

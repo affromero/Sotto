@@ -40,12 +40,12 @@ import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 // ---- Helpers ----
 
 const autoModelDefaults = {
-  aiProvider: 'groq',
-  aiModel: 'llama-3.1-8b-instant',
+  aiProvider: 'anthropic',
+  aiModel: 'claude-haiku-4-5-20251001',
   ttsProvider: 'kittentts',
   ttsModel: 'kitten-tts-mini-0.8',
-  sttProvider: 'groq',
-  sttModel: 'whisper-large-v3-turbo',
+  sttProvider: 'openai',
+  sttModel: 'whisper-1',
 };
 
 const baseFreeTierConfig = {
@@ -69,8 +69,8 @@ describe('selectFreeTierProviders', () => {
       const result = await selectFreeTierProviders('user-001');
 
       expect(result).toEqual({
-        aiProvider: 'groq',
-        aiModel: 'llama-3.1-8b-instant',
+        aiProvider: 'anthropic',
+        aiModel: 'claude-haiku-4-5-20251001',
         aiQuota: 3,
         ttsProvider: 'kittentts',
         ttsModel: 'kitten-tts-mini-0.8',
@@ -122,8 +122,8 @@ describe('selectFreeTierProviders', () => {
 
       const result = await selectFreeTierProviders('user-001');
 
-      expect(result.aiProvider).toBe('groq');
-      expect(result.aiModel).toBe('llama-3.1-8b-instant');
+      expect(result.aiProvider).toBe('anthropic');
+      expect(result.aiModel).toBe('claude-haiku-4-5-20251001');
     });
   });
 });

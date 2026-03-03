@@ -67,8 +67,6 @@ function getSttPlatformKey(provider: string): string | undefined {
   switch (provider) {
     case 'openai':
       return process.env.OPENAI_API_KEY;
-    case 'groq':
-      return process.env.GROQ_API_KEY;
     case 'elevenlabs':
       return process.env.ELEVENLABS_API_KEY;
     case 'together':
@@ -313,7 +311,7 @@ export async function POST(request: NextRequest) {
       let sttKey: string | undefined;
 
       if (keySource === 'byok') {
-        if (provider === 'openai' || provider === 'groq' || provider === 'together' || provider === 'deepgram' || provider === 'assemblyai') {
+        if (provider === 'openai' || provider === 'together' || provider === 'deepgram' || provider === 'assemblyai') {
           const keyData = await getAiKey(adminId, provider as AiProviderId);
           if (!keyData) {
             return NextResponse.json({
