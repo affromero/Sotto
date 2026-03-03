@@ -90,18 +90,18 @@ export async function fetchBucketUsage(bucket: string): Promise<R2BucketUsage> {
 
   const json = await res.json() as {
     result: {
-      payloadSize: number;
-      metadataSize: number;
-      objectCount: number;
-      uploadCount: number;
+      payloadSize: string | number;
+      metadataSize: string | number;
+      objectCount: string | number;
+      uploadCount: string | number;
     };
   };
 
   return {
-    payloadSizeBytes: json.result.payloadSize,
-    metadataSizeBytes: json.result.metadataSize,
-    objectCount: json.result.objectCount,
-    uploadCount: json.result.uploadCount,
+    payloadSizeBytes: Number(json.result.payloadSize),
+    metadataSizeBytes: Number(json.result.metadataSize),
+    objectCount: Number(json.result.objectCount),
+    uploadCount: Number(json.result.uploadCount),
   };
 }
 
