@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { checkAutoTweetThreshold } from '@/lib/twitter-auto-tweet';
+import { addJob, featureComputationQueue, JobType } from '@/lib/queue';
 import type { IngestEventsPayload } from '@/lib/queue';
 
 /** Lazy-load geoip-lite to avoid top-level fs.readFileSync at import time. */
@@ -228,6 +229,17 @@ export async function processEventIngestion(
               completionPercent: 100,
             },
           });
+
+          // Fire-and-forget: recompute user + podcast ML features
+          if (userId) {
+            addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+              scope: 'user' as const, targetId: userId,
+            }, { jobId: `fc-user-${userId}` }).catch(() => {});
+          }
+          addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+            scope: 'podcast' as const, targetId: podcastId,
+          }, { jobId: `fc-podcast-${podcastId}` }).catch(() => {});
+
           break;
         }
 
@@ -256,6 +268,17 @@ export async function processEventIngestion(
               interruptCount: data.interactionCount ?? playbackSession.interruptCount,
             },
           });
+
+          // Fire-and-forget: recompute user + podcast ML features
+          if (userId) {
+            addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+              scope: 'user' as const, targetId: userId,
+            }, { jobId: `fc-user-${userId}` }).catch(() => {});
+          }
+          addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+            scope: 'podcast' as const, targetId: podcastId,
+          }, { jobId: `fc-podcast-${podcastId}` }).catch(() => {});
+
           break;
         }
       }

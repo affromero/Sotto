@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { isClaudeAvailable } from '@/lib/claude-code-client';
+import { ALL_QUEUE_NAMES } from '@/lib/queue';
 
 export type CheckResult = { status: string; latencyMs?: number; detail?: string };
 
@@ -14,21 +15,6 @@ export interface HealthData {
   vapid?: boolean;
   env?: Record<string, boolean>;
 }
-
-const HEALTH_QUEUE_NAMES = [
-  'content-extraction',
-  'script-generation',
-  'script-verification',
-  'reference-validation',
-  'audio-generation',
-  'audio-stitching',
-  'interactions',
-  'segment-regeneration',
-  'notifications',
-  'pdf-generation',
-  'twitter-mentions',
-  'twitter-reply',
-];
 
 export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
   let healthy = true;
@@ -161,7 +147,7 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     try {
       const redis = getRedisClient();
       const queues: Record<string, { waiting: number; active: number; failed: number }> = {};
-      for (const name of HEALTH_QUEUE_NAMES) {
+      for (const name of ALL_QUEUE_NAMES) {
         const [waiting, active, failed] = await Promise.all([
           redis.llen(`bull:${name}:wait`),
           redis.llen(`bull:${name}:active`),
