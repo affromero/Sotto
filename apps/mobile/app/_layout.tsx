@@ -19,6 +19,7 @@ import { colors } from '@sotto/shared';
 import { isAuthenticated, onAuthSuccess } from '../lib/auth';
 import { api, onAuthRevoked } from '../lib/api';
 import { registerForPushNotifications } from '../lib/notifications';
+import { EventProvider } from '../components/EventProvider';
 
 const queryClient = new QueryClient();
 
@@ -125,19 +126,21 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
-          <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: colors.background },
-              headerTintColor: colors.textPrimary,
-              contentStyle: { backgroundColor: colors.background },
-            }}
-          >
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth/login" options={{ headerShown: false }} />
-            <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="user/[userId]" options={{ title: '' }} />
-          </Stack>
+          <EventProvider>
+            <StatusBar style="dark" />
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.textPrimary,
+                contentStyle: { backgroundColor: colors.background },
+              }}
+            >
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+              <Stack.Screen name="podcast/[id]" options={{ headerShown: false }} />
+              <Stack.Screen name="user/[userId]" options={{ title: '' }} />
+            </Stack>
+          </EventProvider>
         </QueryClientProvider>
       </GestureHandlerRootView>
     </SafeAreaProvider>
