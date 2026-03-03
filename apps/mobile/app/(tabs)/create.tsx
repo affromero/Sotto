@@ -257,7 +257,10 @@ export default function CreateScreen() {
               const parsed = JSON.parse(json);
 
               if (parsed.error) {
-                setDiscoveryError(parsed.error);
+                const errMsg = parsed.requestId
+                  ? `${parsed.error} (${parsed.requestId})`
+                  : parsed.error;
+                setDiscoveryError(errMsg);
                 break;
               }
 
