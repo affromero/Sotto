@@ -160,6 +160,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           title: true,
           remixNote: true,
           createdAt: true,
+          isVoiceOnlyFork: true,
           user: {
             select: {
               id: true,
@@ -192,8 +193,14 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           audioUrl: true,
           duration: true,
           ttsProvider: true,
+          ttsModel: true,
           failureReason: true,
           voices: { select: { speaker: true, voiceId: true } },
+          proposalStatus: true,
+          proposalMessage: true,
+          contributor: {
+            select: { id: true, name: true, handle: true, image: true },
+          },
         },
       },
     },
@@ -270,7 +277,10 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       Promise.all(
         (isOwner
           ? podcast.voiceTracks
-          : podcast.voiceTracks.filter((t) => t.status === 'READY')
+          : podcast.voiceTracks.filter((t) =>
+              t.status === 'READY' &&
+              (t.proposalStatus === null || t.proposalStatus === 'ACCEPTED')
+            )
         ).map(async (t) => ({
           id: t.id,
           name: t.name,
@@ -278,8 +288,12 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           audioUrl: await resolveAudioUrl(t.audioUrl, visibility),
           duration: t.duration,
           ttsProvider: t.ttsProvider,
+          ttsModel: t.ttsModel,
           failureReason: t.failureReason,
           voices: t.voices,
+          contributor: t.contributor,
+          proposalStatus: t.proposalStatus,
+          proposalMessage: t.proposalMessage,
         }))
       ),
     ]);
@@ -310,6 +324,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     aiAutoResolved: podcast.aiAutoResolved,
     ttsAutoResolved: podcast.ttsAutoResolved,
     forkedFromId: podcast.forkedFromId,
+    isVoiceOnlyFork: podcast.isVoiceOnlyFork,
     ownerIsPro: false,
     remixNote: podcast.remixNote,
     failureReason: podcast.failureReason,
@@ -337,6 +352,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       id: f.id,
       title: f.title,
       remixNote: f.remixNote,
+      isVoiceOnlyFork: f.isVoiceOnlyFork,
       createdAt: f.createdAt.toISOString(),
       user: f.user,
     })),

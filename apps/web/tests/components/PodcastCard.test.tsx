@@ -38,6 +38,7 @@ const mockPodcast: PodcastSummary = {
   isHumanContent: false,
   forkedFromId: null,
   forkedFrom: null,
+  isVoiceOnlyFork: false,
   ownerIsPro: true,
   user: {
     id: 'user-1',

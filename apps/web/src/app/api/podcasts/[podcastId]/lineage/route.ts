@@ -56,6 +56,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       title: true,
       remixNote: true,
       createdAt: true,
+      isVoiceOnlyFork: true,
       user: { select: { id: true, name: true, handle: true, image: true } },
     },
   });

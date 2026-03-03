@@ -16,6 +16,7 @@ interface ForkLineageProps {
     title: string;
     remixNote: string | null;
     createdAt: string;
+    isVoiceOnlyFork?: boolean;
     user: { id: string; name: string | null; handle: string | null; image: string | null };
   }>;
 }
@@ -89,7 +90,7 @@ export function ForkLineage({ ancestors, forks }: ForkLineageProps) {
               const userImage = fork.user.image || '/default-avatar.png';
 
               return (
-                <li key={fork.id} className={styles.forkItem}>
+                <li key={fork.id} className={`${styles.forkItem} ${fork.isVoiceOnlyFork ? styles.voiceForkItem : ''}`}>
                   <Link href={`/podcast/${fork.id}`} className={styles.forkLink}>
                     <div className={styles.forkHeader}>
                       <div className={styles.forkUser}>
@@ -105,6 +106,15 @@ export function ForkLineage({ ancestors, forks }: ForkLineageProps) {
                           <span className={styles.forkDate} suppressHydrationWarning>{formatDate(fork.createdAt)}</span>
                         </div>
                       </div>
+                      {fork.isVoiceOnlyFork && (
+                        <span className={styles.voiceBadge}>
+                          <svg width="12" height="12" viewBox="0 0 16 18" fill="none" aria-hidden="true">
+                            <path d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" fill="currentColor" />
+                            <path d="M13 8a5 5 0 0 1-10 0M8 13v3M5 16h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          Re-voice
+                        </span>
+                      )}
                     </div>
                     <h4 className={styles.forkTitle}>{fork.title}</h4>
                     {fork.remixNote && <p className={styles.remixNote}>{fork.remixNote}</p>}

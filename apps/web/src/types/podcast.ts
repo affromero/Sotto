@@ -30,6 +30,7 @@ export interface PodcastSummary {
   ttsAutoResolved?: boolean | null;
   forkedFromId: string | null;
   forkedFrom?: { id: string; title: string } | null;
+  isVoiceOnlyFork?: boolean;
   ownerIsPro: boolean;
   user: {
     id: string;
@@ -56,6 +57,7 @@ export interface ForkSummary {
   id: string;
   title: string;
   remixNote: string | null;
+  isVoiceOnlyFork?: boolean;
   createdAt: string;
   user: {
     id: string;

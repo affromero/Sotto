@@ -26,6 +26,7 @@ export interface PodcastSummary {
   ttsAutoResolved?: boolean | null;
   forkedFromId: string | null;
   forkedFrom?: { id: string; title: string } | null;
+  isVoiceOnlyFork: boolean;
   ownerIsPro?: boolean;
   user: {
     id: string;
@@ -52,6 +53,7 @@ export interface ForkSummary {
   id: string;
   title: string;
   remixNote: string | null;
+  isVoiceOnlyFork: boolean;
   createdAt: string;
   user: {
     id: string;
@@ -79,6 +81,13 @@ export interface PodcastDetail extends PodcastSummary {
   defaultVoiceTrackId: string | null;
 }
 
+export interface VoiceTrackContributor {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  image: string | null;
+}
+
 export interface VoiceTrackSummary {
   id: string;
   name: string;
@@ -86,8 +95,12 @@ export interface VoiceTrackSummary {
   audioUrl: string | null;
   duration: number | null;
   ttsProvider: string | null;
+  ttsModel: string | null;
   failureReason: string | null;
   voices: Array<{ speaker: string; voiceId: string }>;
+  contributor: VoiceTrackContributor | null;
+  proposalStatus: 'PENDING' | 'ACCEPTED' | 'REJECTED' | null;
+  proposalMessage: string | null;
 }
 
 export interface SegmentData {

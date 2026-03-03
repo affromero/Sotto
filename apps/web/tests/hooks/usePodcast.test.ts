@@ -16,6 +16,7 @@ const mockPodcastData: PodcastDetail = {
   source: 'WEB' as const,
   isHumanContent: false,
   forkedFromId: null,
+  isVoiceOnlyFork: false,
   ownerIsPro: false,
   remixNote: null,
   failureReason: null,

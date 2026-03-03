@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { createVoiceTrackSchema } from '@/lib/validations';
+import { voiceForkBodySchema } from '@/lib/validations';
 import { voiceTrackAudioQueue, addJob, JobType } from '@/lib/queue';
-import { getTierFeatures } from '@/lib/tier-features';
 import { checkGenerationGate } from '@/lib/generation-gate';
 import { computeVoiceCharges } from '@/lib/voice-pricing';
 import { resolveTtsProvider } from '@/lib/providers';
 import { checkRateLimit } from '@/lib/redis';
 import { checkSuspension } from '@/lib/auth-guards';
+import { generatePodcastSlug } from '@/lib/slugify';
+import { errorResponse } from '@/lib/api-response';
 import type { TtsProviderId } from '@/lib/providers/tts-registry';
 import type { GenerateVoiceTrackAudioPayload } from '@/lib/queue';
 
-import { errorResponse } from '@/lib/api-response';
 type RouteParams = { params: Promise<{ podcastId: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -27,42 +27,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   const userId = session.user.id;
 
-  // Verify podcast ownership
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
-    select: {
-      userId: true,
-      status: true,
-      segments: { orderBy: { order: 'asc' as const }, select: { id: true, speaker: true, text: true, order: true } },
-    },
-  });
-
-  if (!podcast) {
-    return errorResponse('Podcast not found', 404);
-  }
-  if (podcast.userId !== userId) {
-    return errorResponse('Forbidden', 403);
-  }
-  if (podcast.status !== 'READY') {
-    return errorResponse('Podcast must be in READY status', 400);
-  }
-
-  // Check tier features
-  const gate = await checkGenerationGate(userId);
-  const features = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, session.user.role);
-
-  if (!features.voiceTracksEnabled) {
-    return errorResponse('Voice tracks are not available on your plan. Upgrade to Pro or add your own API keys.', 403);
-  }
-
-  // Check track limit
-  const existingTrackCount = await prisma.voiceTrack.count({
-    where: { podcastId },
-  });
-  if (existingTrackCount >= features.maxVoiceTracks) {
-    return errorResponse(`Maximum ${features.maxVoiceTracks} voice tracks per podcast.`, 403);
-  }
-
   // Rate limits
   const hourly = await checkRateLimit(`generate:hour:${userId}`, 20, 3600);
   if (!hourly.allowed) {
@@ -73,6 +37,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Rate limit exceeded: max 100 generations per day.', 429);
   }
 
+  // Generation gate
+  const gate = await checkGenerationGate(userId);
   if (!gate.allowed) {
     const msg = gate.reason === 'generation_in_progress'
       ? 'A podcast is already generating. Wait for it to finish before starting another.'
@@ -82,19 +48,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Parse body
   const body = await request.json().catch(() => ({}));
-  const parsed = createVoiceTrackSchema.safeParse(body);
+  const parsed = voiceForkBodySchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse(parsed.error.flatten(), 400);
   }
 
   const { name, ttsProvider, ttsModel, voices, paymentIntentIds, skipPaidVoices } = parsed.data;
 
+  // Fetch source podcast
+  const sourcePodcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: {
+      id: true,
+      userId: true,
+      title: true,
+      topic: true,
+      status: true,
+      visibility: true,
+      segments: {
+        orderBy: { order: 'asc' as const },
+        select: { id: true, speaker: true, text: true, order: true },
+      },
+    },
+  });
+
+  if (!sourcePodcast) {
+    return errorResponse('Podcast not found', 404);
+  }
+  if (sourcePodcast.visibility !== 'PUBLIC') {
+    return errorResponse('Only public podcasts can be re-voiced', 403);
+  }
+  if (sourcePodcast.status !== 'READY') {
+    return errorResponse('Only podcasts with READY status can be re-voiced', 400);
+  }
+
   // Check paid voices
   const voicesWithIds = voices.filter(v => !!v.voiceId);
   if (!skipPaidVoices && !paymentIntentIds && voicesWithIds.length > 0) {
     const voiceCharges = await computeVoiceCharges(userId, voicesWithIds);
     if (voiceCharges.length > 0) {
-      return NextResponse.json({ requiresPayment: true, voiceCharges }, { status: 402 });
+      return NextResponse.json(
+        { requiresPayment: true, voiceCharges, sourceTitle: sourcePodcast.title },
+        { status: 402 },
+      );
     }
   }
 
@@ -123,11 +119,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     plan: gate.isProUser ? 'PRO' : 'FREE',
   });
 
-  // Create voice track, voice assignments, and segments in a transaction
-  const voiceTrack = await prisma.$transaction(async (tx) => {
+  // Create voice-only fork podcast + voice track in a transaction
+  const { forkPodcast, voiceTrack } = await prisma.$transaction(async (tx) => {
+    const slug = await generatePodcastSlug(`${name} — ${sourcePodcast.title}`, userId, tx);
+    const newPodcast = await tx.podcast.create({
+      data: {
+        userId,
+        title: `${name} — ${sourcePodcast.title}`,
+        topic: sourcePodcast.topic,
+        slug,
+        status: 'GENERATING_AUDIO',
+        visibility: 'PRIVATE',
+        forkedFromId: podcastId,
+        isVoiceOnlyFork: true,
+        ttsProvider: providerId,
+        ttsModel: ttsModel || null,
+      },
+    });
+
+    // Copy speaker list from parent as PodcastVoice records
+    await tx.podcastVoice.createMany({
+      data: resolvedVoices.map(v => ({
+        podcastId: newPodcast.id,
+        speaker: v.speaker,
+        voiceId: v.voiceId,
+        provider: providerId,
+      })),
+    });
+
+    // Create VoiceTrack
     const track = await tx.voiceTrack.create({
       data: {
-        podcastId,
+        podcastId: newPodcast.id,
         name,
         status: 'GENERATING_AUDIO',
         ttsProvider: providerId,
@@ -135,7 +158,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    // Create voice assignments
+    // Create VoiceTrackVoice assignments
     await tx.voiceTrackVoice.createMany({
       data: resolvedVoices.map(v => ({
         voiceTrackId: track.id,
@@ -145,23 +168,29 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       })),
     });
 
-    // Create voice track segments for each podcast segment
+    // Create VoiceTrackSegment rows referencing parent's Segment IDs
     await tx.voiceTrackSegment.createMany({
-      data: podcast.segments.map(seg => ({
+      data: sourcePodcast.segments.map(seg => ({
         voiceTrackId: track.id,
         segmentId: seg.id,
         order: seg.order,
       })),
     });
 
-    return track;
+    // Increment parent's forkCount
+    await tx.podcast.update({
+      where: { id: podcastId },
+      data: { forkCount: { increment: 1 } },
+    });
+
+    return { forkPodcast: newPodcast, voiceTrack: track };
   });
 
   // Link VoicePurchase records
   if (paymentIntentIds) {
     await prisma.voicePurchase.updateMany({
       where: { stripePaymentIntent: { in: paymentIntentIds } },
-      data: { podcastId },
+      data: { podcastId: forkPodcast.id },
     });
   }
 
@@ -173,11 +202,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   for (const vtSeg of vtSegments) {
-    const podcastSeg = podcast.segments.find(s => s.id === vtSeg.segmentId);
+    const podcastSeg = sourcePodcast.segments.find(s => s.id === vtSeg.segmentId);
     if (!podcastSeg) continue;
 
     const payload: GenerateVoiceTrackAudioPayload = {
-      podcastId,
+      podcastId: forkPodcast.id,
       voiceTrackId: voiceTrack.id,
       voiceTrackSegmentId: vtSeg.id,
       segmentId: vtSeg.segmentId,
@@ -187,67 +216,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     await addJob(voiceTrackAudioQueue, JobType.GENERATE_VOICE_TRACK_AUDIO, payload);
   }
 
-  return NextResponse.json({ id: voiceTrack.id, status: voiceTrack.status }, { status: 201 });
-}
-
-export async function GET(_request: NextRequest, { params }: RouteParams) {
-  const { podcastId } = await params;
-
-  // Auth is optional — public podcasts visible to all
-  const session = await auth();
-  const userId = session?.user?.id;
-
-  const podcast = await prisma.podcast.findUnique({
-    where: { id: podcastId },
-    select: { userId: true, visibility: true },
-  });
-
-  if (!podcast) {
-    return errorResponse('Podcast not found', 404);
-  }
-
-  if (podcast.visibility === 'PRIVATE' && podcast.userId !== userId) {
-    return errorResponse('Forbidden', 403);
-  }
-
-  const isOwner = podcast.userId === userId;
-
-  const tracks = await prisma.voiceTrack.findMany({
-    where: {
-      podcastId,
-      ...(isOwner
-        ? {}
-        : {
-            status: 'READY',
-            OR: [
-              { proposalStatus: null },
-              { proposalStatus: 'ACCEPTED' },
-            ],
-          }),
-    },
-    orderBy: { createdAt: 'asc' },
-    select: {
-      id: true,
-      name: true,
-      status: true,
-      audioUrl: true,
-      duration: true,
-      ttsProvider: true,
-      ttsModel: true,
-      failureReason: isOwner ? true : false,
-      voices: { select: { speaker: true, voiceId: true } },
-      proposalStatus: true,
-      proposalMessage: true,
-      contributor: {
-        select: {
-          id: true,
-          name: true,
-          handle: true,
-          image: true,
-        },
-      },
-    },
-  });
-
-  return NextResponse.json(tracks);
+  return NextResponse.json(
+    { id: forkPodcast.id, voiceTrackId: voiceTrack.id },
+    { status: 201 },
+  );
 }
