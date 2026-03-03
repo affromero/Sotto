@@ -33,18 +33,6 @@ const STT_PROVIDERS: Record<SttProviderId, SttProviderMeta> = {
     platformCostPerMinute: 0.006,
   },
 
-  groq: {
-    id: 'groq',
-    displayName: 'Groq',
-    defaultModel: 'whisper-large-v3-turbo',
-    models: [
-      { id: 'whisper-large-v3-turbo', displayName: 'Whisper Large v3 Turbo', tier: 'fast' },
-      { id: 'whisper-large-v3', displayName: 'Whisper Large v3', tier: 'best' },
-      { id: 'distil-whisper-large-v3-en', displayName: 'Distil Whisper Large v3 (EN)', tier: 'fast' },
-    ],
-    platformCostPerMinute: 0,
-  },
-
   elevenlabs: {
     id: 'elevenlabs',
     displayName: 'ElevenLabs',

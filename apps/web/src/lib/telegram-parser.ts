@@ -1,7 +1,8 @@
 import { logUsage } from './usage-logger';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
-import { createAIProvider, resolveAiProvider, type AIProvider } from './providers/ai';
+import { createAIProvider, type AIProvider } from './providers/ai';
+import { getAiKey } from './byok';
 import type { TelegramParseResult } from '@/types/telegram';
 
 export interface TelegramParseOptions {
@@ -12,11 +13,13 @@ export interface TelegramParseOptions {
 async function getProviderForParsing(opts?: TelegramParseOptions): Promise<{ provider: AIProvider; providerName: string }> {
   if (opts?.userId) {
     try {
-      const resolved = await resolveAiProvider(opts.userId);
-      return {
-        provider: createAIProvider(resolved.provider),
-        providerName: resolved.provider,
-      };
+      const userKey = await getAiKey(opts.userId);
+      if (userKey) {
+        return {
+          provider: createAIProvider(userKey.provider),
+          providerName: userKey.provider,
+        };
+      }
     } catch {
       // Fall through to defaults
     }

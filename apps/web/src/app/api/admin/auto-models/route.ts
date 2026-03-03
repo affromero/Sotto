@@ -22,7 +22,7 @@ const planModelSchema = z.object({
   aiModel: z.string().min(1).optional(),
   ttsProvider: z.enum(['elevenlabs', 'openai', 'cartesia', 'hume', 'fal', 'replicate', 'kittentts']).optional(),
   ttsModel: z.string().min(1).optional(),
-  sttProvider: z.enum(['openai', 'elevenlabs', 'groq', 'together', 'deepgram', 'assemblyai']).optional(),
+  sttProvider: z.enum(['openai', 'elevenlabs', 'together', 'deepgram', 'assemblyai']).optional(),
   sttModel: z.string().min(1).optional(),
 });
 

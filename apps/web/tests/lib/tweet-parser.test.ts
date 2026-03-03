@@ -11,7 +11,10 @@ const mockProvider = {
 
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: vi.fn(() => mockProvider),
-  resolveAiProvider: vi.fn(async () => ({ provider: 'anthropic', source: 'platform' })),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn(async () => null),
 }));
 
 vi.mock('@/lib/usage-logger', () => ({

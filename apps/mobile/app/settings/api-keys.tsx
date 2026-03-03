@@ -24,7 +24,6 @@ interface KeyStatus {
 const AI_PROVIDERS = [
   { id: 'anthropic', name: 'Anthropic (Claude)' },
   { id: 'openai', name: 'OpenAI' },
-  { id: 'groq', name: 'Groq' },
 ] as const;
 
 const TTS_PROVIDERS = [

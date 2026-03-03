@@ -20,14 +20,13 @@
 When Sotto generates a podcast (Free or Pro tier), the platform pays for AI compute.
 BYOK users cost us nothing beyond infrastructure.
 
-### AI Cost: Groq (hosted, pay-per-token)
+### AI Cost: Platform LLM (hosted, pay-per-token)
 
 | Tier | Model | Input (8K tokens) | Output (4K tokens) | Total AI/podcast |
 |---|---|---|---|---|
-| Free | Llama 3.1 8B Instant | $0.0004 | $0.00032 | **~$0.0007** |
-| Pro | Llama 3.3 70B Versatile | $0.0047 | $0.0032 | **~$0.008** |
+| Free | Auto-configured (admin) | — | — | **~$0.0007** |
+| Pro | Auto-configured (admin) | — | — | **~$0.008** |
 
-Prices: 8B = $0.05/M in, $0.08/M out · 70B = $0.59/M in, $0.79/M out.
 Token estimate: one full podcast (script gen + Q&A + discovery chat ≈ 12K input, 5K output).
 
 ### TTS Cost: KittenTTS (self-hosted, CPU-only sidecar)
@@ -159,11 +158,10 @@ CAC for BYOK users is $0. They are free distribution.
 | Risk | Impact | Mitigation |
 |---|---|---|
 | KittenTTS quality too low → no Pro conversions | High | Upgrade Pro to a premium TTS option (ElevenLabs BYOK subsidy or Cartesia) |
-| Groq 8B quality insufficient → free tier doesn't hook users | Medium | Tune prompts; fall back to Anthropic if Groq is unavailable |
-| Groq pricing increases | Low | Abstraction layer in `ai.ts` → swap to another hosted inference in hours |
+| Free tier AI quality insufficient → free tier doesn't hook users | Medium | Tune prompts; swap platform LLM via admin model config |
+| Platform LLM pricing increases | Low | Abstraction layer in `ai.ts` → swap to another hosted inference in hours |
 | High CPU load from KittenTTS → VPS upgrade needed | Medium | CPX41 has headroom for ~20 concurrent syntheses; upgrade at 500+ DAU |
 | Low Pro conversion (< 2%) | Medium | Add more Pro-exclusive features; push analytics and priority more visibly |
-| Free users overwhelm Groq rate limits | Low | Groq free tier: 14,400 req/day; paid tier is cheap (~$0.0007/req) |
 
 ---
 
@@ -189,6 +187,6 @@ usage level because TTS is on-VPS (free) and LLM costs are fractions of a cent p
 The ceiling is high: at 10K MAU with 5% Pro conversion, net profit exceeds $50K ARR from
 subscriptions alone — before voice marketplace revenue, which scales independently.
 
-The risk is not economics. The risk is whether the free tier AI quality (Llama 8B +
+The risk is not economics. The risk is whether the free tier AI quality (platform LLM +
 KittenTTS) is good enough to convert users to Pro. That's a product question, not a
 financial one.

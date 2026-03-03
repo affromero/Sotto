@@ -150,7 +150,7 @@ export default function PrivacyPage() {
               generation, Q&amp;A, discovery chat, content moderation
             </li>
             <li>
-              <strong>Speech-to-Text</strong> (OpenAI Whisper, Groq) — audio
+              <strong>Speech-to-Text</strong> (OpenAI Whisper) — audio
               transcription for imported podcasts
             </li>
             <li>

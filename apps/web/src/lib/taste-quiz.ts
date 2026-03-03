@@ -2,8 +2,9 @@ import { createHash } from 'crypto';
 import type { TasteQuestion, NewsTimeRange } from '@sotto/shared';
 import { prisma } from './prisma';
 import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
-import { createAIProvider, resolveAiProvider } from './providers/ai';
-import { getProviderForModel } from './providers/ai-registry';
+import { createAIProvider } from './providers/ai';
+import { getProviderForModel, resolveAiModelAndProvider } from './providers/ai-registry';
+import { getAiKey } from './byok';
 import { INPUT_SANITIZATION_INSTRUCTIONS } from './safety-prompts';
 import { loadAndRender } from './prompt-loader';
 import { logUsage } from './usage-logger';
@@ -224,7 +225,7 @@ function resolveInspireProvider(
   const providerType = resolved?.provider ?? autoModel.aiProvider;
   const apiKey = resolved?.source === 'byok' ? resolved.apiKey : undefined;
 
-  // Prefer: explicit model → resolver model (e.g. platform Groq) → auto config model
+  // Prefer: explicit model → BYOK key model → auto config model
   const candidateModel = explicitModel ?? resolved?.model ?? autoModel.aiModel;
 
   // Only use the candidate if it belongs to the target provider (or is unknown to the registry)
@@ -387,7 +388,11 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
+    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
+    const aiKey = await getAiKey(userId).catch(() => null);
+    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
+      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
+    ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 
@@ -460,7 +465,11 @@ export async function generateCuriosityQuestions(
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
+    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
+    const aiKey = await getAiKey(userId).catch(() => null);
+    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
+      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
+    ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 
@@ -576,7 +585,11 @@ export async function generateNewsQuestions(
 
   try {
     const userRecord = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } });
-    const resolved = await resolveAiProvider(userId, userRecord?.plan as 'FREE' | 'PRO').catch(() => null);
+    const plan = userRecord?.plan as 'FREE' | 'PRO' | undefined;
+    const aiKey = await getAiKey(userId).catch(() => null);
+    const resolved = await resolveAiModelAndProvider({ aiKey, plan }).then(
+      ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
+    ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
     const llmStart = Date.now();
 

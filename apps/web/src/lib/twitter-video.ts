@@ -54,7 +54,7 @@ export function extractVideoUrl(
 }
 
 /**
- * Download a video from a URL, extract audio with FFmpeg, and transcribe with Groq Whisper.
+ * Download a video from a URL, extract audio with FFmpeg, and transcribe with OpenAI Whisper.
  * Returns the transcript text, or null if transcription fails.
  */
 export async function transcribeVideoFromUrl(videoUrl: string): Promise<string | null> {
@@ -87,9 +87,9 @@ export async function transcribeVideoFromUrl(videoUrl: string): Promise<string |
       audioPath,
     ]);
 
-    // Transcribe with Groq Whisper (fastest + free)
+    // Transcribe with OpenAI Whisper
     const audioBuffer = await readFile(audioPath);
-    const stt = createSttProvider('groq');
+    const stt = createSttProvider('openai');
     const result = await stt.transcribe(audioBuffer);
 
     logger.info('Video transcription complete', {
@@ -130,7 +130,7 @@ export async function transcribeVideoWithYtDlp(tweetUrl: string): Promise<string
     ], { timeout: 120_000 });
 
     const audioBuffer = await readFile(audioPath);
-    const stt = createSttProvider('groq');
+    const stt = createSttProvider('openai');
     const result = await stt.transcribe(audioBuffer);
 
     logger.info('yt-dlp video transcription complete', {

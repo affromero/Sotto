@@ -152,7 +152,7 @@ describe('youtube extractor', () => {
         description: null,
         siteName: 'YouTube',
         transcriptSource: 'yt-dlp',
-        transcriptionProvider: 'groq',
+        transcriptionProvider: 'openai',
         wordCount: 2,
       });
 

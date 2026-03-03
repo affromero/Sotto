@@ -11,8 +11,8 @@ vi.mock('@/lib/auto-model-config', () => ({
     aiModel: 'claude-haiku-4-5-20251001',
     ttsProvider: 'kittentts',
     ttsModel: 'kitten-tts-mini-0.8',
-    sttProvider: 'groq',
-    sttModel: 'whisper-large-v3-turbo',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
   }),
 }));
 
@@ -23,10 +23,6 @@ describe('getCheapestModelForProvider', () => {
 
   it('returns fast-tier model for openai', () => {
     expect(getCheapestModelForProvider('openai')).toBe('gpt-5-mini');
-  });
-
-  it('returns fast-tier model for groq', () => {
-    expect(getCheapestModelForProvider('groq')).toBe('llama-3.1-8b-instant');
   });
 
   it('returns first model when no fast tier exists (claude-code)', () => {
@@ -53,10 +49,6 @@ describe('isValidModelId', () => {
     expect(isValidModelId('gpt-5-mini')).toBe(true);
   });
 
-  it('returns true for known Groq model', () => {
-    expect(isValidModelId('llama-3.3-70b-versatile')).toBe(true);
-  });
-
   it('returns false for unknown model', () => {
     expect(isValidModelId('gpt-99-turbo')).toBe(false);
   });
@@ -71,7 +63,6 @@ describe('getAiProviderIdsWithPricing', () => {
     const ids = getAiProviderIdsWithPricing();
     expect(ids).toContain('anthropic');
     expect(ids).toContain('openai');
-    expect(ids).not.toContain('groq');
     expect(ids).not.toContain('claude-code');
     expect(ids).not.toContain('together');
     expect(ids).not.toContain('deepgram');

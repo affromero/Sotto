@@ -180,16 +180,13 @@ Sotto supports STT for importing existing podcasts (human or AI). Three provider
 
 | Provider       | Model                        | Cost               | Quality | Speed    | Pricing Page                                                            |
 | -------------- | ---------------------------- | ------------------- | ------- | -------- | ----------------------------------------------------------------------- |
-| **Groq**       | whisper-large-v3-turbo       | Free (rate-limited) | ★★★★    | Fastest  | [groq.com/pricing](https://groq.com/pricing/)                          |
-| **Groq**       | whisper-large-v3             | Free (rate-limited) | ★★★★½   | Fast     | [groq.com/pricing](https://groq.com/pricing/)                          |
 | **OpenAI**     | whisper-1                    | $0.006/min          | ★★★★    | Moderate | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing) |
 | **OpenAI**     | gpt-4o-transcribe            | ~$0.01/min          | ★★★★½   | Moderate | [platform.openai.com/pricing](https://platform.openai.com/docs/pricing) |
 | **ElevenLabs** | scribe_v1                    | Credits-based       | ★★★★    | Fast     | [elevenlabs.io/pricing](https://elevenlabs.io/pricing/api)             |
 
-**Default provider**: Groq (free, fast). Configurable via `STT_PROVIDER` env var.
+**Default provider**: OpenAI Whisper. Configurable via `STT_PROVIDER` env var.
 
 **Cost for importing a 30-min podcast**:
-- Groq: Free
 - OpenAI whisper-1: ~$0.18
 - ElevenLabs Scribe: ~credits equivalent
 

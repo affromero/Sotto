@@ -27,7 +27,7 @@ vi.mock('@/lib/auto-model-config', () => ({
 
 vi.mock('@/lib/providers/ai-registry', () => ({
   isValidModelId: vi.fn(() => true),
-  getAiProviderIds: vi.fn(() => ['anthropic', 'openai', 'groq', 'claude-code', 'together', 'deepgram', 'assemblyai']),
+  getAiProviderIds: vi.fn(() => ['anthropic', 'openai', 'claude-code', 'together', 'deepgram', 'assemblyai']),
 }));
 
 vi.mock('@/lib/api-response', () => ({
@@ -54,20 +54,20 @@ function createPatchRequest(body: Record<string, unknown>): NextRequest {
 
 const mockConfig = {
   free: {
-    aiProvider: 'groq',
-    aiModel: 'llama-3.1-8b-instant',
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
     ttsProvider: 'kittentts',
     ttsModel: 'kitten-tts-mini-0.8',
-    sttProvider: 'groq',
-    sttModel: 'whisper-large-v3-turbo',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
   },
   pro: {
     aiProvider: 'anthropic',
     aiModel: 'claude-haiku-4-5-20251001',
     ttsProvider: 'elevenlabs',
     ttsModel: 'eleven_v3',
-    sttProvider: 'groq',
-    sttModel: 'whisper-large-v3-turbo',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
   },
 };
 
@@ -120,7 +120,7 @@ describe('PATCH /api/admin/auto-models', () => {
   it('returns 403 when unauthenticated', async () => {
     mockAuth.mockResolvedValue(null);
 
-    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'groq' } }));
+    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'anthropic' } }));
     const body = await response.json();
 
     expect(response.status).toBe(403);
@@ -130,7 +130,7 @@ describe('PATCH /api/admin/auto-models', () => {
   it('returns 403 when user is not admin', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1', role: 'USER' } });
 
-    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'groq' } }));
+    const response = await PATCH(createPatchRequest({ free: { aiProvider: 'anthropic' } }));
     const body = await response.json();
 
     expect(response.status).toBe(403);
@@ -281,16 +281,16 @@ describe('PATCH /api/admin/auto-models', () => {
 
     const response = await PATCH(
       createPatchRequest({
-        freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
-        proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+        freeIncludedSttModels: ['openai:whisper-1'],
+        proIncludedSttModels: ['openai:whisper-1'],
       })
     );
 
     expect(response.status).toBe(200);
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
       {
-        freeIncludedSttModels: ['groq:whisper-large-v3-turbo'],
-        proIncludedSttModels: ['groq:whisper-large-v3-turbo', 'openai:whisper-1'],
+        freeIncludedSttModels: ['openai:whisper-1'],
+        proIncludedSttModels: ['openai:whisper-1'],
       },
       'admin-1'
     );
@@ -319,13 +319,13 @@ describe('PATCH /api/admin/auto-models', () => {
     const response = await PATCH(
       createPatchRequest({
         freeIncludedSttModels: ['openai:whisper-1'],
-        proIncludedSttModels: ['groq:whisper-large-v3-turbo'],
+        proIncludedSttModels: ['openai:whisper-1', 'elevenlabs:scribe_v1'],
       })
     );
 
     expect(response.status).toBe(200);
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
-      { freeIncludedSttModels: ['openai:whisper-1'], proIncludedSttModels: ['groq:whisper-large-v3-turbo'] },
+      { freeIncludedSttModels: ['openai:whisper-1'], proIncludedSttModels: ['openai:whisper-1', 'elevenlabs:scribe_v1'] },
       'admin-1'
     );
   });

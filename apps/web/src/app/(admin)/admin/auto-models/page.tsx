@@ -8,7 +8,6 @@ import styles from './page.module.css';
 export default async function AutoModelsPage() {
   const config = await getAutoModelConfig();
 
-  // Include Groq for AI here (valid for auto models, unlike free-tier config page)
   const aiProviders = getAllAiProviderMeta()
     .filter((p) => p.id !== 'claude-code' && p.id !== 'deepgram' && p.id !== 'assemblyai')
     .map((p) => ({
