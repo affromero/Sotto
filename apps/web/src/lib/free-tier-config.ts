@@ -23,12 +23,12 @@ export interface FreeTierConfig {
 }
 
 const DEFAULTS: Omit<FreeTierConfig, 'aiAllocations' | 'ttsAllocations'> = {
-  aiProvider: 'groq',
-  aiModel: getAiProviderMeta('groq').defaultModel,
+  aiProvider: 'anthropic',
+  aiModel: getAiProviderMeta('anthropic').defaultModel,
   ttsProvider: 'kittentts',
   ttsModel: getProviderMeta('kittentts').defaultModel,
-  sttProvider: 'groq',
-  sttModel: getSttProviderMeta('groq').defaultModel,
+  sttProvider: 'openai',
+  sttModel: getSttProviderMeta('openai').defaultModel,
   dailyGenerationLimit: 1,
 };
 

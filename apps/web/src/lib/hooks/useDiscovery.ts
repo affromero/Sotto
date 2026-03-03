@@ -195,17 +195,21 @@ export function useDiscovery(
                 metadata?: Partial<DiscoveryMetadata>;
                 done?: boolean;
                 error?: string;
+                requestId?: string;
                 detectedLanguage?: string;
               };
 
               // Handle error events from the server
               if (parsed.error) {
                 serverSentError = true;
+                const errorContent = parsed.requestId
+                  ? `${parsed.error} (${parsed.requestId})`
+                  : (parsed.error as string);
                 setState((prev) => ({
                   ...prev,
                   messages: prev.messages.map((msg) =>
                     msg.id === assistantMessageId
-                      ? { ...msg, content: parsed.error as string }
+                      ? { ...msg, content: errorContent }
                       : msg
                   ),
                 }));

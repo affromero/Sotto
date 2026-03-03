@@ -11,8 +11,8 @@
 
 | Tier | Cost | AI | TTS | Limits |
 |---|---|---|---|---|
-| Free | $0 forever | Groq Llama 3.1 8B | KittenTTS (platform) | 1 podcast/day (configurable via admin) |
-| Pro | $12/month | Groq Llama 3.3 70B | KittenTTS (platform) | Unlimited |
+| Free | $0 forever | Platform LLM (admin-configured) | KittenTTS (platform) | 1 podcast/day (configurable via admin) |
+| Pro | $12/month | Platform LLM (admin-configured) | KittenTTS (platform) | Unlimited |
 | BYOK | $0 (own provider costs) | Any key user adds | Any key user adds | Unlimited |
 
 Voice marketplace is orthogonal to tiers — any user (including Free) can sell voice clones.
@@ -205,8 +205,8 @@ Admin-configurable singleton (`FreeTierConfig`) at `/admin/free-tier`:
 | Field | Default | Description |
 |---|---|---|
 | `dailyGenerationLimit` | `1` | Max podcasts/day for free users |
-| `aiProvider` | `groq` | Platform AI provider |
-| `aiModel` | `llama-3.1-8b-instant` | Platform AI model |
+| `aiProvider` | (admin-configured) | Platform AI provider |
+| `aiModel` | (admin-configured) | Platform AI model |
 | `ttsProvider` | `kittentts` | Platform TTS provider |
 | `ttsModel` | `kitten-tts-mini-0.8` | Platform TTS model |
 
@@ -214,7 +214,7 @@ Admin-configurable singleton (`FreeTierConfig`) at `/admin/free-tier`:
 
 ## BYOK
 
-Users connect their own LLM (Anthropic, OpenAI, Groq) and TTS keys (7 providers).
+Users connect their own LLM (Anthropic, OpenAI) and TTS keys (7 providers).
 Keys are AES-256-GCM encrypted at rest. All features unlock immediately — no daily limit,
 unlimited duration, analytics, private podcasts.
 

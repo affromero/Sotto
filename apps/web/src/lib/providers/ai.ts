@@ -1,6 +1,5 @@
 import { moderateOrThrow } from '../moderation';
-import { getAiKey, hasAiKey } from '../byok';
-import { getAllAiProviderMeta, getAiProviderMeta, type AiProviderId } from './ai-registry';
+import type { AiProviderId } from './ai-registry';
 
 export interface TextContentPart { type: 'text'; text: string }
 export interface ImageContentPart { type: 'image_url'; url: string }
@@ -54,22 +53,6 @@ function toResponsesInput(messages: ChatMessage[]): any[] {
   });
 }
 
-/** Convert ChatMessage[] for Groq (strip images — Llama has no vision). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function toGroqMessages(system: string, messages: ChatMessage[]): any[] {
-  return [
-    { role: 'system', content: system },
-    ...messages.map((m) => {
-      if (typeof m.content === 'string') return { role: m.role, content: m.content };
-      const textParts = m.content.filter((p) => p.type === 'text');
-      const text = textParts.length > 0
-        ? textParts.map((p) => (p as TextContentPart).text).join('\n')
-        : '[Image attached — this model does not support vision]';
-      return { role: m.role, content: text };
-    }),
-  ];
-}
-
 export interface AIOptions {
   maxTokens?: number;
   temperature?: number;
@@ -79,7 +62,7 @@ export interface AIOptions {
   /** Enable web search for this call. Each provider handles it natively. */
   useWebSearch?: boolean;
   /** Request structured JSON output conforming to a JSON Schema. Provider-mapped:
-   *  Anthropic → output_config, OpenAI → response_format, Groq → response_format (json_object only). */
+   *  Anthropic → output_config, OpenAI → response_format. */
   jsonSchema?: { name: string; schema: Record<string, unknown> };
 }
 
@@ -254,78 +237,6 @@ class OpenAIProvider implements AIProvider {
   }
 }
 
-/**
- * Groq provider — fast hosted inference for open-source LLMs.
- * Uses OpenAI-compatible API at api.groq.com.
- */
-class GroqProvider implements AIProvider {
-  private async getClient(apiKeyOverride?: string) {
-    const apiKey = apiKeyOverride || process.env.GROQ_API_KEY;
-    if (!apiKey) throw new Error('GROQ_API_KEY is not set');
-    const { default: OpenAI } = await import('openai');
-    return new OpenAI({ baseURL: 'https://api.groq.com/openai/v1', apiKey } as ConstructorParameters<typeof OpenAI>[0]);
-  }
-
-  async generateResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): Promise<AIResponse> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GROQ_MODEL;
-    if (!model) throw new Error('No Groq model configured. Set GROQ_MODEL or pass opts.model.');
-
-    const response = await client.chat.completions.create({
-      model,
-      max_tokens: opts?.maxTokens || 4096,
-      temperature: opts?.temperature,
-      messages: toGroqMessages(system, messages),
-      ...(opts?.jsonSchema ? { response_format: { type: 'json_object' as const } } : {}),
-    });
-
-    const content = response.choices[0]?.message?.content || '';
-    return {
-      content,
-      inputTokens: response.usage?.prompt_tokens || 0,
-      outputTokens: response.usage?.completion_tokens || 0,
-      model,
-    };
-  }
-
-  async *streamResponse(
-    system: string,
-    messages: ChatMessage[],
-    opts?: AIOptions
-  ): AsyncGenerator<string> {
-    if (!opts?.skipModeration) {
-      const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-      if (lastUserMsg) await moderateOrThrow(textOf(lastUserMsg.content));
-    }
-
-    const client = await this.getClient(opts?.apiKeyOverride);
-    const model = opts?.model || process.env.GROQ_MODEL;
-    if (!model) throw new Error('No Groq model configured. Set GROQ_MODEL or pass opts.model.');
-
-    const stream = await client.chat.completions.create({
-      model,
-      max_tokens: opts?.maxTokens || 4096,
-      temperature: opts?.temperature,
-      messages: toGroqMessages(system, messages),
-      stream: true,
-    });
-
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) yield delta;
-    }
-  }
-}
-
 export function createAIProvider(type?: string): AIProvider {
   switch (type) {
     case 'anthropic':
@@ -333,10 +244,8 @@ export function createAIProvider(type?: string): AIProvider {
       return new AnthropicProvider();
     case 'openai':
       return new OpenAIProvider();
-    case 'groq':
-      return new GroqProvider();
     default:
-      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai, groq`);
+      throw new Error(`Unknown AI provider type: "${type}". Registered providers: anthropic, openai`);
   }
 }
 
@@ -347,53 +256,3 @@ export interface ResolvedAiProvider {
   model?: string;
 }
 
-/**
- * Resolve which AI provider + key to use for a given user.
- *
- * Priority:
- * 1. User BYOK key → their chosen provider
- * 2. Platform Groq key (primary platform LLM)
- *    - PRO → llama-3.3-70b-versatile
- *    - FREE → llama-3.1-8b-instant
- * 3. Platform Anthropic / OpenAI keys (legacy fallback)
- */
-export async function resolveAiProvider(
-  userId: string,
-  plan?: 'FREE' | 'PRO'
-): Promise<ResolvedAiProvider> {
-  // 1. Check user BYOK key
-  const userKey = await getAiKey(userId);
-  if (userKey) {
-    return { provider: userKey.provider, source: 'byok', apiKey: userKey.apiKey };
-  }
-
-  // 2. Groq platform key (primary platform LLM)
-  if (process.env.GROQ_API_KEY) {
-    const groqMeta = getAiProviderMeta('groq');
-    const model = plan === 'PRO'
-      ? (groqMeta.models.find(m => m.tier === 'best')?.id ?? groqMeta.defaultModel)
-      : (groqMeta.models.find(m => m.tier === 'fast')?.id ?? groqMeta.defaultModel);
-    return { provider: 'groq', source: 'platform', model };
-  }
-
-  // 3. Legacy platform keys — derive from registry
-  for (const p of getAllAiProviderMeta()) {
-    if (p.id === 'groq') continue; // already handled above
-    if (p.platformEnvKey && process.env[p.platformEnvKey]) {
-      return { provider: p.id, source: 'platform' };
-    }
-  }
-
-  throw new Error('No AI provider available. Configure an API key in settings.');
-}
-
-/**
- * Check if AI can be resolved for a user without throwing.
- */
-export async function canResolveAi(userId: string): Promise<boolean> {
-  if (await hasAiKey(userId)) return true;
-  for (const p of getAllAiProviderMeta()) {
-    if (p.platformEnvKey && process.env[p.platformEnvKey]) return true;
-  }
-  return false;
-}

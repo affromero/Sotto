@@ -17,12 +17,12 @@ const mockCheckGenerationGate = vi.fn();
 const mockGetFreeTierStatus = vi.fn();
 const mockGetFreeTierConfig = vi.fn();
 const mockResolveAutoModel = vi.fn().mockResolvedValue({
-  aiProvider: 'groq',
-  aiModel: 'llama-3.1-8b-instant',
+  aiProvider: 'anthropic',
+  aiModel: 'claude-haiku-4-5-20251001',
   ttsProvider: 'kittentts',
   ttsModel: 'kitten-tts-mini-0.8',
-  sttProvider: 'groq',
-  sttModel: 'whisper-large-v3-turbo',
+  sttProvider: 'openai',
+  sttModel: 'whisper-1',
 });
 const mockAddJob = vi.fn();
 

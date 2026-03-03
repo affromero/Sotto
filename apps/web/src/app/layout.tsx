@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { DM_Serif_Display, Inter } from 'next/font/google';
 import { BRAND } from '@sotto/shared';
 import { SessionProvider } from '@/components/providers/SessionProvider';
@@ -53,6 +53,9 @@ export const metadata: Metadata = {
     description: BRAND.description,
   },
   manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
   themeColor: '#D97706',
 };
 

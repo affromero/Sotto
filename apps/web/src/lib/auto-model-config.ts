@@ -181,7 +181,7 @@ export function resolveTtsIncludedModels(config: AutoModelConfigData): {
 
 /**
  * Resolve effective included STT models per tier.
- * IDs use provider:model format (e.g. "groq:whisper-large-v3-turbo").
+ * IDs use provider:model format (e.g. "openai:whisper-1").
  * When lists are null (unconfigured), derive from auto defaults.
  */
 export function resolveSttIncludedModels(config: AutoModelConfigData): {

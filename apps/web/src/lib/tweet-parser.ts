@@ -2,7 +2,8 @@ import { logUsage } from './usage-logger';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
 import { getAiProviderMeta, getAllAiProviderMeta } from './providers/ai-registry';
-import { createAIProvider, resolveAiProvider, type AIProvider, type ContentPart } from './providers/ai';
+import { createAIProvider, type AIProvider, type ContentPart } from './providers/ai';
+import { getAiKey } from './byok';
 import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
@@ -15,11 +16,13 @@ export interface ParseOptions {
 async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string }> {
   if (opts?.userId) {
     try {
-      const resolved = await resolveAiProvider(opts.userId);
-      return {
-        provider: createAIProvider(resolved.provider),
-        providerName: resolved.provider,
-      };
+      const userKey = await getAiKey(opts.userId);
+      if (userKey) {
+        return {
+          provider: createAIProvider(userKey.provider),
+          providerName: userKey.provider,
+        };
+      }
     } catch {
       // Fall through to defaults
     }
@@ -56,13 +59,6 @@ export async function parseTweetIntent(
     : textMessage;
 
   const { provider, providerName } = await getProviderForParsing(opts);
-
-  if (opts?.imageUrls?.length && providerName === 'groq') {
-    logger.warn('Images attached but provider does not support vision — images will be ignored', {
-      provider: providerName,
-      imageCount: String(opts.imageUrls.length),
-    });
-  }
 
   const response = await provider.generateResponse(
     SYSTEM_PROMPT,
@@ -221,9 +217,6 @@ const AI_MODEL_ALIASES: Record<string, string> = {
   'gpt5': getAiProviderMeta('openai').defaultModel,
   chatgpt: getAiProviderMeta('openai').defaultModel,
   openai: getAiProviderMeta('openai').defaultModel,
-  // Groq / Llama
-  llama: getAiProviderMeta('groq').defaultModel,
-  groq: getAiProviderMeta('groq').defaultModel,
 };
 
 function resolveAiModel(raw: string): string | null {

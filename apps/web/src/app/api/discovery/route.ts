@@ -10,7 +10,7 @@ import type { AiProviderId } from '@/lib/providers/ai-registry';
 import { isModelAllowedForUser } from '@/lib/tier-features';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
-import { errorResponse } from '@/lib/api-response';
+import { errorResponse, generateRequestId } from '@/lib/api-response';
 import { auth } from '@/lib/auth';
 import { checkSuspension } from '@/lib/auth-guards';
 import { detectLanguage } from '@/lib/language-detect';
@@ -84,6 +84,8 @@ function createStreamingMarkupFilter() {
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+
   const authed = await authenticateRequest(request);
   if (!authed) {
     return errorResponse('Unauthorized', 401);
@@ -355,7 +357,7 @@ export async function POST(request: NextRequest) {
           // Send chips parsed from the fallback response (if any)
           const { chips: fallbackChips } = parseChips(fallbackText);
           controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ done: true, chips: fallbackChips, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
+            encoder.encode(`data: ${JSON.stringify({ done: true, chips: fallbackChips, requestId, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
           );
           return; // no controller.close() here — finally handles it for all paths
         }
@@ -379,7 +381,7 @@ export async function POST(request: NextRequest) {
           : null;
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ done: true, chips, metadata, requestId, ...(detectedLanguage ? { detectedLanguage } : {}) })}\n\n`)
         );
       } catch (error) {
         const status = (error as { status?: number }).status;
@@ -421,7 +423,7 @@ export async function POST(request: NextRequest) {
         }
 
         controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`)
+          encoder.encode(`data: ${JSON.stringify({ error: errorMessage, requestId })}\n\n`)
         );
       } finally {
         controller.close();
@@ -434,6 +436,7 @@ export async function POST(request: NextRequest) {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
+      'x-request-id': requestId,
     },
   });
 }

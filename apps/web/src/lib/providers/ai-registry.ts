@@ -5,7 +5,7 @@
  */
 import { logger } from '../logger';
 
-export type AiProviderId = 'anthropic' | 'openai' | 'groq' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
 
 export interface AiProviderAuthField {
   key: string;
@@ -28,7 +28,7 @@ export interface AiModelOption {
 export interface AiProviderMeta {
   id: AiProviderId;
   displayName: string;
-  /** Short label for badges, e.g. 'Claude', 'GPT', 'Groq'. */
+  /** Short label for badges, e.g. 'Claude', 'GPT'. */
   shortLabel: string;
   /** Env var name for the platform API key, e.g. 'ANTHROPIC_API_KEY'. Omit for STT-only or local-CLI providers. */
   platformEnvKey?: string;
@@ -96,32 +96,6 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
       validate: async (creds) => {
         try {
           const res = await fetch('https://api.openai.com/v1/models', {
-            headers: { Authorization: `Bearer ${creds.apiKey}` },
-          });
-          return res.ok;
-        } catch {
-          return false;
-        }
-      },
-    },
-  },
-
-  groq: {
-    id: 'groq',
-    displayName: 'Groq',
-    shortLabel: 'Groq',
-    platformEnvKey: 'GROQ_API_KEY',
-    defaultModel: 'llama-3.3-70b-versatile',
-    getApiKeyUrl: 'https://console.groq.com/keys',
-    models: [
-      { id: 'llama-3.1-8b-instant', displayName: 'Llama 3.1 8B (Fast)', shortDisplayName: '3.1 8B', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'llama-3.3-70b-versatile', displayName: 'Llama 3.3 70B (Best)', shortDisplayName: '3.3 70B', tier: 'best', requiredPlan: 'PRO' },
-    ],
-    auth: {
-      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'gsk_...' }],
-      validate: async (creds) => {
-        try {
-          const res = await fetch('https://api.groq.com/openai/v1/models', {
             headers: { Authorization: `Bearer ${creds.apiKey}` },
           });
           return res.ok;
@@ -281,7 +255,6 @@ export interface AiProviderClientMeta {
 const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { description: string; badge: 'optional' | 'free' | null }> = {
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
-  groq: { description: 'Free Whisper transcription — no credit card needed', badge: 'free' },
   together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
   deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
   assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
@@ -308,7 +281,7 @@ export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
 
 /**
  * Look up which provider owns a model ID.
- * e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic', 'llama-3.3-70b-versatile' → 'groq'
+ * e.g. 'gpt-5-mini' → 'openai', 'claude-sonnet-4-6' → 'anthropic'
  * Returns null if the model is not found in any provider.
  */
 export function getProviderForModel(modelId: string): AiProviderId | null {

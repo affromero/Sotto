@@ -117,11 +117,6 @@ async function resolveSttApiKey(
     return byokKey?.apiKey ?? process.env.OPENAI_API_KEY ?? undefined;
   }
 
-  if (provider === 'groq') {
-    const byokKey = await getAiKey(userId, 'groq');
-    return byokKey?.apiKey ?? process.env.GROQ_API_KEY ?? undefined;
-  }
-
   if (provider === 'together') {
     const byokKey = await getAiKey(userId, 'together');
     return byokKey?.apiKey ?? process.env.TOGETHER_API_KEY ?? undefined;
@@ -285,7 +280,7 @@ export async function POST(request: NextRequest) {
     if (!sttApiKey && !transcriptText) {
       await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
       const provider = validatedSttProvider ?? 'openai';
-      const providerName = { openai: 'OpenAI', groq: 'Groq', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider;
+      const providerName = { openai: 'OpenAI', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider;
       return errorResponse(
         `No API key available for speech-to-text provider "${provider}". Add a ${providerName} key in Settings → API Keys, or provide a transcript file.`,
         400

@@ -117,15 +117,15 @@ Modular provider architecture — swap external services via env vars.
 
 | File | Interface | Implementations | Env Var |
 | --- | --- | --- | --- |
-| `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` + `resolveAiProvider()`, `canResolveAi()` | `AI_PROVIDER` |
+| `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER` |
 | `ai-registry.ts` | `AiProviderMeta` | Declarative AI provider metadata: validation functions for Anthropic + OpenAI keys | — |
 | `claude-code.ts` | `AIProvider` | `ClaudeCodeProvider` (standalone) | `AI_PROVIDER` |
 | `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider`, `MinimaxProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |
 | `tts-registry.ts` | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities, models | — |
 | `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (Cartesia, Hume, Fal/Replicate, MiniMax) with curated voices + deterministic hash selection | — |
 | `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `cartesia`, `hume`, `fal`, `replicate`, `minimax` | Various TTS APIs |
-| `stt.ts` | `SttProvider` | OpenAI Whisper (`WhisperProvider`), Groq, ElevenLabs STT + `resolveSttProvider()` | `STT_PROVIDER` |
-| `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, Groq, ElevenLabs | — |
+| `stt.ts` | `SttProvider` | OpenAI Whisper (`WhisperProvider`), ElevenLabs STT + `resolveSttProvider()` | `STT_PROVIDER` |
+| `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, ElevenLabs | — |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
 | `index.ts` | `Providers` | `getProviders()` singleton factory | — |

@@ -23,11 +23,6 @@ const STT_PROVIDERS: SttProviderInfo[] = [
     description: 'High-quality transcription with word-level timestamps',
   },
   {
-    id: 'groq',
-    displayName: 'Groq Whisper',
-    description: 'Free, fast transcription powered by Groq',
-  },
-  {
     id: 'together',
     displayName: 'Together AI Whisper',
     description: 'Cheap Whisper transcription at $0.0015/min',
@@ -73,12 +68,6 @@ export async function GET() {
       (isAdmin && !!process.env.ELEVENLABS_API_KEY);
     if (hasElevenLabs) configuredProviders.push('elevenlabs');
 
-    // Groq Whisper: BYOK key, or platform key (admin only)
-    const hasGroq =
-      (await getAiKey(userId, 'groq')) !== null ||
-      (isAdmin && !!process.env.GROQ_API_KEY);
-    if (hasGroq) configuredProviders.push('groq');
-
     // Together AI Whisper: BYOK key, or platform key (admin only)
     const hasTogether =
       (await getAiKey(userId, 'together')) !== null ||
@@ -98,7 +87,7 @@ export async function GET() {
     if (hasAssemblyAi) configuredProviders.push('assemblyai');
 
     // Check if any BYOK keys exist (AI keys that double as STT keys)
-    isByok = [hasOpenAi, hasElevenLabs, hasGroq, hasTogether, hasDeepgram, hasAssemblyAi].some(
+    isByok = [hasOpenAi, hasElevenLabs, hasTogether, hasDeepgram, hasAssemblyAi].some(
       (v) => v && !isAdmin
     );
 

@@ -126,22 +126,6 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
     }
   };
 
-  const groqCheck = async () => {
-    const start = Date.now();
-    try {
-      if (process.env.GROQ_API_KEY) {
-        const res = await fetch('https://api.groq.com/openai/v1/models', {
-          headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-          signal: AbortSignal.timeout(5000),
-        });
-        return { key: 'groq', result: { status: res.ok ? 'ok' : 'error', latencyMs: Date.now() - start, ...(!res.ok && { detail: `HTTP ${res.status}` }) } as CheckResult };
-      }
-      return { key: 'groq', result: { status: 'not_configured', latencyMs: 0 } as CheckResult };
-    } catch {
-      return { key: 'groq', result: { status: 'error', latencyMs: Date.now() - start } as CheckResult };
-    }
-  };
-
   const claudeCodeCheck = async () => {
     const start = Date.now();
     try {
@@ -199,7 +183,7 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
 
   const adminResults = await Promise.allSettled([
     r2Check(), anthropicCheck(), openaiCheck(), elevenlabsCheck(),
-    groqCheck(), claudeCodeCheck(), queueCheck(),
+    claudeCodeCheck(), queueCheck(),
   ]);
 
   for (const result of adminResults) {
@@ -220,7 +204,7 @@ export async function getHealthData(isAdmin: boolean): Promise<HealthData> {
 
   const envKeys = [
     'DATABASE_URL', 'REDIS_URL', 'NEXTAUTH_SECRET', 'PITCH_PASSWORD',
-    'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY', 'GROQ_API_KEY',
+    'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'ELEVENLABS_API_KEY',
     'R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME',
   ];
   const env: Record<string, boolean> = {};

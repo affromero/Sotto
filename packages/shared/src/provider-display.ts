@@ -1,7 +1,6 @@
 export const AI_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
   anthropic: { label: 'Anthropic (Claude)', shortLabel: 'Claude' },
   openai: { label: 'OpenAI', shortLabel: 'GPT' },
-  groq: { label: 'Groq', shortLabel: 'Groq' },
   'claude-code': { label: 'Claude Code (Local)', shortLabel: 'Claude' },
   together: { label: 'Together AI', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },
@@ -19,7 +18,6 @@ export const TTS_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: s
 
 export const STT_PROVIDER_DISPLAY: Record<string, { label: string; shortLabel: string }> = {
   openai: { label: 'OpenAI Whisper', shortLabel: 'Whisper' },
-  groq: { label: 'Groq Whisper', shortLabel: 'Groq' },
   elevenlabs: { label: 'ElevenLabs Scribe', shortLabel: 'Scribe' },
   together: { label: 'Together AI Whisper', shortLabel: 'Together' },
   deepgram: { label: 'Deepgram', shortLabel: 'Deepgram' },

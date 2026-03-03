@@ -10,7 +10,6 @@ export default async function AdminConfigPage() {
   const config = await getFreeTierConfig();
 
   const aiProviders = getAllAiProviderMeta()
-    .filter((p) => p.id !== 'groq') // Groq is STT-only
     .map((p) => ({
       id: p.id,
       displayName: p.displayName,
