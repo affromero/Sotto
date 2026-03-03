@@ -95,6 +95,14 @@ export type {
 export type { ApiKeyData, ApiKeyCreated } from './types/api-key';
 
 export type {
+  EventContext,
+  EventPayload,
+  EventType,
+  BehavioralEventInput,
+  EventBatch,
+} from './types/events';
+
+export type {
   ImportPodcastRequest,
   ImportProgress,
   TranscriptionResult,
