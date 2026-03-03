@@ -436,10 +436,10 @@ describe('claude', () => {
         outputTokens: 1_000_000,
       });
 
-      // Haiku: $0.80 input + $4.00 output = $4.80
+      // Haiku: $1.00 input + $5.00 output = $6.00
       expect(mockApiUsageLogCreate).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          totalCost: expect.closeTo(4.8, 2),
+          totalCost: expect.closeTo(6.0, 2),
           modelId: 'claude-haiku-4-5-20251001',
         }),
       });
