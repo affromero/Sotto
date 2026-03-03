@@ -31,6 +31,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `admin-thread-to-podcast` | `admin-thread-to-podcast` | 1      | Tweet URL → fetch thread → parse intent → create podcast as @sotto                                               | Creates Podcast, kicks off pipeline                                                    |
 | `email-digest`            | `email-digest`            | 1      | Sunday 10:00 UTC cron → query new podcasts + stats → send weekly digest to subscribed waitlist emails            | Sends digest emails via Resend                                                         |
 | `announcement`            | `announcements`           | 1      | Announcement payload (subject + message) → fan-out to all users in batches of 100                                | Creates in-app Notification + push (if pushNotifications=true) + email (if emailNotifications=true) per user |
+| `r2-usage`                | `r2-usage`                | 1      | Scheduled (every 24h) → fetch R2 bucket usage + operation counts from Cloudflare API                            | Creates R2UsageSnapshot with storage size, ops counts, and cost estimates               |
 
 ## Pipeline Flow
 
