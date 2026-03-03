@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 /**
  * POST /api/onboarding/complete
@@ -21,7 +21,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to complete onboarding';
-    return errorResponse(message, 500);
+    logger.error('Failed to complete onboarding', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to complete onboarding', 500);
   }
 }

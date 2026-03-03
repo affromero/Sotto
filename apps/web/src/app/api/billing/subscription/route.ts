@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { LIMITS } from '@/lib/stripe';
 import { listAiProviders, listByokProviders } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 export async function GET(_request: NextRequest) {
   try {
@@ -38,7 +38,7 @@ export async function GET(_request: NextRequest) {
       limits: LIMITS,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch subscription';
-    return errorResponse(message, 500);
+    logger.error('Failed to fetch subscription', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to fetch subscription', 500);
   }
 }
