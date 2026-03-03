@@ -149,7 +149,7 @@ describe('POST /api/discovery', () => {
     vi.clearAllMocks();
     mockGetAiKey.mockResolvedValue({ apiKey: 'test-ai-key' });
     mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: null });
-    mockDetectLanguage.mockReturnValue(null);
+    mockDetectLanguage.mockResolvedValue(null);
   });
 
   describe('Authentication', () => {
@@ -722,7 +722,7 @@ describe('POST /api/discovery', () => {
   describe('Language detection', () => {
     it('includes detectedLanguage in done event when first message is non-English and no preferredLanguage', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockDetectLanguage.mockReturnValue('es');
+      mockDetectLanguage.mockResolvedValue('es');
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
@@ -741,7 +741,7 @@ describe('POST /api/discovery', () => {
     it('does not include detectedLanguage when preferredLanguage is already set', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
       mockUserFindUnique.mockResolvedValue({ plan: 'FREE', preferredLanguage: 'es' });
-      mockDetectLanguage.mockReturnValue('es');
+      mockDetectLanguage.mockResolvedValue('es');
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
@@ -759,7 +759,7 @@ describe('POST /api/discovery', () => {
 
     it('does not include detectedLanguage when history is present (not first message)', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockDetectLanguage.mockReturnValue('es');
+      mockDetectLanguage.mockResolvedValue('es');
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
@@ -783,7 +783,7 @@ describe('POST /api/discovery', () => {
 
     it('does not include detectedLanguage when language is English', async () => {
       mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
-      mockDetectLanguage.mockReturnValue('en');
+      mockDetectLanguage.mockResolvedValue('en');
       mockStreamDiscoveryResponse.mockReturnValue(mockStreamGenerator(['Response']));
       mockParseChips.mockReturnValue({ text: 'Response', chips: [] });
       mockParseMetadata.mockReturnValue(null);
