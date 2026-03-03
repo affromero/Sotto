@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { prisma } from './prisma';
-import type { AiProviderId } from './providers/ai-registry';
-import type { TtsProviderId } from './providers/tts-registry';
+import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './providers/ai-registry';
+import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
+import { getSttProviderMeta } from './providers/stt-registry';
 import type { SttProviderId } from '@sotto/shared';
+import { logger } from './logger';
 
 export interface PlanModelConfig {
   aiProvider: AiProviderId;
@@ -32,16 +34,69 @@ export interface AutoModelConfigData {
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
 
+// Seed values for fresh installs — derived from registry, not hardcoded
+const SEEDS = {
+  freeAiProvider: 'anthropic' as const,
+  freeAiModel: getAiProviderMeta('anthropic').defaultModel,
+  freeTtsProvider: 'kittentts' as const,
+  freeTtsModel: getProviderMeta('kittentts').defaultModel,
+  freeSttProvider: 'openai' as const,
+  freeSttModel: getSttProviderMeta('openai').defaultModel,
+  proAiProvider: 'anthropic' as const,
+  proAiModel: getAiProviderMeta('anthropic').models.find(m => m.tier === 'balanced')?.id ?? getAiProviderMeta('anthropic').defaultModel,
+  proTtsProvider: 'elevenlabs' as const,
+  proTtsModel: getProviderMeta('elevenlabs').defaultModel,
+  proSttProvider: 'openai' as const,
+  proSttModel: getSttProviderMeta('openai').defaultModel,
+  platformAiProvider: 'anthropic' as const,
+  platformAiModel: getAiProviderMeta('anthropic').defaultModel,
+};
+
 /**
  * Get the current auto model configuration.
- * Creates the singleton row with defaults if it doesn't exist.
+ * Creates the singleton row with registry-derived defaults if it doesn't exist.
+ * Self-heals orphaned model/provider pairs in existing rows.
  */
 export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
   const row = await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
     update: {},
-    create: { id: 'singleton' },
+    create: { id: 'singleton', ...SEEDS },
   });
+
+  // Detect and fix orphaned model/provider pairs in existing rows
+  const repairs: Record<string, string> = {};
+  for (const [providerField, modelField, label] of [
+    ['freeAiProvider', 'freeAiModel', 'free'] as const,
+    ['proAiProvider', 'proAiModel', 'pro'] as const,
+    ['platformAiProvider', 'platformAiModel', 'platform'] as const,
+  ]) {
+    const provider = row[providerField];
+    const model = row[modelField];
+    const owner = getProviderForModel(model);
+    if (owner && owner !== provider) {
+      const corrected = getAiProviderMeta(provider as AiProviderId).defaultModel;
+      repairs[modelField] = corrected;
+      logger.warn(`AutoModelConfig: repaired orphaned ${label} model`, {
+        was: `${provider}/${model}`,
+        corrected: `${provider}/${corrected}`,
+      });
+    } else if (!owner) {
+      const corrected = getAiProviderMeta(provider as AiProviderId).defaultModel;
+      repairs[modelField] = corrected;
+      logger.warn(`AutoModelConfig: repaired unknown ${label} model`, {
+        was: `${provider}/${model}`,
+        corrected: `${provider}/${corrected}`,
+      });
+    }
+  }
+  if (Object.keys(repairs).length > 0) {
+    await prisma.autoModelConfig.update({
+      where: { id: 'singleton' },
+      data: repairs,
+    });
+    Object.assign(row, repairs);
+  }
 
   return {
     free: {
