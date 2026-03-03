@@ -129,7 +129,7 @@ Modular provider architecture — swap external services via env vars.
 | `tts-registry.ts` | `TtsProviderMeta` | Declarative provider metadata: quality tiers, costs, auth validation, capabilities, models | — |
 | `tts-voices.ts` | `ProviderVoice` | Per-provider voice pools (Cartesia, Hume, Fal/Replicate, MiniMax) with curated voices + deterministic hash selection | — |
 | `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `cartesia`, `hume`, `fal`, `replicate`, `minimax` | Various TTS APIs |
-| `stt.ts` | `SttProvider` | OpenAI Whisper (`WhisperProvider`), ElevenLabs STT + `resolveSttProvider()` | `STT_PROVIDER` |
+| `stt.ts` | `SttProvider` | OpenAI Whisper, Together, Deepgram, AssemblyAI, ElevenLabs Scribe + `resolveSttProvider()` (BYOK → platform → auto-model config), `getSttPlatformKey()`, `createSttProvider()` | `STT_PROVIDER` |
 | `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, ElevenLabs | — |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
