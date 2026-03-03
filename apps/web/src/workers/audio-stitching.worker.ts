@@ -5,6 +5,7 @@ import {
   JobType,
   notificationQueue,
   pdfGenerationQueue,
+  featureComputationQueue,
   twitterReplyQueue,
   telegramReplyQueue,
   twitterAutoTweetQueue,
@@ -383,6 +384,12 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     await addJob(pdfGenerationQueue, JobType.GENERATE_PDF, {
       podcastId,
       userId: podcast.userId,
+    });
+
+    // 10c2. Compute ML features for this podcast
+    await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+      scope: 'podcast' as const,
+      targetId: podcastId,
     });
 
     // 10d. If this podcast has a pending trend auto-tweet, queue it
