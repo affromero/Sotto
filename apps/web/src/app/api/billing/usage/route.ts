@@ -5,7 +5,7 @@ import { LIMITS } from '@/lib/stripe';
 import { listByokProviders, listAiProviders, hasByokKey } from '@/lib/byok';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 export async function GET(_request: NextRequest) {
   try {
@@ -49,7 +49,7 @@ export async function GET(_request: NextRequest) {
       },
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch usage';
-    return errorResponse(message, 500);
+    logger.error('Failed to fetch usage', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to fetch usage', 500);
   }
 }

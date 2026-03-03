@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { onboardingInterestsSchema } from '@/lib/validations';
 import { generateTagSlug } from '@/lib/slugify';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 export async function POST(request: NextRequest) {
   try {
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to save interests';
-    return errorResponse(message, 500);
+    logger.error('Failed to save interests', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to save interests', 500);
   }
 }

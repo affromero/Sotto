@@ -17,7 +17,6 @@ export async function GET(
       handle: true,
       image: true,
       bio: true,
-      role: true,
       createdAt: true,
       _count: {
         select: {
@@ -53,7 +52,6 @@ export async function GET(
     handle: user.handle,
     image: user.image,
     bio: user.bio,
-    role: user.role,
     createdAt: user.createdAt,
     podcastCount: user._count.podcasts,
     followerCount: user._count.followers,

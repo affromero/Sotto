@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { checkRateLimit } from '@/lib/redis';
 import { generateQuestions } from '@/lib/taste-quiz';
 import { tasteQuizQuerySchema, tasteQuizAnswerSchema } from '@/lib/validations';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 /**
  * GET /api/taste-quiz?count=10
@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ questions });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to generate questions';
-    return errorResponse(message, 500);
+    logger.error('Failed to generate questions', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to generate questions', 500);
   }
 }
 
@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ saved });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to save answers';
-    return errorResponse(message, 500);
+    logger.error('Failed to save answers', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to save answers', 500);
   }
 }
 
@@ -144,7 +144,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ reset: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to reset quiz';
-    return errorResponse(message, 500);
+    logger.error('Failed to reset quiz', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to reset quiz', 500);
   }
 }
