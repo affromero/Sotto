@@ -161,6 +161,27 @@ describe('GET /api/health', () => {
     expect(body.checks.storage.status).toBe('not_configured');
   });
 
+  it('reports cfR2Monitoring not_configured when CF_API_TOKEN is missing', async () => {
+    delete process.env.CF_API_TOKEN;
+    delete process.env.R2_ACCOUNT_ID;
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.checks.cfR2Monitoring.status).toBe('not_configured');
+  });
+
+  it('reports cfR2Monitoring ok when CF API is configured and reachable', async () => {
+    process.env.R2_ACCOUNT_ID = 'test-account';
+    process.env.CF_API_TOKEN = 'test-token';
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.checks.cfR2Monitoring.status).toBe('ok');
+  });
+
   it('reports storage ok when R2 is configured and reachable', async () => {
     process.env.R2_ACCOUNT_ID = 'test-account';
     process.env.R2_ACCESS_KEY_ID = 'test-key';
@@ -305,6 +326,7 @@ describe('GET /api/health', () => {
   it('includes env var map in response', async () => {
     process.env.DATABASE_URL = 'postgresql://test';
     process.env.NEXTAUTH_SECRET = 'secret';
+    process.env.CF_API_TOKEN = 'test-token';
     delete process.env.ANTHROPIC_API_KEY;
 
     const response = await GET();
@@ -313,6 +335,7 @@ describe('GET /api/health', () => {
     expect(body.env.DATABASE_URL).toBe(true);
     expect(body.env.NEXTAUTH_SECRET).toBe(true);
     expect(body.env.ANTHROPIC_API_KEY).toBe(false);
+    expect(body.env.CF_API_TOKEN).toBe(true);
   });
 
   it('includes oauth provider map in response', async () => {
