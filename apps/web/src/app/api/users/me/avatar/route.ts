@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to upload avatar';
-    return errorResponse(message, 500);
+    logger.error('Failed to upload avatar', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to upload avatar', 500);
   }
 }

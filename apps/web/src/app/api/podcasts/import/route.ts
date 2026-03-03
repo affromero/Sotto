@@ -319,7 +319,6 @@ export async function POST(request: NextRequest) {
       error: err instanceof Error ? err.message : String(err),
     });
 
-    const message = err instanceof Error ? err.message : String(err);
-    return errorResponse(`Failed to import podcast: ${message}`, 500);
+    return errorResponse('Failed to import podcast', 500);
   }
 }

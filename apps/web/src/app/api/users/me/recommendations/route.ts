@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-
+import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
 /**
  * DELETE /api/users/me/recommendations
@@ -26,7 +26,7 @@ export async function DELETE() {
 
     return NextResponse.json({ reset: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to reset recommendations';
-    return errorResponse(message, 500);
+    logger.error('Failed to reset recommendations', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to reset recommendations', 500);
   }
 }

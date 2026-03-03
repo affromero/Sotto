@@ -17,13 +17,13 @@ function serializeFeedPodcast(p: {
   forkedFrom?: { id: string; title: string } | null;
   [key: string]: unknown;
 }) {
-  const { plan, ...safeUser } = p.user;
+  const { plan, role, ...safeUser } = p.user;
   return {
     ...p,
     createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : p.createdAt,
     ...(p.updatedAt ? { updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : p.updatedAt } : {}),
     tags: p.tags.map((pt) => pt.tag),
-    ownerIsPro: plan === 'PRO' || ['ADMIN', 'SYSTEM'].includes((safeUser.role as string) ?? ''),
+    ownerIsPro: plan === 'PRO' || ['ADMIN', 'SYSTEM'].includes((role as string) ?? ''),
     forkedFrom: p.forkedFrom ?? null,
     user: safeUser,
   };
