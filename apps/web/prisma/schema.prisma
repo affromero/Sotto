@@ -1986,3 +1986,20 @@ model R2UsageSnapshot {
   @@index([createdAt])
   @@index([bucket, createdAt])
 }
+
+// ============ MODEL PRICING SNAPSHOTS ============
+
+model ModelPricingSnapshot {
+  id              String   @id @default(cuid())
+  modelId         String
+  provider        String
+  inputPerMTok    Float
+  outputPerMTok   Float
+  contextWindow   Int?
+  maxOutputTokens Int?
+  source          String   @default("registry") // "registry" | "fetched" | "admin"
+  createdAt       DateTime @default(now())
+
+  @@index([modelId, createdAt])
+  @@index([createdAt])
+}
