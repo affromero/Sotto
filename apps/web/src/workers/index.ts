@@ -15,6 +15,7 @@ import {
   draftCleanupQueue,
   r2UsageQueue,
   pricingFetchQueue,
+  featureComputationQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -177,6 +178,12 @@ pricingFetchQueue
   .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
   .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
   .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
+
+// Schedule daily ML feature computation catch-up (every 24 hours)
+featureComputationQueue
+  .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
+  .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
+  .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
 startPricingRefreshInterval();
