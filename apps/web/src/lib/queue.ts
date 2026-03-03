@@ -43,6 +43,7 @@ export enum JobType {
   GENERATE_VOICE_TRACK_AUDIO = 'generate_voice_track_audio',
   STITCH_VOICE_TRACK = 'stitch_voice_track',
   CLEANUP_DRAFTS = 'cleanup_drafts',
+  COLLECT_R2_USAGE = 'collect_r2_usage',
 }
 
 /**
@@ -223,6 +224,8 @@ export interface AnnouncementPayload {
   subject: string;
   message: string;
 }
+
+export interface CollectR2UsagePayload {}
 
 export interface GenerateVoiceTrackAudioPayload {
   podcastId: string;
@@ -680,6 +683,7 @@ export const voiceVerificationQueue = createQueue('voice-verification', { attemp
 export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
 export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
 export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1 });
+export const r2UsageQueue = createQueue('r2-usage', { attempts: 2 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -712,4 +716,5 @@ export const ALL_QUEUE_NAMES = [
   'voice-track-audio',
   'voice-track-stitching',
   'draft-cleanup',
+  'r2-usage',
 ] as const;

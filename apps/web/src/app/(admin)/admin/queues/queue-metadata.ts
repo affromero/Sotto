@@ -148,4 +148,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Stitches voice track audio segments together',
     stage: 'Voice Features',
   },
+  'r2-usage': {
+    description: 'Collects R2 storage usage and operations data from Cloudflare API',
+    stage: 'Platform Ops',
+  },
 };
