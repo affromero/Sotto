@@ -3,7 +3,7 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { getAutoModelConfig, setAutoModelConfig } from '@/lib/auto-model-config';
 import { z } from 'zod';
 import { errorResponse } from '@/lib/api-response';
-import { type AiProviderId, getAiProviderIds, isValidModelId } from '@/lib/providers/ai-registry';
+import { type AiProviderId, getAiProviderIds, getProviderForModel, isValidModelId } from '@/lib/providers/ai-registry';
 
 const aiProviderEnum = getAiProviderIds().filter(id => id !== 'claude-code') as [AiProviderId, ...AiProviderId[]];
 
@@ -61,6 +61,20 @@ export async function PATCH(request: NextRequest) {
   for (const block of [parsed.data.free, parsed.data.pro, parsed.data.platform]) {
     if (block?.aiModel && !isValidModelId(block.aiModel)) {
       return errorResponse(`Unknown AI model: "${block.aiModel}". Check /api/ai-models for available models.`, 400);
+    }
+  }
+
+  // Validate model/provider consistency — reject mismatched pairs
+  for (const [label, block] of [['free', parsed.data.free], ['pro', parsed.data.pro], ['platform', parsed.data.platform]] as const) {
+    if (!block) continue;
+    if (block.aiModel && block.aiProvider) {
+      const owner = getProviderForModel(block.aiModel);
+      if (owner && owner !== block.aiProvider) {
+        return errorResponse(
+          `Model "${block.aiModel}" belongs to "${owner}", not "${block.aiProvider}". ` +
+          `Either change the model or the provider for ${label}.`, 400
+        );
+      }
     }
   }
 

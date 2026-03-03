@@ -17,6 +17,29 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn(async () => null),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: vi.fn(async () => ({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
+  })),
+}));
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getAiProviderMeta: vi.fn((id: string) => {
+    if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [{ id: 'claude-haiku-4-5-20251001', tier: 'fast' }, { id: 'claude-sonnet-4-6', tier: 'balanced' }, { id: 'claude-opus-4-6', tier: 'best' }] };
+    if (id === 'openai') return { defaultModel: 'gpt-5', models: [{ id: 'gpt-5-mini', tier: 'fast' }, { id: 'gpt-5', tier: 'balanced' }] };
+    return { defaultModel: '', models: [] };
+  }),
+  getAllAiProviderMeta: vi.fn(() => [
+    { id: 'anthropic', models: [{ id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5' }, { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' }, { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6' }] },
+    { id: 'openai', models: [{ id: 'gpt-5-mini', displayName: 'GPT-5 Mini' }, { id: 'gpt-5', displayName: 'GPT-5' }] },
+  ]),
+}));
+
 vi.mock('@/lib/usage-logger', () => ({
   logUsage: vi.fn(),
 }));
@@ -39,6 +62,32 @@ import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter'
 describe('parseTweetIntent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('passes PLATFORM model to generateResponse', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 50,
+      outputTokens: 50,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    await parseTweetIntent('@sottofm test topic');
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+    );
   });
 
   describe('basic parsing', () => {
@@ -497,6 +546,35 @@ describe('parseThreadIntent', () => {
     const result = await parseThreadIntent(mention, thread);
 
     expect(result.isDebate).toBe(false);
+  });
+
+  it('passes PLATFORM model to generateResponse', async () => {
+    const mockResult: TweetParseResult = {
+      topic: 'Test',
+      title: 'Test Thread',
+      depth: 'standard',
+      audienceLevel: 'beginner',
+      tone: 'casual',
+      focusAreas: [],
+    };
+
+    mockGenerateResponse.mockResolvedValue({
+      content: JSON.stringify(mockResult),
+      inputTokens: 100,
+      outputTokens: 150,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    const thread = createMockThread();
+    const mention = createMockMentionTweet();
+
+    await parseThreadIntent(mention, thread);
+
+    expect(mockGenerateResponse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({ model: 'claude-haiku-4-5-20251001' })
+    );
   });
 
   it('uses maxTokens 1024 for thread parsing', async () => {

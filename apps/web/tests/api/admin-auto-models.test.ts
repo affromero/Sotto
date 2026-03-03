@@ -28,6 +28,11 @@ vi.mock('@/lib/auto-model-config', () => ({
 vi.mock('@/lib/providers/ai-registry', () => ({
   isValidModelId: vi.fn(() => true),
   getAiProviderIds: vi.fn(() => ['anthropic', 'openai', 'claude-code', 'together', 'deepgram', 'assemblyai']),
+  getProviderForModel: vi.fn((id: string) => {
+    if (id.startsWith('claude')) return 'anthropic';
+    if (id.startsWith('gpt')) return 'openai';
+    return null;
+  }),
 }));
 
 vi.mock('@/lib/api-response', () => ({

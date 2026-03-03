@@ -35,7 +35,11 @@ vi.mock('@/lib/byok', () => ({
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
-  getProviderForModel: () => null,
+  getProviderForModel: (id: string) => {
+    if (id.startsWith('claude')) return 'anthropic';
+    if (id.startsWith('gpt')) return 'openai';
+    return null;
+  },
   getAllAiProviderMeta: vi.fn(() => []),
   getAiProviderMeta: vi.fn(() => ({ models: [] })),
   getAiProviderIdsWithPricing: vi.fn(() => []),
@@ -197,6 +201,47 @@ describe('generateForYouQuestions', () => {
     // Prompt includes topic context
     const prompt = ai.generateResponse.mock.calls[0][0];
     expect(prompt).toContain('politics');
+  });
+
+  it('returns empty array when auto config has mismatched model/provider', async () => {
+    // Make resolveAiModelAndProvider fail so the fallback reaches autoModel
+    const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
+    vi.mocked(resolveAiModelAndProvider).mockRejectedValueOnce(new Error('no key'));
+
+    // Simulate anthropic provider with an OpenAI model
+    mockResolveAutoModel.mockResolvedValue({
+      aiProvider: 'anthropic',
+      aiModel: 'gpt-5-mini',
+      ttsProvider: 'kittentts',
+      ttsModel: 'kitten-tts-mini-0.8',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    });
+
+    const result = await generateForYouQuestions('user-1', 1);
+
+    // Should return empty (error caught internally) rather than silently substituting
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when auto config has unknown model', async () => {
+    // Make resolveAiModelAndProvider fail so the fallback reaches autoModel
+    const { resolveAiModelAndProvider } = await import('@/lib/providers/ai-registry');
+    vi.mocked(resolveAiModelAndProvider).mockRejectedValueOnce(new Error('no key'));
+
+    mockResolveAutoModel.mockResolvedValue({
+      aiProvider: 'anthropic',
+      aiModel: 'llama-3.1-8b-instant',
+      ttsProvider: 'kittentts',
+      ttsModel: 'kitten-tts-mini-0.8',
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+    });
+
+    const result = await generateForYouQuestions('user-1', 1);
+
+    // Should return empty (error caught internally) rather than silently substituting
+    expect(result).toEqual([]);
   });
 });
 
