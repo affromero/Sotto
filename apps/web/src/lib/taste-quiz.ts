@@ -412,7 +412,7 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
     const result = await ai.generateResponse(
       systemPrompt,
       [{ role: 'user', content: `Generate ${requestCount} personalized inspire questions.` }],
-      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0 }
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 16384, temperature: 1.0 }
     );
 
     const durationMs = Date.now() - llmStart;
@@ -490,7 +490,7 @@ export async function generateCuriosityQuestions(
     const result = await ai.generateResponse(
       systemPrompt,
       [{ role: 'user', content: `Generate ${requestCount} curiosity questions.` }],
-      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0 }
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 16384, temperature: 1.0 }
     );
 
     const durationMs = Date.now() - llmStart;
@@ -611,7 +611,7 @@ export async function generateNewsQuestions(
     const result = await ai.generateResponse(
       systemPrompt,
       [{ role: 'user', content: `Generate ${requestCount} current-events questions.` }],
-      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 2048, temperature: 1.0, useWebSearch: !useNewsletterPath }
+      { model: resolvedModel, apiKeyOverride: apiKey, maxTokens: 16384, temperature: 1.0, useWebSearch: !useNewsletterPath }
     );
 
     const durationMs = Date.now() - llmStart;

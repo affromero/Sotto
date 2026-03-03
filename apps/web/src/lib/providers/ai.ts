@@ -177,7 +177,19 @@ class OpenAIProvider implements AIProvider {
       } : {}),
     });
 
-    const content = response.choices[0]?.message?.content || '';
+    const choice = response.choices[0];
+    const content = choice?.message?.content || '';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (!content && (choice as any)?.finish_reason === 'length') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const details = (response.usage as any)?.completion_tokens_details;
+      console.warn(
+        `[OpenAI] Empty content with finish_reason=length (model=${model}, ` +
+        `completion_tokens=${response.usage?.completion_tokens || 0}, ` +
+        `reasoning_tokens=${details?.reasoning_tokens ?? 'n/a'}). ` +
+        `Reasoning models need higher max_completion_tokens.`
+      );
+    }
     return {
       content,
       inputTokens: response.usage?.prompt_tokens || 0,
