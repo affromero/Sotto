@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { ImportAudioPayload, notificationQueue, addJob, JobType } from '@/lib/queue';
+import { ImportAudioPayload, notificationQueue, featureComputationQueue, addJob, JobType } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
 import { downloadFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
@@ -69,6 +69,11 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
           duration: podcast.duration,
           fileSize: podcast.fileSize,
         },
+      });
+
+      await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+        scope: 'podcast' as const,
+        targetId: podcastId,
       });
 
       await job.updateProgress(100);
@@ -461,6 +466,12 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
         currentVersion: podcastVersion.version,
         language: detectedLanguage ?? undefined,
       },
+    });
+
+    // Compute ML features for imported podcast
+    await addJob(featureComputationQueue, JobType.COMPUTE_FEATURES, {
+      scope: 'podcast' as const,
+      targetId: podcastId,
     });
 
     // Consume free-tier quota on successful import (not at creation time)

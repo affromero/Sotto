@@ -19,6 +19,11 @@ vi.mock('@/lib/redis', () => ({
     llen: (...args: unknown[]) => mockLlen(...args),
     zcard: (...args: unknown[]) => mockZcard(...args),
   }),
+  createRedisConnection: () => ({
+    ping: () => mockPing(),
+    llen: (...args: unknown[]) => mockLlen(...args),
+    zcard: (...args: unknown[]) => mockZcard(...args),
+  }),
 }));
 
 vi.mock('@aws-sdk/client-s3', () => ({

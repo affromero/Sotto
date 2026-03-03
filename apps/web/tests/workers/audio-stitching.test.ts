@@ -91,12 +91,14 @@ vi.mock('@/lib/queue', () => ({
   JobType: {
     SEND_NOTIFICATION: 'send_notification',
     GENERATE_PDF: 'generate_pdf',
+    COMPUTE_FEATURES: 'compute_features',
     REPLY_TWITTER: 'reply_twitter',
     REPLY_TELEGRAM: 'reply_telegram',
     AUTO_TWEET: 'AUTO_TWEET',
   },
   notificationQueue: { name: 'notifications' },
   pdfGenerationQueue: { name: 'pdf-generation' },
+  featureComputationQueue: { name: 'feature-computation' },
   twitterReplyQueue: { name: 'twitter-reply' },
   telegramReplyQueue: { name: 'telegram-reply' },
   twitterAutoTweetQueue: { name: 'twitter-auto-tweet' },
@@ -600,6 +602,30 @@ describe('processAudioStitching', () => {
     });
   });
 
+  describe('feature computation', () => {
+    it('enqueues feature computation after successful stitching', async () => {
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      expect(mockAddJob).toHaveBeenCalledWith(
+        { name: 'feature-computation' },
+        'compute_features',
+        { scope: 'podcast', targetId: 'podcast-001' }
+      );
+    });
+
+    it('does not enqueue feature computation when duration exceeds limit', async () => {
+      mockStitchWithEffects.mockResolvedValue({ duration: 2100 });
+      const job = createMockJob(defaultPayload);
+      await processAudioStitching(job);
+
+      const featureCall = mockAddJob.mock.calls.find(
+        (call) => call[1] === 'compute_features'
+      );
+      expect(featureCall).toBeUndefined();
+    });
+  });
+
   describe('Twitter reply (source=TWITTER)', () => {
     beforeEach(() => {
       mockPrismaPodcastFindUniqueOrThrow.mockResolvedValue({
@@ -653,7 +679,7 @@ describe('processAudioStitching', () => {
       await processAudioStitching(job);
 
       expect(mockPrismaTweetMentionFindFirst).not.toHaveBeenCalled();
-      expect(mockAddJob).toHaveBeenCalledTimes(2); // notification + transcript
+      expect(mockAddJob).toHaveBeenCalledTimes(3); // notification + transcript + feature computation
     });
 
     it('does not queue Twitter reply when mention is not found', async () => {
