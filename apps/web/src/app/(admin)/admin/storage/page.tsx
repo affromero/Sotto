@@ -1,10 +1,17 @@
 import { getStorageOverview, getStorageTrend, checkStorageAlerts } from '@/lib/storage-metrics';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { listPrefixes, listObjectsDetailed } from '@/lib/r2';
+import { getCorpusCompleteness, getPodcastCompletenessScores } from '@/lib/data-completeness';
+import Link from 'next/link';
 import styles from './page.module.css';
 
 interface PageProps {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{
+    range?: string;
+    sort?: string;
+    dir?: string;
+    page?: string;
+  }>;
 }
 
 interface PrefixBreakdown {
@@ -25,6 +32,10 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
   const params = await searchParams;
   const rangeParam = params.range ?? '30';
   const days = [7, 30, 90].includes(Number(rangeParam)) ? Number(rangeParam) : 30;
+  const sortBy = params.sort === 'score' ? 'score' as const : 'date' as const;
+  const sortDir = params.dir === 'asc' ? 'asc' as const : 'desc' as const;
+  const currentPage = Math.max(1, Number(params.page) || 1);
+  const perPage = 25;
 
   if (!isR2MonitoringConfigured()) {
     return (
@@ -86,6 +97,13 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
   }
 
   const prefixTotalBytes = prefixBreakdown.reduce((sum, p) => sum + p.totalBytes, 0);
+
+  const [corpusCompleteness, podcastScores] = await Promise.all([
+    getCorpusCompleteness(),
+    getPodcastCompletenessScores(currentPage, perPage, sortBy, sortDir),
+  ]);
+
+  const totalPages = Math.ceil(podcastScores.total / perPage);
 
   return (
     <div className={styles.container}>
@@ -308,6 +326,113 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
               ))}
             </tbody>
           </table>
+        </section>
+      )}
+
+      {/* Corpus Completeness */}
+      {corpusCompleteness.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Corpus Completeness ({podcastScores.total} READY podcasts)</h2>
+          <div className={styles.hBarContainer}>
+            {corpusCompleteness.map((dim) => {
+              const pct = dim.total > 0 ? (dim.count / dim.total) * 100 : 0;
+              return (
+                <div key={dim.key} className={styles.hBarRow} role="img" aria-label={`${dim.label}: ${dim.count} of ${dim.total} (${pct.toFixed(0)}%)`}>
+                  <span className={styles.hBarLabel}>{dim.label}</span>
+                  <div className={styles.hBarTrack}>
+                    <div className={styles.hBarFill} style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className={styles.hBarValue}>{pct.toFixed(0)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Podcast List */}
+      {podcastScores.podcasts.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Podcast Data Completeness</h2>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>
+                  <a
+                    href={`/admin/storage?range=${rangeParam}&sort=score&dir=${sortBy === 'score' && sortDir === 'desc' ? 'asc' : 'desc'}&page=1`}
+                    className={styles.sortLink}
+                  >
+                    Score {sortBy === 'score' ? (sortDir === 'desc' ? '\u2193' : '\u2191') : ''}
+                  </a>
+                </th>
+                <th>Providers</th>
+                <th>
+                  <a
+                    href={`/admin/storage?range=${rangeParam}&sort=date&dir=${sortBy === 'date' && sortDir === 'desc' ? 'asc' : 'desc'}&page=1`}
+                    className={styles.sortLink}
+                  >
+                    Created {sortBy === 'date' ? (sortDir === 'desc' ? '\u2193' : '\u2191') : ''}
+                  </a>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {podcastScores.podcasts.map((p) => {
+                const scoreClass = p.score >= 13 ? styles.scoreGreen : p.score >= 9 ? styles.scoreAmber : styles.scoreRed;
+                return (
+                  <tr key={p.podcastId}>
+                    <td>
+                      <Link href={`/admin/storage/${p.podcastId}`} className={styles.podcastLink}>
+                        {p.title}
+                      </Link>
+                    </td>
+                    <td>
+                      <span className={scoreClass} aria-label={`Completeness score ${p.score} of ${p.maxScore}`}>
+                        {p.score}/{p.maxScore}
+                      </span>
+                    </td>
+                    <td className={styles.providerInfo}>
+                      {[p.aiProvider, p.aiModel].filter(Boolean).join('/')}{' '}
+                      {p.ttsProvider && <>+ {[p.ttsProvider, p.ttsModel].filter(Boolean).join('/')}</>}
+                    </td>
+                    <td>
+                      {p.createdAt.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className={styles.pagination}>
+              {currentPage > 1 && (
+                <a
+                  href={`/admin/storage?range=${rangeParam}&sort=${sortBy}&dir=${sortDir}&page=${currentPage - 1}`}
+                  className={styles.pageButton}
+                >
+                  Previous
+                </a>
+              )}
+              <span className={styles.pageInfo}>
+                Page {currentPage} of {totalPages}
+              </span>
+              {currentPage < totalPages && (
+                <a
+                  href={`/admin/storage?range=${rangeParam}&sort=${sortBy}&dir=${sortDir}&page=${currentPage + 1}`}
+                  className={styles.pageButton}
+                >
+                  Next
+                </a>
+              )}
+            </div>
+          )}
         </section>
       )}
 
