@@ -174,4 +174,111 @@ describe('computeCompletenessChecklist', () => {
     // Script, Audio, Segments, ML Features are still false
     expect(result.score).toBe(11);
   });
+
+  it('each dimension is independently togglable', () => {
+    const dimensionInputMap: Record<string, Partial<CompletenessInput>> = {
+      script: { hasScript: true },
+      audio: { hasAudio: true },
+      segments: { segmentCount: 1, segmentsWithAudio: 1 },
+      references: { referenceCount: 1 },
+      verifiedReferences: { verifiedReferenceCount: 1 },
+      discoveryChat: { discoveryMessageCount: 1 },
+      voiceAssignments: { voiceAssignmentCount: 1 },
+      voiceTracks: { completedVoiceTrackCount: 1 },
+      tags: { tagCount: 1 },
+      qaInteractions: { answeredInteractionCount: 1 },
+      ratings: { ratingCount: 1 },
+      playbackData: { playbackSessionCount: 1 },
+      mlFeatures: { hasMLFeatures: true },
+      apiCostLogs: { apiCostLogCount: 1 },
+      segmentVoiceMap: { segmentVoiceMapCount: 1 },
+    };
+
+    for (const [key, overrides] of Object.entries(dimensionInputMap)) {
+      const result = computeCompletenessChecklist(makeInput(overrides));
+      const dim = result.dimensions.find((d) => d.key === key);
+      expect(dim?.present, `${key} should be present when its input is set`).toBe(true);
+      expect(result.score, `score should be 1 when only ${key} is set`).toBe(1);
+    }
+  });
+
+  it('segments require both count > 0 AND all having audio', () => {
+    // Has segments but none with audio
+    const noAudio = computeCompletenessChecklist(makeInput({
+      segmentCount: 10,
+      segmentsWithAudio: 0,
+    }));
+    expect(noAudio.dimensions.find((d) => d.key === 'segments')?.present).toBe(false);
+
+    // Has segments with partial audio
+    const partial = computeCompletenessChecklist(makeInput({
+      segmentCount: 10,
+      segmentsWithAudio: 9,
+    }));
+    expect(partial.dimensions.find((d) => d.key === 'segments')?.present).toBe(false);
+
+    // All segments have audio
+    const all = computeCompletenessChecklist(makeInput({
+      segmentCount: 10,
+      segmentsWithAudio: 10,
+    }));
+    expect(all.dimensions.find((d) => d.key === 'segments')?.present).toBe(true);
+  });
+
+  it('score equals count of present dimensions', () => {
+    // Set exactly 7 dimensions present
+    const result = computeCompletenessChecklist(makeInput({
+      hasScript: true,
+      hasAudio: true,
+      referenceCount: 3,
+      verifiedReferenceCount: 1,
+      tagCount: 2,
+      ratingCount: 5,
+      hasMLFeatures: true,
+    }));
+
+    const presentCount = result.dimensions.filter((d) => d.present).length;
+    expect(result.score).toBe(presentCount);
+    expect(result.score).toBe(7);
+  });
+
+  it('dimension labels are all non-empty strings', () => {
+    const result = computeCompletenessChecklist(makeInput());
+    for (const dim of result.dimensions) {
+      expect(dim.label.length).toBeGreaterThan(0);
+      expect(dim.key.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('maxScore is always 15 regardless of input', () => {
+    const empty = computeCompletenessChecklist(makeInput());
+    const full = computeCompletenessChecklist(makeInput({
+      hasScript: true,
+      hasAudio: true,
+      segmentCount: 5,
+      segmentsWithAudio: 5,
+      referenceCount: 1,
+      verifiedReferenceCount: 1,
+      discoveryMessageCount: 1,
+      voiceAssignmentCount: 1,
+      completedVoiceTrackCount: 1,
+      tagCount: 1,
+      answeredInteractionCount: 1,
+      ratingCount: 1,
+      playbackSessionCount: 1,
+      hasMLFeatures: true,
+      apiCostLogCount: 1,
+      segmentVoiceMapCount: 1,
+    }));
+
+    expect(empty.maxScore).toBe(15);
+    expect(full.maxScore).toBe(15);
+  });
+
+  it('no duplicate dimension keys', () => {
+    const result = computeCompletenessChecklist(makeInput());
+    const keys = result.dimensions.map((d) => d.key);
+    const uniqueKeys = new Set(keys);
+    expect(uniqueKeys.size).toBe(keys.length);
+  });
 });
