@@ -1,6 +1,5 @@
-import { getStorageOverview, getStorageTrend, checkStorageAlerts } from '@/lib/storage-metrics';
+import { getStorageOverview, getStorageTrend, checkStorageAlerts, getLatestPrefixBreakdown } from '@/lib/storage-metrics';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
-import { listPrefixes, listObjectsDetailed } from '@/lib/r2';
 import { getCorpusCompleteness, getPodcastCompletenessScores } from '@/lib/data-completeness';
 import Link from 'next/link';
 import styles from './page.module.css';
@@ -12,12 +11,6 @@ interface PageProps {
     dir?: string;
     page?: string;
   }>;
-}
-
-interface PrefixBreakdown {
-  prefix: string;
-  fileCount: number;
-  totalBytes: number;
 }
 
 function formatBytes(bytes: number): string {
@@ -78,26 +71,7 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
   const maxStorageGb = Math.max(...trend.map((d) => d.payloadSizeGb), 0.001);
   const maxCost = Math.max(...trend.map((d) => d.totalCost), 0.001);
 
-  let prefixBreakdown: PrefixBreakdown[] = [];
-  try {
-    const prefixes = await listPrefixes();
-    const settled = await Promise.allSettled(
-      prefixes.map(async ({ prefix }) => {
-        const objects = await listObjectsDetailed(prefix);
-        return {
-          prefix,
-          fileCount: objects.length,
-          totalBytes: objects.reduce((sum, o) => sum + o.sizeBytes, 0),
-        };
-      })
-    );
-    const details = settled
-      .filter((r): r is PromiseFulfilledResult<PrefixBreakdown> => r.status === 'fulfilled')
-      .map((r) => r.value);
-    prefixBreakdown = details.sort((a, b) => b.totalBytes - a.totalBytes);
-  } catch {
-    // R2 listing unavailable — graceful degradation
-  }
+  const prefixBreakdown = await getLatestPrefixBreakdown();
 
   const prefixTotalBytes = prefixBreakdown.reduce((sum, p) => sum + p.totalBytes, 0);
 
