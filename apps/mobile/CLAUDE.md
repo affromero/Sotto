@@ -68,6 +68,8 @@ app/
 | `formatters.ts` | `formatDuration`, `formatCount`, `timeAgo`, etc. |
 | `audio-player.ts` | react-native-track-player setup + track loading |
 | `notifications.ts` | Push notification handler + token registration |
+| `event-buffer.ts` | Event batching: 5s flush, AppState-aware, silent failure |
+| `usePlaybackTelemetry.ts` | Observes RNTP state, fires playback events |
 
 ## Components
 
@@ -85,6 +87,7 @@ app/
 | `DurationPicker.tsx` / `VisibilityPicker.tsx` | Duration + visibility pickers |
 | `GenerationProgress.tsx` | 8-step pipeline progress indicator |
 | `ScriptPreview.tsx` | Read-only script preview with approve/regenerate |
+| `EventProvider.tsx` | React context providing `track()` + userId sync |
 
 ## Creation Flow
 
