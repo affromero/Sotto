@@ -1,6 +1,6 @@
-import { getCostBreakdown, getDailyCostTrend, checkCostThresholds } from '@/lib/cost-monitor';
+import { getCostBreakdown, getDailyCostTrend, checkCostThresholds, getPerModelCostBreakdown } from '@/lib/cost-monitor';
 import { prisma } from '@/lib/prisma';
-import { getAiProviderIdsWithPricing } from '@/lib/providers/ai-registry';
+import { getAiProviderIdsWithPricing, getAiModelDisplayName } from '@/lib/providers/ai-registry';
 import { subDays, startOfDay } from 'date-fns';
 import styles from './page.module.css';
 
@@ -41,11 +41,12 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
   })();
   const period = periodFromDays(days);
 
-  const [breakdown, dailyTrend, warnings, costPerPodcast] = await Promise.all([
+  const [breakdown, dailyTrend, warnings, costPerPodcast, perModelCosts] = await Promise.all([
     getCostBreakdown(period),
     getDailyCostTrend(days),
     checkCostThresholds(),
     getCostPerPodcast(since),
+    getPerModelCostBreakdown(period),
   ]);
 
   const AI_SERVICES: Set<string> = new Set(getAiProviderIdsWithPricing());
@@ -224,6 +225,41 @@ export default async function AdminCostsPage({ searchParams }: PageProps) {
 
                 return rows;
               })}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* Per-model cost breakdown */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Per-Model Costs</h2>
+        {perModelCosts.length === 0 ? (
+          <p className={styles.empty}>No per-model cost data yet.</p>
+        ) : (
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>Provider</th>
+                <th className={styles.numCell}>Input Tokens</th>
+                <th className={styles.numCell}>Output Tokens</th>
+                <th className={styles.numCell}>Total Cost</th>
+                <th className={styles.numCell}>Calls</th>
+                <th className={styles.numCell}>Avg $/Call</th>
+              </tr>
+            </thead>
+            <tbody>
+              {perModelCosts.map((m) => (
+                <tr key={`${m.service}-${m.modelId}`}>
+                  <td>{getAiModelDisplayName(m.modelId)}</td>
+                  <td>{m.service}</td>
+                  <td className={styles.numCell}>{m.inputTokens.toLocaleString()}</td>
+                  <td className={styles.numCell}>{m.outputTokens.toLocaleString()}</td>
+                  <td className={styles.numCell}>${m.totalCost.toFixed(2)}</td>
+                  <td className={styles.numCell}>{m.callCount.toLocaleString()}</td>
+                  <td className={styles.numCell}>${m.avgCostPerCall.toFixed(4)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}

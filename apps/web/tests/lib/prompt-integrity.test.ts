@@ -66,6 +66,7 @@ const EXPECTED_FILES = [
   'feeds/news-from-newsletters.md',
   'audio/voice-assigner.md',
   'audio/tts-tag-converter.md',
+  'pricing-extractor.md',
 ];
 
 // ── Variable contracts: template → expected placeholder names ──

@@ -16,7 +16,7 @@ declare module 'openai' {
   }
 
   class OpenAI {
-    constructor(opts: { apiKey: string });
+    constructor(opts: { apiKey: string; baseURL?: string });
     chat: {
       completions: {
         create(params: Record<string, unknown>): Promise<ChatCompletion & AsyncIterable<{ choices: ChatCompletionChoice[] }>>;

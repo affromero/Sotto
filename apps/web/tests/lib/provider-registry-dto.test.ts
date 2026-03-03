@@ -5,8 +5,8 @@ import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 describe('AI Provider Client DTO', () => {
   const meta = getAllAiProviderClientMeta();
 
-  it('returns 5 providers and excludes claude-code', () => {
-    expect(meta).toHaveLength(5);
+  it('returns 6 providers and excludes claude-code', () => {
+    expect(meta).toHaveLength(6);
     expect(meta.map((m) => m.id)).not.toContain('claude-code');
   });
 
@@ -18,7 +18,7 @@ describe('AI Provider Client DTO', () => {
   });
 
   it('LLM providers have non-empty models, STT-only providers have empty models', () => {
-    const llmProviders = meta.filter((m) => ['anthropic', 'openai'].includes(m.id));
+    const llmProviders = meta.filter((m) => ['anthropic', 'openai', 'google'].includes(m.id));
     const sttOnlyProviders = meta.filter((m) => ['together', 'deepgram', 'assemblyai'].includes(m.id));
 
     for (const provider of llmProviders) {

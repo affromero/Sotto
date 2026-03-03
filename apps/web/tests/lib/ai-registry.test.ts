@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { getCheapestModelForProvider, getAiProviderIdsWithPricing, isValidModelId, resolveAiModelAndProvider, type AiProviderId } from '@/lib/providers/ai-registry';
+import { getCheapestModelForProvider, getAiProviderIdsWithPricing, isValidModelId, resolveAiModelAndProvider, getModelContextWindow, getModelMaxOutputTokens, type AiProviderId } from '@/lib/providers/ai-registry';
 
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -22,7 +22,11 @@ describe('getCheapestModelForProvider', () => {
   });
 
   it('returns fast-tier model for openai', () => {
-    expect(getCheapestModelForProvider('openai')).toBe('gpt-5-mini');
+    expect(getCheapestModelForProvider('openai')).toBe('gpt-5-nano');
+  });
+
+  it('returns fast-tier model for google', () => {
+    expect(getCheapestModelForProvider('google')).toBe('gemini-3.1-flash-lite-preview');
   });
 
   it('returns first model when no fast tier exists (claude-code)', () => {
@@ -49,6 +53,15 @@ describe('isValidModelId', () => {
     expect(isValidModelId('gpt-5-mini')).toBe(true);
   });
 
+  it('returns true for known Google model', () => {
+    expect(isValidModelId('gemini-3.1-flash-lite-preview')).toBe(true);
+    expect(isValidModelId('gemini-3.1-pro-preview')).toBe(true);
+  });
+
+  it('returns true for gpt-5-nano', () => {
+    expect(isValidModelId('gpt-5-nano')).toBe(true);
+  });
+
   it('returns false for unknown model', () => {
     expect(isValidModelId('gpt-99-turbo')).toBe(false);
   });
@@ -63,10 +76,47 @@ describe('getAiProviderIdsWithPricing', () => {
     const ids = getAiProviderIdsWithPricing();
     expect(ids).toContain('anthropic');
     expect(ids).toContain('openai');
+    expect(ids).toContain('google');
     expect(ids).not.toContain('claude-code');
     expect(ids).not.toContain('together');
     expect(ids).not.toContain('deepgram');
     expect(ids).not.toContain('assemblyai');
+  });
+});
+
+describe('getModelContextWindow', () => {
+  it('returns context window for Anthropic model', () => {
+    expect(getModelContextWindow('claude-sonnet-4-6')).toBe(200_000);
+  });
+
+  it('returns context window for OpenAI model', () => {
+    expect(getModelContextWindow('gpt-5-mini')).toBe(400_000);
+  });
+
+  it('returns context window for Google model', () => {
+    expect(getModelContextWindow('gemini-3.1-flash-lite-preview')).toBe(1_000_000);
+  });
+
+  it('returns null for unknown model', () => {
+    expect(getModelContextWindow('nonexistent')).toBeNull();
+  });
+});
+
+describe('getModelMaxOutputTokens', () => {
+  it('returns max output for Opus (128K)', () => {
+    expect(getModelMaxOutputTokens('claude-opus-4-6')).toBe(128_000);
+  });
+
+  it('returns max output for Haiku (64K)', () => {
+    expect(getModelMaxOutputTokens('claude-haiku-4-5-20251001')).toBe(64_000);
+  });
+
+  it('returns max output for OpenAI model (128K)', () => {
+    expect(getModelMaxOutputTokens('gpt-5-nano')).toBe(128_000);
+  });
+
+  it('returns null for unknown model', () => {
+    expect(getModelMaxOutputTokens('nonexistent')).toBeNull();
   });
 });
 

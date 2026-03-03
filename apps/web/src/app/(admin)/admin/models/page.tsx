@@ -32,6 +32,7 @@ function hasPlatformKey(category: 'ai' | 'tts' | 'stt', providerId: string): boo
     switch (providerId) {
       case 'anthropic': return !!process.env.ANTHROPIC_API_KEY;
       case 'openai': return !!process.env.OPENAI_API_KEY;
+      case 'google': return !!process.env.GOOGLE_AI_API_KEY;
       case 'claude-code': return isClaudeCliAvailable();
       default: return false;
     }

@@ -2,13 +2,14 @@
  * Centralized AI model pricing lookup.
  * All costs are per 1 million tokens.
  *
- * Pricing is derived from the AI registry (single source of truth).
- * Only embeddings are hardcoded here — they're not LLM models.
+ * Pricing is derived from the AI registry (single source of truth) at module load,
+ * then optionally refreshed from ModelPricingSnapshot DB rows every 5 minutes.
+ * The refresh is opt-in via startPricingRefreshInterval() — never fires at build/test time.
  */
 import { logger } from './logger';
 import { getAllAiProviderMeta, getAiProviderMeta, getCheapestModelForProvider } from './providers/ai-registry';
 
-interface ModelPricing {
+export interface ModelPricing {
   inputPerMTok: number;
   outputPerMTok: number;
 }
@@ -32,11 +33,14 @@ function buildPricingMap(): Record<string, ModelPricing> {
 
 const AI_PRICING = buildPricingMap();
 
+/** Mutable in-memory pricing map — starts as registry baseline, updated by DB refresh. */
+let activePricing: Record<string, ModelPricing> = { ...AI_PRICING };
+
 // Default fallback: Sonnet 4.6 pricing (matches prior hardcoded behavior)
 const FALLBACK_PRICING: ModelPricing = { inputPerMTok: 3.0, outputPerMTok: 15.0 };
 
 export function getAiPricing(model: string): ModelPricing {
-  const pricing = AI_PRICING[model];
+  const pricing = activePricing[model];
   if (!pricing) {
     logger.warn('Unknown model for pricing lookup, using Sonnet 4.6 fallback', { model });
     return FALLBACK_PRICING;
@@ -54,7 +58,7 @@ export function getAiCost(model: string, inputTokens: number, outputTokens: numb
 /** Pick the cheapest generative model from the pricing table (excludes embeddings + local CLI). */
 export function getCheapestModel(): string {
   let cheapest: { model: string; cost: number } | null = null;
-  for (const [model, pricing] of Object.entries(AI_PRICING)) {
+  for (const [model, pricing] of Object.entries(activePricing)) {
     if (model.startsWith('text-embedding') || model.startsWith('claude-code:')) continue;
     const totalCost = pricing.inputPerMTok + pricing.outputPerMTok;
     if (!cheapest || totalCost < cheapest.cost) {
@@ -62,4 +66,71 @@ export function getCheapestModel(): string {
     }
   }
   return cheapest?.model ?? getCheapestModelForProvider('anthropic') ?? 'claude-haiku-4-5-20251001';
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic refresh from DB (opt-in)
+// ---------------------------------------------------------------------------
+
+/** Refresh in-memory pricing from the latest DB snapshots. */
+export async function refreshPricingFromDb(): Promise<void> {
+  try {
+    const { getLatestPricingFromDb } = await import('./pricing-fetcher');
+    const dbPricing = await getLatestPricingFromDb();
+    if (dbPricing.size === 0) return;
+
+    // Start with registry baseline, overlay DB values
+    const merged = { ...AI_PRICING };
+    for (const [modelId, data] of dbPricing) {
+      merged[modelId] = { inputPerMTok: data.inputPerMTok, outputPerMTok: data.outputPerMTok };
+    }
+    activePricing = merged;
+    logger.debug('Pricing refreshed from DB', { modelCount: dbPricing.size });
+  } catch (error) {
+    logger.warn('Failed to refresh pricing from DB', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** Returns the full pricing map with source info (for admin page). */
+export async function getAllCurrentPricing(): Promise<
+  Array<{ modelId: string; inputPerMTok: number; outputPerMTok: number; source: string }>
+> {
+  try {
+    const { getLatestPricingFromDb } = await import('./pricing-fetcher');
+    const dbPricing = await getLatestPricingFromDb();
+    const result: Array<{ modelId: string; inputPerMTok: number; outputPerMTok: number; source: string }> = [];
+
+    // Include all models from the active pricing map
+    for (const [modelId, pricing] of Object.entries(activePricing)) {
+      const dbEntry = dbPricing.get(modelId);
+      result.push({
+        modelId,
+        inputPerMTok: pricing.inputPerMTok,
+        outputPerMTok: pricing.outputPerMTok,
+        source: dbEntry?.source ?? 'registry',
+      });
+    }
+    return result;
+  } catch {
+    return Object.entries(activePricing).map(([modelId, pricing]) => ({
+      modelId,
+      ...pricing,
+      source: 'registry',
+    }));
+  }
+}
+
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the 5-minute pricing refresh interval.
+ * Call this from workers/index.ts or Next.js instrumentation — NOT at module scope.
+ */
+export function startPricingRefreshInterval(): void {
+  if (refreshInterval) return;
+  refreshInterval = setInterval(refreshPricingFromDb, 5 * 60 * 1000);
+  // Do an initial refresh
+  refreshPricingFromDb().catch(() => {});
 }
