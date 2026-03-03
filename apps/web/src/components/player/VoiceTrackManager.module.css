@@ -54,6 +54,160 @@
   padding: 1.5rem;
 }
 
+/* Proposals Section */
+.proposalsSection {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sectionTitle {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-warning, #F59E0B);
+  margin: 0 0 0.75rem;
+}
+
+.proposalList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.proposalCard {
+  padding: 1rem;
+  border: 2px solid var(--color-warning, #F59E0B);
+  border-radius: 0.75rem;
+  background: var(--color-warning-lighter, #FFFBEB);
+}
+
+.proposalInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.proposalAuthor {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.proposalAvatar {
+  border-radius: 9999px;
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+}
+
+.proposalAuthorName {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.providerBadge {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.proposalMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+.proposalActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.acceptBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #10B981;
+  border-radius: 0.5rem;
+  background: #D1FAE5;
+  color: #065F46;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 36px;
+}
+
+.acceptBtn:hover {
+  background: #10B981;
+  color: white;
+}
+
+.rejectBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 36px;
+}
+
+.rejectBtn:hover {
+  border-color: #EF4444;
+  color: #EF4444;
+}
+
+.rejectForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.rejectTextarea {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  resize: none;
+}
+
+.rejectTextarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.rejectFormActions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Track list */
 .trackList {
   display: flex;
   flex-direction: column;
@@ -74,12 +228,20 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
 }
 
 .trackName {
   font-weight: 600;
   font-size: 0.9375rem;
   color: var(--color-text-primary);
+}
+
+.contributedBy {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-left: 0.375rem;
 }
 
 .trackMeta {
@@ -120,9 +282,16 @@
   color: #991B1B;
 }
 
+.failureReason {
+  font-size: 0.75rem;
+  color: #991B1B;
+  margin-top: 0.25rem;
+}
+
 .trackActions {
   display: flex;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .actionBtn {
@@ -153,6 +322,7 @@
   color: #EF4444;
 }
 
+/* Add section */
 .addSection {
   margin-top: 1rem;
   padding-top: 1rem;
@@ -182,11 +352,39 @@
   color: var(--color-primary);
 }
 
-.addBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
+.addInput {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.addInput:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.addInput::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+.addFormActions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+/* Empty state */
 .empty {
   text-align: center;
   padding: 2rem 1rem;
