@@ -215,7 +215,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
   const tracks = await prisma.voiceTrack.findMany({
     where: {
       podcastId,
-      ...(isOwner ? {} : { status: 'READY' }),
+      ...(isOwner
+        ? {}
+        : {
+            status: 'READY',
+            OR: [
+              { proposalStatus: null },
+              { proposalStatus: 'ACCEPTED' },
+            ],
+          }),
     },
     orderBy: { createdAt: 'asc' },
     select: {
@@ -225,8 +233,19 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       audioUrl: true,
       duration: true,
       ttsProvider: true,
+      ttsModel: true,
       failureReason: isOwner ? true : false,
       voices: { select: { speaker: true, voiceId: true } },
+      proposalStatus: true,
+      proposalMessage: true,
+      contributor: {
+        select: {
+          id: true,
+          name: true,
+          handle: true,
+          image: true,
+        },
+      },
     },
   });
 
