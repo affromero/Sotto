@@ -7,14 +7,13 @@ import { prisma, prismaUnfiltered } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { addJob, audioImportQueue, JobType } from '@/lib/queue';
 import { importPodcastSchema } from '@/lib/validations';
-import { getAiKey, getByokKey } from '@/lib/byok';
 import { checkGenerationGate } from '@/lib/generation-gate';
+import { resolveSttProvider } from '@/lib/providers/stt';
 
 import { checkRateLimit } from '@/lib/redis';
 import { generatePodcastSlug } from '@/lib/slugify';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
-import type { SttProviderId } from '@sotto/shared';
 
 const MAX_AUDIO_SIZE = 100 * 1024 * 1024;
 
@@ -100,41 +99,6 @@ function parseMultipart(
 
     nodeStream.pipe(bb);
   });
-}
-
-/**
- * Resolve the BYOK API key for the selected STT provider.
- * Falls back to platform keys when no BYOK key is available.
- */
-async function resolveSttApiKey(
-  userId: string,
-  sttProvider: SttProviderId | undefined
-): Promise<string | undefined> {
-  const provider = sttProvider ?? 'openai';
-
-  if (provider === 'openai') {
-    const byokKey = await getAiKey(userId, 'openai');
-    return byokKey?.apiKey ?? process.env.OPENAI_API_KEY ?? undefined;
-  }
-
-  if (provider === 'together') {
-    const byokKey = await getAiKey(userId, 'together');
-    return byokKey?.apiKey ?? process.env.TOGETHER_API_KEY ?? undefined;
-  }
-
-  if (provider === 'deepgram') {
-    const byokKey = await getAiKey(userId, 'deepgram');
-    return byokKey?.apiKey ?? process.env.DEEPGRAM_API_KEY ?? undefined;
-  }
-
-  if (provider === 'assemblyai') {
-    const byokKey = await getAiKey(userId, 'assemblyai');
-    return byokKey?.apiKey ?? process.env.ASSEMBLYAI_API_KEY ?? undefined;
-  }
-
-  // elevenlabs
-  const byokKey = await getByokKey(userId, 'elevenlabs');
-  return byokKey ?? process.env.ELEVENLABS_API_KEY ?? undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -275,14 +239,29 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const sttApiKey = await resolveSttApiKey(userId, validatedSttProvider);
+    let sttApiKey: string | undefined;
+    let effectiveSttProvider = validatedSttProvider;
+    let effectiveSttModel = validatedSttModel;
+
+    try {
+      const resolved = await resolveSttProvider({
+        userId,
+        requestedProvider: validatedSttProvider ?? undefined,
+        requestedModel: validatedSttModel ?? undefined,
+        plan: gate.isProUser ? 'PRO' : 'FREE',
+      });
+      sttApiKey = resolved.apiKey;
+      if (!effectiveSttProvider) effectiveSttProvider = resolved.providerId;
+      if (!effectiveSttModel) effectiveSttModel = resolved.model;
+    } catch {
+      // No STT key available — handled by check below
+    }
 
     if (!sttApiKey && !transcriptText) {
       await prismaUnfiltered.podcast.delete({ where: { id: podcast.id } });
-      const provider = validatedSttProvider ?? 'openai';
-      const providerName = { openai: 'OpenAI', elevenlabs: 'ElevenLabs', together: 'Together AI', deepgram: 'Deepgram', assemblyai: 'AssemblyAI' }[provider] ?? provider;
+      const providerName = effectiveSttProvider ?? 'openai';
       return errorResponse(
-        `No API key available for speech-to-text provider "${provider}". Add a ${providerName} key in Settings → API Keys, or provide a transcript file.`,
+        `No API key available for speech-to-text provider "${providerName}". Add a key in Settings → API Keys, or provide a transcript file.`,
         400
       );
     }
@@ -294,8 +273,8 @@ export async function POST(request: NextRequest) {
       transcriptText,
       isHumanContent,
       generateMetadata,
-      sttProvider: validatedSttProvider,
-      sttModel: validatedSttModel,
+      sttProvider: effectiveSttProvider,
+      sttModel: effectiveSttModel,
       sttApiKey,
     });
 
@@ -306,7 +285,7 @@ export async function POST(request: NextRequest) {
       userId,
       audioSize: String(audioFile.buffer.length),
       hasTranscript: !!transcriptText,
-      sttProvider: validatedSttProvider ?? 'openai',
+      sttProvider: effectiveSttProvider ?? 'auto',
       generateMetadata: String(generateMetadata),
     });
 

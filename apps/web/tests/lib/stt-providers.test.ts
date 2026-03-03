@@ -6,6 +6,24 @@ vi.mock('@/lib/logger', () => ({
 
 const mockTranscriptionsCreate = vi.fn();
 
+const mockGetAiKey = vi.fn();
+const mockGetByokKey = vi.fn();
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+  getByokKey: (...args: unknown[]) => mockGetByokKey(...args),
+}));
+
+const mockResolveAutoModel = vi.fn();
+
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
+}));
+
+vi.mock('@/lib/prisma', () => ({
+  prisma: {},
+}));
+
 vi.mock('openai', () => ({
   default: class MockOpenAI {
     audio = {
@@ -17,7 +35,7 @@ vi.mock('openai', () => ({
   },
 }));
 
-import { createSttProvider } from '@/lib/providers/stt';
+import { createSttProvider, resolveSttProvider, getSttPlatformKey } from '@/lib/providers/stt';
 import {
   isValidAiProviderId,
   getAiProviderMeta,
@@ -77,6 +95,22 @@ describe('createSttProvider', () => {
         model: 'whisper-1',
       })
     );
+  });
+
+  it('extracts .text from object response when verbose_json fails', async () => {
+    await import('openai');
+    const provider = createSttProvider('together', 'tog-test');
+
+    // First call (verbose_json) throws
+    mockTranscriptionsCreate.mockRejectedValueOnce(
+      new Error('verbose_json is not supported')
+    );
+    // Second call (text fallback) returns an object instead of a string
+    mockTranscriptionsCreate.mockResolvedValueOnce({ text: 'transcribed content' });
+
+    const result = await provider.transcribe(Buffer.from('audio'));
+    expect(result.text).toBe('transcribed content');
+    expect(result.segments[0].text).toBe('transcribed content');
   });
 
   it('returns a together provider for "together"', () => {
@@ -301,5 +335,147 @@ describe('importPodcastSchema — STT providers', () => {
     if (result.success) {
       expect(result.data.sttProvider).toBeUndefined();
     }
+  });
+});
+
+describe('getSttPlatformKey', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns OPENAI_API_KEY for openai', () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
+    expect(getSttPlatformKey('openai')).toBe('sk-platform');
+  });
+
+  it('returns TOGETHER_API_KEY for together', () => {
+    vi.stubEnv('TOGETHER_API_KEY', 'tog-platform');
+    expect(getSttPlatformKey('together')).toBe('tog-platform');
+  });
+
+  it('returns undefined when env var is not set', () => {
+    vi.stubEnv('OPENAI_API_KEY', '');
+    expect(getSttPlatformKey('openai')).toBe('');
+  });
+});
+
+describe('resolveSttProvider', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+    mockGetAiKey.mockReset();
+    mockGetByokKey.mockReset();
+    mockResolveAutoModel.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('resolves BYOK key for requested provider', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-openai-key', provider: 'openai' });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'openai',
+    });
+
+    expect(result.providerId).toBe('openai');
+    expect(result.apiKey).toBe('byok-openai-key');
+    expect(result.source).toBe('byok');
+    expect(result.model).toBe('whisper-1');
+  });
+
+  it('falls back to platform key when no BYOK key', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'openai',
+    });
+
+    expect(result.providerId).toBe('openai');
+    expect(result.apiKey).toBe('sk-platform');
+    expect(result.source).toBe('platform');
+  });
+
+  it('throws when no key available for requested provider', async () => {
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('DEEPGRAM_API_KEY', '');
+
+    await expect(
+      resolveSttProvider({ userId: 'user-1', requestedProvider: 'deepgram' })
+    ).rejects.toThrow('No API key available for STT provider "deepgram"');
+  });
+
+  it('uses requestedModel when provided', async () => {
+    mockGetAiKey.mockResolvedValue({ apiKey: 'byok-key', provider: 'openai' });
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'openai',
+      requestedModel: 'gpt-4o-transcribe',
+    });
+
+    expect(result.model).toBe('gpt-4o-transcribe');
+  });
+
+  it('auto-resolves from DB config when no requestedProvider', async () => {
+    mockResolveAutoModel.mockResolvedValue({
+      sttProvider: 'openai',
+      sttModel: 'whisper-1',
+      aiProvider: 'anthropic',
+      aiModel: 'claude-sonnet-4-20250514',
+      ttsProvider: 'elevenlabs',
+      ttsModel: 'eleven_v3',
+    });
+    vi.stubEnv('OPENAI_API_KEY', 'sk-platform');
+    mockGetAiKey.mockResolvedValue(null);
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      plan: 'FREE',
+    });
+
+    expect(result.providerId).toBe('openai');
+    expect(result.apiKey).toBe('sk-platform');
+    expect(result.model).toBe('whisper-1');
+    expect(result.source).toBe('auto');
+    expect(mockResolveAutoModel).toHaveBeenCalledWith('FREE');
+  });
+
+  it('resolves elevenlabs via getByokKey', async () => {
+    mockGetByokKey.mockResolvedValue('el-byok-key');
+
+    const result = await resolveSttProvider({
+      userId: 'user-1',
+      requestedProvider: 'elevenlabs',
+    });
+
+    expect(result.providerId).toBe('elevenlabs');
+    expect(result.apiKey).toBe('el-byok-key');
+    expect(result.source).toBe('byok');
+    expect(mockGetByokKey).toHaveBeenCalledWith('user-1', 'elevenlabs');
+  });
+
+  it('throws when auto-resolved provider has no key', async () => {
+    mockResolveAutoModel.mockResolvedValue({
+      sttProvider: 'deepgram',
+      sttModel: 'nova-3',
+      aiProvider: 'anthropic',
+      aiModel: 'claude-sonnet-4-20250514',
+      ttsProvider: 'elevenlabs',
+      ttsModel: 'eleven_v3',
+    });
+    mockGetAiKey.mockResolvedValue(null);
+    vi.stubEnv('DEEPGRAM_API_KEY', '');
+
+    await expect(
+      resolveSttProvider({ userId: 'user-1', plan: 'PRO' })
+    ).rejects.toThrow('No API key available for auto-configured STT provider "deepgram"');
   });
 });

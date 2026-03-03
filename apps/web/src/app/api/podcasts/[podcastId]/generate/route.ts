@@ -18,8 +18,8 @@ import { checkGenerationGate } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
 import { checkRateLimit } from '@/lib/redis';
-import { getAiKey, getByokKey } from '@/lib/byok';
 import { determineResumePoint, type ResumePoint } from '@/lib/pipeline-resume';
+import { resolveSttProvider } from '@/lib/providers/stt';
 import type {
   ExtractContentPayload,
   ImportAudioPayload,
@@ -104,8 +104,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Podcast must be in PENDING, DISCOVERING, or FAILED status to generate', 400);
   }
 
+  const plan: 'FREE' | 'PRO' = gate.isProUser ? 'PRO' : 'FREE';
+
   // Duration validation — use tier features for duration cap
-  const tierFeatures = getTierFeatures(gate.isProUser ? 'PRO' : 'FREE', gate.isByokUser, isAdmin ? 'ADMIN' : undefined);
+  const tierFeatures = getTierFeatures(plan, gate.isByokUser, isAdmin ? 'ADMIN' : undefined);
   const effectiveMaxDuration = isFinite(tierFeatures.maxDurationMinutes) ? tierFeatures.maxDurationMinutes : 9999;
   const durationTarget = podcast.discovery?.durationTarget;
   if (durationTarget && durationTarget > effectiveMaxDuration) {
@@ -182,14 +184,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         authResult.userId,
         podcast,
         resumePoint,
-        useAdminCredits
+        useAdminCredits,
+        plan
       );
     }
   }
 
   // Imported podcasts re-queue the import pipeline
   if (podcast.source === 'IMPORT' && podcast.importedAudioKey) {
-    return await startImport(podcastId, authResult.userId, podcast);
+    return await startImport(podcastId, authResult.userId, podcast, plan);
   }
 
   // Standard generation pipeline: start from scratch
@@ -234,11 +237,12 @@ async function routeResume(
     discovery: { id: string; sourceUrl: string | null; sourceContent: string | null } | null;
   },
   resumePoint: ResumePoint,
-  useAdminCredits: boolean
+  useAdminCredits: boolean,
+  plan: 'FREE' | 'PRO'
 ): Promise<NextResponse> {
   switch (resumePoint.step) {
     case 'IMPORT_AUDIO': {
-      return await startImport(podcastId, userId, podcast);
+      return await startImport(podcastId, userId, podcast, plan);
     }
 
     case 'EXTRACT_CONTENT': {
@@ -437,45 +441,23 @@ async function startImport(
     importedAudioKey: string | null;
     isHumanContent: boolean;
     title: string;
-  }
+  },
+  plan: 'FREE' | 'PRO'
 ): Promise<NextResponse> {
   if (!podcast.importedAudioKey) {
     return errorResponse('No audio key for import', 400);
   }
 
-  // Resolve STT key — try together first, then openai, then elevenlabs
   let sttProvider: SttProviderId | undefined;
   let sttApiKey: string | undefined;
-
-  // STT fallback chain: together → openai → deepgram → assemblyai → elevenlabs
-  const togetherKey = await getAiKey(userId, 'together');
-  if (togetherKey?.apiKey || process.env.TOGETHER_API_KEY) {
-    sttProvider = 'together';
-    sttApiKey = togetherKey?.apiKey ?? process.env.TOGETHER_API_KEY;
-  } else {
-    const openaiKey = await getAiKey(userId, 'openai');
-    if (openaiKey?.apiKey || process.env.OPENAI_API_KEY) {
-      sttProvider = 'openai';
-      sttApiKey = openaiKey?.apiKey ?? process.env.OPENAI_API_KEY;
-    } else {
-      const dgKey = await getAiKey(userId, 'deepgram');
-      if (dgKey?.apiKey || process.env.DEEPGRAM_API_KEY) {
-        sttProvider = 'deepgram';
-        sttApiKey = dgKey?.apiKey ?? process.env.DEEPGRAM_API_KEY;
-      } else {
-        const aaiKey = await getAiKey(userId, 'assemblyai');
-        if (aaiKey?.apiKey || process.env.ASSEMBLYAI_API_KEY) {
-          sttProvider = 'assemblyai';
-          sttApiKey = aaiKey?.apiKey ?? process.env.ASSEMBLYAI_API_KEY;
-        } else {
-          const elKey = await getByokKey(userId, 'elevenlabs');
-          if (elKey || process.env.ELEVENLABS_API_KEY) {
-            sttProvider = 'elevenlabs';
-            sttApiKey = elKey ?? process.env.ELEVENLABS_API_KEY;
-          }
-        }
-      }
-    }
+  let sttModel: string | undefined;
+  try {
+    const resolved = await resolveSttProvider({ userId, plan });
+    sttProvider = resolved.providerId;
+    sttApiKey = resolved.apiKey;
+    sttModel = resolved.model;
+  } catch {
+    // No STT provider available — worker will handle
   }
 
   await prisma.podcast.update({
@@ -491,6 +473,7 @@ async function startImport(
     generateMetadata: !podcast.title || podcast.title === 'Untitled Import',
     sttProvider,
     sttApiKey,
+    sttModel,
   };
 
   await addJob(audioImportQueue, JobType.IMPORT_AUDIO, importPayload);
