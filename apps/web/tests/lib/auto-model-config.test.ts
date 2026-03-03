@@ -3,15 +3,49 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // ---- Mocks ----
 
 const mockAutoModelConfigUpsert = vi.fn();
+const mockAutoModelConfigUpdate = vi.fn();
 
 vi.mock('@/lib/prisma', () => {
   const _mockPrisma = {
     autoModelConfig: {
       upsert: (...args: unknown[]) => mockAutoModelConfigUpsert(...args),
+      update: (...args: unknown[]) => mockAutoModelConfigUpdate(...args),
     },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  getAiProviderMeta: (id: string) => {
+    if (id === 'anthropic') return { defaultModel: 'claude-haiku-4-5-20251001', models: [{ id: 'claude-haiku-4-5-20251001', tier: 'fast' }, { id: 'claude-sonnet-4-6', tier: 'balanced' }] };
+    if (id === 'openai') return { defaultModel: 'gpt-5', models: [{ id: 'gpt-5-mini', tier: 'fast' }, { id: 'gpt-5', tier: 'balanced' }] };
+    return { defaultModel: '', models: [] };
+  },
+  getProviderForModel: (id: string) => {
+    if (id.startsWith('claude')) return 'anthropic';
+    if (id.startsWith('gpt')) return 'openai';
+    return null;
+  },
+}));
+
+vi.mock('@/lib/providers/tts-registry', () => ({
+  getProviderMeta: (id: string) => {
+    if (id === 'kittentts') return { defaultModel: 'kitten-tts-mini-0.8' };
+    if (id === 'elevenlabs') return { defaultModel: 'eleven_v3' };
+    return { defaultModel: '' };
+  },
+}));
+
+vi.mock('@/lib/providers/stt-registry', () => ({
+  getSttProviderMeta: (id: string) => {
+    if (id === 'openai') return { defaultModel: 'whisper-1' };
+    return { defaultModel: '' };
+  },
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
 
 // ---- Import under test ----
 
@@ -129,7 +163,7 @@ describe('getAutoModelConfig', () => {
     expect(result.proIncludedSttModels).toBeNull();
   });
 
-  it('calls upsert with singleton id and empty update', async () => {
+  it('calls upsert with singleton id, empty update, and registry-derived seeds', async () => {
     mockAutoModelConfigUpsert.mockResolvedValue(defaultRow);
 
     await getAutoModelConfig();
@@ -137,7 +171,13 @@ describe('getAutoModelConfig', () => {
     expect(mockAutoModelConfigUpsert).toHaveBeenCalledWith({
       where: { id: 'singleton' },
       update: {},
-      create: { id: 'singleton' },
+      create: expect.objectContaining({
+        id: 'singleton',
+        freeAiProvider: 'anthropic',
+        freeAiModel: 'claude-haiku-4-5-20251001',
+        platformAiProvider: 'anthropic',
+        platformAiModel: 'claude-haiku-4-5-20251001',
+      }),
     });
   });
 });

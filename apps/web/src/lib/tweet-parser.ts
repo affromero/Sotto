@@ -1,9 +1,10 @@
 import { logUsage } from './usage-logger';
 import { loadPrompt } from './prompt-loader';
 import { logger } from './logger';
-import { getAiProviderMeta, getAllAiProviderMeta } from './providers/ai-registry';
+import { getAiProviderMeta, getAllAiProviderMeta, type AiProviderId } from './providers/ai-registry';
 import { createAIProvider, type AIProvider, type ContentPart } from './providers/ai';
 import { getAiKey } from './byok';
+import { resolveAutoModel } from './auto-model-config';
 import { getAllProviderMeta } from './providers/tts-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
@@ -13,25 +14,29 @@ export interface ParseOptions {
   imageUrls?: string[];
 }
 
-async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string }> {
+async function getProviderForParsing(opts?: ParseOptions): Promise<{ provider: AIProvider; providerName: string; model: string }> {
   if (opts?.userId) {
     try {
       const userKey = await getAiKey(opts.userId);
       if (userKey) {
+        const meta = getAiProviderMeta(userKey.provider as AiProviderId);
         return {
           provider: createAIProvider(userKey.provider),
           providerName: userKey.provider,
+          model: meta.defaultModel,
         };
       }
     } catch {
       // Fall through to defaults
     }
   }
-  if (opts?.apiKeyOverride) {
-    return { provider: createAIProvider('anthropic'), providerName: 'anthropic' };
-  }
-  const defaultProvider = process.env.AI_PROVIDER || 'anthropic';
-  return { provider: createAIProvider(defaultProvider), providerName: defaultProvider };
+
+  const { aiProvider, aiModel } = await resolveAutoModel('PLATFORM');
+  return {
+    provider: createAIProvider(aiProvider),
+    providerName: aiProvider,
+    model: aiModel,
+  };
 }
 
 const SYSTEM_PROMPT = loadPrompt('social/tweet-parser.md');
@@ -58,12 +63,12 @@ export async function parseTweetIntent(
       ]
     : textMessage;
 
-  const { provider, providerName } = await getProviderForParsing(opts);
+  const { provider, providerName, model } = await getProviderForParsing(opts);
 
   const response = await provider.generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content }],
-    { maxTokens: 512, apiKeyOverride: opts?.apiKeyOverride }
+    { maxTokens: 512, model, apiKeyOverride: opts?.apiKeyOverride }
   );
 
   logUsage({
@@ -137,11 +142,11 @@ Thread (${thread.tweetCount} tweets, ${thread.participantCount} participants, ty
 
 ${threadText}`;
 
-  const { provider, providerName } = await getProviderForParsing(opts);
+  const { provider, providerName, model } = await getProviderForParsing(opts);
   const response = await provider.generateResponse(
     THREAD_SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
-    { maxTokens: 1024, apiKeyOverride: opts?.apiKeyOverride }
+    { maxTokens: 1024, model, apiKeyOverride: opts?.apiKeyOverride }
   );
 
   logUsage({

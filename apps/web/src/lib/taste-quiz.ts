@@ -221,18 +221,29 @@ function resolveInspireProvider(
   resolved: { provider: string; source: string; apiKey?: string; model?: string } | null,
   autoModel: PlanModelConfig,
   explicitModel?: string
-): { providerType: string; apiKey: string | undefined; model: string | undefined } {
+): { providerType: string; apiKey: string | undefined; model: string } {
   const providerType = resolved?.provider ?? autoModel.aiProvider;
   const apiKey = resolved?.source === 'byok' ? resolved.apiKey : undefined;
 
   // Prefer: explicit model → BYOK key model → auto config model
   const candidateModel = explicitModel ?? resolved?.model ?? autoModel.aiModel;
 
-  // Only use the candidate if it belongs to the target provider (or is unknown to the registry)
+  // Validate model belongs to target provider — never silently substitute
   const modelOwner = getProviderForModel(candidateModel);
-  const model = (!modelOwner || modelOwner === providerType) ? candidateModel : undefined;
+  if (!modelOwner) {
+    throw new Error(
+      `AI model "${candidateModel}" is not registered with any provider. ` +
+      `Update the model in Admin → Auto Models. Provider: ${providerType}`
+    );
+  }
+  if (modelOwner !== providerType) {
+    throw new Error(
+      `AI model "${candidateModel}" belongs to "${modelOwner}", not "${providerType}". ` +
+      `Update the model/provider pair in Admin → Auto Models.`
+    );
+  }
 
-  return { providerType, apiKey, model };
+  return { providerType, apiKey, model: candidateModel };
 }
 
 interface ParseOptions {
@@ -394,6 +405,7 @@ Also explore topics ADJACENT to their interests — things they haven't explicit
       ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
     ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
+    logger.info('Inspire forYou provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -471,6 +483,7 @@ export async function generateCuriosityQuestions(
       ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
     ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
+    logger.info('Inspire curiosity provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);
@@ -591,6 +604,7 @@ export async function generateNewsQuestions(
       ({ model: m, provider }) => ({ provider, source: aiKey ? 'byok' as const : 'platform' as const, apiKey: aiKey?.apiKey, model: m })
     ).catch(() => null);
     const { providerType, apiKey, model: resolvedModel } = resolveInspireProvider(resolved, ctx.autoModel, model);
+    logger.info('Inspire news provider resolved', { provider: providerType, model: resolvedModel, source: resolved?.source ?? 'auto' });
     const llmStart = Date.now();
 
     const ai = createAIProvider(providerType);

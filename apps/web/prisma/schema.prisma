@@ -1637,7 +1637,7 @@ model Activity {
 model FreeTierConfig {
   id                    String   @id @default("singleton")
   aiProvider            String   @default("anthropic")
-  aiModel               String   @default("llama-3.1-8b-instant")
+  aiModel               String   @default("claude-haiku-4-5-20251001")
   ttsProvider           String   @default("kittentts")
   ttsModel              String   @default("kitten-tts-mini-0.8")
   sttProvider           String   @default("openai")
@@ -1652,7 +1652,7 @@ model FreeTierConfig {
 model AutoModelConfig {
   id              String   @id @default("singleton")
   freeAiProvider  String   @default("anthropic")
-  freeAiModel     String   @default("llama-3.1-8b-instant")
+  freeAiModel     String   @default("claude-haiku-4-5-20251001")
   freeTtsProvider String   @default("kittentts")
   freeTtsModel    String   @default("kitten-tts-mini-0.8")
   freeSttProvider String   @default("openai")
