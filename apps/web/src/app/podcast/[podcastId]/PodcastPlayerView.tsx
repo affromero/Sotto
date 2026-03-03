@@ -35,6 +35,7 @@ import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { VoiceRenditionForkModal } from '@/components/player/VoiceRenditionForkModal';
 import { ProposeRenditionButton } from '@/components/player/ProposeRenditionButton';
+import { Contributors } from '@/components/player/Contributors';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
@@ -818,6 +819,23 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           )}
         </div>
       </div>
+
+      {/* Contributors (from accepted re-voice proposals) */}
+      {(() => {
+        const contributorMap = new Map<string, { contributor: NonNullable<(typeof podcast.voiceTracks)[0]['contributor']>; count: number }>();
+        for (const t of podcast.voiceTracks) {
+          if (t.contributor && t.proposalStatus === 'ACCEPTED') {
+            const existing = contributorMap.get(t.contributor.id);
+            if (existing) {
+              existing.count++;
+            } else {
+              contributorMap.set(t.contributor.id, { contributor: t.contributor, count: 1 });
+            }
+          }
+        }
+        const contributors = Array.from(contributorMap.values());
+        return contributors.length > 0 ? <Contributors contributors={contributors} /> : null;
+      })()}
 
       {/* Interrupt */}
       {isReady && isAuthenticated && (
