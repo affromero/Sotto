@@ -224,20 +224,30 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
     `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
   ]);
 
-  const counts = [
-    withScript, withAudio, withAllSegmentAudio, withReferences,
-    withVerifiedReferences, withDiscoveryMessages, withVoiceAssignments,
-    withCompletedVoiceTracks, withTags, withAnsweredInteractions,
-    withRatings, withPlaybackSessions, withMLFeatures, withApiCostLogs,
-    withSegmentVoiceMap,
-  ];
+  // Use named map instead of positional array to prevent silent mismatch
+  // if DIMENSION_LABELS is ever reordered
+  const countsByKey: Record<string, number> = {
+    script: withScript,
+    audio: withAudio,
+    segments: withAllSegmentAudio,
+    references: withReferences,
+    verifiedReferences: withVerifiedReferences,
+    discoveryChat: withDiscoveryMessages,
+    voiceAssignments: withVoiceAssignments,
+    voiceTracks: withCompletedVoiceTracks,
+    tags: withTags,
+    qaInteractions: withAnsweredInteractions,
+    ratings: withRatings,
+    playbackData: withPlaybackSessions,
+    mlFeatures: withMLFeatures,
+    apiCostLogs: withApiCostLogs,
+    segmentVoiceMap: withSegmentVoiceMap,
+  };
 
-  const keys = Object.keys(DIMENSION_LABELS);
-
-  return keys.map((key, i) => ({
+  return Object.entries(DIMENSION_LABELS).map(([key, label]) => ({
     key,
-    label: DIMENSION_LABELS[key],
-    count: counts[i],
+    label,
+    count: countsByKey[key] ?? 0,
     total: totalReady,
   }));
 }
@@ -248,6 +258,9 @@ export async function getPodcastCompletenessScores(
   sortBy: 'score' | 'date',
   sortDir: 'asc' | 'desc'
 ): Promise<{ podcasts: PodcastCompleteness[]; total: number }> {
+  const safePage = Math.max(1, page);
+  const safePerPage = Math.max(1, perPage);
+
   const total = await prisma.podcast.count({
     where: { status: 'READY', deletedAt: null },
   });
@@ -255,8 +268,8 @@ export async function getPodcastCompletenessScores(
   const podcasts = await prisma.podcast.findMany({
     where: { status: 'READY', deletedAt: null },
     orderBy: sortBy === 'date' ? { createdAt: sortDir } : { createdAt: 'desc' },
-    skip: (page - 1) * perPage,
-    take: perPage,
+    skip: (safePage - 1) * safePerPage,
+    take: safePerPage,
     select: {
       id: true,
       title: true,
@@ -273,12 +286,12 @@ export async function getPodcastCompletenessScores(
           references: true,
           voices: true,
           tags: true,
-          interactions: true,
           ratings: true,
           playbackSessions: true,
           pipelineEvents: true,
         },
       },
+      interactions: { select: { status: true } },
       segments: { select: { audioUrl: true } },
       references: { select: { verificationStatus: true } },
       discovery: {
@@ -319,7 +332,8 @@ export async function getPodcastCompletenessScores(
     const turns = Array.isArray(p.script?.turns) ? p.script.turns : [];
     const segmentsWithAudio = p.segments.filter((s) => s.audioUrl !== null).length;
     const verifiedRefs = p.references.filter((r) => r.verificationStatus === 'VERIFIED').length;
-    const answeredInteractions = p._count.interactions; // Simplified — all counted
+    const answeredStatuses = ['ANSWERED', 'RESOLVED', 'INCORPORATING', 'INCORPORATED'];
+    const answeredInteractions = p.interactions.filter((i) => answeredStatuses.includes(i.status)).length;
     const completedVoiceTracks = p.voiceTracks.filter((vt) => vt.status === 'READY').length;
 
     const input: CompletenessInput = {

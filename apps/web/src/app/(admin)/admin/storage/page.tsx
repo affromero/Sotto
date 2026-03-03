@@ -81,7 +81,7 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
   let prefixBreakdown: PrefixBreakdown[] = [];
   try {
     const prefixes = await listPrefixes();
-    const details = await Promise.all(
+    const settled = await Promise.allSettled(
       prefixes.map(async ({ prefix }) => {
         const objects = await listObjectsDetailed(prefix);
         return {
@@ -91,6 +91,9 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
         };
       })
     );
+    const details = settled
+      .filter((r): r is PromiseFulfilledResult<PrefixBreakdown> => r.status === 'fulfilled')
+      .map((r) => r.value);
     prefixBreakdown = details.sort((a, b) => b.totalBytes - a.totalBytes);
   } catch {
     // R2 listing unavailable — graceful degradation

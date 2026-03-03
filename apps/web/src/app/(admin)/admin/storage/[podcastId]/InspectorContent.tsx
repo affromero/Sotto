@@ -458,19 +458,19 @@ export function InspectorContent({
           <div className={styles.grid}>
             <div className={styles.card}>
               <span className={styles.cardLabel}>Avg Completion</span>
-              <span className={styles.cardValue}>{(mlFeatures.avgCompletionRate * 100).toFixed(0)}%</span>
+              <span className={styles.cardValue}>{((mlFeatures.avgCompletionRate ?? 0) * 100).toFixed(0)}%</span>
             </div>
             <div className={styles.card}>
               <span className={styles.cardLabel}>Unique Listeners</span>
-              <span className={styles.cardValue}>{mlFeatures.totalUniqueListeners}</span>
+              <span className={styles.cardValue}>{mlFeatures.totalUniqueListeners ?? 0}</span>
             </div>
             <div className={styles.card}>
               <span className={styles.cardLabel}>Listen Minutes</span>
-              <span className={styles.cardValue}>{mlFeatures.totalListenMinutes.toFixed(0)}</span>
+              <span className={styles.cardValue}>{(mlFeatures.totalListenMinutes ?? 0).toFixed(0)}</span>
             </div>
             <div className={styles.card}>
               <span className={styles.cardLabel}>Relisten Rate</span>
-              <span className={styles.cardValue}>{(mlFeatures.relistenRate * 100).toFixed(1)}%</span>
+              <span className={styles.cardValue}>{((mlFeatures.relistenRate ?? 0) * 100).toFixed(1)}%</span>
             </div>
           </div>
         ) : (
