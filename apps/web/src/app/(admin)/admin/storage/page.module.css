@@ -156,3 +156,59 @@
 .chartBar:hover .chartTooltip {
   display: flex;
 }
+
+/* Horizontal bar chart (corpus completeness) */
+.hBarContainer { composes: hBarContainer from '../admin.module.css'; }
+.hBarRow { composes: hBarRow from '../admin.module.css'; }
+.hBarLabel { composes: hBarLabel from '../admin.module.css'; min-width: 140px; }
+.hBarTrack { composes: hBarTrack from '../admin.module.css'; }
+.hBarFill { composes: hBarFill from '../admin.module.css'; }
+.hBarValue { composes: hBarValue from '../admin.module.css'; }
+
+/* Pagination */
+.pagination { composes: pagination from '../admin.module.css'; }
+.pageButton { composes: pageButton from '../admin.module.css'; }
+.pageInfo { composes: pageInfo from '../admin.module.css'; }
+
+/* Score badges */
+.scoreGreen {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.scoreAmber {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.scoreRed {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Provider info in podcast table */
+.providerInfo {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Podcast link */
+.podcastLink {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.podcastLink:hover {
+  text-decoration: underline;
+}
+
+/* Sort links in table header */
+.sortLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.sortLink:hover {
+  color: var(--color-primary);
+}

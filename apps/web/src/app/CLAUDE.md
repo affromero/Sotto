@@ -29,6 +29,7 @@
 | `/pitch` | `pitch/page.tsx` | Password | Investor pitch deck |
 | Static pages | `about`, `pricing`, `support`, `join`, `changelog`, `developers`, `privacy`, `terms`, `feedback`, `banned` | No | Public info pages |
 | `/admin/*` | `(admin)/admin/*.tsx` | ADMIN | 19 admin pages (overview, users, podcasts, revenue, costs, storage, engagement, playback, pipeline, retention, waitlist, analytics, moderation, handles, config, twitter, inspire, ratings, quality, announcements, models) |
+| `/admin/storage/[podcastId]` | `(admin)/admin/storage/[podcastId]/page.tsx` | ADMIN | Per-podcast data inspector: 19 sections (provider info, R2 files, script, references, segments, Q&A, discovery, tags, engagement, ratings, API costs, pipeline, ML features, voice assignments, voice tracks, segment voice map, TTS providers, completeness) |
 | `not-found` / `error` | `not-found.tsx` / `error.tsx` | No | 404 + error boundary |
 | `sitemap.xml` | `sitemap.ts` | No | Dynamic sitemap |
 

@@ -69,6 +69,7 @@ All shared business logic and external service integrations live here.
 | `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation | Uses `prisma.ts` |
 | `cloudflare-r2-usage.ts` | Cloudflare R2 usage monitoring: `fetchBucketUsage()`, `fetchOperationCounts()`, `estimateCosts()`, `isR2MonitoringConfigured()` — REST + GraphQL API client with cost estimation | Pure utility (Cloudflare API) |
 | `storage-metrics.ts` | R2 storage dashboard queries: `getStorageOverview()`, `getStorageTrend()`, `checkStorageAlerts()` — reads from R2UsageSnapshot | Uses `prisma.ts` |
+| `data-completeness.ts` | Per-podcast ML readiness: 15-dimension completeness scoring (`computeCompletenessChecklist()`), corpus-wide aggregation (`getCorpusCompleteness()`), paginated podcast scores (`getPodcastCompletenessScores()`) | Uses `prisma.ts` |
 | `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts`, `auto-model-config.ts` |
 | `revenue-metrics.ts` | Revenue aggregation: `getRevenueOverview()`, `getDailyRevenueTrend()`, `getTopSellingVoices()`, `getRevenueByStatus()`, `getMarketplaceHealth()` — voice marketplace | Uses `prisma.ts` |
 | `engagement-metrics.ts` | Engagement queries: `getEngagementOverview()`, `getDailyEngagementTrend()`, `getTopLiked/Forked/Commented()`, `getInteractionStats()` — social metrics | Uses `prisma.ts` |
