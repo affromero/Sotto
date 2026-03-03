@@ -166,6 +166,9 @@ model User {
   // Per-provider free tier usage tracking
   freeProviderUsage FreeProviderUsage[]
 
+  // Voice track contributions (re-voice proposals)
+  voiceTrackContributions VoiceTrack[] @relation("VoiceTrackContributions")
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -289,6 +292,7 @@ model Podcast {
   forks            Podcast[] @relation("Forks")
   remixNote        String?   @db.Text
   parentDiscovery  Json?
+  isVoiceOnlyFork  Boolean   @default(false)
 
   // Versioning
   currentVersion Int @default(1)
@@ -344,6 +348,7 @@ model Podcast {
   ratings          PodcastRating[]
   claimReports     ClaimReport[]
   voiceTracks      VoiceTrack[]
+  voiceTrackProposals VoiceTrack[] @relation("VoiceTrackProposals")
   defaultVoiceTrackId String?
   audioFingerprint  AudioFingerprint?
   duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
@@ -832,6 +837,9 @@ enum NotificationType {
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
   VOICE_TRACK_FAILED
+  RENDITION_PROPOSED
+  RENDITION_ACCEPTED
+  RENDITION_REJECTED
 }
 
 // ============ MODERATION ============
@@ -1850,6 +1858,12 @@ enum VoiceTrackStatus {
   STALE
 }
 
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model VoiceTrack {
   id            String           @id @default(cuid())
   podcastId     String
@@ -1864,12 +1878,24 @@ model VoiceTrack {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
-  podcast  Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  voices   VoiceTrackVoice[]
-  segments VoiceTrackSegment[]
+  // Re-voice proposal fields
+  contributorId         String?
+  proposalStatus        ProposalStatus?
+  proposalMessage       String?          @db.Text
+  proposedFromPodcastId String?
+  reviewedAt            DateTime?
+  rejectionReason       String?          @db.Text
+
+  podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  contributor        User?               @relation("VoiceTrackContributions", fields: [contributorId], references: [id], onDelete: SetNull)
+  proposedFromPodcast Podcast?           @relation("VoiceTrackProposals", fields: [proposedFromPodcastId], references: [id], onDelete: SetNull)
+  voices             VoiceTrackVoice[]
+  segments           VoiceTrackSegment[]
 
   @@index([podcastId])
   @@index([status])
+  @@index([contributorId])
+  @@index([proposalStatus])
 }
 
 model VoiceTrackVoice {
