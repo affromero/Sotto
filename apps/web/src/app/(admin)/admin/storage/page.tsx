@@ -1,9 +1,16 @@
 import { getStorageOverview, getStorageTrend, checkStorageAlerts } from '@/lib/storage-metrics';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
+import { listPrefixes, listObjectsDetailed } from '@/lib/r2';
 import styles from './page.module.css';
 
 interface PageProps {
   searchParams: Promise<{ range?: string }>;
+}
+
+interface PrefixBreakdown {
+  prefix: string;
+  fileCount: number;
+  totalBytes: number;
 }
 
 function formatBytes(bytes: number): string {
@@ -59,6 +66,26 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
 
   const maxStorageGb = Math.max(...trend.map((d) => d.payloadSizeGb), 0.001);
   const maxCost = Math.max(...trend.map((d) => d.totalCost), 0.001);
+
+  let prefixBreakdown: PrefixBreakdown[] = [];
+  try {
+    const prefixes = await listPrefixes();
+    const details = await Promise.all(
+      prefixes.map(async ({ prefix }) => {
+        const objects = await listObjectsDetailed(prefix);
+        return {
+          prefix,
+          fileCount: objects.length,
+          totalBytes: objects.reduce((sum, o) => sum + o.sizeBytes, 0),
+        };
+      })
+    );
+    prefixBreakdown = details.sort((a, b) => b.totalBytes - a.totalBytes);
+  } catch {
+    // R2 listing unavailable — graceful degradation
+  }
+
+  const prefixTotalBytes = prefixBreakdown.reduce((sum, p) => sum + p.totalBytes, 0);
 
   return (
     <div className={styles.container}>
@@ -252,6 +279,33 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
                 <td>Always free</td>
                 <td>$0.0000</td>
               </tr>
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {/* R2 Prefix Breakdown */}
+      {prefixBreakdown.length > 0 && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>R2 Prefix Breakdown</h2>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Prefix</th>
+                <th>Files</th>
+                <th>Size</th>
+                <th>% of Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {prefixBreakdown.map((p) => (
+                <tr key={p.prefix}>
+                  <td><code>{p.prefix}</code></td>
+                  <td>{p.fileCount.toLocaleString()}</td>
+                  <td>{formatBytes(p.totalBytes)}</td>
+                  <td>{prefixTotalBytes > 0 ? ((p.totalBytes / prefixTotalBytes) * 100).toFixed(1) : '0.0'}%</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </section>
