@@ -97,6 +97,9 @@ packages/mcp/dist/
 Sotto.code-workspace
 media/recordings/
 
+# Admin config (migrated to Doppler env var)
+config/admins.json
+
 # Claude Code
 .claude/worktrees/
 .claude/settings.local.json
