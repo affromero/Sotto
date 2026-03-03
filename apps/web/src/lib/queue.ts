@@ -149,7 +149,7 @@ export interface ImportAudioPayload {
   transcriptText?: string;
   isHumanContent: boolean;
   generateMetadata?: boolean;
-  sttProvider?: 'openai' | 'elevenlabs' | 'groq' | 'together' | 'deepgram' | 'assemblyai';
+  sttProvider?: 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai';
   sttModel?: string;
   sttApiKey?: string;
 }

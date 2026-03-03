@@ -116,7 +116,7 @@ export function streamFallbackDiscoveryResponse(
 /**
  * Stream a discovery chat response.
  * When providerType is 'anthropic' or unset, uses the optimised claude.ts path (with onComplete).
- * For other providers (openai, groq, etc.) routes via the provider-agnostic AIProvider interface.
+ * For other providers (openai, etc.) routes via the provider-agnostic AIProvider interface.
  */
 export function streamDiscoveryResponse(
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,

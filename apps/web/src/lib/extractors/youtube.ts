@@ -50,7 +50,6 @@ async function getClient() {
   if (!clientInstance) {
     const { createLinkPreviewClient } = await import('@steipete/summarize-core');
     clientInstance = createLinkPreviewClient({
-      groqApiKey: process.env.GROQ_API_KEY ?? null,
       openaiApiKey: process.env.OPENAI_API_KEY ?? null,
       ytDlpPath: process.env.YT_DLP_PATH || 'yt-dlp',
       onProgress: (event: { kind: string }) => {

@@ -267,12 +267,12 @@ model Podcast {
   // Voice selection
   ttsProvider     String? // null = auto; 'elevenlabs' | 'openai' | 'cartesia' | 'hume' | 'fal' | 'replicate'
   ttsModel        String? // e.g. 'eleven_v3', 'tts-1-hd', 'sonic-2', 'premium', 'octave'
-  aiProvider      String?  // 'anthropic' | 'openai' | 'groq'
+  aiProvider      String?  // 'anthropic' | 'openai'
   aiModel         String?  // e.g. 'claude-sonnet-4-5-20250929', 'claude-opus-4-6'
   verificationMode String  @default("standard") // standard, relaxed
   aiAutoResolved  Boolean @default(false)
   ttsAutoResolved Boolean @default(false)
-  sttProvider     String? // null = auto; 'openai' | 'groq' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
+  sttProvider     String? // null = auto; 'openai' | 'elevenlabs' | 'together' | 'deepgram' | 'assemblyai'
   sttModel        String? // e.g. 'whisper-1', 'whisper-large-v3-turbo', 'scribe_v1'
   language        String?  // ISO 639-1, e.g. 'en', 'es', 'ja'
 
@@ -1636,11 +1636,11 @@ model Activity {
 
 model FreeTierConfig {
   id                    String   @id @default("singleton")
-  aiProvider            String   @default("groq")
+  aiProvider            String   @default("anthropic")
   aiModel               String   @default("llama-3.1-8b-instant")
   ttsProvider           String   @default("kittentts")
   ttsModel              String   @default("kitten-tts-mini-0.8")
-  sttProvider           String   @default("groq")
+  sttProvider           String   @default("openai")
   sttModel              String   @default("whisper-large-v3-turbo")
   dailyGenerationLimit  Int      @default(1)
   aiAllocations         Json?
@@ -1651,17 +1651,17 @@ model FreeTierConfig {
 
 model AutoModelConfig {
   id              String   @id @default("singleton")
-  freeAiProvider  String   @default("groq")
+  freeAiProvider  String   @default("anthropic")
   freeAiModel     String   @default("llama-3.1-8b-instant")
   freeTtsProvider String   @default("kittentts")
   freeTtsModel    String   @default("kitten-tts-mini-0.8")
-  freeSttProvider String   @default("groq")
+  freeSttProvider String   @default("openai")
   freeSttModel    String   @default("whisper-large-v3-turbo")
   proAiProvider   String   @default("anthropic")
   proAiModel      String   @default("claude-haiku-4-5-20251001")
   proTtsProvider  String   @default("elevenlabs")
   proTtsModel     String   @default("eleven_v3")
-  proSttProvider      String   @default("groq")
+  proSttProvider      String   @default("openai")
   proSttModel         String   @default("whisper-large-v3-turbo")
   platformAiProvider  String   @default("anthropic")
   platformAiModel     String   @default("claude-haiku-4-5-20251001")

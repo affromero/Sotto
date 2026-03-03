@@ -69,7 +69,6 @@ describe('POST /api/admin/test-model', () => {
     vi.stubEnv('FAL_KEY', '');
     vi.stubEnv('REPLICATE_API_TOKEN', '');
     vi.stubEnv('KITTENTTS_URL', '');
-    vi.stubEnv('GROQ_API_KEY', '');
     vi.stubEnv('ANTHROPIC_API_KEY', '');
   });
 
@@ -170,7 +169,7 @@ describe('POST /api/admin/test-model', () => {
     it('classifies a 429 rate-limit error', async () => {
       mockGenerateResponse.mockRejectedValue(new Error('429 rate limit exceeded'));
 
-      const res = await POST(createRequest({ type: 'ai', provider: 'groq', model: 'llama-3.3-70b-versatile' }));
+      const res = await POST(createRequest({ type: 'ai', provider: 'anthropic', model: 'claude-haiku-4-5-20251001' }));
       const body = await res.json();
 
       expect(body.success).toBe(false);
@@ -265,10 +264,10 @@ describe('POST /api/admin/test-model', () => {
     it('returns silence note when transcription is empty', async () => {
       vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
       mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('GROQ_API_KEY', 'gsk-test-key');
+      vi.stubEnv('OPENAI_API_KEY', 'sk-test-key');
       mockTranscribe.mockResolvedValue({ text: '', segments: [], language: 'en' });
 
-      const res = await POST(createRequest({ type: 'stt', provider: 'groq', model: 'whisper-large-v3-turbo' }));
+      const res = await POST(createRequest({ type: 'stt', provider: 'openai', model: 'whisper-1' }));
       const body = await res.json();
 
       expect(body.success).toBe(true);
@@ -282,17 +281,6 @@ describe('POST /api/admin/test-model', () => {
 
       expect(body.success).toBe(false);
       expect(body.error).toBe('Platform API key not configured (check .env)');
-    });
-
-    it('passes the correct key and model to createSttProvider', async () => {
-      vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
-      mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-      vi.stubEnv('GROQ_API_KEY', 'groq-key-123');
-      mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
-
-      await POST(createRequest({ type: 'stt', provider: 'groq', model: 'whisper-large-v3-turbo' }));
-
-      expect(mockCreateSttProvider).toHaveBeenCalledWith('groq', 'groq-key-123', 'whisper-large-v3-turbo');
     });
 
     it('routes ElevenLabs STT to ELEVENLABS_API_KEY', async () => {
@@ -392,18 +380,6 @@ describe('POST /api/admin/test-model', () => {
 
         expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'openai');
         expect(mockCreateSttProvider).toHaveBeenCalledWith('openai', 'byok-openai-key', 'whisper-1');
-      });
-
-      it('uses AI BYOK key for groq STT', async () => {
-        vi.stubEnv('KITTENTTS_URL', 'http://localhost:8100');
-        mockGenerateSpeech.mockResolvedValue(Buffer.from('fake-audio'));
-        mockGetAiKey.mockResolvedValue({ apiKey: 'byok-groq-key', provider: 'groq' });
-        mockTranscribe.mockResolvedValue({ text: 'test', segments: [], language: 'en' });
-
-        await POST(createRequest({ type: 'stt', provider: 'groq', model: 'whisper-large-v3-turbo', keySource: 'byok' }));
-
-        expect(mockGetAiKey).toHaveBeenCalledWith('admin-1', 'groq');
-        expect(mockCreateSttProvider).toHaveBeenCalledWith('groq', 'byok-groq-key', 'whisper-large-v3-turbo');
       });
 
       it('uses TTS BYOK key for elevenlabs STT', async () => {

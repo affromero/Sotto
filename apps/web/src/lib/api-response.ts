@@ -5,7 +5,7 @@ import { logger } from '@/lib/logger';
  * Generate a short request ID for error tracking.
  * Format: req_<12 hex chars> (e.g., req_a1b2c3d4e5f6)
  */
-function generateRequestId(): string {
+export function generateRequestId(): string {
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
   const hex = Array.from(bytes)

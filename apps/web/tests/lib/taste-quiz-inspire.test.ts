@@ -7,7 +7,7 @@ const mockUserInterestFindMany = vi.fn();
 const mockTasteQuizAnswerFindMany = vi.fn();
 const mockResolveAutoModel = vi.fn();
 const mockCreateAIProvider = vi.fn();
-const mockResolveAiProvider = vi.fn();
+const mockGetAiKey = vi.fn();
 
 const mockUserFindUnique = vi.fn();
 
@@ -28,7 +28,10 @@ vi.mock('@/lib/auto-model-config', () => ({
 
 vi.mock('@/lib/providers/ai', () => ({
   createAIProvider: (...args: unknown[]) => mockCreateAIProvider(...args),
-  resolveAiProvider: (...args: unknown[]) => mockResolveAiProvider(...args),
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
 }));
 
 vi.mock('@/lib/providers/ai-registry', () => ({
@@ -36,6 +39,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
   getAllAiProviderMeta: vi.fn(() => []),
   getAiProviderMeta: vi.fn(() => ({ models: [] })),
   getAiProviderIdsWithPricing: vi.fn(() => []),
+  resolveAiModelAndProvider: vi.fn(async () => ({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' })),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -81,17 +85,17 @@ function setupDefaultMocks() {
   mockTagFindMany.mockResolvedValue(mockCategories);
   mockTasteQuizAnswerFindMany.mockResolvedValue([]);
   mockResolveAutoModel.mockResolvedValue({
-    aiProvider: 'groq',
-    aiModel: 'llama-3.1-8b-instant',
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
     ttsProvider: 'kittentts',
     ttsModel: 'kitten-tts-mini-0.8',
-    sttProvider: 'groq',
-    sttModel: 'whisper-large-v3-turbo',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
   });
   mockUserInterestFindMany.mockResolvedValue([]);
   mockUserFindUnique.mockResolvedValue({ plan: 'FREE' });
   // Default: no BYOK key, falls through to createAIProvider
-  mockResolveAiProvider.mockRejectedValue(new Error('No AI provider'));
+  mockGetAiKey.mockResolvedValue(null);
   // Default: no newsletter articles, falls back to web search path
   mockFetchNewsletterArticles.mockResolvedValue([]);
   mockFormatArticlesForPrompt.mockReturnValue('');
@@ -101,7 +105,7 @@ function createMockAI(responseContent: string) {
   return {
     generateResponse: vi.fn().mockResolvedValue({
       content: responseContent,
-      model: 'llama-3.1-8b-instant',
+      model: 'claude-haiku-4-5-20251001',
       inputTokens: 100,
       outputTokens: 50,
     }),
@@ -131,8 +135,8 @@ describe('generateForYouQuestions', () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].text).toContain('AI in cooking');
-    // Tries BYOK first (resolveAiProvider), falls back to createAIProvider
-    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1', 'FREE');
+    // Tries BYOK first (getAiKey), falls back to auto model config
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
     expect(mockCreateAIProvider).toHaveBeenCalled();
   });
 
@@ -203,9 +207,8 @@ describe('generateNewsQuestions', () => {
   });
 
   it('uses web search when provider is anthropic', async () => {
-    mockResolveAiProvider.mockResolvedValue({
+    mockGetAiKey.mockResolvedValue({
       provider: 'anthropic',
-      source: 'platform',
       apiKey: 'test-key',
     });
 
@@ -226,9 +229,8 @@ describe('generateNewsQuestions', () => {
     }));
 
     // Re-import to pick up new mock... but since we can't easily, test the fallback path
-    mockResolveAiProvider.mockResolvedValue({
+    mockGetAiKey.mockResolvedValue({
       provider: 'openai',
-      source: 'byok',
       apiKey: 'sk-test',
     });
 
@@ -240,14 +242,13 @@ describe('generateNewsQuestions', () => {
     const result = await generateNewsQuestions('user-1', 1);
 
     expect(result).toHaveLength(1);
-    expect(mockResolveAiProvider).toHaveBeenCalledWith('user-1', 'FREE');
+    expect(mockGetAiKey).toHaveBeenCalledWith('user-1');
   });
 
   it('excludes provided topics in the prompt', async () => {
     // Resolve with no apiKey so it falls through to createAIProvider path
-    mockResolveAiProvider.mockResolvedValue({
+    mockGetAiKey.mockResolvedValue({
       provider: 'openai',
-      source: 'byok',
       apiKey: '',
     });
     delete process.env.ANTHROPIC_API_KEY;
@@ -283,8 +284,8 @@ describe('generateNewsQuestions', () => {
     mockFetchNewsletterArticles.mockResolvedValue(mockArticles);
     mockFormatArticlesForPrompt.mockReturnValue('[1] Reuters — "Article 1"\n[2] NPR — "Article 2"\n[3] BBC — "Article 3"');
 
-    // Falls through to createAIProvider since resolveAiProvider rejects by default
-    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    // Falls through to auto model config since getAiKey returns null by default
+    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
     delete process.env.ANTHROPIC_API_KEY;
 
     const ai = createMockAI(JSON.stringify([
@@ -306,7 +307,7 @@ describe('generateNewsQuestions', () => {
       { title: 'Only One', url: 'https://a.com', summary: 'Solo', pubDate: '2026-02-27', source: 'Reuters' },
     ]);
 
-    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
     delete process.env.ANTHROPIC_API_KEY;
 
     const ai = createMockAI(JSON.stringify([
@@ -324,7 +325,7 @@ describe('generateNewsQuestions', () => {
   it('falls back to web search when fetchNewsletterArticles fails', async () => {
     mockFetchNewsletterArticles.mockRejectedValue(new Error('Fetch failed'));
 
-    mockResolveAiProvider.mockResolvedValue({ provider: 'openai', source: 'byok', apiKey: '' });
+    mockGetAiKey.mockResolvedValue({ provider: 'openai', apiKey: '' });
     delete process.env.ANTHROPIC_API_KEY;
 
     const ai = createMockAI(JSON.stringify([
