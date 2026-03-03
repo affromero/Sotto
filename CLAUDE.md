@@ -98,7 +98,7 @@ content-extraction → script-generation → script-verification (≤3 loops) �
 
 - Use Tailwind, inline styles, or styled-components
 - Use `any` type
-- Hardcode model names — always resolve from config, env vars, or user settings. Fail if no model is configured rather than falling back to a hardcoded default
+- Hardcode model names or provider IDs — always resolve from DB config (`AutoModelConfig`), env vars, or user settings. Never write fallback chains that pick providers by key availability — use `resolveSttProvider()`, `resolveTtsProvider()`, or `resolveAutoModel()` instead
 - Reuse the same 2 voices for every podcast
 - Do heavy processing in API routes
 
