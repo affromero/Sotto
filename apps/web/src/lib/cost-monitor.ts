@@ -142,6 +142,55 @@ export async function getDailyCostTrend(
   }));
 }
 
+export interface PerModelCost {
+  modelId: string;
+  service: string;
+  totalCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  callCount: number;
+  avgCostPerCall: number;
+}
+
+/**
+ * Get cost breakdown grouped by model for a given time period.
+ * Sorted by total cost descending.
+ */
+export async function getPerModelCostBreakdown(
+  period: '24h' | '7d' | '30d' | '90d'
+): Promise<PerModelCost[]> {
+  const now = new Date();
+  const periodMs: Record<string, number> = {
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    '90d': 90 * 24 * 60 * 60 * 1000,
+  };
+  const from = new Date(now.getTime() - periodMs[period]);
+
+  const logs = await prisma.apiUsageLog.groupBy({
+    by: ['service', 'modelId'],
+    where: { createdAt: { gte: from }, modelId: { not: null } },
+    _sum: { totalCost: true, inputTokens: true, outputTokens: true },
+    _count: { id: true },
+  });
+
+  const results: PerModelCost[] = logs
+    .filter((row) => row.modelId !== null)
+    .map((row) => ({
+      modelId: row.modelId!,
+      service: row.service,
+      totalCost: row._sum.totalCost ?? 0,
+      inputTokens: row._sum.inputTokens ?? 0,
+      outputTokens: row._sum.outputTokens ?? 0,
+      callCount: row._count.id,
+      avgCostPerCall: row._count.id > 0 ? (row._sum.totalCost ?? 0) / row._count.id : 0,
+    }));
+
+  results.sort((a, b) => b.totalCost - a.totalCost);
+  return results;
+}
+
 /**
  * Check if costs are approaching a threshold.
  * Returns warnings for any provider whose daily spend exceeds the threshold.
