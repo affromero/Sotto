@@ -27,6 +27,7 @@ import {
   FlaskConical,
   Gauge,
   HardDrive,
+  Tag,
   Wand2,
   HeartPulse,
   ListTodo,
@@ -78,6 +79,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
       { href: '/admin/costs', label: 'Costs', icon: DollarSign },
+      { href: '/admin/pricing', label: 'Pricing', icon: Tag },
       { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
       { href: '/admin/storage', label: 'Storage', icon: HardDrive },
     ],
