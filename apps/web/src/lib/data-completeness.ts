@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import prisma from './prisma';
+import { prisma } from './prisma';
 
 export interface CompletenessDimension {
   key: string;
@@ -133,14 +133,14 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
         SELECT 1 FROM "Segment" s2
         WHERE s2."podcastId" = p.id AND s2."audioUrl" IS NULL
       )
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 4. References
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
       FROM "Reference" r
       JOIN "Podcast" p ON p.id = r."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 5. Verified References
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
@@ -148,7 +148,7 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "Podcast" p ON p.id = r."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
       AND r."verificationStatus" = 'VERIFIED'
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 6. Discovery Chat (with messages)
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT d."podcastId")::bigint as count
@@ -156,14 +156,14 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "DiscoveryMessage" dm ON dm."discoveryId" = d.id
       JOIN "Podcast" p ON p.id = d."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 7. Voice Assignments
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
       FROM "PodcastVoice" pv
       JOIN "Podcast" p ON p.id = pv."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 8. Voice Tracks (completed)
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
@@ -171,14 +171,14 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "Podcast" p ON p.id = vt."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
       AND vt.status = 'READY'
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 9. Tags
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
       FROM "PodcastTag" pt
       JOIN "Podcast" p ON p.id = pt."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 10. Q&A Interactions (answered+)
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
@@ -186,21 +186,21 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "Podcast" p ON p.id = i."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
       AND i.status IN ('ANSWERED', 'RESOLVED', 'INCORPORATING', 'INCORPORATED')
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 11. Ratings
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
       FROM "PodcastRating" pr
       JOIN "Podcast" p ON p.id = pr."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 12. Playback Data
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT "podcastId")::bigint as count
       FROM "PlaybackSession" ps
       JOIN "Podcast" p ON p.id = ps."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 13. ML Features
     prisma.podcastFeature.count({
       where: { podcast: { status: 'READY', deletedAt: null } },
@@ -212,7 +212,7 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "Podcast" p ON p.id = a."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
       AND a."podcastId" IS NOT NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
     // 15. Segment Voice Map
     prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(DISTINCT s."podcastId")::bigint as count
@@ -221,7 +221,7 @@ export async function getCorpusCompleteness(): Promise<CorpusDimensionCount[]> {
       JOIN "Podcast" p ON p.id = s."podcastId"
       WHERE p.status = 'READY' AND p."deletedAt" IS NULL
       AND vts."audioUrl" IS NOT NULL
-    `.then((r) => Number(r[0]?.count ?? 0)),
+    `.then((r: { count: bigint }[]) => Number(r[0]?.count ?? 0)),
   ]);
 
   const counts = [
