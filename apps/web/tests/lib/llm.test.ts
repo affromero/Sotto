@@ -46,7 +46,7 @@ vi.mock('@/lib/claude-code-client', () => ({
 vi.mock('@/lib/auto-model-config', () => ({
   resolveAutoModel: vi.fn().mockResolvedValue({
     aiProvider: 'anthropic',
-    aiModel: 'claude-test-model',
+    aiModel: 'claude-haiku-4-5-20251001',
     ttsProvider: 'kittentts',
     ttsModel: 'kitten-tts-mini-0.8',
     sttProvider: 'openai',
@@ -98,7 +98,7 @@ describe('claude', () => {
         content: 'This is a test response from Claude.',
         inputTokens: 150,
         outputTokens: 75,
-        model: 'claude-test-model', // from resolveAutoModel mock
+        model: 'claude-haiku-4-5-20251001', // from resolveAutoModel mock
       });
     });
 

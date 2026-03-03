@@ -102,27 +102,32 @@ export async function generateResponse(
     return { ...result, model: options.model };
   }
 
+  // Resolve the effective model: explicit → auto-config fallback
+  const { resolveAutoModel } = await import('./auto-model-config');
+  const autoConfig = await resolveAutoModel('PLATFORM');
+  const resolvedModel = options?.model || autoConfig.aiModel;
+
   // Guardrail: auto-route non-Anthropic models to the correct provider.
-  // Prevents e.g. 'gpt-5-mini' being sent to the Anthropic API.
-  if (options?.model) {
+  // Applies to both explicitly-passed AND auto-resolved models.
+  {
     const { getProviderForModel } = await import('./providers/ai-registry');
-    const ownerProvider = getProviderForModel(options.model);
+    const ownerProvider = getProviderForModel(resolvedModel);
     if (ownerProvider === null) {
-      throw new Error(`Unknown AI model ID: "${options.model}" — not registered with any provider`);
+      throw new Error(`Unknown AI model ID: "${resolvedModel}" — not registered with any provider`);
     }
     if (ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
-      const hasWebSearch = options.tools?.some(
+      const hasWebSearch = options?.tools?.some(
         (t) => (t as { type: string }).type === 'web_search_20250305',
       );
       return ai.generateResponse(systemPrompt, messages, {
-        maxTokens: options.maxTokens,
-        model: options.model,
-        apiKeyOverride: options.apiKeyOverride,
-        skipModeration: options.skipModeration,
+        maxTokens: options?.maxTokens,
+        model: resolvedModel,
+        apiKeyOverride: options?.apiKeyOverride,
+        skipModeration: options?.skipModeration,
         ...(hasWebSearch ? { useWebSearch: true } : {}),
-        ...(options.jsonSchema ? { jsonSchema: options.jsonSchema } : {}),
+        ...(options?.jsonSchema ? { jsonSchema: options.jsonSchema } : {}),
       });
     }
   }
@@ -134,10 +139,6 @@ export async function generateResponse(
   if (!activeClient) {
     throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
-
-  const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('PLATFORM');
-  const resolvedModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({
     role: m.role,
@@ -223,24 +224,30 @@ export async function* streamResponse(
     return;
   }
 
+  // Resolve the effective model: explicit → auto-config fallback
+  const { resolveAutoModel } = await import('./auto-model-config');
+  const autoConfig = await resolveAutoModel('PLATFORM');
+  const streamModel = options?.model || autoConfig.aiModel;
+
   // Guardrail: auto-route non-Anthropic models to the correct provider.
-  if (options?.model) {
+  // Applies to both explicitly-passed AND auto-resolved models.
+  {
     const { getProviderForModel } = await import('./providers/ai-registry');
-    const ownerProvider = getProviderForModel(options.model);
+    const ownerProvider = getProviderForModel(streamModel);
     if (ownerProvider === null) {
-      throw new Error(`Unknown AI model ID: "${options.model}" — not registered with any provider`);
+      throw new Error(`Unknown AI model ID: "${streamModel}" — not registered with any provider`);
     }
     if (ownerProvider !== 'anthropic') {
       const { createAIProvider } = await import('./providers/ai');
       const ai = createAIProvider(ownerProvider);
-      const hasWebSearch = options.tools?.some(
+      const hasWebSearch = options?.tools?.some(
         (t) => (t as { type: string }).type === 'web_search_20250305',
       );
       yield* ai.streamResponse(systemPrompt, messages, {
-        maxTokens: options.maxTokens,
-        model: options.model,
-        apiKeyOverride: options.apiKeyOverride,
-        skipModeration: options.skipModeration,
+        maxTokens: options?.maxTokens,
+        model: streamModel,
+        apiKeyOverride: options?.apiKeyOverride,
+        skipModeration: options?.skipModeration,
         ...(hasWebSearch ? { useWebSearch: true } : {}),
       });
       return;
@@ -254,10 +261,6 @@ export async function* streamResponse(
   if (!activeClient) {
     throw new Error('LLM client not initialized — set ANTHROPIC_API_KEY or provide apiKeyOverride');
   }
-
-  const { resolveAutoModel } = await import('./auto-model-config');
-  const autoConfig = await resolveAutoModel('PLATFORM');
-  const streamModel = options?.model || autoConfig.aiModel;
 
   const anthropicMessages = messages.map((m) => ({
     role: m.role,
