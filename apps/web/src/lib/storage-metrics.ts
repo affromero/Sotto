@@ -91,6 +91,24 @@ export async function getStorageTrend(days = 30): Promise<StorageTrendPoint[]> {
   }));
 }
 
+export interface PrefixBreakdown {
+  prefix: string;
+  fileCount: number;
+  totalBytes: number;
+}
+
+export async function getLatestPrefixBreakdown(): Promise<PrefixBreakdown[]> {
+  const snapshot = await prisma.r2UsageSnapshot.findFirst({
+    where: { prefixBreakdown: { not: null } },
+    orderBy: { createdAt: 'desc' },
+    select: { prefixBreakdown: true },
+  });
+
+  if (!snapshot?.prefixBreakdown) return [];
+
+  return snapshot.prefixBreakdown as unknown as PrefixBreakdown[];
+}
+
 export function checkStorageAlerts(
   overview: StorageOverview | null,
   warnAt = 5,

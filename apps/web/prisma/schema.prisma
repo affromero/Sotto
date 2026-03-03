@@ -1981,6 +1981,7 @@ model R2UsageSnapshot {
   classACostEstimate  Float    @default(0)
   classBCostEstimate  Float    @default(0)
   totalCostEstimate   Float    @default(0)
+  prefixBreakdown     Json?
   createdAt           DateTime @default(now())
 
   @@index([createdAt])
