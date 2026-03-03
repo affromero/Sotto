@@ -9,7 +9,7 @@ vi.hoisted(() => {
   process.env.R2_PUBLIC_URL = 'https://cdn.example.com';
 });
 
-import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
@@ -20,10 +20,12 @@ import {
   deleteFile,
   extractR2Key,
   resolveAudioUrl,
+  listPrefixes,
+  listObjectsDetailed,
 } from '@/lib/r2';
 
 // Mock AWS SDK and presigner
-const { mockSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCommand } =
+const { mockSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCommand, MockListObjectsV2Command } =
   vi.hoisted(() => ({
     mockSend: vi.fn(),
     MockPutObjectCommand: vi.fn(function (this: any, params: any) {
@@ -33,6 +35,9 @@ const { mockSend, MockPutObjectCommand, MockGetObjectCommand, MockDeleteObjectCo
       this.params = params;
     }),
     MockDeleteObjectCommand: vi.fn(function (this: any, params: any) {
+      this.params = params;
+    }),
+    MockListObjectsV2Command: vi.fn(function (this: any, params: any) {
       this.params = params;
     }),
   }));
@@ -46,6 +51,7 @@ vi.mock('@aws-sdk/client-s3', () => {
     PutObjectCommand: MockPutObjectCommand,
     GetObjectCommand: MockGetObjectCommand,
     DeleteObjectCommand: MockDeleteObjectCommand,
+    ListObjectsV2Command: MockListObjectsV2Command,
   };
 });
 
@@ -429,6 +435,117 @@ describe('r2.ts', () => {
     it('returns null for null input', async () => {
       const result = await resolveAudioUrl(null, 'PRIVATE');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('listPrefixes', () => {
+    it('returns prefixes from CommonPrefixes', async () => {
+      mockSend.mockResolvedValue({
+        CommonPrefixes: [
+          { Prefix: 'podcasts/' },
+          { Prefix: 'avatars/' },
+          { Prefix: 'recordings/' },
+        ],
+      });
+
+      const result = await listPrefixes();
+
+      expect(result).toEqual([
+        { prefix: 'podcasts/' },
+        { prefix: 'avatars/' },
+        { prefix: 'recordings/' },
+      ]);
+      expect(ListObjectsV2Command).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Delimiter: '/',
+      });
+    });
+
+    it('returns empty array when no prefixes exist', async () => {
+      mockSend.mockResolvedValue({});
+
+      const result = await listPrefixes();
+
+      expect(result).toEqual([]);
+    });
+
+    it('filters out entries without Prefix', async () => {
+      mockSend.mockResolvedValue({
+        CommonPrefixes: [
+          { Prefix: 'podcasts/' },
+          { Prefix: undefined },
+          { Prefix: 'avatars/' },
+        ],
+      });
+
+      const result = await listPrefixes();
+
+      expect(result).toEqual([
+        { prefix: 'podcasts/' },
+        { prefix: 'avatars/' },
+      ]);
+    });
+  });
+
+  describe('listObjectsDetailed', () => {
+    it('returns objects with metadata', async () => {
+      const lastMod = new Date('2025-01-15T10:00:00Z');
+      mockSend.mockResolvedValue({
+        Contents: [
+          { Key: 'podcasts/abc/audio.mp3', Size: 1048576, LastModified: lastMod },
+          { Key: 'podcasts/abc/segments/s1.mp3', Size: 524288, LastModified: lastMod },
+        ],
+        IsTruncated: false,
+      });
+
+      const result = await listObjectsDetailed('podcasts/abc/');
+
+      expect(result).toEqual([
+        { key: 'podcasts/abc/audio.mp3', sizeBytes: 1048576, lastModified: lastMod },
+        { key: 'podcasts/abc/segments/s1.mp3', sizeBytes: 524288, lastModified: lastMod },
+      ]);
+      expect(ListObjectsV2Command).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Prefix: 'podcasts/abc/',
+        ContinuationToken: undefined,
+      });
+    });
+
+    it('handles pagination', async () => {
+      mockSend
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'podcasts/a/audio.mp3', Size: 100, LastModified: undefined }],
+          IsTruncated: true,
+          NextContinuationToken: 'token-1',
+        })
+        .mockResolvedValueOnce({
+          Contents: [{ Key: 'podcasts/b/audio.mp3', Size: 200, LastModified: undefined }],
+          IsTruncated: false,
+        });
+
+      const result = await listObjectsDetailed('podcasts/');
+
+      expect(result).toHaveLength(2);
+      expect(mockSend).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns empty array when no contents', async () => {
+      mockSend.mockResolvedValue({ IsTruncated: false });
+
+      const result = await listObjectsDetailed('empty-prefix/');
+
+      expect(result).toEqual([]);
+    });
+
+    it('defaults Size to 0 when missing', async () => {
+      mockSend.mockResolvedValue({
+        Contents: [{ Key: 'podcasts/abc/audio.mp3' }],
+        IsTruncated: false,
+      });
+
+      const result = await listObjectsDetailed('podcasts/abc/');
+
+      expect(result[0].sizeBytes).toBe(0);
     });
   });
 });
