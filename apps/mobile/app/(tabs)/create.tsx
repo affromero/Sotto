@@ -25,6 +25,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { api } from '../../lib/api';
+import { getToken } from '../../lib/auth';
 import { InspireMe } from '../../components/InspireMe';
 import { AiModelSelector } from '../../components/AiModelSelector';
 import { TtsModelSelector } from '../../components/TtsModelSelector';
@@ -56,13 +57,6 @@ interface ChatMessage {
   chips: string[];
 }
 
-interface DiscoveryResponse {
-  discoveryId: string;
-  message: string;
-  chips: string[];
-  metadata: DiscoveryMetadata | null;
-}
-
 interface CreatePodcastResponse {
   id: string;
   title: string;
@@ -72,6 +66,16 @@ interface CreatePodcastResponse {
 interface PodcastStatusResponse {
   status: string;
 }
+
+const GREETING: ChatMessage = {
+  id: 'greeting',
+  role: 'assistant',
+  content:
+    "Hi! I'm here to help you create the perfect podcast. What topic would you like to explore? You can also paste a URL — articles, YouTube videos, and more.",
+  chips: ['AI & Technology', 'Science', 'History', 'Business', 'Philosophy'],
+};
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'https://sotto.fm/api';
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
@@ -114,7 +118,6 @@ export default function CreateScreen() {
   // Discovery state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
-  const [discoveryId, setDiscoveryId] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<DiscoveryMetadata | null>(null);
   const [latestChips, setLatestChips] = useState<string[]>([]);
   const [showInspire, setShowInspire] = useState(false);
@@ -186,29 +189,121 @@ export default function CreateScreen() {
     }
   }, [pipelineStatus, step, podcastId, router]);
 
-  // Discovery mutation
-  const discoveryMutation = useMutation<DiscoveryResponse, Error, string>({
-    mutationFn: async (userMessage: string) => {
-      const response = await api.post<DiscoveryResponse>('/discovery', {
-        message: userMessage,
-        discoveryId,
-      });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      setDiscoveryId(data.discoveryId);
-      setMetadata(data.metadata);
-      setLatestChips(data.chips);
+  // SSE-based discovery streaming
+  const [isDiscoveringSSE, setIsDiscoveringSSE] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.message,
-        chips: data.chips,
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+  const streamDiscovery = useCallback(
+    async (userMessage: string) => {
+      // Abort any in-flight request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      setIsDiscoveringSSE(true);
+      setDiscoveryError(null);
+
+      const assistantId = `assistant-${Date.now()}`;
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: 'assistant', content: '', chips: [] },
+      ]);
+
+      try {
+        const token = await getToken();
+        const res = await fetch(`${API_BASE}/discovery`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            message: userMessage,
+            history: messages.map((m) => ({
+              role: m.role,
+              content: m.content,
+            })),
+            model: aiModel,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`Server error ${res.status}`);
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error('No response body');
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulated = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const json = line.slice(6).trim();
+            if (!json) continue;
+
+            try {
+              const parsed = JSON.parse(json);
+
+              if (parsed.error) {
+                setDiscoveryError(parsed.error);
+                break;
+              }
+
+              if (parsed.text) {
+                accumulated += parsed.text;
+                const text = accumulated;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, content: text } : m,
+                  ),
+                );
+              }
+
+              if (parsed.done) {
+                if (parsed.metadata) setMetadata(parsed.metadata);
+                const chips: string[] = parsed.chips ?? [];
+                setLatestChips(chips);
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, chips } : m,
+                  ),
+                );
+              }
+            } catch {
+              // Skip malformed SSE lines
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Intentional cancel — remove empty placeholder
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== assistantId || m.content),
+          );
+          return;
+        }
+        setDiscoveryError(
+          err instanceof Error ? err.message : 'Something went wrong',
+        );
+      } finally {
+        setIsDiscoveringSSE(false);
+        abortRef.current = null;
+      }
     },
-  });
+    [messages, aiModel],
+  );
 
   // Create mutation — full payload matching web
   const createMutation = useMutation<CreatePodcastResponse, Error>({
@@ -216,7 +311,6 @@ export default function CreateScreen() {
       const response = await api.post<CreatePodcastResponse>('/podcasts', {
         title: metadata?.topic ?? 'Untitled Podcast',
         topic: metadata?.topic ?? '',
-        discoveryId,
         metadata: metadata
           ? {
               topic: metadata.topic ?? '',
@@ -274,7 +368,7 @@ export default function CreateScreen() {
   const sendMessage = useCallback(
     (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || discoveryMutation.isPending) return;
+      if (!trimmed || isDiscoveringSSE) return;
 
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -285,9 +379,9 @@ export default function CreateScreen() {
       setMessages((prev) => [...prev, userMessage]);
       setInputText('');
       setLatestChips([]);
-      discoveryMutation.mutate(trimmed);
+      streamDiscovery(trimmed);
     },
-    [discoveryMutation],
+    [isDiscoveringSSE, streamDiscovery],
   );
 
   useEffect(() => {
@@ -330,7 +424,8 @@ export default function CreateScreen() {
   );
 
   const isReady = metadata?.ready === true;
-  const isDiscovering = discoveryMutation.isPending;
+  const isDiscovering = isDiscoveringSSE;
+  const displayMessages = messages.length === 0 ? [GREETING] : [GREETING, ...messages];
 
   const inspirePulse = useSharedValue(0);
 
@@ -364,115 +459,133 @@ export default function CreateScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={88}
       >
-        {messages.length === 0 ? (
-          <View style={styles.welcomeContainer}>
-            {renderKeyWarning()}
-            <Text style={styles.welcomeTitle}>Create a Podcast</Text>
-            <Text style={styles.welcomeSubtitle}>
-              Tell me what you want to learn about. I will ask a few questions to
-              understand your interests, then generate a conversational podcast
-              just for you.
-            </Text>
-            <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.inspireMeButton,
-                  pressed && styles.inspireMeButtonPressed,
-                ]}
-                onPress={() => setShowInspire(true)}
-              >
-                <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
-                <Text style={styles.inspireMeButtonText}>Inspire me</Text>
-              </Pressable>
-            </Animated.View>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={messages}
-            renderItem={renderMessage}
-            keyExtractor={keyExtractor}
-            contentContainerStyle={styles.messageList}
-            onContentSizeChange={() =>
-              flatListRef.current?.scrollToEnd({ animated: true })
-            }
-            ListFooterComponent={
-              <>
-                {isDiscovering ? (
-                  <View style={styles.typingIndicator}>
-                    <View style={styles.typingDot} />
-                    <View style={[styles.typingDot, styles.typingDotDelay1]} />
-                    <View style={[styles.typingDot, styles.typingDotDelay2]} />
-                  </View>
-                ) : null}
+        {renderKeyWarning()}
+        <FlatList
+          ref={flatListRef}
+          data={displayMessages}
+          renderItem={renderMessage}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={styles.messageList}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
+          ListHeaderComponent={
+            messages.length === 0 ? (
+              <View style={styles.greetingChipsContainer}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipScrollContent}
+                >
+                  {GREETING.chips.map((chip) => (
+                    <Pressable
+                      key={chip}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pressed && styles.chipPressed,
+                      ]}
+                      onPress={() => handleChipPress(chip)}
+                    >
+                      <Text style={styles.chipText}>{chip}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Animated.View style={[styles.inspireMeGlow, inspireAnimatedStyle]}>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.inspireMeButton,
+                      pressed && styles.inspireMeButtonPressed,
+                    ]}
+                    onPress={() => setShowInspire(true)}
+                  >
+                    <Text style={styles.inspireMeIcon}>{'\u2728'}</Text>
+                    <Text style={styles.inspireMeButtonText}>Inspire me</Text>
+                  </Pressable>
+                </Animated.View>
+              </View>
+            ) : null
+          }
+          ListFooterComponent={
+            <>
+              {isDiscovering ? (
+                <View style={styles.typingIndicator}>
+                  <View style={styles.typingDot} />
+                  <View style={[styles.typingDot, styles.typingDotDelay1]} />
+                  <View style={[styles.typingDot, styles.typingDotDelay2]} />
+                </View>
+              ) : null}
 
-                {latestChips.length > 0 && !isDiscovering ? (
-                  <View style={styles.chipContainer}>
-                    {latestChips.map((chip) => (
-                      <Pressable
-                        key={chip}
-                        style={({ pressed }) => [
-                          styles.chip,
-                          pressed && styles.chipPressed,
-                        ]}
-                        onPress={() => handleChipPress(chip)}
-                      >
-                        <Text style={styles.chipText}>{chip}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
+              {latestChips.length > 0 && !isDiscovering && messages.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.chipScrollContent}
+                  style={styles.chipScrollView}
+                >
+                  {latestChips.map((chip) => (
+                    <Pressable
+                      key={chip}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        pressed && styles.chipPressed,
+                      ]}
+                      onPress={() => handleChipPress(chip)}
+                    >
+                      <Text style={styles.chipText}>{chip}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              ) : null}
 
-                {isReady && !isDiscovering ? (
-                  <View style={styles.readyContainer}>
-                    <View style={styles.readyCard}>
-                      <Text style={styles.readyTitle}>Ready to create</Text>
-                      <Text style={styles.readySubtitle}>
-                        {metadata?.topic ?? 'Your podcast'}
-                      </Text>
-                      <Pressable
-                        style={({ pressed }) => [
-                          styles.createButton,
-                          pressed && !missingKeys && styles.createButtonPressed,
-                          missingKeys && styles.createButtonDisabled,
-                        ]}
-                        onPress={
-                          missingKeys
-                            ? () => router.push('/settings/api-keys')
-                            : handleNextToVoice
-                        }
-                      >
-                        <Text style={styles.createButtonText}>
-                          {missingKeys
-                            ? 'Add API Keys to Create'
-                            : 'Next: Choose Voices'}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : null}
-
-                {discoveryMutation.isError ? (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>
-                      {discoveryMutation.error.message ?? 'Something went wrong'}
+              {isReady && !isDiscovering ? (
+                <View style={styles.readyContainer}>
+                  <View style={styles.readyCard}>
+                    <Text style={styles.readyTitle}>Ready to create</Text>
+                    <Text style={styles.readySubtitle}>
+                      {metadata?.topic ?? 'Your podcast'}
                     </Text>
                     <Pressable
-                      style={styles.retryLink}
-                      onPress={() =>
-                        discoveryMutation.mutate(
-                          messages[messages.length - 1]?.content ?? '',
-                        )
+                      style={({ pressed }) => [
+                        styles.createButton,
+                        pressed && !missingKeys && styles.createButtonPressed,
+                        missingKeys && styles.createButtonDisabled,
+                      ]}
+                      onPress={
+                        missingKeys
+                          ? () => router.push('/settings/api-keys')
+                          : handleNextToVoice
                       }
                     >
-                      <Text style={styles.retryLinkText}>Tap to retry</Text>
+                      <Text style={styles.createButtonText}>
+                        {missingKeys
+                          ? 'Add API Keys to Create'
+                          : 'Next: Choose Voices'}
+                      </Text>
                     </Pressable>
                   </View>
-                ) : null}
-              </>
-            }
-          />
-        )}
+                </View>
+              ) : null}
+
+              {discoveryError ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{discoveryError}</Text>
+                  <Pressable
+                    style={styles.retryLink}
+                    onPress={() => {
+                      setDiscoveryError(null);
+                      const lastUserMsg = messages
+                        .filter((m) => m.role === 'user')
+                        .pop();
+                      if (lastUserMsg) streamDiscovery(lastUserMsg.content);
+                    }}
+                  >
+                    <Text style={styles.retryLinkText}>Tap to retry</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </>
+          }
+        />
 
         <View style={styles.inputContainer}>
           <AiModelSelector value={aiModel} onChange={setAiModel} />
@@ -693,16 +806,16 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '500',
   },
-  welcomeContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+  greetingChipsContainer: {
+    paddingTop: spacing.sm,
+    gap: spacing.md,
   },
   keyWarning: {
     backgroundColor: colors.warningLighter,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
-    marginBottom: spacing.lg,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -721,21 +834,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
-  welcomeTitle: {
-    fontFamily: typography.fontHeading,
-    fontSize: 32,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  welcomeSubtitle: {
-    fontFamily: typography.fontBody,
-    fontSize: 16,
-    color: colors.textSecondary,
-    lineHeight: 24,
-    marginBottom: spacing.lg,
-  },
   inspireMeGlow: {
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     borderRadius: borderRadius.full,
     shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 2 },
@@ -829,10 +929,12 @@ const styles = StyleSheet.create({
   typingDotDelay2: {
     opacity: 0.8,
   },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  chipScrollView: {
+    marginBottom: spacing.sm,
+  },
+  chipScrollContent: {
     gap: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   chip: {
