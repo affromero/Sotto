@@ -14,6 +14,7 @@ import {
   emailDigestQueue,
   draftCleanupQueue,
   r2UsageQueue,
+  pricingFetchQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -49,7 +50,9 @@ import { processVoiceTrackAudio } from './voice-track-audio.worker';
 import { processVoiceTrackStitching } from './voice-track-stitching.worker';
 import { processDraftCleanup } from './draft-cleanup.worker';
 import { processR2Usage } from './r2-usage.worker';
+import { processPricingFetch } from './pricing-fetch.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
+import { startPricingRefreshInterval } from '@/lib/pricing';
 
 logger.info('Starting Sotto workers...');
 
@@ -85,6 +88,7 @@ const workers = [
   createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
   createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
   createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
+  createWorker('pricing-fetch', processPricingFetch, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -167,6 +171,15 @@ if (isR2MonitoringConfigured()) {
 } else {
   logger.info('R2 monitoring not configured — usage collection disabled');
 }
+
+// Schedule daily pricing fetch (every 24 hours)
+pricingFetchQueue
+  .add(JobType.FETCH_PRICING, {}, { repeat: { every: 86400000 } })
+  .then(() => logger.info('Pricing fetch scheduled', { intervalMs: '86400000' }))
+  .catch((err) => logger.error('Failed to schedule pricing fetch', { error: err.message }));
+
+// Start in-memory pricing refresh interval (picks up DB changes every 5 min)
+startPricingRefreshInterval();
 
 logger.info(`${workers.length} workers started`);
 

@@ -64,9 +64,11 @@ All shared business logic and external service integrations live here.
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
-| `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()`, `getCheapestModel()` — centralized pricing for all AI models | Pure utility |
+| `pricing.ts` | AI model pricing table + cost lookup: `getAiCost()`, `getAiPricing()`, `getCheapestModel()`, `refreshPricingFromDb()`, `getAllCurrentPricing()`, `startPricingRefreshInterval()` — centralized pricing with dynamic DB refresh | Pure utility + `pricing-fetcher.ts` |
+| `pricing-fetcher.ts` | Pricing page fetcher + LLM extraction: `fetchProviderPricingPage()`, `extractPricingFromPage()`, `savePricingSnapshots()`, `getLatestPricingFromDb()`, `getAdminOverriddenModels()`, `seedPricingFromRegistry()`, `filterToKnownModels()` | Uses `prisma.ts`, `providers/ai.ts`, `prompt-loader.ts` |
+| `pricing-metrics.ts` | Admin pricing queries: `getCurrentModelPricing()`, `getModelPriceHistory()`, `getLastFetchTime()` — enriches pricing with registry metadata | Uses `prisma.ts`, `pricing.ts`, `ai-registry.ts` |
 | `usage-logger.ts` | Unified `logUsage()` function for all provider cost tracking — replaces old `logApiUsage()`, auto-computes AI costs from model pricing | Uses `prisma.ts`, `pricing.ts` |
-| `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation | Uses `prisma.ts` |
+| `cost-monitor.ts` | Per-provider cost tracking from ApiUsageLog: daily/weekly/monthly breakdowns, per-category + per-model aggregation, `getPerModelCostBreakdown()` | Uses `prisma.ts` |
 | `cloudflare-r2-usage.ts` | Cloudflare R2 usage monitoring: `fetchBucketUsage()`, `fetchOperationCounts()`, `estimateCosts()`, `isR2MonitoringConfigured()` — REST + GraphQL API client with cost estimation | Pure utility (Cloudflare API) |
 | `storage-metrics.ts` | R2 storage dashboard queries: `getStorageOverview()`, `getStorageTrend()`, `checkStorageAlerts()` — reads from R2UsageSnapshot | Uses `prisma.ts` |
 | `data-completeness.ts` | Per-podcast ML readiness: 15-dimension completeness scoring (`computeCompletenessChecklist()`), corpus-wide aggregation (`getCorpusCompleteness()`), paginated podcast scores (`getPodcastCompletenessScores()`) | Uses `prisma.ts` |
@@ -120,7 +122,7 @@ Modular provider architecture — swap external services via env vars.
 
 | File | Interface | Implementations | Env Var |
 | --- | --- | --- | --- |
-| `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER` |
+| `ai.ts` | `AIProvider` | `AnthropicProvider`, `OpenAIProvider`, `GoogleProvider`, `ClaudeCodeLazyProvider` | `AI_PROVIDER` |
 | `ai-registry.ts` | `AiProviderMeta` | Declarative AI provider metadata: validation functions for Anthropic + OpenAI keys | — |
 | `claude-code.ts` | `AIProvider` | `ClaudeCodeProvider` (standalone) | `AI_PROVIDER` |
 | `tts.ts` | `TtsProvider` | `ElevenLabsProvider`, `OpenAITtsProvider`, `CartesiaProvider`, `HumeProvider`, `FalProvider`, `ReplicateProvider`, `MinimaxProvider` + `FallbackTtsProvider`, `resolveTtsProvider()`, `canResolveTts()` | `TTS_PROVIDER` |

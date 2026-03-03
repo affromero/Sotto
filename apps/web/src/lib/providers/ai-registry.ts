@@ -5,7 +5,7 @@
  */
 import { logger } from '../logger';
 
-export type AiProviderId = 'anthropic' | 'openai' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
+export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
 
 export interface AiProviderAuthField {
   key: string;
@@ -21,6 +21,10 @@ export interface AiModelOption {
   tier: 'fast' | 'balanced' | 'best' | 'max';
   /** Minimum plan required to use this model on platform credits (BYOK bypasses). */
   requiredPlan: 'FREE' | 'PRO';
+  /** Maximum input context window in tokens. */
+  contextWindow: number;
+  /** Maximum output tokens the model can generate. */
+  maxOutputTokens: number;
   /** Per-million-token pricing. Omit for zero-cost or non-metered models. */
   pricing?: { inputPerMTok: number; outputPerMTok: number };
 }
@@ -50,9 +54,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', pricing: { inputPerMTok: 0.8, outputPerMTok: 4.0 } },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', pricing: { inputPerMTok: 3.0, outputPerMTok: 15.0 } },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', pricing: { inputPerMTok: 15.0, outputPerMTok: 75.0 } },
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 1.0, outputPerMTok: 5.0 } },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 3.0, outputPerMTok: 15.0 } },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 5.0, outputPerMTok: 25.0 } },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -87,9 +91,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', pricing: { inputPerMTok: 0.3, outputPerMTok: 1.0 } },
-      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
+      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.40 } },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 0.25, outputPerMTok: 2.0 } },
+      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -113,9 +118,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'opus',
     getApiKeyUrl: '',
     models: [
-      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE' },
-      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO' },
-      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO' },
+      { id: 'haiku', displayName: 'Haiku', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'sonnet', displayName: 'Sonnet', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'opus', displayName: 'Opus', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
     auth: {
       fields: [],
@@ -180,6 +185,32 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
         try {
           const res = await fetch('https://api.assemblyai.com/v2/transcript?limit=1', {
             headers: { authorization: creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  google: {
+    id: 'google',
+    displayName: 'Google (Gemini)',
+    shortLabel: 'Gemini',
+    platformEnvKey: 'GOOGLE_AI_API_KEY',
+    defaultModel: 'gemini-3.1-flash-lite-preview',
+    getApiKeyUrl: 'https://aistudio.google.com/apikey',
+    models: [
+      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', requiredPlan: 'FREE', contextWindow: 1_000_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 0.25, outputPerMTok: 1.50 } },
+      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_000_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 2.0, outputPerMTok: 12.0 } },
+    ],
+    auth: {
+      fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'AIza...' }],
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://generativelanguage.googleapis.com/v1beta/openai/models', {
+            headers: { Authorization: `Bearer ${creds.apiKey}` },
           });
           return res.ok;
         } catch {
@@ -255,6 +286,7 @@ export interface AiProviderClientMeta {
 const AI_CLIENT_DESCRIPTIONS: Record<Exclude<AiProviderId, 'claude-code'>, { description: string; badge: 'optional' | 'free' | null }> = {
   anthropic: { description: 'Better script generation and creative writing', badge: 'optional' },
   openai: { description: 'Covers both LLM and TTS with one key', badge: 'optional' },
+  google: { description: 'Gemini models with 1M context window', badge: 'optional' },
   together: { description: 'Cheap Whisper STT at $0.0015/min', badge: 'optional' },
   deepgram: { description: 'Nova-3 STT — high accuracy with $200 free credits', badge: 'optional' },
   assemblyai: { description: 'Universal-2 STT — 99 languages with $50 free credits', badge: 'optional' },
@@ -355,6 +387,30 @@ export function getModelRequiredPlan(modelId: string): 'FREE' | 'PRO' | null {
   for (const provider of Object.values(AI_PROVIDERS)) {
     const model = provider.models.find((m) => m.id === modelId);
     if (model) return model.requiredPlan;
+  }
+  return null;
+}
+
+/**
+ * Get the context window size for a model ID.
+ * Returns null if the model is not found in any provider.
+ */
+export function getModelContextWindow(modelId: string): number | null {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.contextWindow;
+  }
+  return null;
+}
+
+/**
+ * Get the max output tokens for a model ID.
+ * Returns null if the model is not found in any provider.
+ */
+export function getModelMaxOutputTokens(modelId: string): number | null {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.maxOutputTokens;
   }
   return null;
 }
