@@ -190,6 +190,74 @@ export async function deleteVoiceTrackFiles(podcastId: string, trackId: string):
 }
 
 /**
+ * List top-level prefixes (folders) in the bucket using S3 Delimiter.
+ * Single API call — no full bucket scan.
+ */
+export async function listPrefixes(): Promise<{ prefix: string }[]> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured');
+  }
+
+  const response = await s3Client.send(
+    new ListObjectsV2Command({
+      Bucket: R2_BUCKET_NAME,
+      Delimiter: '/',
+    })
+  );
+
+  const prefixes = (response.CommonPrefixes ?? [])
+    .filter((cp): cp is { Prefix: string } => !!cp.Prefix)
+    .map((cp) => ({ prefix: cp.Prefix }));
+
+  logger.info('Listed R2 prefixes', { count: String(prefixes.length) });
+  return prefixes;
+}
+
+/**
+ * List all objects under a prefix with full metadata (size, lastModified).
+ * Handles pagination for large prefixes.
+ */
+export async function listObjectsDetailed(prefix: string): Promise<{
+  key: string;
+  sizeBytes: number;
+  lastModified: Date | undefined;
+}[]> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured');
+  }
+
+  const objects: { key: string; sizeBytes: number; lastModified: Date | undefined }[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await s3Client.send(
+      new ListObjectsV2Command({
+        Bucket: R2_BUCKET_NAME,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    if (response.Contents) {
+      for (const obj of response.Contents) {
+        if (obj.Key) {
+          objects.push({
+            key: obj.Key,
+            sizeBytes: obj.Size ?? 0,
+            lastModified: obj.LastModified,
+          });
+        }
+      }
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  logger.info('Listed detailed objects from R2', { prefix, count: String(objects.length) });
+  return objects;
+}
+
+/**
  * List all object keys under a given prefix, handling pagination
  */
 export async function listFiles(prefix: string): Promise<string[]> {
