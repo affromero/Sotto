@@ -1,0 +1,117 @@
+/* Admin Pricing Dashboard */
+
+.container { composes: container from '../admin.module.css'; }
+.headerRow { composes: headerRow from '../admin.module.css'; }
+.header { composes: header from '../admin.module.css'; }
+.title { composes: title from '../admin.module.css'; }
+.subtitle { composes: subtitle from '../admin.module.css'; }
+.grid { composes: grid from '../admin.module.css'; }
+.card { composes: card from '../admin.module.css'; }
+.cardLabel { composes: cardLabel from '../admin.module.css'; }
+.cardValue { composes: cardValue from '../admin.module.css'; }
+.section { composes: section from '../admin.module.css'; }
+.sectionTitle { composes: sectionTitle from '../admin.module.css'; }
+.empty { composes: empty from '../admin.module.css'; }
+.table { composes: tableCompact from '../admin.module.css'; }
+.chartContainer { composes: chartContainer from '../admin.module.css'; }
+.chartBar { composes: chartBar from '../admin.module.css'; }
+.chartBarFill { composes: chartBarFill from '../admin.module.css'; }
+.chartLabel { composes: chartLabel from '../admin.module.css'; }
+
+/* Grid: 4 columns on desktop */
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Source badges */
+.sourceBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.sourceRegistry {
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
+}
+
+.sourceFetched {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sourceAdmin {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Provider group header row */
+.providerRow {
+  background: var(--color-surface-hover);
+}
+
+.providerRow td {
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 12px;
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+/* Numeric cells right-aligned */
+.numCell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hover tooltip on chart bars */
+.chartBar {
+  composes: chartBar from '../admin.module.css';
+  position: relative;
+}
+
+.chartTooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 6px 10px;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.chartTooltipDetail {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+.chartBar:hover .chartTooltip {
+  display: flex;
+}
+
+/* Card secondary text */
+.cardSecondary {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
