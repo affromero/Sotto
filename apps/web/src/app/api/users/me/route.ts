@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
       preferredAiModel: user.preferredAiModel,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch user';
-    return errorResponse(message, 500);
+    logger.error('Failed to fetch user', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to fetch user', 500);
   }
 }
 
@@ -239,8 +239,8 @@ export async function PATCH(request: NextRequest) {
       preferredAiModel: updatedUser.preferredAiModel,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to update user';
-    return errorResponse(message, 500);
+    logger.error('Failed to update user', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to update user', 500);
   }
 }
 
@@ -321,7 +321,7 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to delete account';
-    return errorResponse(message, 500);
+    logger.error('Failed to delete account', { error: error instanceof Error ? error.message : String(error) });
+    return errorResponse('Failed to delete account', 500);
   }
 }
