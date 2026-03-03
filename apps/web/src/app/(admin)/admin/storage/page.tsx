@@ -2,6 +2,7 @@ import { getStorageOverview, getStorageTrend, checkStorageAlerts, getLatestPrefi
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { getCorpusCompleteness, getPodcastCompletenessScores } from '@/lib/data-completeness';
 import Link from 'next/link';
+import { CollectNowButton } from './CollectNowButton';
 import styles from './page.module.css';
 
 interface PageProps {
@@ -89,22 +90,25 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
           <h1 className={styles.title}>Storage</h1>
           <p className={styles.subtitle}>R2 usage monitoring and cost estimates</p>
         </div>
-        <nav className={styles.rangeNav} aria-label="Time range">
-          {[
-            { value: '7', label: '7d' },
-            { value: '30', label: '30d' },
-            { value: '90', label: '90d' },
-          ].map(({ value, label }) => (
-            <a
-              key={value}
-              href={`/admin/storage?range=${value}`}
-              className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
-              aria-current={rangeParam === value ? 'page' : undefined}
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+          <nav className={styles.rangeNav} aria-label="Time range">
+            {[
+              { value: '7', label: '7d' },
+              { value: '30', label: '30d' },
+              { value: '90', label: '90d' },
+            ].map(({ value, label }) => (
+              <a
+                key={value}
+                href={`/admin/storage?range=${value}`}
+                className={`${styles.rangeLink} ${rangeParam === value ? styles.rangeLinkActive : ''}`}
+                aria-current={rangeParam === value ? 'page' : undefined}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+          <CollectNowButton />
+        </div>
       </div>
 
       {/* Alerts */}
@@ -142,7 +146,7 @@ export default async function AdminStoragePage({ searchParams }: PageProps) {
           </div>
         </div>
       ) : (
-        <p className={styles.empty}>No snapshots collected yet. The worker runs daily.</p>
+        <p className={styles.empty}>No snapshots collected yet. The worker runs daily. <CollectNowButton /></p>
       )}
 
       {/* Storage trend chart */}
