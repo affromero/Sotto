@@ -26,6 +26,7 @@ import {
   Megaphone,
   FlaskConical,
   Gauge,
+  HardDrive,
   Wand2,
   HeartPulse,
   ListTodo,
@@ -78,6 +79,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/revenue', label: 'Revenue', icon: Wallet },
       { href: '/admin/costs', label: 'Costs', icon: DollarSign },
       { href: '/admin/expenses', label: 'Expenses', icon: Receipt },
+      { href: '/admin/storage', label: 'Storage', icon: HardDrive },
     ],
   },
   {
