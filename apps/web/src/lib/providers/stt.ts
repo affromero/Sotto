@@ -1,5 +1,7 @@
 import { logger } from '../logger';
 import { getSttProviderMeta } from './stt-registry';
+import { getAiKey, getByokKey } from '../byok';
+import { resolveAutoModel } from '../auto-model-config';
 
 /**
  * Speech-to-text transcription result
@@ -140,7 +142,9 @@ class OpenAIWhisperProvider implements SttProvider {
           language: opts?.language,
         });
 
-        const text = typeof textResponse === 'string' ? textResponse : String(textResponse);
+        const text = typeof textResponse === 'string'
+          ? textResponse
+          : (textResponse as { text: string }).text;
 
         return {
           text,
@@ -548,4 +552,97 @@ export function createSttProvider(provider?: SttProviderId, apiKey?: string, mod
       return new OpenAIWhisperProvider(apiKey, config);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Platform key mapping — maps STT provider ID → env var value
+// ---------------------------------------------------------------------------
+
+const STT_PLATFORM_ENV: Record<SttProviderId, string> = {
+  openai: 'OPENAI_API_KEY',
+  together: 'TOGETHER_API_KEY',
+  deepgram: 'DEEPGRAM_API_KEY',
+  assemblyai: 'ASSEMBLYAI_API_KEY',
+  elevenlabs: 'ELEVENLABS_API_KEY',
+};
+
+/**
+ * Get the platform API key for a given STT provider.
+ */
+export function getSttPlatformKey(provider: SttProviderId): string | undefined {
+  return process.env[STT_PLATFORM_ENV[provider]];
+}
+
+// ---------------------------------------------------------------------------
+// Centralized STT provider resolution (mirrors resolveTtsProvider pattern)
+// ---------------------------------------------------------------------------
+
+export interface ResolvedSttProvider {
+  providerId: SttProviderId;
+  apiKey: string;
+  model: string;
+  source: 'byok' | 'platform' | 'auto';
+}
+
+/**
+ * Resolve the STT provider, API key, and model for a user.
+ *
+ * Resolution order:
+ *   1. If `requestedProvider` given → BYOK key → platform key. Throws if neither.
+ *   2. Otherwise → DB-configured provider via `resolveAutoModel(plan)` → BYOK → platform. Throws if no key.
+ *
+ * Always returns `model` from either `requestedModel` or the DB config's sttModel.
+ */
+export async function resolveSttProvider(context: {
+  userId: string;
+  requestedProvider?: SttProviderId;
+  requestedModel?: string;
+  plan?: 'FREE' | 'PRO';
+}): Promise<ResolvedSttProvider> {
+  const { userId, requestedProvider, requestedModel } = context;
+
+  if (requestedProvider) {
+    // Explicit provider — try BYOK then platform
+    const key = await resolveKeyForProvider(userId, requestedProvider);
+    if (!key) {
+      throw new Error(
+        `No API key available for STT provider "${requestedProvider}". ` +
+        'Add a key in Settings or configure a platform key.'
+      );
+    }
+    const model = requestedModel ?? getSttProviderMeta(requestedProvider).defaultModel;
+    return { providerId: requestedProvider, apiKey: key, model, source: key === getSttPlatformKey(requestedProvider) ? 'platform' : 'byok' };
+  }
+
+  // Auto-resolve from DB config
+  const autoConfig = await resolveAutoModel(context.plan ?? 'FREE');
+  const provider = autoConfig.sttProvider as SttProviderId;
+  const model = requestedModel ?? autoConfig.sttModel;
+
+  const key = await resolveKeyForProvider(userId, provider);
+  if (!key) {
+    throw new Error(
+      `No API key available for auto-configured STT provider "${provider}". ` +
+      'Add a key in Settings or configure a platform key.'
+    );
+  }
+
+  return { providerId: provider, apiKey: key, model, source: 'auto' };
+}
+
+/**
+ * Try BYOK key first, then fall back to platform env var.
+ */
+async function resolveKeyForProvider(
+  userId: string,
+  provider: SttProviderId
+): Promise<string | undefined> {
+  // ElevenLabs keys are stored in UserTtsKey, others in UserAiKey
+  if (provider === 'elevenlabs') {
+    const byokKey = await getByokKey(userId, 'elevenlabs');
+    return byokKey ?? getSttPlatformKey(provider) ?? undefined;
+  }
+
+  const byokKey = await getAiKey(userId, provider);
+  return byokKey?.apiKey ?? getSttPlatformKey(provider) ?? undefined;
 }
