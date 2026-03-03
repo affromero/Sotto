@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { listObjectsDetailed } from '@/lib/r2';
 import { findByVoiceId } from '@/lib/voice-pool';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
@@ -42,7 +42,7 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
 
   if (!podcast) notFound();
 
-  // Parallel data fetching
+  // Parallel data fetching (split into two groups for TypeScript tuple inference)
   const [
     script,
     segments,
@@ -54,11 +54,6 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     interactions,
     ratingsAgg,
     playbackCount,
-    podcastFeature,
-    apiUsageAgg,
-    pipelineEventsRaw,
-    segmentVoiceMapRaw,
-    r2Files,
   ] = await Promise.all([
     // Script
     prisma.script.findUnique({
@@ -129,6 +124,15 @@ export default async function PodcastInspectorPage({ params }: PageProps) {
     }),
     // Playback sessions
     prisma.playbackSession.count({ where: { podcastId } }),
+  ]);
+
+  const [
+    podcastFeature,
+    apiUsageAgg,
+    pipelineEventsRaw,
+    segmentVoiceMapRaw,
+    r2Files,
+  ] = await Promise.all([
     // ML Features
     prisma.podcastFeature.findUnique({
       where: { podcastId },
