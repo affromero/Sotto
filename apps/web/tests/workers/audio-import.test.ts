@@ -191,8 +191,9 @@ vi.mock('@/lib/generation-gate', () => ({
 const mockAddJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { SEND_NOTIFICATION: 'send_notification' },
+  JobType: { SEND_NOTIFICATION: 'send_notification', COMPUTE_FEATURES: 'compute_features' },
   notificationQueue: { name: 'notifications' },
+  featureComputationQueue: { name: 'feature-computation' },
 }));
 
 vi.mock('@/lib/logger', () => ({
