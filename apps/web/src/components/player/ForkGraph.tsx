@@ -17,6 +17,7 @@ interface ForkGraphProps {
   forks: Array<{
     id: string;
     title: string;
+    isVoiceOnlyFork?: boolean;
     user: { name: string | null; handle: string | null };
   }>;
 }
@@ -28,6 +29,7 @@ interface Node {
   x: number;
   y: number;
   type: 'ancestor' | 'current' | 'fork';
+  isVoiceOnlyFork?: boolean;
 }
 
 function truncate(text: string, maxLength: number): string {
@@ -106,6 +108,7 @@ export function ForkGraph({ ancestors, current, forks }: ForkGraphProps) {
       x: forksStartX + index * horizontalSpacing,
       y: forksY,
       type: 'fork',
+      isVoiceOnlyFork: fork.isVoiceOnlyFork,
     });
   });
 
@@ -195,22 +198,27 @@ export function ForkGraph({ ancestors, current, forks }: ForkGraphProps) {
             const nodeX = node.x - nodeWidth / 2;
             const nodeY = node.y - nodeHeight / 2;
 
-            const fillColor =
-              node.type === 'current'
+            const isVoiceFork = node.type === 'fork' && node.isVoiceOnlyFork;
+
+            const fillColor = isVoiceFork
+              ? '#FFFBEB'
+              : node.type === 'current'
                 ? 'var(--color-primary-lighter)'
                 : node.type === 'ancestor'
                   ? 'var(--color-accent-lighter)'
                   : 'var(--color-surface)';
 
-            const strokeColor =
-              node.type === 'current'
+            const strokeColor = isVoiceFork
+              ? '#D97706'
+              : node.type === 'current'
                 ? 'var(--color-primary)'
                 : node.type === 'ancestor'
                   ? 'var(--color-accent)'
                   : 'var(--color-border)';
 
-            const textColor =
-              node.type === 'current'
+            const textColor = isVoiceFork
+              ? '#92400E'
+              : node.type === 'current'
                 ? 'var(--color-primary)'
                 : node.type === 'ancestor'
                   ? 'var(--color-accent)'
@@ -227,9 +235,28 @@ export function ForkGraph({ ancestors, current, forks }: ForkGraphProps) {
                   fill={fillColor}
                   stroke={strokeColor}
                   strokeWidth="2"
+                  strokeDasharray={isVoiceFork ? '6 3' : undefined}
                 />
+                {isVoiceFork && (
+                  <g transform={`translate(${nodeX + 6}, ${nodeY + 4})`}>
+                    <path
+                      d="M8 1a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"
+                      fill="#D97706"
+                      opacity="0.7"
+                    />
+                    <path
+                      d="M13 8a5 5 0 0 1-10 0M8 13v3M5 16h6"
+                      stroke="#D97706"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      fill="none"
+                      opacity="0.7"
+                    />
+                  </g>
+                )}
                 <text
-                  x={node.x}
+                  x={isVoiceFork ? node.x + 8 : node.x}
                   y={node.y - 8}
                   textAnchor="middle"
                   className={styles.nodeTitle}
@@ -238,7 +265,7 @@ export function ForkGraph({ ancestors, current, forks }: ForkGraphProps) {
                   {node.title}
                 </text>
                 <text
-                  x={node.x}
+                  x={isVoiceFork ? node.x + 8 : node.x}
                   y={node.y + 10}
                   textAnchor="middle"
                   className={styles.nodeUser}

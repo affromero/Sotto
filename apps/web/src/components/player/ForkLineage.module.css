@@ -169,6 +169,30 @@
   margin: 0;
 }
 
+/* Voice-only fork variant */
+.voiceForkItem {
+  border-style: dashed;
+  border-color: #D97706;
+  background: #FFFBEB;
+}
+
+.voiceForkItem:hover {
+  border-color: #B45309;
+}
+
+.voiceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: #FEF3C7;
+  color: #92400E;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 .showMoreBtn {
   align-self: flex-start;
   padding: var(--space-2) var(--space-4);

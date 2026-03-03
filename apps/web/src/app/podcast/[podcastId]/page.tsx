@@ -160,6 +160,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           title: true,
           remixNote: true,
           createdAt: true,
+          isVoiceOnlyFork: true,
           user: {
             select: {
               id: true,

@@ -178,9 +178,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       title: string;
       user: { name: string | null; handle: string | null };
     }>;
-    descendants: Array<{
+    forks: Array<{
       id: string;
       title: string;
+      isVoiceOnlyFork?: boolean;
       user: { name: string | null; handle: string | null };
     }>;
   } | null>(null);
@@ -939,7 +940,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Fork Lineage */}
       {(podcast.forkedFrom || podcast.forks.length > 0) && (
         <section className={styles.lineageSection}>
-          {lineageData && lineageData.ancestors.length + lineageData.descendants.length >= 3 ? (
+          {lineageData && lineageData.ancestors.length + lineageData.forks.length >= 3 ? (
             <ForkGraph
               ancestors={lineageData.ancestors}
               current={{
@@ -947,7 +948,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 title: podcast.title,
                 user: { name: podcast.user.name, handle: podcast.user.handle ?? null },
               }}
-              forks={lineageData.descendants}
+              forks={lineageData.forks}
             />
           ) : (
             <ForkLineage
