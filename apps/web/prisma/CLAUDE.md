@@ -45,6 +45,7 @@ The schema is organized into logical sections:
 | Mobile Push       | ExpoPushToken                                                                                                                                                   | Expo push notification tokens (platform: ios/android)                                                                                 |
 | Waitlist          | Waitlist                                                                                                                                                        | Early access waitlist signups (email, source, `unsubscribed` flag)                                                                    |
 | Twitter Config    | TwitterConfig, TwitterAutoTweet                                                                                                                                 | Singleton config for auto-tweeting thresholds + per-podcast tweet tracking (threshold/manual/trend triggers)                          |
+| R2 Monitoring     | R2UsageSnapshot                                                                                                                                                 | Daily snapshots of R2 bucket usage (storage size, object count, operation counts, cost estimates). Indexes: `[createdAt]`, `[bucket, createdAt]` |
 
 ## Key Enums
 

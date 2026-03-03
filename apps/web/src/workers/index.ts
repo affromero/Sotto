@@ -13,6 +13,7 @@ import {
   twitterTrendPollQueue,
   emailDigestQueue,
   draftCleanupQueue,
+  r2UsageQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -47,6 +48,8 @@ import { processVoiceVerification } from './voice-verification.worker';
 import { processVoiceTrackAudio } from './voice-track-audio.worker';
 import { processVoiceTrackStitching } from './voice-track-stitching.worker';
 import { processDraftCleanup } from './draft-cleanup.worker';
+import { processR2Usage } from './r2-usage.worker';
+import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 
 logger.info('Starting Sotto workers...');
 
@@ -81,6 +84,7 @@ const workers = [
   createWorker('voice-track-audio', processVoiceTrackAudio, { concurrency: 10 }),
   createWorker('voice-track-stitching', processVoiceTrackStitching, { concurrency: 1 }),
   createWorker('draft-cleanup', processDraftCleanup, { concurrency: 1 }),
+  createWorker('r2-usage', processR2Usage, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -153,6 +157,16 @@ keyValidationQueue
   .add(JobType.VALIDATE_KEYS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
   .then(() => logger.info('BYOK key validation scheduled', { intervalMs: '86400000' }))
   .catch((err) => logger.error('Failed to schedule key validation', { error: err.message }));
+
+// Schedule daily R2 usage collection if Cloudflare API token is configured
+if (isR2MonitoringConfigured()) {
+  r2UsageQueue
+    .add(JobType.COLLECT_R2_USAGE, {}, { repeat: { every: 86400000 } })
+    .then(() => logger.info('R2 usage monitoring scheduled', { intervalMs: '86400000' }))
+    .catch((err) => logger.error('Failed to schedule R2 usage monitoring', { error: err.message }));
+} else {
+  logger.info('R2 monitoring not configured — usage collection disabled');
+}
 
 logger.info(`${workers.length} workers started`);
 
