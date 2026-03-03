@@ -150,7 +150,7 @@ vi.mock('@/lib/import-metadata-generator', () => ({
 
 // ---- Language + topic tag mocks ----
 
-const mockDetectLanguage = vi.fn().mockReturnValue('en');
+const mockDetectLanguage = vi.fn().mockResolvedValue('en');
 vi.mock('@/lib/language-detect', () => ({
   detectLanguage: (...args: unknown[]) => mockDetectLanguage(...args),
 }));
@@ -279,7 +279,7 @@ describe('processAudioImport', () => {
 
     mockGenerateImportMetadata.mockResolvedValue({ title: 'AI-Generated Title', topic: 'Quantum Computing Fundamentals' });
     mockIsMetadataDifferent.mockReturnValue(true);
-    mockDetectLanguage.mockReturnValue('en');
+    mockDetectLanguage.mockResolvedValue('en');
     mockMatchTopicTags.mockReturnValue([]);
 
     mockMarkPodcastFailed.mockResolvedValue(undefined);
@@ -583,7 +583,7 @@ describe('processAudioImport', () => {
     });
 
     it('assigns language tag when detected language matches an existing tag', async () => {
-      mockDetectLanguage.mockReturnValue('en');
+      mockDetectLanguage.mockResolvedValue('en');
       mockPrismaTagFindUnique.mockResolvedValue({ id: 'tag-lang-en', slug: 'lang-en' });
 
       const job = createMockJob(defaultPayload);
@@ -595,7 +595,7 @@ describe('processAudioImport', () => {
     });
 
     it('skips language tag assignment when detectLanguage returns null', async () => {
-      mockDetectLanguage.mockReturnValue(null);
+      mockDetectLanguage.mockResolvedValue(null);
 
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);

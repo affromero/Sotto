@@ -157,7 +157,7 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
 
   // Detect language from script text
   const fullText = result.turns.map((t: { text: string }) => t.text).join(' ');
-  const detectedLanguage = detectLanguage(fullText);
+  const detectedLanguage = await detectLanguage(fullText);
   if (detectedLanguage) allTagSlugs.add(`lang-${detectedLanguage}`);
 
   // Production tag

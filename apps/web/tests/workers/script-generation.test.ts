@@ -157,6 +157,10 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/language-detect', () => ({
+  detectLanguage: vi.fn().mockResolvedValue(null),
+}));
+
 // ---- Import under test ----
 import { processScriptGeneration } from '@/workers/script-generation.worker';
 import type { GenerateScriptPayload } from '@/lib/queue';

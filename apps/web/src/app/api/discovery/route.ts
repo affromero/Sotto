@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
   if (isFirstMessage && !user?.preferredLanguage) {
     const rawMessage = message ?? content;
     if (typeof rawMessage === 'string') {
-      const lang = detectLanguage(rawMessage);
+      const lang = await detectLanguage(rawMessage);
       if (lang && lang !== 'en') {
         detectedLanguage = lang;
       }

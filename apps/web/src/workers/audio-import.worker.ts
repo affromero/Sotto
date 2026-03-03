@@ -310,7 +310,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
 
     // Detect language from transcript text
     const importFullText = segments.map((s) => s.text).join(' ');
-    const detectedLanguage = detectLanguage(importFullText);
+    const detectedLanguage = await detectLanguage(importFullText);
 
     // Auto-assign language tag
     if (detectedLanguage) {
