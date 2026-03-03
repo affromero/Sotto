@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { authenticateRequest } from '@/lib/api-keys';
 import { eventIngestionQueue, addJob, JobType } from '@/lib/queue';
 import { eventBatchSchema } from '@/lib/validations/events';
 import type { IngestEventsPayload } from '@/lib/queue';
@@ -25,8 +26,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Attach authenticated user ID if available (supplements client-side userId)
+  // Try NextAuth session first, then Bearer token (mobile sends sk_sotto_* tokens)
   const session = await auth().catch(() => null);
-  const serverUserId = session?.user?.id;
+  let serverUserId = session?.user?.id;
+  if (!serverUserId) {
+    const apiKeyAuth = await authenticateRequest(request).catch(() => null);
+    if (apiKeyAuth) serverUserId = apiKeyAuth.userId;
+  }
 
   const events = parsed.data.events.map((event) => ({
     context: {
