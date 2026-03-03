@@ -34,6 +34,7 @@ import { ForkLineage } from '@/components/player/ForkLineage';
 import { ForkGraph } from '@/components/player/ForkGraph';
 import { ForkRemixModal } from '@/components/player/ForkRemixModal';
 import { VoiceRenditionForkModal } from '@/components/player/VoiceRenditionForkModal';
+import { ProposeRenditionButton } from '@/components/player/ProposeRenditionButton';
 import { AddToCollectionModal } from '@/components/collections/AddToCollectionModal';
 import { ShareMenu } from '@/components/player/ShareMenu';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
@@ -654,6 +655,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               voiceTracks={podcast.voiceTracks}
               defaultVoiceTrackId={podcast.defaultVoiceTrackId}
               isOwner={isOwner}
+            />
+          )}
+          {isOwner && podcast.isVoiceOnlyFork && podcast.forkedFrom && isReady &&
+            podcast.voiceTracks.some(t => t.status === 'READY') && (
+            <ProposeRenditionButton
+              podcastId={podcast.id}
+              voiceTrackId={podcast.voiceTracks.find(t => t.status === 'READY')!.id}
+              originalPodcastId={podcast.forkedFrom.id}
+              originalTitle={podcast.forkedFrom.title}
             />
           )}
         </section>
