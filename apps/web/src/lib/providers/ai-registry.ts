@@ -2,8 +2,46 @@
  * Declarative AI (LLM) provider registry — capabilities, auth config, and
  * validation functions for every supported BYOK AI provider.
  * Parallel to tts-registry.ts for TTS providers.
+ *
+ * Model pricing is sourced from the `pricetoken` package (static offline data)
+ * rather than hardcoded — see hydratePricingFromPricetoken() below.
  */
+import { STATIC_PRICING, type ModelPricing as PricetokenModelPricing } from 'pricetoken';
 import { logger } from '../logger';
+
+// ---------------------------------------------------------------------------
+// Pricetoken lookup — static offline pricing for 36+ models
+// ---------------------------------------------------------------------------
+
+const pricetokenByModelId = new Map<string, PricetokenModelPricing>();
+for (const entry of STATIC_PRICING) {
+  pricetokenByModelId.set(entry.modelId, entry);
+}
+
+/**
+ * Look up pricing metadata from pricetoken's static catalog.
+ * Use this for pricing/admin display — NOT for model selection or routing.
+ * Returns null if the model is not in pricetoken's catalog.
+ */
+export function getPricetokenModelInfo(modelId: string): {
+  displayName: string;
+  provider: string;
+  inputPerMTok: number;
+  outputPerMTok: number;
+  contextWindow: number | null;
+  maxOutputTokens: number | null;
+} | null {
+  const entry = pricetokenByModelId.get(modelId);
+  if (!entry) return null;
+  return {
+    displayName: entry.displayName,
+    provider: entry.provider,
+    inputPerMTok: entry.inputPerMTok,
+    outputPerMTok: entry.outputPerMTok,
+    contextWindow: entry.contextWindow,
+    maxOutputTokens: entry.maxOutputTokens,
+  };
+}
 
 export type AiProviderId = 'anthropic' | 'openai' | 'google' | 'claude-code' | 'together' | 'deepgram' | 'assemblyai';
 
@@ -61,9 +99,9 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'claude-haiku-4-5-20251001',
     getApiKeyUrl: 'https://console.anthropic.com/settings/keys',
     models: [
-      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 1.0, outputPerMTok: 5.0 } },
-      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 3.0, outputPerMTok: 15.0 } },
-      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 5.0, outputPerMTok: 25.0 } },
+      { id: 'claude-haiku-4-5-20251001', displayName: 'Claude Haiku 4.5', shortDisplayName: 'Haiku 4.5', tier: 'fast', requiredPlan: 'FREE', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6', shortDisplayName: 'Sonnet 4.6', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 64_000 },
+      { id: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', shortDisplayName: 'Opus 4.6', tier: 'best', requiredPlan: 'PRO', contextWindow: 200_000, maxOutputTokens: 128_000 },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-ant-...' }],
@@ -98,10 +136,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.40 } },
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 0.25, outputPerMTok: 2.0 } },
-      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
+      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -209,8 +247,8 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gemini-3.1-flash-lite-preview',
     getApiKeyUrl: 'https://aistudio.google.com/apikey',
     models: [
-      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', requiredPlan: 'FREE', contextWindow: 1_000_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 0.25, outputPerMTok: 1.50 } },
-      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_000_000, maxOutputTokens: 64_000, pricing: { inputPerMTok: 2.0, outputPerMTok: 12.0 } },
+      { id: 'gemini-3.1-flash-lite-preview', displayName: 'Gemini 3.1 Flash Lite', shortDisplayName: 'Flash Lite 3.1', tier: 'fast', requiredPlan: 'FREE', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
+      { id: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', shortDisplayName: 'Pro 3.1', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 1_000_000, maxOutputTokens: 64_000 },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'AIza...' }],
@@ -227,6 +265,24 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     },
   },
 };
+
+// ---------------------------------------------------------------------------
+// Hydrate pricing from pricetoken — runs once at module load
+// ---------------------------------------------------------------------------
+
+for (const provider of Object.values(AI_PROVIDERS)) {
+  for (const model of provider.models) {
+    const pt = pricetokenByModelId.get(model.id);
+    if (pt) {
+      model.pricing = { inputPerMTok: pt.inputPerMTok, outputPerMTok: pt.outputPerMTok };
+    }
+  }
+}
+// gemini-3.1-flash-lite-preview is not in pricetoken's catalog (preview model)
+const flashLite = AI_PROVIDERS.google.models.find(m => m.id === 'gemini-3.1-flash-lite-preview');
+if (flashLite && !flashLite.pricing) {
+  flashLite.pricing = { inputPerMTok: 0.25, outputPerMTok: 1.50 };
+}
 
 /**
  * Return the cheapest (fast-tier) model ID for a provider.
