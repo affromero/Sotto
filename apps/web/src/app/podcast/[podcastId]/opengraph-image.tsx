@@ -12,9 +12,10 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-export default async function OgImage({ params }: { params: { podcastId: string } }) {
+export default async function OgImage({ params }: { params: Promise<{ podcastId: string }> }) {
+  const { podcastId } = await params;
   const podcast = await prisma.podcast.findUnique({
-    where: { id: params.podcastId },
+    where: { id: podcastId },
     select: {
       title: true,
       topic: true,
