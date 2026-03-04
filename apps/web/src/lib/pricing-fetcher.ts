@@ -1,21 +1,14 @@
 /**
- * Pricing fetcher — fetches AI model pricing from provider docs pages,
- * extracts pricing via LLM, and persists snapshots to the database.
+ * Pricing fetcher — fetches AI model pricing from pricetoken.ai API
+ * and persists snapshots to the database.
+ *
+ * Replaced the old HTML-scraping + LLM-extraction pipeline with a single
+ * structured API call to pricetoken.ai.
  */
+import { PriceTokenClient, STATIC_PRICING } from 'pricetoken';
 import { prisma } from './prisma';
 import { logger } from './logger';
-import { isValidModelId, getAllAiProviderMeta } from './providers/ai-registry';
-import { loadPrompt } from './prompt-loader';
-
-// ---------------------------------------------------------------------------
-// Provider pricing page URLs
-// ---------------------------------------------------------------------------
-
-export const PRICING_URLS: Record<string, string> = {
-  openai: 'https://developers.openai.com/api/docs/pricing',
-  anthropic: 'https://platform.claude.com/docs/en/docs/about-claude/models',
-  google: 'https://ai.google.dev/gemini-api/docs/pricing',
-};
+import { getPricetokenModelInfo } from './providers/ai-registry';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,66 +24,23 @@ export interface ExtractedModelPricing {
 }
 
 // ---------------------------------------------------------------------------
-// Fetch + extract
+// Fetch from pricetoken API
 // ---------------------------------------------------------------------------
 
-/** Fetch a provider's pricing page and strip to plain text (8K char limit). */
-export async function fetchProviderPricingPage(provider: string): Promise<string> {
-  const url = PRICING_URLS[provider];
-  if (!url) throw new Error(`No pricing URL for provider: ${provider}`);
+/** Fetch all model pricing from pricetoken.ai API. */
+export async function fetchPricingFromPricetoken(): Promise<ExtractedModelPricing[]> {
+  const apiKey = process.env.PRICETOKEN_API_KEY;
+  const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
 
-  const res = await fetch(url, {
-    headers: { 'User-Agent': 'SottoFM-PricingBot/1.0' },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch pricing page for ${provider}: ${res.status}`);
-
-  const html = await res.text();
-  // Strip HTML tags, collapse whitespace, limit to 8K chars
-  const text = html
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 8_000);
-  return text;
-}
-
-/** Use LLM to extract structured pricing from page text. */
-export async function extractPricingFromPage(
-  provider: string,
-  pageText: string
-): Promise<ExtractedModelPricing[]> {
-  const { createAIProvider } = await import('./providers/ai');
-  const { resolveAutoModel } = await import('./auto-model-config');
-
-  const autoConfig = await resolveAutoModel('PLATFORM');
-  const ai = createAIProvider(autoConfig.aiProvider);
-
-  const system = loadPrompt('pricing-extractor.md');
-
-  const response = await ai.generateResponse(system, [
-    { role: 'user', content: `Extract ${provider} model pricing from this page:\n\n${pageText}` },
-  ], {
-    skipModeration: true,
-    maxTokens: 2048,
-    model: autoConfig.aiModel,
-  });
-
-  try {
-    const parsed = JSON.parse(response.content);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m: Record<string, unknown>) =>
-        typeof m.modelId === 'string' &&
-        typeof m.inputPerMTok === 'number' &&
-        typeof m.outputPerMTok === 'number'
-    );
-  } catch {
-    logger.warn('Failed to parse LLM pricing extraction', { provider, content: response.content.slice(0, 200) });
-    return [];
-  }
+  const models = await client.getPricing();
+  return models.map((m) => ({
+    modelId: m.modelId,
+    displayName: m.displayName,
+    inputPerMTok: m.inputPerMTok,
+    outputPerMTok: m.outputPerMTok,
+    contextWindow: m.contextWindow ?? undefined,
+    maxOutputTokens: m.maxOutputTokens ?? undefined,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +92,7 @@ export async function getAdminOverriddenModels(): Promise<Set<string>> {
   return adminSet;
 }
 
-/** Seed the pricing table from the registry if no snapshots exist. */
+/** Seed the pricing table from pricetoken static data + registry if no snapshots exist. */
 export async function seedPricingFromRegistry(): Promise<void> {
   const count = await prisma.modelPricingSnapshot.count();
   if (count > 0) return;
@@ -152,35 +102,32 @@ export async function seedPricingFromRegistry(): Promise<void> {
     provider: string;
     inputPerMTok: number;
     outputPerMTok: number;
-    contextWindow: number;
-    maxOutputTokens: number;
+    contextWindow?: number;
+    maxOutputTokens?: number;
     source: string;
   }> = [];
 
-  for (const provider of getAllAiProviderMeta()) {
-    for (const model of provider.models) {
-      if (!model.pricing) continue;
-      snapshots.push({
-        modelId: model.id,
-        provider: provider.id,
-        inputPerMTok: model.pricing.inputPerMTok,
-        outputPerMTok: model.pricing.outputPerMTok,
-        contextWindow: model.contextWindow,
-        maxOutputTokens: model.maxOutputTokens,
-        source: 'registry',
-      });
-    }
+  for (const entry of STATIC_PRICING) {
+    snapshots.push({
+      modelId: entry.modelId,
+      provider: entry.provider,
+      inputPerMTok: entry.inputPerMTok,
+      outputPerMTok: entry.outputPerMTok,
+      contextWindow: entry.contextWindow ?? undefined,
+      maxOutputTokens: entry.maxOutputTokens ?? undefined,
+      source: 'seed',
+    });
   }
 
   if (snapshots.length > 0) {
     await prisma.modelPricingSnapshot.createMany({ data: snapshots });
-    logger.info('Seeded pricing table from registry', { count: snapshots.length });
+    logger.info('Seeded pricing table from pricetoken', { count: snapshots.length });
   }
 }
 
-/** Filter extracted pricing to only models we know about. */
+/** Filter pricing to models known by the registry or pricetoken catalog. */
 export function filterToKnownModels(
   extracted: ExtractedModelPricing[]
 ): ExtractedModelPricing[] {
-  return extracted.filter((m) => isValidModelId(m.modelId));
+  return extracted.filter((m) => getPricetokenModelInfo(m.modelId) !== null);
 }

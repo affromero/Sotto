@@ -4,70 +4,58 @@ import { logger } from '@/lib/logger';
 import {
   seedPricingFromRegistry,
   getAdminOverriddenModels,
-  fetchProviderPricingPage,
-  extractPricingFromPage,
-  filterToKnownModels,
+  fetchPricingFromPricetoken,
   savePricingSnapshots,
-  PRICING_URLS,
 } from '@/lib/pricing-fetcher';
+import { getPricetokenModelInfo } from '@/lib/providers/ai-registry';
 import { refreshPricingFromDb } from '@/lib/pricing';
 
 export async function processPricingFetch(job: Job<FetchPricingPayload>): Promise<void> {
-  logger.info('Starting pricing fetch');
+  logger.info('Starting pricing fetch via pricetoken API');
   job.updateProgress(5);
 
-  // Seed from registry if table is empty (first run)
+  // Seed from pricetoken static data if table is empty (first run)
   await seedPricingFromRegistry();
   job.updateProgress(10);
 
   // Get admin-overridden models to skip
   const adminOverrides = await getAdminOverriddenModels();
-  const providers = Object.keys(PRICING_URLS);
   let totalUpdated = 0;
 
-  for (let i = 0; i < providers.length; i++) {
-    const provider = providers[i];
-    const progressBase = 10 + (i / providers.length) * 80;
+  try {
+    const fetched = await fetchPricingFromPricetoken();
+    job.updateProgress(60);
 
-    try {
-      logger.info('Fetching pricing page', { provider });
-      const pageText = await fetchProviderPricingPage(provider);
-      job.updateProgress(Math.round(progressBase + 20));
-
-      const extracted = await extractPricingFromPage(provider, pageText);
-      const known = filterToKnownModels(extracted);
-
-      // Filter out admin-overridden models
-      const toSave = known
-        .filter((m) => !adminOverrides.has(m.modelId))
-        .map((m) => ({
+    // Filter out admin-overridden models, resolve provider from pricetoken catalog
+    const toSave = fetched
+      .filter((m) => !adminOverrides.has(m.modelId))
+      .map((m) => {
+        const ptInfo = getPricetokenModelInfo(m.modelId);
+        return {
           modelId: m.modelId,
-          provider,
+          provider: ptInfo?.provider ?? 'unknown',
           inputPerMTok: m.inputPerMTok,
           outputPerMTok: m.outputPerMTok,
           contextWindow: m.contextWindow,
           maxOutputTokens: m.maxOutputTokens,
           source: 'fetched',
-        }));
-
-      if (toSave.length > 0) {
-        await savePricingSnapshots(toSave);
-        totalUpdated += toSave.length;
-      }
-
-      logger.info('Provider pricing fetched', {
-        provider,
-        extracted: String(extracted.length),
-        known: String(known.length),
-        saved: String(toSave.length),
-        skippedAdmin: String(known.length - toSave.length),
+        };
       });
-    } catch (error) {
-      logger.warn('Failed to fetch pricing for provider', {
-        provider,
-        error: error instanceof Error ? error.message : String(error),
-      });
+
+    if (toSave.length > 0) {
+      await savePricingSnapshots(toSave);
+      totalUpdated = toSave.length;
     }
+
+    logger.info('Pricetoken pricing fetched', {
+      total: String(fetched.length),
+      saved: String(toSave.length),
+      skippedAdmin: String(fetched.length - toSave.length),
+    });
+  } catch (error) {
+    logger.warn('Failed to fetch pricing from pricetoken API', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   job.updateProgress(90);

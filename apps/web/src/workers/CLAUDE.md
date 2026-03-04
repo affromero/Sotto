@@ -32,7 +32,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `email-digest`            | `email-digest`            | 1      | Sunday 10:00 UTC cron → query new podcasts + stats → send weekly digest to subscribed waitlist emails            | Sends digest emails via Resend                                                         |
 | `announcement`            | `announcements`           | 1      | Announcement payload (subject + message) → fan-out to all users in batches of 100                                | Creates in-app Notification + push (if pushNotifications=true) + email (if emailNotifications=true) per user |
 | `r2-usage`                | `r2-usage`                | 1      | Scheduled (every 24h) → fetch R2 bucket usage + operation counts from Cloudflare API                            | Creates R2UsageSnapshot with storage size, ops counts, and cost estimates               |
-| `pricing-fetch`             | `pricing-fetch`             | 1      | Scheduled (every 24h) → fetch pricing pages from OpenAI/Anthropic/Google, extract via LLM, save snapshots      | Creates ModelPricingSnapshot rows, refreshes in-memory pricing map                      |
+| `pricing-fetch`             | `pricing-fetch`             | 1      | Scheduled (every 24h) → fetch pricing from pricetoken.ai API, save snapshots                                    | Creates ModelPricingSnapshot rows, refreshes in-memory pricing map                      |
 
 ## Pipeline Flow
 
