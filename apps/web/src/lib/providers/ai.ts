@@ -1,5 +1,16 @@
 import { moderateOrThrow } from '../moderation';
+import { isReasoningModel } from './ai-registry';
 import type { AiProviderId } from './ai-registry';
+import { logger } from '../logger';
+
+/**
+ * Minimum max_completion_tokens for reasoning models.
+ * Reasoning models consume tokens internally for "thinking" before producing
+ * visible output. A low budget (e.g. 2048) can be entirely consumed by
+ * reasoning, leaving 0 visible bytes. 16384 gives ample room for reasoning
+ * while keeping costs reasonable (you only pay for tokens actually generated).
+ */
+const REASONING_MODEL_MIN_TOKENS = 16384;
 
 export interface TextContentPart { type: 'text'; text: string }
 export interface ImageContentPart { type: 'image_url'; url: string }
@@ -164,9 +175,17 @@ class OpenAIProvider implements AIProvider {
       };
     }
 
+    // For reasoning models, ensure the token budget is high enough for
+    // internal thinking + visible output. Callers set maxTokens for visible
+    // output; reasoning overhead is handled transparently here.
+    const requestedTokens = opts?.maxTokens || 4096;
+    const effectiveTokens = isReasoningModel(model)
+      ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
+      : requestedTokens;
+
     const response = await client.chat.completions.create({
       model,
-      max_completion_tokens: opts?.maxTokens || 4096,
+      max_completion_tokens: effectiveTokens,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
       ...(opts?.jsonSchema ? {
@@ -183,11 +202,15 @@ class OpenAIProvider implements AIProvider {
     if (!content && (choice as any)?.finish_reason === 'length') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const details = (response.usage as any)?.completion_tokens_details;
-      console.warn(
-        `[OpenAI] Empty content with finish_reason=length (model=${model}, ` +
-        `completion_tokens=${response.usage?.completion_tokens || 0}, ` +
-        `reasoning_tokens=${details?.reasoning_tokens ?? 'n/a'}). ` +
-        `Reasoning models need higher max_completion_tokens.`
+      logger.warn('[OpenAI] Empty content with finish_reason=length — reasoning model exhausted token budget', {
+        model,
+        max_completion_tokens: String(effectiveTokens),
+        completion_tokens: String(response.usage?.completion_tokens || 0),
+        reasoning_tokens: String(details?.reasoning_tokens ?? 'n/a'),
+      });
+      throw new Error(
+        `OpenAI model "${model}" produced no visible output (finish_reason=length). ` +
+        `Reasoning used all ${effectiveTokens} tokens. Increase max_completion_tokens or use a non-reasoning model.`
       );
     }
     return {
@@ -234,17 +257,49 @@ class OpenAIProvider implements AIProvider {
       return;
     }
 
+    const requestedTokens = opts?.maxTokens || 4096;
+    const effectiveTokens = isReasoningModel(model)
+      ? Math.max(requestedTokens, REASONING_MODEL_MIN_TOKENS)
+      : requestedTokens;
+
     const stream = await client.chat.completions.create({
       model,
-      max_completion_tokens: opts?.maxTokens || 4096,
+      max_completion_tokens: effectiveTokens,
       temperature: opts?.temperature,
       messages: toOpenAiMessages(system, messages),
       stream: true,
     });
 
+    let yieldedAny = false;
+    let lastFinishReason: string | null = null;
     for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content;
-      if (delta) yield delta;
+      const choice = chunk.choices[0];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const finishReason = (choice as any)?.finish_reason as string | null;
+      if (finishReason) lastFinishReason = finishReason;
+      const delta = choice?.delta?.content;
+      if (delta) {
+        yieldedAny = true;
+        yield delta;
+      }
+    }
+
+    if (!yieldedAny) {
+      if (lastFinishReason === 'length') {
+        logger.warn('[OpenAI] Stream produced 0 visible bytes with finish_reason=length', {
+          model,
+          max_completion_tokens: String(effectiveTokens),
+        });
+        throw new Error(
+          `OpenAI model "${model}" streamed no visible output (finish_reason=length). ` +
+          `Reasoning likely consumed all ${effectiveTokens} tokens.`
+        );
+      }
+      logger.warn('[OpenAI] Stream produced 0 visible bytes', {
+        model,
+        finish_reason: lastFinishReason ?? 'unknown',
+        max_completion_tokens: String(effectiveTokens),
+      });
     }
   }
 }

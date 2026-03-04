@@ -27,6 +27,13 @@ export interface AiModelOption {
   maxOutputTokens: number;
   /** Per-million-token pricing. Omit for zero-cost or non-metered models. */
   pricing?: { inputPerMTok: number; outputPerMTok: number };
+  /**
+   * Whether this model uses internal reasoning/thinking tokens that consume
+   * part of max_completion_tokens before producing visible output.
+   * When true, providers auto-boost the token budget so reasoning doesn't
+   * starve the visible output.
+   */
+  isReasoning?: boolean;
 }
 
 export interface AiProviderMeta {
@@ -91,10 +98,10 @@ const AI_PROVIDERS: Record<AiProviderId, AiProviderMeta> = {
     defaultModel: 'gpt-5',
     getApiKeyUrl: 'https://platform.openai.com/api-keys',
     models: [
-      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.40 } },
-      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 0.25, outputPerMTok: 2.0 } },
-      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
-      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
+      { id: 'gpt-5-nano', displayName: 'GPT-5 Nano', shortDisplayName: '5 Nano', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 0.05, outputPerMTok: 0.40 } },
+      { id: 'gpt-5-mini', displayName: 'GPT-5 Mini', shortDisplayName: '5 Mini', tier: 'fast', requiredPlan: 'FREE', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 0.25, outputPerMTok: 2.0 } },
+      { id: 'gpt-5', displayName: 'GPT-5', shortDisplayName: '5', tier: 'balanced', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 1.25, outputPerMTok: 10.0 } },
+      { id: 'gpt-5.2', displayName: 'GPT-5.2', shortDisplayName: '5.2', tier: 'best', requiredPlan: 'PRO', contextWindow: 400_000, maxOutputTokens: 128_000, isReasoning: true, pricing: { inputPerMTok: 1.75, outputPerMTok: 14.0 } },
     ],
     auth: {
       fields: [{ key: 'apiKey', label: 'API Key', placeholder: 'sk-...' }],
@@ -309,6 +316,19 @@ export function getAllAiProviderClientMeta(): AiProviderClientMeta[] {
       description: AI_CLIENT_DESCRIPTIONS[p.id].description,
       badge: AI_CLIENT_DESCRIPTIONS[p.id].badge,
     }));
+}
+
+/**
+ * Check whether a model uses internal reasoning tokens that consume
+ * part of max_completion_tokens before producing visible output.
+ * Returns false for unknown models (safe default — no boost applied).
+ */
+export function isReasoningModel(modelId: string): boolean {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return !!model.isReasoning;
+  }
+  return false;
 }
 
 /**
