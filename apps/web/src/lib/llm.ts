@@ -250,6 +250,9 @@ export async function* streamResponse(
         skipModeration: options?.skipModeration,
         ...(hasWebSearch ? { useWebSearch: true } : {}),
       });
+      // Non-Anthropic providers don't report token usage in their stream,
+      // but fire onComplete so callers at least get the model name logged.
+      options?.onComplete?.({ inputTokens: 0, outputTokens: 0, model: streamModel });
       return;
     }
   }
