@@ -4,7 +4,7 @@ import { errorResponse } from '@/lib/api-response';
 import { getCurrentModelPricing } from '@/lib/pricing-metrics';
 import { savePricingSnapshots } from '@/lib/pricing-fetcher';
 import { refreshPricingFromDb } from '@/lib/pricing';
-import { isValidModelId, getProviderForModel } from '@/lib/providers/ai-registry';
+import { isValidModelId, getProviderForModel, getPricetokenModelInfo } from '@/lib/providers/ai-registry';
 import { z } from 'zod';
 
 export async function GET() {
@@ -37,11 +37,12 @@ export async function PATCH(request: NextRequest) {
 
   const { modelId, inputPerMTok, outputPerMTok } = parsed.data;
 
-  if (!isValidModelId(modelId)) {
+  const ptInfo = getPricetokenModelInfo(modelId);
+  if (!isValidModelId(modelId) && !ptInfo) {
     return errorResponse(`Unknown model: "${modelId}"`, 400);
   }
 
-  const provider = getProviderForModel(modelId);
+  const provider = getProviderForModel(modelId) ?? ptInfo?.provider;
   if (!provider) {
     return errorResponse(`Cannot determine provider for model: "${modelId}"`, 400);
   }

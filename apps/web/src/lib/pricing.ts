@@ -6,8 +6,9 @@
  * then optionally refreshed from ModelPricingSnapshot DB rows every 5 minutes.
  * The refresh is opt-in via startPricingRefreshInterval() — never fires at build/test time.
  */
+import { STATIC_PRICING } from 'pricetoken';
 import { logger } from './logger';
-import { getAllAiProviderMeta, getAiProviderMeta, getCheapestModelForProvider } from './providers/ai-registry';
+import { getAllAiProviderMeta, getAiProviderMeta, getCheapestModelForProvider, isValidModelId } from './providers/ai-registry';
 
 export interface ModelPricing {
   inputPerMTok: number;
@@ -16,6 +17,11 @@ export interface ModelPricing {
 
 function buildPricingMap(): Record<string, ModelPricing> {
   const map: Record<string, ModelPricing> = {};
+  // Start with all pricetoken models (36+ models across providers)
+  for (const entry of STATIC_PRICING) {
+    map[entry.modelId] = { inputPerMTok: entry.inputPerMTok, outputPerMTok: entry.outputPerMTok };
+  }
+  // Overlay registry models (includes pricetoken-hydrated pricing + manual fallbacks like gemini-3.1-flash-lite-preview)
   for (const provider of getAllAiProviderMeta()) {
     for (const model of provider.models) {
       if (model.pricing) map[model.id] = model.pricing;
@@ -55,11 +61,12 @@ export function getAiCost(model: string, inputTokens: number, outputTokens: numb
   return inputCost + outputCost;
 }
 
-/** Pick the cheapest generative model from the pricing table (excludes embeddings + local CLI). */
+/** Pick the cheapest generative model from the pricing table that Sotto can actually serve (registry models only). */
 export function getCheapestModel(): string {
   let cheapest: { model: string; cost: number } | null = null;
   for (const [model, pricing] of Object.entries(activePricing)) {
     if (model.startsWith('text-embedding') || model.startsWith('claude-code:')) continue;
+    if (!isValidModelId(model)) continue;
     const totalCost = pricing.inputPerMTok + pricing.outputPerMTok;
     if (!cheapest || totalCost < cheapest.cost) {
       cheapest = { model, cost: totalCost };
