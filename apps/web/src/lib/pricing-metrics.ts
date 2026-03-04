@@ -3,7 +3,7 @@
  * price history over time, and last fetch timestamp.
  */
 import { prisma } from './prisma';
-import { getAiModelDisplayName, getProviderForModel, getModelContextWindow, getModelMaxOutputTokens } from './providers/ai-registry';
+import { getAiModelDisplayName, getProviderForModel, getModelContextWindow, getModelMaxOutputTokens, getPricetokenModelInfo } from './providers/ai-registry';
 import { getAllCurrentPricing } from './pricing';
 
 export interface ModelPricingRow {
@@ -32,17 +32,22 @@ export async function getCurrentModelPricing(): Promise<ModelPricingRow[]> {
   `;
   const lastUpdatedMap = new Map(latestSnapshots.map((s) => [s.modelId, s.lastUpdated]));
 
-  const rows: ModelPricingRow[] = current.map((m) => ({
-    modelId: m.modelId,
-    displayName: getAiModelDisplayName(m.modelId),
-    provider: getProviderForModel(m.modelId) ?? 'unknown',
-    inputPerMTok: m.inputPerMTok,
-    outputPerMTok: m.outputPerMTok,
-    contextWindow: getModelContextWindow(m.modelId),
-    maxOutputTokens: getModelMaxOutputTokens(m.modelId),
-    source: m.source,
-    lastUpdated: lastUpdatedMap.get(m.modelId) ?? null,
-  }));
+  const rows: ModelPricingRow[] = current.map((m) => {
+    const ptInfo = getPricetokenModelInfo(m.modelId);
+    return {
+      modelId: m.modelId,
+      displayName: getAiModelDisplayName(m.modelId) !== m.modelId
+        ? getAiModelDisplayName(m.modelId)
+        : ptInfo?.displayName ?? m.modelId,
+      provider: getProviderForModel(m.modelId) ?? ptInfo?.provider ?? 'unknown',
+      inputPerMTok: m.inputPerMTok,
+      outputPerMTok: m.outputPerMTok,
+      contextWindow: getModelContextWindow(m.modelId) ?? ptInfo?.contextWindow ?? null,
+      maxOutputTokens: getModelMaxOutputTokens(m.modelId) ?? ptInfo?.maxOutputTokens ?? null,
+      source: m.source,
+      lastUpdated: lastUpdatedMap.get(m.modelId) ?? null,
+    };
+  });
 
   // Sort by provider, then model name
   rows.sort((a, b) => a.provider.localeCompare(b.provider) || a.displayName.localeCompare(b.displayName));

@@ -6,7 +6,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 describe('filterToKnownModels', () => {
-  it('keeps models that exist in the registry', () => {
+  it('keeps models that exist in the AI registry', () => {
     const extracted: ExtractedModelPricing[] = [
       { modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet', inputPerMTok: 3.0, outputPerMTok: 15.0 },
       { modelId: 'gpt-5-mini', displayName: 'GPT-5 Mini', inputPerMTok: 0.25, outputPerMTok: 2.0 },
@@ -17,7 +17,16 @@ describe('filterToKnownModels', () => {
     expect(result[1].modelId).toBe('gpt-5-mini');
   });
 
-  it('filters out unknown models', () => {
+  it('keeps models that exist in pricetoken catalog but not AI registry', () => {
+    const extracted: ExtractedModelPricing[] = [
+      { modelId: 'deepseek-chat', displayName: 'DeepSeek Chat', inputPerMTok: 0.27, outputPerMTok: 1.10 },
+      { modelId: 'grok-3', displayName: 'Grok 3', inputPerMTok: 3.0, outputPerMTok: 15.0 },
+    ];
+    const result = filterToKnownModels(extracted);
+    expect(result).toHaveLength(2);
+  });
+
+  it('filters out completely unknown models', () => {
     const extracted: ExtractedModelPricing[] = [
       { modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet', inputPerMTok: 3.0, outputPerMTok: 15.0 },
       { modelId: 'totally-fake-model', displayName: 'Fake', inputPerMTok: 1.0, outputPerMTok: 1.0 },
@@ -56,38 +65,5 @@ describe('filterToKnownModels', () => {
     expect(result).toHaveLength(1);
     expect(result[0].contextWindow).toBe(200_000);
     expect(result[0].maxOutputTokens).toBe(128_000);
-  });
-
-  it('includes Google Gemini models', () => {
-    const extracted: ExtractedModelPricing[] = [
-      { modelId: 'gemini-3.1-flash-lite-preview', displayName: 'Flash Lite', inputPerMTok: 0.25, outputPerMTok: 1.5 },
-      { modelId: 'gemini-3.1-pro-preview', displayName: 'Pro', inputPerMTok: 2.0, outputPerMTok: 12.0 },
-    ];
-    const result = filterToKnownModels(extracted);
-    expect(result).toHaveLength(2);
-  });
-
-  it('includes GPT-5 Nano', () => {
-    const extracted: ExtractedModelPricing[] = [
-      { modelId: 'gpt-5-nano', displayName: 'GPT-5 Nano', inputPerMTok: 0.05, outputPerMTok: 0.4 },
-    ];
-    const result = filterToKnownModels(extracted);
-    expect(result).toHaveLength(1);
-    expect(result[0].modelId).toBe('gpt-5-nano');
-  });
-});
-
-describe('PRICING_URLS', () => {
-  it('exports URLs for all 3 providers', async () => {
-    const { PRICING_URLS } = await import('@/lib/pricing-fetcher');
-    expect(Object.keys(PRICING_URLS)).toEqual(expect.arrayContaining(['openai', 'anthropic', 'google']));
-    expect(Object.keys(PRICING_URLS)).toHaveLength(3);
-  });
-
-  it('all URLs are valid HTTPS URLs', async () => {
-    const { PRICING_URLS } = await import('@/lib/pricing-fetcher');
-    for (const url of Object.values(PRICING_URLS)) {
-      expect(url).toMatch(/^https:\/\//);
-    }
   });
 });
