@@ -4,6 +4,10 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: sotto-postgres
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     ports:
       - '5432:5432'
     environment:
@@ -21,6 +25,10 @@ services:
   redis:
     image: redis:7-alpine
     container_name: sotto-redis
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     ports:
       - '6379:6379'
     volumes:
@@ -35,6 +43,10 @@ services:
     build:
       context: ./services/kittentts
     container_name: sotto-kittentts
+    deploy:
+      resources:
+        limits:
+          memory: 512m
     ports:
       - '8100:8000'
     healthcheck:
@@ -47,6 +59,10 @@ services:
   pinchtab:
     image: pinchtab/pinchtab
     container_name: sotto-pinchtab
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     ports:
       - '9867:9867'
     environment:

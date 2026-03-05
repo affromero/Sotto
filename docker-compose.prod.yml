@@ -3,6 +3,10 @@ services:
     image: pgvector/pgvector:pg16
     container_name: sotto-prod-postgres
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sotto}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
@@ -26,6 +30,10 @@ services:
     image: redis:7-alpine
     container_name: sotto-prod-redis
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 768m
     command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
     volumes:
       - sotto_redis_data:/data
@@ -53,6 +61,10 @@ services:
         NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
     container_name: sotto-prod-web
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     ports:
       - '127.0.0.1:3000:3000'
     volumes:
@@ -93,6 +105,10 @@ services:
       dockerfile: apps/web/Dockerfile.workers
     container_name: sotto-prod-workers
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     env_file:
       - .env
     environment:
@@ -122,6 +138,10 @@ services:
       dockerfile: Dockerfile
     container_name: sotto-prod-kittentts
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
     healthcheck:
       test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health")']
       interval: 30s
@@ -140,6 +160,10 @@ services:
     image: pinchtab/pinchtab
     container_name: sotto-prod-pinchtab
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     environment:
       BRIDGE_BIND: '0.0.0.0'
       BRIDGE_PORT: '9867'
