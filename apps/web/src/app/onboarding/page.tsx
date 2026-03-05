@@ -8,6 +8,7 @@ import { getAllTtsProviderClientMeta } from '@/lib/providers/tts-registry';
 import { generateQuestions } from '@/lib/taste-quiz';
 import { attributeReferral } from '@/lib/referrals';
 import { ProWaitlistButton } from '@/components/ui/ProWaitlistButton';
+import { NameStep } from './NameStep';
 import { QuizStep } from './QuizStep';
 import { KeySetupForm } from './KeySetupForm';
 import styles from './page.module.css';
@@ -48,7 +49,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
   // Check if already onboarded — skip to keys step or create
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { hasCompletedOnboarding: true },
+    select: { hasCompletedOnboarding: true, name: true },
   });
 
   if (user?.hasCompletedOnboarding && step !== 'keys') {
@@ -106,6 +107,24 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
               />
             </div>
           </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Name step — required before taste quiz for email signups (no OAuth name)
+  if (!user?.name?.trim()) {
+    return (
+      <main className={styles.main}>
+        <div className={styles.container}>
+          <header className={styles.header}>
+            <h1 className={styles.title}>What should we call you?</h1>
+            <p className={styles.subtitle}>
+              This is how you&apos;ll appear on Sotto.
+            </p>
+          </header>
+
+          <NameStep />
         </div>
       </main>
     );
