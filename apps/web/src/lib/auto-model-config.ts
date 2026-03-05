@@ -30,6 +30,9 @@ export interface AutoModelConfigData {
   proIncludedTtsModels: string[] | null;
   freeIncludedSttModels: string[] | null;
   proIncludedSttModels: string[] | null;
+  proImageProvider: string;
+  proImageModel: string;
+  proIncludedImageModels: string[] | null;
 }
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
@@ -50,6 +53,8 @@ const SEEDS = {
   proSttModel: getSttProviderMeta('openai').defaultModel,
   platformAiProvider: 'anthropic' as const,
   platformAiModel: getAiProviderMeta('anthropic').defaultModel,
+  proImageProvider: 'fal',
+  proImageModel: 'flux-schnell',
 };
 
 /**
@@ -125,6 +130,9 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proIncludedTtsModels: includedModelsSchema.parse(row.proIncludedTtsModels),
     freeIncludedSttModels: includedModelsSchema.parse(row.freeIncludedSttModels),
     proIncludedSttModels: includedModelsSchema.parse(row.proIncludedSttModels),
+    proImageProvider: row.proImageProvider,
+    proImageModel: row.proImageModel,
+    proIncludedImageModels: includedModelsSchema.parse(row.proIncludedImageModels),
   };
 }
 
@@ -142,6 +150,9 @@ export async function setAutoModelConfig(
     proIncludedTtsModels?: string[] | null;
     freeIncludedSttModels?: string[] | null;
     proIncludedSttModels?: string[] | null;
+    proImageProvider?: string;
+    proImageModel?: string;
+    proIncludedImageModels?: string[] | null;
   },
   adminId: string
 ): Promise<void> {
@@ -192,6 +203,12 @@ export async function setAutoModelConfig(
 
   if (data.proIncludedSttModels !== undefined) {
     update.proIncludedSttModels = data.proIncludedSttModels;
+  }
+
+  if (data.proImageProvider) update.proImageProvider = data.proImageProvider;
+  if (data.proImageModel) update.proImageModel = data.proImageModel;
+  if (data.proIncludedImageModels !== undefined) {
+    update.proIncludedImageModels = data.proIncludedImageModels;
   }
 
   await prisma.autoModelConfig.upsert({
@@ -266,4 +283,18 @@ export async function resolveAutoModel(plan: 'FREE' | 'PRO' | 'PLATFORM'): Promi
     };
   }
   return plan === 'PRO' ? config.pro : config.free;
+}
+
+/**
+ * Resolve the image provider and model for video generation (PRO-only feature).
+ */
+export async function resolveImageModel(): Promise<{
+  imageProvider: string;
+  imageModel: string;
+}> {
+  const config = await getAutoModelConfig();
+  return {
+    imageProvider: config.proImageProvider,
+    imageModel: config.proImageModel,
+  };
 }

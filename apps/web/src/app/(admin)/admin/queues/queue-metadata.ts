@@ -14,7 +14,8 @@ export type PipelineStage =
   | 'Social'
   | 'Analytics'
   | 'Platform Ops'
-  | 'Voice Features';
+  | 'Voice Features'
+  | 'Video Pipeline';
 
 interface QueueMeta {
   description: string;
@@ -29,6 +30,7 @@ export const PIPELINE_STAGE_ORDER: PipelineStage[] = [
   'Analytics',
   'Platform Ops',
   'Voice Features',
+  'Video Pipeline',
 ];
 
 export const QUEUE_METADATA: Record<string, QueueMeta> = {
@@ -155,5 +157,17 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
   'pricing-fetch': {
     description: 'Fetches AI model pricing from provider pages and updates snapshots',
     stage: 'Platform Ops',
+  },
+  'visual-classification': {
+    description: 'Classifies podcast segments into visual types via Claude',
+    stage: 'Video Pipeline',
+  },
+  'visual-generation': {
+    description: 'Generates AI illustrations and fetches stock footage per segment',
+    stage: 'Video Pipeline',
+  },
+  'video-composition': {
+    description: 'Renders final MP4 video via Remotion sidecar',
+    stage: 'Video Pipeline',
   },
 };

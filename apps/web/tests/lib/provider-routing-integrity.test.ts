@@ -37,6 +37,8 @@ describe('no direct llm.ts imports outside allowlist', () => {
     'lib/discovery-agent.ts',
     // AnthropicProvider wraps llm.ts via dynamic import('../llm') — this IS the provider system
     'lib/providers/ai.ts',
+    // visual-classifier always uses Claude Haiku for batch segment classification
+    'lib/visual-classifier.ts',
   ]);
 
   const STATIC_IMPORT_RE = /from\s+['"]([@./]*lib\/llm|\.\/llm|\.\.\/llm)['"]/;
@@ -74,6 +76,8 @@ describe('no hardcoded anthropic in logUsage service fields', () => {
     'lib/reference-verification/ai-layer.ts',
     'lib/import-metadata-generator.ts',
     'app/api/discovery/route.ts',
+    // visual-classification always uses Anthropic Claude for batch classification
+    'workers/visual-classification.worker.ts',
   ]);
 
   // Matches lines containing both `service:` and the literal `'anthropic'`

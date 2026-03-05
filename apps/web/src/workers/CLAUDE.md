@@ -33,6 +33,9 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `announcement`            | `announcements`           | 1      | Announcement payload (subject + message) → fan-out to all users in batches of 100                                | Creates in-app Notification + push (if pushNotifications=true) + email (if emailNotifications=true) per user |
 | `r2-usage`                | `r2-usage`                | 1      | Scheduled (every 24h) → fetch R2 bucket usage + operation counts from Cloudflare API                            | Creates R2UsageSnapshot with storage size, ops counts, and cost estimates               |
 | `pricing-fetch`             | `pricing-fetch`             | 1      | Scheduled (every 24h) → fetch pricing from pricetoken.ai API, save snapshots                                    | Creates ModelPricingSnapshot rows, refreshes in-memory pricing map                      |
+| `visual-classification`     | `visual-classification`     | 2      | Podcast segments → Claude Haiku batch classification → assign visual types + prompts/metadata per segment       | Creates SegmentVisual records, queues visual-generation for external assets, or video-composition if all programmatic |
+| `visual-generation`         | `visual-generation`         | 5      | SegmentVisual → AI illustration (fal FLUX) or stock footage (Pexels) → upload asset to R2                      | Updates SegmentVisual.assetUrl + status, queues video-composition when all segments ready |
+| `video-composition`         | `video-composition`         | 1      | All segment visuals ready → POST to Remotion sidecar → poll for completion → upload MP4 to R2                  | Sets VideoGeneration.status=READY, Podcast.videoUrl, queues VIDEO_READY notification    |
 
 ## Pipeline Flow
 
@@ -59,6 +62,10 @@ Script review (at SCRIPT_READY):
 Incorporation (post-READY):
   incorporate endpoint → segment-regeneration → audio-stitching (skipSfx) → READY
   (ANSWERED → INCORPORATING)  (TTS + insert)    (re-concat + startTimes)   (INCORPORATED)
+
+Video pipeline (post-READY, PRO/admin only):
+  POST /api/podcasts/[id]/video → visual-classification → visual-generation (×N parallel) → video-composition → notification
+                                   (Claude Haiku)          (fal FLUX / Pexels)              (Remotion sidecar)    (VIDEO_READY)
 ```
 
 ## Standalone Utility Workers

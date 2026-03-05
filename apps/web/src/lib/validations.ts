@@ -625,6 +625,13 @@ export const regenerateWithFeedbackSchema = z.object({
 }).optional();
 
 /**
+ * Video generation request validation
+ */
+export const generateVideoSchema = z.object({
+  imageModel: z.string().optional(),
+}).optional();
+
+/**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
