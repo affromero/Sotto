@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.2.0] - 2026-03-05
+
+### Added
+- Video generation pipeline — AI-powered video from any podcast (PRO/admin feature)
+  - Visual classifier assigns illustration/stock-footage/chart/quote types per segment
+  - Fal FLUX image generation and Pexels stock footage integration
+  - Remotion sidecar for MP4 composition with Docker container
+  - 3 new workers: visual-classification, visual-generation, video-composition
+  - API routes with PRO/admin feature gating
+  - Frontend UI: video tab, generation button, player, and progress tracking
+- Require display name during email signup onboarding
+
+### Changed
+- Stream audio downloads to disk instead of buffering in memory (RAM efficiency)
+- Stream data exports to R2 instead of buffering in memory
+- Paginate feature computation to bound memory usage
+- Skip QueueEvents for utility queues to reduce Redis connections
+- Add Docker memory limits and Node.js heap cap
+- Configure Prisma connection pool limits
+
+### Fixed
+- CI type errors from missing `pricetoken` dependency and stale Prisma client
+- Flaky audio-stitching test caused by stale mock queue (missing `mockReset`)
+
 ## [0.1.42] - 2026-03-04
 
 ### Changed
