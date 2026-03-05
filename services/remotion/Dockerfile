@@ -28,9 +28,6 @@ COPY packages/video/ packages/video/
 COPY services/remotion/ services/remotion/
 COPY tsconfig.base.json ./
 
-# Build the server
-RUN cd services/remotion && npx tsc
-
 EXPOSE 3100
 
-CMD ["node", "services/remotion/dist/server.js"]
+CMD ["npx", "tsx", "services/remotion/src/server.ts"]
