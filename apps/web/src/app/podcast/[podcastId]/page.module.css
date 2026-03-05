@@ -522,6 +522,37 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* Video Section */
+
+.videoSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.videoIdle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.videoFailed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--color-error-lighter);
+  border: 1px solid var(--color-error-light);
+  border-radius: var(--radius-xl);
+  align-items: flex-start;
+}
+
+.videoError {
+  font: var(--text-body-sm);
+  color: var(--color-error);
+}
+
 /* Mobile fixes — ensure no overflow on 320px */
 
 @media (max-width: 599px) {

@@ -75,6 +75,9 @@ const defaultRow = {
   proIncludedTtsModels: null,
   freeIncludedSttModels: null,
   proIncludedSttModels: null,
+  proImageProvider: 'fal',
+  proImageModel: 'flux-schnell',
+  proIncludedImageModels: null,
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -112,6 +115,9 @@ describe('getAutoModelConfig', () => {
         aiProvider: 'anthropic',
         aiModel: 'claude-haiku-4-5-20251001',
       },
+      proImageProvider: 'fal',
+      proImageModel: 'flux-schnell',
+      proIncludedImageModels: null,
       freeIncludedModels: null,
       proIncludedModels: null,
       freeIncludedTtsModels: null,
@@ -344,6 +350,9 @@ describe('resolveIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -414,6 +423,9 @@ describe('resolveTtsIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -484,6 +496,9 @@ describe('resolveSttIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {

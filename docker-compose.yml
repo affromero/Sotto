@@ -84,6 +84,25 @@ services:
       retries: 10
       start_period: 30s
 
+  remotion:
+    build:
+      context: .
+      dockerfile: services/remotion/Dockerfile
+    container_name: sotto-remotion
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    shm_size: '2gb'
+    ports:
+      - '3100:3100'
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost:3100/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
 volumes:
   sotto_postgres_data:
   sotto_redis_data:

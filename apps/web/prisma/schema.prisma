@@ -25,6 +25,28 @@ enum UserPlan {
   PRO
 }
 
+// ============ VIDEO GENERATION ============
+
+enum VisualType {
+  DATA_CHART
+  QUOTE
+  COMPARISON
+  TIMELINE
+  DIAGRAM
+  STOCK_FOOTAGE
+  AI_ILLUSTRATION
+  TEXT_CARD
+}
+
+enum VideoStatus {
+  PENDING
+  CLASSIFYING
+  GENERATING_VISUALS
+  COMPOSING
+  READY
+  FAILED
+}
+
 // ============ USERS & AUTH ============
 
 model User {
@@ -307,6 +329,9 @@ model Podcast {
   // PDF export
   pdfUrl String?
 
+  // Video generation
+  videoUrl String?
+
   // Import fields
   importedAudioKey    String?
   originalFormat      String?
@@ -350,6 +375,7 @@ model Podcast {
   voiceTracks      VoiceTrack[]
   voiceTrackProposals VoiceTrack[] @relation("VoiceTrackProposals")
   defaultVoiceTrackId String?
+  videoGeneration   VideoGeneration?
   audioFingerprint  AudioFingerprint?
   duplicateSource   DuplicateMatch[] @relation("DuplicateSource")
   duplicateMatches  DuplicateMatch[] @relation("DuplicateMatch")
@@ -498,6 +524,7 @@ model Segment {
 
   podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
   voiceTrackSegments VoiceTrackSegment[]
+  segmentVisuals     SegmentVisual[]
 
   @@index([podcastId])
   @@index([order])
@@ -837,6 +864,7 @@ enum NotificationType {
   PIPELINE_FAILURE
   REFERRAL_SIGNUP
   VOICE_TRACK_FAILED
+  VIDEO_READY
   RENDITION_PROPOSED
   RENDITION_ACCEPTED
   RENDITION_REJECTED
@@ -1679,6 +1707,9 @@ model AutoModelConfig {
   proIncludedTtsModels   Json?
   freeIncludedSttModels  Json?
   proIncludedSttModels   Json?
+  proImageProvider       String   @default("fal")
+  proImageModel          String   @default("flux-schnell")
+  proIncludedImageModels Json?
   updatedAt              DateTime @updatedAt
   updatedBy              String?
 }
@@ -2003,4 +2034,50 @@ model ModelPricingSnapshot {
 
   @@index([modelId, createdAt])
   @@index([createdAt])
+}
+
+// ============ VIDEO GENERATION ============
+
+model VideoGeneration {
+  id             String      @id @default(cuid())
+  podcastId      String      @unique
+  status         VideoStatus @default(PENDING)
+  videoUrl       String?
+  duration       Int?        // seconds
+  fileSize       Int?        // bytes
+  width          Int         @default(1280)
+  height         Int         @default(720)
+  imageProvider  String?     // null = auto (fal)
+  imageModel     String?     // e.g. 'flux-schnell', 'flux-1.1-pro', 'flux-2-pro'
+  failureReason  String?     @db.Text
+  technicalError String?     @db.Text
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  podcast Podcast         @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  visuals SegmentVisual[]
+
+  @@index([podcastId])
+}
+
+model SegmentVisual {
+  id                String     @id @default(cuid())
+  videoGenerationId String
+  segmentId         String
+  order             Int
+  visualType        VisualType
+  prompt            String?    @db.Text
+  metadata          Json?      // type-specific: chart data, quote text, timeline events, etc.
+  assetUrl          String?    // R2 URL of generated image/video
+  assetType         String?    // 'image/png' | 'video/mp4'
+  status            String     @default("pending") // pending | generating | ready | failed
+  failureReason     String?    @db.Text
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
+  segment         Segment         @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@index([videoGenerationId])
+  @@index([segmentId])
 }

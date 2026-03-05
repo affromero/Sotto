@@ -45,6 +45,9 @@ export enum JobType {
   CLEANUP_DRAFTS = 'cleanup_drafts',
   COLLECT_R2_USAGE = 'collect_r2_usage',
   FETCH_PRICING = 'fetch_pricing',
+  CLASSIFY_VISUALS = 'classify_visuals',
+  GENERATE_VISUAL = 'generate_visual',
+  COMPOSE_VIDEO = 'compose_video',
 }
 
 /**
@@ -229,6 +232,26 @@ export interface AnnouncementPayload {
 export interface CollectR2UsagePayload {}
 
 export interface FetchPricingPayload {}
+
+export interface ClassifyVisualsPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  userId: string;
+}
+
+export interface GenerateVisualPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  segmentVisualId: string;
+  visualType: string;
+  prompt: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ComposeVideoPayload {
+  podcastId: string;
+  videoGenerationId: string;
+}
 
 export interface GenerateVoiceTrackAudioPayload {
   podcastId: string;
@@ -695,6 +718,9 @@ export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { a
 export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1, skipEvents: true });
 export const r2UsageQueue = createQueue('r2-usage', { attempts: 2, skipEvents: true });
 export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2, skipEvents: true });
+export const visualClassificationQueue = createQueue('visual-classification', { attempts: 2 });
+export const visualGenerationQueue = createQueue('visual-generation', { attempts: 3 });
+export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -729,4 +755,7 @@ export const ALL_QUEUE_NAMES = [
   'draft-cleanup',
   'r2-usage',
   'pricing-fetch',
+  'visual-classification',
+  'visual-generation',
+  'video-composition',
 ] as const;
