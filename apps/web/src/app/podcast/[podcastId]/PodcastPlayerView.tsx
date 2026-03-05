@@ -20,6 +20,7 @@ import {
   Flag,
   BarChart2,
   Shield,
+  Video,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -54,6 +55,8 @@ import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptPreview } from '@/components/player/ScriptPreview';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
+import { VideoPlayer } from '@/components/player/VideoPlayer';
+import { VideoProgress } from '@/components/player/VideoProgress';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { PodcastStatus } from '@prisma/client';
@@ -67,6 +70,7 @@ interface PodcastPlayerViewProps {
   isAuthenticated: boolean;
   currentUserId?: string;
   canMakePrivate?: boolean;
+  canGenerateVideo?: boolean;
 }
 
 type ViewMode = 'transcript' | 'teleprompter';
@@ -137,7 +141,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, canGenerateVideo }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
@@ -172,6 +176,11 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [questionsRefreshTrigger, setQuestionsRefreshTrigger] = useState(0);
+  const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -270,6 +279,50 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     observer.observe(el);
     return () => observer.disconnect();
   }, [liveStatus]);
+
+  // Check existing video generation status on mount
+  useEffect(() => {
+    if (!isOwner || liveStatus !== 'READY') return;
+    fetch(`/api/podcasts/${podcast.id}/video`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.status) return;
+        if (data.status === 'READY' && data.videoUrl) {
+          setVideoState('ready');
+          setVideoUrl(data.videoUrl);
+        } else if (data.status === 'FAILED') {
+          setVideoState('failed');
+          setVideoError(data.failureReason || 'Video generation failed.');
+        } else {
+          setVideoState('generating');
+          setVideoGenerationId(data.videoGenerationId);
+        }
+      })
+      .catch(() => {});
+  }, [isOwner, liveStatus, podcast.id]);
+
+  const handleGenerateVideo = useCallback(async () => {
+    setVideoLoading(true);
+    setVideoError(null);
+    try {
+      const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setVideoError(err.error || 'Failed to start video generation.');
+        setVideoLoading(false);
+        return;
+      }
+      const data = await res.json();
+      setVideoGenerationId(data.videoGenerationId);
+      setVideoState('generating');
+    } catch {
+      setVideoError('Failed to start video generation.');
+    } finally {
+      setVideoLoading(false);
+    }
+  }, [podcast.id]);
 
   const handleLike = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -667,6 +720,56 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               originalPodcastId={podcast.forkedFrom.id}
               originalTitle={podcast.forkedFrom.title}
             />
+          )}
+        </section>
+      )}
+
+      {/* Video Section */}
+      {isReady && isOwner && (
+        <section className={styles.videoSection} aria-label="Video">
+          {videoState === 'idle' && (
+            <div className={styles.videoIdle}>
+              <Button
+                onClick={handleGenerateVideo}
+                loading={videoLoading}
+                disabled={videoLoading || !canGenerateVideo}
+              >
+                <Video size={16} />
+                Generate Video
+              </Button>
+              {!canGenerateVideo && !isAdmin && (
+                <Badge variant="warning">PRO</Badge>
+              )}
+              {videoError && <p className={styles.videoError}>{videoError}</p>}
+            </div>
+          )}
+          {videoState === 'generating' && videoGenerationId && (
+            <VideoProgress
+              podcastId={podcast.id}
+              videoGenerationId={videoGenerationId}
+              onComplete={(url) => {
+                setVideoState('ready');
+                setVideoUrl(url);
+              }}
+            />
+          )}
+          {videoState === 'ready' && videoUrl && (
+            <VideoPlayer videoUrl={videoUrl} title={podcast.title} />
+          )}
+          {videoState === 'failed' && (
+            <div className={styles.videoFailed}>
+              <p className={styles.videoError}>{videoError || 'Video generation failed.'}</p>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setVideoState('idle');
+                  setVideoError(null);
+                }}
+              >
+                <RefreshCw size={16} />
+                Retry
+              </Button>
+            </div>
           )}
         </section>
       )}
