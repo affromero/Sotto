@@ -4,7 +4,8 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { errorResponse } from '@/lib/api-response';
-import { validateDisplayName, moderateDisplayName } from '@/lib/name-validation';
+import { validateDisplayName } from '@/lib/name-validation';
+import { moderateDisplayName } from '@/lib/name-moderation';
 
 const nameSchema = z.object({
   name: z
