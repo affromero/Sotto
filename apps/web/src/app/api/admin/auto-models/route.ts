@@ -43,6 +43,9 @@ const updateSchema = z.object({
   proIncludedTtsModels: includedModelsField,
   freeIncludedSttModels: includedModelsField,
   proIncludedSttModels: includedModelsField,
+  proImageProvider: z.enum(['fal']).optional(),
+  proImageModel: z.string().min(1).optional(),
+  proIncludedImageModels: includedModelsField,
 });
 
 export async function PATCH(request: NextRequest) {

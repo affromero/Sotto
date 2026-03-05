@@ -86,6 +86,7 @@ export type NotificationType =
   | 'VOICE_OWNERSHIP_ALERT'
   | 'VOICE_TRACK_FAILED'
   | 'VOICE_TRACK_READY'
+  | 'VIDEO_READY'
   | 'PIPELINE_FAILURE'
   | 'REFERRAL_SIGNUP';
 
@@ -138,3 +139,21 @@ export type ProposalStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED';
 export type FeedbackType = 'BUG' | 'FEATURE_REQUEST' | 'GENERAL' | 'PRAISE' | 'CONCERN';
 
 export type FeedbackStatus = 'NEW' | 'REVIEWED' | 'IN_PROGRESS' | 'RESOLVED' | 'ARCHIVED';
+
+export type VisualType =
+  | 'DATA_CHART'
+  | 'QUOTE'
+  | 'COMPARISON'
+  | 'TIMELINE'
+  | 'DIAGRAM'
+  | 'STOCK_FOOTAGE'
+  | 'AI_ILLUSTRATION'
+  | 'TEXT_CARD';
+
+export type VideoStatus =
+  | 'PENDING'
+  | 'CLASSIFYING'
+  | 'GENERATING_VISUALS'
+  | 'COMPOSING'
+  | 'READY'
+  | 'FAILED';

@@ -344,6 +344,9 @@ describe('resolveIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -414,6 +417,9 @@ describe('resolveTtsIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -484,6 +490,9 @@ describe('resolveSttIncludedModels', () => {
     proIncludedTtsModels: null,
     freeIncludedSttModels: null,
     proIncludedSttModels: null,
+    proImageProvider: 'fal',
+    proImageModel: 'flux-schnell',
+    proIncludedImageModels: null,
   };
 
   it('derives from auto defaults when lists are null', () => {
