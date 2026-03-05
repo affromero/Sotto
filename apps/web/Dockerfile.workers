@@ -52,4 +52,4 @@ COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/
 USER sotto
 
 WORKDIR /app/apps/web
-CMD ["node", "--import", "tsx", "src/workers/index.ts"]
+CMD ["node", "--max-old-space-size=1536", "--import", "tsx", "src/workers/index.ts"]

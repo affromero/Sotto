@@ -1,7 +1,7 @@
 import { Job } from 'bullmq';
 import { StitchVoiceTrackPayload, addJob, JobType, notificationQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { downloadFile, uploadVoiceTrackAudio } from '@/lib/r2';
+import { downloadToFile, uploadVoiceTrackAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { type SoundCue } from '@/lib/script-generator';
 import { consumeFreeGeneration } from '@/lib/generation-gate';
@@ -11,7 +11,7 @@ import { logger } from '@/lib/logger';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { writeFile, mkdir, rm } from 'fs/promises';
+import { mkdir, rm } from 'fs/promises';
 
 /** Map SoundCue types to stock SFX filenames bundled in the app */
 const STOCK_SFX: Record<SoundCue['type'], string> = {
@@ -75,8 +75,7 @@ export async function processVoiceTrackStitching(job: Job<StitchVoiceTrackPayloa
       }
 
       const segPath = path.join(tmpDir, `seg-${String(i).padStart(3, '0')}.mp3`);
-      const audioBuffer = await downloadFile(seg.audioUrl);
-      await writeFile(segPath, audioBuffer);
+      await downloadToFile(seg.audioUrl, segPath);
       segmentPaths.push(segPath);
 
       const downloadProgress = 10 + Math.round((i / vtSegments.length) * 40);

@@ -267,7 +267,10 @@ const queueInstances = new Map<string, Queue>();
 /**
  * Create or get existing job queue
  */
-export function createQueue(name: string, config?: Partial<QueueConfig>): Queue {
+export function createQueue(
+  name: string,
+  config?: Partial<QueueConfig> & { skipEvents?: boolean }
+): Queue {
   if (queueInstances.has(name)) {
     return queueInstances.get(name)!;
   }
@@ -285,7 +288,10 @@ export function createQueue(name: string, config?: Partial<QueueConfig>): Queue 
     },
   });
 
-  setupQueueEvents(queue, name);
+  if (!config?.skipEvents) {
+    setupQueueEvents(queue, name);
+  }
+
   queueInstances.set(name, queue);
 
   logger.info(`Queue '${name}' created`);
@@ -660,34 +666,35 @@ export const audioGenerationQueue = createQueue('audio-generation', { attempts: 
 export const audioStitchingQueue = createQueue('audio-stitching', { attempts: 2 });
 export const interactionQueue = createQueue('interactions', { attempts: 3 });
 export const segmentRegenerationQueue = createQueue('segment-regeneration', { attempts: 2 });
-export const notificationQueue = createQueue('notifications', { attempts: 5 });
+export const notificationQueue = createQueue('notifications', { attempts: 5, skipEvents: true });
 export const referenceValidationQueue = createQueue('reference-validation', { attempts: 2 });
-export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2 });
+export const pdfGenerationQueue = createQueue('pdf-generation', { attempts: 2, skipEvents: true });
 export const scriptVerificationQueue = createQueue('script-verification', { attempts: 2 });
-export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1 });
-export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3 });
+export const twitterMentionsQueue = createQueue('twitter-mentions', { attempts: 1, skipEvents: true });
+export const twitterReplyQueue = createQueue('twitter-reply', { attempts: 3, skipEvents: true });
 export const eventIngestionQueue = createQueue('event-ingestion', {
   attempts: 2,
   removeOnComplete: { age: 3600, count: 500 },
+  skipEvents: true,
 });
 export const audioImportQueue = createQueue('audio-import', { attempts: 2 });
-export const featureComputationQueue = createQueue('feature-computation', { attempts: 2 });
-export const dataExportQueue = createQueue('data-export', { attempts: 2 });
-export const keyValidationQueue = createQueue('key-validation', { attempts: 1 });
-export const telegramBotQueue = createQueue('telegram-bot', { attempts: 1 });
-export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3 });
-export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempts: 3 });
-export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1 });
-export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2 });
-export const contentModerationQueue = createQueue('content-moderation', { attempts: 2 });
-export const emailDigestQueue = createQueue('email-digest', { attempts: 2 });
-export const announcementQueue = createQueue('announcements', { attempts: 2 });
-export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2 });
+export const featureComputationQueue = createQueue('feature-computation', { attempts: 2, skipEvents: true });
+export const dataExportQueue = createQueue('data-export', { attempts: 2, skipEvents: true });
+export const keyValidationQueue = createQueue('key-validation', { attempts: 1, skipEvents: true });
+export const telegramBotQueue = createQueue('telegram-bot', { attempts: 1, skipEvents: true });
+export const telegramReplyQueue = createQueue('telegram-reply', { attempts: 3, skipEvents: true });
+export const twitterAutoTweetQueue = createQueue('twitter-auto-tweet', { attempts: 3, skipEvents: true });
+export const twitterTrendPollQueue = createQueue('twitter-trend-poll', { attempts: 1, skipEvents: true });
+export const adminThreadToPodcastQueue = createQueue('admin-thread-to-podcast', { attempts: 2, skipEvents: true });
+export const contentModerationQueue = createQueue('content-moderation', { attempts: 2, skipEvents: true });
+export const emailDigestQueue = createQueue('email-digest', { attempts: 2, skipEvents: true });
+export const announcementQueue = createQueue('announcements', { attempts: 2, skipEvents: true });
+export const voiceVerificationQueue = createQueue('voice-verification', { attempts: 2, skipEvents: true });
 export const voiceTrackAudioQueue = createQueue('voice-track-audio', { attempts: 3 });
 export const voiceTrackStitchingQueue = createQueue('voice-track-stitching', { attempts: 2 });
-export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1 });
-export const r2UsageQueue = createQueue('r2-usage', { attempts: 2 });
-export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2 });
+export const draftCleanupQueue = createQueue('draft-cleanup', { attempts: 1, skipEvents: true });
+export const r2UsageQueue = createQueue('r2-usage', { attempts: 2, skipEvents: true });
+export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2, skipEvents: true });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [

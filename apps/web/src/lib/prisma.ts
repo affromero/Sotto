@@ -19,7 +19,12 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
+  const poolUrl = url.includes('connection_limit')
+    ? url
+    : `${url}${url.includes('?') ? '&' : '?'}connection_limit=10&pool_timeout=10`;
+
   return new PrismaClient({
+    datasources: { db: { url: poolUrl } },
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 }
