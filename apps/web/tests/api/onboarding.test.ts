@@ -40,8 +40,17 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+const mockValidateDisplayName = vi.fn();
+const mockModerateDisplayName = vi.fn();
+
+vi.mock('@/lib/name-validation', () => ({
+  validateDisplayName: (...args: unknown[]) => mockValidateDisplayName(...args),
+  moderateDisplayName: (...args: unknown[]) => mockModerateDisplayName(...args),
+}));
+
 import { POST as completeOnboarding } from '@/app/api/onboarding/complete/route';
 import { POST as saveInterests } from '@/app/api/onboarding/interests/route';
+import { POST as setName } from '@/app/api/onboarding/name/route';
 
 function createRequest(body?: object): NextRequest {
   const url = new URL('http://localhost:3000/api/onboarding/interests');
@@ -195,5 +204,101 @@ describe('POST /api/onboarding/interests', () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toContain('Unknown parent category');
+  });
+});
+
+function createNameRequest(body?: object): Request {
+  return new Request('http://localhost:3000/api/onboarding/name', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+describe('POST /api/onboarding/name', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockValidateDisplayName.mockReturnValue({ valid: true });
+    mockModerateDisplayName.mockResolvedValue({ valid: true });
+  });
+
+  it('returns 401 when unauthenticated', async () => {
+    mockAuth.mockResolvedValue(null);
+
+    const response = await setName(createNameRequest({ name: 'Alice' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toMatchObject({ error: 'Unauthorized' });
+  });
+
+  it('returns 400 for empty name', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+
+    const response = await setName(createNameRequest({ name: '' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBeDefined();
+  });
+
+  it('returns 400 for missing name field', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+
+    const response = await setName(createNameRequest({}));
+
+    expect(response.status).toBe(400);
+  });
+
+  it('returns 400 when validateDisplayName rejects', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockValidateDisplayName.mockReturnValue({ valid: false, reason: 'Please enter a real name' });
+
+    const response = await setName(createNameRequest({ name: 'aaaa' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Please enter a real name');
+  });
+
+  it('returns 400 when moderateDisplayName rejects', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockModerateDisplayName.mockResolvedValue({ valid: false, reason: 'This name contains inappropriate content' });
+
+    const response = await setName(createNameRequest({ name: 'BadWord' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('This name contains inappropriate content');
+  });
+
+  it('saves name and returns success', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
+
+    const response = await setName(createNameRequest({ name: 'Alice' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { name: 'Alice' },
+    });
+  });
+
+  it('trims whitespace from name before saving', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
+    mockUserUpdate.mockResolvedValue({ id: 'user-1', name: 'Alice' });
+
+    const response = await setName(createNameRequest({ name: '  Alice  ' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ success: true });
+    expect(mockUserUpdate).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { name: 'Alice' },
+    });
   });
 });
