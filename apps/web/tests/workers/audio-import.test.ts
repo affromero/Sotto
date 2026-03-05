@@ -82,12 +82,12 @@ vi.mock('@/lib/prisma', () => {
 
 // ---- R2 mocks ----
 
-const mockDownloadFile = vi.fn().mockResolvedValue(Buffer.from('audio-data'));
+const mockDownloadToFile = vi.fn().mockResolvedValue(undefined);
 const mockUploadPodcastAudio = vi.fn().mockResolvedValue('https://r2.example.com/final.mp3');
 const mockDeleteFile = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/lib/r2', () => ({
-  downloadFile: (...args: unknown[]) => mockDownloadFile(...args),
+  downloadToFile: (...args: unknown[]) => mockDownloadToFile(...args),
   uploadPodcastAudio: (...args: unknown[]) => mockUploadPodcastAudio(...args),
   deleteFile: (...args: unknown[]) => mockDeleteFile(...args),
 }));
@@ -254,7 +254,7 @@ describe('processAudioImport', () => {
     mockPrismaTagFindUnique.mockResolvedValue(null);
     mockPrismaPodcastTagUpsert.mockResolvedValue({});
 
-    mockDownloadFile.mockResolvedValue(Buffer.from('audio-data'));
+    mockDownloadToFile.mockResolvedValue(undefined);
     mockUploadPodcastAudio.mockResolvedValue('https://r2.example.com/final.mp3');
     mockDeleteFile.mockResolvedValue(undefined);
 
@@ -298,7 +298,7 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockDownloadFile).not.toHaveBeenCalled();
+      expect(mockDownloadToFile).not.toHaveBeenCalled();
       expect(mockExecFileAsync).not.toHaveBeenCalled();
       expect(mockPrismaPodcastUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ status: 'READY' }) })
@@ -383,7 +383,7 @@ describe('processAudioImport', () => {
       const job = createMockJob(defaultPayload);
       await processAudioImport(job);
 
-      expect(mockDownloadFile).toHaveBeenCalledWith('uploads/audio-001.mp3');
+      expect(mockDownloadToFile).toHaveBeenCalledWith('uploads/audio-001.mp3', expect.stringMatching(/original\.mp3$/));
     });
 
     it('runs FFmpeg loudnorm normalization', async () => {
@@ -625,7 +625,7 @@ describe('processAudioImport', () => {
 
   describe('error handling', () => {
     it('marks podcast failed and rethrows on R2 download error', async () => {
-      mockDownloadFile.mockRejectedValue(new Error('R2 network error'));
+      mockDownloadToFile.mockRejectedValue(new Error('R2 network error'));
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioImport(job)).rejects.toThrow('R2 network error');
