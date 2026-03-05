@@ -8,7 +8,7 @@ All shared business logic and external service integrations live here.
 | --- | --- | --- |
 | `prisma.ts` | Database client (PostgreSQL) | Prisma ORM |
 | `redis.ts` | Redis connections, cache helpers, rate limiting | Redis / ioredis |
-| `queue.ts` | BullMQ job queues (24 types), worker creation | BullMQ + Redis |
+| `queue.ts` | BullMQ job queues (27 types), worker creation | BullMQ + Redis |
 | `auth.ts` | NextAuth config, OAuth providers (Google, GitHub, Apple for login; Twitter for account linking only), role system (USER/ADMIN), `ADMIN_EMAILS` auto-assignment | NextAuth v5 |
 | `admin-emails.ts` | Admin email list from `ADMIN_EMAILS` env var, `isAdminEmail()` check | Doppler |
 | `auth-guards.ts` | Suspension check for write-path API routes (`checkSuspension()`) | Pure utility |
@@ -98,6 +98,9 @@ All shared business logic and external service integrations live here.
 | `tts-text-cleaner.ts` | TTS text safety net: strips `[SFX:]` markers and `[N]` citations before sending to TTS. Provider-specific tag conversion handled upstream by `tts-tag-converter.ts` | Pure utility |
 | `tts-tag-converter.ts` | LLM-based TTS tag converter: converts script inline markup to provider-native format at approve time. Uses cheapest model via `pricing.ts`, fetches provider docs via `tts-doc-fetcher.ts` | Uses `llm.ts`, `pricing.ts`, `tts-doc-fetcher.ts` |
 | `tts-doc-fetcher.ts` | TTS provider docs fetcher: fetches formatting docs from provider URL, Redis cache (24h TTL), HTML content extraction | Fetch + `redis.ts` |
+| `visual-classifier.ts` | Claude Haiku-based batch segment classification: assigns visual type + prompt/metadata per segment (8 types: ai-illustration, stock-footage, data-chart, quote, comparison, timeline, diagram, text-card) | Uses `llm.ts` |
+| `stock-footage.ts` | Pexels Video API search + download: returns stock video clips for STOCK_FOOTAGE segments, falls back to TEXT_CARD if no results | Pexels API |
+| `video-gate.ts` | PRO/admin feature gate for video generation: checks user plan, role, and fal key availability (BYOK or platform FAL_KEY) | Uses `prisma.ts` |
 
 ## Hooks (`src/lib/hooks/`)
 
@@ -131,6 +134,9 @@ Modular provider architecture — swap external services via env vars.
 | `tts/*.provider.ts` | `TtsProvider` | Per-provider implementations: `elevenlabs`, `openai`, `cartesia`, `hume`, `fal`, `replicate`, `minimax` | Various TTS APIs |
 | `stt.ts` | `SttProvider` | OpenAI Whisper, Together, Deepgram, AssemblyAI, ElevenLabs Scribe + `resolveSttProvider()` (BYOK → platform → auto-model config), `getSttPlatformKey()`, `createSttProvider()` | `STT_PROVIDER` |
 | `stt-registry.ts` | `SttProviderMeta` | Declarative STT provider metadata: models for OpenAI, ElevenLabs | — |
+| `image.ts` | `ImageProvider` | `resolveImageProvider()`: fal.ai FLUX image generation (Schnell, 1.1 Pro, 2 Pro) for video pipeline AI illustrations | `FAL_KEY` |
+| `image-registry.ts` | `ImageProviderMeta` | Fal provider metadata: model catalog, costs, auth validation | — |
+| `image/fal.provider.ts` | `ImageProvider` | Fal FLUX implementation: generate image from prompt, configurable model/resolution | Fal API |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
 | `index.ts` | `Providers` | `getProviders()` singleton factory | — |

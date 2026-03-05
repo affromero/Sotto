@@ -66,6 +66,7 @@
 | `/api/podcasts/[id]/comments/[cid]/replies` | GET | No | Comment replies |
 | `/api/podcasts/[id]/rating` | GET/POST | Yes | Podcast rating (creator + listener) |
 | `/api/podcasts/[id]/claims` | POST/GET | Yes | Flag/list inaccurate claims |
+| `/api/podcasts/[id]/video` | POST/GET/DELETE | Yes | Video generation: trigger, poll status, delete |
 | `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
 | `/api/feed` | GET | No | Public feed (search/filter/sort) |
 | `/api/activity` | GET | Yes | Followed users activity |
