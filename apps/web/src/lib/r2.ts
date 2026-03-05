@@ -1,5 +1,9 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { Upload } from '@aws-sdk/lib-storage';
+import { Readable } from 'stream';
+import { createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
 import { logger } from './logger';
 
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
@@ -43,6 +47,33 @@ export async function uploadFile(
 
   const url = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${key}` : key;
   logger.info('File uploaded to R2', { key });
+  return url;
+}
+
+/**
+ * Upload a readable stream to R2 using multipart upload.
+ * Streams data without buffering the entire payload in memory.
+ */
+export async function uploadStream(
+  key: string,
+  body: Readable,
+  contentType: string
+): Promise<string> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured — set R2_* environment variables');
+  }
+
+  const upload = new Upload({
+    client: s3Client,
+    params: { Bucket: R2_BUCKET_NAME, Key: key, Body: body, ContentType: contentType },
+    queueSize: 4,
+    partSize: 5 * 1024 * 1024,
+  });
+
+  await upload.done();
+
+  const url = R2_PUBLIC_URL ? `${R2_PUBLIC_URL}/${key}` : key;
+  logger.info('Stream uploaded to R2', { key });
   return url;
 }
 
@@ -133,6 +164,32 @@ export async function downloadFile(urlOrKey: string): Promise<Buffer> {
 
   logger.info('File downloaded from R2', { key });
   return Buffer.concat(chunks);
+}
+
+/**
+ * Stream a file from R2 directly to disk without buffering in memory.
+ */
+export async function downloadToFile(urlOrKey: string, destPath: string): Promise<void> {
+  if (!s3Client) {
+    throw new Error('R2 storage not configured — set R2_* environment variables');
+  }
+
+  const key = extractR2Key(urlOrKey);
+
+  const response = await s3Client.send(
+    new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key })
+  );
+
+  if (!response.Body) {
+    throw new Error(`Empty response downloading ${key} from R2`);
+  }
+
+  await pipeline(
+    Readable.from(response.Body as AsyncIterable<Uint8Array>),
+    createWriteStream(destPath)
+  );
+
+  logger.info('File streamed from R2 to disk', { key, destPath });
 }
 
 /**
