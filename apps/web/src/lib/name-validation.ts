@@ -1,8 +1,3 @@
-import { createAIProvider } from './providers/ai';
-import { resolveAutoModel } from './auto-model-config';
-import { logUsage } from './usage-logger';
-import { logger } from './logger';
-
 const KEYBOARD_PATTERNS = [
   'qwerty', 'asdf', 'zxcv', 'qwertz', 'azerty',
   'hjkl', 'uiop', 'bnm', 'wasd',
@@ -49,6 +44,10 @@ export function validateDisplayName(name: string): { valid: boolean; reason?: st
  */
 export async function moderateDisplayName(name: string): Promise<{ valid: boolean; reason?: string }> {
   try {
+    const { createAIProvider } = await import('./providers/ai');
+    const { resolveAutoModel } = await import('./auto-model-config');
+    const { logUsage } = await import('./usage-logger');
+
     const autoConfig = await resolveAutoModel('PLATFORM');
     const response = await createAIProvider(autoConfig.aiProvider).generateResponse(
       'You are a content moderator. Given a display name, respond with ONLY "ok" if it is acceptable, or "reject" if it is obscene, offensive, a slur, sexually explicit, or impersonating a public figure. Be lenient with creative/unusual names — only reject clearly inappropriate ones.',
@@ -70,6 +69,7 @@ export async function moderateDisplayName(name: string): Promise<{ valid: boolea
     }
     return { valid: true };
   } catch (error) {
+    const { logger } = await import('./logger');
     logger.warn('Name moderation failed, allowing through', { error });
     return { valid: true };
   }
