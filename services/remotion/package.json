@@ -8,15 +8,17 @@
     "dev": "tsx src/server.ts"
   },
   "dependencies": {
+    "@remotion/bundler": "^4.0.0",
     "@remotion/renderer": "^4.0.0",
     "@sotto/video": "*",
     "express": "^4.21.0",
+    "tsx": "^4.19.0",
     "uuid": "^11.0.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
     "@types/uuid": "^10.0.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }
 }

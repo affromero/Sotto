@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "services/*"
   ],
   "description": "Every voice. Every topic. One feed. Create AI podcasts, compare voices side-by-side, remix anything.",
   "scripts": {

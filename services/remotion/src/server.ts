@@ -1,6 +1,6 @@
 import express from 'express';
-import { bundle } from '@remotion/renderer';
-import { renderMedia } from '@remotion/renderer';
+import { bundle } from '@remotion/bundler';
+import { renderMedia, selectComposition } from '@remotion/renderer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
@@ -31,14 +31,14 @@ function getBundlePath(): Promise<string> {
     const entryPoint = path.resolve(__dirname, '../../packages/video/src/index.ts');
     bundlePromise = bundle({
       entryPoint,
-      onProgress: (progress) => {
+      onProgress: (progress: number) => {
         if (progress === 100) {
           console.log('Remotion bundle ready');
         }
       },
     });
   }
-  return bundlePromise;
+  return bundlePromise!;
 }
 
 async function executeRender(jobId: string, input: RenderInput): Promise<void> {
@@ -51,32 +51,24 @@ async function executeRender(jobId: string, input: RenderInput): Promise<void> {
   const outputPath = path.join(os.tmpdir(), `sotto-video-${jobId}.mp4`);
 
   try {
-    const bundlePath = await getBundlePath();
+    const serveUrl = await getBundlePath();
     const config = input.config ?? DEFAULT_RENDER_CONFIG;
 
-    const totalDuration = input.segments.reduce(
-      (max, s) => Math.max(max, s.startTime + s.duration),
-      0,
-    );
-    const durationInFrames = Math.ceil(totalDuration * config.fps);
+    const composition = await selectComposition({
+      serveUrl,
+      id: 'PodcastVideo',
+      inputProps: input,
+    });
 
     await renderMedia({
-      composition: {
-        id: 'PodcastVideo',
-        durationInFrames,
-        fps: config.fps,
-        width: config.width,
-        height: config.height,
-        defaultProps: input,
-        props: input,
-        defaultCodec: 'h264',
-      },
-      serveUrl: bundlePath,
+      composition,
+      serveUrl,
       codec: config.codec,
       crf: config.crf,
-      audioBitrate: config.audioBitrate,
+      audioBitrate: `${config.audioBitrate}` as `${number}k`,
       outputLocation: outputPath,
-      onProgress: ({ progress }) => {
+      inputProps: input,
+      onProgress: ({ progress }: { progress: number }) => {
         job.progress = Math.round(progress * 100);
       },
     });
