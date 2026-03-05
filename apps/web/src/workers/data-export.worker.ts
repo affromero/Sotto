@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { PassThrough } from 'stream';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getProviders } from '@/lib/providers';
@@ -9,55 +10,64 @@ const BATCH_SIZE = 1000;
 /**
  * Data export worker.
  * Streams large result sets to JSONL or CSV files uploaded to R2.
+ * Uses PassThrough + uploadStream to avoid buffering the entire export in memory.
  */
 export async function processDataExport(job: Job<DataExportPayload>): Promise<{ fileUrl: string }> {
   const { exportType, dateFrom, dateTo, format } = job.data;
 
   const dateFilter = buildDateFilter(dateFrom, dateTo);
-  let lines: string[] = [];
 
   await job.updateProgress(10);
 
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const ext = format === 'csv' ? 'csv' : 'jsonl';
+  const filename = `exports/${exportType}_${timestamp}.${ext}`;
+
+  const stream = new PassThrough();
+  const storage = getProviders().storage;
+  const uploadPromise = storage.uploadStream(
+    filename,
+    stream,
+    `text/${ext === 'csv' ? 'csv' : 'plain'}`
+  );
+
+  let lineCount = 0;
+  const writeLine = (line: string) => {
+    stream.write(line + '\n');
+    lineCount++;
+  };
+
   switch (exportType) {
     case 'playback_sessions':
-      lines = await exportPlaybackSessions(dateFilter, format);
+      await exportPlaybackSessions(dateFilter, format, writeLine);
       break;
     case 'behavioral_events':
-      lines = await exportBehavioralEvents(dateFilter, format);
+      await exportBehavioralEvents(dateFilter, format, writeLine);
       break;
     case 'user_features':
-      lines = await exportUserFeatures(format);
+      await exportUserFeatures(format, writeLine);
       break;
     case 'podcast_features':
-      lines = await exportPodcastFeatures(format);
+      await exportPodcastFeatures(format, writeLine);
       break;
     case 'interactions':
-      lines = await exportInteractions(dateFilter, format);
+      await exportInteractions(dateFilter, format, writeLine);
       break;
     case 'training_pairs':
-      lines = await exportTrainingPairs(dateFilter, format);
+      await exportTrainingPairs(dateFilter, format, writeLine);
       break;
   }
 
   await job.updateProgress(80);
 
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const ext = format === 'csv' ? 'csv' : 'jsonl';
-  const filename = `exports/${exportType}_${timestamp}.${ext}`;
-  const content = lines.join('\n');
-
-  const storage = getProviders().storage;
-  const fileUrl = await storage.uploadFile(
-    filename,
-    Buffer.from(content, 'utf-8'),
-    `text/${ext === 'csv' ? 'csv' : 'plain'}`
-  );
+  stream.end();
+  const fileUrl = await uploadPromise;
 
   await job.updateProgress(100);
   logger.info('Data export complete', {
     exportType,
     format,
-    lines: String(lines.length),
+    lines: String(lineCount),
     filename,
   });
   return { fileUrl };
@@ -72,30 +82,27 @@ function buildDateFilter(from?: string, to?: string): { gte?: Date; lte?: Date }
 
 async function exportPlaybackSessions(
   dateFilter: { gte?: Date; lte?: Date },
-  format: string
-): Promise<string[]> {
-  const lines: string[] = [];
-
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push(
+    writeLine(
       'id,userId,sessionId,podcastId,startedAt,endedAt,totalListenSeconds,maxPosition,completionPercent,pauseCount,seekCount,speedChanges,lastSpeed,interruptCount'
     );
   }
 
-  let skip = 0;
-  let hasMore = true;
-
-  while (hasMore) {
+  let cursor: string | undefined;
+  while (true) {
     const batch = await prisma.playbackSession.findMany({
       where: dateFilter.gte || dateFilter.lte ? { startedAt: dateFilter } : {},
-      skip,
       take: BATCH_SIZE,
-      orderBy: { startedAt: 'asc' },
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
     });
 
     for (const session of batch) {
       if (format === 'csv') {
-        lines.push(
+        writeLine(
           [
             session.id,
             session.userId || '',
@@ -114,41 +121,36 @@ async function exportPlaybackSessions(
           ].join(',')
         );
       } else {
-        lines.push(JSON.stringify(session));
+        writeLine(JSON.stringify(session));
       }
     }
 
-    skip += BATCH_SIZE;
-    hasMore = batch.length === BATCH_SIZE;
+    if (batch.length < BATCH_SIZE) break;
+    cursor = batch[batch.length - 1].id;
   }
-
-  return lines;
 }
 
 async function exportBehavioralEvents(
   dateFilter: { gte?: Date; lte?: Date },
-  format: string
-): Promise<string[]> {
-  const lines: string[] = [];
-
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push('id,createdAt,userId,sessionId,eventType,podcastId,pageUrl,deviceType');
+    writeLine('id,createdAt,userId,sessionId,eventType,podcastId,pageUrl,deviceType');
   }
 
-  let skip = 0;
-  let hasMore = true;
-
-  while (hasMore) {
+  let cursor: string | undefined;
+  while (true) {
     const batch = await prisma.behavioralEvent.findMany({
       where: dateFilter.gte || dateFilter.lte ? { createdAt: dateFilter } : {},
-      skip,
       take: BATCH_SIZE,
-      orderBy: { createdAt: 'asc' },
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
     });
 
     for (const event of batch) {
       if (format === 'csv') {
-        lines.push(
+        writeLine(
           [
             event.id,
             event.createdAt.toISOString(),
@@ -161,151 +163,171 @@ async function exportBehavioralEvents(
           ].join(',')
         );
       } else {
-        lines.push(JSON.stringify(event));
+        writeLine(JSON.stringify(event));
       }
     }
 
-    skip += BATCH_SIZE;
-    hasMore = batch.length === BATCH_SIZE;
+    if (batch.length < BATCH_SIZE) break;
+    cursor = batch[batch.length - 1].id;
   }
-
-  return lines;
 }
 
-async function exportUserFeatures(format: string): Promise<string[]> {
-  const lines: string[] = [];
-  const features = await prisma.userFeature.findMany();
-
+async function exportUserFeatures(
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push(
+    writeLine(
       'userId,totalListenMinutes,totalPodcastsListened,avgCompletionRate,avgListenSpeed,avgAbandonPercent,optimalDuration,archetype,speakerPreference,noveltyResponseRate,creatorLoyalty'
     );
   }
 
-  for (const f of features) {
-    if (format === 'csv') {
-      lines.push(
-        [
-          f.userId,
-          f.totalListenMinutes,
-          f.totalPodcastsListened,
-          f.avgCompletionRate,
-          f.avgListenSpeed,
-          f.avgAbandonPercent,
-          f.optimalDuration,
-          f.archetype || '',
-          f.speakerPreference,
-          f.noveltyResponseRate,
-          f.creatorLoyalty,
-        ].join(',')
-      );
-    } else {
-      lines.push(JSON.stringify(f));
-    }
-  }
+  let cursor: string | undefined;
+  while (true) {
+    const batch = await prisma.userFeature.findMany({
+      take: BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
 
-  return lines;
+    for (const f of batch) {
+      if (format === 'csv') {
+        writeLine(
+          [
+            f.userId,
+            f.totalListenMinutes,
+            f.totalPodcastsListened,
+            f.avgCompletionRate,
+            f.avgListenSpeed,
+            f.avgAbandonPercent,
+            f.optimalDuration,
+            f.archetype || '',
+            f.speakerPreference,
+            f.noveltyResponseRate,
+            f.creatorLoyalty,
+          ].join(',')
+        );
+      } else {
+        writeLine(JSON.stringify(f));
+      }
+    }
+
+    if (batch.length < BATCH_SIZE) break;
+    cursor = batch[batch.length - 1].id;
+  }
 }
 
-async function exportPodcastFeatures(format: string): Promise<string[]> {
-  const lines: string[] = [];
-  const features = await prisma.podcastFeature.findMany();
-
+async function exportPodcastFeatures(
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push(
+    writeLine(
       'podcastId,avgCompletionRate,medianCompletionRate,totalUniqueListeners,totalListenMinutes,likeToListenRatio,saveToListenRatio,forkToListenRatio,interactionRate,relistenRate,avgListenSpeed,segmentCount,durationSeconds,referenceCount,verifiedReferenceRate'
     );
   }
 
-  for (const f of features) {
-    if (format === 'csv') {
-      lines.push(
-        [
-          f.podcastId,
-          f.avgCompletionRate,
-          f.medianCompletionRate,
-          f.totalUniqueListeners,
-          f.totalListenMinutes,
-          f.likeToListenRatio,
-          f.saveToListenRatio,
-          f.forkToListenRatio,
-          f.interactionRate,
-          f.relistenRate,
-          f.avgListenSpeed,
-          f.segmentCount,
-          f.durationSeconds,
-          f.referenceCount,
-          f.verifiedReferenceRate,
-        ].join(',')
-      );
-    } else {
-      lines.push(JSON.stringify(f));
-    }
-  }
+  let cursor: string | undefined;
+  while (true) {
+    const batch = await prisma.podcastFeature.findMany({
+      take: BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
 
-  return lines;
+    for (const f of batch) {
+      if (format === 'csv') {
+        writeLine(
+          [
+            f.podcastId,
+            f.avgCompletionRate,
+            f.medianCompletionRate,
+            f.totalUniqueListeners,
+            f.totalListenMinutes,
+            f.likeToListenRatio,
+            f.saveToListenRatio,
+            f.forkToListenRatio,
+            f.interactionRate,
+            f.relistenRate,
+            f.avgListenSpeed,
+            f.segmentCount,
+            f.durationSeconds,
+            f.referenceCount,
+            f.verifiedReferenceRate,
+          ].join(',')
+        );
+      } else {
+        writeLine(JSON.stringify(f));
+      }
+    }
+
+    if (batch.length < BATCH_SIZE) break;
+    cursor = batch[batch.length - 1].id;
+  }
 }
 
 async function exportInteractions(
   dateFilter: { gte?: Date; lte?: Date },
-  format: string
-): Promise<string[]> {
-  const lines: string[] = [];
-
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push('id,podcastId,userId,question,timestamp,answer,status,resolved,incorporated');
+    writeLine('id,podcastId,userId,question,timestamp,answer,status,resolved,incorporated');
   }
 
-  const interactions = await prisma.interaction.findMany({
-    where: dateFilter.gte || dateFilter.lte ? { createdAt: dateFilter } : {},
-    orderBy: { createdAt: 'asc' },
-  });
+  let cursor: string | undefined;
+  while (true) {
+    const batch = await prisma.interaction.findMany({
+      where: dateFilter.gte || dateFilter.lte ? { createdAt: dateFilter } : {},
+      take: BATCH_SIZE,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
 
-  for (const i of interactions) {
-    if (format === 'csv') {
-      lines.push(
-        [
-          i.id,
-          i.podcastId,
-          i.userId,
-          `"${i.question.replace(/"/g, '""')}"`,
-          i.timestamp,
-          `"${(i.answer || '').replace(/"/g, '""')}"`,
-          i.status,
-          i.resolved,
-          i.incorporated,
-        ].join(',')
-      );
-    } else {
-      lines.push(JSON.stringify(i));
+    for (const i of batch) {
+      if (format === 'csv') {
+        writeLine(
+          [
+            i.id,
+            i.podcastId,
+            i.userId,
+            `"${i.question.replace(/"/g, '""')}"`,
+            i.timestamp,
+            `"${(i.answer || '').replace(/"/g, '""')}"`,
+            i.status,
+            i.resolved,
+            i.incorporated,
+          ].join(',')
+        );
+      } else {
+        writeLine(JSON.stringify(i));
+      }
     }
-  }
 
-  return lines;
+    if (batch.length < BATCH_SIZE) break;
+    cursor = batch[batch.length - 1].id;
+  }
 }
 
 async function exportTrainingPairs(
   dateFilter: { gte?: Date; lte?: Date },
-  format: string
-): Promise<string[]> {
-  const lines: string[] = [];
-
+  format: string,
+  writeLine: (line: string) => void
+): Promise<void> {
   if (format === 'csv') {
-    lines.push('userId,podcastId,completionPercent,liked,saved,engagementLabel');
+    writeLine('userId,podcastId,completionPercent,liked,saved,engagementLabel');
   }
 
-  let skip = 0;
-  let hasMore = true;
-
-  while (hasMore) {
+  let cursor: string | undefined;
+  while (true) {
     const sessions = await prisma.playbackSession.findMany({
       where: {
         userId: { not: null },
         ...(dateFilter.gte || dateFilter.lte ? { startedAt: dateFilter } : {}),
       },
-      skip,
       take: BATCH_SIZE,
-      orderBy: { startedAt: 'asc' },
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
     });
 
     for (const session of sessions) {
@@ -320,11 +342,10 @@ async function exportTrainingPairs(
         }),
       ]);
 
-      // Engagement label: positive (completed 50%+ or liked/saved), negative otherwise
       const label = session.completionPercent >= 50 || liked || saved ? 'positive' : 'negative';
 
       if (format === 'csv') {
-        lines.push(
+        writeLine(
           [
             session.userId,
             session.podcastId,
@@ -335,7 +356,7 @@ async function exportTrainingPairs(
           ].join(',')
         );
       } else {
-        lines.push(
+        writeLine(
           JSON.stringify({
             userId: session.userId,
             podcastId: session.podcastId,
@@ -348,9 +369,7 @@ async function exportTrainingPairs(
       }
     }
 
-    skip += BATCH_SIZE;
-    hasMore = sessions.length === BATCH_SIZE;
+    if (sessions.length < BATCH_SIZE) break;
+    cursor = sessions[sessions.length - 1].id;
   }
-
-  return lines;
 }

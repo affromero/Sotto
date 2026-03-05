@@ -1,7 +1,9 @@
+import type { Readable } from 'stream';
 import { logger } from '../logger';
 
 export interface StorageProvider {
   uploadFile(key: string, data: Buffer, contentType: string): Promise<string>;
+  uploadStream(key: string, body: Readable, contentType: string): Promise<string>;
   getPresignedUrl(key: string, expiresIn?: number): Promise<string>;
   deleteFile(key: string): Promise<void>;
 }
@@ -17,6 +19,11 @@ class R2Provider implements StorageProvider {
   async uploadFile(key: string, data: Buffer, contentType: string): Promise<string> {
     const r2 = await this.getClient();
     return r2.uploadFile(key, data, contentType);
+  }
+
+  async uploadStream(key: string, body: Readable, contentType: string): Promise<string> {
+    const r2 = await this.getClient();
+    return r2.uploadStream(key, body, contentType);
   }
 
   async getPresignedUrl(key: string, expiresIn?: number): Promise<string> {
@@ -65,6 +72,21 @@ class S3Provider implements StorageProvider {
     return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
   }
 
+  async uploadStream(key: string, body: Readable, contentType: string): Promise<string> {
+    const { client } = await this.getS3Client();
+    const { Upload } = await import('@aws-sdk/lib-storage');
+    const upload = new Upload({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      client: client as any,
+      params: { Bucket: this.bucket, Key: key, Body: body, ContentType: contentType },
+      queueSize: 4,
+      partSize: 5 * 1024 * 1024,
+    });
+    await upload.done();
+    const region = process.env.AWS_S3_REGION || 'us-east-1';
+    return `https://${this.bucket}.s3.${region}.amazonaws.com/${key}`;
+  }
+
   async getPresignedUrl(key: string, expiresIn = 3600): Promise<string> {
     const { client, GetObjectCommand, getSignedUrl } = await this.getS3Client();
     return getSignedUrl(
@@ -94,6 +116,17 @@ class LocalProvider implements StorageProvider {
     const filePath = path.join(this.baseDir, key);
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, data);
+    return `file://${filePath}`;
+  }
+
+  async uploadStream(key: string, body: Readable, _contentType: string): Promise<string> {
+    const fs = await import('fs');
+    const fsPromises = await import('fs/promises');
+    const path = await import('path');
+    const { pipeline } = await import('stream/promises');
+    const filePath = path.join(this.baseDir, key);
+    await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+    await pipeline(body, fs.createWriteStream(filePath));
     return `file://${filePath}`;
   }
 

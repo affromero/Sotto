@@ -13,10 +13,12 @@ import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2C
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
   uploadFile,
+  uploadStream,
   uploadPodcastAudio,
   uploadSegmentAudio,
   getPresignedUrl,
   downloadFile,
+  downloadToFile,
   deleteFile,
   extractR2Key,
   resolveAudioUrl,
@@ -58,6 +60,35 @@ vi.mock('@aws-sdk/client-s3', () => {
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: vi.fn(),
 }));
+
+const { mockUploadDone } = vi.hoisted(() => ({
+  mockUploadDone: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('@aws-sdk/lib-storage', () => ({
+  Upload: vi.fn().mockImplementation(function () {
+    return { done: mockUploadDone };
+  }),
+}));
+
+const { mockCreateWriteStream, mockPipeline } = vi.hoisted(() => ({
+  mockCreateWriteStream: vi.fn().mockReturnValue({
+    on: vi.fn(),
+    write: vi.fn(),
+    end: vi.fn(),
+  }),
+  mockPipeline: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock(import('fs'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: { ...actual, createWriteStream: mockCreateWriteStream }, createWriteStream: mockCreateWriteStream };
+});
+
+vi.mock(import('stream/promises'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, default: { ...actual, pipeline: mockPipeline }, pipeline: mockPipeline };
+});
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({
@@ -484,6 +515,75 @@ describe('r2.ts', () => {
         { prefix: 'podcasts/' },
         { prefix: 'avatars/' },
       ]);
+    });
+  });
+
+  describe('uploadStream', () => {
+    it('uploads a readable stream via multipart upload', async () => {
+      const { Readable } = await import('stream');
+      const body = Readable.from(['chunk1', 'chunk2']);
+
+      const result = await uploadStream('test/stream.jsonl', body, 'text/plain');
+
+      expect(result).toBe('https://cdn.example.com/test/stream.jsonl');
+      expect(mockUploadDone).toHaveBeenCalled();
+    });
+
+    it('throws when R2 is not configured', async () => {
+      delete process.env.R2_ACCOUNT_ID;
+
+      vi.resetModules();
+      const { uploadStream: uploadStreamReimport } = await import('@/lib/r2');
+      const { Readable } = await import('stream');
+      const body = Readable.from(['data']);
+
+      await expect(uploadStreamReimport('test/file', body, 'text/plain')).rejects.toThrow(
+        'R2 storage not configured'
+      );
+    });
+  });
+
+  describe('downloadToFile', () => {
+    it('streams file from R2 to disk', async () => {
+      const mockStream = {
+        async *[Symbol.asyncIterator]() {
+          yield new Uint8Array([1, 2, 3]);
+        },
+      };
+
+      mockSend.mockResolvedValue({ Body: mockStream });
+
+      await downloadToFile('test/file.mp3', '/tmp/dest.mp3');
+
+      expect(GetObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Key: 'test/file.mp3',
+      });
+    });
+
+    it('extracts key from full URL', async () => {
+      const mockStream = {
+        async *[Symbol.asyncIterator]() {
+          yield new Uint8Array([1]);
+        },
+      };
+
+      mockSend.mockResolvedValue({ Body: mockStream });
+
+      await downloadToFile('https://cdn.example.com/test/file.mp3', '/tmp/dest.mp3');
+
+      expect(GetObjectCommand).toHaveBeenCalledWith({
+        Bucket: 'test-bucket',
+        Key: 'test/file.mp3',
+      });
+    });
+
+    it('throws when response body is empty', async () => {
+      mockSend.mockResolvedValue({ Body: undefined });
+
+      await expect(downloadToFile('test/file.mp3', '/tmp/dest.mp3')).rejects.toThrow(
+        'Empty response downloading test/file.mp3 from R2'
+      );
     });
   });
 
