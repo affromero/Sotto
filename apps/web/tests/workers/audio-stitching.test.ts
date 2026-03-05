@@ -63,6 +63,9 @@ vi.mock('@/lib/prisma', () => {
     pipelineEvent: {
       create: (...args: unknown[]) => mockPrismaPipelineEventCreate(...args),
     },
+    audioFingerprint: {
+      upsert: vi.fn().mockResolvedValue({}),
+    },
   };
   return { prisma: _mockPrisma, prismaUnfiltered: _mockPrisma };
 });
@@ -112,6 +115,18 @@ vi.mock('@/lib/elevenlabs', () => ({
 
 vi.mock('@/lib/byok', () => ({
   hasByokKey: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('@/lib/audio-fingerprint', () => ({
+  generateFingerprint: vi.fn().mockResolvedValue({ fingerprint: [1, 2, 3], duration: 300 }),
+}));
+
+vi.mock('@/lib/voice-pricing', () => ({
+  capturePodcastPayments: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/referrals', () => ({
+  verifyReferral: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockConsumeFreeGeneration = vi.fn().mockResolvedValue(undefined);
@@ -190,6 +205,10 @@ const defaultPayload: StitchAudioPayload = {
 describe('processAudioStitching', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Reset segment mock to clear any stale mockResolvedValueOnce values
+    // (clearAllMocks does NOT clear the once queue)
+    mockPrismaSegmentFindMany.mockReset();
 
     // Default segment data - first call (initial fetch with audioUrl)
     mockPrismaSegmentFindMany.mockResolvedValueOnce([
