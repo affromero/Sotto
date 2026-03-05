@@ -242,10 +242,12 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isOwner = userId === podcast.userId;
   const isAdmin = session?.user?.role === 'ADMIN';
   let canMakePrivate: boolean | undefined;
+  let canGenerateVideo = false;
   if (isOwner && userId) {
     const freeTier = await getFreeTierStatus(userId);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
+    canGenerateVideo = freeTier.isProUser || isAdmin;
   }
 
   const visibility = podcast.visibility;
@@ -383,7 +385,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} canGenerateVideo={canGenerateVideo} />
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}
