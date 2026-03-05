@@ -2,7 +2,7 @@ import { Job } from 'bullmq';
 import { ImportAudioPayload, notificationQueue, featureComputationQueue, addJob, JobType } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { downloadFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
+import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { createSttProvider } from '@/lib/providers/stt';
 import { parseTranscript, diarizeSpeakers } from '@/lib/transcript-parser';
@@ -20,7 +20,7 @@ import { generateFingerprint, findDuplicates } from '@/lib/audio-fingerprint';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { writeFile, mkdir, rm } from 'fs/promises';
+import { mkdir, rm } from 'fs/promises';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 
@@ -97,8 +97,7 @@ export async function processAudioImport(job: Job<ImportAudioPayload>): Promise<
     const normalizedPath = path.join(tmpDir, 'normalized.mp3');
 
     logger.info('Downloading audio from R2', { audioKey });
-    const audioBuffer = await downloadFile(audioKey);
-    await writeFile(originalPath, audioBuffer);
+    await downloadToFile(audioKey, originalPath);
     await job.updateProgress(10);
 
     logger.info('Validating and normalizing audio with FFmpeg');

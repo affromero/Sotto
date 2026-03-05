@@ -75,11 +75,11 @@ vi.mock('@/lib/audio-stitcher', () => ({
   getAudioDuration: (...args: unknown[]) => mockGetAudioDuration(...args),
 }));
 
-const mockDownloadFile = vi.fn().mockResolvedValue(Buffer.from('segment-audio'));
+const mockDownloadToFile = vi.fn().mockResolvedValue(undefined);
 const mockUploadPodcastAudio = vi.fn().mockResolvedValue('https://r2.example.com/final.mp3');
 
 vi.mock('@/lib/r2', () => ({
-  downloadFile: (...args: unknown[]) => mockDownloadFile(...args),
+  downloadToFile: (...args: unknown[]) => mockDownloadToFile(...args),
   uploadPodcastAudio: (...args: unknown[]) => mockUploadPodcastAudio(...args),
   deleteFile: vi.fn().mockResolvedValue(undefined),
 }));
@@ -222,7 +222,7 @@ describe('processAudioStitching', () => {
     mockStitchWithEffects.mockResolvedValue({ duration: 300 });
 
     // Default file operations
-    mockDownloadFile.mockResolvedValue(Buffer.from('segment-audio'));
+    mockDownloadToFile.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue(Buffer.from('final-audio-data'));
     mockUploadPodcastAudio.mockResolvedValue('https://r2.example.com/final.mp3');
   });
@@ -251,14 +251,23 @@ describe('processAudioStitching', () => {
   });
 
   describe('audio downloading', () => {
-    it('downloads all segment audio files from R2', async () => {
+    it('downloads all segment audio files from R2 to disk', async () => {
       const job = createMockJob(defaultPayload);
       await processAudioStitching(job);
 
-      expect(mockDownloadFile).toHaveBeenCalledTimes(3);
-      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-1.mp3');
-      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-2.mp3');
-      expect(mockDownloadFile).toHaveBeenCalledWith('https://r2.example.com/seg-3.mp3');
+      expect(mockDownloadToFile).toHaveBeenCalledTimes(3);
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        'https://r2.example.com/seg-1.mp3',
+        expect.stringMatching(/seg-000\.mp3$/)
+      );
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        'https://r2.example.com/seg-2.mp3',
+        expect.stringMatching(/seg-001\.mp3$/)
+      );
+      expect(mockDownloadToFile).toHaveBeenCalledWith(
+        'https://r2.example.com/seg-3.mp3',
+        expect.stringMatching(/seg-002\.mp3$/)
+      );
     });
   });
 
@@ -762,8 +771,8 @@ describe('processAudioStitching', () => {
       expect(mockMarkPodcastFailed).not.toHaveBeenCalled();
     });
 
-    it('propagates error from downloadFile', async () => {
-      mockDownloadFile.mockRejectedValue(new Error('R2 download failed'));
+    it('propagates error from downloadToFile', async () => {
+      mockDownloadToFile.mockRejectedValue(new Error('R2 download failed'));
       const job = createMockJob(defaultPayload);
 
       await expect(processAudioStitching(job)).rejects.toThrow('R2 download failed');
@@ -902,7 +911,7 @@ describe('processAudioStitching', () => {
       expect(mockPrismaScriptFindUnique).toHaveBeenCalled();
 
       // Audio downloaded from R2
-      expect(mockDownloadFile).toHaveBeenCalledTimes(3);
+      expect(mockDownloadToFile).toHaveBeenCalledTimes(3);
 
       // FFmpeg stitching called
       expect(mockStitchWithEffects).toHaveBeenCalled();

@@ -12,7 +12,7 @@ import {
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { downloadFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
+import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
@@ -84,8 +84,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       }
 
       const segPath = path.join(tmpDir, `seg-${String(i).padStart(3, '0')}.mp3`);
-      const audioBuffer = await downloadFile(seg.audioUrl);
-      await writeFile(segPath, audioBuffer);
+      await downloadToFile(seg.audioUrl, segPath);
       segmentPaths.push(segPath);
 
       // Update progress: downloading is 10-50%
