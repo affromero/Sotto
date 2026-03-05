@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { Prisma } from '@prisma/client';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { logger } from '@/lib/logger';
 import { getEmbeddingProvider } from '@/lib/embeddings';
@@ -35,33 +36,45 @@ export async function processFeatureComputation(
   return { computed: scope };
 }
 
-async function computeAllFeatures(job: Job): Promise<void> {
-  // Compute features for all users with playback sessions
-  const userIds = await prisma.playbackSession.findMany({
-    select: { userId: true },
-    where: { userId: { not: null } },
-    distinct: ['userId'],
-  });
+const ID_BATCH = 200;
 
-  const totalUsers = userIds.length;
-  for (let i = 0; i < totalUsers; i++) {
-    const userId = userIds[i].userId;
-    if (userId) {
+async function computeAllFeatures(job: Job): Promise<void> {
+  // Compute features for all users with playback sessions (cursor-paginated)
+  let lastUserId: string | null = null;
+  let processedUsers = 0;
+  while (true) {
+    const userIds: Array<{ userId: string }> = await prisma.$queryRaw`
+      SELECT DISTINCT "userId" FROM "PlaybackSession"
+      WHERE "userId" IS NOT NULL
+      ${lastUserId ? Prisma.sql`AND "userId" > ${lastUserId}` : Prisma.empty}
+      ORDER BY "userId" ASC LIMIT ${ID_BATCH}
+    `;
+    if (userIds.length === 0) break;
+    for (const { userId } of userIds) {
       await computeUserFeatures(userId);
+      processedUsers++;
     }
-    await job.updateProgress(Math.round((i / (totalUsers + 1)) * 50));
+    lastUserId = userIds[userIds.length - 1].userId;
+    await job.updateProgress(Math.min(49, Math.round(processedUsers * 0.5)));
   }
 
-  // Compute features for all ready podcasts
-  const podcastIds = await prisma.podcast.findMany({
-    select: { id: true },
-    where: { status: 'READY' },
-  });
-
-  const totalPodcasts = podcastIds.length;
-  for (let i = 0; i < totalPodcasts; i++) {
-    await computePodcastFeatures(podcastIds[i].id);
-    await job.updateProgress(50 + Math.round((i / (totalPodcasts + 1)) * 50));
+  // Compute features for all ready podcasts (cursor-paginated)
+  let lastPodcastId: string | null = null;
+  let processedPodcasts = 0;
+  while (true) {
+    const podcastIds: Array<{ id: string }> = await prisma.$queryRaw`
+      SELECT id FROM "Podcast"
+      WHERE status = 'READY' AND "deletedAt" IS NULL
+      ${lastPodcastId ? Prisma.sql`AND id > ${lastPodcastId}` : Prisma.empty}
+      ORDER BY id ASC LIMIT ${ID_BATCH}
+    `;
+    if (podcastIds.length === 0) break;
+    for (const { id } of podcastIds) {
+      await computePodcastFeatures(id);
+      processedPodcasts++;
+    }
+    lastPodcastId = podcastIds[podcastIds.length - 1].id;
+    await job.updateProgress(50 + Math.min(49, Math.round(processedPodcasts * 0.5)));
   }
 }
 
@@ -72,6 +85,8 @@ async function computeUserFeatures(userId: string): Promise<void> {
       include: {
         podcast: { select: { id: true, duration: true, tags: { include: { tag: true } } } },
       },
+      orderBy: { startedAt: 'desc' },
+      take: 5000,
     });
 
     if (sessions.length === 0) return;
@@ -280,6 +295,8 @@ async function computePodcastFeatures(podcastId: string): Promise<void> {
 
     const sessions = await prisma.playbackSession.findMany({
       where: { podcastId },
+      orderBy: { startedAt: 'desc' },
+      take: 10000,
     });
 
     type PodcastSessionType = (typeof sessions)[0];
