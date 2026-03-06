@@ -1,26 +1,109 @@
+import { PriceTokenClient, STATIC_IMAGE_PRICING, STATIC_VIDEO_PRICING } from 'pricetoken';
+import type { ImageModelPricing, VideoModelPricing } from 'pricetoken';
 import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo } from '@/types/pipeline';
+import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from '@/lib/providers/fal-endpoints';
+import { logger } from '@/lib/logger';
 
 /** Minimal image model shape needed for cost estimation. */
 export type ImageModelCostInfo = { modelId: string; pricePerImage: number };
 /** Minimal video model shape needed for cost estimation. */
 export type VideoModelCostInfo = { modelId: string; costPerMinute: number; maxDuration?: number | null };
 
-/** Static catalog of Fal image models with pricing. */
-const FAL_IMAGE_MODELS: FalImageModelInfo[] = [
-  { modelId: 'fal-recraft-v3', displayName: 'Recraft V3', pricePerImage: 0.04, defaultResolution: '1280x720', qualityTier: 'high' },
-  { modelId: 'fal-flux-1-pro', displayName: 'FLUX 1.1 Pro', pricePerImage: 0.04, defaultResolution: '1280x720', qualityTier: 'high' },
-  { modelId: 'fal-flux-2-pro', displayName: 'FLUX 2 Pro', pricePerImage: 0.03, defaultResolution: '1280x720', qualityTier: 'best' },
-  { modelId: 'fal-ideogram-v2', displayName: 'Ideogram V2', pricePerImage: 0.08, defaultResolution: '1280x720', qualityTier: 'high' },
-  { modelId: 'fal-sd3', displayName: 'SD3 Medium', pricePerImage: 0.003, defaultResolution: '1280x720', qualityTier: 'standard' },
-];
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
-/** Static catalog of Fal video models with pricing. */
-const FAL_VIDEO_MODELS: FalVideoModelInfo[] = [
-  { modelId: 'fal-veo3-1080p', displayName: 'Veo 3 (1080p)', costPerMinute: 3.50, resolution: '1080p', maxDuration: 8, qualityMode: 'quality' },
-  { modelId: 'fal-veo3-fast-1080p', displayName: 'Veo 3 Fast (1080p)', costPerMinute: 1.75, resolution: '1080p', maxDuration: 8, qualityMode: 'fast' },
-  { modelId: 'fal-kling3-1080p', displayName: 'Kling 3 (1080p)', costPerMinute: 2.00, resolution: '1080p', maxDuration: 10, qualityMode: 'quality' },
-  { modelId: 'fal-wan2.5-480p', displayName: 'Wan 2.5 (480p)', costPerMinute: 0.50, resolution: '480p', maxDuration: 5, qualityMode: 'fast' },
-];
+let imageCache: { data: FalImageModelInfo[]; expiresAt: number } | null = null;
+let videoCache: { data: FalVideoModelInfo[]; expiresAt: number } | null = null;
+
+function mapImageModel(m: ImageModelPricing): FalImageModelInfo {
+  return {
+    modelId: m.modelId,
+    displayName: m.displayName,
+    pricePerImage: m.pricePerImage,
+    defaultResolution: m.defaultResolution ?? '1280x720',
+    qualityTier: m.qualityTier ?? 'standard',
+  };
+}
+
+function mapVideoModel(m: VideoModelPricing): FalVideoModelInfo {
+  return {
+    modelId: m.modelId,
+    displayName: m.displayName,
+    costPerMinute: m.costPerMinute,
+    resolution: m.resolution ?? null,
+    maxDuration: m.maxDuration ?? null,
+    qualityMode: m.qualityMode ?? null,
+  };
+}
+
+/** Fallback: derive FAL image models from pricetoken static data. */
+function staticFalImageModels(): FalImageModelInfo[] {
+  return STATIC_IMAGE_PRICING
+    .filter((m) => FAL_IMAGE_MODEL_IDS.has(m.modelId))
+    .map(mapImageModel);
+}
+
+/** Fallback: derive FAL video models from pricetoken static data. */
+function staticFalVideoModels(): FalVideoModelInfo[] {
+  return STATIC_VIDEO_PRICING
+    .filter((m) => FAL_VIDEO_MODEL_IDS.has(m.modelId))
+    .map(mapVideoModel);
+}
+
+/** Return available Fal image models with live pricing from pricetoken. */
+export async function fetchFalImageModels(): Promise<FalImageModelInfo[]> {
+  const now = Date.now();
+  if (imageCache && now < imageCache.expiresAt) return imageCache.data;
+
+  try {
+    const apiKey = process.env.PRICETOKEN_API_KEY;
+    const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
+    const all = await client.getImagePricing({ provider: 'fal' });
+    const models = all
+      .filter((m) => FAL_IMAGE_MODEL_IDS.has(m.modelId))
+      .map(mapImageModel);
+
+    if (models.length > 0) {
+      imageCache = { data: models, expiresAt: now + CACHE_TTL_MS };
+      return models;
+    }
+  } catch (err) {
+    logger.warn('Failed to fetch FAL image pricing from pricetoken, using static fallback', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  const fallback = staticFalImageModels();
+  imageCache = { data: fallback, expiresAt: now + CACHE_TTL_MS };
+  return fallback;
+}
+
+/** Return available Fal video models with live pricing from pricetoken. */
+export async function fetchFalVideoModels(): Promise<FalVideoModelInfo[]> {
+  const now = Date.now();
+  if (videoCache && now < videoCache.expiresAt) return videoCache.data;
+
+  try {
+    const apiKey = process.env.PRICETOKEN_API_KEY;
+    const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
+    const all = await client.getVideoPricing({ provider: 'fal' });
+    const models = all
+      .filter((m) => FAL_VIDEO_MODEL_IDS.has(m.modelId))
+      .map(mapVideoModel);
+
+    if (models.length > 0) {
+      videoCache = { data: models, expiresAt: now + CACHE_TTL_MS };
+      return models;
+    }
+  } catch (err) {
+    logger.warn('Failed to fetch FAL video pricing from pricetoken, using static fallback', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  const fallback = staticFalVideoModels();
+  videoCache = { data: fallback, expiresAt: now + CACHE_TTL_MS };
+  return fallback;
+}
 
 export function estimateSegmentCost(
   segment: PipelineSegmentNode,
@@ -58,16 +141,6 @@ export function formatCost(cost: number): string {
   if (cost < 0.01) return `$${cost.toFixed(4)}`;
   if (cost < 1) return `$${cost.toFixed(3)}`;
   return `$${cost.toFixed(2)}`;
-}
-
-/** Return available Fal image models from local catalog. */
-export async function fetchFalImageModels(): Promise<FalImageModelInfo[]> {
-  return FAL_IMAGE_MODELS;
-}
-
-/** Return available Fal video models from local catalog. */
-export async function fetchFalVideoModels(): Promise<FalVideoModelInfo[]> {
-  return FAL_VIDEO_MODELS;
 }
 
 export function cheapestModel<T extends { modelId: string }>(
