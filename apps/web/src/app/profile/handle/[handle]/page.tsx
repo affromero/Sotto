@@ -19,11 +19,28 @@ export async function generateMetadata({ params }: HandleProfilePageProps): Prom
   if (!user) return { title: 'User Not Found' };
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const displayName = user.name || `@${user.handle}`;
+  const description = user.bio || `${displayName}'s podcasts on Sotto`;
+  const profileUrl = `${appUrl}/@${user.handle}`;
 
   return {
-    title: user.name || `@${user.handle}`,
-    description: user.bio || `${user.name || `@${user.handle}`}'s podcasts on Sotto`,
+    title: displayName,
+    description,
+    openGraph: {
+      title: displayName,
+      description,
+      type: 'profile',
+      url: profileUrl,
+      siteName: 'Sotto',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${displayName} — Sotto`,
+      description,
+      site: '@SottoFM',
+    },
     alternates: {
+      canonical: profileUrl,
       types: {
         'application/rss+xml': `${appUrl}/api/users/handle/${handle}/rss`,
       },
