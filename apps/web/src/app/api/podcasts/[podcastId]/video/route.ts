@@ -96,14 +96,70 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
   }
 
-  // Delete failed generation if retrying
+  // Resume or restart failed generation
   if (existing?.status === 'FAILED') {
-    await prisma.segmentVisual.deleteMany({
-      where: { videoGenerationId: existing.id },
-    });
-    await prisma.videoGeneration.delete({
-      where: { id: existing.id },
-    });
+    if (pipeline) {
+      // New pipeline provided — start fresh (user changed settings)
+      await prisma.segmentVisual.deleteMany({ where: { videoGenerationId: existing.id } });
+      await prisma.videoGeneration.delete({ where: { id: existing.id } });
+      // Fall through to create new generation
+    } else {
+      // Resume from where it failed
+      const visuals = await prisma.segmentVisual.findMany({
+        where: { videoGenerationId: existing.id },
+        select: { id: true, segmentId: true, status: true, visualType: true, prompt: true, metadata: true, visualMode: true, videoModel: true },
+      });
+
+      if (visuals.length === 0) {
+        // Classification failed — delete and start fresh
+        await prisma.videoGeneration.delete({ where: { id: existing.id } });
+        // Fall through to create new generation
+      } else {
+        const failedVisuals = visuals.filter(v => v.status === 'failed');
+        const pendingVisuals = visuals.filter(v => v.status === 'pending');
+        const allReady = failedVisuals.length === 0 && pendingVisuals.length === 0;
+
+        if (allReady) {
+          // All visuals ready — composition must have failed. Re-queue composition.
+          await prisma.videoGeneration.update({
+            where: { id: existing.id },
+            data: { status: 'COMPOSING', failureReason: null },
+          });
+          await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+            podcastId, videoGenerationId: existing.id,
+          });
+          return NextResponse.json({
+            videoGenerationId: existing.id, status: 'COMPOSING',
+          });
+        }
+
+        // Some visuals failed/pending — reset and re-queue those
+        const toRegenerate = [...failedVisuals, ...pendingVisuals];
+        await prisma.segmentVisual.updateMany({
+          where: { id: { in: toRegenerate.map(v => v.id) } },
+          data: { status: 'pending', failureReason: null },
+        });
+        await prisma.videoGeneration.update({
+          where: { id: existing.id },
+          data: { status: 'GENERATING_VISUALS', failureReason: null },
+        });
+
+        for (const visual of toRegenerate) {
+          await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+            podcastId,
+            videoGenerationId: existing.id,
+            segmentVisualId: visual.id,
+            visualType: visual.visualType,
+            prompt: visual.prompt ?? '',
+            metadata: (visual.metadata as Record<string, unknown>) ?? {},
+          });
+        }
+
+        return NextResponse.json({
+          videoGenerationId: existing.id, status: 'GENERATING_VISUALS',
+        });
+      }
+    }
   }
 
   // Create VideoGeneration record
