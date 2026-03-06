@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { STATIC_VIDEO_PRICING } from 'pricetoken';
+import { fetchFalVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
   addJob,
@@ -129,7 +129,8 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         assetExt = 'mp4';
         service = falKey ? 'fal_byok' : 'fal';
 
-        const pricing = STATIC_VIDEO_PRICING.find((m) => m.modelId === visual.videoModel);
+        const videoModels = await fetchFalVideoModels();
+        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
         if (pricing) {
           totalCost = ((segment?.duration ?? 5) / 60) * pricing.costPerMinute;
         }

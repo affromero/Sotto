@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { STATIC_IMAGE_PRICING, STATIC_VIDEO_PRICING } from 'pricetoken';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { checkVideoGenerationGate } from '@/lib/video-gate';
 import { classifySegmentVisuals, type VisualTypeString } from '@/lib/visual-classifier';
-import { getFalImageEndpoint, getFalVideoEndpoint } from '@/lib/providers/fal-endpoints';
 import {
   estimateSegmentCost,
   estimatePipelineCost,
-  cheapestFalImageModel,
-  cheapestFalVideoModel,
+  fetchFalImageModels,
+  fetchFalVideoModels,
+  cheapestModel,
 } from '@/lib/video-cost-estimator';
 import type { PipelineSegmentNode, VisualMode, VideoPipeline } from '@/types/pipeline';
 import { logger } from '@/lib/logger';
@@ -87,10 +86,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     duration: s.duration ?? 5,
   }));
 
-  const { classifications } = await classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic);
+  const [{ classifications }, imageModels, videoModels] = await Promise.all([
+    classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic),
+    fetchFalImageModels(),
+    fetchFalVideoModels(),
+  ]);
 
-  const defaultImageModel = cheapestFalImageModel();
-  const defaultVideoModel = cheapestFalVideoModel();
+  const defaultImageModel = cheapestModel(imageModels, (m) => m.pricePerImage, 'fal-recraft-v3');
+  const defaultVideoModel = cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
 
   const segments: PipelineSegmentNode[] = classifications.map((c) => {
     const input = segmentInputs.find((s) => s.segmentId === c.segmentId)!;
@@ -110,14 +113,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       metadata: c.metadata,
       estimatedCost: 0,
     };
-    node.estimatedCost = estimateSegmentCost(node);
+    node.estimatedCost = estimateSegmentCost(node, imageModels, videoModels);
     return node;
   });
 
   const pipeline: VideoPipeline = {
     version: 1,
     segments,
-    totalEstimatedCost: estimatePipelineCost(segments),
+    totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
     defaultImageModel,
     defaultVideoModel,
   };
@@ -161,12 +164,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Invalid pipeline format', 400);
   }
 
-  const validImageIds = new Set(
-    STATIC_IMAGE_PRICING.filter((m) => m.provider === 'fal' && getFalImageEndpoint(m.modelId)).map((m) => m.modelId),
-  );
-  const validVideoIds = new Set(
-    STATIC_VIDEO_PRICING.filter((m) => m.provider === 'fal' && getFalVideoEndpoint(m.modelId)).map((m) => m.modelId),
-  );
+  const [imageModels, videoModels] = await Promise.all([fetchFalImageModels(), fetchFalVideoModels()]);
+
+  const validImageIds = new Set(imageModels.map((m) => m.modelId));
+  const validVideoIds = new Set(videoModels.map((m) => m.modelId));
 
   for (const seg of body.segments) {
     if (seg.model && seg.visualMode === 'image' && !validImageIds.has(seg.model)) {
@@ -179,13 +180,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const segments = body.segments.map((seg) => ({
     ...seg,
-    estimatedCost: estimateSegmentCost(seg),
+    estimatedCost: estimateSegmentCost(seg, imageModels, videoModels),
   }));
 
   const pipeline: VideoPipeline = {
     ...body,
     segments,
-    totalEstimatedCost: estimatePipelineCost(segments),
+    totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
   };
 
   return NextResponse.json(pipeline);

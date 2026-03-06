@@ -7,6 +7,7 @@ import {
   Controls,
   type Node,
   type Edge,
+  type NodeTypes,
   BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -25,7 +26,7 @@ interface PipelineEditorProps {
   onCancel: () => void;
 }
 
-const nodeTypes = { segment: SegmentNode };
+const nodeTypes: NodeTypes = { segment: SegmentNode as NodeTypes[string] };
 
 const NODE_Y_GAP = 180;
 const SEGMENT_X = 400;
@@ -36,26 +37,32 @@ export function PipelineEditor({ podcastTitle, pipeline, falModels, onApprove, o
   const [segments, setSegments] = useState<PipelineSegmentNode[]>(pipeline.segments);
 
   const allSpeakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
-  const totalCost = useMemo(() => estimatePipelineCost(segments), [segments]);
+  const totalCost = useMemo(
+    () => estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels),
+    [segments, falModels.imageModels, falModels.videoModels],
+  );
 
-  const handleSegmentUpdate = useCallback((segmentId: string, updates: Partial<PipelineSegmentNode>) => {
-    setSegments((prev) =>
-      prev.map((seg) => {
-        if (seg.segmentId !== segmentId) return seg;
-        const updated = { ...seg, ...updates };
-        updated.estimatedCost = estimateSegmentCost(updated);
-        return updated;
-      }),
-    );
-  }, []);
+  const handleSegmentUpdate = useCallback(
+    (segmentId: string, updates: Partial<PipelineSegmentNode>) => {
+      setSegments((prev) =>
+        prev.map((seg) => {
+          if (seg.segmentId !== segmentId) return seg;
+          const updated = { ...seg, ...updates };
+          updated.estimatedCost = estimateSegmentCost(updated, falModels.imageModels, falModels.videoModels);
+          return updated;
+        }),
+      );
+    },
+    [falModels.imageModels, falModels.videoModels],
+  );
 
   const handleApprove = useCallback(() => {
     onApprove({
       ...pipeline,
       segments,
-      totalEstimatedCost: estimatePipelineCost(segments),
+      totalEstimatedCost: estimatePipelineCost(segments, falModels.imageModels, falModels.videoModels),
     });
-  }, [pipeline, segments, onApprove]);
+  }, [pipeline, segments, onApprove, falModels.imageModels, falModels.videoModels]);
 
   const totalHeight = Math.max(segments.length * NODE_Y_GAP, 400);
   const centerY = totalHeight / 2;
