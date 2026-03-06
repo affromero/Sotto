@@ -180,14 +180,26 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
 
     await job.updateProgress(90);
   } catch (err) {
-    // Mark this visual as failed
-    await prisma.segmentVisual.update({
-      where: { id: segmentVisualId },
-      data: {
-        status: 'failed',
-        failureReason: err instanceof Error ? err.message : String(err),
-      },
-    });
+    const maxAttempts = job.opts?.attempts ?? 3;
+    const isTerminal = job.attemptsMade >= maxAttempts;
+
+    if (isTerminal) {
+      // Final attempt — mark as permanently failed
+      await prisma.segmentVisual.update({
+        where: { id: segmentVisualId },
+        data: {
+          status: 'failed',
+          failureReason: err instanceof Error ? err.message : String(err),
+        },
+      });
+      await checkAllReady(videoGenerationId, podcastId);
+    } else {
+      // Non-terminal — reset to pending so checkAllReady doesn't prematurely fail
+      await prisma.segmentVisual.update({
+        where: { id: segmentVisualId },
+        data: { status: 'pending' },
+      });
+    }
     throw err;
   }
 
