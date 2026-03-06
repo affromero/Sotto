@@ -1,11 +1,26 @@
-import { PriceTokenClient, type ImageModelPricing, type VideoModelPricing } from 'pricetoken';
-import type { PipelineSegmentNode } from '@/types/pipeline';
-import { getFalImageEndpoint, getFalVideoEndpoint } from './providers/fal-endpoints';
+import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo } from '@/types/pipeline';
 
-/** Minimal image model shape needed for cost estimation (accepts both ImageModelPricing and FalImageModelInfo). */
+/** Minimal image model shape needed for cost estimation. */
 export type ImageModelCostInfo = { modelId: string; pricePerImage: number };
-/** Minimal video model shape needed for cost estimation (accepts both VideoModelPricing and FalVideoModelInfo). */
+/** Minimal video model shape needed for cost estimation. */
 export type VideoModelCostInfo = { modelId: string; costPerMinute: number; maxDuration?: number | null };
+
+/** Static catalog of Fal image models with pricing. */
+const FAL_IMAGE_MODELS: FalImageModelInfo[] = [
+  { modelId: 'fal-recraft-v3', displayName: 'Recraft V3', pricePerImage: 0.04, defaultResolution: '1280x720', qualityTier: 'high' },
+  { modelId: 'fal-flux-1-pro', displayName: 'FLUX 1.1 Pro', pricePerImage: 0.04, defaultResolution: '1280x720', qualityTier: 'high' },
+  { modelId: 'fal-flux-2-pro', displayName: 'FLUX 2 Pro', pricePerImage: 0.03, defaultResolution: '1280x720', qualityTier: 'best' },
+  { modelId: 'fal-ideogram-v2', displayName: 'Ideogram V2', pricePerImage: 0.08, defaultResolution: '1280x720', qualityTier: 'high' },
+  { modelId: 'fal-sd3', displayName: 'SD3 Medium', pricePerImage: 0.003, defaultResolution: '1280x720', qualityTier: 'standard' },
+];
+
+/** Static catalog of Fal video models with pricing. */
+const FAL_VIDEO_MODELS: FalVideoModelInfo[] = [
+  { modelId: 'fal-veo3-1080p', displayName: 'Veo 3 (1080p)', costPerMinute: 3.50, resolution: '1080p', maxDuration: 8, qualityMode: 'quality' },
+  { modelId: 'fal-veo3-fast-1080p', displayName: 'Veo 3 Fast (1080p)', costPerMinute: 1.75, resolution: '1080p', maxDuration: 8, qualityMode: 'fast' },
+  { modelId: 'fal-kling3-1080p', displayName: 'Kling 3 (1080p)', costPerMinute: 2.00, resolution: '1080p', maxDuration: 10, qualityMode: 'quality' },
+  { modelId: 'fal-wan2.5-480p', displayName: 'Wan 2.5 (480p)', costPerMinute: 0.50, resolution: '480p', maxDuration: 5, qualityMode: 'fast' },
+];
 
 export function estimateSegmentCost(
   segment: PipelineSegmentNode,
@@ -45,20 +60,14 @@ export function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-/** Fetch live Fal image models from pricetoken API, filtered to models with known endpoints. */
-export async function fetchFalImageModels(): Promise<ImageModelPricing[]> {
-  const apiKey = process.env.PRICETOKEN_API_KEY;
-  const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
-  const models = await client.getImagePricing({ provider: 'fal' });
-  return models.filter((m) => getFalImageEndpoint(m.modelId));
+/** Return available Fal image models from local catalog. */
+export async function fetchFalImageModels(): Promise<FalImageModelInfo[]> {
+  return FAL_IMAGE_MODELS;
 }
 
-/** Fetch live Fal video models from pricetoken API, filtered to models with known endpoints. */
-export async function fetchFalVideoModels(): Promise<VideoModelPricing[]> {
-  const apiKey = process.env.PRICETOKEN_API_KEY;
-  const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
-  const models = await client.getVideoPricing({ provider: 'fal' });
-  return models.filter((m) => getFalVideoEndpoint(m.modelId));
+/** Return available Fal video models from local catalog. */
+export async function fetchFalVideoModels(): Promise<FalVideoModelInfo[]> {
+  return FAL_VIDEO_MODELS;
 }
 
 export function cheapestModel<T extends { modelId: string }>(

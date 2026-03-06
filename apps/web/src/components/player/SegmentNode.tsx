@@ -76,9 +76,9 @@ function SegmentNodeComponent({ data }: NodeProps<SegmentNodeType>) {
       if (mode === segment.visualMode) return;
       let model: string | null = null;
       if (mode === 'image' && imageModels.length > 0) {
-        model = imageModels.reduce((a, b) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
+        model = imageModels.reduce((a: FalImageModelInfo, b: FalImageModelInfo) => (a.pricePerImage <= b.pricePerImage ? a : b)).modelId;
       } else if (mode === 'video' && videoModels.length > 0) {
-        model = videoModels.reduce((a, b) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
+        model = videoModels.reduce((a: FalVideoModelInfo, b: FalVideoModelInfo) => (a.costPerMinute <= b.costPerMinute ? a : b)).modelId;
       }
       onUpdate(segment.segmentId, { visualMode: mode, model });
     },
@@ -156,7 +156,7 @@ function SegmentNodeComponent({ data }: NodeProps<SegmentNodeType>) {
             onChange={handleModelChange}
             aria-label="Model"
           >
-            {models.map((m) => (
+            {models.map((m: FalImageModelInfo | FalVideoModelInfo) => (
               <option key={m.modelId} value={m.modelId}>
                 {m.displayName} —{' '}
                 {'pricePerImage' in m

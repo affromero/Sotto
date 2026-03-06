@@ -1,4 +1,4 @@
-import { Queue } from 'bullmq';
+import { ConnectionOptions, Queue } from 'bullmq';
 import { ALL_QUEUE_NAMES } from './queue';
 import { createRedisConnection } from './redis';
 
@@ -10,7 +10,7 @@ export function getAdminQueue(name: string): Queue {
   }
   let queue = adminQueues.get(name);
   if (!queue) {
-    queue = new Queue(name, { connection: createRedisConnection() });
+    queue = new Queue(name, { connection: createRedisConnection() as ConnectionOptions });
     adminQueues.set(name, queue);
   }
   return queue;
