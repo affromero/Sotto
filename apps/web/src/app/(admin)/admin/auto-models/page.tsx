@@ -2,6 +2,7 @@ import { getAutoModelConfig } from '@/lib/auto-model-config';
 import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
+import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
 import { AutoModelForm } from './AutoModelForm';
 import styles from './page.module.css';
 
@@ -40,6 +41,16 @@ export default async function AutoModelsPage() {
     })),
   }));
 
+  const imageProviders = getAllImageProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+    })),
+  }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -54,6 +65,7 @@ export default async function AutoModelsPage() {
         aiProviders={aiProviders}
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
+        imageProviders={imageProviders}
       />
 
       <div className={styles.platformNote}>

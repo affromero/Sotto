@@ -57,6 +57,7 @@ import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioCon
 import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
+import { VideoView } from '@/components/player/VideoView';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { PodcastStatus } from '@prisma/client';
@@ -73,7 +74,7 @@ interface PodcastPlayerViewProps {
   canGenerateVideo?: boolean;
 }
 
-type ViewMode = 'transcript' | 'teleprompter';
+type ViewMode = 'transcript' | 'teleprompter' | 'video';
 
 const statusVariants: Record<PodcastStatus, 'default' | 'success' | 'warning' | 'error' | 'info'> =
   {
@@ -176,8 +177,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const completionPercentRef = useRef(0);
   const [questionCounts, setQuestionCounts] = useState<Map<number, number>>(new Map());
   const [questionsRefreshTrigger, setQuestionsRefreshTrigger] = useState(0);
-  const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
+    podcast.videoUrl ? 'ready' : 'idle'
+  );
+  const [videoUrl, setVideoUrl] = useState<string | null>(podcast.videoUrl ?? null);
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
@@ -300,6 +303,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       })
       .catch(() => {});
   }, [isOwner, liveStatus, podcast.id]);
+
+  // Fall back to transcript if video tab is active but videoUrl is removed
+  useEffect(() => {
+    if (!videoUrl && viewMode === 'video') {
+      setViewMode('transcript');
+    }
+  }, [videoUrl, viewMode]);
 
   const handleGenerateVideo = useCallback(async () => {
     setVideoLoading(true);
@@ -984,6 +994,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             >
               Teleprompter
             </button>
+            {videoUrl && (
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : ''}`}
+                onClick={() => setViewMode('video')}
+                role="tab"
+                aria-selected={viewMode === 'video'}
+                type="button"
+              >
+                Video
+              </button>
+            )}
           </div>
 
           <section className={styles.transcriptSection}>
@@ -996,14 +1017,23 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 questionCounts={isOwner ? questionCounts : undefined}
                 podcastId={podcast.id}
               />
-            ) : (
+            ) : viewMode === 'teleprompter' ? (
               <Teleprompter
                 segments={podcast.segments}
                 references={podcast.references}
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
               />
-            )}
+            ) : videoUrl ? (
+              <VideoView
+                videoUrl={videoUrl}
+                segments={podcast.segments}
+                references={podcast.references}
+                currentTime={currentTime}
+                onSegmentClick={handleSegmentClick}
+                title={podcast.title}
+              />
+            ) : null}
           </section>
 
           {podcast.references.length > 0 && (
