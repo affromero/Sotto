@@ -1,8 +1,8 @@
 /**
- * Visual classifier — single Claude call to classify all segments in a podcast
+ * Visual classifier — single AI call to classify all segments in a podcast
  * with visual types and generation metadata for video production.
  */
-import { generateResponse } from './llm';
+import { createAIProvider } from './providers/ai';
 import { logger } from './logger';
 import { z } from 'zod';
 
@@ -80,6 +80,7 @@ export async function classifySegmentVisuals(
   segments: SegmentInput[],
   podcastTitle: string,
   podcastTopic: string,
+  opts?: { provider?: string; model?: string; apiKeyOverride?: string },
 ): Promise<{ classifications: ClassifiedSegment[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
     .map((s) => `[${s.order}] ${s.speaker}: ${s.text.slice(0, 500)}${s.text.length > 500 ? '...' : ''} (${s.duration.toFixed(1)}s)`)
@@ -93,12 +94,14 @@ ${segmentList}
 
 Classify each segment with a visual type. Return JSON only.`;
 
-  const result = await generateResponse(
+  const ai = createAIProvider(opts?.provider);
+  const result = await ai.generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
     {
       maxTokens: 4096,
-      model: 'claude-haiku-4-5-20251001',
+      model: opts?.model,
+      apiKeyOverride: opts?.apiKeyOverride,
       skipModeration: true,
       jsonSchema: {
         name: 'visual_classification',
