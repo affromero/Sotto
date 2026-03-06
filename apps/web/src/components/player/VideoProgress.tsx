@@ -1,6 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import NextImage from 'next/image';
+import {
+  Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type,
+  AlertTriangle, RefreshCw,
+} from 'lucide-react';
 import styles from './VideoProgress.module.css';
 
 interface SegmentVisual {
@@ -9,6 +14,8 @@ interface SegmentVisual {
   visualType: string;
   status: string;
   assetUrl: string | null;
+  order: number;
+  visualMode: string | null;
 }
 
 interface VideoStatusResponse {
@@ -23,6 +30,7 @@ interface VideoProgressProps {
   podcastId: string;
   videoGenerationId: string;
   onComplete: (videoUrl: string) => void;
+  onFailed?: (reason: string) => void;
 }
 
 const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'COMPOSING', 'READY'] as const;
@@ -33,6 +41,52 @@ const STAGE_LABELS: Record<string, string> = {
   GENERATING_VISUALS: 'Generating visuals',
   COMPOSING: 'Composing video',
   READY: 'Ready',
+  FAILED: 'Failed',
+};
+
+const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {
+  AI_ILLUSTRATION: ImageIcon,
+  STOCK_FOOTAGE: Film,
+  DATA_CHART: BarChart3,
+  QUOTE: Quote,
+  COMPARISON: GitCompare,
+  TIMELINE: Clock,
+  DIAGRAM: Network,
+  TEXT_CARD: Type,
+};
+
+const VISUAL_TYPE_LABELS: Record<string, string> = {
+  AI_ILLUSTRATION: 'AI Illustration',
+  STOCK_FOOTAGE: 'Stock Footage',
+  DATA_CHART: 'Data Chart',
+  QUOTE: 'Quote',
+  COMPARISON: 'Comparison',
+  TIMELINE: 'Timeline',
+  DIAGRAM: 'Diagram',
+  TEXT_CARD: 'Text Card',
+};
+
+const PROGRAMMATIC_TYPES = new Set(['DATA_CHART', 'QUOTE', 'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD']);
+
+const SUB_MESSAGES: Record<string, string[]> = {
+  PENDING: ['Preparing your video...', 'Setting up the pipeline...'],
+  CLASSIFYING: [
+    'Analyzing each segment for the best visual treatment...',
+    'Choosing between illustrations, charts, and text cards...',
+    'AI is reviewing your script structure...',
+  ],
+  GENERATING_VISUALS: [
+    'Creating AI illustrations for your podcast...',
+    'Each segment gets its own unique visual...',
+    'Generating images to match your content...',
+    'This is the most visual-intensive step...',
+  ],
+  COMPOSING: [
+    'Rendering your final video with Remotion...',
+    'Combining audio, visuals, and animations...',
+    'Almost there — final composition in progress...',
+    'Encoding video frames...',
+  ],
 };
 
 function stageIndex(status: string): number {
@@ -40,68 +94,205 @@ function stageIndex(status: string): number {
   return idx === -1 ? 0 : idx;
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, onComplete }: VideoProgressProps) {
+function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
+  const Icon = VISUAL_TYPE_ICONS[visual.visualType] || Type;
+  const label = VISUAL_TYPE_LABELS[visual.visualType] || visual.visualType;
+  const isProgrammatic = PROGRAMMATIC_TYPES.has(visual.visualType);
+  const isReady = visual.status === 'ready';
+  const isGenerating = visual.status === 'generating';
+  const isFailed = visual.status === 'failed';
+  const showImage = isReady && visual.assetUrl && !isProgrammatic;
+
+  const statusClass = isFailed ? styles.thumbFailed
+    : isGenerating ? styles.thumbGenerating
+    : isReady ? styles.thumbReady
+    : styles.thumbPending;
+
+  return (
+    <div
+      className={`${styles.thumb} ${statusClass}`}
+      title={`#${visual.order} ${label} — ${visual.status}`}
+      data-status={visual.status}
+    >
+      {showImage ? (
+        <NextImage
+          src={visual.assetUrl!}
+          alt={`Segment ${visual.order} visual`}
+          className={styles.thumbImage}
+          fill
+          sizes="120px"
+        />
+      ) : (
+        <div className={styles.thumbPlaceholder}>
+          <Icon size={20} strokeWidth={1.5} />
+          <span className={styles.thumbLabel}>{label}</span>
+        </div>
+      )}
+      <span className={styles.thumbOrder}>{visual.order}</span>
+    </div>
+  );
+}
+
+export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  const [subMessageTick, setSubMessageTick] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const completedRef = useRef(false);
+  const filmstripRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<() => void>(() => {});
+
+  const schedulePoll = useCallback((ms: number) => {
+    timerRef.current = setTimeout(() => pollRef.current(), ms);
+  }, []);
 
   const poll = useCallback(async () => {
     try {
       const res = await fetch(`/api/podcasts/${podcastId}/video`);
-      if (!res.ok) return;
+      if (!res.ok) { schedulePoll(5000); return; }
       const json = await res.json() as VideoStatusResponse;
-      if (!json.status) return;
+      if (!json.status) { schedulePoll(5000); return; }
       setData(json);
 
       if (json.status === 'READY' && json.videoUrl && !completedRef.current) {
         completedRef.current = true;
-        if (intervalRef.current) clearInterval(intervalRef.current);
         onComplete(json.videoUrl);
+        return;
       }
 
       if (json.status === 'FAILED') {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        setError(json.failureReason || 'Video generation failed.');
+        onFailed?.(json.failureReason || 'Video generation failed.');
+        return;
       }
+
+      // Adaptive polling interval
+      const interval = json.status === 'GENERATING_VISUALS' ? 3000 : 5000;
+      schedulePoll(interval);
     } catch {
-      // Silently retry next interval
+      schedulePoll(5000);
     }
-  }, [podcastId, onComplete]);
+  }, [podcastId, onComplete, onFailed, schedulePoll]);
 
   useEffect(() => {
-    // Suppress unused variable warning — videoGenerationId is used for React key identity
+    pollRef.current = poll;
+  }, [poll]);
+
+  useEffect(() => {
     void videoGenerationId;
-    // Defer initial poll to avoid setState-in-effect lint rule
-    const initialTimer = setTimeout(poll, 0);
-    intervalRef.current = setInterval(poll, 5000);
+    completedRef.current = false;
+    schedulePoll(0);
     return () => {
-      clearTimeout(initialTimer);
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [poll, videoGenerationId]);
+  }, [poll, videoGenerationId, schedulePoll]);
+
+  // Sub-message rotation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSubMessageTick(t => t + 1);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-scroll filmstrip to first generating segment
+  useEffect(() => {
+    if (!filmstripRef.current || !data?.segmentVisuals) return;
+    const generating = filmstripRef.current.querySelector('[data-status="generating"]');
+    if (generating) {
+      generating.scrollIntoView({ inline: 'center', behavior: 'smooth', block: 'nearest' });
+    }
+  }, [data?.segmentVisuals]);
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    setRetryError(null);
+    try {
+      const res = await fetch(`/api/podcasts/${podcastId}/video`, { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Retry failed' })) as { error?: string };
+        setRetryError(body.error || 'Retry failed');
+        setRetrying(false);
+        return;
+      }
+      completedRef.current = false;
+      schedulePoll(1000);
+    } catch {
+      setRetryError('Network error — could not retry.');
+    }
+    setRetrying(false);
+  };
 
   const currentStatus = data?.status || 'PENDING';
   const currentStage = stageIndex(currentStatus);
-  const progressPercent = currentStatus === 'READY'
-    ? 100
-    : Math.round(((currentStage + 0.5) / STAGES.length) * 100);
+  const visuals = data?.segmentVisuals || [];
+  const readyCount = visuals.filter(v => v.status === 'ready').length;
+  const failedCount = visuals.filter(v => v.status === 'failed').length;
+  const totalCount = visuals.length;
+  const showFilmstrip = totalCount > 0 && currentStatus !== 'PENDING';
+
+  // Granular progress
+  let progressPercent: number;
+  if (currentStatus === 'READY') {
+    progressPercent = 100;
+  } else if (currentStatus === 'CLASSIFYING' || currentStatus === 'PENDING') {
+    progressPercent = 5;
+  } else if (currentStatus === 'GENERATING_VISUALS' && totalCount > 0) {
+    progressPercent = 10 + Math.round((readyCount / totalCount) * 70);
+  } else if (currentStatus === 'COMPOSING') {
+    progressPercent = 85;
+  } else {
+    progressPercent = Math.round(((currentStage + 0.5) / STAGES.length) * 100);
+  }
+
+  const isComposing = currentStatus === 'COMPOSING';
+  const isFailed = currentStatus === 'FAILED';
+  const errorMessage = retryError || (isFailed ? (data?.failureReason || 'Video generation failed.') : null);
+
+  // Sub-message
+  const messages = SUB_MESSAGES[currentStatus] || SUB_MESSAGES.PENDING;
+  const subMessage = messages[subMessageTick % messages.length];
 
   return (
     <div className={styles.root} role="status" aria-label="Video generation progress">
       <div className={styles.header}>
-        <span className={styles.label}>{STAGE_LABELS[currentStatus] || currentStatus}</span>
-        <span className={styles.percent}>{progressPercent}%</span>
+        <span className={styles.label}>
+          {isFailed ? 'Generation failed' : (STAGE_LABELS[currentStatus] || currentStatus)}
+        </span>
+        {!isFailed && <span className={styles.percent}>{progressPercent}%</span>}
       </div>
 
-      <div className={styles.progressBar} role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100}>
-        <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+      <div
+        className={`${styles.progressBar} ${isComposing ? styles.progressBarIndeterminate : ''}`}
+        role="progressbar"
+        aria-valuenow={isComposing ? undefined : progressPercent}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        {isComposing ? (
+          <div className={styles.progressFillIndeterminate} />
+        ) : (
+          <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
+        )}
       </div>
+
+      {currentStatus === 'GENERATING_VISUALS' && totalCount > 0 && (
+        <p className={styles.counter}>
+          {readyCount} of {totalCount} visuals generated
+          {failedCount > 0 && <span className={styles.counterFailed}> ({failedCount} failed)</span>}
+        </p>
+      )}
+
+      {!isFailed && (
+        <p className={styles.subMessage} key={subMessageTick}>
+          {subMessage}
+        </p>
+      )}
 
       <div className={styles.stages}>
         {STAGES.map((stage, i) => {
           const isDone = currentStage > i || currentStatus === 'READY';
-          const isActive = currentStage === i && currentStatus !== 'READY';
+          const isActive = currentStage === i && currentStatus !== 'READY' && !isFailed;
           return (
             <div
               key={stage}
@@ -114,22 +305,33 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete }: Vide
         })}
       </div>
 
-      {data?.segmentVisuals && data.segmentVisuals.length > 0 && (
-        <div className={styles.visuals}>
-          <span className={styles.visualsLabel}>Segment visuals</span>
-          <div className={styles.visualsList}>
-            {data.segmentVisuals.map((v) => (
-              <div
-                key={v.id}
-                className={`${styles.visualChip} ${styles[`visual_${v.status}`] || ''}`}
-                title={`${v.visualType} — ${v.status}`}
-              />
+      {showFilmstrip && (
+        <div className={styles.filmstrip}>
+          <span className={styles.filmstripLabel}>Segment visuals</span>
+          <div className={styles.filmstripTrack} ref={filmstripRef}>
+            {visuals.map((v) => (
+              <FilmstripThumbnail key={v.id} visual={v} />
             ))}
           </div>
         </div>
       )}
 
-      {error && <p className={styles.error}>{error}</p>}
+      {(isFailed || retryError) && errorMessage && (
+        <div className={styles.errorBlock}>
+          <div className={styles.errorMessage}>
+            <AlertTriangle size={16} />
+            <p>{errorMessage}</p>
+          </div>
+          <button
+            className={styles.retryButton}
+            onClick={handleRetry}
+            disabled={retrying}
+          >
+            <RefreshCw size={14} className={retrying ? styles.retrySpinning : ''} />
+            {retrying ? 'Resuming...' : 'Retry'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
