@@ -86,52 +86,58 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     duration: s.duration ?? 5,
   }));
 
-  const [{ classifications }, imageModels, videoModels] = await Promise.all([
-    classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic),
-    fetchFalImageModels(),
-    fetchFalVideoModels(),
-  ]);
+  try {
+    const [{ classifications }, imageModels, videoModels] = await Promise.all([
+      classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic),
+      fetchFalImageModels(),
+      fetchFalVideoModels(),
+    ]);
 
-  const defaultImageModel = cheapestModel(imageModels, (m) => m.pricePerImage, 'fal-recraft-v3');
-  const defaultVideoModel = cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
+    const defaultImageModel = cheapestModel(imageModels, (m) => m.pricePerImage, 'fal-recraft-v3');
+    const defaultVideoModel = cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
 
-  const segments: PipelineSegmentNode[] = classifications.map((c) => {
-    const input = segmentInputs.find((s) => s.segmentId === c.segmentId)!;
-    const mode = visualModeForType(c.visualType);
-    const model = mode === 'image' ? defaultImageModel : mode === 'video' ? defaultVideoModel : null;
+    const segments: PipelineSegmentNode[] = classifications.map((c) => {
+      const input = segmentInputs.find((s) => s.segmentId === c.segmentId)!;
+      const mode = visualModeForType(c.visualType);
+      const model = mode === 'image' ? defaultImageModel : mode === 'video' ? defaultVideoModel : null;
 
-    const node: PipelineSegmentNode = {
-      segmentId: c.segmentId,
-      order: c.order,
-      speaker: input.speaker,
-      text: input.text,
-      duration: input.duration,
-      visualType: c.visualType,
-      visualMode: mode,
-      model,
-      prompt: c.prompt,
-      metadata: c.metadata,
-      estimatedCost: 0,
+      const node: PipelineSegmentNode = {
+        segmentId: c.segmentId,
+        order: c.order,
+        speaker: input.speaker,
+        text: input.text,
+        duration: input.duration,
+        visualType: c.visualType,
+        visualMode: mode,
+        model,
+        prompt: c.prompt,
+        metadata: c.metadata,
+        estimatedCost: 0,
+      };
+      node.estimatedCost = estimateSegmentCost(node, imageModels, videoModels);
+      return node;
+    });
+
+    const pipeline: VideoPipeline = {
+      version: 1,
+      segments,
+      totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
+      defaultImageModel,
+      defaultVideoModel,
     };
-    node.estimatedCost = estimateSegmentCost(node, imageModels, videoModels);
-    return node;
-  });
 
-  const pipeline: VideoPipeline = {
-    version: 1,
-    segments,
-    totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
-    defaultImageModel,
-    defaultVideoModel,
-  };
+    logger.info('Pipeline created for editor', {
+      podcastId,
+      segmentCount: String(segments.length),
+      totalCost: String(pipeline.totalEstimatedCost),
+    });
 
-  logger.info('Pipeline created for editor', {
-    podcastId,
-    segmentCount: String(segments.length),
-    totalCost: String(pipeline.totalEstimatedCost),
-  });
-
-  return NextResponse.json(pipeline);
+    return NextResponse.json(pipeline);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error('Failed to create video pipeline', { podcastId, error: message });
+    return errorResponse(`Pipeline creation failed: ${message}`, 500);
+  }
 }
 
 /**
