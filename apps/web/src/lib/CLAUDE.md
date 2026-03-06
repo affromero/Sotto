@@ -79,6 +79,7 @@ All shared business logic and external service integrations live here.
 | `funnel-metrics.ts` | Conversion funnel: `getFreeTierFunnel()`, `getByokAdoption()`, `getPipelineHealth()` — BYOK conversion + pipeline health | Uses `prisma.ts` |
 | `retention-metrics.ts` | Retention: `getDAU_WAU_MAU()`, `getDailyActiveUsers()`, `getRetentionCohorts()` — active users + weekly cohort heatmap (filters null userId) | Uses `prisma.ts` |
 | `quality-metrics.ts` | Quality analytics: `getModelUsageDistribution()`, `getQualityTrend()`, `getBestModelByTopic()`, `getRatingVolumeTrend()`, `getOverallQualityScore()` — investor-facing quality dashboard | Uses `prisma.ts` |
+| `segment-utils.ts` | Shared segment utilities: `findActiveIndex()` for time-based segment lookup | Pure utility |
 | `detect-urls.ts` | URL detection in message strings (client-safe, no server dependencies) | Pure utility |
 | `embeddings.ts` | Embedding provider abstraction (384-dim): stub hash-based for dev, swap to `text-embedding-3-small` | Pure utility (swappable) |
 | `event-buffer.ts` | Client-side behavioral event buffer: 5s flush / 50-event cap, `sendBeacon` on unload | `'use client'` |

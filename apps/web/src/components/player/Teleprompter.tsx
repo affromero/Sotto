@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useEffect, useRef } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
 import { useScrollFollow } from '@/lib/hooks/useScrollFollow';
+import { findActiveIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
@@ -13,16 +14,6 @@ interface TeleprompterProps {
   references: ReferenceData[];
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
-}
-
-function findActiveIndex(segments: SegmentData[], currentTime: number): number {
-  for (let i = segments.length - 1; i >= 0; i--) {
-    const seg = segments[i];
-    if (seg.startTime !== null && currentTime >= seg.startTime) {
-      return i;
-    }
-  }
-  return 0;
 }
 
 function SegmentBlock({

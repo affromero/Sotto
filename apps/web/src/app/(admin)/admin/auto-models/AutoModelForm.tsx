@@ -40,10 +40,14 @@ interface AutoModelFormProps {
     proIncludedTtsModels: string[] | null;
     freeIncludedSttModels: string[] | null;
     proIncludedSttModels: string[] | null;
+    proImageProvider: string;
+    proImageModel: string;
+    proIncludedImageModels: string[] | null;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
   sttProviders: ProviderOption[];
+  imageProviders: ProviderOption[];
 }
 
 function usePlanState(initial: PlanConfig, providers: { ai: ProviderOption[]; tts: ProviderOption[]; stt: ProviderOption[] }) {
@@ -307,7 +311,7 @@ function IncludedModelsEditor({
   );
 }
 
-export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders }: AutoModelFormProps) {
+export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -338,6 +342,23 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   );
   const [proIncludedStt, setProIncludedStt] = useState<Set<string>>(
     new Set(initialConfig.proIncludedSttModels ?? [])
+  );
+
+  // Image provider state (PRO-only)
+  const [proImageProvider, setProImageProvider] = useState(initialConfig.proImageProvider);
+  const [proImageModel, setProImageModel] = useState(initialConfig.proImageModel);
+  const proImageModels = imageProviders.find((p) => p.id === proImageProvider)?.models ?? [];
+
+  const handleImageProviderChange = (newProvider: string) => {
+    setProImageProvider(newProvider);
+    const provider = imageProviders.find((p) => p.id === newProvider);
+    if (provider && provider.models.length > 0) {
+      setProImageModel(provider.models[0].id);
+    }
+  };
+
+  const [proIncludedImage, setProIncludedImage] = useState<Set<string>>(
+    new Set(initialConfig.proIncludedImageModels ?? [])
   );
 
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
@@ -386,6 +407,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const aiHandlers = makeIncludedHandlers(setFreeIncluded, setProIncluded);
   const ttsHandlers = makeIncludedHandlers(setFreeIncludedTts, setProIncludedTts);
   const sttHandlers = makeIncludedHandlers(setFreeIncludedStt, setProIncludedStt);
+  const imageHandlers = makeIncludedHandlers(() => {}, setProIncludedImage);
 
   const handleSave = async () => {
     setSaving(true);
@@ -406,6 +428,9 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           proIncludedTtsModels: proIncludedTts.size > 0 ? [...proIncludedTts] : null,
           freeIncludedSttModels: freeIncludedStt.size > 0 ? [...freeIncludedStt] : null,
           proIncludedSttModels: proIncludedStt.size > 0 ? [...proIncludedStt] : null,
+          proImageProvider,
+          proImageModel,
+          proIncludedImageModels: proIncludedImage.size > 0 ? [...proIncludedImage] : null,
         }),
       });
 
@@ -480,6 +505,55 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         onFreeChange={sttHandlers.onFreeChange}
         onProChange={sttHandlers.onProChange}
         onClear={sttHandlers.onClear}
+      />
+
+      <fieldset className={styles.section}>
+        <legend className={styles.sectionTitle}>Video Generation (Pro Only)</legend>
+        <p className={styles.platformDescription}>
+          Image provider and model used to generate visuals during video creation. Only available to Pro users.
+        </p>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="image-provider">Image Provider</label>
+          <select
+            id="image-provider"
+            className={styles.select}
+            value={proImageProvider}
+            onChange={(e) => handleImageProviderChange(e.target.value)}
+          >
+            {imageProviders.map((p) => (
+              <option key={p.id} value={p.id}>{p.displayName}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="image-model">Default Image Model</label>
+          <select
+            id="image-model"
+            className={styles.select}
+            value={proImageModel}
+            onChange={(e) => setProImageModel(e.target.value)}
+          >
+            {proImageModels.map((m) => (
+              <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
+            ))}
+          </select>
+        </div>
+      </fieldset>
+
+      <IncludedModelsEditor
+        title="Included Image Models"
+        description="Control which image models are available for video generation. Only relevant for Pro users."
+        providers={imageProviders}
+        freeIncluded={new Set()}
+        proIncluded={proIncludedImage}
+        freeDefault=""
+        proDefault={`${proImageProvider}:${proImageModel}`}
+        compositeIds
+        onFreeChange={() => {}}
+        onProChange={imageHandlers.onProChange}
+        onClear={imageHandlers.onClear}
       />
 
       <fieldset className={styles.section}>
