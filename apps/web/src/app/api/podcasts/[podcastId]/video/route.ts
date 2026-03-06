@@ -5,7 +5,8 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { checkVideoGenerationGate } from '@/lib/video-gate';
 import { generateVideoSchema } from '@/lib/validations';
-import { addJob, JobType, visualClassificationQueue } from '@/lib/queue';
+import { Prisma } from '@prisma/client';
+import { addJob, JobType, visualClassificationQueue, visualGenerationQueue, videoCompositionQueue } from '@/lib/queue';
 import { deleteFile, extractR2Key } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 
@@ -55,11 +56,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
   // Parse optional body
   let imageModel: string | undefined;
+  let pipeline: {
+    version: 1;
+    defaultImageModel: string;
+    defaultVideoModel: string;
+    segments: Array<{
+      segmentId: string;
+      order: number;
+      visualType: string;
+      visualMode: 'image' | 'video' | 'programmatic';
+      model: string | null;
+      prompt: string | null;
+      metadata: Record<string, unknown> | null;
+    }>;
+  } | undefined;
+
   try {
     const body = await request.json();
     const parsed = generateVideoSchema.safeParse(body);
     if (parsed.success && parsed.data) {
       imageModel = parsed.data.imageModel;
+      pipeline = parsed.data.pipeline;
     }
   } catch {
     // No body — use defaults
@@ -95,15 +112,71 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       podcastId,
       status: 'PENDING',
       imageModel: imageModel ?? null,
+      pipelineJson: pipeline ? (pipeline as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
 
-  // Queue classification
-  await addJob(visualClassificationQueue, JobType.CLASSIFY_VISUALS, {
-    podcastId,
-    videoGenerationId: videoGeneration.id,
-    userId: authResult.userId,
-  });
+  if (pipeline) {
+    // Pipeline-driven: create SegmentVisuals directly, skip classification
+    const EXTERNAL_MODES = new Set(['image', 'video']);
+
+    await prisma.segmentVisual.createMany({
+      data: pipeline.segments.map((seg) => ({
+        videoGenerationId: videoGeneration.id,
+        segmentId: seg.segmentId,
+        order: seg.order,
+        visualType: seg.visualType as 'AI_ILLUSTRATION' | 'STOCK_FOOTAGE' | 'DATA_CHART' | 'QUOTE' | 'COMPARISON' | 'TIMELINE' | 'DIAGRAM' | 'TEXT_CARD',
+        visualMode: seg.visualMode,
+        videoModel: seg.visualMode === 'video' ? seg.model : null,
+        prompt: seg.prompt,
+        metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+        status: EXTERNAL_MODES.has(seg.visualMode) ? 'pending' : 'ready',
+      })),
+    });
+
+    await prisma.videoGeneration.update({
+      where: { id: videoGeneration.id },
+      data: { status: 'GENERATING_VISUALS' },
+    });
+
+    const externals = pipeline.segments.filter((s) => EXTERNAL_MODES.has(s.visualMode));
+
+    if (externals.length > 0) {
+      const visuals = await prisma.segmentVisual.findMany({
+        where: { videoGenerationId: videoGeneration.id },
+        select: { id: true, segmentId: true, visualType: true, prompt: true, metadata: true },
+      });
+      const visualBySegment = new Map(visuals.map((v) => [v.segmentId, v]));
+
+      for (const ext of externals) {
+        const visual = visualBySegment.get(ext.segmentId);
+        if (!visual) continue;
+
+        await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+          podcastId,
+          videoGenerationId: videoGeneration.id,
+          segmentVisualId: visual.id,
+          visualType: visual.visualType,
+          prompt: visual.prompt ?? '',
+          metadata: (visual.metadata as Record<string, unknown>) ?? {},
+        });
+      }
+    } else {
+      await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+        podcastId,
+        videoGenerationId: videoGeneration.id,
+      });
+    }
+
+    logger.info('Video generation started from pipeline', { podcastId, segmentCount: String(pipeline.segments.length) });
+  } else {
+    // Legacy: queue classification worker
+    await addJob(visualClassificationQueue, JobType.CLASSIFY_VISUALS, {
+      podcastId,
+      videoGenerationId: videoGeneration.id,
+      userId: authResult.userId,
+    });
+  }
 
   return NextResponse.json({
     videoGenerationId: videoGeneration.id,

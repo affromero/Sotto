@@ -102,6 +102,7 @@ All shared business logic and external service integrations live here.
 | `visual-classifier.ts` | Claude Haiku-based batch segment classification: assigns visual type + prompt/metadata per segment (8 types: ai-illustration, stock-footage, data-chart, quote, comparison, timeline, diagram, text-card) | Uses `llm.ts` |
 | `stock-footage.ts` | Pexels Video API search + download: returns stock video clips for STOCK_FOOTAGE segments, falls back to TEXT_CARD if no results | Pexels API |
 | `video-gate.ts` | PRO/admin feature gate for video generation: checks user plan, role, and fal key availability (BYOK or platform FAL_KEY) | Uses `prisma.ts` |
+| `video-cost-estimator.ts` | Pricetoken-based cost calculation for video pipeline: `estimateSegmentCost()`, `estimatePipelineCost()`, `formatCost()`, `fetchFalImageModels()`, `fetchFalVideoModels()`, `cheapestModel()` — live pricing via `PriceTokenClient` | pricetoken API |
 
 ## Hooks (`src/lib/hooks/`)
 
@@ -138,6 +139,8 @@ Modular provider architecture — swap external services via env vars.
 | `image.ts` | `ImageProvider` | `resolveImageProvider()`: fal.ai FLUX image generation (Schnell, 1.1 Pro, 2 Pro) for video pipeline AI illustrations | `FAL_KEY` |
 | `image-registry.ts` | `ImageProviderMeta` | Fal provider metadata: model catalog, costs, auth validation | — |
 | `image/fal.provider.ts` | `ImageProvider` | Fal FLUX implementation: generate image from prompt, configurable model/resolution | Fal API |
+| `image/fal-video.ts` | — | Fal video generation (text-to-video) via async queue API with polling | Fal API |
+| `fal-endpoints.ts` | — | Pricetoken model ID → Fal REST API endpoint mapping (image + video + legacy) | Pure utility |
 | `ml.ts` | `MLProvider` | `SottoMLProvider`: pgvector similarity, multi-signal scoring (relevance, collaborative, quality, freshness, novelty) | — |
 | `storage.ts` | `StorageProvider` | `R2Provider`, `S3Provider`, `LocalProvider` | `STORAGE_PROVIDER` |
 | `index.ts` | `Providers` | `getProviders()` singleton factory | — |

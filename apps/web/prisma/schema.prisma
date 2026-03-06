@@ -2049,6 +2049,7 @@ model VideoGeneration {
   height         Int         @default(720)
   imageProvider  String?     // null = auto (fal)
   imageModel     String?     // e.g. 'flux-schnell', 'flux-1.1-pro', 'flux-2-pro'
+  pipelineJson   Json?       // Approved pipeline editor state
   failureReason  String?     @db.Text
   technicalError String?     @db.Text
   createdAt      DateTime    @default(now())
@@ -2068,6 +2069,8 @@ model SegmentVisual {
   visualType        VisualType
   prompt            String?    @db.Text
   metadata          Json?      // type-specific: chart data, quote text, timeline events, etc.
+  visualMode        String?    // 'image' | 'video' | 'programmatic'
+  videoModel        String?    // pricetoken model ID for video mode
   assetUrl          String?    // R2 URL of generated image/video
   assetType         String?    // 'image/png' | 'video/mp4'
   status            String     @default("pending") // pending | generating | ready | failed

@@ -58,8 +58,10 @@ import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
+import { PipelineEditor } from '@/components/player/PipelineEditor';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
+import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
 import type { PodcastStatus } from '@prisma/client';
 import { profileUrl } from '@/lib/urls';
 import styles from './page.module.css';
@@ -184,6 +186,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [pipelineData, setPipelineData] = useState<VideoPipeline | null>(null);
+  const [showPipelineEditor, setShowPipelineEditor] = useState(false);
+  const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
+  const [pipelineLoading, setPipelineLoading] = useState(false);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -312,27 +318,57 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   }, [videoUrl, viewMode]);
 
   const handleGenerateVideo = useCallback(async () => {
-    setVideoLoading(true);
+    setPipelineLoading(true);
     setVideoError(null);
     try {
-      const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
-        method: 'POST',
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        setVideoError(err.error || 'Failed to start video generation.');
-        setVideoLoading(false);
+      const [pipelineRes, modelsRes] = await Promise.all([
+        fetch(`/api/podcasts/${podcast.id}/video/pipeline`, { method: 'POST' }),
+        fetch('/api/fal-models'),
+      ]);
+      if (!pipelineRes.ok) {
+        const err = await pipelineRes.json().catch(() => ({}));
+        setVideoError(err.error || 'Failed to create pipeline.');
         return;
       }
-      const data = await res.json();
-      setVideoGenerationId(data.videoGenerationId);
-      setVideoState('generating');
+      if (!modelsRes.ok) {
+        setVideoError('Failed to load available models.');
+        return;
+      }
+      const pipeline: VideoPipeline = await pipelineRes.json();
+      const models: FalModelsResponse = await modelsRes.json();
+      setPipelineData(pipeline);
+      setFalModels(models);
+      setShowPipelineEditor(true);
     } catch {
-      setVideoError('Failed to start video generation.');
+      setVideoError('Failed to create pipeline.');
     } finally {
-      setVideoLoading(false);
+      setPipelineLoading(false);
     }
   }, [podcast.id]);
+
+  const handlePipelineApprove = useCallback(
+    async (pipeline: VideoPipeline) => {
+      setShowPipelineEditor(false);
+      setVideoState('generating');
+      setVideoLoading(true);
+      try {
+        const res = await fetch(`/api/podcasts/${podcast.id}/video`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pipeline }),
+        });
+        if (!res.ok) throw new Error('Failed to start video generation');
+        const data = await res.json();
+        setVideoGenerationId(data.videoGenerationId);
+      } catch (err) {
+        setVideoState('failed');
+        setVideoError(err instanceof Error ? err.message : 'Generation failed');
+      } finally {
+        setVideoLoading(false);
+      }
+    },
+    [podcast.id],
+  );
 
   const handleLike = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -737,12 +773,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Video Section */}
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
-          {videoState === 'idle' && (
+          {videoState === 'idle' && !showPipelineEditor && (
             <div className={styles.videoIdle}>
               <Button
                 onClick={handleGenerateVideo}
-                loading={videoLoading}
-                disabled={videoLoading || !canGenerateVideo}
+                loading={pipelineLoading || videoLoading}
+                disabled={pipelineLoading || videoLoading || !canGenerateVideo}
               >
                 <Video size={16} />
                 Generate Video
@@ -752,6 +788,19 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               )}
               {videoError && <p className={styles.videoError}>{videoError}</p>}
             </div>
+          )}
+          {showPipelineEditor && pipelineData && falModels && (
+            <PipelineEditor
+              podcastId={podcast.id}
+              podcastTitle={podcast.title}
+              pipeline={pipelineData}
+              falModels={falModels}
+              onApprove={handlePipelineApprove}
+              onCancel={() => {
+                setShowPipelineEditor(false);
+                setPipelineData(null);
+              }}
+            />
           )}
           {videoState === 'generating' && videoGenerationId && (
             <VideoProgress
