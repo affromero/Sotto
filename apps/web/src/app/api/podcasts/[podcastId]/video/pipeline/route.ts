@@ -12,6 +12,8 @@ import {
   fetchFalVideoModels,
   cheapestModel,
 } from '@/lib/video-cost-estimator';
+import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import { getAiKey } from '@/lib/byok';
 import type { PipelineSegmentNode, VisualMode, VideoPipeline } from '@/types/pipeline';
 import { logger } from '@/lib/logger';
 
@@ -62,6 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       status: true,
       title: true,
       topic: true,
+      aiModel: true,
       segments: {
         orderBy: { order: 'asc' },
         select: { id: true, order: true, speaker: true, text: true, duration: true },
@@ -87,8 +90,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }));
 
   try {
+    const [aiKey, user] = await Promise.all([
+      getAiKey(auth.userId),
+      prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, select: { plan: true } }),
+    ]);
+    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
+      podcastAiModel: podcast.aiModel,
+      aiKey,
+      plan: user.plan as 'FREE' | 'PRO',
+    });
+
     const [{ classifications }, imageModels, videoModels] = await Promise.all([
-      classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic),
+      classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic, {
+        provider: aiProvider,
+        model: aiModel,
+        apiKeyOverride: aiKey?.apiKey,
+      }),
       fetchFalImageModels(),
       fetchFalVideoModels(),
     ]);
@@ -136,7 +153,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Failed to create video pipeline', { podcastId, error: message });
-    return errorResponse(`Pipeline creation failed: ${message}`, 500);
+    return errorResponse(
+      isAdmin ? `Pipeline creation failed: ${message}` : 'Pipeline creation failed. Please try again later.',
+      500,
+    );
   }
 }
 
