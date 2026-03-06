@@ -358,4 +358,40 @@ describe('PATCH /api/admin/auto-models', () => {
       'admin-1'
     );
   });
+
+  it('accepts image model config in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        proImageProvider: 'fal',
+        proImageModel: 'flux-schnell',
+        proIncludedImageModels: ['fal:flux-schnell', 'fal:flux-2-pro'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        proImageProvider: 'fal',
+        proImageModel: 'flux-schnell',
+        proIncludedImageModels: ['fal:flux-schnell', 'fal:flux-2-pro'],
+      },
+      'admin-1'
+    );
+  });
+
+  it('accepts null to clear image included model overrides', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({ proIncludedImageModels: null })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      { proIncludedImageModels: null },
+      'admin-1'
+    );
+  });
 });
