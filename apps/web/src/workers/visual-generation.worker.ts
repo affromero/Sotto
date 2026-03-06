@@ -1,4 +1,5 @@
 import { Job } from 'bullmq';
+import { fetchFalVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
   addJob,
@@ -8,6 +9,8 @@ import {
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
 import { getImageModelCost } from '@/lib/providers/image-registry';
+import { generateFalVideo } from '@/lib/providers/image/fal-video';
+import { getByokKey } from '@/lib/byok';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -95,15 +98,53 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       service = 'pexels';
       totalCost = 0; // Free
     } else {
-      // Should not reach here — programmatic types are marked ready in classification
-      logger.warn('Unexpected visual type in generation worker', { visualType, segmentVisualId });
-      await prisma.segmentVisual.update({
+      // Check if this is a video-mode segment (from pipeline editor)
+      const visual = await prisma.segmentVisual.findUnique({
         where: { id: segmentVisualId },
-        data: { status: 'ready' },
+        select: { visualMode: true, videoModel: true },
       });
-      await checkAllReady(videoGenerationId, podcastId);
-      await job.updateProgress(100);
-      return;
+
+      if (visual?.visualMode === 'video' && visual.videoModel) {
+        const podcast = await prisma.podcast.findUniqueOrThrow({
+          where: { id: podcastId },
+          select: { userId: true },
+        });
+        const falKey = await getByokKey(podcast.userId, 'fal');
+        const apiKey = falKey || process.env.FAL_KEY;
+        if (!apiKey) throw new Error('No Fal API key for video generation');
+
+        const segment = await prisma.segment.findFirst({
+          where: { podcastId },
+          orderBy: { order: 'asc' },
+          select: { duration: true },
+        });
+
+        assetBuffer = await generateFalVideo({
+          apiKey,
+          model: visual.videoModel,
+          prompt,
+          duration: segment?.duration ?? 5,
+        });
+        assetType = 'video/mp4';
+        assetExt = 'mp4';
+        service = falKey ? 'fal_byok' : 'fal';
+
+        const videoModels = await fetchFalVideoModels();
+        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
+        if (pricing) {
+          totalCost = ((segment?.duration ?? 5) / 60) * pricing.costPerMinute;
+        }
+      } else {
+        // Should not reach here — programmatic types are marked ready in classification
+        logger.warn('Unexpected visual type in generation worker', { visualType, segmentVisualId });
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: { status: 'ready' },
+        });
+        await checkAllReady(videoGenerationId, podcastId);
+        await job.updateProgress(100);
+        return;
+      }
     }
 
     await job.updateProgress(70);

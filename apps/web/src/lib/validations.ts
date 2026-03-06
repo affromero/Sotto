@@ -627,9 +627,29 @@ export const regenerateWithFeedbackSchema = z.object({
 /**
  * Video generation request validation
  */
-export const generateVideoSchema = z.object({
-  imageModel: z.string().optional(),
-}).optional();
+export const generateVideoSchema = z
+  .object({
+    imageModel: z.string().optional(),
+    pipeline: z
+      .object({
+        version: z.literal(1),
+        defaultImageModel: z.string(),
+        defaultVideoModel: z.string(),
+        segments: z.array(
+          z.object({
+            segmentId: z.string(),
+            order: z.number(),
+            visualType: z.string(),
+            visualMode: z.enum(['image', 'video', 'programmatic']),
+            model: z.string().nullable(),
+            prompt: z.string().nullable(),
+            metadata: z.record(z.unknown()).nullable(),
+          }),
+        ),
+      })
+      .optional(),
+  })
+  .optional();
 
 /**
  * AI-generated script validation — applied after JSON parse in script-generator

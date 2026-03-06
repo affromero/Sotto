@@ -1,0 +1,90 @@
+import { describe, it, expect } from 'vitest';
+import type { PipelineSegmentNode } from '@/types/pipeline';
+import type { ImageModelCostInfo, VideoModelCostInfo } from '@/lib/video-cost-estimator';
+import { estimateSegmentCost, estimatePipelineCost, formatCost } from '@/lib/video-cost-estimator';
+
+const MOCK_IMAGE_MODELS: ImageModelCostInfo[] = [
+  { modelId: 'fal-recraft-v3', pricePerImage: 0.02 },
+  { modelId: 'fal-flux-2-pro', pricePerImage: 0.04 },
+];
+
+const MOCK_VIDEO_MODELS: VideoModelCostInfo[] = [
+  { modelId: 'fal-wan2.5-480p', costPerMinute: 3, maxDuration: 5 },
+  { modelId: 'fal-veo3-fast-1080p', costPerMinute: 6, maxDuration: 8 },
+];
+
+function makeSegment(overrides: Partial<PipelineSegmentNode> = {}): PipelineSegmentNode {
+  return {
+    segmentId: 'seg-1',
+    order: 0,
+    speaker: 'Host',
+    text: 'Hello world',
+    duration: 5,
+    visualType: 'AI_ILLUSTRATION',
+    visualMode: 'image',
+    model: 'fal-flux-2-pro',
+    prompt: 'A test prompt',
+    metadata: null,
+    estimatedCost: 0,
+    ...overrides,
+  };
+}
+
+describe('estimateSegmentCost', () => {
+  it('returns 0 for programmatic segments', () => {
+    const seg = makeSegment({ visualMode: 'programmatic', model: null, visualType: 'TEXT_CARD' });
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBe(0);
+  });
+
+  it('returns 0 when model is null', () => {
+    const seg = makeSegment({ model: null });
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBe(0);
+  });
+
+  it('calculates image cost from model pricing', () => {
+    const seg = makeSegment({ visualMode: 'image', model: 'fal-flux-2-pro' });
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBe(0.04);
+  });
+
+  it('calculates video cost proportional to duration', () => {
+    const seg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 5 });
+    // 5s capped at maxDuration=5, cost = (5/60) * 3 = 0.25
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.25);
+  });
+
+  it('returns 0 for unknown model ID', () => {
+    const seg = makeSegment({ model: 'nonexistent-model-xyz' });
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBe(0);
+  });
+});
+
+describe('estimatePipelineCost', () => {
+  it('sums costs across mixed modes', () => {
+    const imgSeg = makeSegment({ visualMode: 'image', model: 'fal-flux-2-pro' });
+    const progSeg = makeSegment({ visualMode: 'programmatic', model: null, visualType: 'QUOTE' });
+    const vidSeg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 3 });
+
+    const total = estimatePipelineCost([imgSeg, progSeg, vidSeg], MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS);
+    const expectedImg = 0.04;
+    const expectedVid = (3 / 60) * 3; // 3s, $3/min
+    expect(total).toBeCloseTo(expectedImg + 0 + expectedVid);
+  });
+});
+
+describe('formatCost', () => {
+  it('returns "Free" for zero', () => {
+    expect(formatCost(0)).toBe('Free');
+  });
+
+  it('formats small costs with 4 decimals', () => {
+    expect(formatCost(0.0025)).toBe('$0.0025');
+  });
+
+  it('formats medium costs with 3 decimals', () => {
+    expect(formatCost(0.04)).toBe('$0.040');
+  });
+
+  it('formats large costs with 2 decimals', () => {
+    expect(formatCost(1.5)).toBe('$1.50');
+  });
+});
