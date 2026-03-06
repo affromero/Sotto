@@ -1,4 +1,4 @@
-import { Queue, Worker, Job, QueueEvents } from 'bullmq';
+import { ConnectionOptions, Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { createRedisConnection } from './redis';
 import { logger } from './logger';
 import { prismaUnfiltered as prisma } from './prisma';
@@ -298,7 +298,7 @@ export function createQueue(
     return queueInstances.get(name)!;
   }
 
-  const connection = createRedisConnection(`queue:${name}`);
+  const connection = createRedisConnection(`queue:${name}`) as unknown as ConnectionOptions;
   const mergedConfig = { ...DEFAULT_QUEUE_OPTIONS, ...config };
 
   const queue = new Queue(name, {
@@ -323,7 +323,7 @@ export function createQueue(
 
 function setupQueueEvents(queue: Queue, queueName: string): void {
   const events = new QueueEvents(queueName, {
-    connection: createRedisConnection(`events:${queueName}`),
+    connection: createRedisConnection(`events:${queueName}`) as unknown as ConnectionOptions,
   });
 
   events.on('completed', (args) => {
@@ -661,7 +661,7 @@ export function createWorker<T>(
   processor: (job: Job<T>) => Promise<unknown>,
   config?: { concurrency?: number; lockDuration?: number }
 ): Worker<T> {
-  const connection = createRedisConnection(`worker:${queueName}`);
+  const connection = createRedisConnection(`worker:${queueName}`) as unknown as ConnectionOptions;
 
   const worker = new Worker<T>(queueName, processor, {
     connection,
