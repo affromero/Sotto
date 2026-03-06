@@ -5,12 +5,7 @@
 import { logger } from '../../logger';
 import type { ImageProvider } from '../image';
 import type { ImageProviderId } from '../image-registry';
-
-const MODEL_ENDPOINTS: Record<string, string> = {
-  'flux-schnell': 'fal-ai/flux/schnell',
-  'flux-1.1-pro': 'fal-ai/flux-pro/v1.1',
-  'flux-2-pro': 'fal-ai/flux-pro/v2',
-};
+import { getFalImageEndpoint } from '../fal-endpoints';
 
 interface FalImageResponse {
   images: Array<{ url: string; content_type: string }>;
@@ -31,9 +26,9 @@ export class FalImageProvider implements ImageProvider {
   }
 
   async generateImage(params: { prompt: string; width?: number; height?: number }): Promise<Buffer> {
-    const endpoint = MODEL_ENDPOINTS[this.model];
+    const endpoint = getFalImageEndpoint(this.model);
     if (!endpoint) {
-      throw new Error(`Unknown fal image model: ${this.model}`);
+      throw new Error(`No Fal endpoint for image model: ${this.model}`);
     }
 
     const width = params.width ?? 1280;
