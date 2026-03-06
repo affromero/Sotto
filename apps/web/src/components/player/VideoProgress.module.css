@@ -42,9 +42,72 @@
   transition: width 400ms ease;
 }
 
+.progressBarIndeterminate {
+  position: relative;
+}
+
+.progressFillIndeterminate {
+  height: 100%;
+  width: 30%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(233%); }
+  100% { transform: translateX(-100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .progressFill {
     transition: none;
+  }
+
+  .progressFillIndeterminate {
+    animation: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}
+
+/* Counter */
+
+.counter {
+  font: var(--text-body-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.counterFailed {
+  color: var(--color-error);
+}
+
+/* Sub-message */
+
+.subMessage {
+  font: var(--text-caption);
+  color: var(--color-text-tertiary);
+  margin: 0;
+  animation: fadeSlideIn 0.5s ease-out;
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .subMessage {
+    animation: none;
   }
 }
 
@@ -99,64 +162,213 @@
   font-weight: 600;
 }
 
-/* Segment visual chips */
+/* Filmstrip */
 
-.visuals {
+.filmstrip {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
 }
 
-.visualsLabel {
+.filmstripLabel {
   font: var(--text-caption);
   color: var(--color-text-tertiary);
 }
 
-.visualsList {
+.filmstripTrack {
   display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--spacing-xs);
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
-.visualChip {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
+.filmstripTrack::-webkit-scrollbar {
+  height: 4px;
+}
+
+.filmstripTrack::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.filmstripTrack::-webkit-scrollbar-thumb {
   background: var(--color-border);
-  transition: background 300ms ease;
+  border-radius: var(--radius-full);
+}
+
+/* Thumbnail */
+
+.thumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 120px;
+  height: 80px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-background);
+  border: 2px solid var(--color-border);
+  transition: border-color 300ms ease;
+}
+
+.thumbPending {
+  border-color: var(--color-border);
+}
+
+.thumbGenerating {
+  border-color: var(--color-primary);
+  animation: thumbPulse 2s ease-in-out infinite;
+}
+
+@keyframes thumbPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(217, 119, 6, 0.15); }
+}
+
+.thumbReady {
+  border-color: var(--color-success);
+}
+
+.thumbFailed {
+  border-color: var(--color-error);
+  opacity: 0.6;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visualChip {
+  .thumb {
     transition: none;
+  }
+
+  .thumbGenerating {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.3);
   }
 }
 
-.visual_pending {
-  background: var(--color-border);
+.thumbImage {
+  object-fit: cover;
+  animation: thumbFadeIn 0.5s ease-out;
 }
 
-.visual_generating {
-  background: var(--color-primary);
+@keyframes thumbFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
-.visual_ready {
-  background: var(--color-success);
+@media (prefers-reduced-motion: reduce) {
+  .thumbImage {
+    animation: none;
+  }
 }
 
-.visual_failed {
-  background: var(--color-error);
+.thumbPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--color-text-tertiary);
 }
 
-/* Error message */
+.thumbLabel {
+  font-size: 9px;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4px;
+}
 
-.error {
-  font: var(--text-body-sm);
-  color: var(--color-error);
+.thumbOrder {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-text-tertiary);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+
+/* Error + retry */
+
+.errorBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   padding: var(--spacing-sm);
   background: var(--color-error-lighter);
   border-radius: var(--radius-md);
 }
+
+.errorMessage {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  color: var(--color-error);
+}
+
+.errorMessage p {
+  font: var(--text-body-sm);
+  margin: 0;
+  word-break: break-word;
+}
+
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  align-self: flex-start;
+  padding: 6px 12px;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-surface);
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.retryButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.retryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.retrySpinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retrySpinning {
+    animation: none;
+  }
+}
+
+/* Mobile */
 
 @media (max-width: 599px) {
   .root {
@@ -166,5 +378,19 @@
   .stages {
     flex-direction: column;
     gap: var(--spacing-sm);
+  }
+
+  .thumb {
+    width: 80px;
+    height: 60px;
+  }
+
+  .thumbLabel {
+    font-size: 8px;
+  }
+
+  .thumbPlaceholder svg {
+    width: 16px;
+    height: 16px;
   }
 }
