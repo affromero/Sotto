@@ -56,11 +56,21 @@ vi.mock('pricetoken', () => ({
       ]);
     }
   },
+  STATIC_PRICING: [],
+  STATIC_IMAGE_PRICING: [
+    { modelId: 'fal-recraft-v3', provider: 'fal', displayName: 'fal Recraft V3', pricePerImage: 0.02, defaultResolution: '1024x1024', qualityTier: 'standard' },
+    { modelId: 'fal-flux-2-pro', provider: 'fal', displayName: 'fal FLUX 2 Pro', pricePerImage: 0.04, defaultResolution: '1024x1024', qualityTier: 'standard' },
+  ],
+  STATIC_VIDEO_PRICING: [
+    { modelId: 'fal-wan2.5-480p', provider: 'fal', displayName: 'FAL WAN 2.5 480p', costPerMinute: 3, maxDuration: 5, resolution: '480p', qualityMode: 'standard' },
+  ],
 }));
 
 vi.mock('@/lib/providers/fal-endpoints', () => ({
   getFalImageEndpoint: (id: string) => (id.startsWith('fal-') ? `fal-ai/${id}` : null),
   getFalVideoEndpoint: (id: string) => (id.startsWith('fal-') ? `fal-ai/${id}` : null),
+  FAL_IMAGE_MODEL_IDS: new Set(['fal-recraft-v3', 'fal-flux-2-pro']),
+  FAL_VIDEO_MODEL_IDS: new Set(['fal-wan2.5-480p']),
 }));
 
 vi.mock('@/lib/logger', () => ({

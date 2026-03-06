@@ -1,5 +1,19 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { PipelineSegmentNode } from '@/types/pipeline';
+
+vi.mock('pricetoken', () => ({
+  PriceTokenClient: class {
+    async getImagePricing() { return []; }
+    async getVideoPricing() { return []; }
+  },
+  STATIC_IMAGE_PRICING: [],
+  STATIC_VIDEO_PRICING: [],
+}));
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 import type { ImageModelCostInfo, VideoModelCostInfo } from '@/lib/video-cost-estimator';
 import { estimateSegmentCost, estimatePipelineCost, formatCost } from '@/lib/video-cost-estimator';
 
