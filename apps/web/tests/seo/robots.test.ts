@@ -29,8 +29,8 @@ describe('robots.ts', () => {
     expect(disallowed).toContain('/onboarding');
     expect(disallowed).toContain('/team');
     expect(disallowed).toContain('/pitch');
-    expect(disallowed).toContain('/profile/');
     expect(disallowed).toContain('/_next/');
+    expect(disallowed).not.toContain('/profile/');
   });
 
   it('blocks GPTBot from all paths', () => {
