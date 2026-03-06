@@ -282,6 +282,8 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           visualType: true,
           status: true,
           assetUrl: true,
+          order: true,
+          visualMode: true,
         },
         orderBy: { order: 'asc' },
       },
