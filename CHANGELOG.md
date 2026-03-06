@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.9] - 2026-03-07
+
+### Added
+- Dynamic FAL model pricing — image and video model catalog now fetched live from PriceToken API with 5-minute cache and static SDK fallback
+- Filmstrip progress UI — replaces chip grid with live visual previews during video generation
+- Video pipeline resume — failed video generations resume from last checkpoint instead of restarting
+
+### Fixed
+- Video pipeline error handling — catch and surface descriptive errors instead of silent failures
+- Video GET response now includes segment order and visual mode
+
 ## [0.2.3] - 2026-03-06
 
 ### Added
