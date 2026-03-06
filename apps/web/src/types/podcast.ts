@@ -83,6 +83,7 @@ export interface PodcastDetail extends PodcastSummary {
   interactions: InteractionSummary[];
   references: ReferenceData[];
   pdfUrl: string | null;
+  videoUrl: string | null;
   isLiked: boolean;
   isSaved: boolean;
   voiceTracks: VoiceTrackSummary[];
