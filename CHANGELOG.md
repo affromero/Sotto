@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.3] - 2026-03-06
+
+### Added
+- Video tab — third tab alongside Transcript/Teleprompter when a podcast has a generated video
+  - Muted video synced with audio player (drift correction > 0.3s)
+  - Live subtitle overlay with speaker-colored badges and citation parsing
+  - Visible to all users (not just owners)
+- Admin Auto Models — Image/Video provider section for configuring default image model used in video generation
+
+### Changed
+- Extract `findActiveIndex` to shared `segment-utils.ts` (used by Teleprompter and VideoView)
+
 ## [0.2.0] - 2026-03-05
 
 ### Added
