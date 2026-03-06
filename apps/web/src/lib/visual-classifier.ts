@@ -45,7 +45,7 @@ const classificationItemSchema = z.object({
     'TEXT_CARD',
   ]),
   prompt: z.string().nullable(),
-  metadata: z.record(z.unknown()).nullable(),
+  metadata: z.union([z.record(z.unknown()), z.string(), z.null()]),
 });
 
 const classificationSchema = z.object({
@@ -74,7 +74,8 @@ RULES:
 7. Use TEXT_CARD as a general fallback for explanatory content.
 8. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
 
-Return JSON: { "segments": [{ "order": number, "visualType": string, "prompt": string|null, "metadata": object|null }] }`;
+Return JSON: { "segments": [{ "order": number, "visualType": string, "prompt": string|null, "metadata": string|null }] }
+For metadata, return a JSON-encoded string (e.g. "{\"chartType\":\"bar\",\"title\":\"Revenue\"}"), not a raw object. Return null if no metadata is needed.`;
 
 export async function classifySegmentVisuals(
   segments: SegmentInput[],
@@ -107,18 +108,20 @@ Classify each segment with a visual type. Return JSON only.`;
         name: 'visual_classification',
         schema: {
           type: 'object',
+          additionalProperties: false,
           properties: {
             segments: {
               type: 'array',
               items: {
                 type: 'object',
+                additionalProperties: false,
                 properties: {
                   order: { type: 'number' },
                   visualType: { type: 'string' },
-                  prompt: { type: ['string', 'null'] },
-                  metadata: { type: ['object', 'null'] },
+                  prompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                  metadata: { anyOf: [{ type: 'string' }, { type: 'null' }] },
                 },
-                required: ['order', 'visualType'],
+                required: ['order', 'visualType', 'prompt', 'metadata'],
               },
             },
           },
@@ -148,17 +151,25 @@ Classify each segment with a visual type. Return JSON only.`;
     };
   }
 
-  // Map classified segments back to segment IDs
+  // Map classified segments back to segment IDs, parsing stringified metadata
   const orderToId = new Map(segments.map((s) => [s.order, s.segmentId]));
   const classifications: ClassifiedSegment[] = parsed.segments
     .filter((c) => orderToId.has(c.order))
-    .map((c) => ({
-      segmentId: orderToId.get(c.order)!,
-      order: c.order,
-      visualType: c.visualType,
-      prompt: c.prompt,
-      metadata: c.metadata,
-    }));
+    .map((c) => {
+      let metadata: Record<string, unknown> | null = null;
+      if (typeof c.metadata === 'string') {
+        try { metadata = JSON.parse(c.metadata); } catch { metadata = null; }
+      } else if (c.metadata && typeof c.metadata === 'object') {
+        metadata = c.metadata as Record<string, unknown>;
+      }
+      return {
+        segmentId: orderToId.get(c.order)!,
+        order: c.order,
+        visualType: c.visualType,
+        prompt: c.prompt,
+        metadata,
+      };
+    });
 
   // Fill in any segments that Claude missed
   for (const seg of segments) {
