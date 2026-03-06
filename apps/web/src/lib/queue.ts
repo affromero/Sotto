@@ -431,6 +431,73 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
+      // Handle video pipeline failures separately — podcast is already READY
+      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition'];
+      if (VIDEO_QUEUES.includes(queueName)) {
+        const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
+        if (!videoGenerationId) return;
+
+        const maxAttempts = job?.opts?.attempts ?? 3;
+        const isTerminal = job?.attemptsMade != null && job.attemptsMade >= maxAttempts;
+        if (!isTerminal) return;
+
+        const descriptive = `[${queueName}] ${args.failedReason || 'Unknown error'}`;
+        await prisma.videoGeneration.update({
+          where: { id: videoGenerationId },
+          data: { status: 'FAILED', failureReason: descriptive },
+        }).catch((err: unknown) => {
+          logger.error('Failed to mark VideoGeneration FAILED', { videoGenerationId, error: err instanceof Error ? err.message : String(err) });
+        });
+
+        // Notify user
+        if (notifQueue) {
+          await notifQueue.add('send_notification', {
+            userId: podcast.userId,
+            type: 'VIDEO_FAILED',
+            title: 'Video Generation Failed',
+            message: `Video generation failed: ${args.failedReason || 'Unknown error'}`,
+            data: { podcastId },
+          });
+        }
+
+        // Notify admins
+        const podcastLabel = podcast.title || podcastId;
+        const adminUsers = await prisma.user.findMany({
+          where: { role: 'ADMIN', id: { not: podcast.userId } },
+          select: { id: true, telegramChatId: true },
+        });
+        const adminMsg = `[${queueName}] ${podcastLabel} — ${errorKind}`;
+        for (const admin of adminUsers) {
+          if (notifQueue) {
+            notifQueue.add('send_notification', {
+              userId: admin.id,
+              type: 'PIPELINE_FAILURE',
+              title: 'Video Pipeline Failure',
+              message: adminMsg,
+              data: { podcastId },
+            }).catch((err: unknown) => {
+              logger.warn('Failed to queue admin video-failure notification', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+            });
+          }
+          if (admin.telegramChatId && isTelegramBotConfigured()) {
+            const errorId = `verr_${Array.from(crypto.getRandomValues(new Uint8Array(6)))
+              .map(b => b.toString(16).padStart(2, '0')).join('')}`;
+            const telegramText = [
+              `🎬 *Video Pipeline Failure*`,
+              `*Queue:* ${queueName}`,
+              `*Podcast:* ${podcastLabel}`,
+              `*Error:* ${errorKind}`,
+              `*Ref:* \`${errorId}\``,
+              `\`${(args.failedReason || 'Unknown').substring(0, 500)}\``,
+            ].join('\n');
+            sendTelegram(admin.telegramChatId, telegramText, { parse_mode: 'Markdown' }).catch((err: unknown) => {
+              logger.warn('Failed to send admin video-failure Telegram', { adminId: admin.id, error: err instanceof Error ? err.message : String(err) });
+            });
+          }
+        }
+        return;
+      }
+
       // Handle interaction failures separately — podcast is already READY
       if (queueName === 'interactions') {
         if (isKeyInvalidationError(errorKind)) {
