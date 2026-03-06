@@ -66,7 +66,9 @@
 | `/api/podcasts/[id]/comments/[cid]/replies` | GET | No | Comment replies |
 | `/api/podcasts/[id]/rating` | GET/POST | Yes | Podcast rating (creator + listener) |
 | `/api/podcasts/[id]/claims` | POST/GET | Yes | Flag/list inaccurate claims |
-| `/api/podcasts/[id]/video` | POST/GET/DELETE | Yes | Video generation: trigger, poll status, delete |
+| `/api/podcasts/[id]/video` | POST/GET/DELETE | Yes | Video generation: trigger (accepts optional pipeline JSON), poll status, delete |
+| `/api/podcasts/[id]/video/pipeline` | POST/PATCH | Yes | Pipeline editor API: POST classifies segments + returns pipeline JSON; PATCH validates + recalculates costs |
+| `/api/fal-models` | GET | Yes | Available Fal image/video models with live pricetoken pricing |
 | `/api/podcasts/[id]/export` | POST/GET | Yes | PDF export |
 | `/api/feed` | GET | No | Public feed (search/filter/sort) |
 | `/api/activity` | GET | Yes | Followed users activity |
