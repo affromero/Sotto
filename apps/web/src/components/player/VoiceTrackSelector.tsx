@@ -46,6 +46,7 @@ export function VoiceTrackSelector({
   const handleSelectOriginal = useCallback(() => {
     const currentTime = player.currentTime;
     setActiveTrackId(null);
+    player.setActiveVoiceTrackId(null);
     player.loadPodcast(podcastId, podcastAudioUrl, podcastTitle);
     setTimeout(() => player.seek(currentTime), 100);
   }, [player, podcastId, podcastAudioUrl, podcastTitle]);
@@ -54,6 +55,7 @@ export function VoiceTrackSelector({
     if (!track.audioUrl) return;
     const currentTime = player.currentTime;
     setActiveTrackId(track.id);
+    player.setActiveVoiceTrackId(track.id);
     player.loadPodcast(podcastId, track.audioUrl, podcastTitle);
     setTimeout(() => player.seek(currentTime), 100);
   }, [player, podcastId, podcastTitle]);

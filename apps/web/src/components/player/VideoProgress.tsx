@@ -12,8 +12,11 @@ interface SegmentVisual {
   id: string;
   segmentId: string;
   visualType: string;
+  prompt: string | null;
+  metadata: Record<string, unknown> | null;
   status: string;
   assetUrl: string | null;
+  assetType: string | null;
   order: number;
   visualMode: string | null;
 }
@@ -29,7 +32,7 @@ interface VideoStatusResponse {
 interface VideoProgressProps {
   podcastId: string;
   videoGenerationId: string;
-  onComplete: (videoUrl: string) => void;
+  onComplete: (visuals: SegmentVisual[]) => void;
   onFailed?: (reason: string) => void;
 }
 
@@ -155,9 +158,9 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
       if (!json.status) { schedulePoll(5000); return; }
       setData(json);
 
-      if (json.status === 'READY' && json.videoUrl && !completedRef.current) {
+      if (json.status === 'READY' && json.segmentVisuals?.length > 0 && !completedRef.current) {
         completedRef.current = true;
-        onComplete(json.videoUrl);
+        onComplete(json.segmentVisuals);
         return;
       }
 

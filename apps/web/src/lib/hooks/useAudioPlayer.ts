@@ -92,6 +92,10 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     }
   }, []);
 
+  const setActiveVoiceTrackId = useCallback((id: string | null) => {
+    setState((s) => ({ ...s, activeVoiceTrackId: id }));
+  }, []);
+
   const loadPodcast = useCallback(
     (podcastId: string, audioUrl: string, podcastTitle?: string) => {
       const audio = getAudio();
@@ -146,6 +150,7 @@ export function useAudioPlayer(): PlayerState & PlayerControls {
     setPlaybackRate,
     setVolume,
     toggleMute,
+    setActiveVoiceTrackId,
     loadPodcast,
     clearPodcast,
   };
