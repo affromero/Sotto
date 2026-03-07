@@ -55,6 +55,10 @@ export function useMapbox({
       attributionControl: false,
     });
 
+    map.on('error', (e) => {
+      console.error('[MapView] Mapbox error:', e.error?.message ?? e);
+    });
+
     map.on('load', () => {
       if (presetConfig.terrain3d) {
         map.addSource('mapbox-dem', {

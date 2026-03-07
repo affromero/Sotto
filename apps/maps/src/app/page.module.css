@@ -39,6 +39,7 @@
 
 .mapContainer {
   flex: 1;
+  height: 0;
   min-height: 500px;
   border-radius: 12px;
   overflow: hidden;
