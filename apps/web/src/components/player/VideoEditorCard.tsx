@@ -12,7 +12,7 @@ import styles from './VideoEditorCard.module.css';
 
 const VISUAL_TYPES: VisualTypeString[] = [
   'AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'DATA_CHART', 'QUOTE',
-  'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD',
+  'COMPARISON', 'TIMELINE', 'DIAGRAM', 'TEXT_CARD', 'MAP_OVERLAY',
 ];
 
 const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
@@ -24,6 +24,7 @@ const VISUAL_TYPE_LABELS: Record<VisualTypeString, string> = {
   TIMELINE: 'Timeline',
   DIAGRAM: 'Diagram',
   TEXT_CARD: 'Text Card',
+  MAP_OVERLAY: 'Map Overlay',
 };
 
 const VISUAL_TYPE_ICONS: Record<string, typeof ImageIcon> = {

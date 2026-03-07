@@ -36,6 +36,7 @@ enum VisualType {
   STOCK_FOOTAGE
   AI_ILLUSTRATION
   TEXT_CARD
+  MAP_OVERLAY
 }
 
 enum VideoStatus {

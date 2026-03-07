@@ -8,6 +8,7 @@ import { Timeline } from './Timeline';
 import { Diagram } from './Diagram';
 import { ImageSlide } from './ImageSlide';
 import { TextCard } from './TextCard';
+import { MapSlide } from './MapSlide';
 
 const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> = {
   [VisualType.DATA_CHART]: React.memo(DataChart),
@@ -18,6 +19,7 @@ const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> 
   [VisualType.AI_ILLUSTRATION]: React.memo(ImageSlide),
   [VisualType.STOCK_FOOTAGE]: React.memo(ImageSlide),
   [VisualType.TEXT_CARD]: React.memo(TextCard),
+  [VisualType.MAP_OVERLAY]: React.memo(MapSlide),
 };
 
 export function resolveSegmentComponent(
@@ -26,4 +28,4 @@ export function resolveSegmentComponent(
   return SEGMENT_MAP[visualType as VisualTypeValue] ?? TextCard;
 }
 
-export { DataChart, Quote, Comparison, Timeline, Diagram, ImageSlide, TextCard };
+export { DataChart, Quote, Comparison, Timeline, Diagram, ImageSlide, TextCard, MapSlide };

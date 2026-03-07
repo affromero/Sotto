@@ -14,7 +14,7 @@ import { getAiKey } from '@/lib/byok';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 
-const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE']);
+const EXTERNAL_ASSET_TYPES = new Set(['AI_ILLUSTRATION', 'STOCK_FOOTAGE', 'MAP_OVERLAY']);
 
 export async function processVisualClassification(job: Job<ClassifyVisualsPayload>): Promise<void> {
   const { podcastId, videoGenerationId, userId } = job.data;
