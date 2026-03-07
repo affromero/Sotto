@@ -65,6 +65,7 @@ import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
 import type { PodcastStatus } from '@prisma/client';
+import type { SegmentVisualData } from '@/lib/segment-utils';
 import { profileUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
@@ -184,15 +185,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
   );
-  const [segmentVisuals, setSegmentVisuals] = useState<Array<{
-    segmentId: string;
-    visualType: string;
-    prompt: string | null;
-    metadata: Record<string, unknown> | null;
-    assetUrl: string | null;
-    assetType: string | null;
-    order: number;
-  }>>([]);
+  const [segmentVisuals, setSegmentVisuals] = useState<SegmentVisualData[]>([]);
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
