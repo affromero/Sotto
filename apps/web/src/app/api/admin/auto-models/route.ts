@@ -43,9 +43,27 @@ const updateSchema = z.object({
   proIncludedTtsModels: includedModelsField,
   freeIncludedSttModels: includedModelsField,
   proIncludedSttModels: includedModelsField,
-  proImageProvider: z.enum(['fal']).optional(),
+  // Image
+  freeImageProvider: z.string().min(1).optional(),
+  freeImageModel: z.string().min(1).optional(),
+  proImageProvider: z.string().min(1).optional(),
   proImageModel: z.string().min(1).optional(),
+  freeIncludedImageModels: includedModelsField,
   proIncludedImageModels: includedModelsField,
+  // Video
+  freeVideoProvider: z.string().min(1).optional(),
+  freeVideoModel: z.string().min(1).optional(),
+  proVideoProvider: z.string().min(1).optional(),
+  proVideoModel: z.string().min(1).optional(),
+  freeIncludedVideoModels: includedModelsField,
+  proIncludedVideoModels: includedModelsField,
+  // Avatar
+  freeAvatarProvider: z.string().min(1).optional(),
+  freeAvatarModel: z.string().min(1).optional(),
+  proAvatarProvider: z.string().min(1).optional(),
+  proAvatarModel: z.string().min(1).optional(),
+  freeIncludedAvatarModels: includedModelsField,
+  proIncludedAvatarModels: includedModelsField,
 });
 
 export async function PATCH(request: NextRequest) {
