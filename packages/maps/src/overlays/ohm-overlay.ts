@@ -36,7 +36,27 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
 
   const filter = year != null ? { filter: yearFilter(year) } : {};
 
-  // Historical borders — thick colored lines by admin level
+  // Glow layer behind borders for visibility against satellite imagery
+  map.addLayer({
+    id: 'ohm-land-glow',
+    type: 'line',
+    source: OHM_SOURCE_ID,
+    'source-layer': 'land_ohm_lines',
+    paint: {
+      'line-color': '#FFD700',
+      'line-width': [
+        'match', ['get', 'admin_level'],
+        2, 10,
+        3, 7,
+        5,
+      ],
+      'line-opacity': 0.3,
+      'line-blur': 4,
+    },
+    ...filter,
+  });
+
+  // Historical borders — bold colored lines by admin level
   map.addLayer({
     id: 'ohm-land-lines',
     type: 'line',
@@ -45,18 +65,18 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     paint: {
       'line-color': [
         'match', ['get', 'admin_level'],
-        2, '#B22222',   // national borders — red
-        3, '#CD853F',   // provincial — tan
-        4, '#8B6914',   // regional — dark gold
-        '#8B4513',      // default — brown
+        2, '#FF4444',   // national borders — bright red
+        3, '#FFB347',   // provincial — orange
+        4, '#DAA520',   // regional — goldenrod
+        '#E8A317',      // default — amber
       ],
       'line-width': [
         'match', ['get', 'admin_level'],
-        2, 3,
-        3, 2,
-        1.5,
+        2, 4,
+        3, 3,
+        2,
       ],
-      'line-opacity': 0.85,
+      'line-opacity': 0.9,
     },
     ...filter,
   });
@@ -68,9 +88,9 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     source: OHM_SOURCE_ID,
     'source-layer': 'land_ohm_maritime',
     paint: {
-      'line-color': '#4682B4',
-      'line-width': 1.5,
-      'line-opacity': 0.6,
+      'line-color': '#60A5FA',
+      'line-width': 2,
+      'line-opacity': 0.7,
       'line-dasharray': [4, 3],
     },
     ...filter,
@@ -83,9 +103,9 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     source: OHM_SOURCE_ID,
     'source-layer': 'transport_lines',
     paint: {
-      'line-color': '#6B4423',
-      'line-width': 1.5,
-      'line-opacity': 0.6,
+      'line-color': '#D2691E',
+      'line-width': 2,
+      'line-opacity': 0.7,
       'line-dasharray': [6, 3],
     },
     ...filter,
@@ -98,9 +118,9 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     source: OHM_SOURCE_ID,
     'source-layer': 'route_lines',
     paint: {
-      'line-color': '#A0522D',
-      'line-width': 2,
-      'line-opacity': 0.5,
+      'line-color': '#FF8C00',
+      'line-width': 2.5,
+      'line-opacity': 0.6,
       'line-dasharray': [3, 2],
     },
     ...filter,
@@ -114,16 +134,16 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     'source-layer': 'land_ohm_centroids',
     layout: {
       'text-field': ['get', 'name'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 3, 11, 8, 15],
-      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 3, 13, 8, 18],
+      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
       'text-transform': 'uppercase',
-      'text-letter-spacing': 0.1,
+      'text-letter-spacing': 0.15,
       'text-allow-overlap': false,
     },
     paint: {
-      'text-color': '#8B0000',
-      'text-halo-color': 'rgba(255, 248, 230, 0.95)',
-      'text-halo-width': 2,
+      'text-color': '#FFFFFF',
+      'text-halo-color': 'rgba(139, 0, 0, 0.9)',
+      'text-halo-width': 2.5,
     },
     ...filter,
   });
@@ -136,21 +156,21 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     'source-layer': 'place_points_centroids',
     layout: {
       'text-field': ['get', 'name'],
-      'text-size': ['interpolate', ['linear'], ['zoom'], 4, 10, 10, 14],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 4, 11, 10, 15],
       'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
       'text-anchor': 'bottom',
       'text-offset': [0, -0.5],
     },
     paint: {
-      'text-color': '#3D1C00',
-      'text-halo-color': 'rgba(255, 248, 230, 0.9)',
-      'text-halo-width': 1.5,
+      'text-color': '#FFFFFF',
+      'text-halo-color': 'rgba(60, 30, 0, 0.85)',
+      'text-halo-width': 2,
     },
     ...filter,
   });
 }
 
-const OHM_LAYER_IDS = ['ohm-places', 'ohm-centroids', 'ohm-routes', 'ohm-transport', 'ohm-maritime', 'ohm-land-lines'];
+const OHM_LAYER_IDS = ['ohm-places', 'ohm-centroids', 'ohm-routes', 'ohm-transport', 'ohm-maritime', 'ohm-land-lines', 'ohm-land-glow'];
 
 export function removeOHMOverlay(map: MapboxMap): void {
   for (const id of OHM_LAYER_IDS) {
