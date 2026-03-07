@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getFreeTierStatus } from '@/lib/generation-gate';
 import { getTierFeatures } from '@/lib/tier-features';
+import { getVideoGenerationStatus } from '@/lib/video-gate';
 import { resolveAudioUrl } from '@/lib/r2';
 import type { Metadata } from 'next';
 import { PodcastPlayerView } from './PodcastPlayerView';
@@ -242,12 +243,15 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   const isOwner = userId === podcast.userId;
   const isAdmin = session?.user?.role === 'ADMIN';
   let canMakePrivate: boolean | undefined;
-  let canGenerateVideo = false;
+  let videoStatus: { dailyUsed: number; dailyLimit: number; dailyRemaining: number; resetInSeconds?: number; isByokUser: boolean; isProUser: boolean } | undefined;
   if (isOwner && userId) {
-    const freeTier = await getFreeTierStatus(userId);
+    const [freeTier, vidStatus] = await Promise.all([
+      getFreeTierStatus(userId),
+      getVideoGenerationStatus(userId),
+    ]);
     const plan = freeTier.isProUser ? 'PRO' as const : 'FREE' as const;
     canMakePrivate = getTierFeatures(plan, freeTier.isByokUser, session?.user?.role as string | undefined).privateAllowed;
-    canGenerateVideo = freeTier.isProUser || isAdmin;
+    videoStatus = vidStatus;
   }
 
   const visibility = podcast.visibility;
@@ -387,7 +391,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
         />
       )}
       <div className={styles.container}>
-        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} canGenerateVideo={canGenerateVideo} />
+        <PodcastPlayerView podcast={podcastData} isOwner={isOwner} isAdmin={isAdmin} isAuthenticated={!!userId} currentUserId={userId} canMakePrivate={canMakePrivate} videoStatus={videoStatus} />
         {!userId && podcast.visibility === 'PUBLIC' && (
           <JoinCTA creatorHandle={podcast.user.handle} creatorName={podcast.user.name} />
         )}

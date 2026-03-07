@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const mockAuthenticateRequest = vi.fn();
 const mockRequireAdmin = vi.fn();
 const mockCheckVideoGenerationGate = vi.fn();
+const mockTryIncrementVideoGeneration = vi.fn();
 const mockAddJob = vi.fn();
 
 const mockPodcastFindUnique = vi.fn();
@@ -48,6 +49,7 @@ vi.mock('@/lib/auth-guards', () => ({
 
 vi.mock('@/lib/video-gate', () => ({
   checkVideoGenerationGate: (...args: unknown[]) => mockCheckVideoGenerationGate(...args),
+  tryIncrementVideoGeneration: (...args: unknown[]) => mockTryIncrementVideoGeneration(...args),
 }));
 
 vi.mock('@/lib/validations', async () => {
@@ -103,7 +105,8 @@ describe('POST /api/podcasts/[id]/video', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockTryIncrementVideoGeneration.mockResolvedValue(true);
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY' });
     mockVideoGenFindUnique.mockResolvedValue(null);
     mockVideoGenCreate.mockResolvedValue({ id: 'vg-1', podcastId: 'pod-1', status: 'PENDING' });
@@ -167,6 +170,75 @@ describe('POST /api/podcasts/[id]/video', () => {
     expect(mockAddJob).toHaveBeenCalledWith('vis-gen-queue', 'generate_visual', expect.objectContaining({
       segmentVisualId: 'sv-1',
     }));
+  });
+
+  it('returns 429 when daily video limit is reached', async () => {
+    mockCheckVideoGenerationGate.mockResolvedValue({
+      allowed: false,
+      reason: 'daily_limit_reached',
+      dailyUsed: 1,
+      dailyLimit: 1,
+      dailyRemaining: 0,
+      resetInSeconds: 3600,
+      isByokUser: false,
+      isProUser: false,
+    });
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.code).toBe('daily_limit_reached');
+    expect(body.dailyUsed).toBe(1);
+    expect(body.resetInSeconds).toBe(3600);
+  });
+
+  it('returns 403 when no image provider available', async () => {
+    mockCheckVideoGenerationGate.mockResolvedValue({
+      allowed: false,
+      reason: 'no_image_provider',
+      dailyUsed: 0,
+      dailyLimit: 1,
+      dailyRemaining: 1,
+      isByokUser: false,
+      isProUser: false,
+    });
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe('no_image_provider');
+  });
+
+  it('returns 429 when atomic increment fails (TOCTOU race)', async () => {
+    mockTryIncrementVideoGeneration.mockResolvedValue(false);
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(429);
+  });
+
+  it('skips daily counter for BYOK users', async () => {
+    mockCheckVideoGenerationGate.mockResolvedValue({
+      allowed: true,
+      reason: 'ok',
+      dailyUsed: 0,
+      dailyLimit: 1,
+      dailyRemaining: Infinity,
+      isByokUser: true,
+      isProUser: false,
+    });
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(200);
+    expect(mockTryIncrementVideoGeneration).not.toHaveBeenCalled();
+  });
+
+  it('skips daily counter for admin users', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+
+    const res = await POST(createRequest(), routeParams);
+    expect(res.status).toBe(200);
+    expect(mockTryIncrementVideoGeneration).not.toHaveBeenCalled();
+    expect(mockCheckVideoGenerationGate).not.toHaveBeenCalled();
   });
 
   it('stores pipelineJson on VideoGeneration when pipeline provided', async () => {

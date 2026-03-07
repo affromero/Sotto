@@ -18,6 +18,8 @@ export interface FreeTierConfig {
   sttProvider: SttProviderId;
   sttModel: string;
   dailyGenerationLimit: number;
+  dailyVideoLimit: number;
+  dailyVideoLimitPro: number;
   aiAllocations: ProviderAllocation[];
   ttsAllocations: ProviderAllocation[];
 }
@@ -30,6 +32,8 @@ const DEFAULTS: Omit<FreeTierConfig, 'aiAllocations' | 'ttsAllocations'> = {
   sttProvider: 'openai',
   sttModel: getSttProviderMeta('openai').defaultModel,
   dailyGenerationLimit: 1,
+  dailyVideoLimit: 1,
+  dailyVideoLimitPro: 2,
 };
 
 function parseAllocations(json: unknown): ProviderAllocation[] {
@@ -61,6 +65,8 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
       sttProvider: DEFAULTS.sttProvider,
       sttModel: DEFAULTS.sttModel,
       dailyGenerationLimit: DEFAULTS.dailyGenerationLimit,
+      dailyVideoLimit: DEFAULTS.dailyVideoLimit,
+      dailyVideoLimitPro: DEFAULTS.dailyVideoLimitPro,
     },
   });
 
@@ -72,6 +78,8 @@ export async function getFreeTierConfig(): Promise<FreeTierConfig> {
     sttProvider: row.sttProvider as SttProviderId,
     sttModel: row.sttModel,
     dailyGenerationLimit: row.dailyGenerationLimit,
+    dailyVideoLimit: row.dailyVideoLimit,
+    dailyVideoLimitPro: row.dailyVideoLimitPro,
     aiAllocations: parseAllocations(row.aiAllocations),
     ttsAllocations: parseAllocations(row.ttsAllocations),
   };
@@ -96,6 +104,8 @@ export async function setFreeTierConfig(
       ...(data.dailyGenerationLimit !== undefined && {
         dailyGenerationLimit: data.dailyGenerationLimit,
       }),
+      ...(data.dailyVideoLimit !== undefined && { dailyVideoLimit: data.dailyVideoLimit }),
+      ...(data.dailyVideoLimitPro !== undefined && { dailyVideoLimitPro: data.dailyVideoLimitPro }),
       ...(data.aiAllocations !== undefined && { aiAllocations: data.aiAllocations }),
       ...(data.ttsAllocations !== undefined && { ttsAllocations: data.ttsAllocations }),
       updatedBy: adminId,
@@ -109,6 +119,8 @@ export async function setFreeTierConfig(
       sttProvider: data.sttProvider ?? DEFAULTS.sttProvider,
       sttModel: data.sttModel ?? DEFAULTS.sttModel,
       dailyGenerationLimit: data.dailyGenerationLimit ?? DEFAULTS.dailyGenerationLimit,
+      dailyVideoLimit: data.dailyVideoLimit ?? DEFAULTS.dailyVideoLimit,
+      dailyVideoLimitPro: data.dailyVideoLimitPro ?? DEFAULTS.dailyVideoLimitPro,
       aiAllocations: data.aiAllocations ?? [],
       ttsAllocations: data.ttsAllocations ?? [],
       updatedBy: adminId,

@@ -120,7 +120,7 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     vi.clearAllMocks();
     mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
     mockRequireAdmin.mockResolvedValue(null);
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockFindUnique.mockResolvedValue(mockPodcast);
     mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
     mockUserAiKeyFindMany.mockResolvedValue([]);
@@ -162,10 +162,18 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(res.status).toBe(403);
   });
 
-  it('respects video generation gate', async () => {
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'upgrade_to_pro' });
+  it('returns 403 when no image provider', async () => {
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'no_image_provider', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     const res = await POST(createRequest('POST'), routeParams);
     expect(res.status).toBe(403);
+  });
+
+  it('returns 429 when daily video limit reached', async () => {
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: false, reason: 'daily_limit_reached', dailyUsed: 1, dailyLimit: 1, dailyRemaining: 0, resetInSeconds: 7200, isByokUser: false, isProUser: false });
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.code).toBe('daily_limit_reached');
   });
 });
 
