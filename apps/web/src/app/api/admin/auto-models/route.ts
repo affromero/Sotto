@@ -64,6 +64,20 @@ const updateSchema = z.object({
   proAvatarModel: z.string().min(1).optional(),
   freeIncludedAvatarModels: includedModelsField,
   proIncludedAvatarModels: includedModelsField,
+  // Daily limits & allocations
+  dailyGenerationLimit: z.number().int().min(0).optional(),
+  dailyVideoLimit: z.number().int().min(0).optional(),
+  dailyVideoLimitPro: z.number().int().min(0).optional(),
+  aiAllocations: z.array(z.object({
+    provider: z.string().min(1),
+    model: z.string().min(1),
+    quota: z.number().int().min(1),
+  })).optional(),
+  ttsAllocations: z.array(z.object({
+    provider: z.string().min(1),
+    model: z.string().min(1),
+    quota: z.number().int().min(1),
+  })).optional(),
 });
 
 export async function PATCH(request: NextRequest) {

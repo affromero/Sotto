@@ -58,6 +58,9 @@ interface AutoModelFormProps {
     proAvatarModel: string;
     freeIncludedAvatarModels: string[] | null;
     proIncludedAvatarModels: string[] | null;
+    dailyGenerationLimit: number;
+    dailyVideoLimit: number;
+    dailyVideoLimitPro: number;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
@@ -478,6 +481,11 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const [freeIncludedAvatar, setFreeIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.freeIncludedAvatarModels ?? []));
   const [proIncludedAvatar, setProIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.proIncludedAvatarModels ?? []));
 
+  // Daily limits
+  const [dailyGenerationLimit, setDailyGenerationLimit] = useState(initialConfig.dailyGenerationLimit);
+  const [dailyVideoLimit, setDailyVideoLimit] = useState(initialConfig.dailyVideoLimit);
+  const [dailyVideoLimitPro, setDailyVideoLimitPro] = useState(initialConfig.dailyVideoLimitPro);
+
   // Platform AI
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
@@ -571,6 +579,10 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           proAvatarModel: proAvatar.model,
           freeIncludedAvatarModels: setToArray(freeIncludedAvatar),
           proIncludedAvatarModels: setToArray(proIncludedAvatar),
+          // Daily limits
+          dailyGenerationLimit,
+          dailyVideoLimit,
+          dailyVideoLimitPro,
         }),
       });
 
@@ -745,6 +757,49 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
               <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
             ))}
           </select>
+        </div>
+      </fieldset>
+
+      <fieldset className={styles.section}>
+        <legend className={styles.sectionTitle}>Daily Limits</legend>
+        <p className={styles.platformDescription}>
+          Maximum generations per user per day. 0 = unlimited. Video limits apply to both free and pro tiers separately.
+        </p>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="dailyGenerationLimit">Daily Generation Limit (Free)</label>
+          <input
+            id="dailyGenerationLimit"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyGenerationLimit}
+            onChange={(e) => setDailyGenerationLimit(parseInt(e.target.value, 10) || 0)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="dailyVideoLimit">Daily Video Limit (Free)</label>
+          <input
+            id="dailyVideoLimit"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyVideoLimit}
+            onChange={(e) => setDailyVideoLimit(parseInt(e.target.value, 10) || 0)}
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="dailyVideoLimitPro">Daily Video Limit (Pro)</label>
+          <input
+            id="dailyVideoLimitPro"
+            type="number"
+            className={styles.select}
+            min={0}
+            value={dailyVideoLimitPro}
+            onChange={(e) => setDailyVideoLimitPro(parseInt(e.target.value, 10) || 0)}
+          />
         </div>
       </fieldset>
 

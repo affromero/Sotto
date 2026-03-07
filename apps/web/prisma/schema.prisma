@@ -1671,24 +1671,7 @@ model Activity {
   @@index([createdAt])
 }
 
-// ============ FREE TIER CONFIG ============
-
-model FreeTierConfig {
-  id                    String   @id @default("singleton")
-  aiProvider            String   @default("anthropic")
-  aiModel               String   @default("claude-haiku-4-5-20251001")
-  ttsProvider           String   @default("kittentts")
-  ttsModel              String   @default("kitten-tts-mini-0.8")
-  sttProvider           String   @default("openai")
-  sttModel              String   @default("whisper-large-v3-turbo")
-  dailyGenerationLimit  Int      @default(1)
-  dailyVideoLimit       Int      @default(1)
-  dailyVideoLimitPro    Int      @default(2)
-  aiAllocations         Json?
-  ttsAllocations        Json?
-  updatedAt             DateTime @updatedAt
-  updatedBy             String?
-}
+// ============ AUTO MODEL CONFIG ============
 
 model AutoModelConfig {
   id              String   @id @default("singleton")
@@ -1733,6 +1716,12 @@ model AutoModelConfig {
   proAvatarModel          String   @default("avatar-iii")
   freeIncludedAvatarModels Json?
   proIncludedAvatarModels  Json?
+  // Daily limits (migrated from FreeTierConfig)
+  dailyGenerationLimit    Int      @default(1)
+  dailyVideoLimit         Int      @default(1)
+  dailyVideoLimitPro      Int      @default(2)
+  aiAllocations           Json     @default("[]")
+  ttsAllocations          Json     @default("[]")
   updatedAt               DateTime @updatedAt
   updatedBy               String?
 }

@@ -93,6 +93,11 @@ const defaultRow = {
   proAvatarModel: 'avatar-iii',
   freeIncludedAvatarModels: null,
   proIncludedAvatarModels: null,
+  dailyGenerationLimit: 1,
+  dailyVideoLimit: 1,
+  dailyVideoLimitPro: 2,
+  aiAllocations: [],
+  ttsAllocations: [],
   updatedAt: new Date(),
   updatedBy: null,
 };
@@ -148,6 +153,11 @@ describe('getAutoModelConfig', () => {
       proAvatarModel: 'avatar-iii',
       freeIncludedAvatarModels: null,
       proIncludedAvatarModels: null,
+      dailyGenerationLimit: 1,
+      dailyVideoLimit: 1,
+      dailyVideoLimitPro: 2,
+      aiAllocations: [],
+      ttsAllocations: [],
       freeIncludedModels: null,
       proIncludedModels: null,
       freeIncludedTtsModels: null,
@@ -398,6 +408,11 @@ describe('resolveIncludedModels', () => {
     proAvatarModel: 'avatar-iii',
     freeIncludedAvatarModels: null,
     proIncludedAvatarModels: null,
+    dailyGenerationLimit: 1,
+    dailyVideoLimit: 1,
+    dailyVideoLimitPro: 2,
+    aiAllocations: [],
+    ttsAllocations: [],
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -486,6 +501,11 @@ describe('resolveTtsIncludedModels', () => {
     proAvatarModel: 'avatar-iii',
     freeIncludedAvatarModels: null,
     proIncludedAvatarModels: null,
+    dailyGenerationLimit: 1,
+    dailyVideoLimit: 1,
+    dailyVideoLimitPro: 2,
+    aiAllocations: [],
+    ttsAllocations: [],
   };
 
   it('derives from auto defaults when lists are null', () => {
@@ -574,6 +594,11 @@ describe('resolveSttIncludedModels', () => {
     proAvatarModel: 'avatar-iii',
     freeIncludedAvatarModels: null,
     proIncludedAvatarModels: null,
+    dailyGenerationLimit: 1,
+    dailyVideoLimit: 1,
+    dailyVideoLimitPro: 2,
+    aiAllocations: [],
+    ttsAllocations: [],
   };
 
   it('derives from auto defaults when lists are null', () => {
