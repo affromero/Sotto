@@ -16,6 +16,34 @@ import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
 import { logger } from '@/lib/logger';
 
+async function generateAiImage(
+  podcastId: string,
+  videoGenerationId: string,
+  imagePrompt: string,
+): Promise<{ buffer: Buffer; service: string; cost: number }> {
+  const podcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+
+  const videoGen = await prisma.videoGeneration.findUnique({
+    where: { id: videoGenerationId },
+    select: { imageModel: true },
+  });
+
+  const { provider, source } = await resolveImageProvider({
+    userId: podcast.userId,
+    requestedModel: videoGen?.imageModel,
+  });
+
+  const buffer = await provider.generateImage({ prompt: imagePrompt, width: 1280, height: 720 });
+  const service = source === 'byok' ? 'fal_byok' : 'fal';
+  const megapixels = (1280 * 720) / 1_000_000;
+  const cost = megapixels * getImageModelCost(provider.getModelId());
+
+  return { buffer, service, cost };
+}
+
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
   const { podcastId, videoGenerationId, segmentVisualId, visualType, prompt } = job.data;
 
@@ -51,52 +79,36 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     let totalCost = 0;
 
     if (visualType === 'AI_ILLUSTRATION') {
-      // Resolve image provider (BYOK or platform fal key)
-      const podcast = await prisma.podcast.findUniqueOrThrow({
-        where: { id: podcastId },
-        select: { userId: true },
-      });
-
-      const videoGen = await prisma.videoGeneration.findUnique({
-        where: { id: videoGenerationId },
-        select: { imageModel: true },
-      });
-
-      const { provider, source } = await resolveImageProvider({
-        userId: podcast.userId,
-        requestedModel: videoGen?.imageModel,
-      });
-
-      assetBuffer = await provider.generateImage({ prompt, width: 1280, height: 720 });
+      const result = await generateAiImage(podcastId, videoGenerationId, prompt);
+      assetBuffer = result.buffer;
       assetType = 'image/png';
       assetExt = 'png';
-      service = source === 'byok' ? 'fal_byok' : 'fal';
-
-      // Cost: 1280x720 = 0.9216 megapixels
-      const megapixels = (1280 * 720) / 1_000_000;
-      totalCost = megapixels * getImageModelCost(provider.getModelId());
+      service = result.service;
+      totalCost = result.cost;
     } else if (visualType === 'STOCK_FOOTAGE') {
       const result = await searchStockVideo(prompt);
       if (!result) {
-        // Fallback: convert to TEXT_CARD (programmatic, no asset needed)
+        // Fallback: generate AI illustration instead of showing a text card
+        logger.info('No stock footage found, falling back to AI illustration', { segmentVisualId, prompt });
+        const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
+        assetBuffer = aiResult.buffer;
+        assetType = 'image/png';
+        assetExt = 'png';
+        service = aiResult.service;
+        totalCost = aiResult.cost;
+
+        // Update visualType so the renderer uses ImageSlide
         await prisma.segmentVisual.update({
           where: { id: segmentVisualId },
-          data: {
-            visualType: 'TEXT_CARD',
-            status: 'ready',
-            metadata: { headline: prompt, bullets: [] },
-          },
+          data: { visualType: 'AI_ILLUSTRATION' },
         });
-        await checkAllReady(videoGenerationId, podcastId);
-        await job.updateProgress(100);
-        return;
+      } else {
+        assetBuffer = await downloadStockAsset(result.url);
+        assetType = 'video/mp4';
+        assetExt = 'mp4';
+        service = 'pexels';
+        totalCost = 0; // Free
       }
-
-      assetBuffer = await downloadStockAsset(result.url);
-      assetType = 'video/mp4';
-      assetExt = 'mp4';
-      service = 'pexels';
-      totalCost = 0; // Free
     } else {
       // Check if this is a video-mode segment (from pipeline editor)
       const visual = await prisma.segmentVisual.findUnique({
