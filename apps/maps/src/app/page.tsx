@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { SearchBar } from '@/components/SearchBar';
 import { PresetPicker } from '@/components/PresetPicker';
@@ -19,6 +19,15 @@ export default function HomePage() {
   const [hasSearched, setHasSearched] = useState(false);
   const mapRef = useRef<MapboxMap | null>(null);
   const ohmLoadedRef = useRef(false);
+  const yearRef = useRef<number | null>(null);
+
+  const loadOHM = useCallback((map: MapboxMap, y: number) => {
+    if (ohmLoadedRef.current) {
+      removeOHMOverlay(map);
+    }
+    addOHMOverlay({ map, year: y });
+    ohmLoadedRef.current = true;
+  }, []);
 
   const handleMapLoad = useCallback((map: MapboxMap) => {
     mapRef.current = map;
@@ -30,7 +39,20 @@ export default function HomePage() {
       'space-color': 'rgb(11, 11, 25)',
       'star-intensity': 0.6,
     });
-  }, []);
+
+    // Re-add OHM overlay after style changes (preset switch)
+    map.on('style.load', () => {
+      ohmLoadedRef.current = false;
+      if (yearRef.current != null) {
+        // Small delay to let the style fully settle
+        setTimeout(() => {
+          if (mapRef.current && yearRef.current != null) {
+            loadOHM(mapRef.current, yearRef.current);
+          }
+        }, 200);
+      }
+    });
+  }, [loadOHM]);
 
   const flyToPlace = useCallback((p: PlaceMetadata, y: number | null) => {
     const map = mapRef.current;
@@ -48,29 +70,24 @@ export default function HomePage() {
 
     // Add OHM overlay after fly-in completes
     map.once('moveend', () => {
-      if (ohmLoadedRef.current) {
-        removeOHMOverlay(map);
-        ohmLoadedRef.current = false;
-      }
       if (y != null) {
-        addOHMOverlay({ map, year: y });
-        ohmLoadedRef.current = true;
+        loadOHM(map, y);
       }
     });
-  }, []);
+  }, [loadOHM]);
 
   const handleYearChange = useCallback((newYear: number) => {
     setYear(newYear);
+    yearRef.current = newYear;
     const map = mapRef.current;
     if (!map) return;
 
     if (!ohmLoadedRef.current) {
-      addOHMOverlay({ map, year: newYear });
-      ohmLoadedRef.current = true;
+      loadOHM(map, newYear);
     } else {
       updateOHMYear(map, newYear);
     }
-  }, []);
+  }, [loadOHM]);
 
   const handleSearch = useCallback(async (query: string, parsedYear?: number) => {
     setError(null);
@@ -85,13 +102,20 @@ export default function HomePage() {
       }
       const data: PlaceMetadata = await res.json();
       setPlace(data);
-      setYear(parsedYear ?? null);
+      const y = parsedYear ?? null;
+      setYear(y);
+      yearRef.current = y;
       setHasSearched(true);
-      flyToPlace(data, parsedYear ?? null);
+      flyToPlace(data, y);
     } catch {
       setError('Failed to resolve place');
     }
   }, [flyToPlace]);
+
+  // Keep yearRef in sync
+  useEffect(() => {
+    yearRef.current = year;
+  }, [year]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
@@ -162,6 +186,9 @@ export default function HomePage() {
               label: ctx.periodName,
             })) ?? []}
           />
+          <p className={styles.ohmNote}>
+            Historical borders from OpenHistoricalMap — coverage varies by region and era
+          </p>
         </div>
       )}
 
