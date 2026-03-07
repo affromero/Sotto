@@ -20,6 +20,7 @@ export interface PlayerControls {
   setPlaybackRate: (rate: number) => void;
   setVolume: (volume: number) => void;
   toggleMute: () => void;
+  setActiveVoiceTrackId: (id: string | null) => void;
   loadPodcast: (podcastId: string, audioUrl: string, podcastTitle?: string) => void;
   clearPodcast: () => void;
 }

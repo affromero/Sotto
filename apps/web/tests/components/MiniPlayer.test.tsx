@@ -26,6 +26,7 @@ describe('MiniPlayer', () => {
     setPlaybackRate: vi.fn(),
     setVolume: vi.fn(),
     toggleMute: vi.fn(),
+    setActiveVoiceTrackId: vi.fn(),
     loadPodcast: vi.fn(),
     clearPodcast: vi.fn(),
   };
