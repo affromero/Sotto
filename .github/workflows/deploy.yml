@@ -30,6 +30,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          token: ${{ secrets.DEPLOY_PAT }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -55,6 +56,7 @@ jobs:
         with:
           fetch-depth: 2
           submodules: recursive
+          token: ${{ secrets.DEPLOY_PAT }}
 
       - name: Check if pitch rebuild needed
         id: pitch_check
@@ -79,13 +81,16 @@ jobs:
             set -e
             cd ~/sotto
 
-            echo "Pulling latest code..."
-            git pull origin main
-            git submodule update --init --recursive
-
             echo "Downloading secrets from Doppler..."
             doppler secrets download --no-file --format env > .env
             chmod 600 .env
+
+            echo "Pulling latest code..."
+            git pull origin main
+
+            echo "Updating submodules..."
+            GITHUB_TOKEN=$(grep '^GITHUB_DEPLOY_TOKEN=' .env | cut -d= -f2)
+            git -c url."https://${GITHUB_TOKEN}@github.com/SottoFM/".insteadOf="https://github.com/SottoFM/" submodule update --init --recursive
 
             echo "Building containers..."
             export COMMIT_SHA=$(git rev-parse --short HEAD)
