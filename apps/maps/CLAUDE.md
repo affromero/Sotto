@@ -25,7 +25,7 @@ src/components/
 ## Commands
 
 ```bash
-npm run dev     # Port 3001
+npm run dev     # Port 3002
 npm run ci      # lint + type-check + build
 npm run build   # Production build
 ```
