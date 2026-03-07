@@ -1,6 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { VideoView } from '@/components/player/VideoView';
+
+// jsdom doesn't have ResizeObserver
+beforeAll(() => {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+});
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { SegmentVisualData } from '@/lib/segment-utils';
