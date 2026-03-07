@@ -3,9 +3,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { VideoView } from '@/components/player/VideoView';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
+import type { SegmentVisualData } from '@/lib/segment-utils';
 
-const mockPlay = vi.fn().mockResolvedValue(undefined);
+const mockPlay = vi.fn();
 const mockPause = vi.fn();
+const mockSeekTo = vi.fn();
 let mockIsPlaying = false;
 
 vi.mock('@/components/providers/AudioPlayerProvider', () => ({
@@ -28,10 +30,25 @@ vi.mock('@/components/providers/AudioPlayerProvider', () => ({
   }),
 }));
 
+vi.mock('@remotion/player', () => ({
+  Player: vi.fn().mockImplementation(({ ref, ...props }) => {
+    if (ref) {
+      ref.current = { play: mockPlay, pause: mockPause, seekTo: mockSeekTo };
+    }
+    return <div data-testid="remotion-player" aria-label={props['aria-label']} />;
+  }),
+}));
+
 const mockSegments: SegmentData[] = [
   { id: 'seg-1', speaker: 'HOST', text: 'Welcome to the show!', audioUrl: null, order: 0, startTime: 0, duration: 5 },
   { id: 'seg-2', speaker: 'EXPERT', text: 'Thanks for having me.', audioUrl: null, order: 1, startTime: 5, duration: 8 },
   { id: 'seg-3', speaker: 'HOST', text: 'Let us begin.', audioUrl: null, order: 2, startTime: 13, duration: 3 },
+];
+
+const mockVisuals: SegmentVisualData[] = [
+  { segmentId: 'seg-1', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 0 },
+  { segmentId: 'seg-2', visualType: 'IMAGE_SLIDE', prompt: 'expert photo', metadata: null, assetUrl: 'https://example.com/img.png', assetType: 'image/png', order: 1 },
+  { segmentId: 'seg-3', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 2 },
 ];
 
 const mockReferences: ReferenceData[] = [];
@@ -39,34 +56,28 @@ const mockReferences: ReferenceData[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsPlaying = false;
-  // Mock HTMLMediaElement methods
-  HTMLMediaElement.prototype.play = mockPlay;
-  HTMLMediaElement.prototype.pause = mockPause;
 });
 
 describe('VideoView', () => {
-  it('renders video element with correct src and muted attribute', () => {
+  it('renders Remotion Player with correct aria label', () => {
     render(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={mockSegments}
+        segmentVisuals={mockVisuals}
         references={mockReferences}
         currentTime={0}
       />
     );
 
-    const video = screen.getByLabelText('Podcast video') as HTMLVideoElement;
-    expect(video).toBeInTheDocument();
-    expect(video.tagName).toBe('VIDEO');
-    expect(video).toHaveAttribute('src', 'https://example.com/video.mp4');
-    expect(video.muted).toBe(true);
+    expect(screen.getByTestId('remotion-player')).toBeInTheDocument();
+    expect(screen.getByLabelText('Podcast video')).toBeInTheDocument();
   });
 
   it('shows current segment subtitle based on currentTime', () => {
     render(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={mockSegments}
+        segmentVisuals={mockVisuals}
         references={mockReferences}
         currentTime={6}
       />
@@ -80,8 +91,8 @@ describe('VideoView', () => {
     const onSegmentClick = vi.fn();
     render(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={mockSegments}
+        segmentVisuals={mockVisuals}
         references={mockReferences}
         currentTime={6}
         onSegmentClick={onSegmentClick}
@@ -95,23 +106,23 @@ describe('VideoView', () => {
   it('handles empty segments array gracefully', () => {
     render(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={[]}
+        segmentVisuals={[]}
         references={mockReferences}
         currentTime={0}
       />
     );
 
     expect(screen.getByLabelText('Video view')).toBeInTheDocument();
-    expect(screen.getByLabelText('Podcast video')).toBeInTheDocument();
+    expect(screen.getByTestId('remotion-player')).toBeInTheDocument();
   });
 
-  it('calls video.play() when isPlaying is true and pause when false', () => {
+  it('calls player.play() when isPlaying and pause when not', () => {
     mockIsPlaying = true;
     const { rerender } = render(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={mockSegments}
+        segmentVisuals={mockVisuals}
         references={mockReferences}
         currentTime={0}
       />
@@ -123,13 +134,36 @@ describe('VideoView', () => {
     mockPlay.mockClear();
     rerender(
       <VideoView
-        videoUrl="https://example.com/video.mp4"
         segments={mockSegments}
+        segmentVisuals={mockVisuals}
         references={mockReferences}
         currentTime={0}
       />
     );
 
     expect(mockPause).toHaveBeenCalled();
+  });
+
+  it('seeks Remotion player to correct frame when currentTime changes', () => {
+    const { rerender } = render(
+      <VideoView
+        segments={mockSegments}
+        segmentVisuals={mockVisuals}
+        references={mockReferences}
+        currentTime={0}
+      />
+    );
+
+    rerender(
+      <VideoView
+        segments={mockSegments}
+        segmentVisuals={mockVisuals}
+        references={mockReferences}
+        currentTime={10}
+      />
+    );
+
+    // 10 seconds * 30 fps = frame 300
+    expect(mockSeekTo).toHaveBeenCalledWith(300);
   });
 });

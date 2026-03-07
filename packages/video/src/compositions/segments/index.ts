@@ -9,14 +9,14 @@ import { ImageSlide } from './ImageSlide';
 import { TextCard } from './TextCard';
 
 const SEGMENT_MAP: Record<string, React.FC<{ segment: VideoSegment }>> = {
-  DATA_CHART: DataChart,
-  QUOTE: Quote,
-  COMPARISON: Comparison,
-  TIMELINE: Timeline,
-  DIAGRAM: Diagram,
-  AI_ILLUSTRATION: ImageSlide,
-  STOCK_FOOTAGE: ImageSlide,
-  TEXT_CARD: TextCard,
+  DATA_CHART: React.memo(DataChart),
+  QUOTE: React.memo(Quote),
+  COMPARISON: React.memo(Comparison),
+  TIMELINE: React.memo(Timeline),
+  DIAGRAM: React.memo(Diagram),
+  AI_ILLUSTRATION: React.memo(ImageSlide),
+  STOCK_FOOTAGE: React.memo(ImageSlide),
+  TEXT_CARD: React.memo(TextCard),
 };
 
 export function resolveSegmentComponent(

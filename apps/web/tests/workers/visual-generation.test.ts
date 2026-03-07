@@ -134,7 +134,7 @@ describe('visual-generation worker', () => {
     expect(mockUploadFile).not.toHaveBeenCalled();
   });
 
-  it('queues composition when all visuals ready', async () => {
+  it('marks generation READY when all visuals ready (client-side rendering)', async () => {
     mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
@@ -156,10 +156,15 @@ describe('visual-generation worker', () => {
 
     await processVisualGeneration(makeJob(baseData));
 
-    expect(mockAddJob).toHaveBeenCalledWith(
+    // Default: client-side rendering — marks READY directly, no composition queue
+    expect(mockPrisma.videoGeneration.update).toHaveBeenCalledWith({
+      where: { id: 'vg-1' },
+      data: { status: 'READY' },
+    });
+    expect(mockAddJob).not.toHaveBeenCalledWith(
       expect.objectContaining({ name: 'video-composition' }),
-      'compose_video',
-      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1' }),
+      expect.anything(),
+      expect.anything(),
     );
   });
 });
