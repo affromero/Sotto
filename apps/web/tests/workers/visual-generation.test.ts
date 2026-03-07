@@ -12,6 +12,7 @@ const {
     segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     videoGeneration: { findUnique: vi.fn(), update: vi.fn() },
+    avatarOverlay: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
   },
   mockResolveImageProvider: vi.fn(),
   mockSearchStockVideo: vi.fn(),
@@ -36,8 +37,9 @@ vi.mock('@/lib/r2', () => ({
 }));
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { COMPOSE_VIDEO: 'compose_video' },
+  JobType: { COMPOSE_VIDEO: 'compose_video', GENERATE_AVATAR: 'generate_avatar' },
   videoCompositionQueue: { name: 'video-composition' },
+  avatarGenerationQueue: { name: 'avatar-generation' },
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
