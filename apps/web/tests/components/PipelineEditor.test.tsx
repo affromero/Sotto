@@ -3,39 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
 import type { VideoPipeline, FalModelsResponse, PipelineSegmentNode } from '@/types/pipeline';
 
-vi.mock('@xyflow/react', () => {
-  const Background = () => <div data-testid="rf-background" />;
-  const Controls = () => <div data-testid="rf-controls" />;
-
-  const ReactFlow = ({ nodes, children }: { nodes: Array<{ id: string; data: Record<string, unknown> }>; children: React.ReactNode }) => (
-    <div data-testid="react-flow">
-      {nodes.map((n) => {
-        if (n.id.startsWith('segment-') && typeof n.data === 'object') {
-          const SegNode = nodeTypes.segment;
-          return <SegNode key={n.id} id={n.id} type="segment" data={n.data as Record<string, unknown>} />;
-        }
-        return <div key={n.id} data-testid={`node-${n.id}`} />;
-      })}
-      {children}
-    </div>
-  );
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeTypes: Record<string, any> = {};
-
-  return {
-    ReactFlow: ({ nodes, nodeTypes: nt, children, ...rest }: Record<string, unknown>) => {
-      Object.assign(nodeTypes, nt as Record<string, unknown>);
-      return <ReactFlow nodes={nodes as Array<{ id: string; data: Record<string, unknown> }>} children={children as React.ReactNode} {...rest} />;
-    },
-    Background,
-    Controls,
-    Handle: ({ position }: { position: string }) => <div data-testid={`handle-${position}`} />,
-    Position: { Left: 'left', Right: 'right', Top: 'top', Bottom: 'bottom' },
-    BackgroundVariant: { Dots: 'dots' },
-  };
-});
-
 vi.mock('@/lib/speaker-colors', () => ({
   getSpeakerIndex: (speaker: string, all: string[]) => all.indexOf(speaker) % 4,
   getUniqueSpeakers: (items: Array<{ speaker: string }>) => {
@@ -82,48 +49,64 @@ function makePipeline(segments: PipelineSegmentNode[]): VideoPipeline {
   };
 }
 
-describe('PipelineEditor', () => {
-  const onApprove = vi.fn();
-  const onCancel = vi.fn();
+function renderEditor(segments: PipelineSegmentNode[], overrides: { onApprove?: () => void; onCancel?: () => void } = {}) {
+  const onApprove = overrides.onApprove ?? vi.fn();
+  const onCancel = overrides.onCancel ?? vi.fn();
+  const pipeline = makePipeline(segments);
 
+  render(
+    <PipelineEditor
+      podcastId="pod-1"
+      podcastTitle="Test"
+      pipeline={pipeline}
+      falModels={defaultModels}
+      onApprove={onApprove}
+      onCancel={onCancel}
+    />,
+  );
+
+  return { onApprove, onCancel };
+}
+
+describe('PipelineEditor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // scrollIntoView is not implemented in jsdom
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
-  it('renders segment nodes for each pipeline segment', () => {
+  it('renders scene cards for each segment', () => {
     const seg1 = makeSegment({ segmentId: 'seg-1', speaker: 'Host' });
     const seg2 = makeSegment({ segmentId: 'seg-2', speaker: 'Expert', order: 1 });
-    const pipeline = makePipeline([seg1, seg2]);
+    renderEditor([seg1, seg2]);
 
-    render(
-      <PipelineEditor
-        podcastId="pod-1"
-        podcastTitle="Test"
-        pipeline={pipeline}
-        falModels={defaultModels}
-        onApprove={onApprove}
-        onCancel={onCancel}
-      />,
-    );
-
+    expect(screen.getByText('Scene 1')).toBeDefined();
+    expect(screen.getByText('Scene 2')).toBeDefined();
     expect(screen.getByText('Host')).toBeDefined();
     expect(screen.getByText('Expert')).toBeDefined();
   });
 
-  it('approve button calls onApprove with current pipeline state', () => {
-    const seg = makeSegment();
-    const pipeline = makePipeline([seg]);
+  it('shows Video Storyboard title', () => {
+    renderEditor([makeSegment()]);
+    expect(screen.getByText('Video Storyboard')).toBeDefined();
+  });
 
-    render(
-      <PipelineEditor
-        podcastId="pod-1"
-        podcastTitle="Test"
-        pipeline={pipeline}
-        falModels={defaultModels}
-        onApprove={onApprove}
-        onCancel={onCancel}
-      />,
-    );
+  it('displays visual type badge for AI classification', () => {
+    renderEditor([makeSegment({ visualType: 'AI_ILLUSTRATION' })]);
+    expect(screen.getByText('AI Illustration')).toBeDefined();
+  });
+
+  it('displays approval summary with scene count and cost', () => {
+    const seg1 = makeSegment({ segmentId: 'seg-1', duration: 5, estimatedCost: 0.04 });
+    const seg2 = makeSegment({ segmentId: 'seg-2', duration: 8, estimatedCost: 0.02 });
+    renderEditor([seg1, seg2]);
+
+    expect(screen.getByText(/2 scenes.*~13s video.*est\./)).toBeDefined();
+  });
+
+  it('approve button calls onApprove with current pipeline state', () => {
+    const onApprove = vi.fn();
+    renderEditor([makeSegment()], { onApprove });
 
     fireEvent.click(screen.getByText('Approve & Render'));
     expect(onApprove).toHaveBeenCalledTimes(1);
@@ -133,39 +116,45 @@ describe('PipelineEditor', () => {
   });
 
   it('cancel button calls onCancel', () => {
-    const pipeline = makePipeline([makeSegment()]);
-
-    render(
-      <PipelineEditor
-        podcastId="pod-1"
-        podcastTitle="Test"
-        pipeline={pipeline}
-        falModels={defaultModels}
-        onApprove={onApprove}
-        onCancel={onCancel}
-      />,
-    );
+    const onCancel = vi.fn();
+    renderEditor([makeSegment()], { onCancel });
 
     fireEvent.click(screen.getByText('Cancel'));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('displays total cost in toolbar', () => {
-    const seg = makeSegment({ estimatedCost: 0.04 });
-    const pipeline = makePipeline([seg]);
+  it('expanding a card shows visual type pills and prompt', () => {
+    renderEditor([makeSegment({ prompt: 'A test image' })]);
 
-    render(
-      <PipelineEditor
-        podcastId="pod-1"
-        podcastTitle="Test"
-        pipeline={pipeline}
-        falModels={defaultModels}
-        onApprove={onApprove}
-        onCancel={onCancel}
-      />,
-    );
+    // Card starts collapsed — no pill grid visible
+    expect(screen.queryByRole('group', { name: 'Visual type' })).toBeNull();
 
-    const costElements = screen.getAllByText('$0.040');
-    expect(costElements.length).toBeGreaterThanOrEqual(1);
+    // Click header to expand
+    fireEvent.click(screen.getByText('Scene 1'));
+
+    // Pill grid and prompt should now be visible
+    expect(screen.getByRole('group', { name: 'Visual type' })).toBeDefined();
+    expect(screen.getByText('A test image')).toBeDefined();
+  });
+
+  it('changing visual type via pill click updates the badge', () => {
+    renderEditor([makeSegment({ visualType: 'AI_ILLUSTRATION' })]);
+
+    // Expand card
+    fireEvent.click(screen.getByText('Scene 1'));
+
+    // Click "Stock Footage" pill
+    fireEvent.click(screen.getByRole('button', { name: 'Stock Footage' }));
+
+    // Badge in header should update
+    const badges = screen.getAllByText('Stock Footage');
+    expect(badges.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('displays cost in approval summary', () => {
+    renderEditor([makeSegment({ estimatedCost: 0.04 })]);
+
+    // Cost appears in the approval summary footer
+    expect(screen.getByText(/est\.\s*\$0\.040/)).toBeDefined();
   });
 });
