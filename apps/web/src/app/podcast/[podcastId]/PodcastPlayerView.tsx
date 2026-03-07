@@ -181,7 +181,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
   );
-  const [videoUrl, setVideoUrl] = useState<string | null>(podcast.videoUrl ?? null);
   const [segmentVisuals, setSegmentVisuals] = useState<Array<{
     segmentId: string;
     visualType: string;
@@ -306,7 +305,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         if (!data?.status) return;
         if (data.status === 'READY' && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
-          setVideoUrl(data.videoUrl);
           setSegmentVisuals(data.segmentVisuals);
         } else if (data.status === 'FAILED') {
           setVideoState('failed');
