@@ -62,10 +62,15 @@ export default function HomePage() {
     const map = mapRef.current;
     if (!map) return;
 
+    // When a historical year is provided, zoom out to see empire-level boundaries
+    // OHM boundary data is most visible at z5-z8, sparse at z10+
+    const hasHistorical = y != null;
+    const zoom = p.bbox ? 7 : hasHistorical ? 6 : 10;
+
     map.flyTo({
       center: p.coordinates,
-      zoom: p.bbox ? 8 : 11,
-      pitch: 45,
+      zoom,
+      pitch: hasHistorical ? 30 : 45,
       bearing: 0,
       duration: 4000,
       curve: 1.42,
@@ -138,7 +143,10 @@ export default function HomePage() {
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
-  const minYear = place?.historicalContext?.[0]?.yearStart ?? (year != null ? year - 500 : -500);
+  // Slider range: include the searched year AND any historical context
+  const contextStart = place?.historicalContext?.[0]?.yearStart;
+  const baseMin = year != null ? year - 200 : -500;
+  const minYear = contextStart != null ? Math.min(contextStart, baseMin) : baseMin;
   const maxYear = 2024;
 
   return (
@@ -259,7 +267,7 @@ export default function HomePage() {
         <div className={styles.hint}>
           <p>Search for a place to explore</p>
           <p className={styles.hintExamples}>
-            Try: &quot;Rome 44 BCE&quot;, &quot;Constantinople 1453&quot;, &quot;Jerusalem 70 CE&quot;
+            Try: &quot;Rome 44 BCE&quot;, &quot;Constantinople 1453&quot;, &quot;Paris 1789&quot;, &quot;Cusco 1400&quot;
           </p>
         </div>
       )}
