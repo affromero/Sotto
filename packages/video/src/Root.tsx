@@ -8,7 +8,7 @@ const RemotionRoot: React.FC = () => {
   return (
     <Composition
       id="PodcastVideo"
-      component={PodcastVideo}
+      component={PodcastVideo as React.FC}
       durationInFrames={30 * 60} // placeholder — overridden at render time
       fps={DEFAULT_RENDER_CONFIG.fps}
       width={DEFAULT_RENDER_CONFIG.width}
