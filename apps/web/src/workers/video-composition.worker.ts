@@ -131,7 +131,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
 
       const status = (await statusResponse.json()) as { status: string; progress: number; error?: string };
 
-      if (status.status === 'completed') {
+      if (status.status === 'done') {
         // Scale progress from 30-80 during render
         const renderProgress = Math.min(80, 30 + Math.round(status.progress * 50));
         if (renderProgress > lastProgress) {
@@ -141,7 +141,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         break;
       }
 
-      if (status.status === 'failed') {
+      if (status.status === 'error') {
         throw new Error(`Remotion render failed: ${status.error ?? 'unknown'}`);
       }
 
