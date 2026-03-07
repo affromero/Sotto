@@ -7,9 +7,9 @@ import { PresetPicker } from '@/components/PresetPicker';
 import {
   MapView, TimeSlider,
   addOHMOverlay, updateOHMYear, removeOHMOverlay,
-  addAllmapsOverlay, removeAllmapsOverlay,
+  findHistoricalMaps,
 } from '@sotto/maps';
-import type { PlaceMetadata, MapPresetId } from '@sotto/maps';
+import type { PlaceMetadata, MapPresetId, AntiqueMapResult } from '@sotto/maps';
 import styles from './page.module.css';
 
 const GLOBE_CENTER: [number, number] = [12, 30];
@@ -21,8 +21,9 @@ export default function HomePage() {
   const [preset, setPreset] = useState<MapPresetId>('vintage');
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [antiqueMapLoaded, setAntiqueMapLoaded] = useState(false);
+  const [antiqueMaps, setAntiqueMaps] = useState<AntiqueMapResult[]>([]);
   const [antiqueMapLoading, setAntiqueMapLoading] = useState(false);
+  const [showAntiqueMaps, setShowAntiqueMaps] = useState(false);
   const mapRef = useRef<MapboxMap | null>(null);
   const ohmLoadedRef = useRef(false);
   const yearRef = useRef<number | null>(null);
@@ -37,7 +38,6 @@ export default function HomePage() {
 
   const handleMapLoad = useCallback((map: MapboxMap) => {
     mapRef.current = map;
-    // Atmosphere for globe effect
     map.setFog({
       color: 'rgb(186, 210, 235)',
       'high-color': 'rgb(36, 92, 223)',
@@ -46,11 +46,9 @@ export default function HomePage() {
       'star-intensity': 0.6,
     });
 
-    // Re-add OHM overlay after style changes (preset switch)
     map.on('style.load', () => {
       ohmLoadedRef.current = false;
       if (yearRef.current != null) {
-        // Small delay to let the style fully settle
         setTimeout(() => {
           if (mapRef.current && yearRef.current != null) {
             loadOHM(mapRef.current, yearRef.current);
@@ -74,7 +72,6 @@ export default function HomePage() {
       essential: true,
     });
 
-    // Add OHM overlay after fly-in completes
     map.once('moveend', () => {
       if (y != null) {
         loadOHM(map, y);
@@ -97,7 +94,8 @@ export default function HomePage() {
 
   const handleSearch = useCallback(async (query: string, parsedYear?: number) => {
     setError(null);
-    setAntiqueMapLoaded(false);
+    setAntiqueMaps([]);
+    setShowAntiqueMaps(false);
     try {
       const params = new URLSearchParams({ q: query });
       if (parsedYear != null) params.set('year', String(parsedYear));
@@ -119,34 +117,27 @@ export default function HomePage() {
     }
   }, [flyToPlace]);
 
-  const toggleAntiqueMap = useCallback(async () => {
-    const map = mapRef.current;
-    if (!map || !place) return;
+  const loadAntiqueMaps = useCallback(async () => {
+    if (!place) return;
 
-    if (antiqueMapLoaded) {
-      removeAllmapsOverlay(map);
-      setAntiqueMapLoaded(false);
+    if (showAntiqueMaps) {
+      setShowAntiqueMaps(false);
       return;
     }
 
     setAntiqueMapLoading(true);
-    const success = await addAllmapsOverlay({
-      map,
-      coordinates: place.coordinates,
-      bbox: place.bbox ?? undefined,
-    });
-    setAntiqueMapLoaded(success);
+    const maps = await findHistoricalMaps(place.name, 6);
+    setAntiqueMaps(maps);
+    setShowAntiqueMaps(true);
     setAntiqueMapLoading(false);
-  }, [place, antiqueMapLoaded]);
+  }, [place, showAntiqueMaps]);
 
-  // Keep yearRef in sync
   useEffect(() => {
     yearRef.current = year;
   }, [year]);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
-  // Derive time range from place context or default
   const minYear = place?.historicalContext?.[0]?.yearStart ?? (year != null ? year - 500 : -500);
   const maxYear = 2024;
 
@@ -200,12 +191,49 @@ export default function HomePage() {
           )}
           <button
             type="button"
-            className={`${styles.antiqueToggle} ${antiqueMapLoaded ? styles.antiqueActive : ''}`}
-            onClick={toggleAntiqueMap}
+            className={`${styles.antiqueToggle} ${showAntiqueMaps ? styles.antiqueActive : ''}`}
+            onClick={loadAntiqueMaps}
             disabled={antiqueMapLoading}
           >
-            {antiqueMapLoading ? 'Searching...' : antiqueMapLoaded ? 'Hide Antique Map' : 'Show Antique Map'}
+            {antiqueMapLoading ? 'Searching...' : showAntiqueMaps ? 'Hide Antique Maps' : 'Browse Antique Maps'}
           </button>
+        </div>
+      )}
+
+      {showAntiqueMaps && (
+        <div className={styles.antiquePanel}>
+          <h3 className={styles.antiquePanelTitle}>
+            Antique Maps{antiqueMaps.length > 0 && ` (${antiqueMaps.length})`}
+          </h3>
+          {antiqueMaps.length === 0 ? (
+            <p className={styles.antiqueEmpty}>No antique maps found for this location</p>
+          ) : (
+            <div className={styles.antiqueGrid}>
+              {antiqueMaps.map((m, i) => (
+                <a
+                  key={i}
+                  href={m.viewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.antiqueCard}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={m.thumbnailUrl} alt={m.title} className={styles.antiqueThumb} />
+                  <div className={styles.antiqueCardInfo}>
+                    <span className={styles.antiqueCardTitle}>{m.title}</span>
+                    {m.date && <span className={styles.antiqueCardDate}>{m.date}</span>}
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+          <p className={styles.antiqueAttribution}>
+            Maps courtesy of the{' '}
+            <a href="https://www.davidrumsey.com" target="_blank" rel="noopener noreferrer">
+              David Rumsey Map Collection
+            </a>
+            , Stanford Libraries
+          </p>
         </div>
       )}
 

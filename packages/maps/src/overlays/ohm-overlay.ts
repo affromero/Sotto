@@ -8,12 +8,20 @@ interface OHMOverlayOptions {
   year?: number;
 }
 
+/**
+ * Build a Mapbox GL filter that selects features whose [start_decdate, end_decdate]
+ * range contains the given year. OHM tiles use decimal-year numbers
+ * (e.g. 1453.5, -499.99) — NOT ISO date strings.
+ */
 function yearFilter(year: number): FilterSpecification {
-  const yearStr = String(year);
   return [
     'all',
-    ['<=', ['get', 'start_date'], yearStr],
-    ['any', ['!', ['has', 'end_date']], ['>=', ['get', 'end_date'], yearStr]],
+    ['has', 'start_decdate'],
+    ['<=', ['get', 'start_decdate'], year],
+    ['any',
+      ['!', ['has', 'end_decdate']],
+      ['>=', ['get', 'end_decdate'], year],
+    ],
   ];
 }
 
@@ -28,16 +36,42 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
 
   const filter = year != null ? { filter: yearFilter(year) } : {};
 
-  // Historical borders (land boundaries)
+  // Historical borders — thick colored lines by admin level
   map.addLayer({
     id: 'ohm-land-lines',
     type: 'line',
     source: OHM_SOURCE_ID,
     'source-layer': 'land_ohm_lines',
     paint: {
-      'line-color': '#8B4513',
-      'line-width': 2,
-      'line-opacity': 0.8,
+      'line-color': [
+        'match', ['get', 'admin_level'],
+        2, '#B22222',   // national borders — red
+        3, '#CD853F',   // provincial — tan
+        4, '#8B6914',   // regional — dark gold
+        '#8B4513',      // default — brown
+      ],
+      'line-width': [
+        'match', ['get', 'admin_level'],
+        2, 3,
+        3, 2,
+        1.5,
+      ],
+      'line-opacity': 0.85,
+    },
+    ...filter,
+  });
+
+  // Maritime boundaries
+  map.addLayer({
+    id: 'ohm-maritime',
+    type: 'line',
+    source: OHM_SOURCE_ID,
+    'source-layer': 'land_ohm_maritime',
+    paint: {
+      'line-color': '#4682B4',
+      'line-width': 1.5,
+      'line-opacity': 0.6,
+      'line-dasharray': [4, 3],
     },
     ...filter,
   });
@@ -50,8 +84,46 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
     'source-layer': 'transport_lines',
     paint: {
       'line-color': '#6B4423',
-      'line-width': 1,
+      'line-width': 1.5,
+      'line-opacity': 0.6,
+      'line-dasharray': [6, 3],
+    },
+    ...filter,
+  });
+
+  // Route lines (trade routes, pilgrimage routes)
+  map.addLayer({
+    id: 'ohm-routes',
+    type: 'line',
+    source: OHM_SOURCE_ID,
+    'source-layer': 'route_lines',
+    paint: {
+      'line-color': '#A0522D',
+      'line-width': 2,
       'line-opacity': 0.5,
+      'line-dasharray': [3, 2],
+    },
+    ...filter,
+  });
+
+  // Territory labels (centroids of admin areas)
+  map.addLayer({
+    id: 'ohm-centroids',
+    type: 'symbol',
+    source: OHM_SOURCE_ID,
+    'source-layer': 'land_ohm_centroids',
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 3, 11, 8, 15],
+      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+      'text-transform': 'uppercase',
+      'text-letter-spacing': 0.1,
+      'text-allow-overlap': false,
+    },
+    paint: {
+      'text-color': '#8B0000',
+      'text-halo-color': 'rgba(255, 248, 230, 0.95)',
+      'text-halo-width': 2,
     },
     ...filter,
   });
@@ -78,7 +150,7 @@ export function addOHMOverlay({ map, year }: OHMOverlayOptions): void {
   });
 }
 
-const OHM_LAYER_IDS = ['ohm-places', 'ohm-transport', 'ohm-land-lines'];
+const OHM_LAYER_IDS = ['ohm-places', 'ohm-centroids', 'ohm-routes', 'ohm-transport', 'ohm-maritime', 'ohm-land-lines'];
 
 export function removeOHMOverlay(map: MapboxMap): void {
   for (const id of OHM_LAYER_IDS) {
