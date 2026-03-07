@@ -3,6 +3,8 @@ import { getAllAiProviderMeta } from '@/lib/providers/ai-registry';
 import { getAllProviderMeta } from '@/lib/providers/tts-registry';
 import { getAllSttProviderMeta } from '@/lib/providers/stt-registry';
 import { getAllImageProviderMeta } from '@/lib/providers/image-registry';
+import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
+import { getAllAvatarProviderMeta } from '@/lib/providers/avatar-registry';
 import { AutoModelForm } from './AutoModelForm';
 import styles from './page.module.css';
 
@@ -51,6 +53,26 @@ export default async function AutoModelsPage() {
     })),
   }));
 
+  const videoProviders = getAllVideoProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+    })),
+  }));
+
+  const avatarProviders = getAllAvatarProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    models: p.models.map((m) => ({
+      id: m.id,
+      displayName: m.displayName,
+      tier: m.tier,
+    })),
+  }));
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -66,6 +88,8 @@ export default async function AutoModelsPage() {
         ttsProviders={ttsProviders}
         sttProviders={sttProviders}
         imageProviders={imageProviders}
+        videoProviders={videoProviders}
+        avatarProviders={avatarProviders}
       />
 
       <div className={styles.platformNote}>

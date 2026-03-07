@@ -119,7 +119,7 @@ export async function storeByokKey(
  * Retrieve and decrypt a user's BYOK key for a specific provider.
  * Returns null if the user has no key for that provider.
  */
-export async function getByokKey(userId: string, provider?: TtsProviderId): Promise<string | null> {
+export async function getByokKey(userId: string, provider?: TtsProviderId | string): Promise<string | null> {
   // Legacy: no provider arg → query elevenlabs (backward compat)
   const targetProvider = provider ?? 'elevenlabs';
 
@@ -211,7 +211,7 @@ export async function listByokProviders(userId: string): Promise<ByokKeyInfo[]> 
 /**
  * Check if a user has any BYOK key configured.
  */
-export async function hasByokKey(userId: string, provider?: TtsProviderId): Promise<boolean> {
+export async function hasByokKey(userId: string, provider?: TtsProviderId | string): Promise<boolean> {
   if (provider) {
     const count = await prisma.userTtsKey.count({
       where: { userId, provider, isValid: true },

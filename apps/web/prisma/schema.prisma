@@ -1709,11 +1709,29 @@ model AutoModelConfig {
   proIncludedTtsModels   Json?
   freeIncludedSttModels  Json?
   proIncludedSttModels   Json?
-  proImageProvider       String   @default("fal")
-  proImageModel          String   @default("flux-schnell")
-  proIncludedImageModels Json?
-  updatedAt              DateTime @updatedAt
-  updatedBy              String?
+  // Image (still images for video visuals)
+  freeImageProvider       String   @default("fal")
+  freeImageModel          String   @default("flux-schnell")
+  proImageProvider        String   @default("fal")
+  proImageModel           String   @default("flux-schnell")
+  freeIncludedImageModels Json?
+  proIncludedImageModels  Json?
+  // Video (text-to-video)
+  freeVideoProvider       String   @default("fal")
+  freeVideoModel          String   @default("fal-wan2.5-480p")
+  proVideoProvider        String   @default("fal")
+  proVideoModel           String   @default("fal-wan2.5-480p")
+  freeIncludedVideoModels Json?
+  proIncludedVideoModels  Json?
+  // Avatar (lip-sync avatar overlays)
+  freeAvatarProvider      String   @default("heygen")
+  freeAvatarModel         String   @default("avatar-iii")
+  proAvatarProvider       String   @default("heygen")
+  proAvatarModel          String   @default("avatar-iii")
+  freeIncludedAvatarModels Json?
+  proIncludedAvatarModels  Json?
+  updatedAt               DateTime @updatedAt
+  updatedBy               String?
 }
 
 model FreeProviderUsage {

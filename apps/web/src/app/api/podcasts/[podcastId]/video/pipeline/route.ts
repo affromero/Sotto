@@ -48,11 +48,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!isAdmin) {
     const gate = await checkVideoGenerationGate(auth.userId);
     if (!gate.allowed) {
-      const msg =
-        gate.reason === 'upgrade_to_pro'
-          ? 'Video generation is a PRO feature. Upgrade to generate videos.'
-          : 'No image provider available. Add a fal API key in Settings.';
-      return errorResponse(msg, 403, { code: gate.reason });
+      return errorResponse('No image provider available. Add a fal or MiniMax API key in Settings.', 403, { code: gate.reason });
     }
   }
 

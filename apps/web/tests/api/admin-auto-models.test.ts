@@ -381,6 +381,58 @@ describe('PATCH /api/admin/auto-models', () => {
     );
   });
 
+  it('accepts video model config in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeVideoProvider: 'fal',
+        freeVideoModel: 'fal-wan2.5-480p',
+        proVideoProvider: 'minimax',
+        proVideoModel: 'minimax-t2v-01',
+        freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
+        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-t2v-01'],
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeVideoProvider: 'fal',
+        freeVideoModel: 'fal-wan2.5-480p',
+        proVideoProvider: 'minimax',
+        proVideoModel: 'minimax-t2v-01',
+        freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
+        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-t2v-01'],
+      },
+      'admin-1'
+    );
+  });
+
+  it('accepts avatar model config in PATCH', async () => {
+    mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
+
+    const response = await PATCH(
+      createPatchRequest({
+        freeAvatarProvider: 'heygen',
+        freeAvatarModel: 'avatar-iii',
+        proAvatarProvider: 'heygen',
+        proAvatarModel: 'avatar-iv',
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
+      {
+        freeAvatarProvider: 'heygen',
+        freeAvatarModel: 'avatar-iii',
+        proAvatarProvider: 'heygen',
+        proAvatarModel: 'avatar-iv',
+      },
+      'admin-1'
+    );
+  });
+
   it('accepts null to clear image included model overrides', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'admin-1', role: 'ADMIN' } });
 

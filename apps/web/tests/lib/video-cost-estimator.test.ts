@@ -10,6 +10,17 @@ vi.mock('pricetoken', () => ({
   STATIC_VIDEO_PRICING: [],
 }));
 
+vi.mock('@/lib/providers/video-registry', () => ({
+  getAllVideoProviderMeta: () => [
+    {
+      id: 'minimax',
+      models: [
+        { id: 'minimax-t2v-01', displayName: 'T2V-01', tier: 'standard' },
+      ],
+    },
+  ],
+}));
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));

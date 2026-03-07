@@ -2,12 +2,24 @@ import { PriceTokenClient, STATIC_IMAGE_PRICING, STATIC_VIDEO_PRICING } from 'pr
 import type { ImageModelPricing, VideoModelPricing } from 'pricetoken';
 import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo } from '@/types/pipeline';
 import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from '@/lib/providers/fal-endpoints';
+import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
 
 /** Minimal image model shape needed for cost estimation. */
 export type ImageModelCostInfo = { modelId: string; pricePerImage: number };
 /** Minimal video model shape needed for cost estimation. */
 export type VideoModelCostInfo = { modelId: string; costPerMinute: number; maxDuration?: number | null };
+
+/** Set of all known video model IDs across all providers. */
+function getAllVideoModelIds(): Set<string> {
+  const ids = new Set(FAL_VIDEO_MODEL_IDS);
+  for (const provider of getAllVideoProviderMeta()) {
+    for (const model of provider.models) {
+      ids.add(model.id);
+    }
+  }
+  return ids;
+}
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
@@ -96,6 +108,41 @@ export async function fetchFalVideoModels(): Promise<FalVideoModelInfo[]> {
     }
   } catch (err) {
     logger.warn('Failed to fetch FAL video pricing from pricetoken, using static fallback', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  const fallback = staticFalVideoModels();
+  videoCache = { data: fallback, expiresAt: now + CACHE_TTL_MS };
+  return fallback;
+}
+
+/** Return video models from all providers (FAL + MiniMax) with live pricing. */
+export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
+  const now = Date.now();
+  if (videoCache && now < videoCache.expiresAt) return videoCache.data;
+
+  const knownIds = getAllVideoModelIds();
+
+  try {
+    const apiKey = process.env.PRICETOKEN_API_KEY;
+    const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
+    // Fetch from all video providers
+    const [falModels, minimaxModels] = await Promise.all([
+      client.getVideoPricing({ provider: 'fal' }).catch(() => [] as VideoModelPricing[]),
+      client.getVideoPricing({ provider: 'minimax' }).catch(() => [] as VideoModelPricing[]),
+    ]);
+    const all = [...falModels, ...minimaxModels];
+    const models = all
+      .filter((m) => knownIds.has(m.modelId))
+      .map(mapVideoModel);
+
+    if (models.length > 0) {
+      videoCache = { data: models, expiresAt: now + CACHE_TTL_MS };
+      return models;
+    }
+  } catch (err) {
+    logger.warn('Failed to fetch video pricing from pricetoken, using static fallback', {
       error: err instanceof Error ? err.message : String(err),
     });
   }
