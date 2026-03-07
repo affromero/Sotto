@@ -1,0 +1,51 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 8px;
+}
+
+.labels {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.yearLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.currentYear {
+  font-family: 'DM Serif Display', serif;
+  font-size: 16px;
+  color: #fefcf8;
+}
+
+.track {
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.slider {
+  width: 100%;
+  accent-color: #d97706;
+  cursor: pointer;
+}
+
+.eventMarker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d97706;
+  pointer-events: none;
+  z-index: 1;
+}
