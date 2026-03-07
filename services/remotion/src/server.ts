@@ -28,7 +28,7 @@ let bundlePromise: Promise<string> | null = null;
 
 function getBundlePath(): Promise<string> {
   if (!bundlePromise) {
-    const entryPoint = path.resolve(process.cwd(), 'packages/video/src/index.ts');
+    const entryPoint = path.resolve(process.cwd(), 'packages/video/src/Root.tsx');
     bundlePromise = bundle({
       entryPoint,
       onProgress: (progress: number) => {
