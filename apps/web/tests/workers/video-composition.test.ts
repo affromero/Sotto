@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Set REMOTION_URL before importing the worker (fail-fast check)
-vi.stubEnv('REMOTION_URL', 'http://remotion:3100');
-
 const {
   mockPrisma,
   mockUploadFile,
   mockAddJob,
-} = vi.hoisted(() => ({
+} = vi.hoisted(() => {
+  // Set REMOTION_URL inside vi.hoisted so it runs before static imports
+  process.env.REMOTION_URL = 'http://remotion:3100';
+  return {
   mockPrisma: {
     podcast: { findUnique: vi.fn(), update: vi.fn() },
     videoGeneration: { update: vi.fn() },
@@ -15,7 +15,8 @@ const {
   },
   mockUploadFile: vi.fn().mockResolvedValue('https://cdn.example.com/video.mp4'),
   mockAddJob: vi.fn(),
-}));
+  };
+});
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
 vi.mock('@/lib/r2', () => ({
