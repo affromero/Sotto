@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback, useRef, useState } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import type { AnimationSequence, MapPresetId } from '../types';
