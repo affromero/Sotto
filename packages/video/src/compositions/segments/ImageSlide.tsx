@@ -8,12 +8,20 @@ export const ImageSlide: React.FC<{ segment: VideoSegment }> = ({ segment }) => 
 
   const { assetUrl, order } = segment;
 
-  // Ken Burns: alternate zoom direction per segment index
-  const zoomDirection = order % 2 === 0 ? 1 : -1;
-  const scale = interpolate(frame, [0, durationInFrames], [1, 1.08], {
+  // Ken Burns: 4 preset directions cycling by segment order
+  const preset = order % 4;
+  const scaleFrom = preset < 2 ? 1 : 1.12;
+  const scaleTo = preset < 2 ? 1.12 : 1;
+  const panXDir = preset % 2 === 0 ? 1 : -1;
+  const panYDir = preset < 2 ? 1 : -1;
+
+  const scale = interpolate(frame, [0, durationInFrames], [scaleFrom, scaleTo], {
     extrapolateRight: 'clamp',
   });
-  const panX = interpolate(frame, [0, durationInFrames], [0, 15 * zoomDirection], {
+  const panX = interpolate(frame, [0, durationInFrames], [0, 20 * panXDir], {
+    extrapolateRight: 'clamp',
+  });
+  const panY = interpolate(frame, [0, durationInFrames], [0, 10 * panYDir], {
     extrapolateRight: 'clamp',
   });
 
@@ -51,7 +59,7 @@ export const ImageSlide: React.FC<{ segment: VideoSegment }> = ({ segment }) => 
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          transform: `scale(${scale}) translateX(${panX}px)`,
+          transform: `scale(${scale}) translate(${panX}px, ${panY}px)`,
         }}
       />
     </div>
