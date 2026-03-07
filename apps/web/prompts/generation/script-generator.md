@@ -109,8 +109,14 @@ Include sound effect suggestions as [SFX: description] markers at natural transi
 - [SFX: gentle outro music, 4s] at the end
 - Use sparingly (3-5 per episode max) — they should enhance, not distract
 
+## Place Extraction (for map visuals):
+When the topic involves specific geographic locations, historical places, battles, trade routes, or events tied to places, include a "places" array in your JSON response. This enables rich map visuals in the video.
+- Only include places that are specifically discussed — not passing mentions
+- Include yearHint when the place is discussed in a historical context
+- coordinates are optional — they will be resolved automatically if omitted
+
 ## Output Format:
-Return a JSON object with three arrays:
+Return a JSON object with these fields:
 {
   "turns": [
     {"speaker": "{{HOST_SPEAKER}}", "text": "...", "direction": "energetic"},
@@ -124,6 +130,9 @@ Return a JSON object with three arrays:
   "references": [
     {"number": 1, "title": "Study Title", "authors": ["Author A", "Author B"], "year": 2023, "url": "https://...", "type": "PAPER", "publisher": "Nature", "doi": "10.1234/..."},
     {"number": 2, "title": "Book Title", "authors": ["Author C"], "year": 2021, "url": null, "type": "BOOK", "publisher": "Publisher Name", "doi": null}
+  ],
+  "places": [
+    {"name": "Constantinople", "modernName": "Istanbul", "yearHint": 1453, "significance": "Site of the final Ottoman siege"}
   ]
 }
 
