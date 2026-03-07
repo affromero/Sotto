@@ -1038,6 +1038,7 @@ model TweetMention {
   replyTweetId  String?
   parentTweetId String?
   errorMessage  String?            @db.Text
+  videoPrefs    Json?              // { imageModel, videoModel, wantsVideo } from tweet parsing
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
 
@@ -2048,7 +2049,8 @@ model VideoGeneration {
   width          Int         @default(1280)
   height         Int         @default(720)
   imageProvider  String?     // null = auto (fal)
-  imageModel     String?     // e.g. 'flux-schnell', 'flux-1.1-pro', 'flux-2-pro'
+  imageModel     String?     // e.g. 'fal-flux-2-pro', 'fal-recraft-v3'
+  videoModel     String?     // e.g. 'fal-veo3-1080p', 'fal-kling3-1080p'
   pipelineJson   Json?       // Approved pipeline editor state
   failureReason  String?     @db.Text
   technicalError String?     @db.Text

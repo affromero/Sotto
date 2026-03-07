@@ -6,6 +6,7 @@ import { createAIProvider, type AIProvider, type ContentPart } from './providers
 import { getAiKey } from './byok';
 import { resolveAutoModel } from './auto-model-config';
 import { getAllProviderMeta } from './providers/tts-registry';
+import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from './providers/fal-endpoints';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 export interface ParseOptions {
@@ -184,19 +185,29 @@ ${threadText}`;
   return parsed;
 }
 
-/**
- * Map fuzzy model/provider names from tweets to actual registry IDs.
- * Returns { aiModel, ttsProvider } with null for unrecognized names.
- *
- * This only affects the podcast generation pipeline (script + audio),
- * NOT the tweet parser itself (which uses the user's configured AI provider).
- */
-export function resolveModelFromTweet(parsed: TweetParseResult): {
+export interface ResolvedTweetModels {
   aiModel: string | null;
   ttsProvider: string | null;
-} {
+  imageModel: string | null;
+  videoModel: string | null;
+  wantsVideo: boolean;
+  costPreference: 'cheapest' | null;
+}
+
+/**
+ * Map fuzzy model/provider names from tweets to actual registry IDs.
+ * Returns resolved model IDs with null for unrecognized names.
+ * "auto" values signal video generation with default models.
+ *
+ * This only affects the podcast generation pipeline (script + audio + video),
+ * NOT the tweet parser itself (which uses the user's configured AI provider).
+ */
+export function resolveModelFromTweet(parsed: TweetParseResult): ResolvedTweetModels {
   let aiModel: string | null = null;
   let ttsProvider: string | null = null;
+  let imageModel: string | null = null;
+  let videoModel: string | null = null;
+  const wantsVideo = !!(parsed.requestedImageModel || parsed.requestedVideoModel);
 
   if (parsed.requestedAiModel) {
     aiModel = resolveAiModel(parsed.requestedAiModel);
@@ -204,8 +215,43 @@ export function resolveModelFromTweet(parsed: TweetParseResult): {
   if (parsed.requestedTtsProvider) {
     ttsProvider = resolveTtsProvider(parsed.requestedTtsProvider);
   }
+  if (parsed.requestedImageModel && parsed.requestedImageModel !== 'auto') {
+    imageModel = resolveImageModel(parsed.requestedImageModel);
+  }
+  if (parsed.requestedVideoModel && parsed.requestedVideoModel !== 'auto') {
+    videoModel = resolveVideoModel(parsed.requestedVideoModel);
+  }
 
-  return { aiModel, ttsProvider };
+  return { aiModel, ttsProvider, imageModel, videoModel, wantsVideo, costPreference: parsed.costPreference ?? null };
+}
+
+/**
+ * Resolve "cheapest" cost preference to concrete model IDs.
+ * Async because image/video pricing requires fetching from PriceToken.
+ * Called by the worker when costPreference === 'cheapest'.
+ */
+export async function resolveCheapestModels(current: ResolvedTweetModels): Promise<ResolvedTweetModels> {
+  const { getCheapestModel } = await import('./pricing');
+  const { fetchFalImageModels, fetchFalVideoModels, cheapestModel } = await import('./video-cost-estimator');
+
+  const result = { ...current };
+
+  if (!result.aiModel) {
+    result.aiModel = getCheapestModel();
+  }
+
+  if (result.wantsVideo) {
+    if (!result.imageModel) {
+      const imageModels = await fetchFalImageModels();
+      result.imageModel = cheapestModel(imageModels, (m) => m.pricePerImage, 'fal-flux-1-pro');
+    }
+    if (!result.videoModel) {
+      const videoModels = await fetchFalVideoModels();
+      result.videoModel = cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
+    }
+  }
+
+  return result;
 }
 
 const AI_MODEL_ALIASES: Record<string, string> = {
@@ -281,5 +327,65 @@ function resolveTtsProvider(raw: string): string | null {
   }
 
   logger.info('Unrecognized TTS provider from tweet', { raw });
+  return null;
+}
+
+const IMAGE_MODEL_ALIASES: Record<string, string> = {
+  flux: 'fal-flux-2-pro',
+  'flux pro': 'fal-flux-2-pro',
+  'flux 2': 'fal-flux-2-pro',
+  'flux 1': 'fal-flux-1-pro',
+  recraft: 'fal-recraft-v3',
+  'recraft v3': 'fal-recraft-v3',
+  ideogram: 'fal-ideogram-v2',
+  'ideogram v2': 'fal-ideogram-v2',
+  sd3: 'fal-sd3',
+  'stable diffusion': 'fal-sd3',
+  'stable diffusion 3': 'fal-sd3',
+};
+
+function resolveImageModel(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  if (IMAGE_MODEL_ALIASES[normalized]) return IMAGE_MODEL_ALIASES[normalized];
+
+  // Direct model ID match
+  if (FAL_IMAGE_MODEL_IDS.has(normalized)) return normalized;
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, modelId] of Object.entries(IMAGE_MODEL_ALIASES)) {
+    if (normalized.includes(alias)) return modelId;
+  }
+
+  logger.info('Unrecognized image model from tweet', { raw });
+  return null;
+}
+
+const VIDEO_MODEL_ALIASES: Record<string, string> = {
+  veo: 'fal-veo3-1080p',
+  veo3: 'fal-veo3-1080p',
+  'veo fast': 'fal-veo3-fast-1080p',
+  'veo 3': 'fal-veo3-1080p',
+  kling: 'fal-kling3-1080p',
+  kling3: 'fal-kling3-1080p',
+  'kling 3': 'fal-kling3-1080p',
+  wan: 'fal-wan2.5-480p',
+  'wan 2.5': 'fal-wan2.5-480p',
+};
+
+function resolveVideoModel(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  if (VIDEO_MODEL_ALIASES[normalized]) return VIDEO_MODEL_ALIASES[normalized];
+
+  // Direct model ID match
+  if (FAL_VIDEO_MODEL_IDS.has(normalized)) return normalized;
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, modelId] of Object.entries(VIDEO_MODEL_ALIASES)) {
+    if (normalized.includes(alias)) return modelId;
+  }
+
+  logger.info('Unrecognized video model from tweet', { raw });
   return null;
 }

@@ -9,6 +9,7 @@ import {
   twitterReplyQueue,
   telegramReplyQueue,
   twitterAutoTweetQueue,
+  visualClassificationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
@@ -418,6 +419,47 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
           where: { id: mention.id },
           data: { status: 'READY' },
         });
+      }
+    }
+
+    // 11b. Auto-trigger video generation if tweet requested it
+    if (!skipSfx && podcast.source === 'TWITTER') {
+      const mentionWithVideoPrefs = await prisma.tweetMention.findFirst({
+        where: { podcastId },
+        select: { videoPrefs: true },
+      });
+      const videoPrefs = mentionWithVideoPrefs?.videoPrefs as { imageModel?: string; videoModel?: string; wantsVideo?: boolean } | null;
+      if (videoPrefs?.wantsVideo) {
+        const { checkVideoGenerationGate } = await import('@/lib/video-gate');
+        const gate = await checkVideoGenerationGate(podcast.userId);
+        if (gate.allowed) {
+          const existing = await prisma.videoGeneration.findUnique({ where: { podcastId } });
+          if (!existing) {
+            const videoGen = await prisma.videoGeneration.create({
+              data: {
+                podcastId,
+                status: 'PENDING',
+                imageModel: videoPrefs.imageModel ?? null,
+                videoModel: videoPrefs.videoModel ?? null,
+              },
+            });
+            await addJob(visualClassificationQueue, JobType.CLASSIFY_VISUALS, {
+              podcastId,
+              videoGenerationId: videoGen.id,
+              userId: podcast.userId,
+            });
+            logger.info('Auto-triggered video generation from tweet', {
+              podcastId,
+              imageModel: videoPrefs.imageModel ?? 'default',
+              videoModel: videoPrefs.videoModel ?? 'default',
+            });
+          }
+        } else {
+          logger.info('Skipping video auto-trigger — user not gated for video', {
+            podcastId,
+            reason: gate.reason,
+          });
+        }
       }
     }
 
