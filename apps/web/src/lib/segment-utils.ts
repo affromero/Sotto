@@ -12,12 +12,16 @@ export function findActiveIndex(segments: SegmentData[], currentTime: number): n
 }
 
 export interface SegmentVisualData {
+  id: string;
   segmentId: string;
   visualType: string;
+  visualMode?: string | null;
+  videoModel?: string | null;
   prompt?: string | null;
   metadata?: Record<string, unknown> | null;
   assetUrl?: string | null;
   assetType?: string | null;
+  status: string;
   order: number;
 }
 

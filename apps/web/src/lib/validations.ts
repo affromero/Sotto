@@ -652,6 +652,22 @@ export const generateVideoSchema = z
   .optional();
 
 /**
+ * Video segment update validation — selective regeneration via PATCH
+ */
+export const updateVideoSegmentsSchema = z.object({
+  segments: z.array(
+    z.object({
+      segmentVisualId: z.string(),
+      visualType: z.string().optional(),
+      visualMode: z.enum(['image', 'video', 'programmatic']).optional(),
+      model: z.string().nullable().optional(),
+      prompt: z.string().nullable().optional(),
+      metadata: z.record(z.unknown()).nullable().optional(),
+    }),
+  ).min(1),
+});
+
+/**
  * AI-generated script validation — applied after JSON parse in script-generator
  */
 export const generatedScriptSchema = z.object({
