@@ -1,4 +1,4 @@
-export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue } from './types';
+export type { VideoSegment, RenderConfig, RenderInput, VisualsInput, Branding, RenderStatusValue, VisualTypeValue, AvatarOverlayInput } from './types';
 export { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus, VisualType } from './types';
 export { PodcastVideo } from './compositions/PodcastVideo';
 export { PodcastVisuals } from './compositions/PodcastVisuals';
@@ -7,3 +7,4 @@ export { KenBurns } from './compositions/effects/KenBurns';
 export { SottoWatermark } from './compositions/shared/SottoWatermark';
 export { SpeakerLabel } from './compositions/shared/SpeakerLabel';
 export { Background } from './compositions/shared/Background';
+export { AvatarPip } from './compositions/shared/AvatarPip';

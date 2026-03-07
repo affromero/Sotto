@@ -42,6 +42,7 @@ enum VideoStatus {
   PENDING
   CLASSIFYING
   GENERATING_VISUALS
+  GENERATING_AVATARS
   COMPOSING
   READY
   FAILED
@@ -2057,8 +2058,9 @@ model VideoGeneration {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  podcast Podcast         @relation(fields: [podcastId], references: [id], onDelete: Cascade)
-  visuals SegmentVisual[]
+  podcast        Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  visuals        SegmentVisual[]
+  avatarOverlays AvatarOverlay[]
 
   @@index([podcastId])
 }
@@ -2085,4 +2087,30 @@ model SegmentVisual {
 
   @@index([videoGenerationId])
   @@index([segmentId])
+}
+
+model AvatarOverlay {
+  id                String   @id @default(cuid())
+  videoGenerationId String
+  speaker           String
+  avatarId          String
+  avatarName        String?
+  previewImageUrl   String?
+  heygenVideoId     String?
+  videoUrl          String?
+  concatAudioUrl    String?
+  status            String   @default("pending")
+  failureReason     String?  @db.Text
+  durationSeconds   Float?
+  posX              Float    @default(0.02)
+  posY              Float    @default(0.55)
+  width             Float    @default(0.25)
+  height            Float    @default(0.35)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
+
+  @@unique([videoGenerationId, speaker])
+  @@index([videoGenerationId])
 }

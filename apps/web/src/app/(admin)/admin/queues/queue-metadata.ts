@@ -170,4 +170,8 @@ export const QUEUE_METADATA: Record<string, QueueMeta> = {
     description: 'Renders final MP4 video via Remotion sidecar',
     stage: 'Video Pipeline',
   },
+  'avatar-generation': {
+    description: 'Generates lip-synced avatar overlays via HeyGen',
+    stage: 'Video Pipeline',
+  },
 };

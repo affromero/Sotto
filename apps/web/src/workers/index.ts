@@ -55,6 +55,7 @@ import { processPricingFetch } from './pricing-fetch.worker';
 import { processVisualClassification } from './visual-classification.worker';
 import { processVisualGeneration } from './visual-generation.worker';
 import { processVideoComposition } from './video-composition.worker';
+import { processAvatarGeneration } from './avatar-generation.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -96,6 +97,7 @@ const workers = [
   createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
   createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
   createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
+  createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 600000 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured

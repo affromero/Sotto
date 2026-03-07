@@ -154,6 +154,7 @@ export type VideoStatus =
   | 'PENDING'
   | 'CLASSIFYING'
   | 'GENERATING_VISUALS'
+  | 'GENERATING_AVATARS'
   | 'COMPOSING'
   | 'READY'
   | 'FAILED';

@@ -694,3 +694,20 @@ export const generatedScriptSchema = z.object({
     })),
   ),
 });
+
+export const configureAvatarsSchema = z.object({
+  avatars: z.array(z.object({
+    speaker: z.string().min(1).max(50),
+    avatarId: z.string().min(1),
+  })).min(1).max(4),
+});
+
+export const updateAvatarPositionsSchema = z.object({
+  positions: z.array(z.object({
+    speaker: z.string().min(1),
+    posX: z.number().min(0).max(1),
+    posY: z.number().min(0).max(1),
+    width: z.number().min(0.05).max(0.8),
+    height: z.number().min(0.05).max(0.8),
+  })),
+});

@@ -307,6 +307,22 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         },
         orderBy: { order: 'asc' },
       },
+      avatarOverlays: {
+        select: {
+          id: true,
+          speaker: true,
+          avatarId: true,
+          avatarName: true,
+          previewImageUrl: true,
+          videoUrl: true,
+          status: true,
+          posX: true,
+          posY: true,
+          width: true,
+          height: true,
+          durationSeconds: true,
+        },
+      },
     },
   });
 
@@ -323,6 +339,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     failureReason: videoGeneration.failureReason,
     createdAt: videoGeneration.createdAt,
     segmentVisuals: videoGeneration.visuals,
+    avatarOverlays: videoGeneration.avatarOverlays,
   });
 }
 
@@ -357,6 +374,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       id: true,
       videoUrl: true,
       visuals: { select: { assetUrl: true } },
+      avatarOverlays: { select: { videoUrl: true, concatAudioUrl: true } },
     },
   });
 
@@ -370,6 +388,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   for (const visual of videoGeneration.visuals) {
     if (visual.assetUrl) {
       const key = extractR2Key(visual.assetUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+  }
+
+  for (const overlay of videoGeneration.avatarOverlays) {
+    if (overlay.videoUrl) {
+      const key = extractR2Key(overlay.videoUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+    if (overlay.concatAudioUrl) {
+      const key = extractR2Key(overlay.concatAudioUrl);
       if (key) deletePromises.push(deleteFile(key));
     }
   }

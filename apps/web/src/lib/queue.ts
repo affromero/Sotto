@@ -48,6 +48,7 @@ export enum JobType {
   CLASSIFY_VISUALS = 'classify_visuals',
   GENERATE_VISUAL = 'generate_visual',
   COMPOSE_VIDEO = 'compose_video',
+  GENERATE_AVATAR = 'generate_avatar',
 }
 
 /**
@@ -253,6 +254,14 @@ export interface ComposeVideoPayload {
   videoGenerationId: string;
 }
 
+export interface GenerateAvatarPayload {
+  podcastId: string;
+  videoGenerationId: string;
+  avatarOverlayId: string;
+  speaker: string;
+  avatarId: string;
+}
+
 export interface GenerateVoiceTrackAudioPayload {
   podcastId: string;
   voiceTrackId: string;
@@ -432,7 +441,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
       // Handle video pipeline failures separately — podcast is already READY
-      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition'];
+      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition', 'avatar-generation'];
       if (VIDEO_QUEUES.includes(queueName)) {
         const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
         if (!videoGenerationId) return;
@@ -788,6 +797,7 @@ export const pricingFetchQueue = createQueue('pricing-fetch', { attempts: 2, ski
 export const visualClassificationQueue = createQueue('visual-classification', { attempts: 2 });
 export const visualGenerationQueue = createQueue('visual-generation', { attempts: 3 });
 export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
+export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -825,4 +835,5 @@ export const ALL_QUEUE_NAMES = [
   'visual-classification',
   'visual-generation',
   'video-composition',
+  'avatar-generation',
 ] as const;
