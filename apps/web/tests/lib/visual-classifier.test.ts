@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGenerateResponse = vi.fn();
-vi.mock('@/lib/llm', () => ({
-  generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+vi.mock('@/lib/providers/ai', () => ({
+  createAIProvider: () => ({
+    generateResponse: (...args: unknown[]) => mockGenerateResponse(...args),
+  }),
 }));
 
 vi.mock('@/lib/logger', () => ({
@@ -94,8 +96,8 @@ describe('classifySegmentVisuals', () => {
       expect.any(String),
       expect.any(Array),
       expect.objectContaining({
-        model: 'claude-haiku-4-5-20251001',
         skipModeration: true,
+        maxTokens: 4096,
       }),
     );
   });

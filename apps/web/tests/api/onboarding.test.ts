@@ -45,6 +45,9 @@ const mockModerateDisplayName = vi.fn();
 
 vi.mock('@/lib/name-validation', () => ({
   validateDisplayName: (...args: unknown[]) => mockValidateDisplayName(...args),
+}));
+
+vi.mock('@/lib/name-moderation', () => ({
   moderateDisplayName: (...args: unknown[]) => mockModerateDisplayName(...args),
 }));
 

@@ -4,14 +4,19 @@ const {
   mockPrisma,
   mockClassify,
   mockAddJob,
+  mockGetAiKey,
+  mockResolveAiModel,
 } = vi.hoisted(() => ({
   mockPrisma: {
     videoGeneration: { update: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn() },
     segmentVisual: { createMany: vi.fn(), findMany: vi.fn() },
+    user: { findUniqueOrThrow: vi.fn() },
   },
   mockClassify: vi.fn(),
   mockAddJob: vi.fn(),
+  mockGetAiKey: vi.fn(),
+  mockResolveAiModel: vi.fn(),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
@@ -25,6 +30,12 @@ vi.mock('@/lib/queue', () => ({
   videoCompositionQueue: { name: 'video-composition' },
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
+vi.mock('@/lib/byok', () => ({
+  getAiKey: (...args: unknown[]) => mockGetAiKey(...args),
+}));
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: (...args: unknown[]) => mockResolveAiModel(...args),
+}));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -37,6 +48,9 @@ function makeJob(data: Record<string, unknown>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockGetAiKey.mockResolvedValue(null);
+  mockPrisma.user.findUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
+  mockResolveAiModel.mockResolvedValue({ model: 'claude-haiku-4-5-20251001', provider: 'anthropic' });
 });
 
 describe('visual-classification worker', () => {

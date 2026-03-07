@@ -20,10 +20,26 @@ const mockPodcast = {
 
 const mockFindUnique = vi.fn();
 
+const mockUserFindUniqueOrThrow = vi.fn();
+const mockUserAiKeyFindMany = vi.fn();
+
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockFindUnique(...args) },
+    user: { findUniqueOrThrow: (...args: unknown[]) => mockUserFindUniqueOrThrow(...args) },
+    userAiKey: { findMany: (...args: unknown[]) => mockUserAiKeyFindMany(...args) },
   },
+}));
+
+vi.mock('@/lib/byok', () => ({
+  getAiKey: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/providers/ai-registry', () => ({
+  resolveAiModelAndProvider: vi.fn().mockResolvedValue({
+    model: 'claude-haiku-4-5-20251001',
+    provider: 'anthropic',
+  }),
 }));
 
 vi.mock('@/lib/api-keys', () => ({
@@ -106,6 +122,8 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     mockRequireAdmin.mockResolvedValue(null);
     mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok' });
     mockFindUnique.mockResolvedValue(mockPodcast);
+    mockUserFindUniqueOrThrow.mockResolvedValue({ plan: 'FREE' });
+    mockUserAiKeyFindMany.mockResolvedValue([]);
     mockClassifySegmentVisuals.mockResolvedValue({
       classifications: [
         { segmentId: 'seg-1', order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'A test image', metadata: null },
