@@ -142,6 +142,10 @@ export async function processScriptGeneration(job: Job<GenerateScriptPayload>): 
     logger.info('References saved', { podcastId, count: String(result.references.length) });
   }
 
+  if (result.places.length > 0) {
+    logger.info('Places extracted from script', { podcastId, places: result.places.map((p) => p.name) });
+  }
+
   // Collect all tag slugs upfront for a single batched lookup
   const allTagSlugs = new Set<string>();
 

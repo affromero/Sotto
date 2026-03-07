@@ -709,6 +709,13 @@ export const generatedScriptSchema = z.object({
       doi: z.string().nullish(),
     })),
   ),
+  places: z.array(z.object({
+    name: z.string().min(1),
+    modernName: z.string().nullish(),
+    coordinates: z.tuple([z.number(), z.number()]).nullish(),
+    yearHint: z.number().int().nullish(),
+    significance: z.string().nullish(),
+  })).catch([]),
 });
 
 export const configureAvatarsSchema = z.object({

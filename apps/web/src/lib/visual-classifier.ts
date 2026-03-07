@@ -22,7 +22,8 @@ export type VisualTypeString =
   | 'COMPARISON'
   | 'TIMELINE'
   | 'DIAGRAM'
-  | 'TEXT_CARD';
+  | 'TEXT_CARD'
+  | 'MAP_OVERLAY';
 
 export interface ClassifiedSegment {
   segmentId: string;
@@ -43,6 +44,7 @@ const classificationItemSchema = z.object({
     'TIMELINE',
     'DIAGRAM',
     'TEXT_CARD',
+    'MAP_OVERLAY',
   ]),
   prompt: z.string().nullable(),
   metadata: z.union([z.record(z.unknown()), z.string(), z.null()]),
@@ -63,6 +65,7 @@ VISUAL TYPES:
 - TIMELINE: Chronological events. Provide metadata: { events: [{ year, label, description }] }.
 - DIAGRAM: Conceptual diagram. Provide metadata: { svgContent } with a simple SVG string.
 - TEXT_CARD: Key points summary. Provide metadata: { headline, bullets: string[], statValue?, statLabel? }.
+- MAP_OVERLAY: Geographic content — specific locations, historical places, battle sites, trade routes, geographic features. Provide a search-friendly place description in prompt. Provide metadata: { places: [{ name, yearHint? }], preset: "vintage"|"satellite"|"cinematic" }.
 
 RULES:
 1. Every segment gets exactly one visual type.

@@ -87,6 +87,14 @@ export type GeneratedReference = {
   doi: string | null;
 };
 
+export type ScriptPlace = {
+  name: string;
+  modernName?: string | null;
+  coordinates?: [number, number] | null;
+  yearHint?: number | null;
+  significance?: string | null;
+};
+
 /**
  * Normalize references from AI output — authors may arrive as a
  * comma-separated string instead of string[].
@@ -356,6 +364,7 @@ export async function generateScript(params: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
   outputTokens: number;
@@ -438,6 +447,7 @@ export async function generateScriptWithFeedback(params: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
   outputTokens: number;
@@ -527,6 +537,7 @@ export async function generateScriptWithUserFeedback(params: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
   outputTokens: number;
@@ -602,18 +613,19 @@ function parseScriptResponse(response: {
   turns: ScriptTurn[];
   soundCues: SoundCue[];
   references: GeneratedReference[];
+  places: ScriptPlace[];
   markdown: string;
   inputTokens: number;
   outputTokens: number;
   model: string;
 } {
-  let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[] };
+  let parsed: { turns: ScriptTurn[]; soundCues: SoundCue[]; references: GeneratedReference[]; places?: ScriptPlace[] };
 
   // Helper: attempt JSON parse with optional array-wrapping
   function tryParseJson(text: string): typeof parsed | null {
     try {
       const rawParsed = JSON.parse(text);
-      if (Array.isArray(rawParsed)) return { turns: rawParsed, soundCues: [], references: [] };
+      if (Array.isArray(rawParsed)) return { turns: rawParsed, soundCues: [], references: [], places: [] };
       return rawParsed;
     } catch { return null; }
   }
@@ -625,7 +637,7 @@ function parseScriptResponse(response: {
     } catch {
       try {
         const turns = JSON.parse(extractFirstJson(text, '['));
-        return { turns, soundCues: [], references: [] };
+        return { turns, soundCues: [], references: [], places: [] };
       } catch { return null; }
     }
   }
@@ -651,7 +663,7 @@ function parseScriptResponse(response: {
         model: response.model,
         turnCount: String(turns.length),
       });
-      parsed = { turns, soundCues: [], references: [] };
+      parsed = { turns, soundCues: [], references: [], places: [] };
     }
   }
 
@@ -704,6 +716,7 @@ function parseScriptResponse(response: {
     turns,
     soundCues: validated.soundCues as SoundCue[],
     references,
+    places: (validated.places ?? []) as ScriptPlace[],
     markdown,
     inputTokens: response.inputTokens,
     outputTokens: response.outputTokens,
