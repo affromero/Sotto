@@ -1,7 +1,7 @@
 'use client';
 
-import { memo, useCallback } from 'react';
-import { Handle, Position, type NodeProps } from '@xyflow/react';
+import { memo, useCallback, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo, VisualMode } from '@/types/pipeline';
 import type { VisualTypeString } from '@/lib/visual-classifier';
 import { formatCost } from '@/lib/video-cost-estimator';
@@ -38,29 +38,33 @@ const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'TEXT_CARD',
 ]);
 
-export interface SegmentNodeData {
+export interface StoryboardCardProps {
   segment: PipelineSegmentNode;
+  index: number;
   speakerIndex: number;
   imageModels: FalImageModelInfo[];
   videoModels: FalVideoModelInfo[];
   hasFalKey: boolean;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   onUpdate: (segmentId: string, updates: Partial<PipelineSegmentNode>) => void;
-  [key: string]: unknown;
 }
 
-type SegmentNodeType = {
-  id: string;
-  type: 'segment';
-  position: { x: number; y: number };
-  data: SegmentNodeData;
-};
-
-function SegmentNodeComponent({ data }: NodeProps<SegmentNodeType>) {
-  const { segment, speakerIndex, imageModels, videoModels, hasFalKey, onUpdate } = data;
+function StoryboardCardComponent({
+  segment,
+  index,
+  speakerIndex,
+  imageModels,
+  videoModels,
+  hasFalKey,
+  isExpanded,
+  onToggleExpand,
+  onUpdate,
+}: StoryboardCardProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleVisualTypeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const visualType = e.target.value as VisualTypeString;
+    (visualType: VisualTypeString) => {
       const isProgrammatic = PROGRAMMATIC_TYPES.has(visualType);
       onUpdate(segment.segmentId, {
         visualType,
@@ -101,94 +105,157 @@ function SegmentNodeComponent({ data }: NodeProps<SegmentNodeType>) {
 
   const isProgrammatic = segment.visualMode === 'programmatic';
   const models = segment.visualMode === 'image' ? imageModels : segment.visualMode === 'video' ? videoModels : [];
-  const textPreview = segment.text.length > 80 ? `${segment.text.slice(0, 80)}...` : segment.text;
+  const textPreview = segment.text.length > 140 ? `${segment.text.slice(0, 140)}...` : segment.text;
+  const headerId = `storyboard-header-${segment.segmentId}`;
+  const panelId = `storyboard-panel-${segment.segmentId}`;
 
   return (
-    <div className={styles.node}>
-      <Handle type="target" position={Position.Left} className={styles.handle} />
-
-      <div className={styles.header}>
+    <div className={`${styles.card} ${isExpanded ? styles.cardExpanded : ''}`}>
+      <button
+        id={headerId}
+        className={styles.cardHeader}
+        onClick={onToggleExpand}
+        aria-expanded={isExpanded}
+        aria-controls={panelId}
+        type="button"
+      >
+        <span className={styles.sceneNumber}>Scene {index + 1}</span>
         <span className={styles.speakerBadge} data-speaker-index={speakerIndex}>
           {segment.speaker}
         </span>
+        <p className={styles.textPreview}>{textPreview}</p>
+        <span className={styles.visualTypeBadge}>
+          {VISUAL_TYPE_LABELS[segment.visualType]}
+        </span>
         <span className={styles.duration}>{segment.duration.toFixed(1)}s</span>
-      </div>
+        <ChevronDown
+          size={18}
+          className={`${styles.chevron} ${isExpanded ? styles.chevronOpen : ''}`}
+          aria-hidden="true"
+        />
+      </button>
 
-      <p className={styles.textPreview}>{textPreview}</p>
-
-      <div className={styles.controls}>
-        <select
-          className={styles.select}
-          value={segment.visualType}
-          onChange={handleVisualTypeChange}
-          aria-label="Visual type"
+      {isExpanded && (
+        <div
+          id={panelId}
+          className={styles.expandedContent}
+          role="region"
+          aria-labelledby={headerId}
         >
-          {VISUAL_TYPES.map((vt) => (
-            <option key={vt} value={vt}>
-              {VISUAL_TYPE_LABELS[vt]}
-            </option>
-          ))}
-        </select>
-
-        {!isProgrammatic && (
-          <div className={styles.modeToggle} role="group" aria-label="Visual mode">
-            <button
-              className={`${styles.modeBtn} ${segment.visualMode === 'image' ? styles.modeBtnActive : ''}`}
-              onClick={() => handleModeChange('image')}
-              type="button"
-            >
-              Image
-            </button>
-            <button
-              className={`${styles.modeBtn} ${segment.visualMode === 'video' ? styles.modeBtnActive : ''}`}
-              onClick={() => handleModeChange('video')}
-              type="button"
-            >
-              Video
-            </button>
+          {/* Visual type pill grid */}
+          <div>
+            <span className={styles.fieldLabel}>Visual style</span>
+            <div className={styles.typeGrid} role="group" aria-label="Visual type">
+              {VISUAL_TYPES.map((vt) => (
+                <button
+                  key={vt}
+                  className={`${styles.typePill} ${segment.visualType === vt ? styles.typePillActive : ''}`}
+                  onClick={() => handleVisualTypeChange(vt)}
+                  type="button"
+                  aria-pressed={segment.visualType === vt}
+                >
+                  {VISUAL_TYPE_LABELS[vt]}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
 
-        {!isProgrammatic && models.length > 0 && (
-          <select
-            className={styles.select}
-            value={segment.model ?? ''}
-            onChange={handleModelChange}
-            aria-label="Model"
-          >
-            {models.map((m: FalImageModelInfo | FalVideoModelInfo) => (
-              <option key={m.modelId} value={m.modelId}>
-                {m.displayName} —{' '}
-                {'pricePerImage' in m
-                  ? `$${(m as FalImageModelInfo).pricePerImage}/img`
-                  : `$${(m as FalVideoModelInfo).costPerMinute}/min`}
-              </option>
-            ))}
-          </select>
-        )}
+          {/* Image / Video toggle */}
+          {!isProgrammatic && (
+            <div>
+              <span className={styles.fieldLabel}>Output format</span>
+              <div className={styles.modeToggle} role="group" aria-label="Output format">
+                <button
+                  className={`${styles.modeBtn} ${segment.visualMode === 'image' ? styles.modeBtnActive : ''}`}
+                  onClick={() => handleModeChange('image')}
+                  type="button"
+                  aria-pressed={segment.visualMode === 'image'}
+                >
+                  Image
+                </button>
+                <button
+                  className={`${styles.modeBtn} ${segment.visualMode === 'video' ? styles.modeBtnActive : ''}`}
+                  onClick={() => handleModeChange('video')}
+                  type="button"
+                  aria-pressed={segment.visualMode === 'video'}
+                >
+                  Video
+                </button>
+              </div>
+            </div>
+          )}
 
-        {!isProgrammatic && (
-          <textarea
-            className={styles.prompt}
-            value={segment.prompt ?? ''}
-            onChange={handlePromptChange}
-            placeholder="Visual prompt..."
-            rows={2}
-            aria-label="Visual prompt"
-          />
-        )}
-      </div>
+          {/* AI prompt (read-only by default) */}
+          {!isProgrammatic && segment.prompt && !showAdvanced && (
+            <div>
+              <span className={styles.fieldLabel}>AI prompt</span>
+              <p className={styles.promptPreview}>{segment.prompt}</p>
+            </div>
+          )}
 
-      <div className={styles.footer}>
-        <span className={styles.cost}>{formatCost(segment.estimatedCost)}</span>
-        {!isProgrammatic && !hasFalKey && (
-          <span className={styles.noKeyHint}>Add Fal key in Settings</span>
-        )}
-      </div>
+          {/* Footer: cost + no-key hint + advanced toggle */}
+          <div className={styles.cardFooter}>
+            <span className={styles.segmentCost}>{formatCost(segment.estimatedCost)}</span>
+            {!isProgrammatic && !hasFalKey && (
+              <span className={styles.noKeyHint}>Add Fal key in Settings</span>
+            )}
+            {!isProgrammatic && (
+              <button
+                className={styles.advancedToggle}
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                type="button"
+                aria-expanded={showAdvanced}
+              >
+                {showAdvanced ? 'Hide advanced' : 'Advanced'}
+              </button>
+            )}
+          </div>
 
-      <Handle type="source" position={Position.Right} className={styles.handle} />
+          {/* Layer 3: Advanced controls */}
+          {showAdvanced && !isProgrammatic && (
+            <div className={styles.advancedContent}>
+              {models.length > 0 && (
+                <div>
+                  <label className={styles.fieldLabel} htmlFor={`model-${segment.segmentId}`}>
+                    Model
+                  </label>
+                  <select
+                    id={`model-${segment.segmentId}`}
+                    className={styles.select}
+                    value={segment.model ?? ''}
+                    onChange={handleModelChange}
+                  >
+                    {models.map((m: FalImageModelInfo | FalVideoModelInfo) => (
+                      <option key={m.modelId} value={m.modelId}>
+                        {m.displayName} —{' '}
+                        {'pricePerImage' in m
+                          ? `$${(m as FalImageModelInfo).pricePerImage}/img`
+                          : `$${(m as FalVideoModelInfo).costPerMinute}/min`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className={styles.fieldLabel} htmlFor={`prompt-${segment.segmentId}`}>
+                  Visual prompt
+                </label>
+                <textarea
+                  id={`prompt-${segment.segmentId}`}
+                  className={styles.prompt}
+                  value={segment.prompt ?? ''}
+                  onChange={handlePromptChange}
+                  placeholder="Describe the visual..."
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export const SegmentNode = memo(SegmentNodeComponent);
+export const SegmentNode = memo(StoryboardCardComponent);
