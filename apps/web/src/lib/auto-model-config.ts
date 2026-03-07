@@ -6,6 +6,24 @@ import { getSttProviderMeta } from './providers/stt-registry';
 import type { SttProviderId } from '@sotto/shared';
 import { logger } from './logger';
 
+export interface ProviderAllocation {
+  provider: string;
+  model: string;
+  quota: number;
+}
+
+function parseAllocations(json: unknown): ProviderAllocation[] {
+  if (!Array.isArray(json)) return [];
+  return json.filter(
+    (item): item is ProviderAllocation =>
+      typeof item === 'object' &&
+      item !== null &&
+      typeof item.provider === 'string' &&
+      typeof item.model === 'string' &&
+      typeof item.quota === 'number'
+  );
+}
+
 export interface PlanModelConfig {
   aiProvider: AiProviderId;
   aiModel: string;
@@ -51,6 +69,12 @@ export interface AutoModelConfigData {
   proAvatarModel: string;
   freeIncludedAvatarModels: string[] | null;
   proIncludedAvatarModels: string[] | null;
+  // Daily limits & allocations (migrated from FreeTierConfig)
+  dailyGenerationLimit: number;
+  dailyVideoLimit: number;
+  dailyVideoLimitPro: number;
+  aiAllocations: ProviderAllocation[];
+  ttsAllocations: ProviderAllocation[];
 }
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
@@ -83,6 +107,9 @@ const SEEDS = {
   freeAvatarModel: 'avatar-iii',
   proAvatarProvider: 'heygen',
   proAvatarModel: 'avatar-iii',
+  dailyGenerationLimit: 1,
+  dailyVideoLimit: 1,
+  dailyVideoLimitPro: 2,
 };
 
 /**
@@ -179,6 +206,12 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proAvatarModel: row.proAvatarModel,
     freeIncludedAvatarModels: includedModelsSchema.parse(row.freeIncludedAvatarModels),
     proIncludedAvatarModels: includedModelsSchema.parse(row.proIncludedAvatarModels),
+    // Daily limits & allocations
+    dailyGenerationLimit: row.dailyGenerationLimit,
+    dailyVideoLimit: row.dailyVideoLimit,
+    dailyVideoLimitPro: row.dailyVideoLimitPro,
+    aiAllocations: parseAllocations(row.aiAllocations),
+    ttsAllocations: parseAllocations(row.ttsAllocations),
   };
 }
 
@@ -217,10 +250,16 @@ export async function setAutoModelConfig(
     proAvatarModel?: string;
     freeIncludedAvatarModels?: string[] | null;
     proIncludedAvatarModels?: string[] | null;
+    // Daily limits & allocations
+    dailyGenerationLimit?: number;
+    dailyVideoLimit?: number;
+    dailyVideoLimitPro?: number;
+    aiAllocations?: ProviderAllocation[];
+    ttsAllocations?: ProviderAllocation[];
   },
   adminId: string
 ): Promise<void> {
-  const update: Record<string, string | string[] | null> = { updatedBy: adminId };
+  const update: Record<string, string | string[] | number | ProviderAllocation[] | null> = { updatedBy: adminId };
 
   if (data.free) {
     if (data.free.aiProvider) update.freeAiProvider = data.free.aiProvider;
@@ -292,6 +331,13 @@ export async function setAutoModelConfig(
   if (data.proAvatarModel) update.proAvatarModel = data.proAvatarModel;
   if (data.freeIncludedAvatarModels !== undefined) update.freeIncludedAvatarModels = data.freeIncludedAvatarModels;
   if (data.proIncludedAvatarModels !== undefined) update.proIncludedAvatarModels = data.proIncludedAvatarModels;
+
+  // Daily limits & allocations
+  if (data.dailyGenerationLimit !== undefined) update.dailyGenerationLimit = data.dailyGenerationLimit;
+  if (data.dailyVideoLimit !== undefined) update.dailyVideoLimit = data.dailyVideoLimit;
+  if (data.dailyVideoLimitPro !== undefined) update.dailyVideoLimitPro = data.dailyVideoLimitPro;
+  if (data.aiAllocations !== undefined) update.aiAllocations = data.aiAllocations;
+  if (data.ttsAllocations !== undefined) update.ttsAllocations = data.ttsAllocations;
 
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },

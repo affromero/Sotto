@@ -1733,6 +1733,12 @@ model AutoModelConfig {
   proAvatarModel          String   @default("avatar-iii")
   freeIncludedAvatarModels Json?
   proIncludedAvatarModels  Json?
+  // Daily limits (migrated from FreeTierConfig)
+  dailyGenerationLimit    Int      @default(1)
+  dailyVideoLimit         Int      @default(1)
+  dailyVideoLimitPro      Int      @default(2)
+  aiAllocations           Json     @default("[]")
+  ttsAllocations          Json     @default("[]")
   updatedAt               DateTime @updatedAt
   updatedBy               String?
 }

@@ -1,6 +1,5 @@
 import { prisma } from './prisma';
-import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
-import { resolveAutoModel, type PlanModelConfig } from './auto-model-config';
+import { getAutoModelConfig, resolveAutoModel, type PlanModelConfig, type ProviderAllocation } from './auto-model-config';
 import { getProviderMeta, compareQuality, type TtsProviderId } from './providers/tts-registry';
 import { getAiProviderMeta, type AiProviderId } from './providers/ai-registry';
 
@@ -35,7 +34,7 @@ export interface SelectedFreeTierProviders {
  */
 export async function selectFreeTierProviders(userId: string): Promise<SelectedFreeTierProviders> {
   const [config, autoFree] = await Promise.all([
-    getFreeTierConfig(),
+    getAutoModelConfig(),
     resolveAutoModel('FREE'),
   ]);
 

@@ -8,7 +8,6 @@
 import { subDays, startOfDay } from 'date-fns';
 import { prisma } from './prisma';
 import { getCostBreakdown, getDailyCostTrend } from './cost-monitor';
-import { getFreeTierConfig } from './free-tier-config';
 import { getAutoModelConfig, type AutoModelConfigData } from './auto-model-config';
 import { DURATION_TOLERANCE_SECONDS } from './duration';
 
@@ -142,8 +141,7 @@ export interface ContentSection {
 }
 
 export interface FreeTierSection {
-  config: { aiProvider: string; aiModel: string; ttsProvider: string; dailyGenerationLimit: number };
-  autoModelConfig: AutoModelConfigData;
+  config: AutoModelConfigData;
   usersWithPodcasts: number;
   byokUsersCount: number;
 }
@@ -326,8 +324,7 @@ export async function buildTrafficReport(
     durationAccuracyWithinTarget,
     durationAccuracyStats,
 
-    // === Free Tier (4) ===
-    freeTierConfig,
+    // === Free Tier (3) ===
     autoModelConfig,
     usersWithPodcasts,
     byokUsersCount,
@@ -724,7 +721,6 @@ export async function buildTrafficReport(
     // -----------------------------------------------------------------------
     // Free Tier
     // -----------------------------------------------------------------------
-    getFreeTierConfig(),
     getAutoModelConfig(),
     prisma.user.count({ where: { podcasts: { some: {} } } }),
     prisma.$queryRaw<[{ count: bigint }]>`
@@ -1096,8 +1092,7 @@ export async function buildTrafficReport(
     },
 
     freeTier: {
-      config: freeTierConfig,
-      autoModelConfig,
+      config: autoModelConfig,
       usersWithPodcasts: usersWithPodcasts,
       byokUsersCount: n(byokUsersCount[0]?.count ?? 0n),
     },
