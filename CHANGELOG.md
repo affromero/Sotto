@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.0] - 2026-03-07
+
+### Added
+- `@sotto/maps` package — rich historical map visuals with 6 presets (vintage, satellite, cinematic, parchment, dark, terrain)
+- Place resolver pipeline — WHG, GeoNames, and Pleiades gazetteers with in-memory LRU cache
+- OpenHistoricalMap vector tile overlay with year filtering via decimal-date properties
+- Antique maps panel — David Rumsey Map Collection search with thumbnails and attribution
+- maps.sotto.fm playground — search historical places, time slider, preset picker, globe view with fly-in
+- MAP_OVERLAY visual type — full video pipeline integration (classifier, generation, Remotion MapSlide)
+- Place extraction during script generation — geographic locations auto-detected for map visuals
+- Post-generation video editor with selective segment regeneration (PATCH endpoint + storyboard UI)
+- Daily video generation cap — free: 1/day, pro: 2/day with quota display in UI
+
+### Fixed
+- OHM year filter uses numeric `start_decdate`/`end_decdate` instead of broken string comparison
+- Historical searches zoom out to z6 for empire-level boundary visibility
+- Time slider range includes the searched year instead of clamping to historicalContext
+- Modern map labels auto-hidden for historical views with toggle button
+- OHM borders made significantly more visible with glow layer and bold colored lines
+- Structured logging for all place resolution failures (per-gazetteer errors, config issues, total failures)
+
+### Changed
+- Replaced broken Allmaps IIIF overlay with David Rumsey search API (Allmaps bbox search returned global results regardless of coordinates)
+- Maps app uses port 3002 (3001 used by PriceToken on prod)
+
 ## [0.3.0] - 2026-03-07
 
 ### Added
