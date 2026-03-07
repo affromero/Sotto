@@ -30,9 +30,27 @@ export interface AutoModelConfigData {
   proIncludedTtsModels: string[] | null;
   freeIncludedSttModels: string[] | null;
   proIncludedSttModels: string[] | null;
+  // Image
+  freeImageProvider: string;
+  freeImageModel: string;
   proImageProvider: string;
   proImageModel: string;
+  freeIncludedImageModels: string[] | null;
   proIncludedImageModels: string[] | null;
+  // Video
+  freeVideoProvider: string;
+  freeVideoModel: string;
+  proVideoProvider: string;
+  proVideoModel: string;
+  freeIncludedVideoModels: string[] | null;
+  proIncludedVideoModels: string[] | null;
+  // Avatar
+  freeAvatarProvider: string;
+  freeAvatarModel: string;
+  proAvatarProvider: string;
+  proAvatarModel: string;
+  freeIncludedAvatarModels: string[] | null;
+  proIncludedAvatarModels: string[] | null;
 }
 
 const includedModelsSchema = z.array(z.string()).nullable().catch(null);
@@ -53,8 +71,18 @@ const SEEDS = {
   proSttModel: getSttProviderMeta('openai').defaultModel,
   platformAiProvider: 'anthropic' as const,
   platformAiModel: getAiProviderMeta('anthropic').defaultModel,
+  freeImageProvider: 'fal',
+  freeImageModel: 'flux-schnell',
   proImageProvider: 'fal',
   proImageModel: 'flux-schnell',
+  freeVideoProvider: 'fal',
+  freeVideoModel: 'fal-wan2.5-480p',
+  proVideoProvider: 'fal',
+  proVideoModel: 'fal-wan2.5-480p',
+  freeAvatarProvider: 'heygen',
+  freeAvatarModel: 'avatar-iii',
+  proAvatarProvider: 'heygen',
+  proAvatarModel: 'avatar-iii',
 };
 
 /**
@@ -130,9 +158,27 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
     proIncludedTtsModels: includedModelsSchema.parse(row.proIncludedTtsModels),
     freeIncludedSttModels: includedModelsSchema.parse(row.freeIncludedSttModels),
     proIncludedSttModels: includedModelsSchema.parse(row.proIncludedSttModels),
+    // Image
+    freeImageProvider: row.freeImageProvider,
+    freeImageModel: row.freeImageModel,
     proImageProvider: row.proImageProvider,
     proImageModel: row.proImageModel,
+    freeIncludedImageModels: includedModelsSchema.parse(row.freeIncludedImageModels),
     proIncludedImageModels: includedModelsSchema.parse(row.proIncludedImageModels),
+    // Video
+    freeVideoProvider: row.freeVideoProvider,
+    freeVideoModel: row.freeVideoModel,
+    proVideoProvider: row.proVideoProvider,
+    proVideoModel: row.proVideoModel,
+    freeIncludedVideoModels: includedModelsSchema.parse(row.freeIncludedVideoModels),
+    proIncludedVideoModels: includedModelsSchema.parse(row.proIncludedVideoModels),
+    // Avatar
+    freeAvatarProvider: row.freeAvatarProvider,
+    freeAvatarModel: row.freeAvatarModel,
+    proAvatarProvider: row.proAvatarProvider,
+    proAvatarModel: row.proAvatarModel,
+    freeIncludedAvatarModels: includedModelsSchema.parse(row.freeIncludedAvatarModels),
+    proIncludedAvatarModels: includedModelsSchema.parse(row.proIncludedAvatarModels),
   };
 }
 
@@ -150,9 +196,27 @@ export async function setAutoModelConfig(
     proIncludedTtsModels?: string[] | null;
     freeIncludedSttModels?: string[] | null;
     proIncludedSttModels?: string[] | null;
+    // Image
+    freeImageProvider?: string;
+    freeImageModel?: string;
     proImageProvider?: string;
     proImageModel?: string;
+    freeIncludedImageModels?: string[] | null;
     proIncludedImageModels?: string[] | null;
+    // Video
+    freeVideoProvider?: string;
+    freeVideoModel?: string;
+    proVideoProvider?: string;
+    proVideoModel?: string;
+    freeIncludedVideoModels?: string[] | null;
+    proIncludedVideoModels?: string[] | null;
+    // Avatar
+    freeAvatarProvider?: string;
+    freeAvatarModel?: string;
+    proAvatarProvider?: string;
+    proAvatarModel?: string;
+    freeIncludedAvatarModels?: string[] | null;
+    proIncludedAvatarModels?: string[] | null;
   },
   adminId: string
 ): Promise<void> {
@@ -205,11 +269,29 @@ export async function setAutoModelConfig(
     update.proIncludedSttModels = data.proIncludedSttModels;
   }
 
+  // Image
+  if (data.freeImageProvider) update.freeImageProvider = data.freeImageProvider;
+  if (data.freeImageModel) update.freeImageModel = data.freeImageModel;
   if (data.proImageProvider) update.proImageProvider = data.proImageProvider;
   if (data.proImageModel) update.proImageModel = data.proImageModel;
-  if (data.proIncludedImageModels !== undefined) {
-    update.proIncludedImageModels = data.proIncludedImageModels;
-  }
+  if (data.freeIncludedImageModels !== undefined) update.freeIncludedImageModels = data.freeIncludedImageModels;
+  if (data.proIncludedImageModels !== undefined) update.proIncludedImageModels = data.proIncludedImageModels;
+
+  // Video
+  if (data.freeVideoProvider) update.freeVideoProvider = data.freeVideoProvider;
+  if (data.freeVideoModel) update.freeVideoModel = data.freeVideoModel;
+  if (data.proVideoProvider) update.proVideoProvider = data.proVideoProvider;
+  if (data.proVideoModel) update.proVideoModel = data.proVideoModel;
+  if (data.freeIncludedVideoModels !== undefined) update.freeIncludedVideoModels = data.freeIncludedVideoModels;
+  if (data.proIncludedVideoModels !== undefined) update.proIncludedVideoModels = data.proIncludedVideoModels;
+
+  // Avatar
+  if (data.freeAvatarProvider) update.freeAvatarProvider = data.freeAvatarProvider;
+  if (data.freeAvatarModel) update.freeAvatarModel = data.freeAvatarModel;
+  if (data.proAvatarProvider) update.proAvatarProvider = data.proAvatarProvider;
+  if (data.proAvatarModel) update.proAvatarModel = data.proAvatarModel;
+  if (data.freeIncludedAvatarModels !== undefined) update.freeIncludedAvatarModels = data.freeIncludedAvatarModels;
+  if (data.proIncludedAvatarModels !== undefined) update.proIncludedAvatarModels = data.proIncludedAvatarModels;
 
   await prisma.autoModelConfig.upsert({
     where: { id: 'singleton' },
@@ -286,15 +368,40 @@ export async function resolveAutoModel(plan: 'FREE' | 'PRO' | 'PLATFORM'): Promi
 }
 
 /**
- * Resolve the image provider and model for video generation (PRO-only feature).
+ * Resolve the image provider and model for video generation.
  */
-export async function resolveImageModel(): Promise<{
+export async function resolveImageModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
   imageProvider: string;
   imageModel: string;
 }> {
   const config = await getAutoModelConfig();
-  return {
-    imageProvider: config.proImageProvider,
-    imageModel: config.proImageModel,
-  };
+  return plan === 'FREE'
+    ? { imageProvider: config.freeImageProvider, imageModel: config.freeImageModel }
+    : { imageProvider: config.proImageProvider, imageModel: config.proImageModel };
+}
+
+/**
+ * Resolve the video provider and model for text-to-video generation.
+ */
+export async function resolveVideoModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+  videoProvider: string;
+  videoModel: string;
+}> {
+  const config = await getAutoModelConfig();
+  return plan === 'FREE'
+    ? { videoProvider: config.freeVideoProvider, videoModel: config.freeVideoModel }
+    : { videoProvider: config.proVideoProvider, videoModel: config.proVideoModel };
+}
+
+/**
+ * Resolve the avatar provider and model for lip-sync overlays.
+ */
+export async function resolveAvatarModel(plan: 'FREE' | 'PRO' = 'PRO'): Promise<{
+  avatarProvider: string;
+  avatarModel: string;
+}> {
+  const config = await getAutoModelConfig();
+  return plan === 'FREE'
+    ? { avatarProvider: config.freeAvatarProvider, avatarModel: config.freeAvatarModel }
+    : { avatarProvider: config.proAvatarProvider, avatarModel: config.proAvatarModel };
 }
