@@ -103,6 +103,16 @@ services:
       retries: 5
       start_period: 60s
 
+  maps:
+    build:
+      context: .
+      dockerfile: apps/maps/Dockerfile
+      args:
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    container_name: sotto-maps
+    ports:
+      - '3001:3001'
+
 volumes:
   sotto_postgres_data:
   sotto_redis_data:

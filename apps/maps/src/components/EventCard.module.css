@@ -1,0 +1,50 @@
+.root {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  background: var(--color-surface);
+  transition:
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+  cursor: pointer;
+}
+
+.root:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.15);
+}
+
+.year {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.description {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
+.places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.placeBadge {
+  font-size: 11px;
+  background: #f3f4f6;
+  color: var(--color-text-muted);
+  padding: 2px 8px;
+  border-radius: 10px;
+}

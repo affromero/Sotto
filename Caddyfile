@@ -26,6 +26,27 @@ sotto.fm {
 	}
 }
 
+maps.sotto.fm {
+	reverse_proxy localhost:3001
+
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		-Server
+	}
+
+	@static path /fonts/* /_next/static/* /favicon.ico
+	header @static Cache-Control "public, max-age=31536000, immutable"
+
+	log {
+		output file /var/log/caddy/maps-access.log {
+			roll_size 50MiB
+			roll_keep 5
+		}
+	}
+}
+
 www.sotto.fm {
 	# Telegram webhook — proxy directly (Telegram can't resolve apex .fm domains)
 	handle /api/telegram/webhook {

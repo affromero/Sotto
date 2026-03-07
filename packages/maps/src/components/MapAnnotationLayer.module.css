@@ -1,0 +1,61 @@
+.root {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.annotation {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.text {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.label .text {
+  font-family: 'DM Serif Display', serif;
+  font-size: 14px;
+  color: #1a1a1a;
+  text-shadow:
+    0 1px 2px rgba(255, 255, 255, 0.8),
+    0 -1px 2px rgba(255, 255, 255, 0.8);
+}
+
+.callout {
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #d97706;
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.callout .text {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+}
+
+.marker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.marker::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d97706;
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.3);
+}
+
+.marker .text {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a1a1a;
+}

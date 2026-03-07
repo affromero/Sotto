@@ -81,6 +81,7 @@ export const VisualType = {
   STOCK_FOOTAGE: 'STOCK_FOOTAGE',
   AI_ILLUSTRATION: 'AI_ILLUSTRATION',
   TEXT_CARD: 'TEXT_CARD',
+  MAP_OVERLAY: 'MAP_OVERLAY',
 } as const;
 
 export type VisualTypeValue = (typeof VisualType)[keyof typeof VisualType];

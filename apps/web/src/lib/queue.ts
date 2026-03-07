@@ -49,6 +49,7 @@ export enum JobType {
   GENERATE_VISUAL = 'generate_visual',
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
+  PLACE_ENRICHMENT = 'place_enrichment',
 }
 
 /**
@@ -252,6 +253,13 @@ export interface GenerateVisualPayload {
 export interface ComposeVideoPayload {
   podcastId: string;
   videoGenerationId: string;
+}
+
+export interface PlaceEnrichmentPayload {
+  segmentVisualId: string;
+  podcastId: string;
+  videoGenerationId: string;
+  places: Array<{ name: string; yearHint?: number }>;
 }
 
 export interface GenerateAvatarPayload {
@@ -798,6 +806,7 @@ export const visualClassificationQueue = createQueue('visual-classification', { 
 export const visualGenerationQueue = createQueue('visual-generation', { attempts: 3 });
 export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
 export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
+export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -836,4 +845,5 @@ export const ALL_QUEUE_NAMES = [
   'visual-generation',
   'video-composition',
   'avatar-generation',
+  'place-enrichment',
 ] as const;

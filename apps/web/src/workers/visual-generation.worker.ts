@@ -85,6 +85,35 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       assetExt = 'png';
       service = result.service;
       totalCost = result.cost;
+    } else if (visualType === 'MAP_OVERLAY') {
+      const metadata = job.data.metadata as { places?: Array<{ name: string }>; preset?: string } | undefined;
+      const placeName = metadata?.places?.[0]?.name ?? prompt;
+      const presetName = (metadata?.preset as string) ?? 'vintage';
+
+      const { generateMapImage } = await import('@/lib/map-image');
+      const { PlaceResolver } = await import('@sotto/maps');
+      const resolver = new PlaceResolver({ redisUrl: process.env.REDIS_URL });
+      const place = await resolver.resolve(placeName);
+
+      if (!place) {
+        logger.info('No place resolved, falling back to AI illustration', { segmentVisualId, placeName });
+        const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
+        assetBuffer = aiResult.buffer;
+        assetType = 'image/png';
+        assetExt = 'png';
+        service = aiResult.service;
+        totalCost = aiResult.cost;
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: { visualType: 'AI_ILLUSTRATION' },
+        });
+      } else {
+        assetBuffer = await generateMapImage(place, presetName);
+        assetType = 'image/png';
+        assetExt = 'png';
+        service = 'mapbox';
+        totalCost = 0;
+      }
     } else if (visualType === 'STOCK_FOOTAGE') {
       const result = await searchStockVideo(prompt);
       if (!result) {
