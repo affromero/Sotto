@@ -27,8 +27,8 @@ sotto.fm {
 }
 
 maps.sotto.fm {
-	# Gated access while testing — remove basicauth block when ready for public
-	basicauth {
+	# Gated access while testing — remove basic_auth block when ready for public
+	basic_auth {
 		sotto $2a$14$YxxgThNHezJKyQ/JC1qBVuo.XswYpOoYZlhv63YD3z9UV7KtZUX4q
 	}
 
