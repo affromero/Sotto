@@ -53,6 +53,11 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/providers/fal-endpoints', () => ({
+  FAL_IMAGE_MODEL_IDS: new Set(['fal-flux-2-pro', 'fal-flux-1-pro', 'fal-recraft-v3', 'fal-ideogram-v2', 'fal-sd3']),
+  FAL_VIDEO_MODEL_IDS: new Set(['fal-veo3-1080p', 'fal-veo3-fast-1080p', 'fal-kling3-1080p', 'fal-wan2.5-480p']),
+}));
+
 // ---- Import under test ----
 import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
@@ -710,10 +715,14 @@ describe('resolveModelFromTweet', () => {
     focusAreas: [],
   };
 
-  it('returns nulls when no model is requested', () => {
+  it('returns nulls and wantsVideo=false when no model is requested', () => {
     const result = resolveModelFromTweet(baseParsed);
     expect(result.aiModel).toBeNull();
     expect(result.ttsProvider).toBeNull();
+    expect(result.imageModel).toBeNull();
+    expect(result.videoModel).toBeNull();
+    expect(result.wantsVideo).toBe(false);
+    expect(result.costPreference).toBeNull();
   });
 
   it('resolves "opus" to claude-opus-4-6', () => {
@@ -774,5 +783,105 @@ describe('resolveModelFromTweet', () => {
     });
     expect(result.aiModel).toBe('claude-opus-4-6');
     expect(result.ttsProvider).toBe('elevenlabs');
+  });
+
+  // ---- Image model resolution ----
+
+  it('resolves "flux" to fal-flux-2-pro', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'flux' });
+    expect(result.imageModel).toBe('fal-flux-2-pro');
+    expect(result.wantsVideo).toBe(true);
+  });
+
+  it('resolves "recraft" to fal-recraft-v3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'recraft' });
+    expect(result.imageModel).toBe('fal-recraft-v3');
+  });
+
+  it('resolves "ideogram" to fal-ideogram-v2', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'ideogram' });
+    expect(result.imageModel).toBe('fal-ideogram-v2');
+  });
+
+  it('resolves "sd3" to fal-sd3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'sd3' });
+    expect(result.imageModel).toBe('fal-sd3');
+  });
+
+  it('resolves "stable diffusion" to fal-sd3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'stable diffusion' });
+    expect(result.imageModel).toBe('fal-sd3');
+  });
+
+  it('returns null for unrecognized image model', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedImageModel: 'dalle-9000' });
+    expect(result.imageModel).toBeNull();
+  });
+
+  // ---- Video model resolution ----
+
+  it('resolves "veo" to fal-veo3-1080p', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedVideoModel: 'veo' });
+    expect(result.videoModel).toBe('fal-veo3-1080p');
+    expect(result.wantsVideo).toBe(true);
+  });
+
+  it('resolves "kling" to fal-kling3-1080p', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedVideoModel: 'kling' });
+    expect(result.videoModel).toBe('fal-kling3-1080p');
+  });
+
+  it('resolves "wan" to fal-wan2.5-480p', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedVideoModel: 'wan' });
+    expect(result.videoModel).toBe('fal-wan2.5-480p');
+  });
+
+  it('resolves "veo fast" to fal-veo3-fast-1080p', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedVideoModel: 'veo fast' });
+    expect(result.videoModel).toBe('fal-veo3-fast-1080p');
+  });
+
+  it('returns null for unrecognized video model', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedVideoModel: 'unknown-video' });
+    expect(result.videoModel).toBeNull();
+  });
+
+  // ---- "auto" handling ----
+
+  it('sets wantsVideo=true but leaves models null for "auto" requests', () => {
+    const result = resolveModelFromTweet({
+      ...baseParsed,
+      requestedImageModel: 'auto',
+      requestedVideoModel: 'auto',
+    });
+    expect(result.wantsVideo).toBe(true);
+    expect(result.imageModel).toBeNull();
+    expect(result.videoModel).toBeNull();
+  });
+
+  // ---- costPreference passthrough ----
+
+  it('passes through costPreference from parsed result', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, costPreference: 'cheapest' });
+    expect(result.costPreference).toBe('cheapest');
+  });
+
+  // ---- Combined resolution ----
+
+  it('resolves all model types simultaneously', () => {
+    const result = resolveModelFromTweet({
+      ...baseParsed,
+      requestedAiModel: 'haiku',
+      requestedTtsProvider: 'cartesia',
+      requestedImageModel: 'flux',
+      requestedVideoModel: 'wan',
+      costPreference: 'cheapest',
+    });
+    expect(result.aiModel).toBe('claude-haiku-4-5-20251001');
+    expect(result.ttsProvider).toBe('cartesia');
+    expect(result.imageModel).toBe('fal-flux-2-pro');
+    expect(result.videoModel).toBe('fal-wan2.5-480p');
+    expect(result.wantsVideo).toBe(true);
+    expect(result.costPreference).toBe('cheapest');
   });
 });
