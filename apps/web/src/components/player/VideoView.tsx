@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo, useCallback, useState } from 'react';
 import { Player, type PlayerRef } from '@remotion/player';
 import { PodcastVisuals } from '@sotto/video';
 import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
@@ -10,6 +10,8 @@ import { findActiveIndex, buildVideoSegments, computeTotalFrames } from '@/lib/s
 import type { SegmentVisualData } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
+import { AvatarOverlay } from '@/components/player/AvatarOverlay';
+import type { AvatarOverlayData } from '@/types/avatar';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import styles from './VideoView.module.css';
@@ -21,6 +23,9 @@ interface VideoViewProps {
   currentTime: number;
   onSegmentClick?: (startTime: number) => void;
   title?: string;
+  avatarOverlays?: AvatarOverlayData[];
+  isOwner?: boolean;
+  onAvatarPositionChange?: (speaker: string, pos: { posX: number; posY: number; width: number; height: number }) => void;
 }
 
 const FPS = DEFAULT_RENDER_CONFIG.fps;
@@ -32,9 +37,33 @@ export function VideoView({
   currentTime,
   onSegmentClick,
   title,
+  avatarOverlays,
+  isOwner,
+  onAvatarPositionChange,
 }: VideoViewProps) {
   const playerRef = useRef<PlayerRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const { isPlaying } = usePlayer();
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  // Track container pixel dimensions for avatar positioning
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setContainerSize({
+        width: entry.contentRect.width,
+        height: entry.contentRect.height,
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const readyOverlays = useMemo(
+    () => (avatarOverlays ?? []).filter((o) => o.status === 'ready' && o.videoUrl),
+    [avatarOverlays],
+  );
 
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
   const activeIndex = findActiveIndex(segments, currentTime);
@@ -96,7 +125,7 @@ export function VideoView({
 
   return (
     <div className={styles.root} aria-label="Video view">
-      <div className={styles.videoContainer}>
+      <div className={styles.videoContainer} ref={containerRef}>
         <Player
           ref={playerRef}
           component={PodcastVisuals as React.FC}
@@ -109,6 +138,23 @@ export function VideoView({
           controls={false}
           aria-label={title ? `Video for ${title}` : 'Podcast video'}
         />
+        {containerSize.width > 0 && readyOverlays.map((overlay) => (
+          <AvatarOverlay
+            key={overlay.id}
+            videoUrl={overlay.videoUrl!}
+            speaker={overlay.speaker}
+            posX={overlay.posX}
+            posY={overlay.posY}
+            width={overlay.width}
+            height={overlay.height}
+            currentTime={currentTime}
+            isPlaying={isPlaying}
+            containerWidth={containerSize.width}
+            containerHeight={containerSize.height}
+            editable={isOwner ?? false}
+            onPositionChange={(pos) => onAvatarPositionChange?.(overlay.speaker, pos)}
+          />
+        ))}
       </div>
 
       {activeSegment && (
