@@ -25,8 +25,9 @@ vi.mock('@/lib/visual-classifier', () => ({
 }));
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { GENERATE_VISUAL: 'generate_visual', COMPOSE_VIDEO: 'compose_video' },
+  JobType: { GENERATE_VISUAL: 'generate_visual', COMPOSE_VIDEO: 'compose_video', PLACE_ENRICHMENT: 'place_enrichment' },
   visualGenerationQueue: { name: 'visual-generation' },
+  placeEnrichmentQueue: { name: 'place-enrichment' },
   videoCompositionQueue: { name: 'video-composition' },
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
@@ -97,6 +98,56 @@ describe('visual-classification worker', () => {
       expect.objectContaining({ name: 'visual-generation' }),
       'generate_visual',
       expect.objectContaining({ segmentVisualId: 'sv-1', visualType: 'AI_ILLUSTRATION' }),
+    );
+  });
+
+  it('routes MAP_OVERLAY segments to place-enrichment instead of visual-generation', async () => {
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+      title: 'Ancient Rome',
+      topic: 'History',
+      segments: [
+        { id: 'seg-1', order: 0, speaker: 'Host', text: 'Rome was founded...', startTime: 0, duration: 5 },
+      ],
+    });
+
+    mockClassify.mockResolvedValue({
+      classifications: [
+        {
+          segmentId: 'seg-1',
+          order: 0,
+          visualType: 'MAP_OVERLAY',
+          prompt: 'Ancient Rome city',
+          metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
+        },
+      ],
+      inputTokens: 80,
+      outputTokens: 60,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    mockPrisma.segmentVisual.findMany.mockResolvedValue([
+      {
+        id: 'sv-1',
+        segmentId: 'seg-1',
+        visualType: 'MAP_OVERLAY',
+        prompt: 'Ancient Rome city',
+        metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
+      },
+    ]);
+
+    await processVisualClassification(makeJob(baseData));
+
+    // Should queue place-enrichment, NOT visual-generation
+    expect(mockAddJob).toHaveBeenCalledTimes(1);
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'place-enrichment' }),
+      'place_enrichment',
+      expect.objectContaining({
+        podcastId: 'pod-1',
+        videoGenerationId: 'vg-1',
+        segmentVisualId: 'sv-1',
+        places: [{ name: 'Rome', yearHint: -753 }],
+      }),
     );
   });
 
