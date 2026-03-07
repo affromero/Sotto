@@ -5,6 +5,7 @@ import {
   addJob,
   JobType,
   visualGenerationQueue,
+  placeEnrichmentQueue,
   videoCompositionQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
@@ -111,14 +112,25 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         const visual = visualBySegment.get(ext.segmentId);
         if (!visual) continue;
 
-        await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
-          podcastId,
-          videoGenerationId,
-          segmentVisualId: visual.id,
-          visualType: visual.visualType,
-          prompt: visual.prompt ?? '',
-          metadata: (visual.metadata as Record<string, unknown>) ?? {},
-        });
+        if (visual.visualType === 'MAP_OVERLAY') {
+          const meta = (visual.metadata as Record<string, unknown>) ?? {};
+          const places = (meta.places as Array<{ name: string; yearHint?: number }>) ?? [];
+          await addJob(placeEnrichmentQueue, JobType.PLACE_ENRICHMENT, {
+            podcastId,
+            videoGenerationId,
+            segmentVisualId: visual.id,
+            places,
+          });
+        } else {
+          await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+            podcastId,
+            videoGenerationId,
+            segmentVisualId: visual.id,
+            visualType: visual.visualType,
+            prompt: visual.prompt ?? '',
+            metadata: (visual.metadata as Record<string, unknown>) ?? {},
+          });
+        }
       }
     } else {
       // All segments are programmatic — skip straight to composition

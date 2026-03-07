@@ -170,6 +170,89 @@ describe('visual-generation worker', () => {
     );
   });
 
+  it('generates map image from pre-enriched place metadata', async () => {
+    const mockGenerateMapImage = vi.fn().mockResolvedValue(Buffer.from('map-png'));
+    vi.doMock('@/lib/map-image', () => ({
+      generateMapImage: (...args: unknown[]) => mockGenerateMapImage(...args),
+    }));
+
+    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const mapData = {
+      ...baseData,
+      visualType: 'MAP_OVERLAY',
+      prompt: 'Ancient Rome',
+      metadata: {
+        places: [{
+          name: 'Rome',
+          coordinates: [12.4964, 41.9028],
+          aliases: ['Roma'],
+          modernRegion: 'Lazio, Italy',
+          historicalContext: [{ yearStart: -753, periodName: 'Roman Kingdom' }],
+          source: 'whg',
+          confidence: 0.95,
+        }],
+        preset: 'vintage',
+      },
+    };
+
+    await processVisualGeneration(makeJob(mapData));
+
+    expect(mockGenerateMapImage).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Rome', coordinates: [12.4964, 41.9028] }),
+      'vintage',
+    );
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      'podcasts/pod-1/visuals/sv-1.png',
+      expect.any(Buffer),
+      'image/png',
+    );
+  });
+
+  it('falls back to AI illustration when no enriched place has coordinates', async () => {
+    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
+
+    const mockProvider = {
+      generateImage: vi.fn().mockResolvedValue(Buffer.from('fallback')),
+      getModelId: () => 'flux-schnell',
+      providerId: 'fal' as const,
+    };
+    mockResolveImageProvider.mockResolvedValue({
+      provider: mockProvider,
+      source: 'platform',
+      providerId: 'fal',
+    });
+
+    mockPrisma.segmentVisual.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const mapData = {
+      ...baseData,
+      visualType: 'MAP_OVERLAY',
+      prompt: 'Unknown place',
+      metadata: {
+        places: [{ name: 'Atlantis' }],
+        preset: 'cinematic',
+      },
+    };
+
+    await processVisualGeneration(makeJob(mapData));
+
+    // Should fall back to AI illustration
+    expect(mockProvider.generateImage).toHaveBeenCalled();
+    expect(mockPrisma.segmentVisual.update).toHaveBeenCalledWith({
+      where: { id: 'sv-1' },
+      data: { visualType: 'AI_ILLUSTRATION' },
+    });
+  });
+
   it('marks generation READY when all visuals ready (client-side rendering)', async () => {
     mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
