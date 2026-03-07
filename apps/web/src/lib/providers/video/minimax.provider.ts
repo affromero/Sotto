@@ -7,11 +7,13 @@ import type { VideoProvider } from '../video';
 
 const MINIMAX_API_BASE = 'https://api.minimax.io/v1';
 
-/** Map our registry model IDs to MiniMax API model names. */
-const MODEL_MAP: Record<string, string> = {
-  'minimax-t2v-01': 'T2V-01',
-  'minimax-hailuo-02': 'MiniMax-Hailuo-02',
-  'minimax-hailuo-2.3': 'MiniMax-Hailuo-2.3',
+/** Map pricetoken model IDs to MiniMax API model names. */
+const MODEL_MAP: Record<string, { apiModel: string; resolution: string }> = {
+  'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P' },
+  'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P' },
+  'minimax-hailuo02-pro-1080p': { apiModel: 'MiniMax-Hailuo-02', resolution: '1080P' },
+  'minimax-hailuo23-fast-1080p': { apiModel: 'MiniMax-Hailuo-2.3', resolution: '1080P' },
+  'minimax-hailuo23-fast-768p': { apiModel: 'MiniMax-Hailuo-2.3', resolution: '768P' },
 };
 
 interface MiniMaxBaseResp {
@@ -43,10 +45,10 @@ export class MiniMaxVideoProvider implements VideoProvider {
   }
 
   async generateVideo(params: { prompt: string; duration?: number }): Promise<Buffer> {
-    const apiModel = MODEL_MAP[this.model];
-    if (!apiModel) throw new Error(`Unknown MiniMax video model: ${this.model}`);
+    const mapping = MODEL_MAP[this.model];
+    if (!mapping) throw new Error(`Unknown MiniMax video model: ${this.model}`);
 
-    logger.info('Submitting MiniMax video task', { model: this.model, apiModel });
+    logger.info('Submitting MiniMax video task', { model: this.model, apiModel: mapping.apiModel, resolution: mapping.resolution });
 
     const submitRes = await fetch(`${MINIMAX_API_BASE}/video_generation`, {
       method: 'POST',
@@ -55,11 +57,11 @@ export class MiniMaxVideoProvider implements VideoProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: apiModel,
+        model: mapping.apiModel,
         prompt: params.prompt,
         prompt_optimizer: true,
         duration: params.duration ?? 6,
-        resolution: '1080P',
+        resolution: mapping.resolution,
       }),
     });
 

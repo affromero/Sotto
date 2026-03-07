@@ -55,11 +55,13 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
     id: 'minimax',
     displayName: 'MiniMax (Hailuo)',
     getApiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
-    defaultModel: 'minimax-hailuo-02',
+    defaultModel: 'minimax-hailuo02-768p',
     models: [
-      { id: 'minimax-t2v-01', displayName: 'T2V-01 (720p)', tier: 'standard' },
-      { id: 'minimax-hailuo-02', displayName: 'Hailuo 02 (1080p)', tier: 'high' },
-      { id: 'minimax-hailuo-2.3', displayName: 'Hailuo 2.3 (1080p)', tier: 'best' },
+      { id: 'minimax-hailuo02-512p', displayName: 'Hailuo 02 (512p)', tier: 'standard' },
+      { id: 'minimax-hailuo02-768p', displayName: 'Hailuo 02 (768p)', tier: 'standard' },
+      { id: 'minimax-hailuo02-pro-1080p', displayName: 'Hailuo 02 Pro (1080p)', tier: 'high' },
+      { id: 'minimax-hailuo23-fast-1080p', displayName: 'Hailuo 2.3 Fast (1080p)', tier: 'high' },
+      { id: 'minimax-hailuo23-fast-768p', displayName: 'Hailuo 2.3 Fast (768p)', tier: 'best' },
     ],
     platformKeyEnv: 'MINIMAX_API_KEY',
     auth: {
