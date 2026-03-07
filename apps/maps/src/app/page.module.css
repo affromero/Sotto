@@ -1,65 +1,155 @@
 .root {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  padding: 24px;
-  max-width: 1200px;
-  margin: 0 auto;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Floating overlay on top of the map */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 20px 24px;
+  pointer-events: none;
+}
+
+.overlay > * {
+  pointer-events: auto;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .title {
   font-family: var(--font-heading);
-  font-size: 36px;
-  color: var(--color-text);
-  margin-bottom: 4px;
+  font-size: 28px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  margin-bottom: 2px;
 }
 
 .subtitle {
-  font-size: 16px;
-  color: var(--color-text-muted);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
 }
 
 .controls {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 12px;
+  justify-content: center;
   flex-wrap: wrap;
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .error {
-  color: #dc2626;
+  text-align: center;
+  color: #fca5a5;
   font-size: 14px;
-  margin-bottom: 12px;
+  margin-top: 8px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 
-.mapContainer {
-  flex: 1;
-  height: 0;
-  min-height: 500px;
+/* Place info card — bottom left */
+.placeInfo {
+  position: absolute;
+  bottom: 80px;
+  left: 20px;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 14px 18px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  max-width: 320px;
+  backdrop-filter: blur(8px);
+}
+
+.placeName {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.aliases {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.region {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.period {
+  display: inline-block;
+  font-size: 11px;
+  background: var(--color-primary);
+  color: #fff;
+  padding: 2px 8px;
   border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
+  margin-right: 4px;
+  margin-bottom: 4px;
 }
 
-.placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 500px;
-  color: var(--color-text-muted);
+.yearBadge {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  color: var(--color-accent);
+  background: rgba(30, 58, 95, 0.1);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+/* Time slider — bottom center */
+.timeSliderContainer {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(600px, calc(100vw - 40px));
+  background: rgba(255, 255, 255, 0.92);
+  padding: 12px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+}
+
+/* Hint text when no search yet */
+.hint {
+  position: absolute;
+  bottom: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hint p {
+  color: rgba(255, 255, 255, 0.9);
   font-size: 18px;
-  gap: 8px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
 }
 
-.examples {
-  font-size: 14px;
-  color: var(--color-text-muted);
-  opacity: 0.7;
+.hintExamples {
+  font-size: 14px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-top: 4px;
 }
