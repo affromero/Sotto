@@ -90,11 +90,11 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
+    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
 
     const mockProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('fake-image')),
-      getModelId: () => 'flux-schnell',
+      getModelId: () => 'fal-flux-1-schnell',
       providerId: 'fal' as const,
     };
     mockResolveImageProvider.mockResolvedValue({
@@ -131,11 +131,11 @@ describe('visual-generation worker', () => {
     mockSearchStockVideo.mockResolvedValue(null);
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
+    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
 
     const mockProvider = {
       generateImage: vi.fn().mockResolvedValue(Buffer.from('fallback-image')),
-      getModelId: () => 'flux-schnell',
+      getModelId: () => 'fal-flux-1-schnell',
       providerId: 'fal' as const,
     };
     mockResolveImageProvider.mockResolvedValue({
@@ -179,7 +179,7 @@ describe('visual-generation worker', () => {
     mockResolveImageProvider.mockResolvedValue({
       provider: {
         generateImage: vi.fn().mockResolvedValue(Buffer.from('img')),
-        getModelId: () => 'flux-schnell',
+        getModelId: () => 'fal-flux-1-schnell',
         providerId: 'fal' as const,
       },
       source: 'platform',

@@ -28,11 +28,14 @@ const IMAGE_PROVIDERS: Record<ImageProviderId, ImageProviderMeta> = {
     id: 'fal',
     displayName: 'Fal (FLUX)',
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
-    defaultModel: 'flux-schnell',
+    defaultModel: 'fal-flux-1-schnell',
     models: [
-      { id: 'flux-schnell', displayName: 'FLUX Schnell', costPerMegapixel: 0.003, tier: 'standard' },
-      { id: 'flux-1.1-pro', displayName: 'FLUX 1.1 Pro', costPerMegapixel: 0.04, tier: 'high' },
-      { id: 'flux-2-pro', displayName: 'FLUX 2 Pro', costPerMegapixel: 0.03, tier: 'best' },
+      { id: 'fal-flux-1-schnell', displayName: 'FLUX.1 Schnell', costPerMegapixel: 0.003, tier: 'standard' },
+      { id: 'fal-flux-1-pro', displayName: 'FLUX 1 Pro', costPerMegapixel: 0.025, tier: 'high' },
+      { id: 'fal-flux-2-pro', displayName: 'FLUX 2 Pro', costPerMegapixel: 0.04, tier: 'best' },
+      { id: 'fal-recraft-v3', displayName: 'Recraft V3', costPerMegapixel: 0.02, tier: 'standard' },
+      { id: 'fal-ideogram-v2', displayName: 'Ideogram V2', costPerMegapixel: 0.08, tier: 'high' },
+      { id: 'fal-sd3', displayName: 'Stable Diffusion 3', costPerMegapixel: 0.035, tier: 'standard' },
     ],
     auth: {
       validate: async (creds) => {

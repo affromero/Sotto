@@ -15,7 +15,7 @@ vi.mock('@/lib/providers/video-registry', () => ({
     {
       id: 'minimax',
       models: [
-        { id: 'minimax-t2v-01', displayName: 'T2V-01', tier: 'standard' },
+        { id: 'minimax-hailuo02-768p', displayName: 'Hailuo 02 768p', tier: 'standard' },
       ],
     },
   ],
