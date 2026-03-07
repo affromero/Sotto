@@ -10,8 +10,7 @@ import {
 import type { TtsProviderId } from './tts-registry';
 import { getProviderMeta, compareQuality } from './tts-registry';
 import { getByokKey, getByokExtraData, listByokProviders, hasByokKey } from '../byok';
-import { getFreeTierConfig } from '../free-tier-config';
-import { resolveAutoModel } from '../auto-model-config';
+import { resolveAutoModel, getAutoModelConfig } from '../auto-model-config';
 
 export interface SpeechParams {
   text: string;
@@ -297,8 +296,8 @@ export async function resolveTtsProvider(context: {
     // Platform fallback for elevenlabs/openai (we have platform keys)
     // Prefer user's requested model, fall back to admin-configured model
     if (requestedProvider === 'elevenlabs' && process.env.ELEVENLABS_API_KEY) {
-      const config = await getFreeTierConfig();
-      const model = requestedModel ?? (config.ttsProvider === 'elevenlabs' ? config.ttsModel : undefined);
+      const config = await getAutoModelConfig();
+      const model = requestedModel ?? (config.free.ttsProvider === 'elevenlabs' ? config.free.ttsModel : undefined);
       return {
         provider: createPremiumTtsProvider(undefined, model),
         source: 'platform',
@@ -306,8 +305,8 @@ export async function resolveTtsProvider(context: {
       };
     }
     if (requestedProvider === 'openai' && process.env.OPENAI_API_KEY) {
-      const config = await getFreeTierConfig();
-      const model = requestedModel ?? (config.ttsProvider === 'openai' ? config.ttsModel : undefined);
+      const config = await getAutoModelConfig();
+      const model = requestedModel ?? (config.free.ttsProvider === 'openai' ? config.free.ttsModel : undefined);
       return {
         provider: createTtsProvider('openai', undefined, model),
         source: 'platform',
@@ -315,8 +314,8 @@ export async function resolveTtsProvider(context: {
       };
     }
     if (requestedProvider === 'cartesia' && process.env.CARTESIA_API_KEY) {
-      const config = await getFreeTierConfig();
-      const model = requestedModel ?? (config.ttsProvider === 'cartesia' ? config.ttsModel : undefined);
+      const config = await getAutoModelConfig();
+      const model = requestedModel ?? (config.free.ttsProvider === 'cartesia' ? config.free.ttsModel : undefined);
       const provider = await createTtsProviderAsync('cartesia', undefined, undefined, model);
       return { provider, source: 'platform', providerId: 'cartesia' };
     }

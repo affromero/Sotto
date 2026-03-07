@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { getFreeTierConfig } from './free-tier-config';
+import { getAutoModelConfig } from './auto-model-config';
 import { getRedisClient } from './redis';
 
 export type VideoGateReason = 'ok' | 'no_image_provider' | 'daily_limit_reached';
@@ -62,7 +62,7 @@ export async function checkVideoGenerationGate(userId: string): Promise<VideoGat
   const [hasByok, providerAvailable, config, user] = await Promise.all([
     hasImageByokKey(userId),
     hasImageProvider(userId),
-    getFreeTierConfig(),
+    getAutoModelConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, plan: true },
@@ -163,7 +163,7 @@ export async function getVideoGenerationStatus(userId: string): Promise<{
 }> {
   const [hasByok, config, user, dailyData] = await Promise.all([
     hasImageByokKey(userId),
-    getFreeTierConfig(),
+    getAutoModelConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, plan: true },

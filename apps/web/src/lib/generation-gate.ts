@@ -1,6 +1,6 @@
 import { prisma } from './prisma';
 import { hasByokKey } from './byok';
-import { getFreeTierConfig, type ProviderAllocation } from './free-tier-config';
+import { getAutoModelConfig, type ProviderAllocation } from './auto-model-config';
 import { getRedisClient } from './redis';
 import { getReferralBonus, getActiveReferralCount } from './referrals';
 
@@ -90,7 +90,7 @@ async function hasInFlightGeneration(userId: string): Promise<boolean> {
 export async function checkGenerationGate(userId: string): Promise<GenerationGateResult> {
   const [hasTts, config, user] = await Promise.all([
     hasByokKey(userId),
-    getFreeTierConfig(),
+    getAutoModelConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, plan: true, dailyGenerationOverride: true },
@@ -292,7 +292,7 @@ export async function getFreeTierStatus(userId: string): Promise<{
 }> {
   const [hasTts, config, user, dailyData] = await Promise.all([
     hasByokKey(userId),
-    getFreeTierConfig(),
+    getAutoModelConfig(),
     prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: { role: true, plan: true, dailyGenerationOverride: true },
