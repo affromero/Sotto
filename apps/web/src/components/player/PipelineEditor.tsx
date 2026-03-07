@@ -92,7 +92,9 @@ export function PipelineEditor({ pipeline, falModels, onApprove, onCancel }: Pip
 
       <div className={styles.footer}>
         <p className={styles.approvalSummary}>
-          {segments.length} scene{segments.length !== 1 ? 's' : ''}, ~{Math.ceil(totalDuration)}s video, est. {formatCost(totalCost)}
+          {segments.length} scene{segments.length !== 1 ? 's' : ''}, ~{Math.ceil(totalDuration)}s video
+          <br />
+          <span className={styles.costLabel}>Free</span> · est. {formatCost(totalCost)} on us
         </p>
         <div className={styles.footerActions}>
           <button className={styles.cancelBtn} onClick={onCancel} type="button">

@@ -76,6 +76,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.costLabel {
+  color: #22c55e;
+  font-weight: 600;
+}
+
 .footerActions {
   display: flex;
   align-items: center;

@@ -70,6 +70,15 @@ import type { SegmentVisualData } from '@/lib/segment-utils';
 import { profileUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
+export interface VideoGenerationStatus {
+  dailyUsed: number;
+  dailyLimit: number;
+  dailyRemaining: number;
+  resetInSeconds?: number;
+  isByokUser: boolean;
+  isProUser: boolean;
+}
+
 interface PodcastPlayerViewProps {
   podcast: PodcastDetail;
   isOwner: boolean;
@@ -77,7 +86,7 @@ interface PodcastPlayerViewProps {
   isAuthenticated: boolean;
   currentUserId?: string;
   canMakePrivate?: boolean;
-  canGenerateVideo?: boolean;
+  videoStatus?: VideoGenerationStatus;
 }
 
 type ViewMode = 'transcript' | 'teleprompter' | 'video';
@@ -148,7 +157,7 @@ function PlayerBridge({
   return null;
 }
 
-export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, canGenerateVideo }: PodcastPlayerViewProps) {
+export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, currentUserId, canMakePrivate, videoStatus }: PodcastPlayerViewProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [liked, setLiked] = useState(podcast.isLiked);
@@ -806,7 +815,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <Button
                 onClick={handleGenerateVideo}
                 loading={pipelineLoading || videoLoading}
-                disabled={pipelineLoading || videoLoading || !canGenerateVideo}
+                disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
               >
                 <Video size={16} />
                 Generate Video
@@ -814,13 +823,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <Button
                 variant="secondary"
                 onClick={() => setShowAvatarPicker(true)}
-                disabled={!canGenerateVideo}
+                disabled={videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin}
               >
                 <Users size={16} />
                 Add Avatars
               </Button>
-              {!canGenerateVideo && !isAdmin && (
-                <Badge variant="warning">PRO</Badge>
+              {videoStatus && !videoStatus.isByokUser && (
+                <span className={styles.videoQuota}>
+                  Free · {videoStatus.dailyRemaining} of {videoStatus.dailyLimit} remaining today
+                </span>
               )}
               {videoError && <p className={styles.videoError}>{videoError}</p>}
             </div>
