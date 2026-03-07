@@ -34,7 +34,7 @@ export async function resolveImageProvider(context: {
   const { userId, requestedModel } = context;
 
   const config = await getAutoModelConfig();
-  const model = requestedModel ?? config.proImageModel ?? 'flux-schnell';
+  const model = requestedModel ?? config.proImageModel ?? 'fal-flux-1-schnell';
 
   // Try BYOK fal key first (shared with TTS — fal keys stored in UserTtsKey)
   const byokKey = await getByokKey(userId, 'fal');

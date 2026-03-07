@@ -365,8 +365,8 @@ describe('PATCH /api/admin/auto-models', () => {
     const response = await PATCH(
       createPatchRequest({
         proImageProvider: 'fal',
-        proImageModel: 'flux-schnell',
-        proIncludedImageModels: ['fal:flux-schnell', 'fal:flux-2-pro'],
+        proImageModel: 'fal-flux-1-schnell',
+        proIncludedImageModels: ['fal:fal-flux-1-schnell', 'fal:fal-flux-2-pro'],
       })
     );
 
@@ -374,8 +374,8 @@ describe('PATCH /api/admin/auto-models', () => {
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
       {
         proImageProvider: 'fal',
-        proImageModel: 'flux-schnell',
-        proIncludedImageModels: ['fal:flux-schnell', 'fal:flux-2-pro'],
+        proImageModel: 'fal-flux-1-schnell',
+        proIncludedImageModels: ['fal:fal-flux-1-schnell', 'fal:fal-flux-2-pro'],
       },
       'admin-1'
     );
@@ -389,9 +389,9 @@ describe('PATCH /api/admin/auto-models', () => {
         freeVideoProvider: 'fal',
         freeVideoModel: 'fal-wan2.5-480p',
         proVideoProvider: 'minimax',
-        proVideoModel: 'minimax-t2v-01',
+        proVideoModel: 'minimax-hailuo02-768p',
         freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
-        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-t2v-01'],
+        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-hailuo02-768p'],
       })
     );
 
@@ -401,9 +401,9 @@ describe('PATCH /api/admin/auto-models', () => {
         freeVideoProvider: 'fal',
         freeVideoModel: 'fal-wan2.5-480p',
         proVideoProvider: 'minimax',
-        proVideoModel: 'minimax-t2v-01',
+        proVideoModel: 'minimax-hailuo02-768p',
         freeIncludedVideoModels: ['fal:fal-wan2.5-480p'],
-        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-t2v-01'],
+        proIncludedVideoModels: ['fal:fal-wan2.5-480p', 'minimax:minimax-hailuo02-768p'],
       },
       'admin-1'
     );
