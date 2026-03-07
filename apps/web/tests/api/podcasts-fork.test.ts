@@ -115,9 +115,9 @@ vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
 }));
 
-const mockGetFreeTierConfig = vi.fn();
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+const mockGetAutoModelConfig = vi.fn();
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
 // Mock validations — let real schema through

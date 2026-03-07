@@ -11,7 +11,6 @@ import {
   BarChart2,
   Shield,
   AtSign,
-  Settings,
   MessageSquareShare,
   Star,
   Sparkles,
@@ -100,7 +99,6 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/admin/waitlist', label: 'Waitlist', icon: Mail },
       { href: '/admin/handles', label: 'Handles', icon: AtSign },
-      { href: '/admin/config', label: 'Config', icon: Settings },
       { href: '/admin/auto-models', label: 'Auto Models', icon: Wand2 },
       { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
       { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
