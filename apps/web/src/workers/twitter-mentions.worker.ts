@@ -3,7 +3,7 @@ import { PollTwitterMentionsPayload, addJob, JobType, contentExtractionQueue } f
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { getRedisClient } from '@/lib/redis';
 import { getMentions, getTweet, getThread, replyToTweet, sendDirectMessage } from '@/lib/twitter';
-import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
+import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet, resolveCheapestModels } from '@/lib/tweet-parser';
 import { getAiKey, hasByokKey } from '@/lib/byok';
 import { checkGenerationGate, tryIncrementFreeGeneration } from '@/lib/generation-gate';
 import { selectFreeTierProviders } from '@/lib/free-tier-provider-selector';
@@ -195,7 +195,11 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
     }
 
     // 7c. Resolve user-requested model preferences from tweet
-    const tweetModels = resolveModelFromTweet(parsed);
+    let tweetModels = resolveModelFromTweet(parsed);
+    if (tweetModels.costPreference === 'cheapest') {
+      tweetModels = await resolveCheapestModels(tweetModels);
+    }
+
     let effectiveAiModel = user.preferredAiModel ?? undefined;
     let effectiveTtsProvider = user.preferredTtsProvider ?? undefined;
     let effectiveTtsModel = user.preferredTtsModel ?? undefined;
@@ -221,9 +225,18 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       effectiveTtsModel = undefined; // use provider default
     }
 
+    // Store video preferences on the mention for downstream use by audio-stitching
+    const videoPrefs = tweetModels.wantsVideo
+      ? { imageModel: tweetModels.imageModel, videoModel: tweetModels.videoModel, wantsVideo: true }
+      : null;
+
     await prisma.tweetMention.update({
       where: { id: mention.id },
-      data: { parsedTopic: parsed.topic, status: 'GENERATING' },
+      data: {
+        parsedTopic: parsed.topic,
+        status: 'GENERATING',
+        ...(videoPrefs ? { videoPrefs } : {}),
+      },
     });
 
     // 8. Determine voice IDs
@@ -355,6 +368,9 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       isThread: String(!!isThreadPodcast),
       requestedAiModel: parsed.requestedAiModel ?? 'none',
       requestedTtsProvider: parsed.requestedTtsProvider ?? 'none',
+      wantsVideo: String(tweetModels.wantsVideo),
+      imageModel: tweetModels.imageModel ?? 'none',
+      videoModel: tweetModels.videoModel ?? 'none',
     });
   } catch (err) {
     await prisma.tweetMention.update({
