@@ -1,5 +1,0 @@
-/* Re-export mapbox-gl CSS for consumers.
-   Import this file in your root layout or global styles:
-   import '@sotto/maps/styles/mapbox-gl.css';
-*/
-@import 'mapbox-gl/dist/mapbox-gl.css';
