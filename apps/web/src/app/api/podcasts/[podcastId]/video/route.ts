@@ -4,7 +4,7 @@ import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { checkVideoGenerationGate } from '@/lib/video-gate';
-import { generateVideoSchema } from '@/lib/validations';
+import { generateVideoSchema, updateVideoSegmentsSchema } from '@/lib/validations';
 import { Prisma } from '@prisma/client';
 import { addJob, JobType, visualClassificationQueue, visualGenerationQueue, videoCompositionQueue } from '@/lib/queue';
 import { deleteFile, extractR2Key } from '@/lib/r2';
@@ -421,4 +421,150 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   logger.info('Video generation deleted', { podcastId });
 
   return NextResponse.json({ success: true });
+}
+
+/**
+ * PATCH — Selectively regenerate changed video segments.
+ */
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  const { podcastId } = await params;
+  const authResult = await authenticateRequest(request);
+
+  if (!authResult) {
+    return errorResponse('Unauthorized', 401);
+  }
+
+  const podcast = await prisma.podcast.findUnique({
+    where: { id: podcastId },
+    select: { id: true, userId: true },
+  });
+
+  if (!podcast) {
+    return errorResponse('Podcast not found', 404);
+  }
+
+  const adminId = await requireAdmin();
+  if (podcast.userId !== authResult.userId && !adminId) {
+    return errorResponse('Forbidden', 403);
+  }
+
+  const body = await request.json().catch(() => null);
+  const parsed = updateVideoSegmentsSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse('Invalid request body', 400, { details: parsed.error.flatten() });
+  }
+
+  const videoGeneration = await prisma.videoGeneration.findUnique({
+    where: { podcastId },
+    select: { id: true, status: true, videoUrl: true },
+  });
+
+  if (!videoGeneration) {
+    return errorResponse('No video generation found', 404);
+  }
+
+  if (videoGeneration.status !== 'READY' && videoGeneration.status !== 'FAILED') {
+    return errorResponse('Video must be in READY or FAILED status to edit', 400);
+  }
+
+  // Look up all referenced segment visuals
+  const segmentIds = parsed.data.segments.map((s) => s.segmentVisualId);
+  const existingVisuals = await prisma.segmentVisual.findMany({
+    where: { id: { in: segmentIds }, videoGenerationId: videoGeneration.id },
+    select: { id: true, assetUrl: true, visualMode: true },
+  });
+
+  const existingMap = new Map(existingVisuals.map((v) => [v.id, v]));
+  const missing = segmentIds.filter((id) => !existingMap.has(id));
+  if (missing.length > 0) {
+    return errorResponse(`Segment visuals not found: ${missing.join(', ')}`, 404);
+  }
+
+  // Delete old assets from R2
+  const deletePromises: Promise<void>[] = [];
+  for (const visual of existingVisuals) {
+    if (visual.assetUrl) {
+      const key = extractR2Key(visual.assetUrl);
+      if (key) deletePromises.push(deleteFile(key));
+    }
+  }
+  // Delete old composed video if it exists
+  if (videoGeneration.videoUrl) {
+    const key = extractR2Key(videoGeneration.videoUrl);
+    if (key) deletePromises.push(deleteFile(key));
+  }
+  await Promise.allSettled(deletePromises);
+
+  const EXTERNAL_MODES = new Set(['image', 'video']);
+
+  // Update segment visuals and video generation in a transaction
+  await prisma.$transaction(async (tx) => {
+    for (const seg of parsed.data.segments) {
+      const newMode = seg.visualMode ?? existingMap.get(seg.segmentVisualId)!.visualMode ?? 'image';
+      const isExternal = EXTERNAL_MODES.has(newMode);
+
+      await tx.segmentVisual.update({
+        where: { id: seg.segmentVisualId },
+        data: {
+          ...(seg.visualType !== undefined && { visualType: seg.visualType as Prisma.EnumVisualTypeFieldUpdateOperationsInput['set'] }),
+          ...(seg.visualMode !== undefined && { visualMode: seg.visualMode }),
+          ...(seg.model !== undefined && { videoModel: seg.model }),
+          ...(seg.prompt !== undefined && { prompt: seg.prompt }),
+          ...(seg.metadata !== undefined && { metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull }),
+          status: isExternal ? 'pending' : 'ready',
+          assetUrl: null,
+          assetType: null,
+          failureReason: null,
+        },
+      });
+    }
+
+    await tx.videoGeneration.update({
+      where: { id: videoGeneration.id },
+      data: {
+        status: 'GENERATING_VISUALS',
+        videoUrl: null,
+        failureReason: null,
+      },
+    });
+  });
+
+  // Queue regeneration jobs for external visuals
+  const updatedVisuals = await prisma.segmentVisual.findMany({
+    where: { id: { in: segmentIds }, videoGenerationId: videoGeneration.id },
+    select: { id: true, segmentId: true, visualType: true, visualMode: true, prompt: true, metadata: true },
+  });
+
+  for (const visual of updatedVisuals) {
+    if (!EXTERNAL_MODES.has(visual.visualMode ?? '')) continue;
+
+    await addJob(visualGenerationQueue, JobType.GENERATE_VISUAL, {
+      podcastId,
+      videoGenerationId: videoGeneration.id,
+      segmentVisualId: visual.id,
+      visualType: visual.visualType,
+      prompt: visual.prompt ?? '',
+      metadata: (visual.metadata as Record<string, unknown>) ?? {},
+    });
+  }
+
+  // If all changed segments are programmatic, check if everything is ready
+  const allVisuals = await prisma.segmentVisual.findMany({
+    where: { videoGenerationId: videoGeneration.id },
+    select: { status: true },
+  });
+  const allReady = allVisuals.every((v) => v.status === 'ready');
+
+  if (allReady) {
+    await prisma.videoGeneration.update({
+      where: { id: videoGeneration.id },
+      data: { status: 'READY' },
+    });
+
+    logger.info('Video segments updated (all programmatic)', { podcastId, count: String(segmentIds.length) });
+    return NextResponse.json({ videoGenerationId: videoGeneration.id, status: 'READY' });
+  }
+
+  logger.info('Video segments updated, regenerating', { podcastId, count: String(segmentIds.length) });
+  return NextResponse.json({ videoGenerationId: videoGeneration.id, status: 'GENERATING_VISUALS' });
 }

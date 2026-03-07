@@ -59,12 +59,14 @@ import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
+import { VideoEditor } from '@/components/player/VideoEditor';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
 import type { PodcastStatus } from '@prisma/client';
+import type { SegmentVisualData } from '@/lib/segment-utils';
 import { profileUrl } from '@/lib/urls';
 import styles from './page.module.css';
 
@@ -184,15 +186,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [videoState, setVideoState] = useState<'idle' | 'generating' | 'ready' | 'failed'>(
     podcast.videoUrl ? 'ready' : 'idle'
   );
-  const [segmentVisuals, setSegmentVisuals] = useState<Array<{
-    segmentId: string;
-    visualType: string;
-    prompt: string | null;
-    metadata: Record<string, unknown> | null;
-    assetUrl: string | null;
-    assetType: string | null;
-    order: number;
-  }>>([]);
+  const [segmentVisuals, setSegmentVisuals] = useState<SegmentVisualData[]>([]);
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
@@ -201,6 +195,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -865,6 +860,37 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 setVideoState('ready');
                 setSegmentVisuals(visuals);
               }}
+            />
+          )}
+          {videoState === 'ready' && !showVideoEditor && (
+            <div className={styles.videoIdle}>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (!falModels) {
+                    const res = await fetch('/api/fal-models');
+                    if (res.ok) setFalModels(await res.json());
+                  }
+                  setShowVideoEditor(true);
+                }}
+              >
+                <Pencil size={16} />
+                Edit Storyboard
+              </Button>
+            </div>
+          )}
+          {showVideoEditor && videoState === 'ready' && falModels && (
+            <VideoEditor
+              podcastId={podcast.id}
+              segments={podcast.segments}
+              segmentVisuals={segmentVisuals}
+              falModels={falModels}
+              onRegenerate={(genId) => {
+                setShowVideoEditor(false);
+                setVideoState('generating');
+                setVideoGenerationId(genId);
+              }}
+              onCancel={() => setShowVideoEditor(false)}
             />
           )}
           {videoState === 'failed' && (

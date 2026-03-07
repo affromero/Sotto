@@ -12,8 +12,11 @@ const mockVideoGenCreate = vi.fn();
 const mockSegmentVisualCreateMany = vi.fn();
 const mockSegmentVisualDeleteMany = vi.fn();
 const mockSegmentVisualFindMany = vi.fn();
+const mockSegmentVisualUpdate = vi.fn();
+const mockSegmentVisualUpdateMany = vi.fn();
 const mockVideoGenUpdate = vi.fn();
 const mockVideoGenDelete = vi.fn();
+const mockTransaction = vi.fn();
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -28,7 +31,10 @@ vi.mock('@/lib/prisma', () => ({
       createMany: (...args: unknown[]) => mockSegmentVisualCreateMany(...args),
       deleteMany: (...args: unknown[]) => mockSegmentVisualDeleteMany(...args),
       findMany: (...args: unknown[]) => mockSegmentVisualFindMany(...args),
+      update: (...args: unknown[]) => mockSegmentVisualUpdate(...args),
+      updateMany: (...args: unknown[]) => mockSegmentVisualUpdateMany(...args),
     },
+    $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
 }));
 
@@ -80,7 +86,7 @@ vi.mock('@/lib/api-response', () => ({
   },
 }));
 
-import { POST } from '@/app/api/podcasts/[podcastId]/video/route';
+import { POST, PATCH } from '@/app/api/podcasts/[podcastId]/video/route';
 
 function createRequest(body?: unknown): NextRequest {
   return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/video'), {
@@ -190,5 +196,149 @@ describe('POST /api/podcasts/[id]/video', () => {
         }),
       }),
     );
+  });
+});
+
+function createPatchRequest(body: unknown): NextRequest {
+  return new NextRequest(new URL('http://localhost:3000/api/podcasts/pod-1/video'), {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+describe('PATCH /api/podcasts/[id]/video', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-1' });
+    mockRequireAdmin.mockResolvedValue(null);
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1' });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY', videoUrl: null });
+    mockSegmentVisualFindMany.mockResolvedValue([
+      { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'old prompt', metadata: null, assetUrl: 'https://r2.example.com/old.png' },
+    ]);
+    mockSegmentVisualUpdate.mockResolvedValue({});
+    mockVideoGenUpdate.mockResolvedValue({});
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      const tx = {
+        segmentVisual: { update: mockSegmentVisualUpdate },
+        videoGeneration: { update: mockVideoGenUpdate },
+      };
+      await fn(tx);
+    });
+    mockAddJob.mockResolvedValue({});
+  });
+
+  it('rejects unauthenticated requests', async () => {
+    mockAuthenticateRequest.mockResolvedValue(null);
+    const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-1' }] }), routeParams);
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects non-owner requests', async () => {
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'other-user' });
+    const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-1' }] }), routeParams);
+    expect(res.status).toBe(403);
+  });
+
+  it('rejects when video is not READY or FAILED', async () => {
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS', videoUrl: null });
+    const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-1' }] }), routeParams);
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects invalid body', async () => {
+    const res = await PATCH(createPatchRequest({ segments: [] }), routeParams);
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects missing segment visual IDs', async () => {
+    mockSegmentVisualFindMany.mockResolvedValueOnce([]);
+    const res = await PATCH(createPatchRequest({ segments: [{ segmentVisualId: 'sv-missing' }] }), routeParams);
+    expect(res.status).toBe(404);
+  });
+
+  it('updates segment visuals and queues regeneration for image mode', async () => {
+    // After transaction, return updated visuals for job queuing
+    mockSegmentVisualFindMany
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: 'https://r2.example.com/old.png', prompt: 'old prompt', metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'STOCK_FOOTAGE', visualMode: 'image', prompt: 'new prompt', metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', status: 'pending' },
+      ]);
+
+    const res = await PATCH(createPatchRequest({
+      segments: [{
+        segmentVisualId: 'sv-1',
+        visualType: 'STOCK_FOOTAGE',
+        prompt: 'new prompt',
+      }],
+    }), routeParams);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('GENERATING_VISUALS');
+
+    // Should have run transaction
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+
+    // Should queue visual generation
+    expect(mockAddJob).toHaveBeenCalledWith('vis-gen-queue', 'generate_visual', expect.objectContaining({
+      segmentVisualId: 'sv-1',
+    }));
+  });
+
+  it('marks READY immediately when all changed segments are programmatic', async () => {
+    mockSegmentVisualFindMany
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: null, prompt: null, metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'TEXT_CARD', visualMode: 'programmatic', prompt: null, metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', status: 'ready' },
+      ]);
+
+    const res = await PATCH(createPatchRequest({
+      segments: [{
+        segmentVisualId: 'sv-1',
+        visualType: 'TEXT_CARD',
+        visualMode: 'programmatic',
+      }],
+    }), routeParams);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('READY');
+
+    // Should NOT queue any jobs
+    expect(mockAddJob).not.toHaveBeenCalled();
+  });
+
+  it('allows PATCH when video is FAILED', async () => {
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'FAILED', videoUrl: null });
+    mockSegmentVisualFindMany
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', assetUrl: null, prompt: null, metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', visualMode: 'image', prompt: 'retry prompt', metadata: null },
+      ])
+      .mockResolvedValueOnce([
+        { id: 'sv-1', status: 'pending' },
+      ]);
+
+    const res = await PATCH(createPatchRequest({
+      segments: [{ segmentVisualId: 'sv-1', prompt: 'retry prompt' }],
+    }), routeParams);
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('GENERATING_VISUALS');
   });
 });
