@@ -14,6 +14,7 @@ interface UseMapboxOptions {
   preset?: MapPresetId;
   mapboxToken: string;
   interactive?: boolean;
+  projection?: 'mercator' | 'globe';
   onMapLoad?: (map: mapboxgl.Map) => void;
 }
 
@@ -31,6 +32,7 @@ export function useMapbox({
   preset = 'vintage',
   mapboxToken,
   interactive = true,
+  projection,
   onMapLoad,
 }: UseMapboxOptions): UseMapboxReturn {
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -52,6 +54,7 @@ export function useMapbox({
       pitch: pitch ?? presetConfig.pitch,
       bearing: bearing ?? 0,
       interactive,
+      projection: projection ?? 'mercator',
       attributionControl: false,
     });
 
@@ -75,7 +78,7 @@ export function useMapbox({
     });
 
     mapRef.current = map;
-  }, [container, center, zoom, pitch, bearing, preset, mapboxToken, interactive]);
+  }, [container, center, zoom, pitch, bearing, preset, mapboxToken, interactive, projection]);
 
   useEffect(() => {
     initMap();

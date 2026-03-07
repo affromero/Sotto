@@ -15,6 +15,7 @@ export interface MapViewProps {
   preset?: MapPresetId;
   mapboxToken: string;
   interactive?: boolean;
+  projection?: 'mercator' | 'globe';
   onMapLoad?: (map: MapboxMap) => void;
   children?: React.ReactNode;
   className?: string;
@@ -28,6 +29,7 @@ export function MapView({
   preset = 'vintage',
   mapboxToken,
   interactive = true,
+  projection,
   onMapLoad,
   children,
   className,
@@ -44,6 +46,7 @@ export function MapView({
     preset,
     mapboxToken,
     interactive,
+    projection,
     onMapLoad,
   });
 

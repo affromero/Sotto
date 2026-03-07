@@ -8,18 +8,21 @@
 .input {
   flex: 1;
   padding: 10px 16px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   font-size: 15px;
   font-family: var(--font-body);
-  background: var(--color-surface);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--color-text);
   outline: none;
   transition: border-color 0.15s ease;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(8px);
 }
 
 .input:focus {
   border-color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.97);
 }
 
 .input::placeholder {
@@ -38,6 +41,7 @@
   cursor: pointer;
   transition: background 0.15s ease;
   white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
 .button:hover {
