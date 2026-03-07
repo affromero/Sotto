@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0] - 2026-03-07
+
+### Added
+- Multi-provider video — FAL and MiniMax video provider registry with admin-configurable free/pro tiers
+- Avatar overlays — HeyGen lip-sync avatars with draggable positioning, chromakey, and Remotion MP4 export
+- Avatar provider registry — pluggable avatar backends (HeyGen first) with cost estimation
+- Client-side Remotion Player — decoupled video from audio with cross-fade transitions and Ken Burns presets
+- Storyboard editor — replaced ReactFlow node graph with vertical storyboard card list
+- Tweet-to-podcast video models — video model selection and cheapest-cost qualifier in tweet pipeline
+- Admin panel for video/avatar/image tiers — separate free and pro model configuration per provider
+
+### Fixed
+- Video duration capped to model's maxDuration
+- Stock footage fallback to AI illustration when search fails
+- Remotion entry point resolution (registerRoot, cwd-based paths)
+- Video worker status alignment with Remotion sidecar responses
+- Stale avatar detection and cleanup
+
+### Changed
+- Image/video model resolution uses `fetchAllVideoModels` for live catalog
+- Video export gated behind `ENABLE_VIDEO_EXPORT` flag
+
 ## [0.2.9] - 2026-03-07
 
 ### Added
