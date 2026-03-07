@@ -22,25 +22,24 @@ Sotto podcasts often reference real places — historical and modern. We wanted 
 
 ## Comparison with existing solutions
 
-| Feature | **@sotto/maps** | [react-map-gl](https://visgl.github.io/react-map-gl/) | [Leaflet](https://leafletjs.com/) / react-leaflet | [deck.gl](https://deck.gl/) | [MapLibre GL](https://maplibre.org/) | [Allmaps](https://allmaps.org/) | Manual Mapbox GL |
-|---|---|---|---|---|---|---|---|
-| **React components** | Built-in (`MapView`, `HistoricalMap`, `DualEraView`) | Yes | Yes | Yes | Community wrappers | No | Manual |
-| **Map presets** (vintage, cinematic, dark, etc.) | 6 built-in presets with texture overlays | No | No | No | No | No | Manual per-project |
-| **3D terrain** | One-line (`preset="cinematic"`) | Manual setup | No | Yes (mesh layers) | Manual setup | No | Manual setup |
-| **Historical map overlays** (IIIF warping) | Built-in via Allmaps integration | No | Plugin required | No | Plugin required | Core feature (standalone) | Manual integration |
-| **OpenHistoricalMap tiles** | Built-in with year filtering | No | No | No | No | No | Manual tile source |
-| **Before/after comparison** | 3 modes (side-by-side, slider, overlay-fade) | No | No | No | No | No | Manual |
-| **Time slider** with event markers | Built-in `TimeSlider` component | No | No | No | No | No | Manual |
-| **Place resolution** (name → coordinates) | Multi-gazetteer (WHG, GeoNames, Pleiades) | No | No | No | No | No | External service |
-| **Historical place bias** | `resolveHistorical()` — biases WHG/Pleiades | No | No | No | No | No | N/A |
-| **Camera animations** | `SequenceBuilder`, cinematic fly-betweens | No | No | Yes (transitions) | No | No | Manual `flyTo()` |
-| **Animation sequences** | `MapSequence` with playback controls | No | No | No | No | No | Manual |
-| **Remotion integration** | `MapSlide` for video pipeline | No | No | No | No | No | N/A |
-| **Static image API** | `generateMapImage()` for video frames | No | No | No | No | No | Manual API call |
-| **CSS Modules** | All components use CSS Modules | Inline styles | CSS classes | Inline styles | CSS classes | N/A | N/A |
-| **Content-synced media** | Designed for podcast/video sync | No | No | No | No | No | No |
-| **Caching** | In-memory LRU (500 entries, 24h TTL) | N/A | N/A | N/A | N/A | N/A | N/A |
-| **Bundle impact** | Tree-shakeable — workers import types only | Full GL bundle | ~40KB | ~300KB | Full GL bundle | Separate package | Full GL bundle |
+| Feature | **@sotto/maps** | react-map-gl | Leaflet | deck.gl | MapLibre GL | Allmaps | Manual Mapbox GL |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| React components | Yes | Yes | Yes | Yes | No | No | No |
+| Map presets (vintage, cinematic, etc.) | Yes (6) | No | No | No | No | No | No |
+| 3D terrain (one-line) | Yes | No | No | Yes | No | No | No |
+| Historical map overlays (IIIF) | Yes | No | No | No | No | Yes | No |
+| OpenHistoricalMap tiles | Yes | No | No | No | No | No | No |
+| Before/after comparison (3 modes) | Yes | No | No | No | No | No | No |
+| Time slider with event markers | Yes | No | No | No | No | No | No |
+| Place resolution (name → coords) | Yes | No | No | No | No | No | No |
+| Historical place bias | Yes | No | No | No | No | No | No |
+| Camera animation sequences | Yes | No | No | Yes | No | No | No |
+| Remotion video integration | Yes | No | No | No | No | No | No |
+| Static image API for video frames | Yes | No | No | No | No | No | No |
+| CSS Modules | Yes | No | No | No | No | No | No |
+| Content-synced media design | Yes | No | No | No | No | No | No |
+| Built-in caching (LRU + TTL) | Yes | No | No | No | No | No | No |
+| Tree-shakeable (types-only import) | Yes | No | Yes | No | No | Yes | No |
 
 ### Why not use existing libraries directly?
 
