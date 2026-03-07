@@ -4,7 +4,11 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { SearchBar } from '@/components/SearchBar';
 import { PresetPicker } from '@/components/PresetPicker';
-import { MapView, TimeSlider, addOHMOverlay, updateOHMYear, removeOHMOverlay } from '@sotto/maps';
+import {
+  MapView, TimeSlider,
+  addOHMOverlay, updateOHMYear, removeOHMOverlay,
+  addAllmapsOverlay, removeAllmapsOverlay,
+} from '@sotto/maps';
 import type { PlaceMetadata, MapPresetId } from '@sotto/maps';
 import styles from './page.module.css';
 
@@ -17,6 +21,8 @@ export default function HomePage() {
   const [preset, setPreset] = useState<MapPresetId>('vintage');
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [antiqueMapLoaded, setAntiqueMapLoaded] = useState(false);
+  const [antiqueMapLoading, setAntiqueMapLoading] = useState(false);
   const mapRef = useRef<MapboxMap | null>(null);
   const ohmLoadedRef = useRef(false);
   const yearRef = useRef<number | null>(null);
@@ -91,6 +97,7 @@ export default function HomePage() {
 
   const handleSearch = useCallback(async (query: string, parsedYear?: number) => {
     setError(null);
+    setAntiqueMapLoaded(false);
     try {
       const params = new URLSearchParams({ q: query });
       if (parsedYear != null) params.set('year', String(parsedYear));
@@ -111,6 +118,26 @@ export default function HomePage() {
       setError('Failed to resolve place');
     }
   }, [flyToPlace]);
+
+  const toggleAntiqueMap = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map || !place) return;
+
+    if (antiqueMapLoaded) {
+      removeAllmapsOverlay(map);
+      setAntiqueMapLoaded(false);
+      return;
+    }
+
+    setAntiqueMapLoading(true);
+    const success = await addAllmapsOverlay({
+      map,
+      coordinates: place.coordinates,
+      bbox: place.bbox ?? undefined,
+    });
+    setAntiqueMapLoaded(success);
+    setAntiqueMapLoading(false);
+  }, [place, antiqueMapLoaded]);
 
   // Keep yearRef in sync
   useEffect(() => {
@@ -171,6 +198,14 @@ export default function HomePage() {
               {year < 0 ? `${Math.abs(year)} BCE` : `${year} CE`}
             </div>
           )}
+          <button
+            type="button"
+            className={`${styles.antiqueToggle} ${antiqueMapLoaded ? styles.antiqueActive : ''}`}
+            onClick={toggleAntiqueMap}
+            disabled={antiqueMapLoading}
+          >
+            {antiqueMapLoading ? 'Searching...' : antiqueMapLoaded ? 'Hide Antique Map' : 'Show Antique Map'}
+          </button>
         </div>
       )}
 

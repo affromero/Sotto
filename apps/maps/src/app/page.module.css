@@ -154,6 +154,36 @@
   margin-top: 4px;
 }
 
+.antiqueToggle {
+  display: block;
+  margin-top: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 13px;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.antiqueToggle:hover {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.antiqueToggle:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.antiqueActive {
+  background: var(--color-accent);
+  color: #fff;
+}
+
 .ohmNote {
   font-size: 11px;
   color: var(--color-text-muted);

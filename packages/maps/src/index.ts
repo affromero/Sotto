@@ -37,7 +37,7 @@ export { TimeSlider } from './components/TimeSlider';
 export type { TimeSliderProps } from './components/TimeSlider';
 
 // Overlays
-export { addAllmapsOverlay, removeAllmapsOverlay } from './overlays/allmaps-overlay';
+export { addAllmapsOverlay, removeAllmapsOverlay, findHistoricalMaps } from './overlays/allmaps-overlay';
 export { addOHMOverlay, removeOHMOverlay, updateOHMYear } from './overlays/ohm-overlay';
 
 export { MapSequence } from './components/MapSequence';
