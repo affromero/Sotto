@@ -3,8 +3,13 @@ import { ComposeVideoPayload, addJob, JobType, notificationQueue } from '@/lib/q
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
+import { RenderStatus } from '@sotto/video';
 
-const REMOTION_URL = process.env.REMOTION_URL || 'http://localhost:3100';
+if (!process.env.REMOTION_URL) {
+  throw new Error('REMOTION_URL is not set — video composition worker cannot start');
+}
+
+const REMOTION_URL = process.env.REMOTION_URL;
 const POLL_INTERVAL_MS = 5000;
 const RENDER_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -131,7 +136,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
 
       const status = (await statusResponse.json()) as { status: string; progress: number; error?: string };
 
-      if (status.status === 'done') {
+      if (status.status === RenderStatus.DONE) {
         // Scale progress from 30-80 during render
         const renderProgress = Math.min(80, 30 + Math.round(status.progress * 50));
         if (renderProgress > lastProgress) {
@@ -141,7 +146,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         break;
       }
 
-      if (status.status === 'error') {
+      if (status.status === RenderStatus.ERROR) {
         throw new Error(`Remotion render failed: ${status.error ?? 'unknown'}`);
       }
 

@@ -5,8 +5,8 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import type { RenderInput } from '@sotto/video';
-import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING } from '@sotto/video';
+import type { RenderInput, RenderStatusValue } from '@sotto/video';
+import { DEFAULT_RENDER_CONFIG, DEFAULT_BRANDING, RenderStatus } from '@sotto/video';
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -14,7 +14,7 @@ app.use(express.json({ limit: '50mb' }));
 const PORT = parseInt(process.env.PORT ?? '3100', 10);
 
 interface RenderJob {
-  status: 'queued' | 'rendering' | 'done' | 'error';
+  status: RenderStatusValue;
   progress: number;
   outputPath?: string;
   error?: string;
@@ -45,7 +45,7 @@ async function executeRender(jobId: string, input: RenderInput): Promise<void> {
   const job = jobs.get(jobId);
   if (!job) return;
 
-  job.status = 'rendering';
+  job.status = RenderStatus.RENDERING;
   currentRender = jobId;
 
   const outputPath = path.join(os.tmpdir(), `sotto-video-${jobId}.mp4`);
@@ -73,11 +73,11 @@ async function executeRender(jobId: string, input: RenderInput): Promise<void> {
       },
     });
 
-    job.status = 'done';
+    job.status = RenderStatus.DONE;
     job.progress = 100;
     job.outputPath = outputPath;
   } catch (err) {
-    job.status = 'error';
+    job.status = RenderStatus.ERROR;
     job.error = err instanceof Error ? err.message : 'Render failed';
     console.error(`Render ${jobId} failed:`, err);
   } finally {
@@ -109,7 +109,7 @@ app.post('/render', (req, res) => {
   };
 
   const jobId = uuidv4();
-  jobs.set(jobId, { status: 'queued', progress: 0 });
+  jobs.set(jobId, { status: RenderStatus.QUEUED, progress: 0 });
 
   // Fire and forget — render runs in background
   executeRender(jobId, input);
@@ -139,7 +139,7 @@ app.get('/render/:jobId/output', (req, res) => {
     res.status(404).json({ error: 'Job not found' });
     return;
   }
-  if (job.status !== 'done' || !job.outputPath) {
+  if (job.status !== RenderStatus.DONE || !job.outputPath) {
     res.status(409).json({ error: 'Render not complete', status: job.status });
     return;
   }
