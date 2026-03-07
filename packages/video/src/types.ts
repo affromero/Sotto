@@ -43,6 +43,33 @@ export const DEFAULT_RENDER_CONFIG: RenderConfig = {
   audioBitrate: '192k',
 };
 
+/** Render job status values — shared between Remotion sidecar and workers. */
+export const RenderStatus = {
+  QUEUED: 'queued',
+  RENDERING: 'rendering',
+  DONE: 'done',
+  ERROR: 'error',
+} as const;
+
+export type RenderStatusValue = (typeof RenderStatus)[keyof typeof RenderStatus];
+
+/**
+ * Visual type enum values — must match Prisma VisualType enum exactly.
+ * Single source of truth for DB ↔ Remotion component mapping.
+ */
+export const VisualType = {
+  DATA_CHART: 'DATA_CHART',
+  QUOTE: 'QUOTE',
+  COMPARISON: 'COMPARISON',
+  TIMELINE: 'TIMELINE',
+  DIAGRAM: 'DIAGRAM',
+  STOCK_FOOTAGE: 'STOCK_FOOTAGE',
+  AI_ILLUSTRATION: 'AI_ILLUSTRATION',
+  TEXT_CARD: 'TEXT_CARD',
+} as const;
+
+export type VisualTypeValue = (typeof VisualType)[keyof typeof VisualType];
+
 export const DEFAULT_BRANDING: RenderInput['branding'] = {
   primaryColor: '#D97706',
   accentColor: '#1E3A5F',
