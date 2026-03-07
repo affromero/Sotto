@@ -10,20 +10,20 @@ import { ImageSlide } from './ImageSlide';
 import { TextCard } from './TextCard';
 
 const SEGMENT_MAP: Record<VisualTypeValue, React.FC<{ segment: VideoSegment }>> = {
-  [VisualType.DATA_CHART]: DataChart,
-  [VisualType.QUOTE]: Quote,
-  [VisualType.COMPARISON]: Comparison,
-  [VisualType.TIMELINE]: Timeline,
-  [VisualType.DIAGRAM]: Diagram,
-  [VisualType.AI_ILLUSTRATION]: ImageSlide,
-  [VisualType.STOCK_FOOTAGE]: ImageSlide,
-  [VisualType.TEXT_CARD]: TextCard,
+  [VisualType.DATA_CHART]: React.memo(DataChart),
+  [VisualType.QUOTE]: React.memo(Quote),
+  [VisualType.COMPARISON]: React.memo(Comparison),
+  [VisualType.TIMELINE]: React.memo(Timeline),
+  [VisualType.DIAGRAM]: React.memo(Diagram),
+  [VisualType.AI_ILLUSTRATION]: React.memo(ImageSlide),
+  [VisualType.STOCK_FOOTAGE]: React.memo(ImageSlide),
+  [VisualType.TEXT_CARD]: React.memo(TextCard),
 };
 
 export function resolveSegmentComponent(
   visualType: string,
 ): React.FC<{ segment: VideoSegment }> {
-  return SEGMENT_MAP[visualType] ?? TextCard;
+  return SEGMENT_MAP[visualType as VisualTypeValue] ?? TextCard;
 }
 
 export { DataChart, Quote, Comparison, Timeline, Diagram, ImageSlide, TextCard };

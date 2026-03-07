@@ -21,17 +21,22 @@ export interface RenderConfig {
   audioBitrate: string;
 }
 
-export interface RenderInput {
-  audioUrl: string;
+export interface Branding {
+  primaryColor: string; // #D97706
+  accentColor: string; // #1E3A5F
+  backgroundColor: string; // #FEFCF8
+  headingFont: string;
+  bodyFont: string;
+}
+
+export interface VisualsInput {
   segments: VideoSegment[];
   config: RenderConfig;
-  branding: {
-    primaryColor: string; // #D97706
-    accentColor: string; // #1E3A5F
-    backgroundColor: string; // #FEFCF8
-    headingFont: string;
-    bodyFont: string;
-  };
+  branding: Branding;
+}
+
+export interface RenderInput extends VisualsInput {
+  audioUrl: string;
 }
 
 export const DEFAULT_RENDER_CONFIG: RenderConfig = {
@@ -70,7 +75,7 @@ export const VisualType = {
 
 export type VisualTypeValue = (typeof VisualType)[keyof typeof VisualType];
 
-export const DEFAULT_BRANDING: RenderInput['branding'] = {
+export const DEFAULT_BRANDING: Branding = {
   primaryColor: '#D97706',
   accentColor: '#1E3A5F',
   backgroundColor: '#FEFCF8',
