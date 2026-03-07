@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, prefetch } from 'remotion';
 import type { VisualsInput } from '../types';
 import { resolveSegmentComponent } from './segments';
 import { SottoWatermark } from './shared/SottoWatermark';
@@ -33,6 +33,18 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
   branding,
 }) => {
   const { fps } = useVideoConfig();
+
+  // Prefetch all image/video assets so they're ready before their segment plays
+  React.useEffect(() => {
+    const cleanups: (() => void)[] = [];
+    for (const segment of segments) {
+      if (segment.assetUrl) {
+        const { free } = prefetch(segment.assetUrl, { method: 'blob-url' });
+        cleanups.push(free);
+      }
+    }
+    return () => cleanups.forEach((fn) => fn());
+  }, [segments]);
 
   return (
     <AbsoluteFill>
