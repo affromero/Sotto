@@ -1,3 +1,5 @@
+'use client';
+
 import { useRef, useEffect, useState, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { MapPresetId } from '../types';

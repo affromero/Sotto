@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useRef, useCallback } from 'react';
 import type { PlaceMetadata, MapPresetId } from '../types';
 import { MapView } from './MapView';
