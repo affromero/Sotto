@@ -23,7 +23,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!authResult) return errorResponse('Unauthorized', 401);
 
   const gate = await checkVideoGenerationGate(authResult.userId);
-  if (!gate.allowed) return errorResponse(gate.reason, 403);
+  if (!gate.allowed) {
+    const message = gate.reason === 'daily_limit_reached'
+      ? 'Daily video generation limit reached. Try again later.'
+      : 'No image provider available.';
+    return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
+  }
 
   const apiKey = process.env.HEYGEN_API_KEY;
   if (!apiKey) return errorResponse('Avatar generation is not configured', 503);

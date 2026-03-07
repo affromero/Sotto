@@ -1681,6 +1681,8 @@ model FreeTierConfig {
   sttProvider           String   @default("openai")
   sttModel              String   @default("whisper-large-v3-turbo")
   dailyGenerationLimit  Int      @default(1)
+  dailyVideoLimit       Int      @default(1)
+  dailyVideoLimitPro    Int      @default(2)
   aiAllocations         Json?
   ttsAllocations        Json?
   updatedAt             DateTime @updatedAt
