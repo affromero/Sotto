@@ -41,6 +41,12 @@ vi.mock('@/lib/queue', () => ({
   videoCompositionQueue: { name: 'video-composition' },
   avatarGenerationQueue: { name: 'avatar-generation' },
 }));
+vi.mock('@/lib/providers/video', () => ({
+  resolveVideoProvider: vi.fn(),
+}));
+vi.mock('@/lib/video-cost-estimator', () => ({
+  fetchFalVideoModels: vi.fn().mockResolvedValue([]),
+}));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
