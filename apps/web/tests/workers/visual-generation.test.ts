@@ -118,20 +118,48 @@ describe('visual-generation worker', () => {
     });
   });
 
-  it('falls back to TEXT_CARD when no stock footage found', async () => {
+  it('falls back to AI illustration when no stock footage found', async () => {
     mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
     mockSearchStockVideo.mockResolvedValue(null);
-    mockPrisma.segmentVisual.count.mockResolvedValue(0);
-    mockPrisma.videoGeneration.update.mockResolvedValue({});
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
+
+    const mockProvider = {
+      generateImage: vi.fn().mockResolvedValue(Buffer.from('fallback-image')),
+      getModelId: () => 'flux-schnell',
+      providerId: 'fal' as const,
+    };
+    mockResolveImageProvider.mockResolvedValue({
+      provider: mockProvider,
+      source: 'platform',
+      providerId: 'fal',
+    });
+
+    mockPrisma.segmentVisual.count
+      .mockResolvedValueOnce(0)  // pending/generating count
+      .mockResolvedValueOnce(0); // failed count
 
     const stockData = { ...baseData, visualType: 'STOCK_FOOTAGE', prompt: 'ocean waves' };
     await processVisualGeneration(makeJob(stockData));
 
+    // Should generate an AI image, not render a text card
+    expect(mockProvider.generateImage).toHaveBeenCalledWith({
+      prompt: 'ocean waves',
+      width: 1280,
+      height: 720,
+    });
+    // Should update visualType to AI_ILLUSTRATION
     expect(mockPrisma.segmentVisual.update).toHaveBeenCalledWith({
       where: { id: 'sv-1' },
-      data: expect.objectContaining({ visualType: 'TEXT_CARD', status: 'ready' }),
+      data: { visualType: 'AI_ILLUSTRATION' },
     });
-    expect(mockUploadFile).not.toHaveBeenCalled();
+    // Should upload the generated image
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      'podcasts/pod-1/visuals/sv-1.png',
+      expect.any(Buffer),
+      'image/png',
+    );
   });
 
   it('marks generation READY when all visuals ready (client-side rendering)', async () => {
