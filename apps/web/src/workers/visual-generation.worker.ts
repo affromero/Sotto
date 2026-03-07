@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { fetchFalVideoModels } from '@/lib/video-cost-estimator';
+import { fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
   addJob,
@@ -133,18 +133,23 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           select: { duration: true },
         });
 
+        // Look up model pricing to get maxDuration cap
+        const videoModels = await fetchAllVideoModels();
+        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
+        const maxDuration = pricing?.maxDuration ?? 10;
+        const rawDuration = segment?.duration ?? 5;
+        const cappedDuration = Math.min(rawDuration, maxDuration);
+
         assetBuffer = await videoProvider.generateVideo({
           prompt,
-          duration: segment?.duration ?? 5,
+          duration: cappedDuration,
         });
         assetType = 'video/mp4';
         assetExt = 'mp4';
         service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
 
-        const videoModels = await fetchFalVideoModels();
-        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
         if (pricing) {
-          totalCost = ((segment?.duration ?? 5) / 60) * pricing.costPerMinute;
+          totalCost = (cappedDuration / 60) * pricing.costPerMinute;
         }
       } else {
         // Should not reach here — programmatic types are marked ready in classification

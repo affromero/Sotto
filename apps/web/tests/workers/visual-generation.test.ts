@@ -45,7 +45,7 @@ vi.mock('@/lib/providers/video', () => ({
   resolveVideoProvider: vi.fn(),
 }));
 vi.mock('@/lib/video-cost-estimator', () => ({
-  fetchFalVideoModels: vi.fn().mockResolvedValue([]),
+  fetchAllVideoModels: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
