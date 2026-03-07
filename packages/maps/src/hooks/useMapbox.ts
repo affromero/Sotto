@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { MapPresetId } from '../types';
 import { MAP_PRESETS } from '../presets';
@@ -39,9 +39,13 @@ export function useMapbox({
   const [isLoaded, setIsLoaded] = useState(false);
   const onMapLoadRef = useRef(onMapLoad);
   onMapLoadRef.current = onMapLoad;
+  const presetRef = useRef(preset);
+  const initializedRef = useRef(false);
 
-  const initMap = useCallback(() => {
-    if (!container.current || mapRef.current) return;
+  // Create map once
+  useEffect(() => {
+    if (!container.current || initializedRef.current) return;
+    initializedRef.current = true;
 
     const presetConfig = MAP_PRESETS[preset];
     mapboxgl.accessToken = mapboxToken;
@@ -62,35 +66,56 @@ export function useMapbox({
       console.error('[MapView] Mapbox error:', e.error?.message ?? e);
     });
 
-    map.on('load', () => {
-      if (presetConfig.terrain3d) {
-        map.addSource('mapbox-dem', {
-          type: 'raster-dem',
-          url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-          tileSize: 512,
-          maxzoom: 14,
-        });
+    const applyTerrain = (config: typeof presetConfig) => {
+      if (config.terrain3d) {
+        if (!map.getSource('mapbox-dem')) {
+          map.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14,
+          });
+        }
         map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+      } else {
+        map.setTerrain(null);
       }
+    };
 
+    map.on('load', () => {
+      applyTerrain(presetConfig);
       setIsLoaded(true);
       onMapLoadRef.current?.(map);
     });
 
-    mapRef.current = map;
-  }, [container, center, zoom, pitch, bearing, preset, mapboxToken, interactive, projection]);
+    // Re-apply terrain after style changes
+    map.on('style.load', () => {
+      const currentConfig = MAP_PRESETS[presetRef.current];
+      applyTerrain(currentConfig);
+    });
 
-  useEffect(() => {
-    initMap();
+    mapRef.current = map;
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        setIsLoaded(false);
-      }
+      map.remove();
+      mapRef.current = null;
+      initializedRef.current = false;
+      setIsLoaded(false);
     };
-  }, [initMap]);
+    // Only run on mount/unmount — all updates go through the effects below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [container, mapboxToken]);
+
+  // Style change (preset switch) — no new map load
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+    if (presetRef.current === preset) return;
+
+    presetRef.current = preset;
+    const config = MAP_PRESETS[preset];
+    map.setStyle(config.styleUrl);
+  }, [preset, isLoaded]);
 
   return { map: mapRef.current, isLoaded };
 }
