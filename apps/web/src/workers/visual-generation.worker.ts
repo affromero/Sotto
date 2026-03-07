@@ -10,8 +10,7 @@ import {
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
 import { getImageModelCost } from '@/lib/providers/image-registry';
-import { generateFalVideo } from '@/lib/providers/image/fal-video';
-import { getByokKey } from '@/lib/byok';
+import { resolveVideoProvider } from '@/lib/providers/video';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -122,9 +121,11 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           where: { id: podcastId },
           select: { userId: true },
         });
-        const falKey = await getByokKey(podcast.userId, 'fal');
-        const apiKey = falKey || process.env.FAL_KEY;
-        if (!apiKey) throw new Error('No Fal API key for video generation');
+
+        const { provider: videoProvider, source: videoSource, providerId } = await resolveVideoProvider({
+          userId: podcast.userId,
+          requestedModel: visual.videoModel,
+        });
 
         const segment = await prisma.segment.findFirst({
           where: { podcastId },
@@ -132,15 +133,13 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           select: { duration: true },
         });
 
-        assetBuffer = await generateFalVideo({
-          apiKey,
-          model: visual.videoModel,
+        assetBuffer = await videoProvider.generateVideo({
           prompt,
           duration: segment?.duration ?? 5,
         });
         assetType = 'video/mp4';
         assetExt = 'mp4';
-        service = falKey ? 'fal_byok' : 'fal';
+        service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
 
         const videoModels = await fetchFalVideoModels();
         const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
