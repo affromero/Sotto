@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { checkVideoGenerationGate } from '@/lib/video-gate';
+import { checkVideoGenerationGate, tryIncrementVideoGeneration } from '@/lib/video-gate';
 import { generateVideoSchema, updateVideoSegmentsSchema } from '@/lib/validations';
 import { Prisma } from '@prisma/client';
 import { addJob, JobType, visualClassificationQueue, visualGenerationQueue, videoCompositionQueue } from '@/lib/queue';
@@ -26,12 +26,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const adminId = await requireAdmin();
   const isAdmin = adminId !== null;
 
-  // Feature gate: PRO/admin only
-  if (!isAdmin) {
-    const gate = await checkVideoGenerationGate(authResult.userId);
-    if (!gate.allowed) {
-      return errorResponse('No image provider available. Add a fal or MiniMax API key in Settings.', 403, { code: gate.reason });
-    }
+  // Feature gate: check provider availability + daily video limit
+  const gate = !isAdmin ? await checkVideoGenerationGate(authResult.userId) : null;
+  if (gate && !gate.allowed) {
+    const message = gate.reason === 'daily_limit_reached'
+      ? 'Daily video generation limit reached. Try again later.'
+      : 'No image provider available. Add a fal or MiniMax API key in Settings.';
+    return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, {
+      code: gate.reason,
+      dailyUsed: gate.dailyUsed,
+      dailyLimit: gate.dailyLimit,
+      resetInSeconds: gate.resetInSeconds,
+    });
   }
 
   const podcast = await prisma.podcast.findUnique({
@@ -166,6 +172,16 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           videoGenerationId: existing.id, status: 'GENERATING_VISUALS',
         });
       }
+    }
+  }
+
+  // Increment daily video counter (non-admin, non-BYOK users)
+  if (gate && !gate.isByokUser) {
+    const incremented = await tryIncrementVideoGeneration(authResult.userId, gate.dailyLimit);
+    if (!incremented) {
+      return errorResponse('Daily video generation limit reached. Try again later.', 429, {
+        code: 'daily_limit_reached',
+      });
     }
   }
 
