@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { PlaceResolver } from '@sotto/maps/resolver/place-resolver';
+import { PlaceResolver } from '@sotto/maps/server';
 
 const resolveQuerySchema = z.object({
   q: z.string().min(1).max(200),
