@@ -48,7 +48,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (!isAdmin) {
     const gate = await checkVideoGenerationGate(auth.userId);
     if (!gate.allowed) {
-      return errorResponse('No image provider available. Add a fal or MiniMax API key in Settings.', 403, { code: gate.reason });
+      const message = gate.reason === 'daily_limit_reached'
+        ? 'Daily video generation limit reached. Try again later.'
+        : 'No image provider available. Add a fal or MiniMax API key in Settings.';
+      return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, {
+        code: gate.reason,
+        dailyUsed: gate.dailyUsed,
+        dailyLimit: gate.dailyLimit,
+        resetInSeconds: gate.resetInSeconds,
+      });
     }
   }
 

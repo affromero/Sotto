@@ -548,6 +548,11 @@
   align-items: flex-start;
 }
 
+.videoQuota {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+}
+
 .videoError {
   font: var(--text-body-sm);
   color: var(--color-error);

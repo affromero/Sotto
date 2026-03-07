@@ -430,11 +430,19 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       });
       const videoPrefs = mentionWithVideoPrefs?.videoPrefs as { imageModel?: string; videoModel?: string; wantsVideo?: boolean } | null;
       if (videoPrefs?.wantsVideo) {
-        const { checkVideoGenerationGate } = await import('@/lib/video-gate');
+        const { checkVideoGenerationGate, tryIncrementVideoGeneration } = await import('@/lib/video-gate');
         const gate = await checkVideoGenerationGate(podcast.userId);
         if (gate.allowed) {
+          // Increment daily counter for non-BYOK users; skip video if limit reached
+          let videoLimitOk = true;
+          if (!gate.isByokUser) {
+            videoLimitOk = await tryIncrementVideoGeneration(podcast.userId, gate.dailyLimit);
+            if (!videoLimitOk) {
+              logger.info('Skipped auto video generation: daily limit reached', { podcastId });
+            }
+          }
           const existing = await prisma.videoGeneration.findUnique({ where: { podcastId } });
-          if (!existing) {
+          if (videoLimitOk && !existing) {
             const videoGen = await prisma.videoGeneration.create({
               data: {
                 podcastId,

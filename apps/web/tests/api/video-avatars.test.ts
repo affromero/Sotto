@@ -97,7 +97,7 @@ beforeEach(() => {
 describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   it('returns cached avatars from Redis', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     const cached = [{ avatar_id: 'av-1', avatar_name: 'Test' }];
     mockRedisGet.mockResolvedValue(JSON.stringify(cached));
 
@@ -110,7 +110,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('fetches from HeyGen and filters premium avatars', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true });
+    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockRedisGet.mockResolvedValue(null);
     mockListAvatars.mockResolvedValue([
       { avatar_id: 'av-1', avatar_name: 'Free', premium: false },
