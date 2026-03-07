@@ -59,8 +59,7 @@ All shared business logic and external service integrations live here.
 | `newsletter-fetcher.ts` | RSS fetcher for "In the News": curated politically-balanced feeds, JSDOM XML parsing, Redis caching, `fetchNewsletterArticles()` + `formatArticlesForPrompt()` | Fetch + JSDOM + `redis.ts` |
 | `handles.ts` | Handle validation, availability checks, unique generation (reserved handles, format validation) | Uses `prisma.ts` |
 | `rss.ts` | `generateCreatorRssFeed(userId)`: RSS 2.0 XML with iTunes namespace for user's public podcasts | Uses `prisma.ts` |
-| `free-tier-config.ts` | `getFreeTierConfig()` reads singleton FreeTierConfig row; `setFreeTierConfig()` for admin updates | Uses `prisma.ts` |
-| `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
+| `auto-model-config.ts` | `getAutoModelConfig()` / `setAutoModelConfig()` for per-plan "Auto" model resolution + daily limits + provider allocations; `resolveAutoModel(plan)` returns AI/TTS/STT config for FREE or PRO | Uses `prisma.ts` |
 | `twitter-config.ts` | `getTwitterConfig()` reads singleton TwitterConfig row (auto-tweet thresholds, trend polling, template); `setTwitterConfig()` for admin updates | Uses `prisma.ts` |
 | `twitter-auto-tweet.ts` | `checkAutoTweetThreshold(podcastId)` — fire-and-forget after like/fork/play; `manualTweet(podcastId)` — admin-triggered tweet | Uses `prisma.ts`, `twitter-config.ts`, `queue.ts` |
 | `generation-gate.ts` | `checkGenerationGate(userId)`: BYOK check + free tier counter; `tryIncrementFreeGeneration()`: atomic SQL increment; `getFreeTierStatus()` for display | Uses `prisma.ts`, `byok.ts` |
@@ -72,7 +71,7 @@ All shared business logic and external service integrations live here.
 | `cloudflare-r2-usage.ts` | Cloudflare R2 usage monitoring: `fetchBucketUsage()`, `fetchOperationCounts()`, `estimateCosts()`, `isR2MonitoringConfigured()` — REST + GraphQL API client with cost estimation | Pure utility (Cloudflare API) |
 | `storage-metrics.ts` | R2 storage dashboard queries: `getStorageOverview()`, `getStorageTrend()`, `checkStorageAlerts()` — reads from R2UsageSnapshot | Uses `prisma.ts` |
 | `data-completeness.ts` | Per-podcast ML readiness: 15-dimension completeness scoring (`computeCompletenessChecklist()`), corpus-wide aggregation (`getCorpusCompleteness()`), paginated podcast scores (`getPodcastCompletenessScores()`) | Uses `prisma.ts` |
-| `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `free-tier-config.ts`, `auto-model-config.ts` |
+| `traffic-report.ts` | Traffic report builder: 70+ aggregation queries → structured JSON for `/api/admin/traffic-report` | Uses `prisma.ts`, `cost-monitor.ts`, `auto-model-config.ts` |
 | `revenue-metrics.ts` | Revenue aggregation: `getRevenueOverview()`, `getDailyRevenueTrend()`, `getTopSellingVoices()`, `getRevenueByStatus()`, `getMarketplaceHealth()` — voice marketplace | Uses `prisma.ts` |
 | `engagement-metrics.ts` | Engagement queries: `getEngagementOverview()`, `getDailyEngagementTrend()`, `getTopLiked/Forked/Commented()`, `getInteractionStats()` — social metrics | Uses `prisma.ts` |
 | `playback-metrics.ts` | Playback analytics: `getPlaybackOverview()`, `getSpeedDistribution()`, `getCompletionDistribution()`, `getDailyListenHours()` — listening data | Uses `prisma.ts` |
