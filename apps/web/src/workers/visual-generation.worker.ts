@@ -1,5 +1,5 @@
 import { Job } from 'bullmq';
-import { fetchFalVideoModels } from '@/lib/video-cost-estimator';
+import { fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
   addJob,
@@ -10,8 +10,7 @@ import {
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
 import { getImageModelCost } from '@/lib/providers/image-registry';
-import { generateFalVideo } from '@/lib/providers/image/fal-video';
-import { getByokKey } from '@/lib/byok';
+import { resolveVideoProvider } from '@/lib/providers/video';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -122,9 +121,11 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           where: { id: podcastId },
           select: { userId: true },
         });
-        const falKey = await getByokKey(podcast.userId, 'fal');
-        const apiKey = falKey || process.env.FAL_KEY;
-        if (!apiKey) throw new Error('No Fal API key for video generation');
+
+        const { provider: videoProvider, source: videoSource, providerId } = await resolveVideoProvider({
+          userId: podcast.userId,
+          requestedModel: visual.videoModel,
+        });
 
         const segment = await prisma.segment.findFirst({
           where: { podcastId },
@@ -132,20 +133,23 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           select: { duration: true },
         });
 
-        assetBuffer = await generateFalVideo({
-          apiKey,
-          model: visual.videoModel,
+        // Look up model pricing to get maxDuration cap
+        const videoModels = await fetchAllVideoModels();
+        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
+        const maxDuration = pricing?.maxDuration ?? 10;
+        const rawDuration = segment?.duration ?? 5;
+        const cappedDuration = Math.min(rawDuration, maxDuration);
+
+        assetBuffer = await videoProvider.generateVideo({
           prompt,
-          duration: segment?.duration ?? 5,
+          duration: cappedDuration,
         });
         assetType = 'video/mp4';
         assetExt = 'mp4';
-        service = falKey ? 'fal_byok' : 'fal';
+        service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
 
-        const videoModels = await fetchFalVideoModels();
-        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
         if (pricing) {
-          totalCost = ((segment?.duration ?? 5) / 60) * pricing.costPerMinute;
+          totalCost = (cappedDuration / 60) * pricing.costPerMinute;
         }
       } else {
         // Should not reach here — programmatic types are marked ready in classification
