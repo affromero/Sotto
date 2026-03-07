@@ -5,6 +5,7 @@ import {
   addJob,
   JobType,
   videoCompositionQueue,
+  avatarGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
@@ -231,6 +232,31 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
           failureReason: `${failed} visual(s) failed to generate`,
         },
       });
+      return;
+    }
+
+    // Check for pending avatar overlays before proceeding
+    const pendingAvatars = await prisma.avatarOverlay.count({
+      where: { videoGenerationId, status: { in: ['pending', 'concatenating', 'submitting', 'processing'] } },
+    });
+
+    if (pendingAvatars > 0) {
+      await prisma.videoGeneration.update({
+        where: { id: videoGenerationId },
+        data: { status: 'GENERATING_AVATARS' },
+      });
+      const overlays = await prisma.avatarOverlay.findMany({
+        where: { videoGenerationId, status: 'pending' },
+      });
+      for (const overlay of overlays) {
+        await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
+          podcastId,
+          videoGenerationId,
+          avatarOverlayId: overlay.id,
+          speaker: overlay.speaker,
+          avatarId: overlay.avatarId,
+        });
+      }
       return;
     }
 

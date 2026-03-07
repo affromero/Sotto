@@ -21,6 +21,7 @@ import {
   BarChart2,
   Shield,
   Video,
+  Users,
 } from 'lucide-react';
 import { usePlayer } from '@/components/providers/AudioPlayerProvider';
 import { AudioPlayer } from '@/components/player/AudioPlayer';
@@ -58,6 +59,7 @@ import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
+import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
@@ -197,6 +199,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showPipelineEditor, setShowPipelineEditor] = useState(false);
   const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -780,7 +783,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {/* Video Section */}
       {isReady && isOwner && (
         <section className={styles.videoSection} aria-label="Video">
-          {videoState === 'idle' && !showPipelineEditor && (
+          {videoState === 'idle' && !showPipelineEditor && !showAvatarPicker && (
             <div className={styles.videoIdle}>
               <Button
                 onClick={handleGenerateVideo}
@@ -790,11 +793,33 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 <Video size={16} />
                 Generate Video
               </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowAvatarPicker(true)}
+                disabled={!canGenerateVideo}
+              >
+                <Users size={16} />
+                Add Avatars
+              </Button>
               {!canGenerateVideo && !isAdmin && (
                 <Badge variant="warning">PRO</Badge>
               )}
               {videoError && <p className={styles.videoError}>{videoError}</p>}
             </div>
+          )}
+          {showAvatarPicker && (
+            <AvatarPicker
+              podcastId={podcast.id}
+              speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
+              podcastDuration={podcast.duration ?? 0}
+              onConfigured={() => {
+                setShowAvatarPicker(false);
+                if (videoState === 'idle') {
+                  handleGenerateVideo();
+                }
+              }}
+              onCancel={() => setShowAvatarPicker(false)}
+            />
           )}
           {showPipelineEditor && pipelineData && falModels && (
             <PipelineEditor

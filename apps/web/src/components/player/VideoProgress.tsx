@@ -23,7 +23,7 @@ interface SegmentVisual {
 
 interface VideoStatusResponse {
   videoGenerationId: string;
-  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'COMPOSING' | 'READY' | 'FAILED';
+  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED';
   videoUrl: string | null;
   failureReason: string | null;
   segmentVisuals: SegmentVisual[];
@@ -36,12 +36,13 @@ interface VideoProgressProps {
   onFailed?: (reason: string) => void;
 }
 
-const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'COMPOSING', 'READY'] as const;
+const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
 
 const STAGE_LABELS: Record<string, string> = {
   PENDING: 'Starting...',
   CLASSIFYING: 'Classifying segments',
   GENERATING_VISUALS: 'Generating visuals',
+  GENERATING_AVATARS: 'Generating avatars',
   COMPOSING: 'Composing video',
   READY: 'Ready',
   FAILED: 'Failed',
@@ -83,6 +84,12 @@ const SUB_MESSAGES: Record<string, string[]> = {
     'Each segment gets its own unique visual...',
     'Generating images to match your content...',
     'This is the most visual-intensive step...',
+  ],
+  GENERATING_AVATARS: [
+    'Generating lip-synced avatar overlays...',
+    'HeyGen is rendering your avatar videos...',
+    'Creating transparent avatar clips for each speaker...',
+    'This step takes a few minutes per speaker...',
   ],
   COMPOSING: [
     'Rendering your final video with Remotion...',
@@ -241,7 +248,9 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
   } else if (currentStatus === 'CLASSIFYING' || currentStatus === 'PENDING') {
     progressPercent = 5;
   } else if (currentStatus === 'GENERATING_VISUALS' && totalCount > 0) {
-    progressPercent = 10 + Math.round((readyCount / totalCount) * 70);
+    progressPercent = 10 + Math.round((readyCount / totalCount) * 60);
+  } else if (currentStatus === 'GENERATING_AVATARS') {
+    progressPercent = 75;
   } else if (currentStatus === 'COMPOSING') {
     progressPercent = 85;
   } else {
