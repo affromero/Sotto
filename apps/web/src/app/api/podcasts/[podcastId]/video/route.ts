@@ -120,16 +120,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         const allReady = failedVisuals.length === 0 && pendingVisuals.length === 0;
 
         if (allReady) {
-          // All visuals ready — composition must have failed. Re-queue composition.
+          if (process.env.ENABLE_VIDEO_EXPORT === 'true') {
+            // Legacy: server-side composition — re-queue
+            await prisma.videoGeneration.update({
+              where: { id: existing.id },
+              data: { status: 'COMPOSING', failureReason: null },
+            });
+            await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+              podcastId, videoGenerationId: existing.id,
+            });
+            return NextResponse.json({
+              videoGenerationId: existing.id, status: 'COMPOSING',
+            });
+          }
+          // Client-side rendering: just mark as READY
           await prisma.videoGeneration.update({
             where: { id: existing.id },
-            data: { status: 'COMPOSING', failureReason: null },
-          });
-          await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-            podcastId, videoGenerationId: existing.id,
+            data: { status: 'READY', failureReason: null },
           });
           return NextResponse.json({
-            videoGenerationId: existing.id, status: 'COMPOSING',
+            videoGenerationId: existing.id, status: 'READY',
           });
         }
 
@@ -217,10 +227,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           metadata: (visual.metadata as Record<string, unknown>) ?? {},
         });
       }
-    } else {
+    } else if (process.env.ENABLE_VIDEO_EXPORT === 'true') {
+      // All visuals programmatic — queue server-side composition
       await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
         podcastId,
         videoGenerationId: videoGeneration.id,
+      });
+    } else {
+      // All visuals programmatic, client-side rendering — mark READY
+      await prisma.videoGeneration.update({
+        where: { id: videoGeneration.id },
+        data: { status: 'READY' },
       });
     }
 
