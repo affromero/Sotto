@@ -53,7 +53,10 @@ export class GeoNamesClient implements GazetteerClient {
   }
 
   async search(query: string, _options?: ResolveOptions): Promise<PlaceMetadata | null> {
-    if (!this.username) return null;
+    if (!this.username) {
+      console.warn('[maps:geonames] GEONAMES_USERNAME not configured, skipping');
+      return null;
+    }
 
     const params = new URLSearchParams({
       q: query,
@@ -68,7 +71,10 @@ export class GeoNamesClient implements GazetteerClient {
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn('[maps:geonames] API error', { status: response.status, query });
+      return null;
+    }
 
     const data = (await response.json()) as GeoNamesResponse;
     if (!data.geonames?.length) return null;
