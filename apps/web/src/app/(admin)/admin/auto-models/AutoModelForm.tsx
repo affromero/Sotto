@@ -40,14 +40,31 @@ interface AutoModelFormProps {
     proIncludedTtsModels: string[] | null;
     freeIncludedSttModels: string[] | null;
     proIncludedSttModels: string[] | null;
+    freeImageProvider: string;
+    freeImageModel: string;
     proImageProvider: string;
     proImageModel: string;
+    freeIncludedImageModels: string[] | null;
     proIncludedImageModels: string[] | null;
+    freeVideoProvider: string;
+    freeVideoModel: string;
+    proVideoProvider: string;
+    proVideoModel: string;
+    freeIncludedVideoModels: string[] | null;
+    proIncludedVideoModels: string[] | null;
+    freeAvatarProvider: string;
+    freeAvatarModel: string;
+    proAvatarProvider: string;
+    proAvatarModel: string;
+    freeIncludedAvatarModels: string[] | null;
+    proIncludedAvatarModels: string[] | null;
   };
   aiProviders: ProviderOption[];
   ttsProviders: ProviderOption[];
   sttProviders: ProviderOption[];
   imageProviders: ProviderOption[];
+  videoProviders: ProviderOption[];
+  avatarProviders: ProviderOption[];
 }
 
 function usePlanState(initial: PlanConfig, providers: { ai: ProviderOption[]; tts: ProviderOption[]; stt: ProviderOption[] }) {
@@ -92,6 +109,25 @@ function usePlanState(initial: PlanConfig, providers: { ai: ProviderOption[]; tt
     sttProvider, sttModel, setSttModel, sttModels, handleSttProviderChange,
     toData: () => ({ aiProvider, aiModel, ttsProvider, ttsModel, sttProvider, sttModel }),
   };
+}
+
+/** Reusable hook for a single provider + model pair. */
+function useProviderModelState(
+  initialProvider: string,
+  initialModel: string,
+  providers: ProviderOption[],
+) {
+  const [provider, setProvider] = useState(initialProvider);
+  const [model, setModel] = useState(initialModel);
+  const models = providers.find((p) => p.id === provider)?.models ?? [];
+
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider);
+    const p = providers.find((pp) => pp.id === newProvider);
+    if (p && p.models.length > 0) setModel(p.models[0].id);
+  };
+
+  return { provider, model, setModel, models, handleProviderChange };
 }
 
 function PlanSection({
@@ -192,6 +228,86 @@ function PlanSection({
           onChange={(e) => state.setSttModel(e.target.value)}
         >
           {state.sttModels.map((m) => (
+            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
+          ))}
+        </select>
+      </div>
+    </fieldset>
+  );
+}
+
+/** Reusable provider + model selector for a modality (image, video, avatar). */
+function ModalityTierSection({
+  title,
+  description,
+  freeState,
+  proState,
+  providers,
+}: {
+  title: string;
+  description: string;
+  freeState: ReturnType<typeof useProviderModelState>;
+  proState: ReturnType<typeof useProviderModelState>;
+  providers: ProviderOption[];
+}) {
+  const slug = title.toLowerCase().replace(/\s+/g, '-');
+
+  return (
+    <fieldset className={styles.section}>
+      <legend className={styles.sectionTitle}>{title}</legend>
+      <p className={styles.platformDescription}>{description}</p>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${slug}-free-provider`}>Free Provider</label>
+        <select
+          id={`${slug}-free-provider`}
+          className={styles.select}
+          value={freeState.provider}
+          onChange={(e) => freeState.handleProviderChange(e.target.value)}
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>{p.displayName}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${slug}-free-model`}>Free Model</label>
+        <select
+          id={`${slug}-free-model`}
+          className={styles.select}
+          value={freeState.model}
+          onChange={(e) => freeState.setModel(e.target.value)}
+        >
+          {freeState.models.map((m) => (
+            <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${slug}-pro-provider`}>Pro Provider</label>
+        <select
+          id={`${slug}-pro-provider`}
+          className={styles.select}
+          value={proState.provider}
+          onChange={(e) => proState.handleProviderChange(e.target.value)}
+        >
+          {providers.map((p) => (
+            <option key={p.id} value={p.id}>{p.displayName}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className={styles.field}>
+        <label className={styles.label} htmlFor={`${slug}-pro-model`}>Pro Model</label>
+        <select
+          id={`${slug}-pro-model`}
+          className={styles.select}
+          value={proState.model}
+          onChange={(e) => proState.setModel(e.target.value)}
+        >
+          {proState.models.map((m) => (
             <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
           ))}
         </select>
@@ -311,7 +427,7 @@ function IncludedModelsEditor({
   );
 }
 
-export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders }: AutoModelFormProps) {
+export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttProviders, imageProviders, videoProviders, avatarProviders }: AutoModelFormProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -344,23 +460,25 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     new Set(initialConfig.proIncludedSttModels ?? [])
   );
 
-  // Image provider state (PRO-only)
-  const [proImageProvider, setProImageProvider] = useState(initialConfig.proImageProvider);
-  const [proImageModel, setProImageModel] = useState(initialConfig.proImageModel);
-  const proImageModels = imageProviders.find((p) => p.id === proImageProvider)?.models ?? [];
+  // Image provider/model state (free + pro)
+  const freeImage = useProviderModelState(initialConfig.freeImageProvider, initialConfig.freeImageModel, imageProviders);
+  const proImage = useProviderModelState(initialConfig.proImageProvider, initialConfig.proImageModel, imageProviders);
+  const [freeIncludedImage, setFreeIncludedImage] = useState<Set<string>>(new Set(initialConfig.freeIncludedImageModels ?? []));
+  const [proIncludedImage, setProIncludedImage] = useState<Set<string>>(new Set(initialConfig.proIncludedImageModels ?? []));
 
-  const handleImageProviderChange = (newProvider: string) => {
-    setProImageProvider(newProvider);
-    const provider = imageProviders.find((p) => p.id === newProvider);
-    if (provider && provider.models.length > 0) {
-      setProImageModel(provider.models[0].id);
-    }
-  };
+  // Video provider/model state (free + pro)
+  const freeVideo = useProviderModelState(initialConfig.freeVideoProvider, initialConfig.freeVideoModel, videoProviders);
+  const proVideo = useProviderModelState(initialConfig.proVideoProvider, initialConfig.proVideoModel, videoProviders);
+  const [freeIncludedVideo, setFreeIncludedVideo] = useState<Set<string>>(new Set(initialConfig.freeIncludedVideoModels ?? []));
+  const [proIncludedVideo, setProIncludedVideo] = useState<Set<string>>(new Set(initialConfig.proIncludedVideoModels ?? []));
 
-  const [proIncludedImage, setProIncludedImage] = useState<Set<string>>(
-    new Set(initialConfig.proIncludedImageModels ?? [])
-  );
+  // Avatar provider/model state (free + pro)
+  const freeAvatar = useProviderModelState(initialConfig.freeAvatarProvider, initialConfig.freeAvatarModel, avatarProviders);
+  const proAvatar = useProviderModelState(initialConfig.proAvatarProvider, initialConfig.proAvatarModel, avatarProviders);
+  const [freeIncludedAvatar, setFreeIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.freeIncludedAvatarModels ?? []));
+  const [proIncludedAvatar, setProIncludedAvatar] = useState<Set<string>>(new Set(initialConfig.proIncludedAvatarModels ?? []));
 
+  // Platform AI
   const [platformAiProvider, setPlatformAiProvider] = useState(initialConfig.platform.aiProvider);
   const [platformAiModel, setPlatformAiModel] = useState(initialConfig.platform.aiModel);
   const platformAiModels = aiProviders.find((p) => p.id === platformAiProvider)?.models ?? [];
@@ -373,7 +491,7 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
     }
   };
 
-  // Generic included model handlers (reusable for AI, TTS, STT)
+  // Generic included model handlers
   function makeIncludedHandlers(
     setFree: React.Dispatch<React.SetStateAction<Set<string>>>,
     setPro: React.Dispatch<React.SetStateAction<Set<string>>>
@@ -407,7 +525,11 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
   const aiHandlers = makeIncludedHandlers(setFreeIncluded, setProIncluded);
   const ttsHandlers = makeIncludedHandlers(setFreeIncludedTts, setProIncludedTts);
   const sttHandlers = makeIncludedHandlers(setFreeIncludedStt, setProIncludedStt);
-  const imageHandlers = makeIncludedHandlers(() => {}, setProIncludedImage);
+  const imageHandlers = makeIncludedHandlers(setFreeIncludedImage, setProIncludedImage);
+  const videoHandlers = makeIncludedHandlers(setFreeIncludedVideo, setProIncludedVideo);
+  const avatarHandlers = makeIncludedHandlers(setFreeIncludedAvatar, setProIncludedAvatar);
+
+  const setToArray = (s: Set<string>) => s.size > 0 ? [...s] : null;
 
   const handleSave = async () => {
     setSaving(true);
@@ -422,15 +544,33 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
           free: freeState.toData(),
           pro: proState.toData(),
           platform: { aiProvider: platformAiProvider, aiModel: platformAiModel },
-          freeIncludedModels: freeIncluded.size > 0 ? [...freeIncluded] : null,
-          proIncludedModels: proIncluded.size > 0 ? [...proIncluded] : null,
-          freeIncludedTtsModels: freeIncludedTts.size > 0 ? [...freeIncludedTts] : null,
-          proIncludedTtsModels: proIncludedTts.size > 0 ? [...proIncludedTts] : null,
-          freeIncludedSttModels: freeIncludedStt.size > 0 ? [...freeIncludedStt] : null,
-          proIncludedSttModels: proIncludedStt.size > 0 ? [...proIncludedStt] : null,
-          proImageProvider,
-          proImageModel,
-          proIncludedImageModels: proIncludedImage.size > 0 ? [...proIncludedImage] : null,
+          freeIncludedModels: setToArray(freeIncluded),
+          proIncludedModels: setToArray(proIncluded),
+          freeIncludedTtsModels: setToArray(freeIncludedTts),
+          proIncludedTtsModels: setToArray(proIncludedTts),
+          freeIncludedSttModels: setToArray(freeIncludedStt),
+          proIncludedSttModels: setToArray(proIncludedStt),
+          // Image
+          freeImageProvider: freeImage.provider,
+          freeImageModel: freeImage.model,
+          proImageProvider: proImage.provider,
+          proImageModel: proImage.model,
+          freeIncludedImageModels: setToArray(freeIncludedImage),
+          proIncludedImageModels: setToArray(proIncludedImage),
+          // Video
+          freeVideoProvider: freeVideo.provider,
+          freeVideoModel: freeVideo.model,
+          proVideoProvider: proVideo.provider,
+          proVideoModel: proVideo.model,
+          freeIncludedVideoModels: setToArray(freeIncludedVideo),
+          proIncludedVideoModels: setToArray(proIncludedVideo),
+          // Avatar
+          freeAvatarProvider: freeAvatar.provider,
+          freeAvatarModel: freeAvatar.model,
+          proAvatarProvider: proAvatar.provider,
+          proAvatarModel: proAvatar.model,
+          freeIncludedAvatarModels: setToArray(freeIncludedAvatar),
+          proIncludedAvatarModels: setToArray(proIncludedAvatar),
         }),
       });
 
@@ -507,53 +647,70 @@ export function AutoModelForm({ initialConfig, aiProviders, ttsProviders, sttPro
         onClear={sttHandlers.onClear}
       />
 
-      <fieldset className={styles.section}>
-        <legend className={styles.sectionTitle}>Video Generation (Pro Only)</legend>
-        <p className={styles.platformDescription}>
-          Image provider and model used to generate visuals during video creation. Only available to Pro users.
-        </p>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="image-provider">Image Provider</label>
-          <select
-            id="image-provider"
-            className={styles.select}
-            value={proImageProvider}
-            onChange={(e) => handleImageProviderChange(e.target.value)}
-          >
-            {imageProviders.map((p) => (
-              <option key={p.id} value={p.id}>{p.displayName}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className={styles.field}>
-          <label className={styles.label} htmlFor="image-model">Default Image Model</label>
-          <select
-            id="image-model"
-            className={styles.select}
-            value={proImageModel}
-            onChange={(e) => setProImageModel(e.target.value)}
-          >
-            {proImageModels.map((m) => (
-              <option key={m.id} value={m.id}>{m.displayName} ({m.tier})</option>
-            ))}
-          </select>
-        </div>
-      </fieldset>
+      <ModalityTierSection
+        title="Image Generation"
+        description="Still image provider and model for video visuals (AI illustrations)."
+        freeState={freeImage}
+        proState={proImage}
+        providers={imageProviders}
+      />
 
       <IncludedModelsEditor
         title="Included Image Models"
-        description="Control which image models are available for video generation. Only relevant for Pro users."
+        description="Control which image models are available for video generation."
         providers={imageProviders}
-        freeIncluded={new Set()}
+        freeIncluded={freeIncludedImage}
         proIncluded={proIncludedImage}
-        freeDefault=""
-        proDefault={`${proImageProvider}:${proImageModel}`}
+        freeDefault={`${freeImage.provider}:${freeImage.model}`}
+        proDefault={`${proImage.provider}:${proImage.model}`}
         compositeIds
-        onFreeChange={() => {}}
+        onFreeChange={imageHandlers.onFreeChange}
         onProChange={imageHandlers.onProChange}
         onClear={imageHandlers.onClear}
+      />
+
+      <ModalityTierSection
+        title="Video Generation"
+        description="Text-to-video provider and model for animated video segments."
+        freeState={freeVideo}
+        proState={proVideo}
+        providers={videoProviders}
+      />
+
+      <IncludedModelsEditor
+        title="Included Video Models"
+        description="Control which video models are available for text-to-video generation."
+        providers={videoProviders}
+        freeIncluded={freeIncludedVideo}
+        proIncluded={proIncludedVideo}
+        freeDefault={`${freeVideo.provider}:${freeVideo.model}`}
+        proDefault={`${proVideo.provider}:${proVideo.model}`}
+        compositeIds
+        onFreeChange={videoHandlers.onFreeChange}
+        onProChange={videoHandlers.onProChange}
+        onClear={videoHandlers.onClear}
+      />
+
+      <ModalityTierSection
+        title="Avatar Generation"
+        description="Lip-sync avatar overlay provider and engine for video podcasts."
+        freeState={freeAvatar}
+        proState={proAvatar}
+        providers={avatarProviders}
+      />
+
+      <IncludedModelsEditor
+        title="Included Avatar Models"
+        description="Control which avatar engines are available for lip-sync overlays."
+        providers={avatarProviders}
+        freeIncluded={freeIncludedAvatar}
+        proIncluded={proIncludedAvatar}
+        freeDefault={`${freeAvatar.provider}:${freeAvatar.model}`}
+        proDefault={`${proAvatar.provider}:${proAvatar.model}`}
+        compositeIds
+        onFreeChange={avatarHandlers.onFreeChange}
+        onProChange={avatarHandlers.onProChange}
+        onClear={avatarHandlers.onClear}
       />
 
       <fieldset className={styles.section}>
