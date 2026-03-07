@@ -184,6 +184,44 @@
   color: #fff;
 }
 
+.sliderRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.sliderRow > :first-child {
+  flex: 1;
+}
+
+.labelToggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--color-text-muted);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.labelToggle:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.labelToggleActive {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  text-decoration: none;
+  opacity: 1;
+}
+
 .ohmNote {
   font-size: 11px;
   color: var(--color-text-muted);

@@ -15,6 +15,19 @@ import styles from './page.module.css';
 const GLOBE_CENTER: [number, number] = [12, 30];
 const GLOBE_ZOOM = 1.8;
 
+/** Hide modern labels (roads, cities, POIs) from the base map style */
+function setBaseLabelsVisible(map: MapboxMap, visible: boolean) {
+  const style = map.getStyle();
+  if (!style?.layers) return;
+  for (const layer of style.layers) {
+    // Skip our own OHM layers
+    if (layer.id.startsWith('ohm-')) continue;
+    if (layer.type === 'symbol') {
+      map.setLayoutProperty(layer.id, 'visibility', visible ? 'visible' : 'none');
+    }
+  }
+}
+
 export default function HomePage() {
   const [place, setPlace] = useState<PlaceMetadata | null>(null);
   const [year, setYear] = useState<number | null>(null);
@@ -24,9 +37,11 @@ export default function HomePage() {
   const [antiqueMaps, setAntiqueMaps] = useState<AntiqueMapResult[]>([]);
   const [antiqueMapLoading, setAntiqueMapLoading] = useState(false);
   const [showAntiqueMaps, setShowAntiqueMaps] = useState(false);
+  const [labelsHidden, setLabelsHidden] = useState(false);
   const mapRef = useRef<MapboxMap | null>(null);
   const ohmLoadedRef = useRef(false);
   const yearRef = useRef<number | null>(null);
+  const labelsHiddenRef = useRef(false);
 
   const loadOHM = useCallback((map: MapboxMap, y: number) => {
     if (ohmLoadedRef.current) {
@@ -52,6 +67,10 @@ export default function HomePage() {
         setTimeout(() => {
           if (mapRef.current && yearRef.current != null) {
             loadOHM(mapRef.current, yearRef.current);
+            // Re-apply label visibility after style change
+            if (labelsHiddenRef.current) {
+              setBaseLabelsVisible(mapRef.current, false);
+            }
           }
         }, 200);
       }
@@ -80,9 +99,24 @@ export default function HomePage() {
     map.once('moveend', () => {
       if (y != null) {
         loadOHM(map, y);
+        // Auto-hide labels for historical views
+        if (!labelsHiddenRef.current) {
+          labelsHiddenRef.current = true;
+          setLabelsHidden(true);
+          setBaseLabelsVisible(map, false);
+        }
       }
     });
   }, [loadOHM]);
+
+  const toggleLabels = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const newVisible = labelsHiddenRef.current;
+    labelsHiddenRef.current = !newVisible;
+    setLabelsHidden(!newVisible);
+    setBaseLabelsVisible(map, newVisible);
+  }, []);
 
   const handleYearChange = useCallback((newYear: number) => {
     setYear(newYear);
@@ -247,16 +281,26 @@ export default function HomePage() {
 
       {hasSearched && year != null && (
         <div className={styles.timeSliderContainer}>
-          <TimeSlider
-            minYear={minYear}
-            maxYear={maxYear}
-            value={year}
-            onChange={handleYearChange}
-            events={place?.historicalContext?.map(ctx => ({
-              year: ctx.yearStart,
-              label: ctx.periodName,
-            })) ?? []}
-          />
+          <div className={styles.sliderRow}>
+            <TimeSlider
+              minYear={minYear}
+              maxYear={maxYear}
+              value={year}
+              onChange={handleYearChange}
+              events={place?.historicalContext?.map(ctx => ({
+                year: ctx.yearStart,
+                label: ctx.periodName,
+              })) ?? []}
+            />
+            <button
+              type="button"
+              className={`${styles.labelToggle} ${labelsHidden ? styles.labelToggleActive : ''}`}
+              onClick={toggleLabels}
+              title={labelsHidden ? 'Show modern labels' : 'Hide modern labels'}
+            >
+              {labelsHidden ? 'Aa' : 'Aa'}
+            </button>
+          </div>
           <p className={styles.ohmNote}>
             Historical borders from OpenHistoricalMap — coverage varies by region and era
           </p>
