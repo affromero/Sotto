@@ -23,33 +23,37 @@ const mockRome: PlaceMetadata = {
   confidence: 0.9,
 };
 
-// Mock all gazetteer clients
-vi.mock('../../src/resolver/gazetteers/whg', () => ({
-  WHGClient: vi.fn().mockImplementation(() => ({
-    source: 'whg',
-    search: vi.fn().mockImplementation(async (query: string) => {
+// Mock all gazetteer clients via the barrel import used by PlaceResolver
+vi.mock('../../src/resolver/gazetteers', () => {
+  class MockWHGClient {
+    source = 'whg' as const;
+    async search(query: string) {
       if (query.toLowerCase().includes('constantinople')) return mockConstantinople;
       return null;
-    }),
-  })),
-}));
+    }
+  }
 
-vi.mock('../../src/resolver/gazetteers/geonames', () => ({
-  GeoNamesClient: vi.fn().mockImplementation(() => ({
-    source: 'geonames',
-    search: vi.fn().mockImplementation(async (query: string) => {
+  class MockGeoNamesClient {
+    source = 'geonames' as const;
+    async search(query: string) {
       if (query.toLowerCase().includes('rome')) return mockRome;
       return null;
-    }),
-  })),
-}));
+    }
+  }
 
-vi.mock('../../src/resolver/gazetteers/pleiades', () => ({
-  PleiadesClient: vi.fn().mockImplementation(() => ({
-    source: 'pleiades',
-    search: vi.fn().mockResolvedValue(null),
-  })),
-}));
+  class MockPleiadesClient {
+    source = 'pleiades' as const;
+    async search() {
+      return null;
+    }
+  }
+
+  return {
+    WHGClient: MockWHGClient,
+    GeoNamesClient: MockGeoNamesClient,
+    PleiadesClient: MockPleiadesClient,
+  };
+});
 
 describe('PlaceResolver', () => {
   let resolver: PlaceResolver;

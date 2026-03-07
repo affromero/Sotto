@@ -72,7 +72,10 @@ export class WHGClient implements GazetteerClient {
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn('[maps:whg] API error', { status: response.status, query });
+      return null;
+    }
 
     const data = (await response.json()) as WHGResponse;
     if (!data.features?.length) return null;

@@ -92,7 +92,10 @@ export class PleiadesClient implements GazetteerClient {
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn('[maps:pleiades] API error', { status: response.status, query });
+      return null;
+    }
 
     const data = (await response.json()) as PleiadesSearchResponse;
     if (!data.items?.length) return null;

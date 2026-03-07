@@ -24,11 +24,16 @@ export class PlaceResolver {
           this.cache.set(query, result, options?.yearHint);
           return result;
         }
-      } catch {
-        // Continue to next gazetteer on failure
+      } catch (err) {
+        console.warn('[maps:resolver] Gazetteer error', {
+          source: client.source,
+          query,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
+    console.warn('[maps:resolver] All gazetteers failed', { query, yearHint: options?.yearHint });
     return null;
   }
 
@@ -68,8 +73,12 @@ export class PlaceResolver {
           this.cache.set(query, result, yearStart);
           return result;
         }
-      } catch {
-        // Continue to next gazetteer
+      } catch (err) {
+        console.warn('[maps:resolver] Gazetteer error', {
+          source: client.source,
+          query,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 
