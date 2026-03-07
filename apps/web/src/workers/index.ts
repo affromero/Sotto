@@ -157,11 +157,11 @@ emailDigestQueue
   .then(() => logger.info('Weekly email digest scheduled', { schedule: 'Sunday 10:00 UTC' }))
   .catch((err) => logger.error('Failed to schedule email digest', { error: err.message }));
 
-// Schedule draft cleanup every 24 hours (delete drafts >30 days old)
+// Schedule cleanup every 15 minutes (stale drafts + stuck video generations)
 draftCleanupQueue
-  .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 24 * 60 * 60 * 1000 } })
-  .then(() => logger.info('Draft cleanup scheduled', { intervalMs: '86400000' }))
-  .catch((err) => logger.error('Failed to schedule draft cleanup', { error: err.message }));
+  .add(JobType.CLEANUP_DRAFTS, {}, { repeat: { every: 15 * 60 * 1000 } })
+  .then(() => logger.info('Cleanup scheduled', { intervalMs: '900000' }))
+  .catch((err) => logger.error('Failed to schedule cleanup', { error: err.message }));
 
 // Schedule BYOK key re-validation every 24 hours
 keyValidationQueue

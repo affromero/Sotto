@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+// Set REMOTION_URL before importing the worker (fail-fast check)
+vi.stubEnv('REMOTION_URL', 'http://remotion:3100');
+
 const {
   mockPrisma,
   mockUploadFile,
@@ -103,10 +106,10 @@ describe('video-composition worker', () => {
         ok: true,
         json: () => Promise.resolve({ jobId: 'render-1' }),
       })
-      // Status poll — completed immediately
+      // Status poll — done
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ status: 'completed', progress: 1 }),
+        json: () => Promise.resolve({ status: 'done', progress: 1 }),
       })
       // Output download
       .mockResolvedValueOnce({
@@ -158,7 +161,7 @@ describe('video-composition worker', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ status: 'failed', progress: 0.5, error: 'out of memory' }),
+        json: () => Promise.resolve({ status: 'error', progress: 0.5, error: 'out of memory' }),
       });
 
     const promise = processVideoComposition(makeJob(baseData));
