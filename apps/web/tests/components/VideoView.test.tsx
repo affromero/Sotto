@@ -55,9 +55,9 @@ const mockSegments: SegmentData[] = [
 ];
 
 const mockVisuals: SegmentVisualData[] = [
-  { segmentId: 'seg-1', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 0 },
-  { segmentId: 'seg-2', visualType: 'IMAGE_SLIDE', prompt: 'expert photo', metadata: null, assetUrl: 'https://example.com/img.png', assetType: 'image/png', order: 1 },
-  { segmentId: 'seg-3', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 2 },
+  { id: 'sv-1', segmentId: 'seg-1', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 0, status: 'ready' },
+  { id: 'sv-2', segmentId: 'seg-2', visualType: 'IMAGE_SLIDE', prompt: 'expert photo', metadata: null, assetUrl: 'https://example.com/img.png', assetType: 'image/png', order: 1, status: 'ready' },
+  { id: 'sv-3', segmentId: 'seg-3', visualType: 'TEXT_CARD', prompt: null, metadata: null, assetUrl: null, assetType: null, order: 2, status: 'ready' },
 ];
 
 const mockReferences: ReferenceData[] = [];
