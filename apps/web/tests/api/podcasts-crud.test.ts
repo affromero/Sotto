@@ -15,7 +15,7 @@ const mockDiscoveryCreate = vi.fn();
 const mockCheckGenerationGate = vi.fn();
 
 const mockGetFreeTierStatus = vi.fn();
-const mockGetFreeTierConfig = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
 const mockResolveAutoModel = vi.fn().mockResolvedValue({
   aiProvider: 'anthropic',
   aiModel: 'claude-haiku-4-5-20251001',
@@ -89,11 +89,8 @@ vi.mock('@/lib/generation-gate', () => ({
   getFreeTierStatus: (...args: unknown[]) => mockGetFreeTierStatus(...args),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
-}));
-
 vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
   resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 

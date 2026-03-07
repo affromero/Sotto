@@ -76,10 +76,10 @@ vi.mock('@/lib/generation-gate', () => ({
   tryIncrementFreeGeneration: (...args: unknown[]) => mockTryIncrementFreeGeneration(...args),
 }));
 
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', dailyGenerationLimit: 3, ttsAllocations: [], aiAllocations: [] });
+const mockGetAutoModelConfig = vi.fn().mockResolvedValue({ free: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' }, dailyGenerationLimit: 3, dailyVideoLimit: 1, dailyVideoLimitPro: 2, ttsAllocations: [], aiAllocations: [] });
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
 }));
 
 const mockResolveAutoModel = vi.fn().mockResolvedValue({

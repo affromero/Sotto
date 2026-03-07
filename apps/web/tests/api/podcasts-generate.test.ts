@@ -89,14 +89,22 @@ vi.mock('@/lib/pipeline-resume', () => ({
 }));
 
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
-const mockGetFreeTierConfig = vi.fn().mockResolvedValue({ aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', dailyGenerationLimit: 3, ttsAllocations: [], aiAllocations: [] });
+const mockGetAutoModelConfig = vi.fn().mockResolvedValue({ free: { aiProvider: 'anthropic', aiModel: 'claude-haiku-4-5-20251001', ttsProvider: 'openai', ttsModel: 'tts-1-hd', sttProvider: 'openai', sttModel: 'whisper-1' }, dailyGenerationLimit: 3, dailyVideoLimit: 1, dailyVideoLimitPro: 2, ttsAllocations: [], aiAllocations: [] });
 
 vi.mock('@/lib/generation-gate', () => ({
   checkGenerationGate: (...args: unknown[]) => mockCheckGenerationGate(...args),
 }));
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
+vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
+  resolveAutoModel: vi.fn().mockResolvedValue({
+    aiProvider: 'anthropic',
+    aiModel: 'claude-haiku-4-5-20251001',
+    ttsProvider: 'kittentts',
+    ttsModel: 'kitten-tts-mini-0.8',
+    sttProvider: 'openai',
+    sttModel: 'whisper-1',
+  }),
 }));
 
 const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
@@ -106,17 +114,6 @@ const mockSelectFreeTierProviders = vi.fn().mockResolvedValue({
 
 vi.mock('@/lib/free-tier-provider-selector', () => ({
   selectFreeTierProviders: (...args: unknown[]) => mockSelectFreeTierProviders(...args),
-}));
-
-vi.mock('@/lib/auto-model-config', () => ({
-  resolveAutoModel: vi.fn().mockResolvedValue({
-    aiProvider: 'anthropic',
-    aiModel: 'claude-haiku-4-5-20251001',
-    ttsProvider: 'kittentts',
-    ttsModel: 'kitten-tts-mini-0.8',
-    sttProvider: 'openai',
-    sttModel: 'whisper-1',
-  }),
 }));
 
 const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true, remaining: 19, resetAt: 0 });
