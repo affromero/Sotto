@@ -16,6 +16,9 @@ export interface TweetParseResult {
   isSelfAuthored?: boolean;
   requestedAiModel?: string;
   requestedTtsProvider?: string;
+  requestedImageModel?: string;
+  requestedVideoModel?: string;
+  costPreference?: 'cheapest';
 }
 
 export interface TwitterMediaVariant {

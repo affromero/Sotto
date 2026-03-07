@@ -58,12 +58,14 @@ vi.mock('@/lib/twitter', () => ({
 const mockParseTweetIntent = vi.fn();
 const mockParseThreadIntent = vi.fn();
 
-const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null });
+const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null, imageModel: null, videoModel: null, wantsVideo: false, costPreference: null });
+const mockResolveCheapestModels = vi.fn();
 
 vi.mock('@/lib/tweet-parser', () => ({
   parseTweetIntent: (...args: unknown[]) => mockParseTweetIntent(...args),
   parseThreadIntent: (...args: unknown[]) => mockParseThreadIntent(...args),
   resolveModelFromTweet: (...args: unknown[]) => mockResolveModelFromTweet(...args),
+  resolveCheapestModels: (...args: unknown[]) => mockResolveCheapestModels(...args),
 }));
 
 const mockCheckGenerationGate = vi.fn().mockResolvedValue({ allowed: true, reason: 'ok', isByokUser: true });
@@ -950,6 +952,78 @@ describe('processTwitterMentions', () => {
 
       expect(mockParseThreadIntent).toHaveBeenCalled();
       expect(mockParseTweetIntent).not.toHaveBeenCalled();
+    });
+
+    it('stores video prefs on TweetMention when tweet requests video', async () => {
+      const tweet = createMockTweet();
+      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
+      setupLinkedUser();
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+        requestedImageModel: 'flux',
+        requestedVideoModel: 'wan',
+      });
+      mockResolveModelFromTweet.mockReturnValue({
+        aiModel: null,
+        ttsProvider: null,
+        imageModel: 'fal-flux-2-pro',
+        videoModel: 'fal-wan2.5-480p',
+        wantsVideo: true,
+        costPreference: null,
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      // The GENERATING update should include videoPrefs
+      const updateCalls = mockPrismaTweetMentionUpdate.mock.calls;
+      const generatingUpdate = updateCalls.find(
+        (call: unknown[]) => (call[0] as { data: { status?: string } }).data.status === 'GENERATING'
+      );
+      expect(generatingUpdate).toBeDefined();
+      expect((generatingUpdate![0] as { data: { videoPrefs?: unknown } }).data.videoPrefs).toEqual({
+        imageModel: 'fal-flux-2-pro',
+        videoModel: 'fal-wan2.5-480p',
+        wantsVideo: true,
+      });
+    });
+
+    it('calls resolveCheapestModels when costPreference is cheapest', async () => {
+      const tweet = createMockTweet();
+      mockGetMentions.mockResolvedValue({ tweets: [tweet], mediaByKey: new Map() });
+      setupLinkedUser();
+      mockParseTweetIntent.mockResolvedValue({
+        topic: 'Test',
+        title: 'Test',
+        depth: 'standard',
+        audienceLevel: 'beginner',
+        tone: 'professional',
+        focusAreas: [],
+        costPreference: 'cheapest',
+      });
+      const initialModels = {
+        aiModel: null,
+        ttsProvider: null,
+        imageModel: null,
+        videoModel: null,
+        wantsVideo: false,
+        costPreference: 'cheapest' as const,
+      };
+      mockResolveModelFromTweet.mockReturnValue(initialModels);
+      mockResolveCheapestModels.mockResolvedValue({
+        ...initialModels,
+        aiModel: 'cheapest-model',
+      });
+
+      const job = createMockJob({});
+      await processTwitterMentions(job);
+
+      expect(mockResolveCheapestModels).toHaveBeenCalledWith(initialModels);
     });
 
     it('multi-participant thread still needs 3 replies', async () => {
