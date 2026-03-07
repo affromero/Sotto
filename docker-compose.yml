@@ -111,7 +111,7 @@ services:
         NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
     container_name: sotto-maps
     ports:
-      - '3001:3001'
+      - '3002:3002'
 
 volumes:
   sotto_postgres_data:

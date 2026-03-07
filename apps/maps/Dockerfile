@@ -46,6 +46,6 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/apps/maps/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/maps/.next/static ./apps/maps/.next/static
 USER nextjs
-EXPOSE 3001
-ENV PORT=3001
+EXPOSE 3002
+ENV PORT=3002
 CMD ["node", "apps/maps/server.js"]
