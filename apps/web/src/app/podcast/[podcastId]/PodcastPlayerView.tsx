@@ -55,7 +55,6 @@ import { GenerationProgress } from '@/components/create/GenerationProgress';
 import { ScriptPreview } from '@/components/player/ScriptPreview';
 import { AudioConfigPanel, type AudioConfig } from '@/components/player/AudioConfigPanel';
 import { MiniPlayer } from '@/components/player/MiniPlayer';
-import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
@@ -811,9 +810,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 setVideoUrl(url);
               }}
             />
-          )}
-          {videoState === 'ready' && videoUrl && (
-            <VideoPlayer videoUrl={videoUrl} title={podcast.title} />
           )}
           {videoState === 'failed' && (
             <div className={styles.videoFailed}>
