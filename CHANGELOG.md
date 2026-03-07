@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.1] - 2026-03-08
+
+### Added
+- Place-enrichment worker as pre-step for MAP_OVERLAY visuals — robust geocoding before video generation
+- Daily limits UI on admin Auto Models page
+
+### Fixed
+- CI workflows and deploy script now checkout git submodules (`submodules: recursive`)
+- Removed basic_auth gate from maps.sotto.fm Caddyfile
+
+### Changed
+- `packages/maps/` converted from inline code to git submodule pointing to SottoFM/maps
+- FreeTierConfig consolidated into AutoModelConfig — single source of truth for model defaults and limits
+- Image and video model IDs aligned with PriceToken canonical IDs
+
 ## [0.4.0] - 2026-03-07
 
 ### Added
