@@ -449,7 +449,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
 
       // Handle video pipeline failures separately — podcast is already READY
-      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition', 'avatar-generation'];
+      const VIDEO_QUEUES = ['visual-classification', 'visual-generation', 'video-composition', 'avatar-generation', 'place-enrichment'];
       if (VIDEO_QUEUES.includes(queueName)) {
         const videoGenerationId = (job?.data as Record<string, unknown>)?.videoGenerationId as string | undefined;
         if (!videoGenerationId) return;

@@ -86,17 +86,18 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       service = result.service;
       totalCost = result.cost;
     } else if (visualType === 'MAP_OVERLAY') {
-      const metadata = job.data.metadata as { places?: Array<{ name: string }>; preset?: string } | undefined;
-      const placeName = metadata?.places?.[0]?.name ?? prompt;
+      const metadata = job.data.metadata as {
+        places?: Array<{ name: string; coordinates?: [number, number] }>;
+        preset?: string;
+      } | undefined;
       const presetName = (metadata?.preset as string) ?? 'vintage';
 
-      const { generateMapImage } = await import('@/lib/map-image');
-      const { PlaceResolver } = await import('@sotto/maps');
-      const resolver = new PlaceResolver({ redisUrl: process.env.REDIS_URL });
-      const place = await resolver.resolve(placeName);
+      // Places are pre-enriched by the place-enrichment worker with full PlaceMetadata
+      const enrichedPlace = metadata?.places?.find((p) => p.coordinates);
 
-      if (!place) {
-        logger.info('No place resolved, falling back to AI illustration', { segmentVisualId, placeName });
+      if (!enrichedPlace || !enrichedPlace.coordinates) {
+        const placeName = metadata?.places?.[0]?.name ?? prompt;
+        logger.info('No enriched place with coordinates, falling back to AI illustration', { segmentVisualId, placeName });
         const aiResult = await generateAiImage(podcastId, videoGenerationId, prompt);
         assetBuffer = aiResult.buffer;
         assetType = 'image/png';
@@ -108,6 +109,9 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
           data: { visualType: 'AI_ILLUSTRATION' },
         });
       } else {
+        const { generateMapImage } = await import('@/lib/map-image');
+        // Cast to PlaceMetadata — enrichment worker writes the full shape
+        const place = enrichedPlace as import('@sotto/maps').PlaceMetadata;
         assetBuffer = await generateMapImage(place, presetName);
         assetType = 'image/png';
         assetExt = 'png';
