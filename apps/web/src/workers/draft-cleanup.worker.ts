@@ -24,7 +24,7 @@ export async function processDraftCleanup(_job: Job): Promise<void> {
 
   const staleVideos = await prisma.videoGeneration.updateMany({
     where: {
-      status: { in: ['PENDING', 'CLASSIFYING', 'GENERATING_VISUALS', 'COMPOSING'] },
+      status: { in: ['PENDING', 'CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_AVATARS', 'COMPOSING'] },
       updatedAt: { lt: staleThreshold },
     },
     data: {
@@ -35,5 +35,23 @@ export async function processDraftCleanup(_job: Job): Promise<void> {
 
   if (staleVideos.count > 0) {
     logger.warn('Marked stale video generations as FAILED', { count: String(staleVideos.count) });
+  }
+
+  // Mark avatar overlays stuck in processing for >30 minutes as failed
+  const staleAvatarThreshold = new Date(Date.now() - 30 * 60 * 1000);
+
+  const staleAvatars = await prisma.avatarOverlay.updateMany({
+    where: {
+      status: { in: ['concatenating', 'submitting', 'processing'] },
+      updatedAt: { lt: staleAvatarThreshold },
+    },
+    data: {
+      status: 'failed',
+      failureReason: 'Timed out — stuck in processing for over 30 minutes',
+    },
+  });
+
+  if (staleAvatars.count > 0) {
+    logger.warn('Marked stale avatar overlays as failed', { count: String(staleAvatars.count) });
   }
 }
