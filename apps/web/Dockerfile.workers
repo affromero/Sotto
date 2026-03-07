@@ -14,6 +14,7 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/video/package.json ./packages/video/
 COPY packages/verification-standard/package.json ./packages/verification-standard/
+COPY packages/maps/package.json ./packages/maps/
 COPY apps/web/prisma ./apps/web/prisma/
 
 RUN --mount=type=cache,target=/root/.npm npm ci --ignore-scripts
@@ -47,6 +48,7 @@ COPY --chown=sotto:sotto apps/web/prisma ./apps/web/prisma/
 COPY --chown=sotto:sotto packages/shared ./packages/shared/
 COPY --chown=sotto:sotto packages/video ./packages/video/
 COPY --chown=sotto:sotto packages/verification-standard ./packages/verification-standard/
+COPY --chown=sotto:sotto packages/maps ./packages/maps/
 COPY --chown=sotto:sotto apps/web/src ./apps/web/src/
 COPY --chown=sotto:sotto apps/web/models ./apps/web/models/
 COPY --chown=sotto:sotto apps/web/prompts ./apps/web/prompts/

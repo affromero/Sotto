@@ -148,7 +148,8 @@ export type VisualType =
   | 'DIAGRAM'
   | 'STOCK_FOOTAGE'
   | 'AI_ILLUSTRATION'
-  | 'TEXT_CARD';
+  | 'TEXT_CARD'
+  | 'MAP_OVERLAY';
 
 export type VideoStatus =
   | 'PENDING'
