@@ -35,8 +35,18 @@ export interface VisualsInput {
   branding: Branding;
 }
 
+export interface AvatarOverlayInput {
+  speaker: string;
+  videoUrl: string;
+  posX: number;
+  posY: number;
+  width: number;
+  height: number;
+}
+
 export interface RenderInput extends VisualsInput {
   audioUrl: string;
+  avatarOverlays?: AvatarOverlayInput[];
 }
 
 export const DEFAULT_RENDER_CONFIG: RenderConfig = {
