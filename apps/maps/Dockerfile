@@ -9,9 +9,6 @@ RUN npm ci --workspace=@sotto/maps-app --workspace=@sotto/maps --workspace=@sott
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/maps/node_modules ./apps/maps/node_modules
-COPY --from=deps /app/packages/maps/node_modules ./packages/maps/node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules
 COPY package.json package-lock.json tsconfig.base.json ./
 COPY apps/maps/ apps/maps/
 COPY packages/maps/ packages/maps/
@@ -24,7 +21,6 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-COPY --from=builder /app/apps/maps/public ./apps/maps/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/maps/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/maps/.next/static ./apps/maps/.next/static
 USER nextjs
