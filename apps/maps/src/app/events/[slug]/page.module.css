@@ -1,0 +1,30 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.placeholder {
+  text-align: center;
+  padding: 40px;
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: 32px;
+  text-transform: capitalize;
+  margin-bottom: 8px;
+}
+
+.message {
+  font-size: 18px;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.hint {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
