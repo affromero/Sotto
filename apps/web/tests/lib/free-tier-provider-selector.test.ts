@@ -2,14 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
-const mockGetFreeTierConfig = vi.fn();
+const mockGetAutoModelConfig = vi.fn();
 const mockResolveAutoModel = vi.fn();
 
-vi.mock('@/lib/free-tier-config', () => ({
-  getFreeTierConfig: (...args: unknown[]) => mockGetFreeTierConfig(...args),
-}));
-
 vi.mock('@/lib/auto-model-config', () => ({
+  getAutoModelConfig: (...args: unknown[]) => mockGetAutoModelConfig(...args),
   resolveAutoModel: (...args: unknown[]) => mockResolveAutoModel(...args),
 }));
 
@@ -48,8 +45,10 @@ const autoModelDefaults = {
   sttModel: 'whisper-1',
 };
 
-const baseFreeTierConfig = {
+const baseAutoModelConfig = {
   dailyGenerationLimit: 3,
+  dailyVideoLimit: 1,
+  dailyVideoLimitPro: 2,
   ttsAllocations: [],
   aiAllocations: [],
 };
@@ -60,7 +59,7 @@ describe('selectFreeTierProviders', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveAutoModel.mockResolvedValue(autoModelDefaults);
-    mockGetFreeTierConfig.mockResolvedValue(baseFreeTierConfig);
+    mockGetAutoModelConfig.mockResolvedValue(baseAutoModelConfig);
     mockFreeProviderUsageFindMany.mockResolvedValue([]);
   });
 
@@ -93,8 +92,8 @@ describe('selectFreeTierProviders', () => {
 
   describe('TTS allocation exhausted — falls back to auto model', () => {
     it('falls back to auto model ttsProvider when all TTS allocations exhausted', async () => {
-      mockGetFreeTierConfig.mockResolvedValue({
-        ...baseFreeTierConfig,
+      mockGetAutoModelConfig.mockResolvedValue({
+        ...baseAutoModelConfig,
         ttsAllocations: [{ provider: 'elevenlabs', model: 'eleven_v3', quota: 5 }],
       });
       // User has used all 5 elevenlabs quota
@@ -111,8 +110,8 @@ describe('selectFreeTierProviders', () => {
 
   describe('AI allocation exhausted — falls back to auto model', () => {
     it('falls back to auto model aiProvider when all AI allocations exhausted', async () => {
-      mockGetFreeTierConfig.mockResolvedValue({
-        ...baseFreeTierConfig,
+      mockGetAutoModelConfig.mockResolvedValue({
+        ...baseAutoModelConfig,
         aiAllocations: [{ provider: 'anthropic', model: 'claude-haiku-4-5-20251001', quota: 10 }],
       });
       // User has used all 10 anthropic quota
