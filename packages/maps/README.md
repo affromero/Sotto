@@ -22,37 +22,38 @@ Sotto podcasts often reference real places — historical and modern. We wanted 
 
 ## Comparison with existing solutions
 
-| Feature | **@sotto/maps** | react-map-gl | Leaflet | deck.gl | MapLibre GL | Allmaps | Manual Mapbox GL |
+| Feature | **@sotto/maps** | [react-map-gl](https://visgl.github.io/react-map-gl/) | [Leaflet](https://leafletjs.com/) | [deck.gl](https://deck.gl/) | [MapLibre GL](https://maplibre.org/) | [Allmaps](https://allmaps.org/) | [Mapbox GL JS](https://docs.mapbox.com/mapbox-gl-js/) |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| React components | Yes | Yes | Yes | Yes | No | No | No |
-| Map presets (vintage, cinematic, etc.) | Yes (6) | No | No | No | No | No | No |
-| 3D terrain (one-line) | Yes | No | No | Yes | No | No | No |
-| Historical map overlays (IIIF) | Yes | No | No | No | No | Yes | No |
-| OpenHistoricalMap tiles | Yes | No | No | No | No | No | No |
-| Before/after comparison (3 modes) | Yes | No | No | No | No | No | No |
-| Time slider with event markers | Yes | No | No | No | No | No | No |
-| Place resolution (name → coords) | Yes | No | No | No | No | No | No |
-| Historical place bias | Yes | No | No | No | No | No | No |
-| Camera animation sequences | Yes | No | No | Yes | No | No | No |
-| Remotion video integration | Yes | No | No | No | No | No | No |
-| Static image API for video frames | Yes | No | No | No | No | No | No |
-| CSS Modules | Yes | No | No | No | No | No | No |
-| Content-synced media design | Yes | No | No | No | No | No | No |
-| Built-in caching (LRU + TTL) | Yes | No | No | No | No | No | No |
-| Tree-shakeable (types-only import) | Yes | No | Yes | No | No | Yes | No |
+| React components | **Yes** | **Yes** | **Yes** | **Yes** | No | No | No |
+| Map presets (vintage, cinematic, etc.) | **Yes** (6) | No | No | No | No | No | No |
+| 3D terrain (one-line) | **Yes** | No | No | **Yes** | No | No | No |
+| Historical map overlays (IIIF) | **Yes** | No | No | No | No | **Yes** | No |
+| OpenHistoricalMap tiles | **Yes** | No | No | No | No | No | No |
+| Before/after comparison (3 modes) | **Yes** | No | No | No | No | No | No |
+| Time slider with event markers | **Yes** | No | No | No | No | No | No |
+| Place resolution (name → coords) | **Yes** | No | No | No | No | No | No |
+| Historical place bias | **Yes** | No | No | No | No | No | No |
+| Camera animation sequences | **Yes** | No | No | **Yes** | No | No | No |
+| Remotion video integration | **Yes** | No | No | No | No | No | No |
+| Static image API for video frames | **Yes** | No | No | No | No | No | No |
+| CSS Modules | **Yes** | No | No | No | No | No | No |
+| Content-synced media design | **Yes** | No | No | No | No | No | No |
+| Built-in caching (LRU + TTL) | **Yes** | No | No | No | No | No | No |
+| Tree-shakeable (types-only import) | **Yes** | No | **Yes** | No | No | **Yes** | No |
 
-### Why not use existing libraries directly?
+### Closest alternative: react-map-gl + manual integration
 
-| Library | What it does well | What's missing for Sotto |
-|---|---|---|
-| **react-map-gl** | Thin React wrapper over Mapbox GL | No presets, no historical overlays, no animation system, no place resolution. We'd still need to build everything on top. |
-| **Leaflet** | Lightweight 2D maps, huge plugin ecosystem | No 3D terrain, no WebGL rendering, poor performance for cinematic animations. Plugin ecosystem is fragmented. |
-| **deck.gl** | Large-scale data visualization on maps | Overkill for our use case (we're rendering places, not millions of data points). No historical features. |
-| **MapLibre GL** | Open-source Mapbox GL fork | Same API as Mapbox GL but without premium styles. Still need all the same wrapper code. |
-| **Allmaps** | IIIF historical map warping | Standalone viewer only. No React components, no presets, no integration with modern map UIs. We integrate it as one overlay source. |
-| **OpenHistoricalMap** | Community-curated historical geodata | Tile server only. No components, no year filtering UI, no integration layer. We consume their tiles. |
+[react-map-gl](https://visgl.github.io/react-map-gl/) is the most popular React wrapper for Mapbox GL and the closest starting point. To match what `@sotto/maps` provides, you'd need to:
 
-**The gap**: Each library solves one piece. None provides a unified API for "show me Constantinople in 1453 with a vintage style, historical overlay, and cinematic fly-in" — which is what our podcast video pipeline needs.
+1. **Build a preset system** — create and maintain 6 map style configurations with texture overlays and 3D terrain toggles
+2. **Integrate Allmaps** — wire up `@allmaps/maplibre` for IIIF historical map warping, handle lifecycle and layer management
+3. **Add OpenHistoricalMap** — configure vector tile sources with year-based filtering
+4. **Build DualEraView** — implement 3 comparison modes (side-by-side with synced cameras, CSS clip-path slider, opacity fade) from scratch
+5. **Build a place resolver** — integrate 3 gazetteer APIs (WHG, GeoNames, Pleiades) with caching, confidence scoring, and historical bias
+6. **Build an animation system** — keyframe interpolation, bearing calculation, easing functions, sequence playback with progress tracking
+7. **Build Remotion compositions** — Ken Burns effect on static map images with annotation overlays for the video pipeline
+
+Each piece exists in isolation across different libraries. `@sotto/maps` combines them into a single API where `<HistoricalMap place={constantinople} year={1453} preset="vintage" />` just works.
 
 ## Features
 
@@ -72,9 +73,9 @@ const historical = await resolver.resolveHistorical('Byzantium', 330, 1453);
 | `vintage` | Sepia antique | No | Paper grain texture overlay |
 | `satellite` | Satellite Streets | No | Modern satellite imagery |
 | `parchment` | Light + sepia filter | No | Old-world parchment feel |
-| `cinematic` | Satellite + terrain | Yes | Johnny Harris style — dramatic 3D |
+| `cinematic` | Satellite + terrain | **Yes** | Johnny Harris style — dramatic 3D |
 | `dark` | Dark v11 | No | Dark mode |
-| `terrain` | Outdoors + terrain | Yes | Topographic with hillshading |
+| `terrain` | Outdoors + terrain | **Yes** | Topographic with hillshading |
 
 ### Components
 ```tsx
