@@ -1,10 +1,32 @@
 import React from 'react';
-import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import type { VisualsInput } from '../types';
 import { resolveSegmentComponent } from './segments';
 import { SottoWatermark } from './shared/SottoWatermark';
 import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
+
+const TRANSITION_FRAMES = 8;
+
+const SegmentWithFade: React.FC<{
+  children: React.ReactNode;
+  durationInFrames: number;
+}> = ({ children, durationInFrames }) => {
+  const frame = useCurrentFrame();
+
+  const opacity = interpolate(
+    frame,
+    [0, TRANSITION_FRAMES, durationInFrames - TRANSITION_FRAMES, durationInFrames],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+
+  return (
+    <AbsoluteFill style={{ opacity }}>
+      {children}
+    </AbsoluteFill>
+  );
+};
 
 export const PodcastVisuals: React.FC<VisualsInput> = ({
   segments,
@@ -26,10 +48,10 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
               from={fromFrame}
               durationInFrames={durationFrames}
             >
-              <AbsoluteFill>
+              <SegmentWithFade durationInFrames={durationFrames}>
                 <SegmentComponent segment={segment} />
                 <SpeakerLabel speaker={segment.speaker} branding={branding} />
-              </AbsoluteFill>
+              </SegmentWithFade>
             </Sequence>
           );
         })}
