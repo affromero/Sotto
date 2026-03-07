@@ -9,8 +9,19 @@ interface MapSlideProps {
 export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
-  const metadata = segment.metadata as { places?: Array<{ name: string }>; preset?: string } | undefined;
-  const placeName = metadata?.places?.[0]?.name ?? '';
+  const metadata = segment.metadata as {
+    places?: Array<{
+      name: string;
+      modernRegion?: string;
+      confidence?: number;
+      historicalContext?: Array<{ periodName: string }>;
+    }>;
+    preset?: string;
+  } | undefined;
+  const place = metadata?.places?.[0];
+  const placeName = place?.name ?? '';
+  const subtitle = place?.historicalContext?.[0]?.periodName ?? place?.modernRegion ?? '';
+  const isHighConfidence = (place?.confidence ?? 1) >= 0.7;
 
   // Ken Burns: slow zoom in over the duration
   const scale = interpolate(frame, [0, durationInFrames], [1, 1.08], {
@@ -46,14 +57,19 @@ export const MapSlide: React.FC<MapSlideProps> = ({ segment }) => {
             opacity: annotationOpacity,
             background: 'rgba(0,0,0,0.7)',
             color: '#fefcf8',
-            fontFamily: 'DM Serif Display, serif',
-            fontSize: 28,
             padding: '10px 20px',
             borderRadius: 8,
-            borderLeft: '4px solid #D97706',
+            borderLeft: `4px ${isHighConfidence ? 'solid' : 'dashed'} #D97706`,
           }}
         >
-          {placeName}
+          <div style={{ fontFamily: 'DM Serif Display, serif', fontSize: 28 }}>
+            {placeName}
+          </div>
+          {subtitle && (
+            <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 16, color: '#9CA3AF', marginTop: 4 }}>
+              {subtitle}
+            </div>
+          )}
         </div>
       )}
     </AbsoluteFill>
