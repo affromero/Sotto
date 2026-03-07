@@ -1714,9 +1714,9 @@ model AutoModelConfig {
   proIncludedSttModels   Json?
   // Image (still images for video visuals)
   freeImageProvider       String   @default("fal")
-  freeImageModel          String   @default("flux-schnell")
+  freeImageModel          String   @default("fal-flux-1-schnell")
   proImageProvider        String   @default("fal")
-  proImageModel           String   @default("flux-schnell")
+  proImageModel           String   @default("fal-flux-1-schnell")
   freeIncludedImageModels Json?
   proIncludedImageModels  Json?
   // Video (text-to-video)

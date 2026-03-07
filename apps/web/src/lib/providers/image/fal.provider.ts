@@ -18,7 +18,7 @@ export class FalImageProvider implements ImageProvider {
 
   constructor(apiKey: string, model?: string) {
     this.apiKey = apiKey;
-    this.model = model ?? 'flux-schnell';
+    this.model = model ?? 'fal-flux-1-schnell';
   }
 
   getModelId(): string {
