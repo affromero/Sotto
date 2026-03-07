@@ -82,6 +82,23 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
       };
     });
 
+    // Fetch ready avatar overlays
+    const avatarOverlays = await prisma.avatarOverlay.findMany({
+      where: { videoGenerationId, status: 'ready' },
+      select: { speaker: true, videoUrl: true, posX: true, posY: true, width: true, height: true },
+    });
+
+    const avatarOverlayInputs = avatarOverlays
+      .filter((o) => o.videoUrl)
+      .map((o) => ({
+        speaker: o.speaker,
+        videoUrl: o.videoUrl!,
+        posX: o.posX,
+        posY: o.posY,
+        width: o.width,
+        height: o.height,
+      }));
+
     await job.updateProgress(20);
 
     // POST to Remotion sidecar
@@ -106,6 +123,7 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
           headingFont: 'DM Serif Display',
           bodyFont: 'Inter',
         },
+        ...(avatarOverlayInputs.length > 0 && { avatarOverlays: avatarOverlayInputs }),
       }),
     });
 
