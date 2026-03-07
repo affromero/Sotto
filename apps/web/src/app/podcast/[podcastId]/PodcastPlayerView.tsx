@@ -59,6 +59,7 @@ import { MiniPlayer } from '@/components/player/MiniPlayer';
 import { VideoProgress } from '@/components/player/VideoProgress';
 import { VideoView } from '@/components/player/VideoView';
 import { PipelineEditor } from '@/components/player/PipelineEditor';
+import { VideoEditor } from '@/components/player/VideoEditor';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
 import type { PodcastDetail } from '@/types/podcast';
@@ -194,6 +195,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [falModels, setFalModels] = useState<FalModelsResponse | null>(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
@@ -858,6 +860,37 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 setVideoState('ready');
                 setSegmentVisuals(visuals);
               }}
+            />
+          )}
+          {videoState === 'ready' && !showVideoEditor && (
+            <div className={styles.videoIdle}>
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (!falModels) {
+                    const res = await fetch('/api/fal-models');
+                    if (res.ok) setFalModels(await res.json());
+                  }
+                  setShowVideoEditor(true);
+                }}
+              >
+                <Pencil size={16} />
+                Edit Storyboard
+              </Button>
+            </div>
+          )}
+          {showVideoEditor && videoState === 'ready' && falModels && (
+            <VideoEditor
+              podcastId={podcast.id}
+              segments={podcast.segments}
+              segmentVisuals={segmentVisuals}
+              falModels={falModels}
+              onRegenerate={(genId) => {
+                setShowVideoEditor(false);
+                setVideoState('generating');
+                setVideoGenerationId(genId);
+              }}
+              onCancel={() => setShowVideoEditor(false)}
             />
           )}
           {videoState === 'failed' && (
