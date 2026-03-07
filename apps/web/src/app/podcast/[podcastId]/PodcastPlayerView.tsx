@@ -183,6 +183,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     podcast.videoUrl ? 'ready' : 'idle'
   );
   const [videoUrl, setVideoUrl] = useState<string | null>(podcast.videoUrl ?? null);
+  const [segmentVisuals, setSegmentVisuals] = useState<Array<{
+    segmentId: string;
+    visualType: string;
+    prompt: string | null;
+    metadata: Record<string, unknown> | null;
+    assetUrl: string | null;
+    assetType: string | null;
+    order: number;
+  }>>([]);
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
@@ -296,9 +305,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!data?.status) return;
-        if (data.status === 'READY' && data.videoUrl) {
+        if (data.status === 'READY' && data.segmentVisuals?.length > 0) {
           setVideoState('ready');
           setVideoUrl(data.videoUrl);
+          setSegmentVisuals(data.segmentVisuals);
         } else if (data.status === 'FAILED') {
           setVideoState('failed');
           setVideoError(data.failureReason || 'Video generation failed.');
@@ -310,12 +320,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [isOwner, liveStatus, podcast.id]);
 
-  // Fall back to transcript if video tab is active but videoUrl is removed
+  // Fall back to transcript if video tab is active but no visuals available
   useEffect(() => {
-    if (!videoUrl && viewMode === 'video') {
+    if (segmentVisuals.length === 0 && viewMode === 'video') {
       setViewMode('transcript');
     }
-  }, [videoUrl, viewMode]);
+  }, [segmentVisuals, viewMode]);
 
   const handleGenerateVideo = useCallback(async () => {
     setPipelineLoading(true);
@@ -806,9 +816,9 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             <VideoProgress
               podcastId={podcast.id}
               videoGenerationId={videoGenerationId}
-              onComplete={(url) => {
+              onComplete={(visuals) => {
                 setVideoState('ready');
-                setVideoUrl(url);
+                setSegmentVisuals(visuals);
               }}
             />
           )}
@@ -1043,7 +1053,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             >
               Teleprompter
             </button>
-            {videoUrl && (
+            {segmentVisuals.length > 0 && (
               <button
                 className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : ''}`}
                 onClick={() => setViewMode('video')}
@@ -1073,10 +1083,10 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
               />
-            ) : videoUrl ? (
+            ) : segmentVisuals.length > 0 ? (
               <VideoView
-                videoUrl={videoUrl}
                 segments={podcast.segments}
+                segmentVisuals={segmentVisuals}
                 references={podcast.references}
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
