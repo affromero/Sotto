@@ -234,10 +234,19 @@ async function checkAllReady(videoGenerationId: string, podcastId: string): Prom
       return;
     }
 
-    // All ready — queue composition
-    await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
-      podcastId,
-      videoGenerationId,
-    });
+    // All visuals ready — client-side rendering is the default
+    if (process.env.ENABLE_VIDEO_EXPORT === 'true') {
+      // Legacy: server-side MP4 composition via Remotion sidecar
+      await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
+        podcastId,
+        videoGenerationId,
+      });
+    } else {
+      // Client-side rendering: mark as READY immediately
+      await prisma.videoGeneration.update({
+        where: { id: videoGenerationId },
+        data: { status: 'READY' },
+      });
+    }
   }
 }
