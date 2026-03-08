@@ -982,12 +982,29 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
               <Button
                 variant="secondary"
-                onClick={() => {
-                  setVideoState('idle');
+                loading={videoLoading}
+                disabled={videoLoading}
+                onClick={async () => {
+                  setVideoLoading(true);
                   setVideoError(null);
+                  try {
+                    const res = await fetch(`/api/podcasts/${podcast.id}/video`, { method: 'POST' });
+                    if (!res.ok) {
+                      const body = await res.json().catch(() => ({})) as { error?: string };
+                      setVideoError({ message: body.error || 'Retry failed.' });
+                      return;
+                    }
+                    const data = await res.json() as { videoGenerationId: string; status: string };
+                    setVideoGenerationId(data.videoGenerationId);
+                    setVideoState('generating');
+                  } catch {
+                    setVideoError({ message: 'Network error — could not retry.' });
+                  } finally {
+                    setVideoLoading(false);
+                  }
                 }}
               >
-                <RefreshCw size={16} />
+                {!videoLoading && <RefreshCw size={16} />}
                 Retry
               </Button>
             </div>
