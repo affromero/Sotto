@@ -66,8 +66,8 @@ describe('concatenateSpeakerAudio', () => {
     });
 
     expect(result.durationSeconds).toBeCloseTo(65.3, 1);
-    // Fetch called 3 times for 3 segments
-    expect(fetch).toHaveBeenCalledTimes(3);
+    // Fetch called 6 times: 3 HEAD (pre-validation) + 3 GET (download)
+    expect(fetch).toHaveBeenCalledTimes(6);
   });
 
   it('returns duration from ffprobe output', async () => {
@@ -79,7 +79,7 @@ describe('concatenateSpeakerAudio', () => {
     expect(result.durationSeconds).toBeCloseTo(65.3, 1);
   });
 
-  it('throws when segment download fails', async () => {
+  it('throws when segment audio is missing from storage (HEAD check)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
@@ -88,6 +88,21 @@ describe('concatenateSpeakerAudio', () => {
     await expect(concatenateSpeakerAudio({
       segments: [{ audioUrl: 'https://r2/missing.mp3', order: 1 }],
       outputPath: '/tmp/test/out.mp3',
-    })).rejects.toThrow('Failed to download segment audio (404)');
+    })).rejects.toThrow('1 segment audio file(s) missing from storage');
+  });
+
+  it('reports all missing segments in pre-validation error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+    }));
+
+    await expect(concatenateSpeakerAudio({
+      segments: [
+        { audioUrl: 'https://r2/seg1.mp3', order: 1 },
+        { audioUrl: 'https://r2/seg2.mp3', order: 2 },
+      ],
+      outputPath: '/tmp/test/out.mp3',
+    })).rejects.toThrow('2 segment audio file(s) missing from storage');
   });
 });

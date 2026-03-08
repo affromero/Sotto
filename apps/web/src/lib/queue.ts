@@ -470,7 +470,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         if (notifQueue) {
           await notifQueue.add('send_notification', {
             userId: podcast.userId,
-            type: 'VIDEO_FAILED',
+            type: 'PODCAST_FAILED',
             title: 'Video Generation Failed',
             message: `Video generation failed: ${args.failedReason || 'Unknown error'}`,
             data: { podcastId },
