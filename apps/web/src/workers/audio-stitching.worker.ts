@@ -428,7 +428,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
         where: { podcastId },
         select: { videoPrefs: true },
       });
-      const videoPrefs = mentionWithVideoPrefs?.videoPrefs as { imageModel?: string; videoModel?: string; wantsVideo?: boolean } | null;
+      const videoPrefs = mentionWithVideoPrefs?.videoPrefs as { imageModel?: string; videoModel?: string; avatarModel?: string; wantsVideo?: boolean; wantsAvatar?: boolean } | null;
       if (videoPrefs?.wantsVideo) {
         const { checkVideoGenerationGate, tryIncrementVideoGeneration } = await import('@/lib/video-gate');
         const gate = await checkVideoGenerationGate(podcast.userId);
@@ -451,6 +451,34 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
                 videoModel: videoPrefs.videoModel ?? null,
               },
             });
+            // Auto-create avatar overlays if requested
+            if (videoPrefs.wantsAvatar) {
+              try {
+                const avatarId = await pickDefaultAvatarId(podcastId);
+                const speakers = ['HOST', 'EXPERT'];
+                for (const speaker of speakers) {
+                  await prisma.avatarOverlay.create({
+                    data: {
+                      videoGenerationId: videoGen.id,
+                      speaker,
+                      avatarId,
+                      status: 'pending',
+                    },
+                  });
+                }
+                logger.info('Auto-created avatar overlays from tweet', {
+                  podcastId,
+                  avatarId,
+                  avatarModel: videoPrefs.avatarModel ?? 'default',
+                });
+              } catch (avatarErr) {
+                logger.warn('Failed to auto-create avatar overlays', {
+                  podcastId,
+                  error: avatarErr instanceof Error ? avatarErr.message : String(avatarErr),
+                });
+              }
+            }
+
             await addJob(visualClassificationQueue, JobType.CLASSIFY_VISUALS, {
               podcastId,
               videoGenerationId: videoGen.id,
@@ -460,6 +488,7 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
               podcastId,
               imageModel: videoPrefs.imageModel ?? 'default',
               videoModel: videoPrefs.videoModel ?? 'default',
+              wantsAvatar: String(!!videoPrefs.wantsAvatar),
             });
           }
         } else {
@@ -506,4 +535,37 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
     // 11. Clean up temp directory
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/**
+ * Pick a default HeyGen stock avatar ID for auto-triggered avatar generation.
+ * Uses Redis-cached avatar list (same cache as GET /api/podcasts/[id]/video/avatars),
+ * then deterministically selects one by hashing the podcastId.
+ */
+async function pickDefaultAvatarId(podcastId: string): Promise<string> {
+  const { createHash } = await import('crypto');
+  const { listAvatars } = await import('@/lib/heygen');
+  const { getRedisClient } = await import('@/lib/redis');
+
+  const apiKey = process.env.HEYGEN_API_KEY;
+  if (!apiKey) throw new Error('HEYGEN_API_KEY is not configured');
+
+  const redis = getRedisClient();
+  const cacheKey = 'heygen:avatars:stock';
+  let avatars: Array<{ avatar_id: string; premium: boolean }>;
+
+  const cached = await redis.get(cacheKey);
+  if (cached) {
+    avatars = JSON.parse(cached);
+  } else {
+    const all = await listAvatars(apiKey);
+    avatars = all.filter((a) => !a.premium);
+    await redis.set(cacheKey, JSON.stringify(avatars), 'EX', 3600).catch(() => {});
+  }
+
+  if (avatars.length === 0) throw new Error('No stock avatars available');
+
+  const hash = createHash('sha256').update(podcastId).digest();
+  const index = hash.readUInt32BE(0) % avatars.length;
+  return avatars[index].avatar_id;
 }
