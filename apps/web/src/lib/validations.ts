@@ -513,8 +513,20 @@ export const adminUpdateBadgeSchema = z.object({
  * Report resolution validation (admin)
  */
 export const resolveReportSchema = z.object({
-  status: z.enum(['RESOLVED_ACTIONED', 'RESOLVED_DISMISSED']),
+  status: z.enum(['RESOLVED_ACTIONED', 'RESOLVED_DISMISSED', 'ASSET_REPLACED', 'DELISTED']),
   resolution: z.string().max(2000).optional(),
+});
+
+export const copyrightClaimSchema = z.object({
+  claimantEmail: z.string().email().max(320),
+  claimantName: z.string().min(1).max(200),
+  description: z.string().min(10).max(5000),
+  evidenceUrl: z.string().url().max(2000).optional(),
+  segmentVisualId: z.string().min(1).optional(),
+});
+
+export const copyrightCounterNoticeSchema = z.object({
+  counterNotice: z.string().min(10).max(5000),
 });
 
 /**

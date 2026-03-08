@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       take: limit,
       include: {
         reporter: { select: { id: true, name: true, email: true, handle: true } },
+        segmentVisual: { select: { id: true, assetUrl: true, visualType: true, status: true } },
       },
     }),
     prisma.report.count({ where }),

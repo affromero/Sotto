@@ -3,6 +3,7 @@ import { AbsoluteFill, Sequence, useCurrentFrame, useVideoConfig, interpolate, p
 import type { VisualsInput } from '../types';
 import { resolveSegmentComponent } from './segments';
 import { SottoWatermark } from './shared/SottoWatermark';
+import { AttributionOverlay } from './shared/AttributionOverlay';
 import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
 
@@ -63,6 +64,12 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
               <SegmentWithFade durationInFrames={durationFrames}>
                 <SegmentComponent segment={segment} />
                 <SpeakerLabel speaker={segment.speaker} branding={branding} />
+                {typeof segment.metadata?.photographer === 'string' && (
+                  <AttributionOverlay
+                    photographer={segment.metadata.photographer}
+                    source="Pexels"
+                  />
+                )}
               </SegmentWithFade>
             </Sequence>
           );
