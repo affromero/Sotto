@@ -98,7 +98,8 @@ export async function pollAvatarVideo(params: {
     }
 
     if (body.data.status === 'failed') {
-      throw new Error(`HeyGen video generation failed: ${body.data.error ?? 'unknown'}`);
+      const errorDetail = typeof body.data.error === 'object' ? JSON.stringify(body.data.error) : (body.data.error ?? 'unknown');
+      throw new Error(`HeyGen video generation failed: ${errorDetail}`);
     }
   }
 
