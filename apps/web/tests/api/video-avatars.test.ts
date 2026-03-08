@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 
 const mockAuthenticateRequest = vi.fn();
 const mockRequireAdmin = vi.fn();
-const mockCheckVideoGenerationGate = vi.fn();
+const mockCheckAvatarGenerationGate = vi.fn();
+const mockTryIncrementAvatarGeneration = vi.fn();
 const mockListAvatars = vi.fn();
 const mockDeleteFile = vi.fn();
 
@@ -48,7 +49,8 @@ vi.mock('@/lib/auth-guards', () => ({
 }));
 
 vi.mock('@/lib/video-gate', () => ({
-  checkVideoGenerationGate: (...args: unknown[]) => mockCheckVideoGenerationGate(...args),
+  checkAvatarGenerationGate: (...args: unknown[]) => mockCheckAvatarGenerationGate(...args),
+  tryIncrementAvatarGeneration: (...args: unknown[]) => mockTryIncrementAvatarGeneration(...args),
 }));
 
 vi.mock('@/lib/heygen', () => ({
@@ -108,7 +110,7 @@ beforeEach(() => {
 describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   it('returns cached avatars from Redis', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     const cached = [{ avatar_id: 'av-1', avatar_name: 'Test' }];
     mockRedisGet.mockResolvedValue(JSON.stringify(cached));
 
@@ -121,7 +123,7 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
 
   it('fetches from HeyGen and filters premium avatars', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
-    mockCheckVideoGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockRedisGet.mockResolvedValue(null);
     mockListAvatars.mockResolvedValue([
       { avatar_id: 'av-1', avatar_name: 'Free', premium: false },
@@ -150,6 +152,7 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
     mockVideoGenUpdate.mockResolvedValue({});
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       ...create,
