@@ -9,9 +9,11 @@ const mockDeleteFile = vi.fn();
 
 const mockPodcastFindUnique = vi.fn();
 const mockVideoGenFindUnique = vi.fn();
+const mockVideoGenUpdate = vi.fn();
 const mockAvatarOverlayUpsert = vi.fn();
 const mockAvatarOverlayDeleteMany = vi.fn();
 const mockAvatarOverlayUpdateMany = vi.fn();
+const mockAddJob = vi.fn();
 
 const mockRedisGet = vi.fn();
 const mockRedisSet = vi.fn();
@@ -19,13 +21,22 @@ const mockRedisSet = vi.fn();
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     podcast: { findUnique: (...args: unknown[]) => mockPodcastFindUnique(...args) },
-    videoGeneration: { findUnique: (...args: unknown[]) => mockVideoGenFindUnique(...args) },
+    videoGeneration: {
+      findUnique: (...args: unknown[]) => mockVideoGenFindUnique(...args),
+      update: (...args: unknown[]) => mockVideoGenUpdate(...args),
+    },
     avatarOverlay: {
       upsert: (...args: unknown[]) => mockAvatarOverlayUpsert(...args),
       deleteMany: (...args: unknown[]) => mockAvatarOverlayDeleteMany(...args),
       updateMany: (...args: unknown[]) => mockAvatarOverlayUpdateMany(...args),
     },
   },
+}));
+
+vi.mock('@/lib/queue', () => ({
+  addJob: (...args: unknown[]) => mockAddJob(...args),
+  JobType: { GENERATE_AVATAR: 'generate_avatar' },
+  avatarGenerationQueue: { name: 'avatar-generation' },
 }));
 
 vi.mock('@/lib/api-keys', () => ({
@@ -134,10 +145,11 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
 });
 
 describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
-  it('creates avatar overlays for speakers', async () => {
+  it('creates avatar overlays and auto-starts generation when video is READY', async () => {
     const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
     mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockVideoGenUpdate.mockResolvedValue({});
     mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
       id: `overlay-${create.speaker}`,
       ...create,
@@ -151,7 +163,41 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.overlays).toHaveLength(1);
+    expect(data.videoGenerationId).toBe('vg-1');
+    expect(data.generationStarted).toBe(true);
     expect(mockAvatarOverlayUpsert).toHaveBeenCalledTimes(1);
+    // Should transition to GENERATING_AVATARS
+    expect(mockVideoGenUpdate).toHaveBeenCalledWith({
+      where: { id: 'vg-1' },
+      data: { status: 'GENERATING_AVATARS' },
+    });
+    // Should queue avatar generation job
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'avatar-generation' }),
+      'generate_avatar',
+      expect.objectContaining({ podcastId: 'pod-1', videoGenerationId: 'vg-1', speaker: 'Host', avatarId: 'av-1' }),
+    );
+  });
+
+  it('creates overlays without auto-start when video is still generating', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'GENERATING_VISUALS' });
+    mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
+      id: `overlay-${create.speaker}`,
+      ...create,
+    }));
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.generationStarted).toBe(false);
+    expect(mockVideoGenUpdate).not.toHaveBeenCalled();
+    expect(mockAddJob).not.toHaveBeenCalled();
   });
 
   it('rejects podcasts exceeding 600s duration', async () => {

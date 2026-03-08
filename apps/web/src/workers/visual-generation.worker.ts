@@ -11,6 +11,7 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
 import { getImageModelCost } from '@/lib/providers/image-registry';
 import { resolveVideoProvider } from '@/lib/providers/video';
+import { videoModelRequiresFirstFrame } from '@/lib/providers/video-registry';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -46,6 +47,7 @@ async function generateAiImage(
 
 async function generateAiVideo(
   podcastId: string,
+  videoGenerationId: string,
   segmentVisualId: string,
   videoModel: string,
   videoPrompt: string,
@@ -76,15 +78,27 @@ async function generateAiVideo(
   const rawDuration = segment?.duration ?? 5;
   const cappedDuration = Math.min(rawDuration, maxDuration);
 
+  // Generate a first-frame image for models that require it (e.g. 512P is image-to-video only)
+  let firstFrameImage: string | undefined;
+  let imageCost = 0;
+  if (videoModelRequiresFirstFrame(videoModel)) {
+    logger.info('Generating first-frame image for I2V model', { videoModel, segmentVisualId });
+    const imgResult = await generateAiImage(podcastId, videoGenerationId, videoPrompt);
+    const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-first-frame.png`;
+    firstFrameImage = await uploadFile(r2Key, imgResult.buffer, 'image/png');
+    imageCost = imgResult.cost;
+  }
+
   const buffer = await videoProvider.generateVideo({
     prompt: videoPrompt,
     duration: cappedDuration,
+    firstFrameImage,
   });
 
   const service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
-  const cost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
+  const videoCost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
 
-  return { buffer, service, cost };
+  return { buffer, service, cost: videoCost + imageCost };
 }
 
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
@@ -129,7 +143,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     });
 
     if (visual?.visualMode === 'video' && visual.videoModel) {
-      const result = await generateAiVideo(podcastId, segmentVisualId, visual.videoModel, prompt);
+      const result = await generateAiVideo(podcastId, videoGenerationId, segmentVisualId, visual.videoModel, prompt);
       assetBuffer = result.buffer;
       assetType = 'video/mp4';
       assetExt = 'mp4';
