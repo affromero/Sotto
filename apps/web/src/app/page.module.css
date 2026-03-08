@@ -436,6 +436,60 @@
 }
 
 /* ==========================================================================
+   TRUST STRIP — verification promise between pillars and demo
+   ========================================================================== */
+
+.trustStrip {
+  padding: 20px 0;
+  background: linear-gradient(90deg, rgba(30, 58, 95, 0.06) 0%, rgba(30, 58, 95, 0.03) 100%);
+  border-top: 1px solid rgba(30, 58, 95, 0.08);
+  border-bottom: 1px solid rgba(30, 58, 95, 0.08);
+}
+
+.trustStripInner {
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+  padding: 0 var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-accent);
+  flex-wrap: wrap;
+}
+
+.trustStripIcon {
+  flex-shrink: 0;
+}
+
+.trustStripLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: gap var(--transition-fast);
+}
+
+.trustStripLink:hover {
+  gap: 6px;
+}
+
+@media (max-width: 440px) {
+  .trustStripInner {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+}
+
+/* ==========================================================================
    SPLIT LAYOUT (Demo + Interrupt sections)
    ========================================================================== */
 
