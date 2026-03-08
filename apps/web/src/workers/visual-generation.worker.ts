@@ -141,6 +141,24 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         assetExt = 'mp4';
         service = 'pexels';
         totalCost = 0; // Free
+
+        // Store Pexels attribution in metadata for credit display
+        const existingVisual = await prisma.segmentVisual.findUnique({
+          where: { id: segmentVisualId },
+          select: { metadata: true },
+        });
+        await prisma.segmentVisual.update({
+          where: { id: segmentVisualId },
+          data: {
+            metadata: {
+              ...(existingVisual?.metadata as Record<string, unknown> | null),
+              photographer: result.photographer,
+              photographerUrl: result.photographerUrl,
+              pexelsVideoId: result.pexelsVideoId,
+              pexelsVideoUrl: result.pexelsVideoUrl,
+            },
+          },
+        });
       }
     } else {
       // Check if this is a video-mode segment (from pipeline editor)
