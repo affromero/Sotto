@@ -58,7 +58,7 @@ vi.mock('@/lib/twitter', () => ({
 const mockParseTweetIntent = vi.fn();
 const mockParseThreadIntent = vi.fn();
 
-const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null, imageModel: null, videoModel: null, wantsVideo: false, costPreference: null });
+const mockResolveModelFromTweet = vi.fn().mockReturnValue({ aiModel: null, ttsProvider: null, ttsModel: null, imageModel: null, videoModel: null, avatarModel: null, wantsVideo: false, wantsAvatar: false, costPreference: null });
 const mockResolveCheapestModels = vi.fn();
 
 vi.mock('@/lib/tweet-parser', () => ({
@@ -971,9 +971,12 @@ describe('processTwitterMentions', () => {
       mockResolveModelFromTweet.mockReturnValue({
         aiModel: null,
         ttsProvider: null,
+        ttsModel: null,
         imageModel: 'fal-flux-2-pro',
         videoModel: 'fal-wan2.5-480p',
+        avatarModel: null,
         wantsVideo: true,
+        wantsAvatar: false,
         costPreference: null,
       });
 
@@ -989,7 +992,9 @@ describe('processTwitterMentions', () => {
       expect((generatingUpdate![0] as { data: { videoPrefs?: unknown } }).data.videoPrefs).toEqual({
         imageModel: 'fal-flux-2-pro',
         videoModel: 'fal-wan2.5-480p',
+        avatarModel: null,
         wantsVideo: true,
+        wantsAvatar: false,
       });
     });
 
@@ -1009,9 +1014,12 @@ describe('processTwitterMentions', () => {
       const initialModels = {
         aiModel: null,
         ttsProvider: null,
+        ttsModel: null,
         imageModel: null,
         videoModel: null,
+        avatarModel: null,
         wantsVideo: false,
+        wantsAvatar: false,
         costPreference: 'cheapest' as const,
       };
       mockResolveModelFromTweet.mockReturnValue(initialModels);

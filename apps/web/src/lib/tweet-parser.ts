@@ -7,6 +7,7 @@ import { getAiKey } from './byok';
 import { resolveAutoModel } from './auto-model-config';
 import { getAllProviderMeta } from './providers/tts-registry';
 import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from './providers/fal-endpoints';
+import { getAllAvatarModelIds } from './providers/avatar-registry';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
 
 export interface ParseOptions {
@@ -188,9 +189,12 @@ ${threadText}`;
 export interface ResolvedTweetModels {
   aiModel: string | null;
   ttsProvider: string | null;
+  ttsModel: string | null;
   imageModel: string | null;
   videoModel: string | null;
+  avatarModel: string | null;
   wantsVideo: boolean;
+  wantsAvatar: boolean;
   costPreference: 'cheapest' | null;
 }
 
@@ -205,9 +209,13 @@ export interface ResolvedTweetModels {
 export function resolveModelFromTweet(parsed: TweetParseResult): ResolvedTweetModels {
   let aiModel: string | null = null;
   let ttsProvider: string | null = null;
+  let ttsModel: string | null = null;
   let imageModel: string | null = null;
   let videoModel: string | null = null;
-  const wantsVideo = !!(parsed.requestedImageModel || parsed.requestedVideoModel);
+  let avatarModel: string | null = null;
+  const wantsAvatar = !!parsed.requestedAvatarModel;
+  // Avatar requires video — force wantsVideo when avatar requested
+  const wantsVideo = !!(parsed.requestedImageModel || parsed.requestedVideoModel || wantsAvatar);
 
   if (parsed.requestedAiModel) {
     aiModel = resolveAiModel(parsed.requestedAiModel);
@@ -215,14 +223,20 @@ export function resolveModelFromTweet(parsed: TweetParseResult): ResolvedTweetMo
   if (parsed.requestedTtsProvider) {
     ttsProvider = resolveTtsProvider(parsed.requestedTtsProvider);
   }
+  if (parsed.requestedTtsModel) {
+    ttsModel = resolveTtsModel(parsed.requestedTtsModel);
+  }
   if (parsed.requestedImageModel && parsed.requestedImageModel !== 'auto') {
     imageModel = resolveImageModel(parsed.requestedImageModel);
   }
   if (parsed.requestedVideoModel && parsed.requestedVideoModel !== 'auto') {
     videoModel = resolveVideoModel(parsed.requestedVideoModel);
   }
+  if (parsed.requestedAvatarModel) {
+    avatarModel = resolveAvatarModel(parsed.requestedAvatarModel);
+  }
 
-  return { aiModel, ttsProvider, imageModel, videoModel, wantsVideo, costPreference: parsed.costPreference ?? null };
+  return { aiModel, ttsProvider, ttsModel, imageModel, videoModel, avatarModel, wantsVideo, wantsAvatar, costPreference: parsed.costPreference ?? null };
 }
 
 /**
@@ -238,6 +252,19 @@ export async function resolveCheapestModels(current: ResolvedTweetModels): Promi
 
   if (!result.aiModel) {
     result.aiModel = getCheapestModel();
+  }
+
+  // Pick cheapest TTS provider+model by platformCostPerKChar
+  if (!result.ttsProvider) {
+    let cheapestCost = Infinity;
+    for (const provider of getAllProviderMeta()) {
+      if (provider.id === 'kittentts') continue;
+      if (provider.platformCostPerKChar < cheapestCost) {
+        cheapestCost = provider.platformCostPerKChar;
+        result.ttsProvider = provider.id;
+        result.ttsModel = provider.defaultModel;
+      }
+    }
   }
 
   if (result.wantsVideo) {
@@ -387,5 +414,107 @@ function resolveVideoModel(raw: string): string | null {
   }
 
   logger.info('Unrecognized video model from tweet', { raw });
+  return null;
+}
+
+const TTS_MODEL_ALIASES: Record<string, string> = {
+  // ElevenLabs
+  v3: 'eleven_v3',
+  'eleven v3': 'eleven_v3',
+  'elevenlabs v3': 'eleven_v3',
+  flash: 'eleven_flash_v2_5',
+  'eleven flash': 'eleven_flash_v2_5',
+  'flash v2.5': 'eleven_flash_v2_5',
+  'eleven turbo': 'eleven_turbo_v2',
+  'turbo v2': 'eleven_turbo_v2',
+  multilingual: 'eleven_multilingual_v2',
+  'eleven multilingual': 'eleven_multilingual_v2',
+  // Cartesia
+  'sonic 3': 'sonic-3',
+  'cartesia sonic': 'sonic-3',
+  sonic: 'sonic-3',
+  'sonic turbo': 'sonic-turbo',
+  // OpenAI
+  'tts-1-hd': 'tts-1-hd',
+  'openai hd': 'tts-1-hd',
+  'tts-1': 'tts-1',
+  'gpt-4o-mini-tts': 'gpt-4o-mini-tts',
+  'gpt tts': 'gpt-4o-mini-tts',
+  // Hume
+  octave: 'octave-v1',
+  'hume octave': 'octave-v1',
+  // MiniMax
+  'speech-02-hd': 'speech-02-hd',
+  'minimax hd': 'speech-02-hd',
+  'speech-02-turbo': 'speech-02-turbo',
+  'minimax turbo': 'speech-02-turbo',
+};
+
+function resolveTtsModel(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  if (TTS_MODEL_ALIASES[normalized]) return TTS_MODEL_ALIASES[normalized];
+
+  // Check against actual registry model IDs
+  for (const provider of getAllProviderMeta()) {
+    for (const model of provider.models) {
+      if (model.id === normalized || model.displayName.toLowerCase() === normalized) {
+        return model.id;
+      }
+    }
+  }
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, modelId] of Object.entries(TTS_MODEL_ALIASES)) {
+    if (normalized.includes(alias)) return modelId;
+  }
+
+  logger.info('Unrecognized TTS model from tweet', { raw });
+  return null;
+}
+
+const AVATAR_MODEL_ALIASES: Record<string, string> = {
+  // HeyGen — standard
+  heygen: 'heygen-avatar-standard',
+  'heygen avatar': 'heygen-avatar-standard',
+  avatar: 'heygen-avatar-standard',
+  avatars: 'heygen-avatar-standard',
+  'heygen standard': 'heygen-avatar-standard',
+  // HeyGen — photo avatar
+  'photo avatar': 'heygen-photo-avatar-iii',
+  'heygen photo': 'heygen-photo-avatar-iii',
+  // HeyGen — digital twin
+  'digital twin': 'heygen-digital-twin-iii',
+  'heygen twin': 'heygen-digital-twin-iii',
+  // HeyGen — premium (IV)
+  'heygen iv': 'heygen-avatar-iv',
+  'avatar iv': 'heygen-avatar-iv',
+  'avatar 4': 'heygen-avatar-iv',
+  'interactive avatar': 'heygen-avatar-iv',
+  'digital twin iv': 'heygen-digital-twin-iv',
+  'twin iv': 'heygen-digital-twin-iv',
+  'photo avatar iv': 'heygen-photo-avatar-iv',
+  'photo iv': 'heygen-photo-avatar-iv',
+  // Fal
+  'fal avatar': 'fal-heygen-avatar4-i2v',
+  'fal heygen': 'fal-heygen-avatar4-i2v',
+  'fal twin': 'fal-heygen-avatar4-twin',
+  'fal digital twin': 'fal-heygen-avatar4-twin',
+};
+
+function resolveAvatarModel(raw: string): string | null {
+  const normalized = raw.toLowerCase().trim();
+
+  if (AVATAR_MODEL_ALIASES[normalized]) return AVATAR_MODEL_ALIASES[normalized];
+
+  // Direct model ID match from registry
+  if (getAllAvatarModelIds().has(normalized)) return normalized;
+
+  // Fuzzy: check if the raw string contains a known alias
+  for (const [alias, modelId] of Object.entries(AVATAR_MODEL_ALIASES)) {
+    if (normalized.includes(alias)) return modelId;
+  }
+
+  logger.info('Unrecognized avatar model from tweet', { raw });
   return null;
 }
