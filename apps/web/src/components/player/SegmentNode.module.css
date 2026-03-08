@@ -269,6 +269,12 @@
   color: #4ade80;
 }
 
+.videoDurationHint {
+  font-weight: 400;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .noKeyHint {
   font-size: 12px;
   color: var(--color-primary, #d97706);
