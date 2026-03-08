@@ -4,7 +4,7 @@ import { memo, useCallback, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo, VisualMode } from '@/types/pipeline';
 import type { VisualTypeString } from '@/lib/visual-classifier';
-import { formatCost } from '@/lib/video-cost-estimator';
+import { formatCost, getClipInfo } from '@/lib/video-cost-estimator';
 import styles from './SegmentNode.module.css';
 
 const VISUAL_TYPES: VisualTypeString[] = [
@@ -109,15 +109,16 @@ function StoryboardCardComponent({
   const models = segment.visualMode === 'image' ? imageModels : segment.visualMode === 'video' ? videoModels : [];
   const textPreview = segment.text.length > 140 ? `${segment.text.slice(0, 140)}...` : segment.text;
 
-  // Compute actual video duration (capped by model's maxDuration)
-  const videoDurationLabel = (() => {
+  // Compute clip info for chained video segments
+  const videoClipLabel = (() => {
     if (segment.visualMode !== 'video' || !segment.model) return null;
     const model = videoModels.find((m) => m.modelId === segment.model);
     if (!model) return null;
     const maxDur = model.maxDuration ?? 10;
-    const capped = Math.min(segment.duration, maxDur);
-    if (capped >= segment.duration) return null; // no cap, no need to clarify
-    return `${capped}s video`;
+    const { clipCount } = getClipInfo(segment.duration, maxDur);
+    if (clipCount <= 1) return null;
+    const perClipCost = (maxDur / 60) * model.costPerMinute;
+    return `${clipCount} clips \u00d7 ${formatCost(perClipCost)}`;
   })();
   const headerId = `storyboard-header-${segment.segmentId}`;
   const panelId = `storyboard-panel-${segment.segmentId}`;
@@ -215,8 +216,8 @@ function StoryboardCardComponent({
           <div className={styles.cardFooter}>
             <span className={styles.segmentCost}>
               {formatCost(segment.estimatedCost)}
-              {videoDurationLabel && (
-                <span className={styles.videoDurationHint}> ({videoDurationLabel})</span>
+              {videoClipLabel && (
+                <span className={styles.videoDurationHint}> ({videoClipLabel})</span>
               )}
             </span>
             {!isProgrammatic && !hasFalKey && (
