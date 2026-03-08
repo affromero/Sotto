@@ -1,11 +1,11 @@
-import type { Job } from 'bullmq';
+import { type Job, UnrecoverableError } from 'bullmq';
 import type { GenerateAvatarPayload } from '@/lib/queue';
 import { addJob, JobType, videoCompositionQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { uploadFile } from '@/lib/r2';
 import { logger } from '@/lib/logger';
 import { logUsage } from '@/lib/usage-logger';
-import { submitAvatarVideo, pollAvatarVideo } from '@/lib/heygen';
+import { submitAvatarVideo, pollAvatarVideo, isNonRetryableHeyGenError } from '@/lib/heygen';
 import { concatenateSpeakerAudio } from '@/lib/avatar-audio-concat';
 
 export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): Promise<void> {
@@ -44,61 +44,83 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
   const tmpDir = await mkdtemp(join(tmpdir(), 'avatar-'));
 
   try {
-    // Step 1: Update status
-    await prisma.avatarOverlay.update({
-      where: { id: avatarOverlayId },
-      data: { status: 'concatenating' },
-    });
-    await job.updateProgress(10);
+    let concatAudioUrl: string;
+    let durationSeconds: number;
+    let heygenVideoId: string;
 
-    // Step 2: Fetch segments for this speaker
-    const segments = await prisma.segment.findMany({
-      where: { podcastId, speaker },
-      orderBy: { order: 'asc' },
-      select: { id: true, order: true, audioUrl: true },
-    });
+    // Checkpoint 1: Skip concat + upload if already done on a previous attempt
+    if (overlay.concatAudioUrl && overlay.durationSeconds) {
+      logger.info('Concat audio already exists, skipping concat', { avatarOverlayId });
+      concatAudioUrl = overlay.concatAudioUrl;
+      durationSeconds = overlay.durationSeconds;
+      await job.updateProgress(30);
+    } else {
+      // Step 1: Update status
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { status: 'concatenating' },
+      });
+      await job.updateProgress(10);
 
-    if (segments.length === 0) {
-      throw new Error(`No segments found for speaker "${speaker}"`);
+      // Step 2: Fetch segments for this speaker
+      const segments = await prisma.segment.findMany({
+        where: { podcastId, speaker },
+        orderBy: { order: 'asc' },
+        select: { id: true, order: true, audioUrl: true },
+      });
+
+      if (segments.length === 0) {
+        throw new Error(`No segments found for speaker "${speaker}"`);
+      }
+
+      const segmentsWithAudio = segments.filter((s) => s.audioUrl);
+      if (segmentsWithAudio.length === 0) {
+        throw new Error(`No audio segments found for speaker "${speaker}"`);
+      }
+
+      // Step 3: Concatenate speaker audio
+      const concatOutputPath = join(tmpDir, `${speaker}-concat.mp3`);
+      const concatResult = await concatenateSpeakerAudio({
+        segments: segmentsWithAudio.map((s) => ({ audioUrl: s.audioUrl!, order: s.order })),
+        outputPath: concatOutputPath,
+      });
+      durationSeconds = concatResult.durationSeconds;
+
+      await job.updateProgress(25);
+
+      // Step 4: Upload concat audio to R2
+      const concatAudioBuffer = await readFile(concatOutputPath);
+      const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
+      concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { concatAudioUrl, durationSeconds, status: 'submitting' },
+      });
+
+      await job.updateProgress(30);
     }
 
-    const segmentsWithAudio = segments.filter((s) => s.audioUrl);
-    if (segmentsWithAudio.length === 0) {
-      throw new Error(`No audio segments found for speaker "${speaker}"`);
+    // Checkpoint 2: Skip HeyGen submission if already submitted (prevents credit waste on retry)
+    if (overlay.heygenVideoId) {
+      logger.info('HeyGen video already submitted, skipping to polling', {
+        avatarOverlayId,
+        heygenVideoId: overlay.heygenVideoId,
+      });
+      heygenVideoId = overlay.heygenVideoId;
+    } else {
+      // Step 5: Submit to HeyGen
+      heygenVideoId = await submitAvatarVideo({
+        apiKey,
+        avatarId,
+        audioUrl: concatAudioUrl,
+      });
+
+      await prisma.avatarOverlay.update({
+        where: { id: avatarOverlayId },
+        data: { heygenVideoId, status: 'processing' },
+      });
     }
-
-    // Step 3: Concatenate speaker audio
-    const concatOutputPath = join(tmpDir, `${speaker}-concat.mp3`);
-    const { durationSeconds } = await concatenateSpeakerAudio({
-      segments: segmentsWithAudio.map((s) => ({ audioUrl: s.audioUrl!, order: s.order })),
-      outputPath: concatOutputPath,
-    });
-
-    await job.updateProgress(25);
-
-    // Step 4: Upload concat audio to R2
-    const concatAudioBuffer = await readFile(concatOutputPath);
-    const concatAudioKey = `podcasts/${podcastId}/avatars/${speaker}-audio.mp3`;
-    const concatAudioUrl = await uploadFile(concatAudioKey, concatAudioBuffer, 'audio/mpeg');
-
-    await prisma.avatarOverlay.update({
-      where: { id: avatarOverlayId },
-      data: { concatAudioUrl, durationSeconds, status: 'submitting' },
-    });
-
-    await job.updateProgress(30);
-
-    // Step 5: Submit to HeyGen
-    const heygenVideoId = await submitAvatarVideo({
-      apiKey,
-      avatarId,
-      audioUrl: concatAudioUrl,
-    });
-
-    await prisma.avatarOverlay.update({
-      where: { id: avatarOverlayId },
-      data: { heygenVideoId, status: 'processing' },
-    });
 
     await job.updateProgress(35);
 
@@ -124,6 +146,7 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
 
     // Step 8: Chromakey to transparent WebM
     const transparentPath = join(tmpDir, 'transparent.webm');
+    const chromakeyTimeout = Math.max(300_000, Math.round(durationSeconds * 3000));
     await execFileAsync('ffmpeg', [
       '-y',
       '-i', greenVideoPath,
@@ -132,7 +155,7 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
       '-auto-alt-ref', '0',
       '-an',
       transparentPath,
-    ], { timeout: 300000 });
+    ], { timeout: chromakeyTimeout });
 
     await job.updateProgress(90);
 
@@ -174,6 +197,12 @@ export async function processAvatarGeneration(job: Job<GenerateAvatarPayload>): 
     // Check if all avatars are done (some may have failed)
     await checkAllAvatarsReady(videoGenerationId, podcastId);
 
+    // Billing/credit errors should never be retried — prevents burning more credits
+    if (isNonRetryableHeyGenError(err)) {
+      logger.error('Non-retryable HeyGen error, stopping retries', { message, avatarOverlayId });
+      throw new UnrecoverableError(message);
+    }
+
     throw err;
   } finally {
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
@@ -195,12 +224,12 @@ async function checkAllAvatarsReady(videoGenerationId: string, podcastId: string
   });
 
   if (failed > 0) {
+    // Avatar failure is non-critical — the base video is already generated.
+    // Keep status as READY so the video remains visible; individual overlay
+    // records already track their own status/failureReason.
     await prisma.videoGeneration.update({
       where: { id: videoGenerationId },
-      data: {
-        status: 'FAILED',
-        failureReason: `${failed} avatar overlay(s) failed to generate`,
-      },
+      data: { status: 'READY' },
     });
     return;
   }

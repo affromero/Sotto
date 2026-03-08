@@ -35,6 +35,7 @@ vi.mock('@/lib/providers/ai-registry', () => ({
 vi.mock('@/lib/heygen', () => ({
   submitAvatarVideo: vi.fn().mockResolvedValue('heygen_vid_123'),
   pollAvatarVideo: vi.fn().mockResolvedValue({ videoUrl: 'https://heygen.com/result.mp4' }),
+  isNonRetryableHeyGenError: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/lib/avatar-audio-concat', () => ({
@@ -48,6 +49,9 @@ vi.mock('@/lib/queue', () => ({
 }));
 
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
+import { submitAvatarVideo } from '@/lib/heygen';
+import { isNonRetryableHeyGenError } from '@/lib/heygen';
+import { concatenateSpeakerAudio } from '@/lib/avatar-audio-concat';
 import { processAvatarGeneration } from '@/workers/avatar-generation.worker';
 
 const mockJob = {
@@ -63,6 +67,7 @@ const mockJob = {
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  vi.clearAllMocks();
   process.env.HEYGEN_API_KEY = 'test-heygen-key';
 
   // Default mocks for happy path
@@ -172,12 +177,76 @@ describe('processAvatarGeneration', () => {
       }),
     );
   });
+
+  it('skips concat when concatAudioUrl already exists (retry checkpoint)', async () => {
+    vi.mocked(prisma.avatarOverlay.findUnique).mockResolvedValue({
+      id: 'ao_1',
+      videoGenerationId: 'vg_1',
+      speaker: 'Host',
+      avatarId: 'avatar_anna',
+      avatarName: null,
+      previewImageUrl: null,
+      heygenVideoId: null,
+      videoUrl: null,
+      concatAudioUrl: 'https://r2/existing-concat.mp3',
+      status: 'submitting',
+      failureReason: null,
+      durationSeconds: 120,
+      posX: 0.02,
+      posY: 0.55,
+      width: 0.25,
+      height: 0.35,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await processAvatarGeneration(mockJob);
+
+    expect(concatenateSpeakerAudio).not.toHaveBeenCalled();
+    expect(submitAvatarVideo).toHaveBeenCalled();
+  });
+
+  it('skips HeyGen submission when heygenVideoId already exists (retry checkpoint)', async () => {
+    vi.mocked(prisma.avatarOverlay.findUnique).mockResolvedValue({
+      id: 'ao_1',
+      videoGenerationId: 'vg_1',
+      speaker: 'Host',
+      avatarId: 'avatar_anna',
+      avatarName: null,
+      previewImageUrl: null,
+      heygenVideoId: 'existing_heygen_vid',
+      videoUrl: null,
+      concatAudioUrl: 'https://r2/existing-concat.mp3',
+      status: 'processing',
+      failureReason: null,
+      durationSeconds: 120,
+      posX: 0.02,
+      posY: 0.55,
+      width: 0.25,
+      height: 0.35,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await processAvatarGeneration(mockJob);
+
+    expect(concatenateSpeakerAudio).not.toHaveBeenCalled();
+    expect(submitAvatarVideo).not.toHaveBeenCalled();
+  });
+
+  it('throws UnrecoverableError for billing/credit errors', async () => {
+    vi.mocked(prisma.segment.findMany).mockResolvedValue([]);
+    vi.mocked(isNonRetryableHeyGenError).mockReturnValue(true);
+
+    const err = await processAvatarGeneration(mockJob).catch((e: Error) => e);
+    expect(err).toBeDefined();
+    expect(err!.constructor.name).toBe('UnrecoverableError');
+  });
 });
 
 describe('checkAllAvatarsReady', () => {
-  it('marks videoGeneration FAILED when avatars have failures', async () => {
-    // First call returns overlay with no videoUrl (happy path start)
-    // After error, checkAllAvatarsReady runs
+  it('reverts videoGeneration to READY when avatars fail (non-critical)', async () => {
+    // Avatar failure should NOT hide the existing working video
     vi.mocked(prisma.avatarOverlay.count)
       .mockResolvedValueOnce(0) // pending count = 0
       .mockResolvedValueOnce(1); // failed count = 1
@@ -186,8 +255,11 @@ describe('checkAllAvatarsReady', () => {
 
     await expect(processAvatarGeneration(mockJob)).rejects.toThrow();
 
-    // The checkAllAvatarsReady in the catch block runs
-    // We verify it was called by checking videoGeneration update calls
+    expect(prisma.videoGeneration.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: 'READY' },
+      }),
+    );
   });
 
   it('marks videoGeneration READY when all avatars succeed and export disabled', async () => {

@@ -211,6 +211,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [showVideoEditor, setShowVideoEditor] = useState(false);
   const [avatarOverlays, setAvatarOverlays] = useState<AvatarOverlayData[]>([]);
+  const [avatarsVisible, setAvatarsVisible] = useState(true);
   const [lineageData, setLineageData] = useState<{
     ancestors: Array<{
       id: string;
@@ -321,6 +322,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           setVideoState('ready');
           setSegmentVisuals(data.segmentVisuals);
           if (data.avatarOverlays) setAvatarOverlays(data.avatarOverlays);
+          if (typeof data.avatarsVisible === 'boolean') setAvatarsVisible(data.avatarsVisible);
         } else if (data.status === 'FAILED') {
           setVideoState('failed');
           setVideoError({ message: data.failureReason || 'Video generation failed.' });
@@ -1260,8 +1262,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
                 title={podcast.title}
-                avatarOverlays={avatarOverlays}
+                avatarOverlays={avatarsVisible ? avatarOverlays : []}
                 isOwner={isOwner}
+                avatarsVisible={avatarsVisible}
+                onAvatarsVisibleChange={async (visible) => {
+                  setAvatarsVisible(visible);
+                  await fetch(`/api/podcasts/${podcast.id}/video`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ avatarsVisible: visible }),
+                  });
+                }}
                 onAvatarPositionChange={handleAvatarPositionChange}
               />
             ) : null}
