@@ -10,7 +10,7 @@ import styles from './AvatarPicker.module.css';
 interface AvatarPickerProps {
   podcastId: string;
   speakers: string[];
-  onConfigured: () => void;
+  onConfigured: (data: { videoGenerationId: string; generationStarted: boolean }) => void;
   onCancel: () => void;
   podcastDuration: number;
 }
@@ -61,7 +61,8 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
         setError(body.error || 'Failed to configure avatars');
         return;
       }
-      onConfigured();
+      const data = await res.json() as { videoGenerationId: string; generationStarted: boolean };
+      onConfigured({ videoGenerationId: data.videoGenerationId, generationStarted: data.generationStarted });
     } catch {
       setError('Network error');
     } finally {

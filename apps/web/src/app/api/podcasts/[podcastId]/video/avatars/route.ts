@@ -7,6 +7,7 @@ import { checkVideoGenerationGate } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listAvatars } from '@/lib/heygen';
 import { deleteFile, extractR2Key } from '@/lib/r2';
+import { addJob, JobType, avatarGenerationQueue } from '@/lib/queue';
 import { logger } from '@/lib/logger';
 import { createRedisConnection } from '@/lib/redis';
 
@@ -67,7 +68,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
 /**
  * POST — Configure avatar overlays for a video generation.
- * Creates/upserts AvatarOverlay records. Does NOT start generation.
+ * Creates/upserts AvatarOverlay records. If the video generation is already
+ * READY, auto-starts avatar generation (transitions to GENERATING_AVATARS).
  */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -143,7 +145,36 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     speakers: parsed.data.avatars.map((a) => a.speaker).join(', '),
   });
 
-  return NextResponse.json({ overlays });
+  // Auto-start avatar generation if the video generation is already complete
+  let generationStarted = false;
+  if (videoGeneration.status === 'READY') {
+    await prisma.videoGeneration.update({
+      where: { id: videoGeneration.id },
+      data: { status: 'GENERATING_AVATARS' },
+    });
+
+    for (const overlay of overlays) {
+      await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
+        podcastId,
+        videoGenerationId: videoGeneration.id,
+        avatarOverlayId: overlay.id,
+        speaker: overlay.speaker,
+        avatarId: overlay.avatarId,
+      });
+    }
+
+    generationStarted = true;
+    logger.info('Auto-started avatar generation for completed video', {
+      podcastId,
+      videoGenerationId: videoGeneration.id,
+    });
+  }
+
+  return NextResponse.json({
+    overlays,
+    videoGenerationId: videoGeneration.id,
+    generationStarted,
+  });
 }
 
 /**
