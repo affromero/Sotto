@@ -66,7 +66,10 @@ export class FalVideoProvider implements VideoProvider {
     const { request_id } = submitData;
     const fallbackBase = `https://queue.fal.run/${endpoint}/requests/${request_id}`;
     const statusUrl = submitData.status_url ?? `${fallbackBase}/status`;
-    const resultUrl = submitData.response_url ?? fallbackBase;
+    // Derive result URL: prefer response_url, then strip /status from status_url, then fallback
+    const resultUrl =
+      submitData.response_url ??
+      (submitData.status_url ? submitData.status_url.replace(/\/status$/, '') : fallbackBase);
 
     logger.info('Fal video job submitted', { request_id, statusUrl });
 
