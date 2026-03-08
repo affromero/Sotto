@@ -111,7 +111,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
       } else {
         const { generateMapImage } = await import('@/lib/map-image');
         // Cast to PlaceMetadata — enrichment worker writes the full shape
-        const place = enrichedPlace as import('@sotto/maps').PlaceMetadata;
+        const place = enrichedPlace as import('@sotto/maps/server').PlaceMetadata;
         assetBuffer = await generateMapImage(place, presetName);
         assetType = 'image/png';
         assetExt = 'png';

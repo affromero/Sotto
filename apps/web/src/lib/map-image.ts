@@ -1,5 +1,5 @@
-import type { PlaceMetadata } from '@sotto/maps';
-import { MAP_PRESETS } from '@sotto/maps';
+import type { PlaceMetadata } from '@sotto/maps/server';
+import { MAP_PRESETS } from '@sotto/maps/server';
 
 export async function generateMapImage(
   place: PlaceMetadata,
