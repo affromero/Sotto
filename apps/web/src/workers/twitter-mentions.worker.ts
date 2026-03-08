@@ -222,12 +222,20 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
 
     if (tweetModels.ttsProvider) {
       effectiveTtsProvider = tweetModels.ttsProvider;
-      effectiveTtsModel = undefined; // use provider default
+      effectiveTtsModel = tweetModels.ttsModel ?? undefined;
+    } else if (tweetModels.ttsModel) {
+      effectiveTtsModel = tweetModels.ttsModel;
     }
 
-    // Store video preferences on the mention for downstream use by audio-stitching
+    // Store video + avatar preferences on the mention for downstream use by audio-stitching
     const videoPrefs = tweetModels.wantsVideo
-      ? { imageModel: tweetModels.imageModel, videoModel: tweetModels.videoModel, wantsVideo: true }
+      ? {
+          imageModel: tweetModels.imageModel,
+          videoModel: tweetModels.videoModel,
+          avatarModel: tweetModels.avatarModel,
+          wantsVideo: true,
+          wantsAvatar: tweetModels.wantsAvatar,
+        }
       : null;
 
     await prisma.tweetMention.update({
@@ -368,9 +376,12 @@ async function processSingleMention(tweet: TwitterTweet, mediaByKey: Map<string,
       isThread: String(!!isThreadPodcast),
       requestedAiModel: parsed.requestedAiModel ?? 'none',
       requestedTtsProvider: parsed.requestedTtsProvider ?? 'none',
+      requestedTtsModel: parsed.requestedTtsModel ?? 'none',
       wantsVideo: String(tweetModels.wantsVideo),
+      wantsAvatar: String(tweetModels.wantsAvatar),
       imageModel: tweetModels.imageModel ?? 'none',
       videoModel: tweetModels.videoModel ?? 'none',
+      avatarModel: tweetModels.avatarModel ?? 'none',
     });
   } catch (err) {
     await prisma.tweetMention.update({

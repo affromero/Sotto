@@ -58,6 +58,15 @@ vi.mock('@/lib/providers/fal-endpoints', () => ({
   FAL_VIDEO_MODEL_IDS: new Set(['fal-veo3-1080p', 'fal-veo3-fast-1080p', 'fal-kling3-1080p', 'fal-wan2.5-480p']),
 }));
 
+vi.mock('@/lib/providers/avatar-registry', () => ({
+  getAllAvatarModelIds: vi.fn(() => new Set([
+    'heygen-avatar-standard', 'heygen-photo-avatar-iii', 'heygen-public-avatar-iii',
+    'heygen-digital-twin-iii', 'heygen-avatar-iv', 'heygen-digital-twin-iv',
+    'heygen-photo-avatar-iv', 'heygen-public-avatar-iv',
+    'fal-heygen-avatar4-i2v', 'fal-heygen-avatar4-twin',
+  ])),
+}));
+
 // ---- Import under test ----
 import { parseTweetIntent, parseThreadIntent, resolveModelFromTweet } from '@/lib/tweet-parser';
 import type { TweetParseResult, ThreadData, ThreadTweet } from '@/types/twitter';
@@ -719,9 +728,12 @@ describe('resolveModelFromTweet', () => {
     const result = resolveModelFromTweet(baseParsed);
     expect(result.aiModel).toBeNull();
     expect(result.ttsProvider).toBeNull();
+    expect(result.ttsModel).toBeNull();
     expect(result.imageModel).toBeNull();
     expect(result.videoModel).toBeNull();
+    expect(result.avatarModel).toBeNull();
     expect(result.wantsVideo).toBe(false);
+    expect(result.wantsAvatar).toBe(false);
     expect(result.costPreference).toBeNull();
   });
 
@@ -866,6 +878,91 @@ describe('resolveModelFromTweet', () => {
     expect(result.costPreference).toBe('cheapest');
   });
 
+  // ---- TTS model resolution ----
+
+  it('resolves "v3" to eleven_v3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'v3' });
+    expect(result.ttsModel).toBe('eleven_v3');
+  });
+
+  it('resolves "elevenlabs v3" to eleven_v3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'elevenlabs v3' });
+    expect(result.ttsModel).toBe('eleven_v3');
+  });
+
+  it('resolves "sonic 3" to sonic-3', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'sonic 3' });
+    expect(result.ttsModel).toBe('sonic-3');
+  });
+
+  it('resolves "tts-1-hd" to tts-1-hd', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'tts-1-hd' });
+    expect(result.ttsModel).toBe('tts-1-hd');
+  });
+
+  it('resolves "octave" to octave-v1', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'octave' });
+    expect(result.ttsModel).toBe('octave-v1');
+  });
+
+  it('resolves "eleven flash" to eleven_flash_v2_5', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'eleven flash' });
+    expect(result.ttsModel).toBe('eleven_flash_v2_5');
+  });
+
+  it('resolves "minimax hd" to speech-02-hd', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'minimax hd' });
+    expect(result.ttsModel).toBe('speech-02-hd');
+  });
+
+  it('returns null for unrecognized TTS model', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedTtsModel: 'banana-voice-9000' });
+    expect(result.ttsModel).toBeNull();
+  });
+
+  // ---- Avatar model resolution ----
+
+  it('resolves "heygen" to heygen-avatar-standard', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'heygen' });
+    expect(result.avatarModel).toBe('heygen-avatar-standard');
+    expect(result.wantsAvatar).toBe(true);
+  });
+
+  it('resolves "avatar iv" to heygen-avatar-iv', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'avatar iv' });
+    expect(result.avatarModel).toBe('heygen-avatar-iv');
+  });
+
+  it('resolves "digital twin" to heygen-digital-twin-iii', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'digital twin' });
+    expect(result.avatarModel).toBe('heygen-digital-twin-iii');
+  });
+
+  it('resolves "fal avatar" to fal-heygen-avatar4-i2v', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'fal avatar' });
+    expect(result.avatarModel).toBe('fal-heygen-avatar4-i2v');
+  });
+
+  it('resolves direct registry model ID', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'heygen-photo-avatar-iii' });
+    expect(result.avatarModel).toBe('heygen-photo-avatar-iii');
+  });
+
+  it('returns null for unrecognized avatar model', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'banana-puppet-9000' });
+    expect(result.avatarModel).toBeNull();
+  });
+
+  // ---- wantsAvatar implies wantsVideo ----
+
+  it('wantsAvatar forces wantsVideo=true even without image/video models', () => {
+    const result = resolveModelFromTweet({ ...baseParsed, requestedAvatarModel: 'heygen' });
+    expect(result.wantsAvatar).toBe(true);
+    expect(result.wantsVideo).toBe(true);
+    expect(result.imageModel).toBeNull();
+    expect(result.videoModel).toBeNull();
+  });
+
   // ---- Combined resolution ----
 
   it('resolves all model types simultaneously', () => {
@@ -873,15 +970,20 @@ describe('resolveModelFromTweet', () => {
       ...baseParsed,
       requestedAiModel: 'haiku',
       requestedTtsProvider: 'cartesia',
+      requestedTtsModel: 'sonic 3',
       requestedImageModel: 'flux',
       requestedVideoModel: 'wan',
+      requestedAvatarModel: 'heygen',
       costPreference: 'cheapest',
     });
     expect(result.aiModel).toBe('claude-haiku-4-5-20251001');
     expect(result.ttsProvider).toBe('cartesia');
+    expect(result.ttsModel).toBe('sonic-3');
     expect(result.imageModel).toBe('fal-flux-2-pro');
     expect(result.videoModel).toBe('fal-wan2.5-480p');
+    expect(result.avatarModel).toBe('heygen-avatar-standard');
     expect(result.wantsVideo).toBe(true);
+    expect(result.wantsAvatar).toBe(true);
     expect(result.costPreference).toBe('cheapest');
   });
 });
