@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
@@ -12,12 +13,24 @@ import {
   fetchFalVideoModels,
   cheapestModel,
 } from '@/lib/video-cost-estimator';
-import { resolveAiModelAndProvider } from '@/lib/providers/ai-registry';
+import {
+  resolveAiModelAndProvider,
+  isValidAiProviderId,
+  isValidModelId,
+} from '@/lib/providers/ai-registry';
+import { classifyError, type ByokErrorKind } from '@/lib/byok-errors';
 import { getAiKey } from '@/lib/byok';
 import type { PipelineSegmentNode, VisualMode, VideoPipeline } from '@/types/pipeline';
 import { logger } from '@/lib/logger';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
+
+const pipelineBodySchema = z.object({
+  aiProvider: z.string().optional(),
+  aiModel: z.string().optional(),
+}).optional();
+
+const LLM_ERROR_KINDS = new Set<ByokErrorKind>(['auth_invalid', 'insufficient_credits', 'rate_limited']);
 
 const PROGRAMMATIC_TYPES = new Set<VisualTypeString>([
   'DATA_CHART',
@@ -93,22 +106,44 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     duration: s.duration ?? 5,
   }));
 
-  try {
+  // Parse optional body for AI provider override
+  const body = pipelineBodySchema.parse(await request.json().catch(() => undefined));
+
+  // Resolve AI provider — hoist above try/catch so catch block can report currentProvider
+  let aiModel: string;
+  let aiProvider: string;
+  let apiKeyOverride: string | undefined;
+
+  if (body?.aiProvider && body?.aiModel) {
+    if (!isValidAiProviderId(body.aiProvider)) {
+      return errorResponse(`Unknown AI provider: ${body.aiProvider}`, 400);
+    }
+    if (!isValidModelId(body.aiModel)) {
+      return errorResponse(`Unknown AI model: ${body.aiModel}`, 400);
+    }
+    aiProvider = body.aiProvider;
+    aiModel = body.aiModel;
+  } else {
     const [aiKey, user] = await Promise.all([
       getAiKey(auth.userId),
       prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, select: { plan: true } }),
     ]);
-    const { model: aiModel, provider: aiProvider } = await resolveAiModelAndProvider({
+    const resolved = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
       aiKey,
       plan: user.plan as 'FREE' | 'PRO',
     });
+    aiModel = resolved.model;
+    aiProvider = resolved.provider;
+    apiKeyOverride = aiKey?.apiKey;
+  }
 
+  try {
     const [{ classifications }, imageModels, videoModels] = await Promise.all([
       classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic, {
         provider: aiProvider,
         model: aiModel,
-        apiKeyOverride: aiKey?.apiKey,
+        apiKeyOverride,
       }),
       fetchFalImageModels(),
       fetchFalVideoModels(),
@@ -157,9 +192,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error('Failed to create video pipeline', { podcastId, error: message });
+
+    const errorKind = classifyError(message);
+    const isLlmError = LLM_ERROR_KINDS.has(errorKind);
+
     return errorResponse(
       isAdmin ? `Pipeline creation failed: ${message}` : 'Pipeline creation failed. Please try again later.',
       500,
+      isLlmError ? { isLlmError: true, errorKind, currentProvider: aiProvider } : undefined,
     );
   }
 }
