@@ -71,7 +71,13 @@ export class FalVideoProvider implements VideoProvider {
       submitData.response_url ??
       (submitData.status_url ? submitData.status_url.replace(/\/status$/, '') : fallbackBase);
 
-    logger.info('Fal video job submitted', { request_id, statusUrl });
+    logger.info('Fal video job submitted', {
+      request_id,
+      statusUrl,
+      resultUrl,
+      hasStatusUrl: !!submitData.status_url,
+      hasResponseUrl: !!submitData.response_url,
+    });
 
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 5000));
