@@ -2097,6 +2097,9 @@ model SegmentVisual {
   metadata          Json?      // type-specific: chart data, quote text, timeline events, etc.
   visualMode        String?    // 'image' | 'video' | 'programmatic'
   videoModel        String?    // pricetoken model ID for video mode
+  endStatePrompt    String?    @db.Text
+  firstFrameUrl     String?
+  lastFrameUrl      String?
   assetUrl          String?    // R2 URL of generated image/video
   assetType         String?    // 'image/png' | 'video/mp4'
   status            String     @default("pending") // pending | generating | ready | failed

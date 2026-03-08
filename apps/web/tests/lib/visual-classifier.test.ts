@@ -28,9 +28,9 @@ describe('classifySegmentVisuals', () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         segments: [
-          { order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'Editorial illustration of AI robot', metadata: null },
-          { order: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar', data: [{ label: '2023', value: 300 }], title: 'AI Adoption' } },
-          { order: 2, visualType: 'QUOTE', prompt: null, metadata: { quoteText: 'Imagination is more important than knowledge', quoteAuthor: 'Einstein' } },
+          { order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'Editorial illustration of AI robot', metadata: null, endStatePrompt: 'AI robot in a futuristic city at dusk' },
+          { order: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar', data: [{ label: '2023', value: 300 }], title: 'AI Adoption' }, endStatePrompt: null },
+          { order: 2, visualType: 'QUOTE', prompt: null, metadata: { quoteText: 'Imagination is more important than knowledge', quoteAuthor: 'Einstein' }, endStatePrompt: null },
         ],
       }),
       inputTokens: 100,
@@ -46,13 +46,16 @@ describe('classifySegmentVisuals', () => {
     expect(result.classifications[1].visualType).toBe('DATA_CHART');
     expect(result.classifications[1].metadata).toEqual(expect.objectContaining({ chartType: 'bar' }));
     expect(result.classifications[2].visualType).toBe('QUOTE');
+    expect(result.classifications[0].endStatePrompt).toBe('AI robot in a futuristic city at dusk');
+    expect(result.classifications[1].endStatePrompt).toBeNull();
+    expect(result.classifications[2].endStatePrompt).toBeNull();
   });
 
   it('fills missing segments with TEXT_CARD fallback', async () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         segments: [
-          { order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'Illustration of AI', metadata: null },
+          { order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'Illustration of AI', metadata: null, endStatePrompt: null },
           // segments 1 and 2 missing
         ],
       }),
@@ -65,7 +68,9 @@ describe('classifySegmentVisuals', () => {
 
     expect(result.classifications).toHaveLength(3);
     expect(result.classifications[1].visualType).toBe('TEXT_CARD');
+    expect(result.classifications[1].endStatePrompt).toBeNull();
     expect(result.classifications[2].visualType).toBe('TEXT_CARD');
+    expect(result.classifications[2].endStatePrompt).toBeNull();
   });
 
   it('falls back to TEXT_CARD for all segments on parse error', async () => {
@@ -106,9 +111,9 @@ describe('classifySegmentVisuals', () => {
     mockGenerateResponse.mockResolvedValue({
       content: JSON.stringify({
         segments: [
-          { order: 2, visualType: 'QUOTE', prompt: null, metadata: null },
-          { order: 0, visualType: 'TEXT_CARD', prompt: null, metadata: null },
-          { order: 1, visualType: 'AI_ILLUSTRATION', prompt: 'test', metadata: null },
+          { order: 2, visualType: 'QUOTE', prompt: null, metadata: null, endStatePrompt: null },
+          { order: 0, visualType: 'TEXT_CARD', prompt: null, metadata: null, endStatePrompt: null },
+          { order: 1, visualType: 'AI_ILLUSTRATION', prompt: 'test', metadata: null, endStatePrompt: 'finished scene' },
         ],
       }),
       inputTokens: 100,

@@ -85,6 +85,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         order: c.order,
         visualType: c.visualType,
         prompt: c.prompt,
+        endStatePrompt: c.endStatePrompt,
         metadata: c.metadata ? (c.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         status: EXTERNAL_ASSET_TYPES.has(c.visualType) ? 'pending' : 'ready',
       })),

@@ -69,8 +69,8 @@ describe('visual-classification worker', () => {
 
     mockClassify.mockResolvedValue({
       classifications: [
-        { segmentId: 'seg-1', order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null },
-        { segmentId: 'seg-2', order: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' } },
+        { segmentId: 'seg-1', order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null, endStatePrompt: 'scene after narration' },
+        { segmentId: 'seg-2', order: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' }, endStatePrompt: null },
       ],
       inputTokens: 100,
       outputTokens: 200,
@@ -87,8 +87,8 @@ describe('visual-classification worker', () => {
     // Should create segment visuals
     expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending' }),
-        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready' }),
+        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending', endStatePrompt: 'scene after narration' }),
+        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready', endStatePrompt: null }),
       ]),
     });
 
@@ -118,6 +118,7 @@ describe('visual-classification worker', () => {
           visualType: 'MAP_OVERLAY',
           prompt: 'Ancient Rome city',
           metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
+          endStatePrompt: null,
         },
       ],
       inputTokens: 80,
@@ -162,7 +163,7 @@ describe('visual-classification worker', () => {
 
     mockClassify.mockResolvedValue({
       classifications: [
-        { segmentId: 'seg-1', order: 0, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Test' } },
+        { segmentId: 'seg-1', order: 0, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Test' }, endStatePrompt: null },
       ],
       inputTokens: 50,
       outputTokens: 30,
