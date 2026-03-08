@@ -31,7 +31,35 @@ const VIDEO_ENDPOINTS: Record<string, string> = {
   'fal-veo3-fast-1080p': 'fal-ai/veo3/fast',
   'fal-kling3-1080p': 'fal-ai/kling-video/v3/master/text-to-video',
   'fal-wan2.5-480p': 'fal-ai/wan/v2.5/text-to-video',
+  'fal-veo3.1-flf2v-1080p': 'fal-ai/veo3.1/first-last-frame-to-video',
+  'fal-veo3.1-fast-flf2v-1080p': 'fal-ai/veo3.1/fast/first-last-frame-to-video',
+  'fal-kling2.5-pro-i2v-1080p': 'fal-ai/kling-video/v2.5-turbo/pro/image-to-video',
 };
+
+/** Per-model frame parameter names for Fal video endpoints. */
+interface FalFrameParamConfig {
+  firstFrameParam: string;
+  lastFrameParam?: string;
+}
+
+const FAL_FRAME_PARAMS: Record<string, FalFrameParamConfig> = {
+  // FLF2V models — both frames required
+  'fal-veo3.1-flf2v-1080p': { firstFrameParam: 'first_frame_url', lastFrameParam: 'last_frame_url' },
+  'fal-veo3.1-fast-flf2v-1080p': { firstFrameParam: 'first_frame_url', lastFrameParam: 'last_frame_url' },
+  // Kling I2V — first frame required, tail_image_url optional
+  'fal-kling2.5-pro-i2v-1080p': { firstFrameParam: 'image_url', lastFrameParam: 'tail_image_url' },
+  // Standard T2V models — image_url is optional first frame
+  'fal-veo3-1080p': { firstFrameParam: 'image_url' },
+  'fal-veo3-fast-1080p': { firstFrameParam: 'image_url' },
+  'fal-kling3-1080p': { firstFrameParam: 'image_url' },
+  'fal-wan2.5-480p': { firstFrameParam: 'image_url' },
+};
+
+/** Get frame parameter names for a Fal video model. */
+export function getFalFrameParams(modelId: string): FalFrameParamConfig {
+  const resolved = resolveModelId(modelId);
+  return FAL_FRAME_PARAMS[resolved] ?? { firstFrameParam: 'image_url' };
+}
 
 /** Map common shorthand / legacy model IDs to their canonical pricetoken IDs. */
 const MODEL_ALIASES: Record<string, string> = {

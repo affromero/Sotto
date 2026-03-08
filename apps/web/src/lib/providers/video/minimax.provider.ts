@@ -44,7 +44,7 @@ export class MiniMaxVideoProvider implements VideoProvider {
     return this.model;
   }
 
-  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string }): Promise<Buffer> {
+  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string; lastFrameImage?: string }): Promise<Buffer> {
     const mapping = MODEL_MAP[this.model];
     if (!mapping) throw new Error(`Unknown MiniMax video model: ${this.model}`);
 

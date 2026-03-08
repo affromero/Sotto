@@ -2,7 +2,7 @@
  * Fal.ai video provider — text-to-video via async queue API.
  * Wraps the existing fal-video.ts logic in the VideoProvider interface.
  */
-import { getFalVideoEndpoint } from '../fal-endpoints';
+import { getFalVideoEndpoint, getFalFrameParams } from '../fal-endpoints';
 import { logger } from '../../logger';
 import type { VideoProvider } from '../video';
 
@@ -20,13 +20,23 @@ export class FalVideoProvider implements VideoProvider {
     return this.model;
   }
 
-  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string }): Promise<Buffer> {
+  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string; lastFrameImage?: string }): Promise<Buffer> {
     const endpoint = getFalVideoEndpoint(this.model);
     if (!endpoint) throw new Error(`No Fal endpoint for video model: ${this.model}`);
 
     const url = `https://queue.fal.run/${endpoint}`;
+    const frameParams = getFalFrameParams(this.model);
 
     logger.info('Submitting fal video job', { model: this.model, endpoint });
+
+    // Build frame parameters dynamically based on model
+    const frameBody: Record<string, string> = {};
+    if (params.firstFrameImage) {
+      frameBody[frameParams.firstFrameParam] = params.firstFrameImage;
+    }
+    if (params.lastFrameImage && frameParams.lastFrameParam) {
+      frameBody[frameParams.lastFrameParam] = params.lastFrameImage;
+    }
 
     const submitRes = await fetch(url, {
       method: 'POST',
@@ -38,7 +48,7 @@ export class FalVideoProvider implements VideoProvider {
         prompt: params.prompt,
         duration: params.duration ? String(params.duration) : undefined,
         aspect_ratio: '16:9',
-        ...(params.firstFrameImage ? { image_url: params.firstFrameImage } : {}),
+        ...frameBody,
       }),
     });
 
