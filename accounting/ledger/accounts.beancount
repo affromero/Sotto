@@ -92,6 +92,9 @@
 ; Minimax — AI music/audio generation
 2026-01-01 open Expenses:AI:Minimax                              USD
 
+; HeyGen — AI avatar/video generation
+2026-01-01 open Expenses:AI:HeyGen                               USD
+
 ; ============================================================
 ; EXPENSES — TTS (Text-to-Speech)
 ; ============================================================

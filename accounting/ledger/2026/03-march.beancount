@@ -9,6 +9,10 @@
   Expenses:AI:FAL                              20.00 USD
   Assets:Current:Cash:Bank                    -20.00 USD
 
+2026-03-07 * "HeyGen" "API credits — March 2026"
+  Expenses:AI:HeyGen                          10.00 USD
+  Assets:Current:Cash:Bank                   -10.00 USD
+
 2026-03-08 * "Minimax" "API credits — March 2026"
   Expenses:AI:Minimax                          30.00 USD
   Assets:Current:Cash:Bank                    -30.00 USD
