@@ -35,11 +35,20 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
+const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google']);
+const VALID_MODELS = new Set(['claude-haiku-4-5-20251001', 'gpt-5-nano', 'gemini-3.1-flash-lite-preview']);
+
 vi.mock('@/lib/providers/ai-registry', () => ({
   resolveAiModelAndProvider: vi.fn().mockResolvedValue({
     model: 'claude-haiku-4-5-20251001',
     provider: 'anthropic',
   }),
+  isValidAiProviderId: (id: string) => VALID_PROVIDERS.has(id),
+  isValidModelId: (id: string) => VALID_MODELS.has(id),
+}));
+
+vi.mock('@/lib/byok-errors', () => ({
+  classifyError: vi.fn().mockReturnValue('unknown'),
 }));
 
 vi.mock('@/lib/api-keys', () => ({
@@ -174,6 +183,67 @@ describe('POST /api/podcasts/[id]/video/pipeline', () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.code).toBe('daily_limit_reached');
+  });
+
+  it('returns isLlmError when classification fails with credit error', async () => {
+    const { classifyError } = await import('@/lib/byok-errors');
+    vi.mocked(classifyError).mockReturnValue('insufficient_credits');
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockClassifySegmentVisuals.mockRejectedValue(new Error('Your credit balance is too low to access the Anthropic API'));
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.isLlmError).toBe(true);
+    expect(body.errorKind).toBe('insufficient_credits');
+    expect(body.currentProvider).toBe('anthropic');
+  });
+
+  it('does not set isLlmError for non-LLM errors', async () => {
+    const { classifyError } = await import('@/lib/byok-errors');
+    vi.mocked(classifyError).mockReturnValue('unknown');
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    mockClassifySegmentVisuals.mockRejectedValue(new Error('Network timeout'));
+    const res = await POST(createRequest('POST'), routeParams);
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.isLlmError).toBeUndefined();
+  });
+
+  it('accepts aiProvider/aiModel override in POST body', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    const res = await POST(
+      createRequest('POST', { aiProvider: 'google', aiModel: 'gemini-3.1-flash-lite-preview' }),
+      routeParams,
+    );
+    expect(res.status).toBe(200);
+    expect(mockClassifySegmentVisuals).toHaveBeenCalledWith(
+      expect.any(Array),
+      'Test Podcast',
+      'Testing',
+      expect.objectContaining({ provider: 'google', model: 'gemini-3.1-flash-lite-preview' }),
+    );
+  });
+
+  it('rejects invalid aiProvider in POST body', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    const res = await POST(
+      createRequest('POST', { aiProvider: 'invalid-provider', aiModel: 'some-model' }),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('Unknown AI provider');
+  });
+
+  it('rejects invalid aiModel in POST body', async () => {
+    mockRequireAdmin.mockResolvedValue('admin-1');
+    const res = await POST(
+      createRequest('POST', { aiProvider: 'openai', aiModel: 'fake-model' }),
+      routeParams,
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('Unknown AI model');
   });
 });
 
