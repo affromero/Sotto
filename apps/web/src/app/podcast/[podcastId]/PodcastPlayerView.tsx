@@ -1262,7 +1262,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 currentTime={currentTime}
                 onSegmentClick={handleSegmentClick}
                 title={podcast.title}
-                avatarOverlays={avatarsVisible ? avatarOverlays : []}
+                avatarOverlays={avatarOverlays}
                 isOwner={isOwner}
                 avatarsVisible={avatarsVisible}
                 onAvatarsVisibleChange={async (visible) => {

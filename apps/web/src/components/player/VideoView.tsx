@@ -154,7 +154,7 @@ export function VideoView({
             {avatarsVisible ? 'Hide Avatars' : 'Show Avatars'}
           </button>
         )}
-        {containerSize.width > 0 && readyOverlays.map((overlay) => (
+        {avatarsVisible && containerSize.width > 0 && readyOverlays.map((overlay) => (
           <AvatarOverlay
             key={overlay.id}
             videoUrl={overlay.videoUrl!}
