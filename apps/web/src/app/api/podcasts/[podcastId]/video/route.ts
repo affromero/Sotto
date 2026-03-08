@@ -71,6 +71,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       model: string | null;
       prompt: string | null;
       metadata: Record<string, unknown> | null;
+      endStatePrompt?: string | null;
     }>;
   } | undefined;
 
@@ -208,6 +209,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         visualMode: seg.visualMode,
         videoModel: seg.visualMode === 'video' ? seg.model : null,
         prompt: seg.prompt,
+        endStatePrompt: seg.endStatePrompt ?? null,
         metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
         status: EXTERNAL_MODES.has(seg.visualMode) ? 'pending' : 'ready',
       })),
@@ -312,10 +314,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
           segmentId: true,
           visualType: true,
           prompt: true,
+          endStatePrompt: true,
           metadata: true,
           status: true,
           assetUrl: true,
           assetType: true,
+          firstFrameUrl: true,
+          lastFrameUrl: true,
           order: true,
           visualMode: true,
         },
@@ -543,6 +548,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           ...(seg.visualMode !== undefined && { visualMode: seg.visualMode }),
           ...(seg.model !== undefined && { videoModel: seg.model }),
           ...(seg.prompt !== undefined && { prompt: seg.prompt }),
+          ...(seg.endStatePrompt !== undefined && { endStatePrompt: seg.endStatePrompt }),
           ...(seg.metadata !== undefined && { metadata: seg.metadata ? (seg.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull }),
           status: isExternal ? 'pending' : 'ready',
           assetUrl: null,

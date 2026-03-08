@@ -656,6 +656,7 @@ export const generateVideoSchema = z
             model: z.string().nullable(),
             prompt: z.string().nullable(),
             metadata: z.record(z.unknown()).nullable(),
+            endStatePrompt: z.string().nullable().optional(),
           }),
         ),
       })
@@ -675,6 +676,7 @@ export const updateVideoSegmentsSchema = z.object({
       model: z.string().nullable().optional(),
       prompt: z.string().nullable().optional(),
       metadata: z.record(z.unknown()).nullable().optional(),
+      endStatePrompt: z.string().nullable().optional(),
     }),
   ).min(1),
 });
