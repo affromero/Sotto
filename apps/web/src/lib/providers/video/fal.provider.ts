@@ -91,10 +91,16 @@ export class FalVideoProvider implements VideoProvider {
         continue;
       }
 
-      const status = (await statusRes.json()) as { status: string; error?: string };
+      const statusBody = await statusRes.json();
+      const status = statusBody as { status: string; error?: string; response_url?: string };
+
+      logger.info('Fal status poll', { attempt: i, status: status.status, httpStatus: statusRes.status });
 
       if (status.status === 'COMPLETED') {
-        const resultRes = await fetch(resultUrl, {
+        // Use response_url from status response if available (most reliable)
+        const fetchUrl = status.response_url ?? resultUrl;
+        logger.info('Fal fetching result', { fetchUrl, resultUrl, statusResponseUrl: status.response_url });
+        const resultRes = await fetch(fetchUrl, {
           headers: { Authorization: `Key ${this.apiKey}` },
         });
         if (!resultRes.ok) {
