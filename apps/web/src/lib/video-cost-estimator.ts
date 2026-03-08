@@ -152,6 +152,19 @@ export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
   return fallback;
 }
 
+/** Compute clip count and per-clip duration for a video segment. */
+export function getClipInfo(
+  segmentDuration: number,
+  maxDuration: number,
+): { clipCount: number; perClipDuration: number; totalDuration: number } {
+  const clipCount = Math.ceil(segmentDuration / maxDuration);
+  const perClipDuration = maxDuration;
+  // Total billed duration: full clips + remainder
+  const remainder = segmentDuration - (clipCount - 1) * maxDuration;
+  const totalDuration = (clipCount - 1) * perClipDuration + Math.min(remainder, maxDuration);
+  return { clipCount, perClipDuration, totalDuration };
+}
+
 export function estimateSegmentCost(
   segment: PipelineSegmentNode,
   imageModels: ImageModelCostInfo[],
@@ -168,8 +181,9 @@ export function estimateSegmentCost(
   if (segment.visualMode === 'video') {
     const model = videoModels.find((m) => m.modelId === segment.model);
     if (!model) return 0;
-    const duration = Math.min(segment.duration, model.maxDuration ?? 10);
-    return (duration / 60) * model.costPerMinute;
+    const maxDur = model.maxDuration ?? 10;
+    const { totalDuration } = getClipInfo(segment.duration, maxDur);
+    return (totalDuration / 60) * model.costPerMinute;
   }
 
   return 0;

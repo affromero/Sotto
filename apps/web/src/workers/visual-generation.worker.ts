@@ -15,6 +15,7 @@ import { videoModelRequiresFirstFrame } from '@/lib/providers/video-registry';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
+import { extractLastFrame, concatenateVideoClips } from '@/lib/video-concat';
 import { logger } from '@/lib/logger';
 
 async function generateAiImage(
@@ -71,12 +72,12 @@ async function generateAiVideo(
     ? await prisma.segment.findUnique({ where: { id: visual.segmentId }, select: { duration: true } })
     : null;
 
-  // Cap to model's max generation length
+  // Determine clip count for chaining
   const videoModels = await fetchAllVideoModels();
   const pricing = videoModels.find((m) => m.modelId === videoModel);
   const maxDuration = pricing?.maxDuration ?? 10;
   const rawDuration = segment?.duration ?? 5;
-  const cappedDuration = Math.min(rawDuration, maxDuration);
+  const clipCount = Math.ceil(rawDuration / maxDuration);
 
   // Generate a first-frame image for models that require it (e.g. 512P is image-to-video only)
   let firstFrameImage: string | undefined;
@@ -89,16 +90,65 @@ async function generateAiVideo(
     imageCost = imgResult.cost;
   }
 
-  const buffer = await videoProvider.generateVideo({
-    prompt: videoPrompt,
-    duration: cappedDuration,
-    firstFrameImage,
+  const service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
+
+  // Single clip — no chaining needed
+  if (clipCount <= 1) {
+    const cappedDuration = Math.min(rawDuration, maxDuration);
+    const buffer = await videoProvider.generateVideo({
+      prompt: videoPrompt,
+      duration: cappedDuration,
+      firstFrameImage,
+    });
+    const videoCost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
+    return { buffer, service, cost: videoCost + imageCost };
+  }
+
+  // Multi-clip chaining: generate N clips, extract last frame → first frame of next
+  logger.info('Chaining video clips', {
+    segmentVisualId,
+    clipCount: String(clipCount),
+    rawDuration: String(rawDuration),
+    maxDuration: String(maxDuration),
   });
 
-  const service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
-  const videoCost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
+  const clips: Buffer[] = [];
+  let chainImage = firstFrameImage;
+  let totalVideoCost = 0;
 
-  return { buffer, service, cost: videoCost + imageCost };
+  for (let i = 0; i < clipCount; i++) {
+    const remaining = rawDuration - i * maxDuration;
+    const clipDuration = Math.min(remaining, maxDuration);
+
+    logger.info('Generating chained clip', {
+      segmentVisualId,
+      clip: `${i + 1}/${clipCount}`,
+      clipDuration: String(clipDuration),
+      hasChainImage: !!chainImage,
+    });
+
+    const clipBuffer = await videoProvider.generateVideo({
+      prompt: videoPrompt,
+      duration: clipDuration,
+      firstFrameImage: chainImage,
+    });
+    clips.push(clipBuffer);
+
+    if (pricing) {
+      totalVideoCost += (clipDuration / 60) * pricing.costPerMinute;
+    }
+
+    // Extract last frame for next clip (skip for the final clip)
+    if (i < clipCount - 1) {
+      const lastFrameBuffer = await extractLastFrame(clipBuffer);
+      const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-chain-${i}.png`;
+      chainImage = await uploadFile(r2Key, lastFrameBuffer, 'image/png');
+    }
+  }
+
+  const buffer = await concatenateVideoClips(clips);
+
+  return { buffer, service, cost: totalVideoCost + imageCost };
 }
 
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
