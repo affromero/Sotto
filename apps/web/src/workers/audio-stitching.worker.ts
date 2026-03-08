@@ -13,7 +13,7 @@ import {
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { markPodcastFailed } from '@/lib/pipeline-resume';
-import { downloadToFile, uploadPodcastAudio, deleteFile } from '@/lib/r2';
+import { downloadToFile, uploadPodcastAudio } from '@/lib/r2';
 import { stitchWithEffects, type SfxInsert } from '@/lib/audio-stitcher';
 import { generateSoundEffect } from '@/lib/elevenlabs';
 import { LIMITS } from '@/lib/stripe';
@@ -348,17 +348,8 @@ export async function processAudioStitching(job: Job<StitchAudioPayload>): Promi
       cumulativeTime += seg.duration ?? 0;
     }
 
-    // 9b. Clean up segment audio files from R2 (no longer needed after stitching)
-    for (const seg of segments) {
-      if (seg.audioUrl) {
-        await deleteFile(seg.audioUrl).catch((err) => {
-          logger.warn('Failed to delete segment audio from R2', {
-            segmentId: seg.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-      }
-    }
+    // Note: segment audio files are preserved in R2 for downstream consumers
+    // (avatar generation, voice tracks). Cleanup handled by storage-cleanup admin endpoint.
 
     await job.updateProgress(95);
 
