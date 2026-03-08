@@ -168,6 +168,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         model,
         prompt: c.prompt,
         metadata: c.metadata,
+        endStatePrompt: c.endStatePrompt,
         estimatedCost: 0,
       };
       node.estimatedCost = estimateSegmentCost(node, imageModels, videoModels);

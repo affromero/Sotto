@@ -13,6 +13,7 @@ export interface PipelineSegmentNode {
   model: string | null;
   prompt: string | null;
   metadata: Record<string, unknown> | null;
+  endStatePrompt: string | null;
   estimatedCost: number;
 }
 

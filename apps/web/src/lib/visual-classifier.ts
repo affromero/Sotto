@@ -31,6 +31,7 @@ export interface ClassifiedSegment {
   visualType: VisualTypeString;
   prompt: string | null;
   metadata: Record<string, unknown> | null;
+  endStatePrompt: string | null;
 }
 
 const classificationItemSchema = z.object({
@@ -48,6 +49,7 @@ const classificationItemSchema = z.object({
   ]),
   prompt: z.string().nullable(),
   metadata: z.union([z.record(z.unknown()), z.string(), z.null()]),
+  endStatePrompt: z.string().nullable().optional(),
 });
 
 const classificationSchema = z.object({
@@ -76,8 +78,9 @@ RULES:
 6. Use QUOTE when a notable quote or key statement is highlighted.
 7. Use TEXT_CARD as a general fallback for explanatory content.
 8. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
+9. For AI_ILLUSTRATION and STOCK_FOOTAGE segments, also provide "endStatePrompt": a description of how the scene should look AFTER the narration concludes — the final visual state. This should differ meaningfully from the opening prompt (e.g., if the prompt shows a city at dawn, the endStatePrompt might show it at midday with bustling activity). For other visual types, set endStatePrompt to null.
 
-Return JSON: { "segments": [{ "order": number, "visualType": string, "prompt": string|null, "metadata": string|null }] }
+Return JSON: { "segments": [{ "order": number, "visualType": string, "prompt": string|null, "metadata": string|null, "endStatePrompt": string|null }] }
 For metadata, return a JSON-encoded string (e.g. "{\"chartType\":\"bar\",\"title\":\"Revenue\"}"), not a raw object. Return null if no metadata is needed.`;
 
 export async function classifySegmentVisuals(
@@ -123,8 +126,9 @@ Classify each segment with a visual type. Return JSON only.`;
                   visualType: { type: 'string' },
                   prompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
                   metadata: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                  endStatePrompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
                 },
-                required: ['order', 'visualType', 'prompt', 'metadata'],
+                required: ['order', 'visualType', 'prompt', 'metadata', 'endStatePrompt'],
               },
             },
           },
@@ -150,6 +154,7 @@ Classify each segment with a visual type. Return JSON only.`;
         visualType: 'TEXT_CARD' as const,
         prompt: null,
         metadata: { headline: podcastTitle, bullets: [s.text.slice(0, 200)] },
+        endStatePrompt: null,
       })),
     };
   }
@@ -171,6 +176,7 @@ Classify each segment with a visual type. Return JSON only.`;
         visualType: c.visualType,
         prompt: c.prompt,
         metadata,
+        endStatePrompt: c.endStatePrompt ?? null,
       };
     });
 
@@ -183,6 +189,7 @@ Classify each segment with a visual type. Return JSON only.`;
         visualType: 'TEXT_CARD',
         prompt: null,
         metadata: { headline: podcastTitle, bullets: [seg.text.slice(0, 200)] },
+        endStatePrompt: null,
       });
     }
   }
