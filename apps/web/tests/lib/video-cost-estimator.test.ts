@@ -72,16 +72,18 @@ describe('estimateSegmentCost', () => {
     expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBe(0.04);
   });
 
-  it('calculates video cost proportional to duration', () => {
+  it('calculates video cost proportional to duration plus frame costs', () => {
     const seg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 5 });
-    // 5s = 1 clip at maxDuration=5, cost = (5/60) * 3 = 0.25
-    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.25);
+    // 5s = 1 clip at maxDuration=5, video cost = (5/60) * 3 = 0.25
+    // Frame cost = cheapest image ($0.02) × 2 = 0.04
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.29);
   });
 
-  it('charges full duration for chained video clips', () => {
+  it('charges full duration for chained video clips plus frame costs', () => {
     const seg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 12 });
-    // 12s / 5s max = 3 clips (5 + 5 + 2), total billed = 12s, cost = (12/60) * 3 = 0.60
-    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.6);
+    // 12s / 5s max = 3 clips, video cost = (12/60) * 3 = 0.60
+    // Frame cost = cheapest image ($0.02) × 2 = 0.04
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.64);
   });
 
   it('returns 0 for unknown model ID', () => {
@@ -99,7 +101,8 @@ describe('estimatePipelineCost', () => {
     const total = estimatePipelineCost([imgSeg, progSeg, vidSeg], MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS);
     const expectedImg = 0.04;
     const expectedVid = (3 / 60) * 3; // 3s, $3/min
-    expect(total).toBeCloseTo(expectedImg + 0 + expectedVid);
+    const expectedFrames = 0.02 * 2; // cheapest image × 2 for video segment
+    expect(total).toBeCloseTo(expectedImg + 0 + expectedVid + expectedFrames);
   });
 });
 
