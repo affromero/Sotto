@@ -1711,9 +1711,9 @@ model AutoModelConfig {
   proIncludedVideoModels  Json?
   // Avatar (lip-sync avatar overlays)
   freeAvatarProvider      String   @default("heygen")
-  freeAvatarModel         String   @default("avatar-iii")
+  freeAvatarModel         String   @default("heygen-avatar-standard")
   proAvatarProvider       String   @default("heygen")
-  proAvatarModel          String   @default("avatar-iii")
+  proAvatarModel          String   @default("heygen-avatar-standard")
   freeIncludedAvatarModels Json?
   proIncludedAvatarModels  Json?
   // Daily limits (migrated from FreeTierConfig)

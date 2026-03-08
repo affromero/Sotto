@@ -415,9 +415,9 @@ describe('PATCH /api/admin/auto-models', () => {
     const response = await PATCH(
       createPatchRequest({
         freeAvatarProvider: 'heygen',
-        freeAvatarModel: 'avatar-iii',
+        freeAvatarModel: 'heygen-avatar-standard',
         proAvatarProvider: 'heygen',
-        proAvatarModel: 'avatar-iv',
+        proAvatarModel: 'heygen-avatar-iv',
       })
     );
 
@@ -425,9 +425,9 @@ describe('PATCH /api/admin/auto-models', () => {
     expect(mockSetAutoModelConfig).toHaveBeenCalledWith(
       {
         freeAvatarProvider: 'heygen',
-        freeAvatarModel: 'avatar-iii',
+        freeAvatarModel: 'heygen-avatar-standard',
         proAvatarProvider: 'heygen',
-        proAvatarModel: 'avatar-iv',
+        proAvatarModel: 'heygen-avatar-iv',
       },
       'admin-1'
     );

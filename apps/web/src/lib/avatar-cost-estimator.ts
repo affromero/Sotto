@@ -1,5 +1,6 @@
 import { PriceTokenClient, STATIC_AVATAR_PRICING } from 'pricetoken';
 import type { AvatarModelPricing } from 'pricetoken';
+import { getAllAvatarModelIds } from '@/lib/providers/avatar-registry';
 import { logger } from '@/lib/logger';
 
 export interface AvatarModelInfo {
@@ -23,33 +24,43 @@ function mapAvatarModel(m: AvatarModelPricing): AvatarModelInfo {
   };
 }
 
-function staticHeygenModels(): AvatarModelInfo[] {
+function staticAvatarModels(): AvatarModelInfo[] {
+  const knownIds = getAllAvatarModelIds();
   return STATIC_AVATAR_PRICING
-    .filter((m) => m.provider === 'heygen')
+    .filter((m) => knownIds.has(m.modelId))
     .map(mapAvatarModel);
 }
 
+/** Fetch avatar models from all providers with live pricing from pricetoken. */
 export async function fetchAvatarModels(): Promise<AvatarModelInfo[]> {
   const now = Date.now();
   if (avatarCache && now < avatarCache.expiresAt) return avatarCache.data;
 
+  const knownIds = getAllAvatarModelIds();
+
   try {
     const apiKey = process.env.PRICETOKEN_API_KEY;
     const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
-    const all = await client.getAvatarPricing({ provider: 'heygen' });
-    const models = all.map(mapAvatarModel);
+    const [heygenModels, falModels] = await Promise.all([
+      client.getAvatarPricing({ provider: 'heygen' }).catch(() => [] as AvatarModelPricing[]),
+      client.getAvatarPricing({ provider: 'fal' }).catch(() => [] as AvatarModelPricing[]),
+    ]);
+    const all = [...heygenModels, ...falModels];
+    const models = all
+      .filter((m) => knownIds.has(m.modelId))
+      .map(mapAvatarModel);
 
     if (models.length > 0) {
       avatarCache = { data: models, expiresAt: now + CACHE_TTL_MS };
       return models;
     }
   } catch (err) {
-    logger.warn('Failed to fetch HeyGen avatar pricing from pricetoken, using static fallback', {
+    logger.warn('Failed to fetch avatar pricing from pricetoken, using static fallback', {
       error: err instanceof Error ? err.message : String(err),
     });
   }
 
-  const fallback = staticHeygenModels();
+  const fallback = staticAvatarModels();
   avatarCache = { data: fallback, expiresAt: now + CACHE_TTL_MS };
   return fallback;
 }
@@ -59,7 +70,7 @@ export function estimateAvatarCost(
   speakerCount: number,
   costPerMinute?: number,
 ): number {
-  const rate = costPerMinute ?? 0.10; // default HeyGen rate
+  const rate = costPerMinute ?? 1.0;
   const perSpeakerCost = (durationSeconds / 60) * rate;
   return perSpeakerCost * speakerCount;
 }
