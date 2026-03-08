@@ -109,7 +109,9 @@ export type ReportStatus =
   | 'PENDING'
   | 'REVIEWING'
   | 'RESOLVED_ACTIONED'
-  | 'RESOLVED_DISMISSED';
+  | 'RESOLVED_DISMISSED'
+  | 'ASSET_REPLACED'
+  | 'DELISTED';
 
 export type VoiceCloneSource = 'UPLOAD' | 'RECORD' | 'IMPORT';
 

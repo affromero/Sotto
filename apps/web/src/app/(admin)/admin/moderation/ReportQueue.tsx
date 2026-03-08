@@ -21,6 +21,11 @@ interface ReportItem {
   createdAt: string;
   resolvedAt: string | null;
   resolution: string | null;
+  claimantEmail: string | null;
+  claimantName: string | null;
+  evidenceUrl: string | null;
+  segmentVisualId: string | null;
+  counterNotice: string | null;
   reporter: {
     id: string;
     name: string | null;
@@ -28,6 +33,7 @@ interface ReportItem {
     handle: string | null;
   };
   podcast: ReportPodcast | null;
+  segmentVisual: { id: string; assetUrl: string | null; visualType: string; status: string } | null;
 }
 
 interface ReportStats {
@@ -207,6 +213,8 @@ export function ReportQueue() {
           <option value="REVIEWING">Reviewing</option>
           <option value="RESOLVED_ACTIONED">Actioned</option>
           <option value="RESOLVED_DISMISSED">Dismissed</option>
+          <option value="ASSET_REPLACED">Asset Replaced</option>
+          <option value="DELISTED">Delisted</option>
         </select>
 
         <select
@@ -295,6 +303,34 @@ export function ReportQueue() {
                       <p className={styles.reportDescription}>
                         Resolution: {report.resolution}
                       </p>
+                    )}
+                    {report.reason === 'COPYRIGHT' && (
+                      <div className={styles.copyrightDetails}>
+                        {report.claimantName && (
+                          <p className={styles.reportDescription}>
+                            Claimant: {report.claimantName}
+                            {report.claimantEmail && ` (${report.claimantEmail})`}
+                          </p>
+                        )}
+                        {report.evidenceUrl && (
+                          <p className={styles.reportDescription}>
+                            Evidence:{' '}
+                            <a href={report.evidenceUrl} target="_blank" rel="noopener noreferrer">
+                              {report.evidenceUrl}
+                            </a>
+                          </p>
+                        )}
+                        {report.segmentVisual && (
+                          <p className={styles.reportDescription}>
+                            Visual: {report.segmentVisual.visualType} ({report.segmentVisual.status})
+                          </p>
+                        )}
+                        {report.counterNotice && (
+                          <p className={styles.reportDescription}>
+                            Counter-notice: {report.counterNotice}
+                          </p>
+                        )}
+                      </div>
                     )}
                     {report.podcast && (
                       <p className={styles.targetPreview}>
@@ -408,6 +444,38 @@ export function ReportQueue() {
                           type="button"
                         >
                           Delete Podcast
+                        </button>
+                      )}
+                      {report.reason === 'COPYRIGHT' && report.segmentVisualId && (
+                        <button
+                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                          onClick={() =>
+                            resolveReport(
+                              report.id,
+                              'ASSET_REPLACED',
+                              'Copyrighted visual replaced with AI illustration'
+                            )
+                          }
+                          disabled={isActing}
+                          type="button"
+                        >
+                          Replace Asset
+                        </button>
+                      )}
+                      {report.reason === 'COPYRIGHT' && report.targetType === 'podcast' && (
+                        <button
+                          className={`${styles.actionBtn} ${styles.actionBtnDanger}`}
+                          onClick={() =>
+                            resolveReport(
+                              report.id,
+                              'DELISTED',
+                              'Podcast delisted due to copyright claim'
+                            )
+                          }
+                          disabled={isActing}
+                          type="button"
+                        >
+                          Delist Podcast
                         </button>
                       )}
                     </div>

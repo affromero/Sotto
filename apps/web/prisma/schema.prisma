@@ -309,6 +309,7 @@ model Podcast {
 
   // Visibility
   visibility PodcastVisibility @default(PUBLIC)
+  isDelisted Boolean           @default(false)
 
   // Fork tracking
   forkedFromId     String?
@@ -1822,6 +1823,8 @@ enum ReportStatus {
   REVIEWING
   RESOLVED_ACTIONED
   RESOLVED_DISMISSED
+  ASSET_REPLACED
+  DELISTED
 }
 
 model Report {
@@ -1837,7 +1840,15 @@ model Report {
   resolvedAt  DateTime?
   createdAt   DateTime     @default(now())
 
-  reporter User @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  // Copyright claim fields (used when reason = COPYRIGHT)
+  claimantEmail    String?
+  claimantName     String?
+  evidenceUrl      String?
+  segmentVisualId  String?
+  counterNotice    String?  @db.Text
+
+  reporter      User            @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  segmentVisual SegmentVisual?  @relation(fields: [segmentVisualId], references: [id], onDelete: SetNull)
 
   @@unique([reporterId, targetType, targetId])
   @@index([status, createdAt])
@@ -2094,6 +2105,7 @@ model SegmentVisual {
 
   videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
   segment         Segment         @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+  reports         Report[]
 
   @@index([videoGenerationId])
   @@index([segmentId])

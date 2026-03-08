@@ -68,6 +68,8 @@ export function VideoView({
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
+  const activeVisual = activeSegment ? segmentVisuals.find((v) => v.segmentId === activeSegment.id) : null;
+  const photographer = activeVisual?.metadata?.photographer as string | undefined;
 
   const videoSegments = useMemo(
     () => buildVideoSegments(segments, segmentVisuals),
@@ -177,6 +179,11 @@ export function VideoView({
               {parseTextWithCitations(activeSegment.text, references)}
             </p>
           </div>
+          {photographer && (
+            <p className={styles.attribution}>
+              Video: {photographer} / Pexels
+            </p>
+          )}
         </div>
       )}
     </div>
