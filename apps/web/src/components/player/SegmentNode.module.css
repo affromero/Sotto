@@ -89,6 +89,9 @@
 }
 
 .visualTypeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 12px;
   border-radius: var(--radius-full, 9999px);
   font-size: 12px;
@@ -97,6 +100,16 @@
   color: var(--color-primary, #d97706);
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.visualModeSuffix {
+  font-weight: 500;
+  opacity: 0.65;
+}
+
+.visualModeSuffix::before {
+  content: '·';
+  margin-right: 1px;
 }
 
 .duration {

@@ -139,6 +139,11 @@ function StoryboardCardComponent({
         <p className={styles.textPreview}>{textPreview}</p>
         <span className={styles.visualTypeBadge}>
           {VISUAL_TYPE_LABELS[segment.visualType]}
+          {!isProgrammatic && (
+            <span className={styles.visualModeSuffix}>
+              {segment.visualMode === 'video' ? 'Video' : 'Image'}
+            </span>
+          )}
         </span>
         <span className={styles.duration}>{segment.duration.toFixed(1)}s</span>
         <ChevronDown
