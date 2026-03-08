@@ -1,9 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Check, AlertCircle, Pause } from 'lucide-react';
+import { Check, AlertCircle, Pause, ShieldCheck } from 'lucide-react';
 import { useRotatingMessage } from '@/lib/hooks/useRotatingMessage';
 import styles from './GenerationProgress.module.css';
+
+const VERIFICATION_STAGES = new Set(['VERIFYING_SCRIPT', 'VALIDATING_REFERENCES']);
 
 interface GenerationProgressProps {
   status: string;
@@ -133,6 +135,13 @@ export function GenerationProgress({ status, progress, error, topic }: Generatio
               aria-live="polite"
             >
               {subMessage}
+            </span>
+          )}
+
+          {isActive && VERIFICATION_STAGES.has(status) && (
+            <span className={styles.verifyBadge}>
+              <ShieldCheck size={14} strokeWidth={2} aria-hidden="true" />
+              We don&apos;t ship hallucinations
             </span>
           )}
         </div>
