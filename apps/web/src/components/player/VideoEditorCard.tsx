@@ -223,8 +223,8 @@ function VideoEditorCardComponent({
           {/* Image / Video toggle */}
           {!isProgrammatic && (
             <div>
-              <span className={styles.fieldLabel}>Output format</span>
-              <div className={styles.modeToggle} role="group" aria-label="Output format">
+              <span className={styles.fieldLabel}>Generate as</span>
+              <div className={styles.modeToggle} role="group" aria-label="Generate as">
                 <button
                   className={`${styles.modeBtn} ${segment.visualMode === 'image' ? styles.modeBtnActive : ''}`}
                   onClick={() => handleModeChange('image')}
