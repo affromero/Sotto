@@ -9,7 +9,6 @@ const {
   mockUploadFile,
   mockAddJob,
   mockFetchAllVideoModels,
-  mockVideoModelRequiresFirstFrame,
 } = vi.hoisted(() => ({
   mockPrisma: {
     segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
@@ -25,7 +24,6 @@ const {
   mockUploadFile: vi.fn().mockResolvedValue('https://cdn.example.com/visual.png'),
   mockAddJob: vi.fn(),
   mockFetchAllVideoModels: vi.fn().mockResolvedValue([]),
-  mockVideoModelRequiresFirstFrame: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
@@ -50,9 +48,6 @@ vi.mock('@/lib/queue', () => ({
 }));
 vi.mock('@/lib/providers/video', () => ({
   resolveVideoProvider: (...args: unknown[]) => mockResolveVideoProvider(...args),
-}));
-vi.mock('@/lib/providers/video-registry', () => ({
-  videoModelRequiresFirstFrame: (modelId: string) => mockVideoModelRequiresFirstFrame(modelId),
 }));
 vi.mock('@/lib/video-cost-estimator', () => ({
   fetchAllVideoModels: (...args: unknown[]) => mockFetchAllVideoModels(...args),
@@ -271,61 +266,18 @@ describe('visual-generation worker', () => {
     });
   });
 
-  it('generates AI video when visualMode is video, regardless of visualType', async () => {
+  it('generates first + last frame images and video for all video segments', async () => {
     mockPrisma.segmentVisual.findUnique
-      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })                        // idempotency
-      .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo-02-512p' }) // mode check
-      .mockResolvedValueOnce({ segmentId: 'seg-1' });                                       // duration lookup
-    mockPrisma.segment.findUnique.mockResolvedValue({ duration: 39.9 });
-    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
-    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
-
-    const mockVideoProvider = {
-      generateVideo: vi.fn().mockResolvedValue(Buffer.from('fake-video')),
-    };
-    mockResolveVideoProvider.mockResolvedValue({
-      provider: mockVideoProvider,
-      source: 'platform',
-      providerId: 'minimax',
-    });
-    mockFetchAllVideoModels.mockResolvedValue([
-      { modelId: 'minimax-hailuo-02-512p', costPerMinute: 0.9, maxDuration: 10 },
-    ]);
-
-    mockPrisma.segmentVisual.count
-      .mockResolvedValueOnce(0)  // pending/generating
-      .mockResolvedValueOnce(0); // failed
-
-    // Use AI_ILLUSTRATION type but video mode — should generate video, not image
-    await processVisualGeneration(makeJob(baseData));
-
-    expect(mockVideoProvider.generateVideo).toHaveBeenCalledWith({
-      prompt: 'Editorial illustration of AI',
-      duration: 10, // capped from 39.9s to maxDuration 10s
-      firstFrameImage: undefined,
-    });
-    expect(mockResolveImageProvider).not.toHaveBeenCalled();
-    expect(mockUploadFile).toHaveBeenCalledWith(
-      'podcasts/pod-1/visuals/sv-1.mp4',
-      expect.any(Buffer),
-      'video/mp4',
-    );
-  });
-
-  it('generates first-frame image for I2V models (e.g. 512P)', async () => {
-    mockVideoModelRequiresFirstFrame.mockReturnValue(true);
-
-    mockPrisma.segmentVisual.findUnique
-      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })                        // idempotency
-      .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo02-512p' }) // mode check
-      .mockResolvedValueOnce({ segmentId: 'seg-1' });                                       // duration lookup
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })                                                      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo02-512p', endStatePrompt: 'scene ends' }) // mode check
+      .mockResolvedValueOnce({ segmentId: 'seg-1' });                                                                     // duration lookup
     mockPrisma.segment.findUnique.mockResolvedValue({ duration: 8 });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
 
     const mockImageProvider = {
-      generateImage: vi.fn().mockResolvedValue(Buffer.from('first-frame-img')),
+      generateImage: vi.fn().mockResolvedValue(Buffer.from('frame-img')),
       getModelId: () => 'fal-flux-1-schnell',
       providerId: 'fal' as const,
     };
@@ -348,6 +300,7 @@ describe('visual-generation worker', () => {
     ]);
     mockUploadFile
       .mockResolvedValueOnce('https://cdn.example.com/first-frame.png')  // first-frame upload
+      .mockResolvedValueOnce('https://cdn.example.com/last-frame.png')   // last-frame upload
       .mockResolvedValueOnce('https://cdn.example.com/visual.mp4');       // video upload
 
     mockPrisma.segmentVisual.count
@@ -356,23 +309,42 @@ describe('visual-generation worker', () => {
 
     await processVisualGeneration(makeJob(baseData));
 
-    // Should generate a first-frame image
-    expect(mockImageProvider.generateImage).toHaveBeenCalledWith({
+    // Should generate 2 frame images (first + last)
+    expect(mockImageProvider.generateImage).toHaveBeenCalledTimes(2);
+    // First frame uses videoPrompt
+    expect(mockImageProvider.generateImage).toHaveBeenNthCalledWith(1, {
       prompt: 'Editorial illustration of AI',
       width: 1280,
       height: 720,
     });
-    // Should upload first-frame to R2
+    // Last frame uses endStatePrompt
+    expect(mockImageProvider.generateImage).toHaveBeenNthCalledWith(2, {
+      prompt: 'scene ends',
+      width: 1280,
+      height: 720,
+    });
+    // Should upload both frames to R2
     expect(mockUploadFile).toHaveBeenCalledWith(
       'podcasts/pod-1/visuals/sv-1-first-frame.png',
       expect.any(Buffer),
       'image/png',
     );
-    // Should pass the first-frame URL to the video provider
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      'podcasts/pod-1/visuals/sv-1-last-frame.png',
+      expect.any(Buffer),
+      'image/png',
+    );
+    // Should persist frame URLs on SegmentVisual
+    expect(mockPrisma.segmentVisual.update).toHaveBeenCalledWith({
+      where: { id: 'sv-1' },
+      data: { firstFrameUrl: 'https://cdn.example.com/first-frame.png', lastFrameUrl: 'https://cdn.example.com/last-frame.png' },
+    });
+    // Should pass both frame URLs to the video provider
     expect(mockVideoProvider.generateVideo).toHaveBeenCalledWith({
       prompt: 'Editorial illustration of AI',
       duration: 8,
       firstFrameImage: 'https://cdn.example.com/first-frame.png',
+      lastFrameImage: 'https://cdn.example.com/last-frame.png',
     });
   });
 
