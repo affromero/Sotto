@@ -44,6 +44,49 @@ async function generateAiImage(
   return { buffer, service, cost };
 }
 
+async function generateAiVideo(
+  podcastId: string,
+  segmentVisualId: string,
+  videoModel: string,
+  videoPrompt: string,
+): Promise<{ buffer: Buffer; service: string; cost: number }> {
+  const podcast = await prisma.podcast.findUniqueOrThrow({
+    where: { id: podcastId },
+    select: { userId: true },
+  });
+
+  const { provider: videoProvider, source: videoSource, providerId } = await resolveVideoProvider({
+    userId: podcast.userId,
+    requestedModel: videoModel,
+  });
+
+  // Get the segment linked to this visual for duration
+  const visual = await prisma.segmentVisual.findUnique({
+    where: { id: segmentVisualId },
+    select: { segmentId: true },
+  });
+  const segment = visual?.segmentId
+    ? await prisma.segment.findUnique({ where: { id: visual.segmentId }, select: { duration: true } })
+    : null;
+
+  // Cap to model's max generation length
+  const videoModels = await fetchAllVideoModels();
+  const pricing = videoModels.find((m) => m.modelId === videoModel);
+  const maxDuration = pricing?.maxDuration ?? 10;
+  const rawDuration = segment?.duration ?? 5;
+  const cappedDuration = Math.min(rawDuration, maxDuration);
+
+  const buffer = await videoProvider.generateVideo({
+    prompt: videoPrompt,
+    duration: cappedDuration,
+  });
+
+  const service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
+  const cost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
+
+  return { buffer, service, cost };
+}
+
 export async function processVisualGeneration(job: Job<GenerateVisualPayload>): Promise<void> {
   const { podcastId, videoGenerationId, segmentVisualId, visualType, prompt } = job.data;
 
@@ -78,7 +121,21 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     let service = 'fal';
     let totalCost = 0;
 
-    if (visualType === 'AI_ILLUSTRATION') {
+    // Check visualMode first — user may have explicitly chosen video mode in the pipeline editor.
+    // This takes priority over visualType-specific logic.
+    const visual = await prisma.segmentVisual.findUnique({
+      where: { id: segmentVisualId },
+      select: { visualMode: true, videoModel: true },
+    });
+
+    if (visual?.visualMode === 'video' && visual.videoModel) {
+      const result = await generateAiVideo(podcastId, segmentVisualId, visual.videoModel, prompt);
+      assetBuffer = result.buffer;
+      assetType = 'video/mp4';
+      assetExt = 'mp4';
+      service = result.service;
+      totalCost = result.cost;
+    } else if (visualType === 'AI_ILLUSTRATION') {
       const result = await generateAiImage(podcastId, videoGenerationId, prompt);
       assetBuffer = result.buffer;
       assetType = 'image/png';
@@ -161,58 +218,15 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         });
       }
     } else {
-      // Check if this is a video-mode segment (from pipeline editor)
-      const visual = await prisma.segmentVisual.findUnique({
+      // Should not reach here — programmatic types are marked ready in classification
+      logger.warn('Unexpected visual type in generation worker', { visualType, segmentVisualId });
+      await prisma.segmentVisual.update({
         where: { id: segmentVisualId },
-        select: { visualMode: true, videoModel: true },
+        data: { status: 'ready' },
       });
-
-      if (visual?.visualMode === 'video' && visual.videoModel) {
-        const podcast = await prisma.podcast.findUniqueOrThrow({
-          where: { id: podcastId },
-          select: { userId: true },
-        });
-
-        const { provider: videoProvider, source: videoSource, providerId } = await resolveVideoProvider({
-          userId: podcast.userId,
-          requestedModel: visual.videoModel,
-        });
-
-        const segment = await prisma.segment.findFirst({
-          where: { podcastId },
-          orderBy: { order: 'asc' },
-          select: { duration: true },
-        });
-
-        // Look up model pricing to get maxDuration cap
-        const videoModels = await fetchAllVideoModels();
-        const pricing = videoModels.find((m) => m.modelId === visual.videoModel);
-        const maxDuration = pricing?.maxDuration ?? 10;
-        const rawDuration = segment?.duration ?? 5;
-        const cappedDuration = Math.min(rawDuration, maxDuration);
-
-        assetBuffer = await videoProvider.generateVideo({
-          prompt,
-          duration: cappedDuration,
-        });
-        assetType = 'video/mp4';
-        assetExt = 'mp4';
-        service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
-
-        if (pricing) {
-          totalCost = (cappedDuration / 60) * pricing.costPerMinute;
-        }
-      } else {
-        // Should not reach here — programmatic types are marked ready in classification
-        logger.warn('Unexpected visual type in generation worker', { visualType, segmentVisualId });
-        await prisma.segmentVisual.update({
-          where: { id: segmentVisualId },
-          data: { status: 'ready' },
-        });
-        await checkAllReady(videoGenerationId, podcastId);
-        await job.updateProgress(100);
-        return;
-      }
+      await checkAllReady(videoGenerationId, podcastId);
+      await job.updateProgress(100);
+      return;
     }
 
     await job.updateProgress(70);

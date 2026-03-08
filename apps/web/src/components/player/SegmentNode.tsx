@@ -108,6 +108,17 @@ function StoryboardCardComponent({
   const isProgrammatic = segment.visualMode === 'programmatic';
   const models = segment.visualMode === 'image' ? imageModels : segment.visualMode === 'video' ? videoModels : [];
   const textPreview = segment.text.length > 140 ? `${segment.text.slice(0, 140)}...` : segment.text;
+
+  // Compute actual video duration (capped by model's maxDuration)
+  const videoDurationLabel = (() => {
+    if (segment.visualMode !== 'video' || !segment.model) return null;
+    const model = videoModels.find((m) => m.modelId === segment.model);
+    if (!model) return null;
+    const maxDur = model.maxDuration ?? 10;
+    const capped = Math.min(segment.duration, maxDur);
+    if (capped >= segment.duration) return null; // no cap, no need to clarify
+    return `${capped}s video`;
+  })();
   const headerId = `storyboard-header-${segment.segmentId}`;
   const panelId = `storyboard-panel-${segment.segmentId}`;
 
@@ -197,7 +208,12 @@ function StoryboardCardComponent({
 
           {/* Footer: cost + no-key hint + advanced toggle */}
           <div className={styles.cardFooter}>
-            <span className={styles.segmentCost}>{formatCost(segment.estimatedCost)}</span>
+            <span className={styles.segmentCost}>
+              {formatCost(segment.estimatedCost)}
+              {videoDurationLabel && (
+                <span className={styles.videoDurationHint}> ({videoDurationLabel})</span>
+              )}
+            </span>
             {!isProgrammatic && !hasFalKey && (
               <span className={styles.noKeyHint}>Add Fal key in Settings</span>
             )}

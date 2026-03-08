@@ -3,22 +3,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
   mockPrisma,
   mockResolveImageProvider,
+  mockResolveVideoProvider,
   mockSearchStockVideo,
   mockDownloadStockAsset,
   mockUploadFile,
   mockAddJob,
+  mockFetchAllVideoModels,
 } = vi.hoisted(() => ({
   mockPrisma: {
     segmentVisual: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
+    segment: { findUnique: vi.fn() },
     podcast: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     videoGeneration: { findUnique: vi.fn(), update: vi.fn() },
     avatarOverlay: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
   },
   mockResolveImageProvider: vi.fn(),
+  mockResolveVideoProvider: vi.fn(),
   mockSearchStockVideo: vi.fn(),
   mockDownloadStockAsset: vi.fn(),
   mockUploadFile: vi.fn().mockResolvedValue('https://cdn.example.com/visual.png'),
   mockAddJob: vi.fn(),
+  mockFetchAllVideoModels: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('@/lib/prisma', () => ({ prismaUnfiltered: mockPrisma }));
@@ -42,10 +47,10 @@ vi.mock('@/lib/queue', () => ({
   avatarGenerationQueue: { name: 'avatar-generation' },
 }));
 vi.mock('@/lib/providers/video', () => ({
-  resolveVideoProvider: vi.fn(),
+  resolveVideoProvider: (...args: unknown[]) => mockResolveVideoProvider(...args),
 }));
 vi.mock('@/lib/video-cost-estimator', () => ({
-  fetchAllVideoModels: vi.fn().mockResolvedValue([]),
+  fetchAllVideoModels: (...args: unknown[]) => mockFetchAllVideoModels(...args),
 }));
 vi.mock('@/lib/usage-logger', () => ({ logUsage: vi.fn() }));
 vi.mock('@/lib/logger', () => ({
@@ -87,7 +92,9 @@ describe('visual-generation worker', () => {
   });
 
   it('generates AI illustration and uploads to R2', async () => {
-    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'fal-flux-1-schnell' });
@@ -127,7 +134,9 @@ describe('visual-generation worker', () => {
   });
 
   it('falls back to AI illustration when no stock footage found', async () => {
-    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockSearchStockVideo.mockResolvedValue(null);
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
@@ -176,7 +185,9 @@ describe('visual-generation worker', () => {
       generateMapImage: (...args: unknown[]) => mockGenerateMapImage(...args),
     }));
 
-    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.segmentVisual.count
       .mockResolvedValueOnce(0)
       .mockResolvedValueOnce(0);
@@ -213,7 +224,9 @@ describe('visual-generation worker', () => {
   });
 
   it('falls back to AI illustration when no enriched place has coordinates', async () => {
-    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: 'flux-schnell' });
@@ -253,8 +266,50 @@ describe('visual-generation worker', () => {
     });
   });
 
+  it('generates AI video when visualMode is video, regardless of visualType', async () => {
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })                        // idempotency
+      .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo-02-512p' }) // mode check
+      .mockResolvedValueOnce({ segmentId: 'seg-1' });                                       // duration lookup
+    mockPrisma.segment.findUnique.mockResolvedValue({ duration: 39.9 });
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
+    mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
+
+    const mockVideoProvider = {
+      generateVideo: vi.fn().mockResolvedValue(Buffer.from('fake-video')),
+    };
+    mockResolveVideoProvider.mockResolvedValue({
+      provider: mockVideoProvider,
+      source: 'platform',
+      providerId: 'minimax',
+    });
+    mockFetchAllVideoModels.mockResolvedValue([
+      { modelId: 'minimax-hailuo-02-512p', costPerMinute: 0.9, maxDuration: 10 },
+    ]);
+
+    mockPrisma.segmentVisual.count
+      .mockResolvedValueOnce(0)  // pending/generating
+      .mockResolvedValueOnce(0); // failed
+
+    // Use AI_ILLUSTRATION type but video mode — should generate video, not image
+    await processVisualGeneration(makeJob(baseData));
+
+    expect(mockVideoProvider.generateVideo).toHaveBeenCalledWith({
+      prompt: 'Editorial illustration of AI',
+      duration: 10, // capped from 39.9s to maxDuration 10s
+    });
+    expect(mockResolveImageProvider).not.toHaveBeenCalled();
+    expect(mockUploadFile).toHaveBeenCalledWith(
+      'podcasts/pod-1/visuals/sv-1.mp4',
+      expect.any(Buffer),
+      'video/mp4',
+    );
+  });
+
   it('marks generation READY when all visuals ready (client-side rendering)', async () => {
-    mockPrisma.segmentVisual.findUnique.mockResolvedValue({ assetUrl: null, status: 'pending' });
+    mockPrisma.segmentVisual.findUnique
+      .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })      // idempotency
+      .mockResolvedValueOnce({ visualMode: 'image', videoModel: null }); // mode check
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.videoGeneration.findUnique.mockResolvedValue({ imageModel: null });
