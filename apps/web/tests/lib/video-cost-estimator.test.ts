@@ -26,7 +26,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import type { ImageModelCostInfo, VideoModelCostInfo } from '@/lib/video-cost-estimator';
-import { estimateSegmentCost, estimatePipelineCost, formatCost } from '@/lib/video-cost-estimator';
+import { estimateSegmentCost, estimatePipelineCost, formatCost, getClipInfo } from '@/lib/video-cost-estimator';
 
 const MOCK_IMAGE_MODELS: ImageModelCostInfo[] = [
   { modelId: 'fal-recraft-v3', pricePerImage: 0.02 },
@@ -73,8 +73,14 @@ describe('estimateSegmentCost', () => {
 
   it('calculates video cost proportional to duration', () => {
     const seg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 5 });
-    // 5s capped at maxDuration=5, cost = (5/60) * 3 = 0.25
+    // 5s = 1 clip at maxDuration=5, cost = (5/60) * 3 = 0.25
     expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.25);
+  });
+
+  it('charges full duration for chained video clips', () => {
+    const seg = makeSegment({ visualMode: 'video', model: 'fal-wan2.5-480p', duration: 12 });
+    // 12s / 5s max = 3 clips (5 + 5 + 2), total billed = 12s, cost = (12/60) * 3 = 0.60
+    expect(estimateSegmentCost(seg, MOCK_IMAGE_MODELS, MOCK_VIDEO_MODELS)).toBeCloseTo(0.6);
   });
 
   it('returns 0 for unknown model ID', () => {
@@ -93,6 +99,38 @@ describe('estimatePipelineCost', () => {
     const expectedImg = 0.04;
     const expectedVid = (3 / 60) * 3; // 3s, $3/min
     expect(total).toBeCloseTo(expectedImg + 0 + expectedVid);
+  });
+});
+
+describe('getClipInfo', () => {
+  it('returns 1 clip when duration fits in maxDuration', () => {
+    const info = getClipInfo(4, 5);
+    expect(info.clipCount).toBe(1);
+    expect(info.totalDuration).toBe(4);
+  });
+
+  it('returns 1 clip when duration equals maxDuration', () => {
+    const info = getClipInfo(5, 5);
+    expect(info.clipCount).toBe(1);
+    expect(info.totalDuration).toBe(5);
+  });
+
+  it('chains 2 clips when duration slightly exceeds maxDuration', () => {
+    const info = getClipInfo(7, 5);
+    expect(info.clipCount).toBe(2);
+    expect(info.totalDuration).toBe(7);
+  });
+
+  it('chains 3 clips for 12s with 5s max', () => {
+    const info = getClipInfo(12, 5);
+    expect(info.clipCount).toBe(3);
+    expect(info.totalDuration).toBe(12);
+  });
+
+  it('chains exact multiples correctly', () => {
+    const info = getClipInfo(10, 5);
+    expect(info.clipCount).toBe(2);
+    expect(info.totalDuration).toBe(10);
   });
 });
 
