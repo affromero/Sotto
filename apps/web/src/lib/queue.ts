@@ -437,13 +437,14 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         select: {
           status: true, userId: true, title: true, ttsProvider: true,
           source: true, sourceTweetId: true,
-          user: { select: { telegramEnabled: true, telegramChatId: true } },
+          user: { select: { name: true, email: true, telegramEnabled: true, telegramChatId: true } },
         },
       });
       if (!podcast) return;
 
       const errorKind = classifyError(args.failedReason || '');
       const notifQueue = queueInstances.get('notifications');
+      const ownerLabel = podcast.user?.name || podcast.user?.email || podcast.userId;
 
       const TTS_QUEUES = ['audio-generation', 'segment-regeneration', 'voice-track-audio'];
       const AI_QUEUES = ['script-generation', 'script-verification', 'reference-validation'];
@@ -483,7 +484,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
           where: { role: 'ADMIN', id: { not: podcast.userId } },
           select: { id: true, telegramChatId: true },
         });
-        const adminMsg = `[${queueName}] ${podcastLabel} — ${errorKind}`;
+        const adminMsg = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
         for (const admin of adminUsers) {
           if (notifQueue) {
             notifQueue.add('send_notification', {
@@ -503,6 +504,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
               `🎬 *Video Pipeline Failure*`,
               `*Queue:* ${queueName}`,
               `*Podcast:* ${podcastLabel}`,
+              `*Owner:* ${ownerLabel}`,
               `*Error:* ${errorKind}`,
               `*Ref:* \`${errorId}\``,
               `\`${(args.failedReason || 'Unknown').substring(0, 500)}\``,
@@ -634,7 +636,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
         where: { role: 'ADMIN', id: { not: podcast.userId } },
         select: { id: true, telegramChatId: true },
       });
-      const adminMessage = `[${queueName}] ${podcastLabel} — ${errorKind}`;
+      const adminMessage = `[${queueName}] ${podcastLabel} (by ${ownerLabel}) — ${errorKind}`;
       for (const admin of adminUsers) {
         // In-app notification (bell)
         if (notifQueue) {
@@ -654,6 +656,7 @@ function setupQueueEvents(queue: Queue, queueName: string): void {
             `🚨 *Pipeline Failure*`,
             `*Queue:* ${queueName}`,
             `*Podcast:* ${podcastLabel}`,
+            `*Owner:* ${ownerLabel}`,
             `*Error:* ${errorKind}`,
             `*Ref:* \`${errorId}\``,
             `\`${techError.substring(0, 500)}\``,
