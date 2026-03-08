@@ -59,7 +59,7 @@ const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign 
 VISUAL TYPES:
 - AI_ILLUSTRATION: Rich editorial illustration. Provide a detailed image prompt (style: editorial illustration, clean, warm tones, no real people likenesses).
 - STOCK_FOOTAGE: Real-world video clip. Provide a short search query in prompt.
-- DATA_CHART: Bar, line, or pie chart. Provide metadata: { chartType, data: [{label, value}], title }.
+- DATA_CHART: Bar, line, or pie chart with fully descriptive labels. Provide metadata: { chartType, data: [{name: "descriptive label", ...values}], title: "Descriptive Chart Title — explain what the chart shows", xAxisLabel: "X-axis description with units", yAxisLabel: "Y-axis description with units" }. Use descriptive data key names (e.g., "Revenue ($M)" not "value"). For pie charts, xAxisLabel and yAxisLabel are optional.
 - QUOTE: Notable quote. Provide metadata: { quoteText, quoteAuthor }.
 - COMPARISON: Two-column comparison. Provide metadata: { leftLabel, rightLabel, leftItems: string[], rightItems: string[] }.
 - TIMELINE: Chronological events. Provide metadata: { events: [{ year, label, description }] }.
