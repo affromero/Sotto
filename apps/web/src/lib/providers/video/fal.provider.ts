@@ -38,6 +38,7 @@ export class FalVideoProvider implements VideoProvider {
         prompt: params.prompt,
         duration: params.duration ? String(params.duration) : undefined,
         aspect_ratio: '16:9',
+        ...(params.firstFrameImage ? { image_url: params.firstFrameImage } : {}),
       }),
     });
 
