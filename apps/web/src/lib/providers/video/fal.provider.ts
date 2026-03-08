@@ -56,6 +56,12 @@ export class FalVideoProvider implements VideoProvider {
       const statusRes = await fetch(statusUrl, {
         headers: { Authorization: `Key ${this.apiKey}` },
       });
+
+      if (!statusRes.ok) {
+        logger.warn('Fal status poll failed', { status: statusRes.status, attempt: i });
+        continue;
+      }
+
       const status = (await statusRes.json()) as { status: string; error?: string };
 
       if (status.status === 'COMPLETED') {
@@ -63,6 +69,10 @@ export class FalVideoProvider implements VideoProvider {
         const resultRes = await fetch(resultUrl, {
           headers: { Authorization: `Key ${this.apiKey}` },
         });
+        if (!resultRes.ok) {
+          const text = await resultRes.text().catch(() => 'unknown');
+          throw new Error(`Fal result fetch failed (${resultRes.status}): ${text}`);
+        }
         const result = (await resultRes.json()) as { video?: { url: string } };
         const videoUrl = result.video?.url;
         if (!videoUrl) throw new Error('Fal returned no video URL');
