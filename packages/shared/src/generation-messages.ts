@@ -49,25 +49,28 @@ export const STAGE_MESSAGES: Partial<Record<string, StageMessagePool>> = {
   },
   VERIFYING_SCRIPT: {
     early: [
-      { text: 'Checking claims for accuracy', topicAware: false },
-      { text: 'Cross-referencing facts about {topic}', topicAware: true },
-      { text: 'Making sure everything checks out', topicAware: false },
-      { text: 'Running a fact-check pass on the script', topicAware: false },
+      { text: 'Every claim is checked — not just trusted', topicAware: false },
+      { text: 'We verify what the AI writes', topicAware: false },
+      { text: 'Cross-referencing real sources on {topic}', topicAware: true },
+      { text: 'Nothing gets through without proof', topicAware: false },
+      { text: 'Most AI tools skip this step. We don\u2019t.', topicAware: false },
+      { text: 'Fact-checking every claim in the script', topicAware: false },
     ],
     late: [
-      { text: 'Thorough verification takes a moment', topicAware: false },
-      { text: 'Double-checking a few more claims', topicAware: false },
+      { text: 'Still checking — accuracy is worth it', topicAware: false },
+      { text: 'A few more claims to verify', topicAware: false },
     ],
   },
   VALIDATING_REFERENCES: {
     early: [
-      { text: 'Verifying source quality', topicAware: false },
-      { text: 'Checking that references are solid', topicAware: false },
-      { text: 'Validating citations and links', topicAware: false },
+      { text: 'Every source is validated before it reaches you', topicAware: false },
+      { text: 'No broken links. No fake citations.', topicAware: false },
+      { text: 'Confirming every reference is real', topicAware: false },
+      { text: 'If a source doesn\u2019t check out, it gets replaced', topicAware: false },
     ],
     late: [
-      { text: 'A few more sources to verify', topicAware: false },
-      { text: 'Almost done checking references', topicAware: false },
+      { text: 'A few more sources to validate', topicAware: false },
+      { text: 'Almost done — every reference accounted for', topicAware: false },
     ],
   },
   GENERATING_AUDIO: {
