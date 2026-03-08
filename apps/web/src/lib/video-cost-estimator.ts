@@ -183,7 +183,13 @@ export function estimateSegmentCost(
     if (!model) return 0;
     const maxDur = model.maxDuration ?? 10;
     const { totalDuration } = getClipInfo(segment.duration, maxDur);
-    return (totalDuration / 60) * model.costPerMinute;
+    const videoCost = (totalDuration / 60) * model.costPerMinute;
+    // Add cost of 2 frame images (first + last) generated for all video segments
+    const cheapestImagePrice = imageModels.length > 0
+      ? Math.min(...imageModels.map((m) => m.pricePerImage))
+      : 0;
+    const frameCost = cheapestImagePrice * 2;
+    return videoCost + frameCost;
   }
 
   return 0;
