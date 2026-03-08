@@ -8,8 +8,8 @@ import type { VideoProvider } from '../video';
 const MINIMAX_API_BASE = 'https://api.minimax.io/v1';
 
 /** Map pricetoken model IDs to MiniMax API model names. */
-const MODEL_MAP: Record<string, { apiModel: string; resolution: string }> = {
-  'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P' },
+const MODEL_MAP: Record<string, { apiModel: string; resolution: string; requiresFirstFrame?: boolean }> = {
+  'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P', requiresFirstFrame: true },
   'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P' },
   'minimax-hailuo02-pro-1080p': { apiModel: 'MiniMax-Hailuo-02', resolution: '1080P' },
   'minimax-hailuo23-fast-1080p': { apiModel: 'MiniMax-Hailuo-2.3', resolution: '1080P' },
@@ -44,11 +44,32 @@ export class MiniMaxVideoProvider implements VideoProvider {
     return this.model;
   }
 
-  async generateVideo(params: { prompt: string; duration?: number }): Promise<Buffer> {
+  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string }): Promise<Buffer> {
     const mapping = MODEL_MAP[this.model];
     if (!mapping) throw new Error(`Unknown MiniMax video model: ${this.model}`);
 
-    logger.info('Submitting MiniMax video task', { model: this.model, apiModel: mapping.apiModel, resolution: mapping.resolution });
+    if (mapping.requiresFirstFrame && !params.firstFrameImage) {
+      throw new Error(`MiniMax model ${this.model} requires a first-frame image (resolution ${mapping.resolution} is image-to-video only)`);
+    }
+
+    logger.info('Submitting MiniMax video task', {
+      model: this.model,
+      apiModel: mapping.apiModel,
+      resolution: mapping.resolution,
+      hasFirstFrame: !!params.firstFrameImage,
+    });
+
+    const body: Record<string, unknown> = {
+      model: mapping.apiModel,
+      prompt: params.prompt,
+      prompt_optimizer: true,
+      duration: params.duration ?? 6,
+      resolution: mapping.resolution,
+    };
+
+    if (params.firstFrameImage) {
+      body.first_frame_image = params.firstFrameImage;
+    }
 
     const submitRes = await fetch(`${MINIMAX_API_BASE}/video_generation`, {
       method: 'POST',
@@ -56,13 +77,7 @@ export class MiniMaxVideoProvider implements VideoProvider {
         Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: mapping.apiModel,
-        prompt: params.prompt,
-        prompt_optimizer: true,
-        duration: params.duration ?? 6,
-        resolution: mapping.resolution,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!submitRes.ok) {

@@ -895,9 +895,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               podcastId={podcast.id}
               speakers={[...new Set(podcast.segments.map(s => s.speaker))]}
               podcastDuration={podcast.duration ?? 0}
-              onConfigured={() => {
+              onConfigured={({ videoGenerationId: vgId, generationStarted }) => {
                 setShowAvatarPicker(false);
-                if (videoState === 'idle') {
+                if (generationStarted && vgId) {
+                  setVideoGenerationId(vgId);
+                  setVideoState('generating');
+                } else if (videoState === 'idle') {
                   handleGenerateVideo();
                 }
               }}
@@ -950,6 +953,13 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               >
                 <Pencil size={16} />
                 Edit Storyboard
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => setShowAvatarPicker(true)}
+              >
+                <Users size={16} />
+                Add Avatars
               </Button>
             </div>
           )}

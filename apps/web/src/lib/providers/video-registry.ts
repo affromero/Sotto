@@ -9,6 +9,8 @@ export interface VideoModelOption {
   id: string;
   displayName: string;
   tier: 'standard' | 'high' | 'best';
+  /** If true, the model requires a first-frame image (image-to-video only). */
+  requiresFirstFrame?: boolean;
 }
 
 export interface VideoProviderMeta {
@@ -57,7 +59,7 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
     getApiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
     defaultModel: 'minimax-hailuo02-768p',
     models: [
-      { id: 'minimax-hailuo02-512p', displayName: 'Hailuo 02 (512p)', tier: 'standard' },
+      { id: 'minimax-hailuo02-512p', displayName: 'Hailuo 02 (512p)', tier: 'standard', requiresFirstFrame: true },
       { id: 'minimax-hailuo02-768p', displayName: 'Hailuo 02 (768p)', tier: 'standard' },
       { id: 'minimax-hailuo02-pro-1080p', displayName: 'Hailuo 02 Pro (1080p)', tier: 'high' },
       { id: 'minimax-hailuo23-fast-1080p', displayName: 'Hailuo 2.3 Fast (1080p)', tier: 'high' },
@@ -108,4 +110,13 @@ export function getVideoModelProvider(modelId: string): VideoProviderId | null {
     if (provider.models.some((m) => m.id === modelId)) return provider.id;
   }
   return null;
+}
+
+/** Check if a video model requires a first-frame image (image-to-video only). */
+export function videoModelRequiresFirstFrame(modelId: string): boolean {
+  for (const provider of Object.values(VIDEO_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.requiresFirstFrame === true;
+  }
+  return false;
 }
