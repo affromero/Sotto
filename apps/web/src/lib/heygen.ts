@@ -2,6 +2,39 @@ import { logger } from './logger';
 
 const HEYGEN_API_BASE = 'https://api.heygen.com';
 
+/** HTTP status codes that indicate a billing/auth issue — never worth retrying. */
+const NON_RETRYABLE_STATUS_CODES = new Set([401, 402, 403]);
+
+/** Error message substrings that indicate credit/billing exhaustion. */
+const NON_RETRYABLE_PATTERNS = [
+  'insufficient_credits',
+  'insufficient credits',
+  'payment required',
+  'quota exceeded',
+  'billing',
+  'subscription expired',
+  'plan limit',
+  'no remaining credits',
+];
+
+/**
+ * Thrown for HeyGen errors that should never be retried (billing, auth, credits).
+ * The avatar-generation worker catches this and wraps it in BullMQ's UnrecoverableError.
+ */
+export class HeyGenBillingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HeyGenBillingError';
+  }
+}
+
+/** Returns true if the error is a billing/credit/auth issue that retrying cannot fix. */
+export function isNonRetryableHeyGenError(error: unknown): boolean {
+  if (error instanceof HeyGenBillingError) return true;
+  const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return NON_RETRYABLE_PATTERNS.some((p) => msg.includes(p));
+}
+
 export interface HeyGenAvatar {
   avatar_id: string;
   avatar_name: string;
@@ -42,7 +75,7 @@ export async function submitAvatarVideo(params: {
           character: {
             type: 'avatar',
             avatar_id: params.avatarId,
-            avatar_style: 'normal',
+            avatar_style: 'closeUp',
           },
           voice: {
             type: 'audio',
@@ -60,6 +93,9 @@ export async function submitAvatarVideo(params: {
 
   if (!res.ok) {
     const text = await res.text().catch(() => 'unknown');
+    if (NON_RETRYABLE_STATUS_CODES.has(res.status)) {
+      throw new HeyGenBillingError(`HeyGen submit failed (${res.status}): ${text}`);
+    }
     throw new Error(`HeyGen submit failed (${res.status}): ${text}`);
   }
 
@@ -99,7 +135,11 @@ export async function pollAvatarVideo(params: {
 
     if (body.data.status === 'failed') {
       const errorDetail = typeof body.data.error === 'object' ? JSON.stringify(body.data.error) : (body.data.error ?? 'unknown');
-      throw new Error(`HeyGen video generation failed: ${errorDetail}`);
+      const msg = `HeyGen video generation failed: ${errorDetail}`;
+      if (NON_RETRYABLE_PATTERNS.some((p) => errorDetail.toLowerCase().includes(p))) {
+        throw new HeyGenBillingError(msg);
+      }
+      throw new Error(msg);
     }
   }
 

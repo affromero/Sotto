@@ -4,7 +4,7 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { listAvatars, submitAvatarVideo, pollAvatarVideo } from '@/lib/heygen';
+import { listAvatars, submitAvatarVideo, pollAvatarVideo, isNonRetryableHeyGenError, HeyGenBillingError } from '@/lib/heygen';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -54,7 +54,7 @@ describe('submitAvatarVideo', () => {
     expect(id).toBe('vid_123');
   });
 
-  it('sends green screen background in request body', async () => {
+  it('sends closeUp style and green screen background', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: { video_id: 'vid_123' } }),
@@ -64,6 +64,7 @@ describe('submitAvatarVideo', () => {
     await submitAvatarVideo({ apiKey: 'key', avatarId: 'av1', audioUrl: 'https://audio.mp3' });
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.video_inputs[0].character.avatar_style).toBe('closeUp');
     expect(body.video_inputs[0].background).toEqual({ type: 'color', value: '#00FF00' });
   });
 
@@ -76,6 +77,28 @@ describe('submitAvatarVideo', () => {
 
     await expect(submitAvatarVideo({ apiKey: 'key', avatarId: 'av1', audioUrl: 'url' }))
       .rejects.toThrow('HeyGen submit failed (400)');
+  });
+
+  it('throws HeyGenBillingError on 402 (credits exhausted)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 402,
+      text: () => Promise.resolve('Payment required'),
+    }));
+
+    await expect(submitAvatarVideo({ apiKey: 'key', avatarId: 'av1', audioUrl: 'url' }))
+      .rejects.toThrow(HeyGenBillingError);
+  });
+
+  it('throws HeyGenBillingError on 401 (invalid key)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      text: () => Promise.resolve('Unauthorized'),
+    }));
+
+    await expect(submitAvatarVideo({ apiKey: 'key', avatarId: 'av1', audioUrl: 'url' }))
+      .rejects.toThrow(HeyGenBillingError);
   });
 });
 
@@ -114,6 +137,16 @@ describe('pollAvatarVideo', () => {
       .rejects.toThrow('HeyGen video generation failed: render error');
   });
 
+  it('throws HeyGenBillingError when poll failure mentions credits', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: { status: 'failed', error: 'insufficient_credits' } }),
+    }));
+
+    await expect(pollAvatarVideo({ apiKey: 'key', videoId: 'vid_123', pollIntervalMs: 10 }))
+      .rejects.toThrow(HeyGenBillingError);
+  });
+
   it('throws on timeout', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -126,5 +159,23 @@ describe('pollAvatarVideo', () => {
       maxPollAttempts: 2,
       pollIntervalMs: 10,
     })).rejects.toThrow('timed out after 2 poll attempts');
+  });
+});
+
+describe('isNonRetryableHeyGenError', () => {
+  it('returns true for HeyGenBillingError', () => {
+    expect(isNonRetryableHeyGenError(new HeyGenBillingError('credits gone'))).toBe(true);
+  });
+
+  it('returns true for errors mentioning billing keywords', () => {
+    expect(isNonRetryableHeyGenError(new Error('insufficient credits on account'))).toBe(true);
+    expect(isNonRetryableHeyGenError(new Error('quota exceeded'))).toBe(true);
+    expect(isNonRetryableHeyGenError(new Error('subscription expired'))).toBe(true);
+  });
+
+  it('returns false for transient errors', () => {
+    expect(isNonRetryableHeyGenError(new Error('network timeout'))).toBe(false);
+    expect(isNonRetryableHeyGenError(new Error('render error'))).toBe(false);
+    expect(isNonRetryableHeyGenError(new Error('internal server error'))).toBe(false);
   });
 });

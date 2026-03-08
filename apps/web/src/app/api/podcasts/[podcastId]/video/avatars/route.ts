@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/api-keys';
 import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
-import { checkVideoGenerationGate } from '@/lib/video-gate';
+import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
 import { listAvatars } from '@/lib/heygen';
 import { deleteFile, extractR2Key } from '@/lib/r2';
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const authResult = await authenticateRequest(request);
   if (!authResult) return errorResponse('Unauthorized', 401);
 
-  const gate = await checkVideoGenerationGate(authResult.userId);
+  const gate = await checkAvatarGenerationGate(authResult.userId);
   if (!gate.allowed) {
     const message = gate.reason === 'daily_limit_reached'
       ? 'Daily video generation limit reached. Try again later.'
@@ -148,6 +148,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Auto-start avatar generation if the video generation is already complete
   let generationStarted = false;
   if (videoGeneration.status === 'READY') {
+    // Check avatar daily limit (separate counter from video)
+    const gate = await checkAvatarGenerationGate(authResult.userId);
+    if (!gate.allowed) {
+      const message = gate.reason === 'daily_limit_reached'
+        ? 'Daily avatar generation limit reached. Try again later.'
+        : 'No image provider available.';
+      return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
+    }
+
+    // Increment daily avatar counter (non-admin, non-BYOK users)
+    if (!gate.isByokUser) {
+      const incremented = await tryIncrementAvatarGeneration(authResult.userId, gate.dailyLimit);
+      if (!incremented) {
+        return errorResponse('Daily avatar generation limit reached. Try again later.', 429, {
+          code: 'daily_limit_reached',
+        });
+      }
+    }
+
     await prisma.videoGeneration.update({
       where: { id: videoGeneration.id },
       data: { status: 'GENERATING_AVATARS' },

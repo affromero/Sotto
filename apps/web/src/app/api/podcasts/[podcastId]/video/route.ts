@@ -303,6 +303,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       videoUrl: true,
       duration: true,
       fileSize: true,
+      avatarsVisible: true,
       failureReason: true,
       createdAt: true,
       visuals: {
@@ -349,6 +350,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     videoUrl: videoGeneration.videoUrl,
     duration: videoGeneration.duration,
     fileSize: videoGeneration.fileSize,
+    avatarsVisible: videoGeneration.avatarsVisible,
     failureReason: videoGeneration.failureReason,
     createdAt: videoGeneration.createdAt,
     segmentVisuals: videoGeneration.visuals,
@@ -465,6 +467,21 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const body = await request.json().catch(() => null);
+
+  // Handle avatarsVisible toggle (simple boolean update)
+  if (body && typeof body.avatarsVisible === 'boolean' && !body.segments) {
+    const vg = await prisma.videoGeneration.findUnique({
+      where: { podcastId },
+      select: { id: true },
+    });
+    if (!vg) return errorResponse('No video generation found', 404);
+    await prisma.videoGeneration.update({
+      where: { id: vg.id },
+      data: { avatarsVisible: body.avatarsVisible },
+    });
+    return NextResponse.json({ avatarsVisible: body.avatarsVisible });
+  }
+
   const parsed = updateVideoSegmentsSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse('Invalid request body', 400, { details: parsed.error.flatten() });
