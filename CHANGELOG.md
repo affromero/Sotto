@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.0] - 2026-03-08
+
+### Added
+- **Animated video charts**: DataChart segments now animate over the segment duration — bars grow from zero, lines reveal point-by-point, pie charts sweep 0°→360°
+- **Descriptive chart labels**: Charts render axis labels (`xAxisLabel`, `yAxisLabel`), legends for multi-series data, and pie slices with name + percentage
+- **Smarter chart metadata**: Visual classifier now instructs the AI to generate descriptive titles, axis labels with units, and meaningful data key names
+
+### Fixed
+- Avatar toggle button now visible even when avatars are hidden
+- Fixed `label`→`name` key mismatch in visual classifier DATA_CHART metadata schema
+
 ## [0.5.0] - 2026-03-08
 
 ### Added
