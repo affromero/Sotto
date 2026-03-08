@@ -89,6 +89,9 @@
 ; Fal.ai — AI image/video generation
 2026-01-01 open Expenses:AI:FAL                                 USD
 
+; Minimax — AI music/audio generation
+2026-01-01 open Expenses:AI:Minimax                              USD
+
 ; ============================================================
 ; EXPENSES — TTS (Text-to-Speech)
 ; ============================================================
