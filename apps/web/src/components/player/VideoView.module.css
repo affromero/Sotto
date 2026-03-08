@@ -84,6 +84,14 @@
   margin: 0;
 }
 
+.attribution {
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  color: #9CA3AF;
+  margin: var(--spacing-sm) 0 0;
+  padding-left: var(--spacing-lg);
+}
+
 @media (min-width: 768px) {
   .text {
     font-size: var(--font-size-xl);
