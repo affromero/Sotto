@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useEffect, useRef } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react';
 import { parseTextWithCitations } from '@/lib/citation-parser';
-import { useScrollFollow } from '@/lib/hooks/useScrollFollow';
 import { findActiveIndex } from '@/lib/segment-utils';
 import { getSpeakerIndex, getUniqueSpeakers } from '@/lib/speaker-colors';
 import type { SegmentData } from '@/types/podcast';
@@ -61,24 +60,50 @@ export function Teleprompter({
     () => findActiveIndex(segments, currentTime),
     [segments, currentTime]
   );
-  const activeRef = useRef<HTMLDivElement>(null);
-  const { scrollContainerRef, isFollowing, reengage } = useScrollFollow();
+  const rootRef = useRef<HTMLDivElement>(null);
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
 
+  // Window-level idle detection: auto-scroll back to teleprompter after 3s idle
+  const [isIdle, setIsIdle] = useState(true);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
+
   useEffect(() => {
-    if (isFollowing) {
-      activeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const resetIdle = () => {
+      setIsIdle(false);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => setIsIdle(true), 3000);
+    };
+
+    window.addEventListener('mousemove', resetIdle, { passive: true });
+    window.addEventListener('wheel', resetIdle, { passive: true });
+    window.addEventListener('touchstart', resetIdle, { passive: true });
+
+    return () => {
+      window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('wheel', resetIdle);
+      window.removeEventListener('touchstart', resetIdle);
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
+  // Scroll teleprompter root into view when user becomes idle
+  useEffect(() => {
+    if (isIdle) {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      rootRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'center',
+      });
     }
-  }, [activeIndex, isFollowing]);
+  }, [isIdle]);
 
   const handleClick = useCallback(
     (startTime: number | null) => {
       if (startTime !== null) {
-        reengage();
         onSegmentClick?.(startTime);
       }
     },
-    [reengage, onSegmentClick]
+    [onSegmentClick]
   );
 
   const prevSegment = activeIndex > 0 ? segments[activeIndex - 1] : null;
@@ -86,7 +111,7 @@ export function Teleprompter({
   const nextSegment = activeIndex < segments.length - 1 ? segments[activeIndex + 1] : null;
 
   return (
-    <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>} className={styles.root} aria-label="Teleprompter view">
+    <div ref={rootRef} className={styles.root} aria-label="Teleprompter view">
       <div className={styles.viewport}>
         {prevSegment && (
           <SegmentBlock
@@ -105,7 +130,6 @@ export function Teleprompter({
             references={references}
             className={`${styles.segment} ${styles.active}`}
             onClick={() => handleClick(currentSegment.startTime)}
-            innerRef={activeRef}
           />
         )}
 

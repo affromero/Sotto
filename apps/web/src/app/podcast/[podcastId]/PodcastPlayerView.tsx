@@ -186,7 +186,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const [scriptRefs, setScriptRefs] = useState<ReferenceData[]>([]);
   const [audioConfig, setAudioConfig] = useState<AudioConfig>({ ttsProvider: undefined, ttsModel: undefined, voices: [] });
   const playerSectionRef = useRef<HTMLElement>(null);
-  const [playerInView, setPlayerInView] = useState(true);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const completionPercentRef = useRef(0);
@@ -298,18 +297,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       })
       .catch(() => {});
   }, [podcast.id, podcast.forkedFrom, podcast.forks.length]);
-
-  // Show mini-player when main player scrolls out of view
-  useEffect(() => {
-    const el = playerSectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => setPlayerInView(entry.isIntersecting),
-      { threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [liveStatus]);
 
   // Check existing video generation status on mount
   useEffect(() => {
@@ -597,6 +584,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   const isReady = liveStatus === 'READY';
   const isScriptReady = liveStatus === 'SCRIPT_READY';
   const isProcessing = !isReady && !isScriptReady && liveStatus !== 'FAILED';
+
+  // Set body attribute for bottom padding when MiniPlayer is visible
+  useEffect(() => {
+    if (isReady && podcast.audioUrl) {
+      document.body.setAttribute('data-mini-player', '');
+    }
+    return () => document.body.removeAttribute('data-mini-player');
+  }, [isReady, podcast.audioUrl]);
 
   return (
     <>
@@ -1386,8 +1381,8 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       )}
     </div>
 
-    {/* Sticky mini-player when main player scrolls out of view */}
-    {isReady && podcast.audioUrl && !playerInView && (
+    {/* Persistent footer mini-player */}
+    {isReady && podcast.audioUrl && (
       <MiniPlayer
         podcastTitle={podcast.title}
         onExpand={() => playerSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}

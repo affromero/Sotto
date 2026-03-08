@@ -4,9 +4,22 @@ import { Teleprompter } from '@/components/player/Teleprompter';
 import type { SegmentData } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 
-// jsdom doesn't implement scrollIntoView
+// jsdom doesn't implement scrollIntoView or matchMedia
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
 });
 
 const mockSegments: SegmentData[] = [
@@ -137,16 +150,6 @@ describe('Teleprompter', () => {
   });
 
   describe('scroll-follow', () => {
-    function mockScrollable(el: Element) {
-      Object.defineProperty(el, 'scrollHeight', { value: 2000, configurable: true });
-      Object.defineProperty(el, 'clientHeight', { value: 300, configurable: true });
-      const original = window.getComputedStyle;
-      vi.spyOn(window, 'getComputedStyle').mockImplementation((target) => {
-        if (target === el) return { overflowY: 'auto' } as CSSStyleDeclaration;
-        return original(target);
-      });
-    }
-
     beforeEach(() => {
       vi.useFakeTimers();
     });
@@ -156,63 +159,55 @@ describe('Teleprompter', () => {
       vi.restoreAllMocks();
     });
 
-    it('pauses auto-scroll after wheel event on root container', () => {
-      const { rerender } = render(
+    it('pauses auto-scroll on mousemove', () => {
+      render(
         <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
       );
-      const root = screen.getByLabelText('Teleprompter view');
-      mockScrollable(root);
 
+      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
+
+      // User moves mouse — should pause auto-scroll
       act(() => {
-        root.dispatchEvent(new Event('wheel', { bubbles: true }));
+        window.dispatchEvent(new Event('mousemove'));
+      });
+
+      // scrollIntoView should NOT be called while user is active
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('resumes auto-scroll after 3s idle', () => {
+      render(
+        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
+      );
+
+      // User moves mouse — disengages
+      act(() => {
+        window.dispatchEvent(new Event('mousemove'));
       });
 
       (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
 
-      // Change currentTime to trigger activeIndex change (0→6 moves to segment 2)
-      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
-      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
-    });
-
-    it('resumes auto-scroll after 3 seconds', () => {
-      const { rerender } = render(
-        <Teleprompter segments={mockSegments} references={[]} currentTime={0} />
-      );
-      const root = screen.getByLabelText('Teleprompter view');
-      mockScrollable(root);
-
-      act(() => {
-        root.dispatchEvent(new Event('wheel', { bubbles: true }));
-      });
-
+      // Wait 3s — should re-engage and scroll root into view
       act(() => {
         vi.advanceTimersByTime(3000);
       });
 
-      (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={6} />);
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     });
 
-    it('segment click re-engages auto-scroll', () => {
+    it('segment click seeks without forcing scroll-back', () => {
       const onSegmentClick = vi.fn();
-      const { rerender } = render(
+      render(
         <Teleprompter segments={mockSegments} references={[]} currentTime={6} onSegmentClick={onSegmentClick} />
       );
-      const root = screen.getByLabelText('Teleprompter view');
-      mockScrollable(root);
-
-      // Disengage
-      act(() => {
-        root.dispatchEvent(new Event('wheel', { bubbles: true }));
-      });
-
-      // Click a segment to reengage
-      fireEvent.click(screen.getByText('Welcome to the show!'));
 
       (Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>).mockClear();
-      rerender(<Teleprompter segments={mockSegments} references={[]} currentTime={14} />);
-      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+
+      // Click a segment — should seek but NOT immediately scroll back
+      fireEvent.click(screen.getByText('Welcome to the show!'));
+
+      expect(onSegmentClick).toHaveBeenCalledWith(0);
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
     });
   });
 });
