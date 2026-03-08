@@ -19,6 +19,23 @@ export async function concatenateSpeakerAudio(params: {
   const tmpDir = dirname(outputPath);
   await mkdir(tmpDir, { recursive: true });
 
+  // Pre-validate all segment audio URLs exist before downloading
+  const missing: string[] = [];
+  for (const seg of sorted) {
+    try {
+      const head = await fetch(seg.audioUrl, { method: 'HEAD' });
+      if (!head.ok) missing.push(seg.audioUrl);
+    } catch {
+      missing.push(seg.audioUrl);
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.length} segment audio file(s) missing from storage (likely cleaned up). ` +
+      `Regenerate audio before retrying avatar generation. URLs: ${missing.join(', ')}`
+    );
+  }
+
   // Download each segment audio to tmp
   const localPaths: string[] = [];
   for (let i = 0; i < sorted.length; i++) {
