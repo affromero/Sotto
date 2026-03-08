@@ -20,7 +20,7 @@ vi.mock('@/lib/queue', () => ({
   JobType: { GENERATE_VISUAL: 'generate_visual' },
   visualGenerationQueue: { name: 'visual-generation' },
 }));
-vi.mock('@sotto/maps', () => ({
+vi.mock('@sotto/maps/server', () => ({
   PlaceResolver: class {
     resolve(...args: unknown[]) { return mockResolve(...args); }
     resolveHistorical(...args: unknown[]) { return mockResolveHistorical(...args); }

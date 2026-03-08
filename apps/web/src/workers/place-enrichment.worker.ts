@@ -7,7 +7,7 @@ import {
   visualGenerationQueue,
 } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { PlaceResolver } from '@sotto/maps';
+import { PlaceResolver } from '@sotto/maps/server';
 import { logger } from '@/lib/logger';
 
 export async function processPlaceEnrichment(job: Job<PlaceEnrichmentPayload>): Promise<void> {
