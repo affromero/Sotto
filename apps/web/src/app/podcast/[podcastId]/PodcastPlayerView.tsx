@@ -925,6 +925,15 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                 setVideoState('ready');
                 setSegmentVisuals(visuals);
               }}
+              onRequestEdit={async (visuals) => {
+                setSegmentVisuals(visuals as SegmentVisualData[]);
+                if (!falModels) {
+                  const res = await fetch('/api/fal-models');
+                  if (res.ok) setFalModels(await res.json());
+                }
+                setVideoState('failed');
+                setShowVideoEditor(true);
+              }}
             />
           )}
           {videoState === 'ready' && !showVideoEditor && (
@@ -944,7 +953,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               </Button>
             </div>
           )}
-          {showVideoEditor && videoState === 'ready' && falModels && (
+          {showVideoEditor && (videoState === 'ready' || videoState === 'failed') && falModels && (
             <VideoEditor
               podcastId={podcast.id}
               segments={podcast.segments}
@@ -958,7 +967,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
               onCancel={() => setShowVideoEditor(false)}
             />
           )}
-          {videoState === 'failed' && (
+          {videoState === 'failed' && !showVideoEditor && (
             <div className={styles.videoFailed}>
               <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
               <Button

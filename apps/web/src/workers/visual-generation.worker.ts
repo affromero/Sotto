@@ -1,4 +1,4 @@
-import { Job } from 'bullmq';
+import { Job, UnrecoverableError } from 'bullmq';
 import { fetchAllVideoModels } from '@/lib/video-cost-estimator';
 import {
   GenerateVisualPayload,
@@ -230,6 +230,22 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
 
     await job.updateProgress(90);
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+
+    // Config errors will never succeed on retry — fail immediately
+    const isConfigError = errMsg.includes('No Fal endpoint') ||
+      errMsg.includes('No image provider available') ||
+      errMsg.includes('No video provider available');
+
+    if (isConfigError) {
+      await prisma.segmentVisual.update({
+        where: { id: segmentVisualId },
+        data: { status: 'failed', failureReason: errMsg },
+      });
+      await checkAllReady(videoGenerationId, podcastId);
+      throw new UnrecoverableError(errMsg);
+    }
+
     const maxAttempts = job.opts?.attempts ?? 3;
     const isTerminal = job.attemptsMade >= maxAttempts;
 
@@ -239,7 +255,7 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
         where: { id: segmentVisualId },
         data: {
           status: 'failed',
-          failureReason: err instanceof Error ? err.message : String(err),
+          failureReason: errMsg,
         },
       });
       await checkAllReady(videoGenerationId, podcastId);
