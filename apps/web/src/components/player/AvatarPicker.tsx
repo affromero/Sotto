@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import NextImage from 'next/image';
-import { User, AlertTriangle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { User, AlertTriangle, Search } from 'lucide-react';
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
 import type { HeyGenAvatarData } from '@/types/avatar';
 import styles from './AvatarPicker.module.css';
@@ -16,6 +15,7 @@ interface AvatarPickerProps {
 }
 
 const MAX_DURATION = 600;
+const VISIBLE_COUNT = 12;
 
 export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration }: AvatarPickerProps) {
   const [avatars, setAvatars] = useState<HeyGenAvatarData[]>([]);
@@ -23,6 +23,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   const [error, setError] = useState<string | null>(null);
   const [selections, setSelections] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState('');
 
   const overDuration = podcastDuration > MAX_DURATION;
 
@@ -33,6 +34,12 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
   }, [podcastId]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q ? avatars.filter((a) => a.avatar_name.toLowerCase().includes(q)) : avatars;
+    return list.slice(0, VISIBLE_COUNT);
+  }, [avatars, search]);
 
   const handleSelect = useCallback((speaker: string, avatarId: string) => {
     setSelections((prev) => {
@@ -95,6 +102,17 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
 
       {error && <p className={styles.error}>{error}</p>}
 
+      <div className={styles.searchRow}>
+        <Search size={14} className={styles.searchIcon} />
+        <input
+          className={styles.searchInput}
+          type="text"
+          placeholder={`Search ${avatars.length} avatars...`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <div className={styles.speakerColumns}>
         {speakers.map((speaker) => (
           <div key={speaker} className={styles.speakerColumn}>
@@ -103,7 +121,7 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
               {speaker}
             </h4>
             <div className={styles.avatarGrid}>
-              {avatars.map((avatar) => (
+              {filtered.map((avatar) => (
                 <button
                   key={avatar.avatar_id}
                   className={`${styles.avatarCard} ${selections[speaker] === avatar.avatar_id ? styles.avatarCardSelected : ''}`}
@@ -113,12 +131,13 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
                   disabled={overDuration}
                 >
                   {avatar.preview_image_url ? (
-                    <NextImage
+                    <img
                       src={avatar.preview_image_url}
                       alt={avatar.avatar_name}
                       width={80}
                       height={80}
                       className={styles.avatarImage}
+                      loading="lazy"
                     />
                   ) : (
                     <div className={styles.avatarPlaceholder}>
@@ -129,9 +148,19 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
                 </button>
               ))}
             </div>
+            {filtered.length === 0 && search && (
+              <p className={styles.noResults}>No avatars match &ldquo;{search}&rdquo;</p>
+            )}
           </div>
         ))}
       </div>
+
+      <p className={styles.browseLink}>
+        Browse all avatars at{' '}
+        <a href="https://www.heygen.com/avatars" target="_blank" rel="noopener noreferrer">
+          heygen.com/avatars
+        </a>
+      </p>
 
       <div className={styles.footer}>
         <p className={styles.costEstimate}>
