@@ -197,7 +197,12 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
   );
   const [segmentVisuals, setSegmentVisuals] = useState<SegmentVisualData[]>([]);
   const [videoGenerationId, setVideoGenerationId] = useState<string | null>(null);
-  const [videoError, setVideoError] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<{
+    message: string;
+    isLlmError?: boolean;
+    currentProvider?: string;
+  } | null>(null);
+  const [llmProviderOverride, setLlmProviderOverride] = useState<string>('');
   const [videoLoading, setVideoLoading] = useState(false);
   const [pipelineData, setPipelineData] = useState<VideoPipeline | null>(null);
   const [showPipelineEditor, setShowPipelineEditor] = useState(false);
@@ -318,7 +323,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           if (data.avatarOverlays) setAvatarOverlays(data.avatarOverlays);
         } else if (data.status === 'FAILED') {
           setVideoState('failed');
-          setVideoError(data.failureReason || 'Video generation failed.');
+          setVideoError({ message: data.failureReason || 'Video generation failed.' });
         } else {
           setVideoState('generating');
           setVideoGenerationId(data.videoGenerationId);
@@ -334,21 +339,29 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
     }
   }, [segmentVisuals, viewMode]);
 
-  const handleGenerateVideo = useCallback(async () => {
+  const handleGenerateVideo = useCallback(async (overrideProvider?: { aiProvider: string; aiModel: string }) => {
     setPipelineLoading(true);
     setVideoError(null);
+    setLlmProviderOverride('');
     try {
+      const pipelineOpts: RequestInit = overrideProvider
+        ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(overrideProvider) }
+        : { method: 'POST' };
       const [pipelineRes, modelsRes] = await Promise.all([
-        fetch(`/api/podcasts/${podcast.id}/video/pipeline`, { method: 'POST' }),
+        fetch(`/api/podcasts/${podcast.id}/video/pipeline`, pipelineOpts),
         fetch('/api/fal-models'),
       ]);
       if (!pipelineRes.ok) {
         const err = await pipelineRes.json().catch(() => ({}));
-        setVideoError(err.error || 'Failed to create pipeline.');
+        setVideoError({
+          message: err.error || 'Failed to create pipeline.',
+          isLlmError: err.isLlmError,
+          currentProvider: err.currentProvider,
+        });
         return;
       }
       if (!modelsRes.ok) {
-        setVideoError('Failed to load available models.');
+        setVideoError({ message: 'Failed to load available models.' });
         return;
       }
       const pipeline: VideoPipeline = await pipelineRes.json();
@@ -357,7 +370,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       setFalModels(models);
       setShowPipelineEditor(true);
     } catch {
-      setVideoError('Failed to create pipeline.');
+      setVideoError({ message: 'Failed to create pipeline.' });
     } finally {
       setPipelineLoading(false);
     }
@@ -379,7 +392,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
         setVideoGenerationId(data.videoGenerationId);
       } catch (err) {
         setVideoState('failed');
-        setVideoError(err instanceof Error ? err.message : 'Generation failed');
+        setVideoError({ message: err instanceof Error ? err.message : 'Generation failed' });
       } finally {
         setVideoLoading(false);
       }
@@ -813,7 +826,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           {videoState === 'idle' && !showPipelineEditor && !showAvatarPicker && (
             <div className={styles.videoIdle}>
               <Button
-                onClick={handleGenerateVideo}
+                onClick={() => handleGenerateVideo()}
                 loading={pipelineLoading || videoLoading}
                 disabled={pipelineLoading || videoLoading || (videoStatus ? videoStatus.dailyRemaining <= 0 && !videoStatus.isByokUser : !isAdmin)}
               >
@@ -833,7 +846,48 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   Free · {videoStatus.dailyRemaining} of {videoStatus.dailyLimit} remaining today
                 </span>
               )}
-              {videoError && <p className={styles.videoError}>{videoError}</p>}
+              {videoError && (
+                <div className={styles.videoErrorBlock}>
+                  <p className={styles.videoError}>{videoError.message}</p>
+                  {videoError.isLlmError && (
+                    <div className={styles.llmErrorActions}>
+                      <label htmlFor="llm-provider-select" className={styles.llmErrorLabel}>
+                        Try a different AI provider:
+                      </label>
+                      <select
+                        id="llm-provider-select"
+                        className={styles.providerSelect}
+                        value={llmProviderOverride}
+                        onChange={(e) => setLlmProviderOverride(e.target.value)}
+                      >
+                        <option value="">Select provider…</option>
+                        <option value="anthropic" disabled={videoError.currentProvider === 'anthropic'}>Anthropic (Claude)</option>
+                        <option value="openai" disabled={videoError.currentProvider === 'openai'}>OpenAI</option>
+                        <option value="google" disabled={videoError.currentProvider === 'google'}>Google (Gemini)</option>
+                      </select>
+                      <Button
+                        variant="secondary"
+                        disabled={!llmProviderOverride || pipelineLoading}
+                        onClick={() => {
+                          if (!llmProviderOverride) return;
+                          const providerDefaults: Record<string, string> = {
+                            anthropic: 'claude-haiku-4-5-20251001',
+                            openai: 'gpt-5-nano',
+                            google: 'gemini-3.1-flash-lite-preview',
+                          };
+                          handleGenerateVideo({
+                            aiProvider: llmProviderOverride,
+                            aiModel: providerDefaults[llmProviderOverride],
+                          });
+                        }}
+                      >
+                        <RefreshCw size={16} />
+                        Retry
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {showAvatarPicker && (
@@ -906,7 +960,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           )}
           {videoState === 'failed' && (
             <div className={styles.videoFailed}>
-              <p className={styles.videoError}>{videoError || 'Video generation failed.'}</p>
+              <p className={styles.videoError}>{videoError?.message || 'Video generation failed.'}</p>
               <Button
                 variant="secondary"
                 onClick={() => {
