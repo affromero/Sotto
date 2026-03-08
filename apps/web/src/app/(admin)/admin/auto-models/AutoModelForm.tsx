@@ -7,6 +7,7 @@ interface ModelOption {
   id: string;
   displayName: string;
   tier: string;
+  price?: string;
 }
 
 interface ProviderOption {
@@ -387,6 +388,9 @@ function IncludedModelsEditor({
                     <span className={styles.modelName}>
                       {model.displayName}
                       <span className={styles.modelTier}>{model.tier}</span>
+                      {model.price && (
+                        <span className={styles.modelPrice}>{model.price}</span>
+                      )}
                       {(isFreeDefault || isProDefault) && (
                         <span className={styles.defaultBadge}>
                           {isFreeDefault && isProDefault ? 'default' : isFreeDefault ? 'free default' : 'pro default'}

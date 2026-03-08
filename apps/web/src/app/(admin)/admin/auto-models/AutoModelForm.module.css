@@ -185,6 +185,12 @@
   color: var(--color-text-tertiary);
 }
 
+.modelPrice {
+  font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .defaultBadge {
   font: var(--text-body-xs, 0.75rem/1 Inter, sans-serif);
   color: var(--color-primary);
