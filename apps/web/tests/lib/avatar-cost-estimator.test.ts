@@ -16,9 +16,9 @@ import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimato
 
 describe('estimateAvatarCost', () => {
   it('calculates cost for 1 speaker at default rate', () => {
-    // 5 min × $0.10/min = $0.50
+    // 5 min × $1.00/min = $5.00
     const cost = estimateAvatarCost(300, 1);
-    expect(cost).toBeCloseTo(0.50, 2);
+    expect(cost).toBeCloseTo(5.0, 2);
   });
 
   it('scales linearly with speaker count', () => {

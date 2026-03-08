@@ -40,3 +40,19 @@ export const FAL_IMAGE_MODEL_IDS = new Set(Object.keys(IMAGE_ENDPOINTS));
 
 /** Set of pricetoken model IDs that have a known Fal video endpoint. */
 export const FAL_VIDEO_MODEL_IDS = new Set(Object.keys(VIDEO_ENDPOINTS));
+
+const AVATAR_ENDPOINTS: Record<string, string> = {
+  'fal-heygen-avatar4-i2v': 'fal-ai/heygen/avatar4/image-to-video',
+  'fal-heygen-avatar4-twin': 'fal-ai/heygen/avatar4/digital-twin',
+};
+
+export function getFalAvatarEndpoint(modelId: string): string | null {
+  return AVATAR_ENDPOINTS[modelId] ?? null;
+}
+
+export function isFalAvatarModel(modelId: string): boolean {
+  return modelId in AVATAR_ENDPOINTS;
+}
+
+/** Set of pricetoken model IDs that have a known Fal avatar endpoint. */
+export const FAL_AVATAR_MODEL_IDS = new Set(Object.keys(AVATAR_ENDPOINTS));

@@ -1,15 +1,17 @@
 /**
  * Declarative avatar provider registry — capabilities, model catalog, and costs.
- * Follows the same pattern as image-registry.ts.
+ * Follows the same pattern as video-registry.ts.
+ *
+ * Model IDs and display names come from pricetoken.ai — prices are fetched
+ * dynamically at runtime via avatar-cost-estimator.ts.
  */
 
-export type AvatarProviderId = 'heygen';
+export type AvatarProviderId = 'heygen' | 'fal';
 
 export interface AvatarModelOption {
   id: string;
   displayName: string;
-  tier: 'standard' | 'premium';
-  costPerMinute: number;
+  tier: 'standard' | 'premium' | 'translation';
 }
 
 export interface AvatarProviderMeta {
@@ -30,10 +32,23 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
     id: 'heygen',
     displayName: 'HeyGen',
     getApiKeyUrl: 'https://app.heygen.com/settings?nav=API',
-    defaultModel: 'avatar-iii',
+    defaultModel: 'heygen-avatar-standard',
     models: [
-      { id: 'avatar-iii', displayName: 'Avatar III', tier: 'standard', costPerMinute: 1.0 },
-      { id: 'avatar-iv', displayName: 'Avatar IV', tier: 'premium', costPerMinute: 6.0 },
+      // Standard tier
+      { id: 'heygen-avatar-standard', displayName: 'Standard Avatar', tier: 'standard' },
+      { id: 'heygen-photo-avatar-iii', displayName: 'Photo Avatar III', tier: 'standard' },
+      { id: 'heygen-public-avatar-iii', displayName: 'Public Avatar III', tier: 'standard' },
+      { id: 'heygen-digital-twin-iii', displayName: 'Digital Twin III', tier: 'standard' },
+      // Premium tier
+      { id: 'heygen-avatar-iv', displayName: 'Interactive Avatar IV', tier: 'premium' },
+      { id: 'heygen-digital-twin-iv', displayName: 'Digital Twin IV', tier: 'premium' },
+      { id: 'heygen-photo-avatar-iv', displayName: 'Photo Avatar IV', tier: 'premium' },
+      { id: 'heygen-public-avatar-iv', displayName: 'Public Avatar IV', tier: 'premium' },
+      // Translation tier
+      { id: 'heygen-translation-proofread', displayName: 'Video Translation — Proofread', tier: 'translation' },
+      { id: 'heygen-translation-speed', displayName: 'Video Translation — Speed Mode', tier: 'translation' },
+      { id: 'heygen-translation-precision', displayName: 'Video Translation — Precision Mode', tier: 'translation' },
+      { id: 'heygen-video-translation', displayName: 'Video Translation', tier: 'translation' },
     ],
     platformKeyEnv: 'HEYGEN_API_KEY',
     auth: {
@@ -41,6 +56,30 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
         try {
           const res = await fetch('https://api.heygen.com/v2/avatars', {
             headers: { 'x-api-key': creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  fal: {
+    id: 'fal',
+    displayName: 'Fal (HeyGen)',
+    getApiKeyUrl: 'https://fal.ai/dashboard/keys',
+    defaultModel: 'fal-heygen-avatar4-i2v',
+    models: [
+      { id: 'fal-heygen-avatar4-i2v', displayName: 'HeyGen Avatar4 (Image-to-Video)', tier: 'premium' },
+      { id: 'fal-heygen-avatar4-twin', displayName: 'HeyGen Avatar4 (Digital Twin)', tier: 'premium' },
+    ],
+    platformKeyEnv: 'FAL_KEY',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://rest.fal.ai/keys/', {
+            headers: { Authorization: `Key ${creds.apiKey}` },
           });
           return res.ok;
         } catch {
@@ -74,4 +113,15 @@ export function getAvatarModelProvider(modelId: string): AvatarProviderId | null
     if (provider.models.some((m) => m.id === modelId)) return provider.id;
   }
   return null;
+}
+
+/** Set of all known avatar model IDs across all providers. */
+export function getAllAvatarModelIds(): Set<string> {
+  const ids = new Set<string>();
+  for (const provider of Object.values(AVATAR_PROVIDERS)) {
+    for (const model of provider.models) {
+      ids.add(model.id);
+    }
+  }
+  return ids;
 }
