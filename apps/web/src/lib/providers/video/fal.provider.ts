@@ -20,7 +20,7 @@ export class FalVideoProvider implements VideoProvider {
     return this.model;
   }
 
-  async generateVideo(params: { prompt: string; duration?: number }): Promise<Buffer> {
+  async generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string }): Promise<Buffer> {
     const endpoint = getFalVideoEndpoint(this.model);
     if (!endpoint) throw new Error(`No Fal endpoint for video model: ${this.model}`);
 

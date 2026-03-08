@@ -8,7 +8,7 @@ import { getAutoModelConfig } from '../auto-model-config';
 import { getVideoModelProvider, type VideoProviderId } from './video-registry';
 
 export interface VideoProvider {
-  generateVideo(params: { prompt: string; duration?: number }): Promise<Buffer>;
+  generateVideo(params: { prompt: string; duration?: number; firstFrameImage?: string }): Promise<Buffer>;
   getModelId(): string;
   readonly providerId: VideoProviderId;
 }
