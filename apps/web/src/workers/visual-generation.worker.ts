@@ -11,7 +11,6 @@ import { prismaUnfiltered as prisma } from '@/lib/prisma';
 import { resolveImageProvider } from '@/lib/providers/image';
 import { getImageModelCost } from '@/lib/providers/image-registry';
 import { resolveVideoProvider } from '@/lib/providers/video';
-import { videoModelRequiresFirstFrame } from '@/lib/providers/video-registry';
 import { searchStockVideo, downloadStockAsset } from '@/lib/stock-footage';
 import { uploadFile } from '@/lib/r2';
 import { logUsage } from '@/lib/usage-logger';
@@ -52,6 +51,7 @@ async function generateAiVideo(
   segmentVisualId: string,
   videoModel: string,
   videoPrompt: string,
+  endStatePrompt?: string | null,
 ): Promise<{ buffer: Buffer; service: string; cost: number }> {
   const podcast = await prisma.podcast.findUniqueOrThrow({
     where: { id: podcastId },
@@ -79,16 +79,27 @@ async function generateAiVideo(
   const rawDuration = segment?.duration ?? 5;
   const clipCount = Math.ceil(rawDuration / maxDuration);
 
-  // Generate a first-frame image for models that require it (e.g. 512P is image-to-video only)
-  let firstFrameImage: string | undefined;
+  // Always generate first-frame image for all video segments
   let imageCost = 0;
-  if (videoModelRequiresFirstFrame(videoModel)) {
-    logger.info('Generating first-frame image for I2V model', { videoModel, segmentVisualId });
-    const imgResult = await generateAiImage(podcastId, videoGenerationId, videoPrompt);
-    const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-first-frame.png`;
-    firstFrameImage = await uploadFile(r2Key, imgResult.buffer, 'image/png');
-    imageCost = imgResult.cost;
-  }
+  logger.info('Generating first-frame image', { videoModel, segmentVisualId });
+  const firstFrameResult = await generateAiImage(podcastId, videoGenerationId, videoPrompt);
+  const firstFrameR2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-first-frame.png`;
+  const firstFrameUrl = await uploadFile(firstFrameR2Key, firstFrameResult.buffer, 'image/png');
+  imageCost += firstFrameResult.cost;
+
+  // Always generate last-frame image (from endStatePrompt or fallback to videoPrompt)
+  const lastFramePrompt = endStatePrompt ?? videoPrompt;
+  logger.info('Generating last-frame image', { videoModel, segmentVisualId, hasEndStatePrompt: !!endStatePrompt });
+  const lastFrameResult = await generateAiImage(podcastId, videoGenerationId, lastFramePrompt);
+  const lastFrameR2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-last-frame.png`;
+  const lastFrameUrl = await uploadFile(lastFrameR2Key, lastFrameResult.buffer, 'image/png');
+  imageCost += lastFrameResult.cost;
+
+  // Persist frame URLs on SegmentVisual
+  await prisma.segmentVisual.update({
+    where: { id: segmentVisualId },
+    data: { firstFrameUrl, lastFrameUrl },
+  });
 
   const service = videoSource === 'byok' ? `${providerId}_byok` : providerId;
 
@@ -98,13 +109,15 @@ async function generateAiVideo(
     const buffer = await videoProvider.generateVideo({
       prompt: videoPrompt,
       duration: cappedDuration,
-      firstFrameImage,
+      firstFrameImage: firstFrameUrl,
+      lastFrameImage: lastFrameUrl,
     });
     const videoCost = pricing ? (cappedDuration / 60) * pricing.costPerMinute : 0;
     return { buffer, service, cost: videoCost + imageCost };
   }
 
   // Multi-clip chaining: generate N clips, extract last frame → first frame of next
+  // Bookend strategy: first clip gets firstFrameUrl, final clip targets lastFrameUrl
   logger.info('Chaining video clips', {
     segmentVisualId,
     clipCount: String(clipCount),
@@ -113,12 +126,13 @@ async function generateAiVideo(
   });
 
   const clips: Buffer[] = [];
-  let chainImage = firstFrameImage;
+  let chainImage: string | undefined = firstFrameUrl;
   let totalVideoCost = 0;
 
   for (let i = 0; i < clipCount; i++) {
     const remaining = rawDuration - i * maxDuration;
     const clipDuration = Math.min(remaining, maxDuration);
+    const isLastClip = i === clipCount - 1;
 
     logger.info('Generating chained clip', {
       segmentVisualId,
@@ -131,6 +145,7 @@ async function generateAiVideo(
       prompt: videoPrompt,
       duration: clipDuration,
       firstFrameImage: chainImage,
+      lastFrameImage: isLastClip ? lastFrameUrl : undefined,
     });
     clips.push(clipBuffer);
 
@@ -139,7 +154,7 @@ async function generateAiVideo(
     }
 
     // Extract last frame for next clip (skip for the final clip)
-    if (i < clipCount - 1) {
+    if (!isLastClip) {
       const lastFrameBuffer = await extractLastFrame(clipBuffer);
       const r2Key = `podcasts/${podcastId}/visuals/${segmentVisualId}-chain-${i}.png`;
       chainImage = await uploadFile(r2Key, lastFrameBuffer, 'image/png');
@@ -189,11 +204,11 @@ export async function processVisualGeneration(job: Job<GenerateVisualPayload>): 
     // This takes priority over visualType-specific logic.
     const visual = await prisma.segmentVisual.findUnique({
       where: { id: segmentVisualId },
-      select: { visualMode: true, videoModel: true },
+      select: { visualMode: true, videoModel: true, endStatePrompt: true },
     });
 
     if (visual?.visualMode === 'video' && visual.videoModel) {
-      const result = await generateAiVideo(podcastId, videoGenerationId, segmentVisualId, visual.videoModel, prompt);
+      const result = await generateAiVideo(podcastId, videoGenerationId, segmentVisualId, visual.videoModel, prompt, visual.endStatePrompt);
       assetBuffer = result.buffer;
       assetType = 'video/mp4';
       assetExt = 'mp4';
