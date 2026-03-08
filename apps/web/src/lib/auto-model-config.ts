@@ -4,6 +4,7 @@ import { getAiProviderMeta, getProviderForModel, type AiProviderId } from './pro
 import { getProviderMeta, type TtsProviderId } from './providers/tts-registry';
 import { getSttProviderMeta } from './providers/stt-registry';
 import type { SttProviderId } from '@sotto/shared';
+import { getAvatarProviderMeta, getAvatarModelProvider, type AvatarProviderId } from './providers/avatar-registry';
 import { logger } from './logger';
 
 export interface ProviderAllocation {
@@ -104,9 +105,9 @@ const SEEDS = {
   proVideoProvider: 'fal',
   proVideoModel: 'fal-wan2.5-480p',
   freeAvatarProvider: 'heygen',
-  freeAvatarModel: 'avatar-iii',
+  freeAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
   proAvatarProvider: 'heygen',
-  proAvatarModel: 'avatar-iii',
+  proAvatarModel: getAvatarProviderMeta('heygen').defaultModel,
   dailyGenerationLimit: 1,
   dailyVideoLimit: 1,
   dailyVideoLimitPro: 2,
@@ -150,6 +151,35 @@ export async function getAutoModelConfig(): Promise<AutoModelConfigData> {
       });
     }
   }
+  // Self-heal legacy avatar model IDs (avatar-iii → heygen-avatar-standard, etc.)
+  const AVATAR_MODEL_MIGRATIONS: Record<string, string> = {
+    'avatar-iii': 'heygen-avatar-standard',
+    'avatar-iv': 'heygen-avatar-iv',
+  };
+  for (const [field, label] of [
+    ['freeAvatarModel', 'free'] as const,
+    ['proAvatarModel', 'pro'] as const,
+  ]) {
+    const current = row[field] as string;
+    const migrated = AVATAR_MODEL_MIGRATIONS[current];
+    if (migrated) {
+      repairs[field] = migrated;
+      logger.warn(`AutoModelConfig: migrated legacy ${label} avatar model`, {
+        was: current,
+        corrected: migrated,
+      });
+    } else if (!getAvatarModelProvider(current)) {
+      const providerField = field.replace('Model', 'Provider') as 'freeAvatarProvider' | 'proAvatarProvider';
+      const provider = row[providerField] as string;
+      const corrected = getAvatarProviderMeta(provider as AvatarProviderId).defaultModel;
+      repairs[field] = corrected;
+      logger.warn(`AutoModelConfig: repaired unknown ${label} avatar model`, {
+        was: `${provider}/${current}`,
+        corrected: `${provider}/${corrected}`,
+      });
+    }
+  }
+
   if (Object.keys(repairs).length > 0) {
     await prisma.autoModelConfig.update({
       where: { id: 'singleton' },
