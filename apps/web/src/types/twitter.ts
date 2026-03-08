@@ -16,8 +16,10 @@ export interface TweetParseResult {
   isSelfAuthored?: boolean;
   requestedAiModel?: string;
   requestedTtsProvider?: string;
+  requestedTtsModel?: string;
   requestedImageModel?: string;
   requestedVideoModel?: string;
+  requestedAvatarModel?: string;
   costPreference?: 'cheapest';
 }
 

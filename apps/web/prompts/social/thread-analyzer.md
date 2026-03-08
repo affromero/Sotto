@@ -24,7 +24,10 @@ Rules:
 - Infer durationTarget in minutes: short threads → 10, long detailed threads → 15, default → 15
 - Strip @sottofm and other handles from the topic
 - If the tagging user mentions a specific AI model or TTS/audio provider (e.g. "use opus", "with elevenlabs", "use gpt-5", "use openai voice"), extract those as requestedAiModel and requestedTtsProvider. Use the exact name they mention (lowercase). Only look at the tagging user's tweet, not the thread content. If not mentioned, set to null.
+- If the tagging user mentions a specific TTS model within a provider (e.g. "elevenlabs v3", "sonic 3", "tts-1-hd", "openai hd", "eleven flash", "octave"), extract as requestedTtsModel. Use the exact name they mention (lowercase). If a combined phrase like "elevenlabs v3" is used, extract "elevenlabs" as requestedTtsProvider AND "v3" as requestedTtsModel. Only look at the tagging user's tweet. If not mentioned, set to null.
 - If the tagging user mentions a specific image model (e.g. "use flux", "with recraft", "ideogram", "sd3") or video model (e.g. "use veo", "kling video", "wan video"), extract those as requestedImageModel and requestedVideoModel. Use the exact name they mention (lowercase). Only look at the tagging user's tweet. If not mentioned, set to null.
+- If the tagging user mentions avatars or a specific avatar provider (e.g. "use heygen avatars", "with avatars", "heygen", "digital twin", "fal avatar"), extract as requestedAvatarModel. Use the exact name they mention (lowercase). Only look at the tagging user's tweet. If not mentioned, set to null.
+- If the tagging user requests avatars but not video, still set requestedImageModel and requestedVideoModel to "auto" — avatars require video generation.
 - If the tagging user says "cheapest" or "lowest cost" or "most affordable" when referring to models, set costPreference to "cheapest". Only look at the tagging user's tweet. If not mentioned, set to null.
 - If the tagging user asks for video generation (e.g. "make a video", "with video", "generate video too"), and does not specify image/video models, set requestedImageModel and requestedVideoModel to "auto" to signal that video should be generated with default models.
 
@@ -52,7 +55,9 @@ Respond with ONLY valid JSON matching this shape:
   "viewpoints": ["@alice argues X because Y", "@bob counters with Z"],
   "requestedAiModel": "string | null — AI model name if user specified one",
   "requestedTtsProvider": "string | null — TTS/audio provider name if user specified one",
+  "requestedTtsModel": "string | null — specific TTS model name if user specified one (e.g. 'v3', 'sonic 3', 'tts-1-hd')",
   "requestedImageModel": "string | null — image model name if user specified one, or 'auto' if video requested without specifying",
   "requestedVideoModel": "string | null — video model name if user specified one, or 'auto' if video requested without specifying",
+  "requestedAvatarModel": "string | null — avatar provider/model name if user specified one",
   "costPreference": "cheapest" | null — cost qualifier if user wants cheapest models"
 }
