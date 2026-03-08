@@ -149,6 +149,23 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ====== TRUST STRIP ====== */}
+      <div className={`${styles.trustStrip} ${styles.rev}`} aria-label="Verification promise">
+        <div className={styles.trustStripInner}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={styles.trustStripIcon}>
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <path d="M9 12l2 2 4-4" />
+          </svg>
+          <span>Every claim fact-checked. Every source verified. No hallucinations.</span>
+          <a href="#verification" className={styles.trustStripLink}>
+            See how
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M7 17l9.2-9.2M17 17V8H8" />
+            </svg>
+          </a>
+        </div>
+      </div>
+
       {/* ====== DEMO ====== */}
       <section className={`${styles.section} ${styles.sectionAlt}`} aria-label="Product demo">
         <div className={styles.inner}>
@@ -1205,7 +1222,7 @@ export default function LandingPage() {
       </section>
 
       {/* ====== OPEN VERIFICATION STANDARD ====== */}
-      <section className={styles.section} aria-label="Open verification standard">
+      <section id="verification" className={styles.section} aria-label="Open verification standard">
         <div className={styles.inner}>
           <div className={`${styles.centered} ${styles.rev}`}>
             <span className={styles.overline}>Open Verification Standard</span>
