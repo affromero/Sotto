@@ -13,6 +13,10 @@ export interface VideoModelOption {
   costPerMinute: number;
   /** If true, the model requires a first-frame image (image-to-video only). */
   requiresFirstFrame?: boolean;
+  /** If true, the model accepts (but may not require) a first-frame image. */
+  supportsFirstFrame?: boolean;
+  /** If true, the model accepts a last-frame image (e.g. FLF2V, Kling tail_image_url). */
+  supportsLastFrame?: boolean;
 }
 
 export interface VideoProviderMeta {
@@ -35,10 +39,13 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
     getApiKeyUrl: 'https://fal.ai/dashboard/keys',
     defaultModel: 'fal-wan2.5-480p',
     models: [
-      { id: 'fal-wan2.5-480p', displayName: 'Wan 2.5 (480p)', tier: 'standard', costPerMinute: 3 },
-      { id: 'fal-kling3-1080p', displayName: 'Kling 3 (1080p)', tier: 'high', costPerMinute: 6 },
-      { id: 'fal-veo3-fast-1080p', displayName: 'Veo 3 Fast (1080p)', tier: 'high', costPerMinute: 6 },
-      { id: 'fal-veo3-1080p', displayName: 'Veo 3 (1080p)', tier: 'best', costPerMinute: 24 },
+      { id: 'fal-wan2.5-480p', displayName: 'Wan 2.5 (480p)', tier: 'standard', costPerMinute: 3, supportsFirstFrame: true },
+      { id: 'fal-kling3-1080p', displayName: 'Kling 3 (1080p)', tier: 'high', costPerMinute: 6, supportsFirstFrame: true },
+      { id: 'fal-veo3-fast-1080p', displayName: 'Veo 3 Fast (1080p)', tier: 'high', costPerMinute: 6, supportsFirstFrame: true },
+      { id: 'fal-veo3-1080p', displayName: 'Veo 3 (1080p)', tier: 'best', costPerMinute: 24, supportsFirstFrame: true },
+      { id: 'fal-veo3.1-flf2v-1080p', displayName: 'Veo 3.1 FLF2V (1080p)', tier: 'best', costPerMinute: 24, requiresFirstFrame: true, supportsFirstFrame: true, supportsLastFrame: true },
+      { id: 'fal-veo3.1-fast-flf2v-1080p', displayName: 'Veo 3.1 Fast FLF2V (1080p)', tier: 'high', costPerMinute: 6, requiresFirstFrame: true, supportsFirstFrame: true, supportsLastFrame: true },
+      { id: 'fal-kling2.5-pro-i2v-1080p', displayName: 'Kling 2.5 Pro I2V (1080p)', tier: 'high', costPerMinute: 6, requiresFirstFrame: true, supportsFirstFrame: true, supportsLastFrame: true },
     ],
     platformKeyEnv: 'FAL_KEY',
     auth: {
@@ -61,11 +68,11 @@ const VIDEO_PROVIDERS: Record<VideoProviderId, VideoProviderMeta> = {
     getApiKeyUrl: 'https://platform.minimax.io/user-center/basic-information/interface-key',
     defaultModel: 'minimax-hailuo02-768p',
     models: [
-      { id: 'minimax-hailuo02-512p', displayName: 'Hailuo 02 (512p)', tier: 'standard', costPerMinute: 0.8, requiresFirstFrame: true },
-      { id: 'minimax-hailuo02-768p', displayName: 'Hailuo 02 (768p)', tier: 'standard', costPerMinute: 3.19 },
-      { id: 'minimax-hailuo02-pro-1080p', displayName: 'Hailuo 02 Pro (1080p)', tier: 'high', costPerMinute: 5.32 },
-      { id: 'minimax-hailuo23-fast-1080p', displayName: 'Hailuo 2.3 Fast (1080p)', tier: 'high', costPerMinute: 3.46 },
-      { id: 'minimax-hailuo23-fast-768p', displayName: 'Hailuo 2.3 Fast (768p)', tier: 'best', costPerMinute: 1.76 },
+      { id: 'minimax-hailuo02-512p', displayName: 'Hailuo 02 (512p)', tier: 'standard', costPerMinute: 0.8, requiresFirstFrame: true, supportsFirstFrame: true },
+      { id: 'minimax-hailuo02-768p', displayName: 'Hailuo 02 (768p)', tier: 'standard', costPerMinute: 3.19, supportsFirstFrame: true },
+      { id: 'minimax-hailuo02-pro-1080p', displayName: 'Hailuo 02 Pro (1080p)', tier: 'high', costPerMinute: 5.32, supportsFirstFrame: true },
+      { id: 'minimax-hailuo23-fast-1080p', displayName: 'Hailuo 2.3 Fast (1080p)', tier: 'high', costPerMinute: 3.46, supportsFirstFrame: true },
+      { id: 'minimax-hailuo23-fast-768p', displayName: 'Hailuo 2.3 Fast (768p)', tier: 'best', costPerMinute: 1.76, supportsFirstFrame: true },
     ],
     platformKeyEnv: 'MINIMAX_API_KEY',
     auth: {
@@ -119,6 +126,24 @@ export function videoModelRequiresFirstFrame(modelId: string): boolean {
   for (const provider of Object.values(VIDEO_PROVIDERS)) {
     const model = provider.models.find((m) => m.id === modelId);
     if (model) return model.requiresFirstFrame === true;
+  }
+  return false;
+}
+
+/** Check if a video model accepts a first-frame image (optional or required). */
+export function videoModelSupportsFirstFrame(modelId: string): boolean {
+  for (const provider of Object.values(VIDEO_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.supportsFirstFrame === true || model.requiresFirstFrame === true;
+  }
+  return false;
+}
+
+/** Check if a video model accepts a last-frame image. */
+export function videoModelSupportsLastFrame(modelId: string): boolean {
+  for (const provider of Object.values(VIDEO_PROVIDERS)) {
+    const model = provider.models.find((m) => m.id === modelId);
+    if (model) return model.supportsLastFrame === true;
   }
   return false;
 }

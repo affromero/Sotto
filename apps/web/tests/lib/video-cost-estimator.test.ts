@@ -50,6 +50,7 @@ function makeSegment(overrides: Partial<PipelineSegmentNode> = {}): PipelineSegm
     model: 'fal-flux-2-pro',
     prompt: 'A test prompt',
     metadata: null,
+    endStatePrompt: null,
     estimatedCost: 0,
     ...overrides,
   };
