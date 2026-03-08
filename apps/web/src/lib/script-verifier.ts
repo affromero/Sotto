@@ -41,7 +41,7 @@ function extractFirstJsonObject(text: string): string {
 }
 
 /** Token budget for verification output — must accommodate 30+ claims with detailed notes. */
-const VERIFICATION_MAX_TOKENS = 16384;
+const VERIFICATION_MAX_TOKENS = 65536;
 
 const PARSE_FAILURE_FEEDBACK = 'PARSE_ERROR: Script verification failed: could not parse AI response. Will retry.';
 
