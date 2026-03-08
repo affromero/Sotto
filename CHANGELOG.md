@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1] - 2026-03-08
+
+### Added
+- **Verification stage messaging**: Bold, confident progress messages during fact-check stages with verification badge
+- **Landing trust strip**: Trust strip section between pillars and demo on the landing page
+- **Pipeline failure owner tracking**: Admin Telegram alerts and in-app notifications now show the podcast owner for attribution
+
 ## [0.6.0] - 2026-03-08
 
 ### Added
