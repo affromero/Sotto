@@ -57,9 +57,19 @@ export class FalVideoProvider implements VideoProvider {
       throw new Error(`Fal video submission failed (${submitRes.status}): ${text}`);
     }
 
-    const { request_id } = (await submitRes.json()) as { request_id: string };
+    // Use status_url/response_url from submit response when available (URL format varies per model)
+    const submitData = (await submitRes.json()) as {
+      request_id: string;
+      status_url?: string;
+      response_url?: string;
+    };
+    const { request_id } = submitData;
+    const fallbackBase = `https://queue.fal.run/${endpoint}/requests/${request_id}`;
+    const statusUrl = submitData.status_url ?? `${fallbackBase}/status`;
+    const resultUrl = submitData.response_url ?? fallbackBase;
 
-    const statusUrl = `https://queue.fal.run/${endpoint}/requests/${request_id}/status`;
+    logger.info('Fal video job submitted', { request_id, statusUrl });
+
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 5000));
 
@@ -75,7 +85,6 @@ export class FalVideoProvider implements VideoProvider {
       const status = (await statusRes.json()) as { status: string; error?: string };
 
       if (status.status === 'COMPLETED') {
-        const resultUrl = `https://queue.fal.run/${endpoint}/requests/${request_id}`;
         const resultRes = await fetch(resultUrl, {
           headers: { Authorization: `Key ${this.apiKey}` },
         });
