@@ -327,11 +327,36 @@
   word-break: break-word;
 }
 
+.errorActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.editButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: 6px 12px;
+  font: var(--text-body-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.editButton:hover {
+  background: var(--color-background);
+}
+
 .retryButton {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
-  align-self: flex-start;
   padding: 6px 12px;
   font: var(--text-body-sm);
   font-weight: 600;

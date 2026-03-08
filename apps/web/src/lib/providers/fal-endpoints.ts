@@ -19,20 +19,36 @@ const VIDEO_ENDPOINTS: Record<string, string> = {
   'fal-wan2.5-480p': 'fal-ai/wan/v2.5/text-to-video',
 };
 
+/** Map common shorthand / legacy model IDs to their canonical pricetoken IDs. */
+const MODEL_ALIASES: Record<string, string> = {
+  'flux-schnell': 'fal-flux-1-schnell',
+  'flux-1-schnell': 'fal-flux-1-schnell',
+  'flux-pro': 'fal-flux-1-pro',
+  'flux-1-pro': 'fal-flux-1-pro',
+  'flux-2-pro': 'fal-flux-2-pro',
+  'recraft-v3': 'fal-recraft-v3',
+  'ideogram-v2': 'fal-ideogram-v2',
+  'sd3': 'fal-sd3',
+};
+
+function resolveModelId(modelId: string): string {
+  return MODEL_ALIASES[modelId] ?? modelId;
+}
+
 export function getFalImageEndpoint(modelId: string): string | null {
-  return IMAGE_ENDPOINTS[modelId] ?? null;
+  return IMAGE_ENDPOINTS[resolveModelId(modelId)] ?? null;
 }
 
 export function getFalVideoEndpoint(modelId: string): string | null {
-  return VIDEO_ENDPOINTS[modelId] ?? null;
+  return VIDEO_ENDPOINTS[resolveModelId(modelId)] ?? null;
 }
 
 export function isFalVideoModel(modelId: string): boolean {
-  return modelId in VIDEO_ENDPOINTS;
+  return resolveModelId(modelId) in VIDEO_ENDPOINTS;
 }
 
 export function isFalImageModel(modelId: string): boolean {
-  return modelId in IMAGE_ENDPOINTS;
+  return resolveModelId(modelId) in IMAGE_ENDPOINTS;
 }
 
 /** Set of pricetoken model IDs that have a known Fal image endpoint. */

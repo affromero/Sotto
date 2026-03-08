@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import NextImage from 'next/image';
 import {
   Image as ImageIcon, Film, BarChart3, Quote, GitCompare, Clock, Network, Type,
-  AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, Pencil,
 } from 'lucide-react';
 import styles from './VideoProgress.module.css';
 
@@ -34,6 +34,7 @@ interface VideoProgressProps {
   videoGenerationId: string;
   onComplete: (visuals: SegmentVisual[]) => void;
   onFailed?: (reason: string) => void;
+  onRequestEdit?: (visuals: SegmentVisual[]) => void;
 }
 
 const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
@@ -143,7 +144,7 @@ function FilmstripThumbnail({ visual }: { visual: SegmentVisual }) {
   );
 }
 
-export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed }: VideoProgressProps) {
+export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFailed, onRequestEdit }: VideoProgressProps) {
   const [data, setData] = useState<VideoStatusResponse | null>(null);
   const [retryError, setRetryError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -334,14 +335,26 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
             <AlertTriangle size={16} />
             <p>{errorMessage}</p>
           </div>
-          <button
-            className={styles.retryButton}
-            onClick={handleRetry}
-            disabled={retrying}
-          >
-            <RefreshCw size={14} className={retrying ? styles.retrySpinning : ''} />
-            {retrying ? 'Resuming...' : 'Retry'}
-          </button>
+          <div className={styles.errorActions}>
+            {onRequestEdit && visuals.length > 0 && (
+              <button
+                className={styles.editButton}
+                onClick={() => onRequestEdit(visuals)}
+                type="button"
+              >
+                <Pencil size={14} />
+                Edit Storyboard
+              </button>
+            )}
+            <button
+              className={styles.retryButton}
+              onClick={handleRetry}
+              disabled={retrying}
+            >
+              <RefreshCw size={14} className={retrying ? styles.retrySpinning : ''} />
+              {retrying ? 'Resuming...' : 'Retry'}
+            </button>
+          </div>
         </div>
       )}
     </div>
