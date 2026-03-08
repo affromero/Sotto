@@ -64,9 +64,9 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
               <SegmentWithFade durationInFrames={durationFrames}>
                 <SegmentComponent segment={segment} />
                 <SpeakerLabel speaker={segment.speaker} branding={branding} />
-                {segment.metadata?.photographer && (
+                {typeof segment.metadata?.photographer === 'string' && (
                   <AttributionOverlay
-                    photographer={segment.metadata.photographer as string}
+                    photographer={segment.metadata.photographer}
                     source="Pexels"
                   />
                 )}
