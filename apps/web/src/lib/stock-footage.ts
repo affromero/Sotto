@@ -9,6 +9,10 @@ export interface StockVideoResult {
   thumbnailUrl: string;
   duration: number;
   source: 'pexels';
+  photographer: string;
+  photographerUrl: string;
+  pexelsVideoId: number;
+  pexelsVideoUrl: string;
 }
 
 interface PexelsVideoFile {
@@ -20,11 +24,18 @@ interface PexelsVideoFile {
   link: string;
 }
 
+interface PexelsUser {
+  id: number;
+  name: string;
+  url: string;
+}
+
 interface PexelsVideo {
   id: number;
   url: string;
   image: string;
   duration: number;
+  user: PexelsUser;
   video_files: PexelsVideoFile[];
 }
 
@@ -79,6 +90,10 @@ export async function searchStockVideo(query: string): Promise<StockVideoResult 
           thumbnailUrl: video.image,
           duration: video.duration,
           source: 'pexels',
+          photographer: video.user.name,
+          photographerUrl: video.user.url,
+          pexelsVideoId: video.id,
+          pexelsVideoUrl: video.url,
         };
       }
     }
