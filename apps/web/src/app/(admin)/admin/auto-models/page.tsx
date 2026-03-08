@@ -20,6 +20,7 @@ export default async function AutoModelsPage() {
         id: m.id,
         displayName: m.displayName,
         tier: m.tier,
+        price: m.pricing ? `$${m.pricing.inputPerMTok}/$${m.pricing.outputPerMTok} per MTok` : undefined,
       })),
     }));
 
@@ -50,6 +51,7 @@ export default async function AutoModelsPage() {
       id: m.id,
       displayName: m.displayName,
       tier: m.tier,
+      price: `$${m.costPerMegapixel}/img`,
     })),
   }));
 
@@ -60,6 +62,7 @@ export default async function AutoModelsPage() {
       id: m.id,
       displayName: m.displayName,
       tier: m.tier,
+      price: `$${m.costPerMinute}/min`,
     })),
   }));
 
