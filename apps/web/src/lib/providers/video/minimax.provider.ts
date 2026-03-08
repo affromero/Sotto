@@ -130,6 +130,25 @@ export class MiniMaxVideoProvider implements VideoProvider {
       throw new Error(`MiniMax file download failed (${res.status})`);
     }
 
-    return Buffer.from(await res.arrayBuffer());
+    // The /files/retrieve endpoint returns JSON with a download_url, not the raw binary
+    const body = (await res.json()) as {
+      file: { download_url: string };
+      base_resp: { status_code: number; status_msg: string };
+    };
+
+    if (body.base_resp.status_code !== 0) {
+      throw new Error(`MiniMax file retrieve error: ${body.base_resp.status_msg}`);
+    }
+
+    if (!body.file?.download_url) {
+      throw new Error('MiniMax file retrieve returned no download_url');
+    }
+
+    const videoRes = await fetch(body.file.download_url);
+    if (!videoRes.ok) {
+      throw new Error(`MiniMax video download failed (${videoRes.status}) from CDN`);
+    }
+
+    return Buffer.from(await videoRes.arrayBuffer());
   }
 }
