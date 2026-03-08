@@ -2074,6 +2074,7 @@ model VideoGeneration {
   imageModel     String?     // e.g. 'fal-flux-2-pro', 'fal-recraft-v3'
   videoModel     String?     // e.g. 'fal-veo3-1080p', 'fal-kling3-1080p'
   pipelineJson   Json?       // Approved pipeline editor state
+  avatarsVisible Boolean     @default(true)
   failureReason  String?     @db.Text
   technicalError String?     @db.Text
   createdAt      DateTime    @default(now())

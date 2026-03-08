@@ -25,6 +25,8 @@ interface VideoViewProps {
   title?: string;
   avatarOverlays?: AvatarOverlayData[];
   isOwner?: boolean;
+  avatarsVisible?: boolean;
+  onAvatarsVisibleChange?: (visible: boolean) => void;
   onAvatarPositionChange?: (speaker: string, pos: { posX: number; posY: number; width: number; height: number }) => void;
 }
 
@@ -39,6 +41,8 @@ export function VideoView({
   title,
   avatarOverlays,
   isOwner,
+  avatarsVisible,
+  onAvatarsVisibleChange,
   onAvatarPositionChange,
 }: VideoViewProps) {
   const playerRef = useRef<PlayerRef>(null);
@@ -140,6 +144,16 @@ export function VideoView({
           controls={false}
           aria-label={title ? `Video for ${title}` : 'Podcast video'}
         />
+        {isOwner && readyOverlays.length > 0 && onAvatarsVisibleChange && (
+          <button
+            className={styles.avatarToggle}
+            onClick={() => onAvatarsVisibleChange(!avatarsVisible)}
+            aria-label={avatarsVisible ? 'Hide avatars' : 'Show avatars'}
+            title={avatarsVisible ? 'Hide avatars' : 'Show avatars'}
+          >
+            {avatarsVisible ? 'Hide Avatars' : 'Show Avatars'}
+          </button>
+        )}
         {containerSize.width > 0 && readyOverlays.map((overlay) => (
           <AvatarOverlay
             key={overlay.id}
