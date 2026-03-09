@@ -2140,3 +2140,21 @@ model AvatarOverlay {
   @@unique([videoGenerationId, speaker])
   @@index([videoGenerationId])
 }
+
+// ============ NEWS INGESTION ============
+
+model IngestedArticle {
+  id        String    @id @default(cuid())
+  title     String
+  url       String    @unique
+  summary   String?   @db.Text
+  source    String
+  sourceUrl String?
+  category  String?
+  pubDate   DateTime?
+  fetchedAt DateTime  @default(now())
+
+  @@index([pubDate])
+  @@index([category, pubDate])
+  @@index([fetchedAt])
+}
