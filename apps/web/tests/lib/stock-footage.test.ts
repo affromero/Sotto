@@ -34,6 +34,7 @@ describe('searchStockVideo', () => {
             url: 'https://pexels.com/video/1',
             image: 'https://pexels.com/thumb/1.jpg',
             duration: 12,
+            user: { id: 99, name: 'John Doe', url: 'https://pexels.com/@johndoe' },
             video_files: [
               { id: 10, quality: 'hd', file_type: 'video/mp4', width: 1280, height: 720, link: 'https://cdn.pexels.com/video1.mp4' },
               { id: 11, quality: 'sd', file_type: 'video/mp4', width: 640, height: 360, link: 'https://cdn.pexels.com/video1-sd.mp4' },
@@ -51,6 +52,10 @@ describe('searchStockVideo', () => {
       thumbnailUrl: 'https://pexels.com/thumb/1.jpg',
       duration: 12,
       source: 'pexels',
+      photographer: 'John Doe',
+      photographerUrl: 'https://pexels.com/@johndoe',
+      pexelsVideoId: 1,
+      pexelsVideoUrl: 'https://pexels.com/video/1',
     });
     expect(fetchSpy).toHaveBeenCalledWith(
       expect.stringContaining('api.pexels.com/videos/search'),
