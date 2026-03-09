@@ -765,6 +765,8 @@ export const configureAvatarsSchema = z.object({
   avatars: z.array(z.object({
     speaker: z.string().min(1).max(50),
     avatarId: z.string().min(1),
+    avatarProvider: z.enum(['heygen', 'runway']).optional(),
+    isPreset: z.boolean().optional(),
   })).min(1).max(4),
 });
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { User, AlertTriangle, Search } from 'lucide-react';
 import { estimateAvatarCost, formatAvatarCost } from '@/lib/avatar-cost-estimator';
-import type { HeyGenAvatarData } from '@/types/avatar';
+import type { UnifiedAvatarData } from '@/types/avatar';
 import styles from './AvatarPicker.module.css';
 
 interface AvatarPickerProps {
@@ -17,43 +17,59 @@ interface AvatarPickerProps {
 const MAX_DURATION = 600;
 const VISIBLE_COUNT = 12;
 
+interface AvatarSelection {
+  avatarId: string;
+  provider: 'heygen' | 'runway';
+  isPreset: boolean;
+}
+
 export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podcastDuration }: AvatarPickerProps) {
-  const [avatars, setAvatars] = useState<HeyGenAvatarData[]>([]);
+  const [avatars, setAvatars] = useState<UnifiedAvatarData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selections, setSelections] = useState<Record<string, string>>({});
+  const [selections, setSelections] = useState<Record<string, AvatarSelection>>({});
   const [submitting, setSubmitting] = useState(false);
   const [search, setSearch] = useState('');
+  const [activeProvider, setActiveProvider] = useState<'heygen' | 'runway'>('heygen');
+  const [availableProviders, setAvailableProviders] = useState<{ heygen: boolean; runway: boolean }>({ heygen: false, runway: false });
 
   const overDuration = podcastDuration > MAX_DURATION;
 
   useEffect(() => {
-    fetch(`/api/podcasts/${podcastId}/video/avatars`)
+    fetch(`/api/podcasts/${podcastId}/video/avatars?provider=${activeProvider}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load avatars'))))
-      .then((data: { avatars: HeyGenAvatarData[] }) => setAvatars(data.avatars))
+      .then((data: { avatars: UnifiedAvatarData[]; providers: { heygen: boolean; runway: boolean } }) => {
+        setAvatars(data.avatars);
+        setAvailableProviders(data.providers);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load avatars'))
       .finally(() => setLoading(false));
-  }, [podcastId]);
+  }, [podcastId, activeProvider]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = q ? avatars.filter((a) => a.avatar_name.toLowerCase().includes(q)) : avatars;
+    const list = q ? avatars.filter((a) => a.name.toLowerCase().includes(q)) : avatars;
     return list.slice(0, VISIBLE_COUNT);
   }, [avatars, search]);
 
-  const handleSelect = useCallback((speaker: string, avatarId: string) => {
+  const handleSelect = useCallback((speaker: string, avatar: UnifiedAvatarData) => {
     setSelections((prev) => {
-      if (prev[speaker] === avatarId) {
+      if (prev[speaker]?.avatarId === avatar.id) {
         const next = { ...prev };
         delete next[speaker];
         return next;
       }
-      return { ...prev, [speaker]: avatarId };
+      return { ...prev, [speaker]: { avatarId: avatar.id, provider: avatar.provider, isPreset: avatar.isPreset } };
     });
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    const configured = Object.entries(selections).map(([speaker, avatarId]) => ({ speaker, avatarId }));
+    const configured = Object.entries(selections).map(([speaker, sel]) => ({
+      speaker,
+      avatarId: sel.avatarId,
+      avatarProvider: sel.provider,
+      isPreset: sel.isPreset,
+    }));
     if (configured.length === 0) return;
 
     setSubmitting(true);
@@ -80,6 +96,9 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
   const selectedCount = Object.keys(selections).length;
   const estimatedCost = estimateAvatarCost(podcastDuration, selectedCount);
 
+  // Check if any selection uses Runway
+  const hasRunwaySelection = Object.values(selections).some((s) => s.provider === 'runway');
+
   if (loading) {
     return (
       <div className={styles.root}>
@@ -102,6 +121,25 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
 
       {error && <p className={styles.error}>{error}</p>}
 
+      {availableProviders.runway && (
+        <div className={styles.providerTabs}>
+          <button
+            className={`${styles.providerTab} ${activeProvider === 'heygen' ? styles.providerTabActive : ''}`}
+            onClick={() => { setActiveProvider('heygen'); setLoading(true); }}
+            type="button"
+          >
+            HeyGen
+          </button>
+          <button
+            className={`${styles.providerTab} ${activeProvider === 'runway' ? styles.providerTabActive : ''}`}
+            onClick={() => { setActiveProvider('runway'); setLoading(true); }}
+            type="button"
+          >
+            Runway
+          </button>
+        </div>
+      )}
+
       <div className={styles.searchRow}>
         <Search size={14} className={styles.searchIcon} />
         <input
@@ -123,17 +161,17 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
             <div className={styles.avatarGrid}>
               {filtered.map((avatar) => (
                 <button
-                  key={avatar.avatar_id}
-                  className={`${styles.avatarCard} ${selections[speaker] === avatar.avatar_id ? styles.avatarCardSelected : ''}`}
-                  onClick={() => handleSelect(speaker, avatar.avatar_id)}
+                  key={avatar.id}
+                  className={`${styles.avatarCard} ${selections[speaker]?.avatarId === avatar.id ? styles.avatarCardSelected : ''}`}
+                  onClick={() => handleSelect(speaker, avatar)}
                   type="button"
-                  aria-pressed={selections[speaker] === avatar.avatar_id}
+                  aria-pressed={selections[speaker]?.avatarId === avatar.id}
                   disabled={overDuration}
                 >
-                  {avatar.preview_image_url ? (
+                  {avatar.previewImageUrl ? (
                     <img
-                      src={avatar.preview_image_url}
-                      alt={avatar.avatar_name}
+                      src={avatar.previewImageUrl}
+                      alt={avatar.name}
                       width={80}
                       height={80}
                       className={styles.avatarImage}
@@ -144,7 +182,10 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
                       <User size={24} />
                     </div>
                   )}
-                  <span className={styles.avatarName}>{avatar.avatar_name}</span>
+                  <span className={styles.avatarName}>{avatar.name}</span>
+                  {avatar.provider === 'runway' && (
+                    <span className={styles.providerBadge}>Runway</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -157,10 +198,22 @@ export function AvatarPicker({ podcastId, speakers, onConfigured, onCancel, podc
 
       <p className={styles.browseLink}>
         Browse all avatars at{' '}
-        <a href="https://www.heygen.com/avatars" target="_blank" rel="noopener noreferrer">
-          heygen.com/avatars
-        </a>
+        {activeProvider === 'runway' ? (
+          <a href="https://dev.runwayml.com" target="_blank" rel="noopener noreferrer">
+            dev.runwayml.com
+          </a>
+        ) : (
+          <a href="https://www.heygen.com/avatars" target="_blank" rel="noopener noreferrer">
+            heygen.com/avatars
+          </a>
+        )}
       </p>
+
+      {hasRunwaySelection && (
+        <p className={styles.runwayNotice}>
+          Runway avatars render in real-time (~{Math.ceil(podcastDuration / 60)} min)
+        </p>
+      )}
 
       <div className={styles.footer}>
         <p className={styles.costEstimate}>
