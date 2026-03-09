@@ -526,6 +526,10 @@ model Segment {
   duration  Float?  // seconds
   version   Int     @default(1)
 
+  ttsProvider String? // Per-segment override: 'elevenlabs' | 'openai' | 'cartesia' | etc.
+  ttsModel    String? // Per-segment override: provider-specific model ID
+  ttsVoiceId  String? // Per-segment override: specific voice ID
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -594,6 +598,7 @@ model PodcastVersionSegment {
   segmentId String
   order     Int
   startTime Float?
+  ttsVoiceId String? // Snapshot of segment's TTS voice ID at version time
 
   version PodcastVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
 
