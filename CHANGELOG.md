@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0] - 2026-03-09
+
+### Added
+- **Multi-visual segments**: Voice segments can now cycle through multiple visual types (e.g., TEXT_CARD 0-10s → MAP_OVERLAY 10-22s → AI_ILLUSTRATION 22-30s) instead of being locked to a single visual
+- **Proactive map insertion**: AI classifier detects geographic mentions in speaker text and automatically inserts MAP_OVERLAY sub-visuals
+- **News ingestion pipeline**: New worker-based pipeline ingests articles from ~26 RSS feeds into the database on a 30-minute schedule
+- **Public news API**: `/api/news` endpoint with pagination for browsing ingested articles
+
+### Fixed
+- MiniMax video duration now snaps to valid values (6s or 10s)
+
 ## [0.6.1] - 2026-03-08
 
 ### Added
