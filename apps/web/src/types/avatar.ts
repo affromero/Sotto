@@ -11,6 +11,8 @@ export interface AvatarOverlayData {
   width: number;
   height: number;
   durationSeconds: number | null;
+  avatarProvider?: string | null;
+  maskShape?: string | null;
 }
 
 export interface HeyGenAvatarData {
@@ -19,5 +21,14 @@ export interface HeyGenAvatarData {
   preview_image_url: string;
   preview_video_url?: string;
   gender: string;
+  premium: boolean;
+}
+
+export interface UnifiedAvatarData {
+  id: string;
+  name: string;
+  previewImageUrl: string;
+  provider: 'heygen' | 'runway';
+  isPreset: boolean;
   premium: boolean;
 }

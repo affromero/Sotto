@@ -5,7 +5,7 @@ import { requireAdmin } from '@/lib/auth-guards';
 import { errorResponse } from '@/lib/api-response';
 import { checkAvatarGenerationGate, tryIncrementAvatarGeneration } from '@/lib/video-gate';
 import { configureAvatarsSchema } from '@/lib/validations';
-import { listAvatars } from '@/lib/heygen';
+import { listUnifiedAvatars } from '@/lib/providers/avatar';
 import { deleteFile, extractR2Key } from '@/lib/r2';
 import { addJob, JobType, avatarGenerationQueue } from '@/lib/queue';
 import { logger } from '@/lib/logger';
@@ -16,7 +16,8 @@ type RouteParams = { params: Promise<{ podcastId: string }> };
 const MAX_AVATAR_DURATION_SECONDS = 600;
 
 /**
- * GET — List available HeyGen stock avatars (Redis-cached, 1hr TTL).
+ * GET — List available avatars (Redis-cached, 1hr TTL).
+ * Accepts ?provider=heygen|runway (defaults to heygen).
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { podcastId } = await params;
@@ -31,35 +32,49 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return errorResponse(message, gate.reason === 'daily_limit_reached' ? 429 : 403, { code: gate.reason });
   }
 
-  const apiKey = process.env.HEYGEN_API_KEY;
+  const provider = (request.nextUrl.searchParams.get('provider') ?? 'heygen') as 'heygen' | 'runway';
+
+  const apiKey = provider === 'runway' ? process.env.RUNWAY_API_KEY : process.env.HEYGEN_API_KEY;
   if (!apiKey) return errorResponse('Avatar generation is not configured', 503);
 
   // Check Redis cache
   const redis = createRedisConnection('avatar-cache');
-  const cacheKey = `heygen:avatars:${podcastId}`;
+  const cacheKey = `avatars:${provider}:${podcastId}`;
   try {
     const cached = await redis.get(cacheKey);
     if (cached) {
-      return NextResponse.json({ avatars: JSON.parse(cached) });
+      return NextResponse.json({
+        avatars: JSON.parse(cached),
+        providers: {
+          heygen: !!process.env.HEYGEN_API_KEY,
+          runway: !!process.env.RUNWAY_API_KEY,
+        },
+      });
     }
   } catch {
     // Cache miss, proceed to API
   }
 
   try {
-    const avatars = await listAvatars(apiKey);
-    const filtered = avatars.filter((a) => !a.premium);
+    const avatars = await listUnifiedAvatars(apiKey, provider);
 
     // Cache for 1 hour
     try {
-      await redis.set(cacheKey, JSON.stringify(filtered), 'EX', 3600);
+      await redis.set(cacheKey, JSON.stringify(avatars), 'EX', 3600);
     } catch {
       // Non-critical cache write failure
     }
 
-    return NextResponse.json({ avatars: filtered });
+    return NextResponse.json({
+      avatars,
+      providers: {
+        heygen: !!process.env.HEYGEN_API_KEY,
+        runway: !!process.env.RUNWAY_API_KEY,
+      },
+    });
   } catch (err) {
-    logger.error('Failed to list HeyGen avatars', {
+    logger.error('Failed to list avatars', {
+      provider,
       error: err instanceof Error ? err.message : String(err),
     });
     return errorResponse('Failed to fetch avatars', 502);
@@ -125,14 +140,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           videoGenerationId: videoGeneration.id,
           speaker: avatar.speaker,
           avatarId: avatar.avatarId,
+          avatarProvider: avatar.avatarProvider ?? null,
           status: 'pending',
         },
         update: {
           avatarId: avatar.avatarId,
+          avatarProvider: avatar.avatarProvider ?? null,
           status: 'pending',
           videoUrl: null,
           concatAudioUrl: null,
           heygenVideoId: null,
+          runwaySessionId: null,
+          runwayChunkIndex: null,
+          runwayTotalChunks: null,
+          maskShape: null,
           failureReason: null,
         },
       }),
@@ -173,12 +194,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     for (const overlay of overlays) {
+      const avatarConfig = parsed.data.avatars.find((a) => a.speaker === overlay.speaker);
       await addJob(avatarGenerationQueue, JobType.GENERATE_AVATAR, {
         podcastId,
         videoGenerationId: videoGeneration.id,
         avatarOverlayId: overlay.id,
         speaker: overlay.speaker,
         avatarId: overlay.avatarId,
+        avatarProvider: (avatarConfig?.avatarProvider ?? 'heygen') as 'heygen' | 'runway',
+        isPreset: avatarConfig?.isPreset,
       });
     }
 
