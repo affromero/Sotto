@@ -52,6 +52,8 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         text: true,
         startTime: true,
         duration: true,
+        ttsProvider: true,
+        ttsModel: true,
         segmentVisuals: {
           where: { videoGenerationId },
           orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
@@ -86,6 +88,8 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         metadata: (first?.metadata as Record<string, unknown>) ?? undefined,
         assetUrl: first?.assetUrl ?? undefined,
         assetType: first?.assetType ?? undefined,
+        ttsProvider: s.ttsProvider ?? undefined,
+        ttsModel: s.ttsModel ?? undefined,
         subVisuals: visuals.length > 1
           ? visuals.map((v) => ({
             subOrder: v.subOrder,
