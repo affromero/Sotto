@@ -205,6 +205,11 @@ describe('processAvatarGeneration', () => {
       posY: 0.55,
       width: 0.25,
       height: 0.35,
+      avatarProvider: null,
+      maskShape: null,
+      runwaySessionId: null,
+      runwayChunkIndex: null,
+      runwayTotalChunks: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -233,6 +238,11 @@ describe('processAvatarGeneration', () => {
       posY: 0.55,
       width: 0.25,
       height: 0.35,
+      avatarProvider: null,
+      maskShape: null,
+      runwaySessionId: null,
+      runwayChunkIndex: null,
+      runwayTotalChunks: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -264,8 +274,15 @@ describe('provider dispatch', () => {
 
   it('dispatches to HeyGen when avatarProvider is heygen', async () => {
     const heygenJob = {
-      ...mockJob,
-      data: { ...mockJob.data, avatarProvider: 'heygen' as const },
+      data: {
+        podcastId: 'pod_1',
+        videoGenerationId: 'vg_1',
+        avatarOverlayId: 'ao_1',
+        speaker: 'Host',
+        avatarId: 'avatar_anna',
+        avatarProvider: 'heygen' as const,
+      },
+      updateProgress: vi.fn(),
     } as never;
 
     await processAvatarGeneration(heygenJob);
@@ -278,7 +295,11 @@ describe('provider dispatch', () => {
 
     const runwayJob = {
       data: {
-        ...mockJob.data,
+        podcastId: 'pod_1',
+        videoGenerationId: 'vg_1',
+        avatarOverlayId: 'ao_1',
+        speaker: 'Host',
+        avatarId: 'avatar_anna',
         avatarProvider: 'runway' as const,
         isPreset: true,
       },
