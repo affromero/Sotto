@@ -1,0 +1,27 @@
+import { getAllProviderMeta } from '@/lib/providers/tts-registry';
+import { ShowcaseBuilder } from './ShowcaseBuilder';
+import styles from './page.module.css';
+
+export const metadata = { title: 'Showcase Builder — Sotto Admin' };
+
+export default function ShowcasePage() {
+  const providers = getAllProviderMeta().map((p) => ({
+    id: p.id,
+    displayName: p.displayName,
+    qualityTier: p.qualityTier,
+    defaultModel: p.defaultModel,
+    models: p.models.map((m) => ({ id: m.id, displayName: m.displayName })),
+  }));
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Showcase Builder</h1>
+        <p className={styles.subtitle}>
+          Build multi-provider showcase podcasts with per-segment TTS assignments.
+        </p>
+      </div>
+      <ShowcaseBuilder providers={providers} />
+    </div>
+  );
+}
