@@ -44,6 +44,12 @@ export interface ClassifiedSegment {
   subVisuals: ClassifiedSubVisual[];
 }
 
+export interface TransitionRecommendation {
+  fromSegmentOrder: number;
+  toSegmentOrder: number;
+  reason: string;
+}
+
 const VISUAL_TYPE_ENUM = [
   'AI_ILLUSTRATION',
   'STOCK_FOOTAGE',
@@ -80,8 +86,15 @@ const legacyClassificationItemSchema = z.object({
   endStatePrompt: z.string().nullable().optional(),
 });
 
+const transitionRecommendationSchema = z.object({
+  fromSegmentOrder: z.number().int(),
+  toSegmentOrder: z.number().int(),
+  reason: z.string(),
+});
+
 const classificationSchema = z.object({
   segments: z.array(z.union([classificationItemSchema, legacyClassificationItemSchema])),
+  transitionRecommendations: z.array(transitionRecommendationSchema).optional().default([]),
 });
 
 const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign each one visual types for a video overlay.
@@ -119,7 +132,19 @@ GENERAL RULES:
 15. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
 16. For AI_ILLUSTRATION and STOCK_FOOTAGE sub-visuals, also provide "endStatePrompt": a description of how the scene should look AFTER the narration concludes. For other visual types, set endStatePrompt to null.
 
-Return JSON: { "segments": [{ "order": number, "subVisuals": [{ "subOrder": 0, "startOffsetFraction": 0.0, "durationFraction": 0.5, "visualType": string, "prompt": string|null, "metadata": string|null, "endStatePrompt": string|null }] }] }
+TRANSITION RECOMMENDATIONS:
+17. Evaluate each boundary between consecutive segments. Recommend an AI video transition when:
+    - The topic shifts significantly (e.g., new subject, different era, different domain)
+    - The mood or tone changes (e.g., serious → lighthearted, data → narrative)
+    - The visual shifts from abstract to concrete or vice versa
+    - There is a geographic or temporal change
+18. Do NOT recommend transitions when:
+    - The same point continues across the boundary
+    - It is a mid-sentence break between segments
+    - The visuals are closely related (same type, similar content)
+19. Include a short reason for each recommendation.
+
+Return JSON: { "segments": [{ "order": number, "subVisuals": [{ "subOrder": 0, "startOffsetFraction": 0.0, "durationFraction": 0.5, "visualType": string, "prompt": string|null, "metadata": string|null, "endStatePrompt": string|null }] }], "transitionRecommendations": [{ "fromSegmentOrder": number, "toSegmentOrder": number, "reason": string }] }
 For metadata, return a JSON-encoded string (e.g. "{\\"chartType\\":\\"bar\\",\\"title\\":\\"Revenue\\"}"), not a raw object. Return null if no metadata is needed.`;
 
 function parseMetadata(raw: unknown): Record<string, unknown> | null {
@@ -157,7 +182,7 @@ export async function classifySegmentVisuals(
   podcastTitle: string,
   podcastTopic: string,
   opts?: { provider?: string; model?: string; apiKeyOverride?: string },
-): Promise<{ classifications: ClassifiedSegment[]; inputTokens: number; outputTokens: number; model: string }> {
+): Promise<{ classifications: ClassifiedSegment[]; transitionRecommendations: TransitionRecommendation[]; inputTokens: number; outputTokens: number; model: string }> {
   const segmentList = segments
     .map((s) => `[${s.order}] ${s.speaker}: ${s.text.slice(0, 500)}${s.text.length > 500 ? '...' : ''} (${s.duration.toFixed(1)}s)`)
     .join('\n');
@@ -213,8 +238,21 @@ Classify each segment with sub-visuals. Return JSON only.`;
                 required: ['order', 'subVisuals'],
               },
             },
+            transitionRecommendations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: {
+                  fromSegmentOrder: { type: 'number' },
+                  toSegmentOrder: { type: 'number' },
+                  reason: { type: 'string' },
+                },
+                required: ['fromSegmentOrder', 'toSegmentOrder', 'reason'],
+              },
+            },
           },
-          required: ['segments'],
+          required: ['segments', 'transitionRecommendations'],
         },
       },
     },
@@ -243,6 +281,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
           endStatePrompt: null,
         }],
       })),
+      transitionRecommendations: [],
     };
   }
 
@@ -320,6 +359,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
 
   return {
     classifications,
+    transitionRecommendations: parsed.transitionRecommendations ?? [],
     inputTokens: result.inputTokens,
     outputTokens: result.outputTokens,
     model: result.model,

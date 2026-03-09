@@ -36,7 +36,8 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `visual-classification`     | `visual-classification`     | 2      | Podcast segments → Claude Haiku batch classification → assign visual types + prompts/metadata per segment       | Creates SegmentVisual records, queues place-enrichment for MAP_OVERLAY, visual-generation for other external assets, or video-composition if all programmatic |
 | `place-enrichment`          | `place-enrichment`          | 3      | SegmentVisual places → gazetteer resolution (WHG/GeoNames/Pleiades) with yearHint → merge enriched metadata    | Updates SegmentVisual.metadata with coordinates/historicalContext/confidence, queues visual-generation |
 | `visual-generation`         | `visual-generation`         | 5      | SegmentVisual → AI illustration (fal FLUX), stock footage (Pexels), or map image (Mapbox from pre-enriched places) → upload asset to R2. For video-mode segments: always generates first + last frame images (from prompt + endStatePrompt), persists `firstFrameUrl`/`lastFrameUrl`, passes both to video provider. Multi-clip chains use bookend strategy (first frame on clip 0, last frame on final clip). | Updates SegmentVisual.assetUrl + firstFrameUrl + lastFrameUrl + status, queues video-composition when all segments ready |
-| `video-composition`         | `video-composition`         | 1      | All segment visuals ready → POST to Remotion sidecar → poll for completion → upload MP4 to R2                  | Sets VideoGeneration.status=READY, Podcast.videoUrl, queues VIDEO_READY notification    |
+| `transition-generation`     | `transition-generation`     | 3      | Adjacent segment visuals → generate inter-segment transition clips (fal video) → upload to R2                  | Creates SegmentTransition records with asset URLs, queues video-composition when all done |
+| `video-composition`         | `video-composition`         | 1      | All segment visuals + transitions ready → POST to Remotion sidecar → poll for completion → upload MP4 to R2    | Sets VideoGeneration.status=READY, Podcast.videoUrl, queues VIDEO_READY notification    |
 | `news-ingest`               | `news-ingest`               | 1      | Scheduled (every 30min) → fetch all RSS feeds → upsert into IngestedArticle → prune >30 days                  | Populates IngestedArticle table for `/api/news` + `fetchNewsletterArticles()` DB reads  |
 
 ## Pipeline Flow
@@ -67,8 +68,8 @@ Incorporation (post-READY):
   (ANSWERED → INCORPORATING)  (TTS + insert)    (re-concat + startTimes)   (INCORPORATED)
 
 Video pipeline (post-READY, PRO/admin only):
-  POST /api/podcasts/[id]/video → visual-classification → place-enrichment (MAP_OVERLAY) / visual-generation (×N parallel) → video-composition → notification
-                                   (Claude Haiku)          (fal FLUX / Pexels)              (Remotion sidecar)    (VIDEO_READY)
+  POST /api/podcasts/[id]/video → visual-classification → place-enrichment (MAP_OVERLAY) / visual-generation (×N parallel) → transition-generation (×N-1 parallel) → video-composition → notification
+                                   (Claude Haiku)          (fal FLUX / Pexels)              (fal video between segments)       (Remotion sidecar)    (VIDEO_READY)
 ```
 
 ## Standalone Utility Workers

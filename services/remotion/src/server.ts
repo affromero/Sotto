@@ -106,6 +106,7 @@ app.post('/render', (req, res) => {
     segments: body.segments,
     config: body.config ?? DEFAULT_RENDER_CONFIG,
     branding: body.branding ?? DEFAULT_BRANDING,
+    transitions: body.transitions,
   };
 
   const jobId = uuidv4();

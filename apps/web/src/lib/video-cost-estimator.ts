@@ -1,6 +1,6 @@
 import { PriceTokenClient, STATIC_IMAGE_PRICING, STATIC_VIDEO_PRICING } from 'pricetoken';
 import type { ImageModelPricing, VideoModelPricing } from 'pricetoken';
-import type { PipelineSegmentNode, FalImageModelInfo, FalVideoModelInfo } from '@/types/pipeline';
+import type { PipelineSegmentNode, PipelineTransition, FalImageModelInfo, FalVideoModelInfo } from '@/types/pipeline';
 import { FAL_IMAGE_MODEL_IDS, FAL_VIDEO_MODEL_IDS } from '@/lib/providers/fal-endpoints';
 import { getAllVideoProviderMeta } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
@@ -211,12 +211,32 @@ export function estimateSegmentCost(
   return estimateSingleVisualCost(segment.visualMode, segment.model, segment.duration, imageModels, videoModels);
 }
 
+export function estimateTransitionCost(
+  transition: PipelineTransition,
+  videoModels: VideoModelCostInfo[],
+): number {
+  if (!transition.enabled || !transition.transitionModel) return 0;
+  const vm = videoModels.find((m) => m.modelId === transition.transitionModel);
+  if (!vm) return 0;
+  return (transition.durationSeconds / 60) * vm.costPerMinute;
+}
+
+export function estimateAllTransitionsCost(
+  transitions: PipelineTransition[],
+  videoModels: VideoModelCostInfo[],
+): number {
+  return transitions.reduce((sum, t) => sum + estimateTransitionCost(t, videoModels), 0);
+}
+
 export function estimatePipelineCost(
   segments: PipelineSegmentNode[],
   imageModels: ImageModelCostInfo[],
   videoModels: VideoModelCostInfo[],
+  transitions?: PipelineTransition[],
 ): number {
-  return segments.reduce((sum, seg) => sum + estimateSegmentCost(seg, imageModels, videoModels), 0);
+  const segmentCost = segments.reduce((sum, seg) => sum + estimateSegmentCost(seg, imageModels, videoModels), 0);
+  const transitionCost = transitions ? estimateAllTransitionsCost(transitions, videoModels) : 0;
+  return segmentCost + transitionCost;
 }
 
 export function formatCost(cost: number): string {

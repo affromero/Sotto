@@ -41,10 +41,18 @@ export interface Branding {
   bodyFont: string;
 }
 
+export interface VideoTransition {
+  fromSegmentOrder: number;
+  toSegmentOrder: number;
+  assetUrl: string;
+  durationSeconds: number;
+}
+
 export interface VisualsInput {
   segments: VideoSegment[];
   config: RenderConfig;
   branding: Branding;
+  transitions?: VideoTransition[];
 }
 
 export interface AvatarOverlayInput {

@@ -651,12 +651,25 @@ const pipelineSubVisualSchema = z.object({
   endStatePrompt: z.string().nullable().optional(),
 });
 
+export const pipelineTransitionSchema = z.object({
+  fromSegmentOrder: z.number().int(),
+  toSegmentOrder: z.number().int(),
+  fromSegmentId: z.string(),
+  toSegmentId: z.string(),
+  enabled: z.boolean(),
+  recommended: z.boolean().optional().default(false),
+  recommendationReason: z.string().optional(),
+  transitionModel: z.string().nullable(),
+  durationSeconds: z.number().min(0.5).max(3).default(1),
+  estimatedCost: z.number().optional().default(0),
+});
+
 export const generateVideoSchema = z
   .object({
     imageModel: z.string().optional(),
     pipeline: z
       .object({
-        version: z.union([z.literal(1), z.literal(2)]),
+        version: z.union([z.literal(1), z.literal(2), z.literal(3)]),
         defaultImageModel: z.string(),
         defaultVideoModel: z.string(),
         segments: z.array(
@@ -672,6 +685,8 @@ export const generateVideoSchema = z
             subVisuals: z.array(pipelineSubVisualSchema).optional(),
           }),
         ),
+        transitions: z.array(pipelineTransitionSchema).optional(),
+        defaultTransitionModel: z.string().optional(),
       })
       .optional(),
   })
