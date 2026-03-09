@@ -57,6 +57,11 @@ vi.mock('@/lib/heygen', () => ({
   listAvatars: (...args: unknown[]) => mockListAvatars(...args),
 }));
 
+const mockListUnifiedAvatars = vi.fn();
+vi.mock('@/lib/providers/avatar', () => ({
+  listUnifiedAvatars: (...args: unknown[]) => mockListUnifiedAvatars(...args),
+}));
+
 vi.mock('@/lib/r2', () => ({
   deleteFile: (...args: unknown[]) => mockDeleteFile(...args),
   extractR2Key: vi.fn((url: string) => url),
@@ -111,30 +116,46 @@ describe('GET /api/podcasts/[podcastId]/video/avatars', () => {
   it('returns cached avatars from Redis', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
-    const cached = [{ avatar_id: 'av-1', avatar_name: 'Test' }];
+    const cached = [{ id: 'av-1', name: 'Test', provider: 'heygen' }];
     mockRedisGet.mockResolvedValue(JSON.stringify(cached));
 
     const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars).toEqual(cached);
-    expect(mockListAvatars).not.toHaveBeenCalled();
+    expect(data.providers).toBeDefined();
+    expect(mockListUnifiedAvatars).not.toHaveBeenCalled();
   });
 
-  it('fetches from HeyGen and filters premium avatars', async () => {
+  it('fetches avatars via listUnifiedAvatars', async () => {
     const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
     mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
     mockRedisGet.mockResolvedValue(null);
-    mockListAvatars.mockResolvedValue([
-      { avatar_id: 'av-1', avatar_name: 'Free', premium: false },
-      { avatar_id: 'av-2', avatar_name: 'Premium', premium: true },
+    mockListUnifiedAvatars.mockResolvedValue([
+      { id: 'av-1', name: 'Free', provider: 'heygen', isPreset: false, premium: false, previewImageUrl: '' },
     ]);
 
     const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars'), routeParams);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.avatars).toHaveLength(1);
-    expect(data.avatars[0].avatar_id).toBe('av-1');
+    expect(data.avatars[0].id).toBe('av-1');
+  });
+
+  it('fetches Runway avatars when provider=runway', async () => {
+    const { GET } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    process.env.RUNWAY_API_KEY = 'test-runway-key';
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: false, isProUser: false });
+    mockRedisGet.mockResolvedValue(null);
+    mockListUnifiedAvatars.mockResolvedValue([
+      { id: 'influencer', name: 'Influencer', provider: 'runway', isPreset: true, premium: false, previewImageUrl: '' },
+    ]);
+
+    const res = await GET(makeGet('http://localhost/api/podcasts/pod-1/video/avatars?provider=runway'), routeParams);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.avatars[0].provider).toBe('runway');
+    expect(mockListUnifiedAvatars).toHaveBeenCalledWith('test-runway-key', 'runway');
   });
 
   it('rejects unauthorized requests', async () => {
@@ -223,6 +244,60 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 
     const res = await POST(
       makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', { avatars: [{ speaker: 'Host', avatarId: 'av-1' }] }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('passes avatarProvider and isPreset through overlay and job', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockVideoGenUpdate.mockResolvedValue({});
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
+      id: `overlay-${create.speaker}`,
+      speaker: create.speaker,
+      ...create,
+    }));
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+        avatars: [{ speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true }],
+      }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(200);
+    // Overlay upsert should include avatarProvider
+    expect(mockAvatarOverlayUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          avatarProvider: 'runway',
+        }),
+      }),
+    );
+    // Job should include avatarProvider and isPreset
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'avatar-generation' }),
+      'generate_avatar',
+      expect.objectContaining({
+        avatarProvider: 'runway',
+        isPreset: true,
+      }),
+    );
+  });
+
+  it('rejects invalid avatarProvider value', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+        avatars: [{ speaker: 'Host', avatarId: 'av-1', avatarProvider: 'invalid-provider' }],
+      }),
       routeParams,
     );
 

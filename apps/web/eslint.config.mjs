@@ -12,6 +12,6 @@ export default [
     },
   },
   {
-    ignores: ["node_modules/", ".next/", "public/sw.js"],
+    ignores: ["node_modules/", ".next/", "public/sw.js", "src/lib/vendor/"],
   },
 ];
