@@ -20,8 +20,7 @@ COPY --from=uv /uv /uvx /usr/local/bin/
 # Use system Python (no venv needed in a single-purpose container) and
 # disable the cache to keep the image lean
 ENV UV_SYSTEM_PYTHON=1 \
-    UV_NO_CACHE=1 \
-    UV_COMPILE_BYTECODE=1
+    UV_NO_CACHE=1
 
 # Copy dependency manifests first — Docker caches this layer until they change
 COPY pyproject.toml uv.lock .python-version ./
