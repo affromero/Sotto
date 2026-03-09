@@ -59,4 +59,30 @@ describe('AvatarOverlay', () => {
     expect(video).not.toBeNull();
     expect(video?.src).toContain('avatar.webm');
   });
+
+  it('applies rounded mask classes when maskShape is rounded', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="rounded" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskRounded');
+  });
+
+  it('applies circle mask classes when maskShape is circle', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="circle" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).toContain('maskedOverlay');
+    expect(overlay.className).toContain('maskCircle');
+  });
+
+  it('applies maskedVideo class to video when maskShape is set', () => {
+    const { container } = render(<AvatarOverlay {...defaultProps} maskShape="rounded" />);
+    const video = container.querySelector('video');
+    expect(video?.className).toContain('maskedVideo');
+  });
+
+  it('does not apply mask classes when maskShape is none', () => {
+    render(<AvatarOverlay {...defaultProps} maskShape="none" />);
+    const overlay = screen.getByLabelText('Avatar overlay for Host');
+    expect(overlay.className).not.toContain('maskedOverlay');
+  });
 });
