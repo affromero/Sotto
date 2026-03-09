@@ -23,7 +23,7 @@ interface SegmentVisual {
 
 interface VideoStatusResponse {
   videoGenerationId: string;
-  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED';
+  status: 'PENDING' | 'CLASSIFYING' | 'GENERATING_VISUALS' | 'GENERATING_TRANSITIONS' | 'GENERATING_AVATARS' | 'COMPOSING' | 'READY' | 'FAILED';
   videoUrl: string | null;
   failureReason: string | null;
   segmentVisuals: SegmentVisual[];
@@ -37,12 +37,13 @@ interface VideoProgressProps {
   onRequestEdit?: (visuals: SegmentVisual[]) => void;
 }
 
-const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
+const STAGES = ['CLASSIFYING', 'GENERATING_VISUALS', 'GENERATING_TRANSITIONS', 'GENERATING_AVATARS', 'COMPOSING', 'READY'] as const;
 
 const STAGE_LABELS: Record<string, string> = {
   PENDING: 'Starting...',
   CLASSIFYING: 'Classifying segments',
   GENERATING_VISUALS: 'Generating visuals',
+  GENERATING_TRANSITIONS: 'Generating transitions',
   GENERATING_AVATARS: 'Generating avatars',
   COMPOSING: 'Composing video',
   READY: 'Ready',
@@ -85,6 +86,11 @@ const SUB_MESSAGES: Record<string, string[]> = {
     'Each segment gets its own unique visual...',
     'Generating images to match your content...',
     'This is the most visual-intensive step...',
+  ],
+  GENERATING_TRANSITIONS: [
+    'Creating AI video transitions between scenes...',
+    'Blending segment boundaries with cinematic effects...',
+    'Generating smooth visual bridges...',
   ],
   GENERATING_AVATARS: [
     'Generating lip-synced avatar overlays...',
@@ -178,7 +184,7 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
       }
 
       // Adaptive polling interval
-      const interval = json.status === 'GENERATING_VISUALS' ? 3000 : 5000;
+      const interval = json.status === 'GENERATING_VISUALS' || json.status === 'GENERATING_TRANSITIONS' ? 3000 : 5000;
       schedulePoll(interval);
     } catch {
       schedulePoll(5000);
@@ -250,8 +256,10 @@ export function VideoProgress({ podcastId, videoGenerationId, onComplete, onFail
     progressPercent = 5;
   } else if (currentStatus === 'GENERATING_VISUALS' && totalCount > 0) {
     progressPercent = 10 + Math.round((readyCount / totalCount) * 60);
+  } else if (currentStatus === 'GENERATING_TRANSITIONS') {
+    progressPercent = 72;
   } else if (currentStatus === 'GENERATING_AVATARS') {
-    progressPercent = 75;
+    progressPercent = 78;
   } else if (currentStatus === 'COMPOSING') {
     progressPercent = 85;
   } else {
