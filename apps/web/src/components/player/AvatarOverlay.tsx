@@ -16,6 +16,7 @@ interface AvatarOverlayProps {
   containerHeight: number;
   onPositionChange: (pos: { posX: number; posY: number; width: number; height: number }) => void;
   editable: boolean;
+  maskShape?: 'none' | 'rounded' | 'circle';
 }
 
 export function AvatarOverlay({
@@ -31,6 +32,7 @@ export function AvatarOverlay({
   containerHeight,
   onPositionChange,
   editable,
+  maskShape,
 }: AvatarOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,7 @@ export function AvatarOverlay({
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''}`}
+      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskShape === 'rounded' ? `${styles.maskedOverlay} ${styles.maskRounded}` : ''} ${maskShape === 'circle' ? `${styles.maskedOverlay} ${styles.maskCircle}` : ''}`}
       style={{
         left: pxLeft,
         top: pxTop,
@@ -137,7 +139,7 @@ export function AvatarOverlay({
       <video
         ref={videoRef}
         src={videoUrl}
-        className={styles.video}
+        className={`${styles.video} ${maskShape && maskShape !== 'none' ? styles.maskedVideo : ''}`}
         muted
         playsInline
         loop
