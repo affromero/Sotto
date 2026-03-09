@@ -33,6 +33,7 @@ import {
   Globe,
   Scale,
   Receipt,
+  Film,
   ArrowLeft,
   Menu,
   ChevronDown,
@@ -104,6 +105,7 @@ const navGroups: NavGroup[] = [
       { href: '/admin/models', label: 'Model Tester', icon: FlaskConical },
       { href: '/admin/health', label: 'System Health', icon: HeartPulse },
       { href: '/admin/queues', label: 'Queues', icon: ListTodo },
+      { href: '/admin/showcase', label: 'Showcase', icon: Film },
     ],
   },
   {

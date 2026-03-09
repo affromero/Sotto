@@ -1,0 +1,227 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+/* Fieldset */
+
+.fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  margin: 0;
+}
+
+.legend {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+  padding: 0 var(--spacing-xs);
+}
+
+/* Selects */
+
+.select,
+.selectSmall {
+  font: var(--text-body-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.select {
+  width: 100%;
+}
+
+.selectSmall {
+  min-width: 140px;
+}
+
+.select:focus,
+.selectSmall:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* Toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.toolbarLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+/* Segment list */
+
+.segmentList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.segmentCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  transition: border-color 0.15s ease;
+}
+
+.segmentCard[data-has-provider='true'] {
+  border-left: 3px solid var(--color-primary);
+}
+
+.segmentHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.segmentOrder {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 2em;
+}
+
+.segmentSpeaker {
+  font: var(--text-label);
+  color: var(--color-text-primary);
+}
+
+.providerBadge {
+  font: var(--text-body-xs);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.audioBadge {
+  font: var(--text-body-xs);
+  color: var(--color-success);
+  border: 1px solid currentColor;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+}
+
+.segmentText {
+  font: var(--text-body-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-sm);
+  line-height: 1.5;
+}
+
+.segmentControls {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Boundary indicator */
+
+.boundary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.boundaryDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.boundaryLine {
+  flex: 1;
+  height: 2px;
+  background: var(--color-border);
+}
+
+.boundaryLabel {
+  font: var(--text-body-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  padding: 0 var(--spacing-xs);
+}
+
+/* Actions */
+
+.actions {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.btnPrimary,
+.btnSecondary {
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font: var(--text-label);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  min-height: 44px;
+}
+
+.btnPrimary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.btnSecondary {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.btnPrimary:hover:not(:disabled),
+.btnSecondary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btnPrimary:disabled,
+.btnSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Banner */
+
+.banner {
+  font: var(--text-body-sm);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.banner[data-variant='success'] {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.banner[data-variant='error'] {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
