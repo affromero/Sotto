@@ -72,7 +72,17 @@ export function VideoView({
   const speakers = useMemo(() => getUniqueSpeakers(segments), [segments]);
   const activeIndex = findActiveIndex(segments, currentTime);
   const activeSegment = segments[activeIndex] ?? null;
-  const activeVisual = activeSegment ? segmentVisuals.find((v) => v.segmentId === activeSegment.id) : null;
+  // Find the active sub-visual based on elapsed time within the segment
+  const activeVisual = useMemo(() => {
+    if (!activeSegment) return null;
+    const segVisuals = segmentVisuals.filter((v) => v.segmentId === activeSegment.id);
+    if (segVisuals.length <= 1) return segVisuals[0] ?? null;
+    // Multiple sub-visuals — find the one matching current playback time
+    const elapsed = currentTime - (activeSegment.startTime ?? 0);
+    return segVisuals.find((v) =>
+      elapsed >= (v.startOffset ?? 0) && elapsed < (v.startOffset ?? 0) + (v.subDuration ?? activeSegment.duration!),
+    ) ?? segVisuals[0];
+  }, [activeSegment, segmentVisuals, currentTime]);
   const photographer = activeVisual?.metadata?.photographer as string | undefined;
 
   const videoSegments = useMemo(

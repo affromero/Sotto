@@ -165,26 +165,27 @@ export function getClipInfo(
   return { clipCount, perClipDuration, totalDuration };
 }
 
-export function estimateSegmentCost(
-  segment: PipelineSegmentNode,
+function estimateSingleVisualCost(
+  visualMode: string,
+  model: string | null,
+  duration: number,
   imageModels: ImageModelCostInfo[],
   videoModels: VideoModelCostInfo[],
 ): number {
-  if (segment.visualMode === 'programmatic' || !segment.model) return 0;
+  if (visualMode === 'programmatic' || !model) return 0;
 
-  if (segment.visualMode === 'image') {
-    const model = imageModels.find((m) => m.modelId === segment.model);
-    if (!model) return 0;
-    return model.pricePerImage;
+  if (visualMode === 'image') {
+    const im = imageModels.find((m) => m.modelId === model);
+    if (!im) return 0;
+    return im.pricePerImage;
   }
 
-  if (segment.visualMode === 'video') {
-    const model = videoModels.find((m) => m.modelId === segment.model);
-    if (!model) return 0;
-    const maxDur = model.maxDuration ?? 10;
-    const { totalDuration } = getClipInfo(segment.duration, maxDur);
-    const videoCost = (totalDuration / 60) * model.costPerMinute;
-    // Add cost of 2 frame images (first + last) generated for all video segments
+  if (visualMode === 'video') {
+    const vm = videoModels.find((m) => m.modelId === model);
+    if (!vm) return 0;
+    const maxDur = vm.maxDuration ?? 10;
+    const { totalDuration } = getClipInfo(duration, maxDur);
+    const videoCost = (totalDuration / 60) * vm.costPerMinute;
     const cheapestImagePrice = imageModels.length > 0
       ? Math.min(...imageModels.map((m) => m.pricePerImage))
       : 0;
@@ -193,6 +194,21 @@ export function estimateSegmentCost(
   }
 
   return 0;
+}
+
+export function estimateSegmentCost(
+  segment: PipelineSegmentNode,
+  imageModels: ImageModelCostInfo[],
+  videoModels: VideoModelCostInfo[],
+): number {
+  // If segment has sub-visuals, sum cost per sub-visual
+  if (segment.subVisuals && segment.subVisuals.length > 0) {
+    return segment.subVisuals.reduce((sum, sv) =>
+      sum + estimateSingleVisualCost(sv.visualMode, sv.model, sv.duration, imageModels, videoModels),
+    0);
+  }
+
+  return estimateSingleVisualCost(segment.visualMode, segment.model, segment.duration, imageModels, videoModels);
 }
 
 export function estimatePipelineCost(
