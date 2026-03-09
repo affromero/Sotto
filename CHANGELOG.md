@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0] - 2026-03-09
+
+### Added
+- **AI video transitions**: Opt-in AI-generated video transitions between segments using first/last frame video generation (FLF2V). Claude Haiku recommends which boundaries benefit from transitions; users toggle per-boundary in the storyboard editor
+- **Transition pipeline editor**: TransitionConnector UI between segment cards with model selection, FLF2V compatibility warnings, per-transition cost estimates, and "AI recommended" badges
+- **Transition generation worker**: New `transition-generation` queue generates FLF2V transition videos, uploads to R2, and gates the pipeline between visuals and avatars
+- **Remotion transition overlays**: TransitionOverlay component renders transition videos at segment boundaries with 6-frame opacity fades, replacing the 0.27s crossfade with 1s cinematic blends
+- **Runway avatar provider**: Full Runway integration as an alternative avatar provider — Playwright session recorder, REST client, audio chunking for sessions > 280s, AvatarPip mask for non-transparent overlays, and AvatarPicker UI for provider selection
+- **Zero-downtime deployments**: Blue-green deploy strategy with health checks and automatic rollback
+- **Admin short durations**: Admin controls for short-duration podcasts and marketing podcast templates
+
+### Changed
+- Video pipeline now progresses through `GENERATING_TRANSITIONS` stage between visuals and avatars
+- `TRANSITION_FRAMES` increased from 8 to 30 (0.27s → 1s at 30fps)
+- Pipeline version bumped to v3 with transitions array
+- VideoProgress UI shows transition generation stage with progress tracking
+
 ## [0.8.2] - 2026-03-09
 
 ### Added
