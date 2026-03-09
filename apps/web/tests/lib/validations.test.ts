@@ -5,6 +5,8 @@ import {
   interactionSchema,
   updatePodcastSchema,
   feedQuerySchema,
+  configureAvatarsSchema,
+  updateAvatarPositionsSchema,
 } from '@/lib/validations';
 
 describe('discoveryMessageSchema', () => {
@@ -398,6 +400,109 @@ describe('feedQuerySchema', () => {
   it('rejects non-integer page', () => {
     const result = feedQuerySchema.safeParse({ page: 1.5 });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('configureAvatarsSchema', () => {
+  it('accepts valid avatar config with heygen provider', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: 'Host', avatarId: 'av-1', avatarProvider: 'heygen' }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid avatar config with runway provider', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.avatars[0].avatarProvider).toBe('runway');
+      expect(result.data.avatars[0].isPreset).toBe(true);
+    }
+  });
+
+  it('accepts avatars without optional avatarProvider and isPreset', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: 'Host', avatarId: 'av-1' }],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.avatars[0].avatarProvider).toBeUndefined();
+      expect(result.data.avatars[0].isPreset).toBeUndefined();
+    }
+  });
+
+  it('rejects invalid avatarProvider value', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: 'Host', avatarId: 'av-1', avatarProvider: 'invalid' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty avatars array', () => {
+    const result = configureAvatarsSchema.safeParse({ avatars: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 4 avatars', () => {
+    const avatars = Array.from({ length: 5 }, (_, i) => ({
+      speaker: `Speaker ${i}`, avatarId: `av-${i}`,
+    }));
+    const result = configureAvatarsSchema.safeParse({ avatars });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty speaker name', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: '', avatarId: 'av-1' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty avatarId', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [{ speaker: 'Host', avatarId: '' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts multiple avatars with mixed providers', () => {
+    const result = configureAvatarsSchema.safeParse({
+      avatars: [
+        { speaker: 'Host', avatarId: 'av-1', avatarProvider: 'heygen' },
+        { speaker: 'Expert', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('updateAvatarPositionsSchema', () => {
+  it('accepts valid positions', () => {
+    const result = updateAvatarPositionsSchema.safeParse({
+      positions: [{ speaker: 'Host', posX: 0.1, posY: 0.5, width: 0.25, height: 0.35 }],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects posX out of range', () => {
+    const result = updateAvatarPositionsSchema.safeParse({
+      positions: [{ speaker: 'Host', posX: 1.5, posY: 0.5, width: 0.25, height: 0.35 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects width below minimum', () => {
+    const result = updateAvatarPositionsSchema.safeParse({
+      positions: [{ speaker: 'Host', posX: 0.1, posY: 0.5, width: 0.01, height: 0.35 }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts empty positions array (clears all positions)', () => {
+    const result = updateAvatarPositionsSchema.safeParse({ positions: [] });
+    expect(result.success).toBe(true);
   });
 });
 

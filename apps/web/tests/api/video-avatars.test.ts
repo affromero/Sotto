@@ -249,6 +249,60 @@ describe('POST /api/podcasts/[podcastId]/video/avatars', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('passes avatarProvider and isPreset through overlay and job', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+    mockVideoGenUpdate.mockResolvedValue({});
+    mockCheckAvatarGenerationGate.mockResolvedValue({ allowed: true, reason: 'ok', dailyUsed: 0, dailyLimit: 1, dailyRemaining: 1, isByokUser: true, isProUser: false });
+    mockAvatarOverlayUpsert.mockImplementation(({ create }: { create: Record<string, unknown> }) => ({
+      id: `overlay-${create.speaker}`,
+      speaker: create.speaker,
+      ...create,
+    }));
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+        avatars: [{ speaker: 'Host', avatarId: 'influencer', avatarProvider: 'runway', isPreset: true }],
+      }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(200);
+    // Overlay upsert should include avatarProvider
+    expect(mockAvatarOverlayUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          avatarProvider: 'runway',
+        }),
+      }),
+    );
+    // Job should include avatarProvider and isPreset
+    expect(mockAddJob).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'avatar-generation' }),
+      'generate_avatar',
+      expect.objectContaining({
+        avatarProvider: 'runway',
+        isPreset: true,
+      }),
+    );
+  });
+
+  it('rejects invalid avatarProvider value', async () => {
+    const { POST } = await import('@/app/api/podcasts/[podcastId]/video/avatars/route');
+    mockPodcastFindUnique.mockResolvedValue({ id: 'pod-1', userId: 'user-1', status: 'READY', duration: 300 });
+    mockVideoGenFindUnique.mockResolvedValue({ id: 'vg-1', status: 'READY' });
+
+    const res = await POST(
+      makeJson('http://localhost/api/podcasts/pod-1/video/avatars', 'POST', {
+        avatars: [{ speaker: 'Host', avatarId: 'av-1', avatarProvider: 'invalid-provider' }],
+      }),
+      routeParams,
+    );
+
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('DELETE /api/podcasts/[podcastId]/video/avatars', () => {
