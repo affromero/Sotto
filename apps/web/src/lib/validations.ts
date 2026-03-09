@@ -745,6 +745,22 @@ export const generatedScriptSchema = z.object({
   })).catch([]),
 });
 
+/**
+ * Invitation link toggle validation (admin)
+ */
+export const toggleInvitationSchema = z.object({
+  id: z.string(),
+  enabled: z.boolean(),
+});
+
+/**
+ * Invitation link redemption validation (public)
+ */
+export const redeemInvitationSchema = z.object({
+  code: z.string().min(1).max(50),
+  email: z.string().email().max(200),
+});
+
 export const configureAvatarsSchema = z.object({
   avatars: z.array(z.object({
     speaker: z.string().min(1).max(50),

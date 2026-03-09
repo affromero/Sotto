@@ -193,6 +193,9 @@ model User {
   // Voice track contributions (re-voice proposals)
   voiceTrackContributions VoiceTrack[] @relation("VoiceTrackContributions")
 
+  // Invitation links created by admin
+  invitationLinks InvitationLink[] @relation("InvitationLinksCreated")
+
   @@index([role])
   @@index([handle])
   @@index([referredById])
@@ -1352,6 +1355,24 @@ model Waitlist {
 
   @@index([createdAt])
   @@index([status])
+}
+
+// ============ INVITATION LINKS ============
+
+model InvitationLink {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  createdBy String
+  email     String?
+  enabled   Boolean   @default(true)
+  usedAt    DateTime?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  creator User @relation("InvitationLinksCreated", fields: [createdBy], references: [id])
+
+  @@index([code])
+  @@index([createdBy])
 }
 
 // ============ API KEYS ============
