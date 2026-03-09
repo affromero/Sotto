@@ -1218,6 +1218,17 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       {podcast.segments.length > 0 && (
         <>
           <div className={styles.viewToggle} role="tablist" aria-label="Transcript view mode">
+            {segmentVisuals.length > 0 && (
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
+                onClick={() => setViewMode('video')}
+                role="tab"
+                aria-selected={viewMode === 'video'}
+                type="button"
+              >
+                Video
+              </button>
+            )}
             <button
               className={`${styles.viewToggleBtn} ${viewMode === 'transcript' ? styles.viewToggleBtnActive : ''}`}
               onClick={() => setViewMode('transcript')}
@@ -1236,17 +1247,6 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             >
               Teleprompter
             </button>
-            {segmentVisuals.length > 0 && (
-              <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
-                onClick={() => setViewMode('video')}
-                role="tab"
-                aria-selected={viewMode === 'video'}
-                type="button"
-              >
-                Video
-              </button>
-            )}
           </div>
 
           <section className={styles.transcriptSection}>
