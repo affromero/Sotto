@@ -153,6 +153,125 @@
   background: rgba(0, 0, 0, 0.8);
 }
 
+/* Shape picker */
+
+.shapePicker {
+  position: absolute;
+  bottom: var(--spacing-sm);
+  left: var(--spacing-sm);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.shapePickerRow {
+  position: relative;
+}
+
+.shapePickerToggle {
+  padding: 4px var(--spacing-sm);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #F5F5F5;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 28px;
+  min-width: 44px;
+}
+
+.shapePickerToggle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.shapeOptions {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+.shapeOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: #9CA3AF;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.shapeOption:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #F5F5F5;
+}
+
+.shapeOptionActive {
+  border-color: var(--color-primary, #D97706);
+  color: #F5F5F5;
+}
+
+.shapePreview {
+  display: block;
+  width: 24px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.preview_none {
+  border-radius: 4px;
+}
+
+.preview_rounded {
+  border-radius: 8px;
+}
+
+.preview_circle {
+  border-radius: 50%;
+}
+
+.preview_hexagon {
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  border-radius: 0;
+}
+
+.preview_diamond {
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  border-radius: 0;
+}
+
+.preview_blob {
+  border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+}
+
+.preview_squircle {
+  border-radius: 33%;
+}
+
+.shapeLabel {
+  font-family: var(--font-body);
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .subtitleBlock {
     transition: none;

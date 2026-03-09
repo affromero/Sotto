@@ -62,6 +62,7 @@ import { PipelineEditor } from '@/components/player/PipelineEditor';
 import { VideoEditor } from '@/components/player/VideoEditor';
 import { AvatarPicker } from '@/components/player/AvatarPicker';
 import type { AvatarOverlayData } from '@/types/avatar';
+import type { AvatarMaskShape } from '@/components/player/AvatarOverlay';
 import type { PodcastDetail } from '@/types/podcast';
 import type { ReferenceData } from '@/types/reference';
 import type { VideoPipeline, FalModelsResponse } from '@/types/pipeline';
@@ -407,6 +408,20 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
           body: JSON.stringify({ positions: [{ speaker, ...pos }] }),
         }).catch(() => {});
       }, 500);
+    },
+    [podcast.id],
+  );
+
+  const handleMaskShapeChange = useCallback(
+    (speaker: string, shape: AvatarMaskShape) => {
+      setAvatarOverlays((prev) =>
+        prev.map((o) => (o.speaker === speaker ? { ...o, maskShape: shape } : o)),
+      );
+      fetch(`/api/podcasts/${podcast.id}/video/avatars/positions`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ positions: [{ speaker, maskShape: shape }] }),
+      }).catch(() => {});
     },
     [podcast.id],
   );
@@ -1271,6 +1286,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
                   });
                 }}
                 onAvatarPositionChange={handleAvatarPositionChange}
+                onMaskShapeChange={handleMaskShapeChange}
               />
             ) : null}
           </section>
