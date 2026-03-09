@@ -104,6 +104,8 @@ jobs:
     needs: publish
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    permissions:
+      packages: read
     environment: production
     outputs:
       deploy_status: ${{ steps.deploy.outcome }}
@@ -133,6 +135,7 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: sotto
           key: ${{ secrets.SSH_KEY }}
+          envs: GHCR_TOKEN
           script: |
             set -e
             cd ~/sotto
@@ -148,6 +151,9 @@ jobs:
             echo "Syncing Caddy config..."
             sudo cp ~/sotto/Caddyfile /etc/caddy/conf.d/sotto.fm
             sudo caddy reload --config /etc/caddy/Caddyfile --force
+
+            echo "Authenticating with GHCR..."
+            echo "${GHCR_TOKEN}" | docker login ghcr.io -u affromero --password-stdin
 
             echo "Pulling pre-built images from GHCR..."
             docker compose -f docker-compose.prod.yml pull web workers remotion kittentts maps
@@ -189,6 +195,8 @@ jobs:
             docker image prune -f
 
             echo "Deploy complete!"
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Rebuild pitch deck
         id: pitch
