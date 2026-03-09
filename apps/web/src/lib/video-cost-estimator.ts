@@ -117,7 +117,7 @@ export async function fetchFalVideoModels(): Promise<FalVideoModelInfo[]> {
   return fallback;
 }
 
-/** Return video models from all providers (FAL + MiniMax) with live pricing. */
+/** Return video models from all providers (FAL + MiniMax + Runway) with live pricing. */
 export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
   const now = Date.now();
   if (videoCache && now < videoCache.expiresAt) return videoCache.data;
@@ -128,11 +128,12 @@ export async function fetchAllVideoModels(): Promise<FalVideoModelInfo[]> {
     const apiKey = process.env.PRICETOKEN_API_KEY;
     const client = new PriceTokenClient(apiKey ? { apiKey } : undefined);
     // Fetch from all video providers
-    const [falModels, minimaxModels] = await Promise.all([
+    const [falModels, minimaxModels, runwayModels] = await Promise.all([
       client.getVideoPricing({ provider: 'fal' }).catch(() => [] as VideoModelPricing[]),
       client.getVideoPricing({ provider: 'minimax' }).catch(() => [] as VideoModelPricing[]),
+      client.getVideoPricing({ provider: 'runway' }).catch(() => [] as VideoModelPricing[]),
     ]);
-    const all = [...falModels, ...minimaxModels];
+    const all = [...falModels, ...minimaxModels, ...runwayModels];
     const models = all
       .filter((m) => knownIds.has(m.modelId))
       .map(mapVideoModel);
