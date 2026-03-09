@@ -22,7 +22,7 @@ async function hasImageByokKey(userId: string): Promise<boolean> {
   const key = await prisma.userTtsKey.findFirst({
     where: {
       userId,
-      provider: { in: ['fal', 'minimax', 'heygen'] },
+      provider: { in: ['fal', 'minimax', 'heygen', 'runway'] },
       isValid: true,
     },
     select: { id: true },
