@@ -1,6 +1,9 @@
 /**
  * Visual classifier — single AI call to classify all segments in a podcast
  * with visual types and generation metadata for video production.
+ *
+ * Supports multiple sub-visuals per segment: a 30s voice segment can have
+ * different visual types for different portions (e.g., TEXT_CARD → MAP_OVERLAY → AI_ILLUSTRATION).
  */
 import { createAIProvider } from './providers/ai';
 import { logger } from './logger';
@@ -25,38 +28,63 @@ export type VisualTypeString =
   | 'TEXT_CARD'
   | 'MAP_OVERLAY';
 
-export interface ClassifiedSegment {
-  segmentId: string;
-  order: number;
+export interface ClassifiedSubVisual {
+  subOrder: number;
+  startOffsetFraction: number; // 0.0-1.0 of segment duration
+  durationFraction: number; // 0.0-1.0 of segment duration
   visualType: VisualTypeString;
   prompt: string | null;
   metadata: Record<string, unknown> | null;
   endStatePrompt: string | null;
 }
 
+export interface ClassifiedSegment {
+  segmentId: string;
+  order: number;
+  subVisuals: ClassifiedSubVisual[];
+}
+
+const VISUAL_TYPE_ENUM = [
+  'AI_ILLUSTRATION',
+  'STOCK_FOOTAGE',
+  'DATA_CHART',
+  'QUOTE',
+  'COMPARISON',
+  'TIMELINE',
+  'DIAGRAM',
+  'TEXT_CARD',
+  'MAP_OVERLAY',
+] as const;
+
+const subVisualSchema = z.object({
+  subOrder: z.number().int().min(0),
+  startOffsetFraction: z.number().min(0).max(1),
+  durationFraction: z.number().min(0).max(1),
+  visualType: z.enum(VISUAL_TYPE_ENUM),
+  prompt: z.string().nullable(),
+  metadata: z.union([z.record(z.unknown()), z.string(), z.null()]),
+  endStatePrompt: z.string().nullable().optional(),
+});
+
 const classificationItemSchema = z.object({
   order: z.number(),
-  visualType: z.enum([
-    'AI_ILLUSTRATION',
-    'STOCK_FOOTAGE',
-    'DATA_CHART',
-    'QUOTE',
-    'COMPARISON',
-    'TIMELINE',
-    'DIAGRAM',
-    'TEXT_CARD',
-    'MAP_OVERLAY',
-  ]),
+  subVisuals: z.array(subVisualSchema).min(1),
+});
+
+// Legacy flat format (single visual per segment) for backward compat
+const legacyClassificationItemSchema = z.object({
+  order: z.number(),
+  visualType: z.enum(VISUAL_TYPE_ENUM),
   prompt: z.string().nullable(),
   metadata: z.union([z.record(z.unknown()), z.string(), z.null()]),
   endStatePrompt: z.string().nullable().optional(),
 });
 
 const classificationSchema = z.object({
-  segments: z.array(classificationItemSchema),
+  segments: z.array(z.union([classificationItemSchema, legacyClassificationItemSchema])),
 });
 
-const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign each one a visual type for a video overlay.
+const SYSTEM_PROMPT = `You are a video producer. Given podcast segments, assign each one visual types for a video overlay.
 
 VISUAL TYPES:
 - AI_ILLUSTRATION: Rich editorial illustration. Provide a detailed image prompt (style: editorial illustration, clean, warm tones, no real people likenesses).
@@ -69,19 +97,60 @@ VISUAL TYPES:
 - TEXT_CARD: Key points summary. Provide metadata: { headline, bullets: string[], statValue?, statLabel? }.
 - MAP_OVERLAY: Geographic content — specific locations, historical places, battle sites, trade routes, geographic features. Provide a search-friendly place description in prompt. Provide metadata: { places: [{ name, yearHint? }], preset: "vintage"|"satellite"|"cinematic" }.
 
-RULES:
-1. Every segment gets exactly one visual type.
-2. Ensure visual variety — don't assign the same type to more than 3 consecutive segments.
-3. Use AI_ILLUSTRATION for vivid narrative moments, abstract concepts, and scene-setting.
-4. Use STOCK_FOOTAGE for real-world topics (nature, cities, technology in action).
-5. Use DATA_CHART when numbers, statistics, or trends are discussed.
-6. Use QUOTE when a notable quote or key statement is highlighted.
-7. Use TEXT_CARD as a general fallback for explanatory content.
-8. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
-9. For AI_ILLUSTRATION and STOCK_FOOTAGE segments, also provide "endStatePrompt": a description of how the scene should look AFTER the narration concludes — the final visual state. This should differ meaningfully from the opening prompt (e.g., if the prompt shows a city at dawn, the endStatePrompt might show it at midday with bustling activity). For other visual types, set endStatePrompt to null.
+SUB-VISUAL RULES:
+1. Each segment can have ONE or MORE sub-visuals that divide it into visual portions.
+2. Segments under 15 seconds: use a single sub-visual.
+3. Segments 15-30 seconds: consider 2 sub-visuals if the content naturally shifts topic or tone.
+4. Segments over 30 seconds: use 2-4 sub-visuals to keep the video visually dynamic.
+5. Sub-visual startOffsetFraction and durationFraction values must sum to exactly 1.0 for each segment.
+6. Each sub-visual's startOffsetFraction must equal the sum of all preceding sub-visuals' durationFraction values.
+7. Ensure visual variety — avoid the same visual type in consecutive sub-visuals within a segment.
 
-Return JSON: { "segments": [{ "order": number, "visualType": string, "prompt": string|null, "metadata": string|null, "endStatePrompt": string|null }] }
-For metadata, return a JSON-encoded string (e.g. "{\"chartType\":\"bar\",\"title\":\"Revenue\"}"), not a raw object. Return null if no metadata is needed.`;
+MAP DETECTION:
+8. When the speaker text mentions specific geographic locations, cities, countries, regions, or routes, PROACTIVELY use a MAP_OVERLAY sub-visual for that portion — even alongside other visual types. For example, "The Silk Road stretched from Xi'an to Constantinople" should get a MAP_OVERLAY sub-visual for that portion.
+
+GENERAL RULES:
+9. Ensure visual variety across segments — don't assign the same type to more than 3 consecutive sub-visuals.
+10. Use AI_ILLUSTRATION for vivid narrative moments, abstract concepts, and scene-setting.
+11. Use STOCK_FOOTAGE for real-world topics (nature, cities, technology in action).
+12. Use DATA_CHART when numbers, statistics, or trends are discussed.
+13. Use QUOTE when a notable quote or key statement is highlighted.
+14. Use TEXT_CARD as a general fallback for explanatory content.
+15. Never generate likenesses of real, identifiable people in AI_ILLUSTRATION prompts.
+16. For AI_ILLUSTRATION and STOCK_FOOTAGE sub-visuals, also provide "endStatePrompt": a description of how the scene should look AFTER the narration concludes. For other visual types, set endStatePrompt to null.
+
+Return JSON: { "segments": [{ "order": number, "subVisuals": [{ "subOrder": 0, "startOffsetFraction": 0.0, "durationFraction": 0.5, "visualType": string, "prompt": string|null, "metadata": string|null, "endStatePrompt": string|null }] }] }
+For metadata, return a JSON-encoded string (e.g. "{\\"chartType\\":\\"bar\\",\\"title\\":\\"Revenue\\"}"), not a raw object. Return null if no metadata is needed.`;
+
+function parseMetadata(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (raw && typeof raw === 'object') {
+    return raw as Record<string, unknown>;
+  }
+  return null;
+}
+
+function isLegacyItem(item: z.infer<typeof classificationSchema>['segments'][number]): item is z.infer<typeof legacyClassificationItemSchema> {
+  return 'visualType' in item && !('subVisuals' in item);
+}
+
+function wrapLegacyAsSubVisual(item: z.infer<typeof legacyClassificationItemSchema>): ClassifiedSubVisual {
+  return {
+    subOrder: 0,
+    startOffsetFraction: 0,
+    durationFraction: 1,
+    visualType: item.visualType,
+    prompt: item.prompt,
+    metadata: parseMetadata(item.metadata),
+    endStatePrompt: item.endStatePrompt ?? null,
+  };
+}
 
 export async function classifySegmentVisuals(
   segments: SegmentInput[],
@@ -99,14 +168,14 @@ Topic: ${podcastTopic}
 Segments:
 ${segmentList}
 
-Classify each segment with a visual type. Return JSON only.`;
+Classify each segment with sub-visuals. Return JSON only.`;
 
   const ai = createAIProvider(opts?.provider);
   const result = await ai.generateResponse(
     SYSTEM_PROMPT,
     [{ role: 'user', content: userMessage }],
     {
-      maxTokens: 4096,
+      maxTokens: 8192,
       model: opts?.model,
       apiKeyOverride: opts?.apiKeyOverride,
       skipModeration: true,
@@ -123,12 +192,25 @@ Classify each segment with a visual type. Return JSON only.`;
                 additionalProperties: false,
                 properties: {
                   order: { type: 'number' },
-                  visualType: { type: 'string' },
-                  prompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-                  metadata: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-                  endStatePrompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                  subVisuals: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      additionalProperties: false,
+                      properties: {
+                        subOrder: { type: 'number' },
+                        startOffsetFraction: { type: 'number' },
+                        durationFraction: { type: 'number' },
+                        visualType: { type: 'string' },
+                        prompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                        metadata: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                        endStatePrompt: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                      },
+                      required: ['subOrder', 'startOffsetFraction', 'durationFraction', 'visualType', 'prompt', 'metadata', 'endStatePrompt'],
+                    },
+                  },
                 },
-                required: ['order', 'visualType', 'prompt', 'metadata', 'endStatePrompt'],
+                required: ['order', 'subVisuals'],
               },
             },
           },
@@ -151,45 +233,85 @@ Classify each segment with a visual type. Return JSON only.`;
     parsed = {
       segments: segments.map((s) => ({
         order: s.order,
-        visualType: 'TEXT_CARD' as const,
-        prompt: null,
-        metadata: { headline: podcastTitle, bullets: [s.text.slice(0, 200)] },
-        endStatePrompt: null,
+        subVisuals: [{
+          subOrder: 0,
+          startOffsetFraction: 0,
+          durationFraction: 1,
+          visualType: 'TEXT_CARD' as const,
+          prompt: null,
+          metadata: { headline: podcastTitle, bullets: [s.text.slice(0, 200)] },
+          endStatePrompt: null,
+        }],
       })),
     };
   }
 
-  // Map classified segments back to segment IDs, parsing stringified metadata
+  // Map classified segments back to segment IDs
   const orderToId = new Map(segments.map((s) => [s.order, s.segmentId]));
   const classifications: ClassifiedSegment[] = parsed.segments
     .filter((c) => orderToId.has(c.order))
     .map((c) => {
-      let metadata: Record<string, unknown> | null = null;
-      if (typeof c.metadata === 'string') {
-        try { metadata = JSON.parse(c.metadata); } catch { metadata = null; }
-      } else if (c.metadata && typeof c.metadata === 'object') {
-        metadata = c.metadata as Record<string, unknown>;
+      // Handle legacy flat format (single visual per segment)
+      if (isLegacyItem(c)) {
+        return {
+          segmentId: orderToId.get(c.order)!,
+          order: c.order,
+          subVisuals: [wrapLegacyAsSubVisual(c)],
+        };
       }
+
+      // New multi-visual format
+      const subVisuals: ClassifiedSubVisual[] = c.subVisuals.map((sv) => ({
+        subOrder: sv.subOrder,
+        startOffsetFraction: sv.startOffsetFraction,
+        durationFraction: sv.durationFraction,
+        visualType: sv.visualType,
+        prompt: sv.prompt,
+        metadata: parseMetadata(sv.metadata),
+        endStatePrompt: sv.endStatePrompt ?? null,
+      }));
+
+      // Validate fractions sum to ~1.0
+      const fractionSum = subVisuals.reduce((sum, sv) => sum + sv.durationFraction, 0);
+      if (Math.abs(fractionSum - 1.0) > 0.05) {
+        logger.warn('Sub-visual duration fractions do not sum to 1.0, normalizing', {
+          order: String(c.order),
+          fractionSum: String(fractionSum),
+        });
+        // Normalize fractions
+        for (const sv of subVisuals) {
+          sv.durationFraction = sv.durationFraction / fractionSum;
+        }
+        // Recalculate startOffsets
+        let offset = 0;
+        for (const sv of subVisuals) {
+          sv.startOffsetFraction = offset;
+          offset += sv.durationFraction;
+        }
+      }
+
       return {
         segmentId: orderToId.get(c.order)!,
         order: c.order,
-        visualType: c.visualType,
-        prompt: c.prompt,
-        metadata,
-        endStatePrompt: c.endStatePrompt ?? null,
+        subVisuals,
       };
     });
 
-  // Fill in any segments that Claude missed
+  // Fill in any segments that the AI missed
   for (const seg of segments) {
     if (!classifications.find((c) => c.segmentId === seg.segmentId)) {
       classifications.push({
         segmentId: seg.segmentId,
         order: seg.order,
-        visualType: 'TEXT_CARD',
-        prompt: null,
-        metadata: { headline: podcastTitle, bullets: [seg.text.slice(0, 200)] },
-        endStatePrompt: null,
+        subVisuals: [{
+          subOrder: 0,
+          startOffsetFraction: 0,
+          durationFraction: 1,
+          visualType: 'TEXT_CARD',
+          prompt: null,
+          metadata: { headline: podcastTitle, bullets: [seg.text.slice(0, 200)] },
+          endStatePrompt: null,
+        }],
       });
     }
   }

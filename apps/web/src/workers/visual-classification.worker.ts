@@ -77,18 +77,26 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
 
     await job.updateProgress(60);
 
-    // Create SegmentVisual records
+    // Build a duration map for fraction→seconds conversion
+    const segmentDurationMap = new Map(segmentInputs.map((s) => [s.segmentId, s.duration]));
+
+    // Create SegmentVisual records — N per segment (one per sub-visual)
     await prisma.segmentVisual.createMany({
-      data: classifications.map((c) => ({
-        videoGenerationId,
-        segmentId: c.segmentId,
-        order: c.order,
-        visualType: c.visualType,
-        prompt: c.prompt,
-        endStatePrompt: c.endStatePrompt,
-        metadata: c.metadata ? (c.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
-        status: EXTERNAL_ASSET_TYPES.has(c.visualType) ? 'pending' : 'ready',
-      })),
+      data: classifications.flatMap((c) =>
+        c.subVisuals.map((sv) => ({
+          videoGenerationId,
+          segmentId: c.segmentId,
+          order: c.order,
+          subOrder: sv.subOrder,
+          startOffset: sv.startOffsetFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
+          subDuration: sv.durationFraction * (segmentDurationMap.get(c.segmentId) ?? 5),
+          visualType: sv.visualType,
+          prompt: sv.prompt,
+          endStatePrompt: sv.endStatePrompt,
+          metadata: sv.metadata ? (sv.metadata as unknown as Prisma.InputJsonValue) : Prisma.JsonNull,
+          status: EXTERNAL_ASSET_TYPES.has(sv.visualType) ? 'pending' : 'ready',
+        })),
+      ),
     });
 
     // Update status to GENERATING_VISUALS
@@ -97,21 +105,20 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       data: { status: 'GENERATING_VISUALS' },
     });
 
-    // Queue jobs for segments needing external assets
-    const externals = classifications.filter((c) => EXTERNAL_ASSET_TYPES.has(c.visualType));
+    // Queue jobs for sub-visuals needing external assets
+    const hasExternals = classifications.some((c) =>
+      c.subVisuals.some((sv) => EXTERNAL_ASSET_TYPES.has(sv.visualType)),
+    );
 
-    if (externals.length > 0) {
+    if (hasExternals) {
       // Look up the created SegmentVisual records for their IDs
       const visuals = await prisma.segmentVisual.findMany({
         where: { videoGenerationId },
-        select: { id: true, segmentId: true, visualType: true, prompt: true, metadata: true },
+        select: { id: true, segmentId: true, subOrder: true, visualType: true, prompt: true, metadata: true },
       });
 
-      const visualBySegment = new Map(visuals.map((v) => [v.segmentId, v]));
-
-      for (const ext of externals) {
-        const visual = visualBySegment.get(ext.segmentId);
-        if (!visual) continue;
+      for (const visual of visuals) {
+        if (!EXTERNAL_ASSET_TYPES.has(visual.visualType)) continue;
 
         if (visual.visualType === 'MAP_OVERLAY') {
           const meta = (visual.metadata as Record<string, unknown>) ?? {};
@@ -134,7 +141,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         }
       }
     } else {
-      // All segments are programmatic — skip straight to composition
+      // All sub-visuals are programmatic — skip straight to composition
       await addJob(videoCompositionQueue, JobType.COMPOSE_VIDEO, {
         podcastId,
         videoGenerationId,
@@ -158,7 +165,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
       podcastId,
       videoGenerationId,
       totalSegments: String(classifications.length),
-      externalAssets: String(externals.length),
+      hasExternalAssets: String(hasExternals),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

@@ -162,7 +162,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const segments: PipelineSegmentNode[] = classifications.map((c) => {
       const input = segmentInputs.find((s) => s.segmentId === c.segmentId)!;
-      const mode = visualModeForType(c.visualType);
+      const firstSv = c.subVisuals[0];
+      const mode = visualModeForType(firstSv.visualType);
       const model = mode === 'image' ? defaultImageModel : mode === 'video' ? defaultVideoModel : null;
 
       const node: PipelineSegmentNode = {
@@ -171,20 +172,40 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         speaker: input.speaker,
         text: input.text,
         duration: input.duration,
-        visualType: c.visualType,
+        visualType: firstSv.visualType,
         visualMode: mode,
         model,
-        prompt: c.prompt,
-        metadata: c.metadata,
-        endStatePrompt: c.endStatePrompt,
+        prompt: firstSv.prompt,
+        metadata: firstSv.metadata,
+        endStatePrompt: firstSv.endStatePrompt,
         estimatedCost: 0,
       };
+
+      if (c.subVisuals.length > 1) {
+        node.subVisuals = c.subVisuals.map((sv) => {
+          const svMode = visualModeForType(sv.visualType);
+          const svModel = svMode === 'image' ? defaultImageModel : svMode === 'video' ? defaultVideoModel : null;
+          return {
+            subOrder: sv.subOrder,
+            startOffset: sv.startOffsetFraction * input.duration,
+            duration: sv.durationFraction * input.duration,
+            visualType: sv.visualType,
+            visualMode: svMode,
+            model: svModel,
+            prompt: sv.prompt,
+            metadata: sv.metadata,
+            endStatePrompt: sv.endStatePrompt,
+            estimatedCost: 0,
+          };
+        });
+      }
+
       node.estimatedCost = estimateSegmentCost(node, imageModels, videoModels);
       return node;
     });
 
     const pipeline: VideoPipeline = {
-      version: 1,
+      version: 2,
       segments,
       totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
       defaultImageModel,
