@@ -6,6 +6,9 @@ import { WaitlistProvider } from '@/components/landing/WaitlistProvider';
 import { AuthCTA } from '@/components/landing/AuthCTA';
 import { PoweredByProviders } from '@/components/landing/PoweredByProviders';
 import { JsonLd } from '@/components/landing/JsonLd';
+import { HeroGradientBlob } from '@/components/landing/HeroGradientBlob';
+import { LottieAnimation } from '@/components/ui/LottieAnimation';
+import heroWaveform from '../../public/lottie/hero-waveform.json';
 import styles from './page.module.css';
 
 const VOICE_TRAITS = [
@@ -28,7 +31,7 @@ export default function LandingPage() {
 
       {/* ====== HERO ====== */}
       <section className={styles.hero} aria-label="Introduction">
-        <div className={styles.heroGlow} aria-hidden="true" />
+        <HeroGradientBlob />
         <div className={styles.heroContent}>
           <div className={styles.badge}>
             <span className={styles.badgeDot} aria-hidden="true" />
@@ -44,11 +47,11 @@ export default function LandingPage() {
           </p>
           <AuthCTA source="hero" />
         </div>
-        <div className={styles.heroWave} aria-hidden="true">
-          {Array.from({ length: 64 }, (_, i) => (
-            <span key={i} className={styles.bar} style={{ '--i': i } as React.CSSProperties} />
-          ))}
-        </div>
+        <LottieAnimation
+          animationData={heroWaveform}
+          className={styles.heroWave}
+          ariaHidden
+        />
       </section>
 
       {/* ====== PILLARS ====== */}

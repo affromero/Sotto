@@ -1,0 +1,96 @@
+.blobs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.blob1,
+.blob2,
+.blob3 {
+  position: absolute;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.blob1 {
+  width: 500px;
+  height: 500px;
+  top: -10%;
+  left: 15%;
+  animation: float1 12s ease-in-out infinite;
+}
+
+.blob2 {
+  width: 450px;
+  height: 450px;
+  top: 20%;
+  right: 10%;
+  animation: float2 15s ease-in-out infinite;
+}
+
+.blob3 {
+  width: 350px;
+  height: 350px;
+  bottom: 10%;
+  left: 40%;
+  animation: float3 10s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -20px) scale(1.05);
+  }
+  66% {
+    transform: translate(-20px, 15px) scale(0.95);
+  }
+}
+
+@keyframes float2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(-25px, 25px) scale(1.08);
+  }
+  66% {
+    transform: translate(15px, -15px) scale(0.97);
+  }
+}
+
+@keyframes float3 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(20px, -25px) scale(1.06);
+  }
+}
+
+@media (max-width: 768px) {
+  .blob1 {
+    width: 300px;
+    height: 300px;
+  }
+
+  .blob2 {
+    width: 250px;
+    height: 250px;
+  }
+
+  .blob3 {
+    width: 200px;
+    height: 200px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blob1,
+  .blob2,
+  .blob3 {
+    animation: none;
+  }
+}
