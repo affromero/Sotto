@@ -46,6 +46,7 @@ The schema is organized into logical sections:
 | Twitter Config    | TwitterConfig, TwitterAutoTweet                                                                                                                                 | Singleton config for auto-tweeting thresholds + per-podcast tweet tracking (threshold/manual/trend triggers)                          |
 | R2 Monitoring     | R2UsageSnapshot                                                                                                                                                 | Daily snapshots of R2 bucket usage (storage size, object count, operation counts, cost estimates). Indexes: `[createdAt]`, `[bucket, createdAt]` |
 | Video Generation  | VideoGeneration, SegmentVisual                                                                                                                                  | Async video pipeline: one VideoGeneration per podcast (status tracking, final MP4 URL), many SegmentVisuals (per-segment visual type + metadata + asset URL) |
+| News Ingestion    | IngestedArticle                                                                                                                                                 | RSS articles ingested by news-ingest worker (dedup by URL @unique, category, pubDate). Indexes: `[pubDate]`, `[category, pubDate]`, `[fetchedAt]`. Pruned after 30 days |
 
 ## Key Enums
 
