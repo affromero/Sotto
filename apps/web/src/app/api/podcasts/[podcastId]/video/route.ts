@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Parse optional body
   let imageModel: string | undefined;
   let pipeline: {
-    version: 1;
+    version: 1 | 2;
     defaultImageModel: string;
     defaultVideoModel: string;
     segments: Array<{
@@ -72,6 +72,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       prompt: string | null;
       metadata: Record<string, unknown> | null;
       endStatePrompt?: string | null;
+      subVisuals?: Array<{
+        subOrder: number;
+        startOffset: number;
+        duration: number;
+        visualType: string;
+        visualMode: 'image' | 'video' | 'programmatic';
+        model: string | null;
+        prompt: string | null;
+        metadata: Record<string, unknown> | null;
+        endStatePrompt?: string | null;
+      }>;
     }>;
   } | undefined;
 

@@ -1,3 +1,14 @@
+export interface VideoSubVisual {
+  subOrder: number;
+  startOffset: number; // seconds from segment start
+  duration: number; // seconds
+  visualType: string;
+  prompt?: string;
+  metadata?: Record<string, unknown>;
+  assetUrl?: string;
+  assetType?: string;
+}
+
 export interface VideoSegment {
   segmentId: string;
   order: number;
@@ -10,6 +21,7 @@ export interface VideoSegment {
   metadata?: Record<string, unknown>;
   assetUrl?: string;
   assetType?: string;
+  subVisuals?: VideoSubVisual[];
 }
 
 export interface RenderConfig {
