@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       return { success: true };
     });
 
-    if ('error' in result) {
+    if ('error' in result && result.error) {
       return errorResponse(result.error, result.status);
     }
 

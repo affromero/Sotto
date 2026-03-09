@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { InviteForm } from './InviteForm';
 import styles from './page.module.css';
@@ -26,7 +27,7 @@ export default async function InvitePage({ params }: PageProps) {
         <div className={styles.errorContainer}>
           <h1 className={styles.errorTitle}>Invalid Invitation</h1>
           <p className={styles.errorMessage}>This invitation link is not valid.</p>
-          <a href="/" className={styles.homeLink}>Go to Sotto</a>
+          <Link href="/" className={styles.homeLink}>Go to Sotto</Link>
         </div>
       </main>
     );
@@ -38,7 +39,7 @@ export default async function InvitePage({ params }: PageProps) {
         <div className={styles.errorContainer}>
           <h1 className={styles.errorTitle}>Already Used</h1>
           <p className={styles.errorMessage}>This invitation has already been redeemed.</p>
-          <a href="/auth/login" className={styles.homeLink}>Sign in</a>
+          <Link href="/auth/login" className={styles.homeLink}>Sign in</Link>
         </div>
       </main>
     );
@@ -50,7 +51,7 @@ export default async function InvitePage({ params }: PageProps) {
         <div className={styles.errorContainer}>
           <h1 className={styles.errorTitle}>Invitation Disabled</h1>
           <p className={styles.errorMessage}>This invitation has been disabled.</p>
-          <a href="/" className={styles.homeLink}>Go to Sotto</a>
+          <Link href="/" className={styles.homeLink}>Go to Sotto</Link>
         </div>
       </main>
     );
@@ -62,7 +63,7 @@ export default async function InvitePage({ params }: PageProps) {
         <div className={styles.errorContainer}>
           <h1 className={styles.errorTitle}>Invitation Expired</h1>
           <p className={styles.errorMessage}>This invitation has expired. Ask the sender for a new one.</p>
-          <a href="/" className={styles.homeLink}>Go to Sotto</a>
+          <Link href="/" className={styles.homeLink}>Go to Sotto</Link>
         </div>
       </main>
     );
