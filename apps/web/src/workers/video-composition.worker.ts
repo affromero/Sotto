@@ -54,32 +54,53 @@ export async function processVideoComposition(job: Job<ComposeVideoPayload>): Pr
         duration: true,
         segmentVisuals: {
           where: { videoGenerationId },
+          orderBy: [{ order: 'asc' }, { subOrder: 'asc' }],
           select: {
             visualType: true,
             prompt: true,
             metadata: true,
             assetUrl: true,
             assetType: true,
+            subOrder: true,
+            startOffset: true,
+            subDuration: true,
           },
         },
       },
     });
 
     const renderSegments = segments.map((s) => {
-      const visual = s.segmentVisuals[0];
-      return {
+      const visuals = s.segmentVisuals;
+      const first = visuals[0];
+      const segDuration = s.duration ?? 5;
+
+      const base = {
         segmentId: s.id,
         order: s.order,
         speaker: s.speaker,
         text: s.text,
         startTime: s.startTime ?? 0,
-        duration: s.duration ?? 5,
-        visualType: visual?.visualType ?? 'TEXT_CARD',
-        prompt: visual?.prompt ?? undefined,
-        metadata: (visual?.metadata as Record<string, unknown>) ?? undefined,
-        assetUrl: visual?.assetUrl ?? undefined,
-        assetType: visual?.assetType ?? undefined,
+        duration: segDuration,
+        visualType: first?.visualType ?? 'TEXT_CARD',
+        prompt: first?.prompt ?? undefined,
+        metadata: (first?.metadata as Record<string, unknown>) ?? undefined,
+        assetUrl: first?.assetUrl ?? undefined,
+        assetType: first?.assetType ?? undefined,
+        subVisuals: visuals.length > 1
+          ? visuals.map((v) => ({
+            subOrder: v.subOrder,
+            startOffset: v.startOffset,
+            duration: v.subDuration ?? segDuration,
+            visualType: v.visualType,
+            prompt: v.prompt ?? undefined,
+            metadata: (v.metadata as Record<string, unknown>) ?? undefined,
+            assetUrl: v.assetUrl ?? undefined,
+            assetType: v.assetType ?? undefined,
+          }))
+          : undefined,
       };
+
+      return base;
     });
 
     // Fetch ready avatar overlays
