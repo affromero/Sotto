@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ExportButton } from './ExportButton';
+import { InvitationLinks } from './InvitationLinks';
 import { WaitlistActions } from './WaitlistActions';
 import styles from './page.module.css';
 
@@ -58,7 +59,24 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
   const page = parseInt(params.page ?? '1', 10);
   const statusFilter = params.status;
 
-  const { entries, total, totalPages, counts } = await getWaitlist(page, statusFilter);
+  const [waitlistData, invitations] = await Promise.all([
+    getWaitlist(page, statusFilter),
+    prisma.invitationLink.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { creator: { select: { name: true, email: true } } },
+    }),
+  ]);
+
+  const { entries, total, totalPages, counts } = waitlistData;
+
+  const now = new Date();
+  const invitationsWithStatus = invitations.map((inv) => ({
+    ...inv,
+    expiresAt: inv.expiresAt.toISOString(),
+    createdAt: inv.createdAt.toISOString(),
+    usedAt: inv.usedAt?.toISOString() ?? null,
+    status: inv.usedAt ? 'used' : !inv.enabled ? 'disabled' : inv.expiresAt < now ? 'expired' : 'active',
+  }));
 
   const tabs = [
     { label: 'All', value: undefined, count: counts.all },
@@ -173,6 +191,8 @@ export default async function AdminWaitlistPage({ searchParams }: PageProps) {
           )}
         </div>
       )}
+
+      <InvitationLinks initialInvitations={invitationsWithStatus} />
     </div>
   );
 }
