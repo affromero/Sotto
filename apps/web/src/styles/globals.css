@@ -118,16 +118,16 @@ body {
   --text-caption: 500 12px/1.4 var(--font-body);
   --text-overline: 600 11px/1.4 var(--font-body);
 
-  /* Font Sizes */
+  /* Font Sizes — fluid clamp() for large sizes, fixed for small */
   --font-size-xs: 11px;
   --font-size-sm: 13px;
   --font-size-base: 15px;
   --font-size-lg: 17px;
   --font-size-xl: 20px;
-  --font-size-2xl: 24px;
-  --font-size-3xl: 30px;
-  --font-size-4xl: 36px;
-  --font-size-5xl: 48px;
+  --font-size-2xl: clamp(1.25rem, 2vw + 0.25rem, 1.625rem);
+  --font-size-3xl: clamp(1.5rem, 2.5vw + 0.5rem, 2rem);
+  --font-size-4xl: clamp(2rem, 3.5vw + 0.5rem, 2.75rem);
+  --font-size-5xl: clamp(2.5rem, 5vw + 1rem, 4rem);
 
   /* Spacing - Semantic (source of truth) */
   --spacing-xs: 4px;
@@ -158,21 +158,40 @@ body {
   --radius-2xl: 16px;
   --radius-full: 9999px;
 
-  /* Shadows */
+  /* Shadows — multi-layer (ambient + edge + lift + color-tint) */
   --shadow-xs: 0 1px 1px 0 rgba(0, 0, 0, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.06), 0 16px 32px rgba(0, 0, 0, 0.08), 0 32px 64px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  --shadow-primary-glow: 0 4px 16px rgba(217, 119, 6, 0.15), 0 8px 32px rgba(217, 119, 6, 0.1);
 
   /* Player shadow (elevated mini player) */
   --shadow-player: 0 -4px 20px rgba(0, 0, 0, 0.1);
 
+  /* Easing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
   /* Transitions */
-  --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 300ms ease;
+  --transition-fast: 150ms var(--ease-out-expo);
+  --transition-base: 250ms var(--ease-out-expo);
+  --transition-slow: 400ms var(--ease-out-expo);
+  --transition-spring: 500ms var(--ease-spring);
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-bg-subtle: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-blur: 12px;
+  --glass-blur-strong: 20px;
+
+  /* Gradients */
+  --gradient-warm: linear-gradient(135deg, #D97706 0%, #F59E0B 50%, #FBBF24 100%);
+  --gradient-hero: linear-gradient(170deg, #0b1120 0%, #122035 45%, #1a3050 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
 
   /* Z-Index Scale */
   --z-dropdown: 1000;
@@ -262,14 +281,22 @@ body {
   --color-teal-light: rgba(45, 212, 191, 0.12);
   --color-teal-subtle: rgba(45, 212, 191, 0.06);
 
-  /* Shadows — stronger for dark backgrounds */
+  /* Shadows — stronger for dark backgrounds, warm amber tint */
   --shadow-xs: 0 1px 1px 0 rgba(0, 0, 0, 0.15);
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 1px 1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.2), 0 8px 16px rgba(0, 0, 0, 0.2), 0 16px 32px rgba(0, 0, 0, 0.15), 0 0 8px rgba(217, 119, 6, 0.05);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.25), 0 16px 32px rgba(0, 0, 0, 0.2), 0 32px 64px rgba(0, 0, 0, 0.15), 0 0 12px rgba(217, 119, 6, 0.05);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-primary-glow: 0 4px 16px rgba(232, 137, 15, 0.2), 0 8px 32px rgba(232, 137, 15, 0.12);
   --shadow-player: 0 -4px 20px rgba(0, 0, 0, 0.3);
+
+  /* Glassmorphism — dark mode */
+  --glass-bg: rgba(38, 36, 32, 0.75);
+  --glass-bg-subtle: rgba(38, 36, 32, 0.4);
+  --glass-border: rgba(217, 119, 6, 0.06);
+  --glass-blur: 12px;
+  --glass-blur-strong: 20px;
 }
 
 /* ============================================ */
