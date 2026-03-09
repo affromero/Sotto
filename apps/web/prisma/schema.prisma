@@ -2092,6 +2092,9 @@ model SegmentVisual {
   videoGenerationId String
   segmentId         String
   order             Int
+  subOrder          Int        @default(0)     // ordering within parent segment (0, 1, 2...)
+  startOffset       Float      @default(0)     // seconds from parent segment start
+  subDuration       Float?                     // seconds; null = full segment duration
   visualType        VisualType
   prompt            String?    @db.Text
   metadata          Json?      // type-specific: chart data, quote text, timeline events, etc.
@@ -2113,6 +2116,7 @@ model SegmentVisual {
 
   @@index([videoGenerationId])
   @@index([segmentId])
+  @@index([segmentId, subOrder])
 }
 
 model AvatarOverlay {

@@ -2,6 +2,19 @@ import type { VisualTypeString } from '@/lib/visual-classifier';
 
 export type VisualMode = 'image' | 'video' | 'programmatic';
 
+export interface PipelineSubVisualNode {
+  subOrder: number;
+  startOffset: number;
+  duration: number;
+  visualType: VisualTypeString;
+  visualMode: VisualMode;
+  model: string | null;
+  prompt: string | null;
+  metadata: Record<string, unknown> | null;
+  endStatePrompt: string | null;
+  estimatedCost: number;
+}
+
 export interface PipelineSegmentNode {
   segmentId: string;
   order: number;
@@ -15,10 +28,11 @@ export interface PipelineSegmentNode {
   metadata: Record<string, unknown> | null;
   endStatePrompt: string | null;
   estimatedCost: number;
+  subVisuals?: PipelineSubVisualNode[];
 }
 
 export interface VideoPipeline {
-  version: 1;
+  version: 1 | 2;
   segments: PipelineSegmentNode[];
   totalEstimatedCost: number;
   defaultImageModel: string;
