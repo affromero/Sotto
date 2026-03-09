@@ -2,7 +2,7 @@
  * Fal.ai video provider — text-to-video via async queue API.
  * Wraps the existing fal-video.ts logic in the VideoProvider interface.
  */
-import { getFalVideoEndpoint, getFalFrameParams } from '../fal-endpoints';
+import { getFalVideoEndpoint, getFalFrameParams, isFalWanModel } from '../fal-endpoints';
 import { logger } from '../../logger';
 import type { VideoProvider } from '../video';
 
@@ -38,6 +38,12 @@ export class FalVideoProvider implements VideoProvider {
       frameBody[frameParams.lastFrameParam] = params.lastFrameImage;
     }
 
+    // WAN models use num_frames (int) instead of duration (string)
+    const isWan = isFalWanModel(this.model);
+    const durationBody: Record<string, unknown> = isWan
+      ? { num_frames: params.duration ? Math.round(params.duration * 24) : 81, resolution: '480p' }
+      : { duration: params.duration ? String(params.duration) : undefined };
+
     const submitRes = await fetch(url, {
       method: 'POST',
       headers: {
@@ -46,8 +52,8 @@ export class FalVideoProvider implements VideoProvider {
       },
       body: JSON.stringify({
         prompt: params.prompt,
-        duration: params.duration ? String(params.duration) : undefined,
         aspect_ratio: '16:9',
+        ...durationBody,
         ...frameBody,
       }),
     });
@@ -71,13 +77,7 @@ export class FalVideoProvider implements VideoProvider {
       submitData.response_url ??
       (submitData.status_url ? submitData.status_url.replace(/\/status$/, '') : fallbackBase);
 
-    logger.info('Fal video job submitted', {
-      request_id,
-      statusUrl,
-      resultUrl,
-      hasStatusUrl: !!submitData.status_url,
-      hasResponseUrl: !!submitData.response_url,
-    });
+    logger.info('Fal video job submitted', { request_id, statusUrl });
 
     for (let i = 0; i < 120; i++) {
       await new Promise((r) => setTimeout(r, 5000));
@@ -94,12 +94,9 @@ export class FalVideoProvider implements VideoProvider {
       const statusBody = await statusRes.json();
       const status = statusBody as { status: string; error?: string; response_url?: string };
 
-      logger.info('Fal status poll', { attempt: i, status: status.status, httpStatus: statusRes.status });
-
       if (status.status === 'COMPLETED') {
         // Use response_url from status response if available (most reliable)
         const fetchUrl = status.response_url ?? resultUrl;
-        logger.info('Fal fetching result', { fetchUrl, resultUrl, statusResponseUrl: status.response_url });
         const resultRes = await fetch(fetchUrl, {
           headers: { Authorization: `Key ${this.apiKey}` },
         });

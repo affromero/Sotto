@@ -35,6 +35,13 @@ vi.mock('@/lib/byok', () => ({
   getAiKey: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock('@/lib/auto-model-config', () => ({
+  resolveVideoModel: vi.fn().mockResolvedValue({
+    videoProvider: 'minimax',
+    videoModel: 'minimax-hailuo02-768p',
+  }),
+}));
+
 const VALID_PROVIDERS = new Set(['anthropic', 'openai', 'google']);
 const VALID_MODELS = new Set(['claude-haiku-4-5-20251001', 'gpt-5-nano', 'gemini-3.1-flash-lite-preview']);
 

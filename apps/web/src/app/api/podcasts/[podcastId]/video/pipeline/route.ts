@@ -10,9 +10,10 @@ import {
   estimateSegmentCost,
   estimatePipelineCost,
   fetchFalImageModels,
-  fetchFalVideoModels,
+  fetchAllVideoModels,
   cheapestModel,
 } from '@/lib/video-cost-estimator';
+import { resolveVideoModel } from '@/lib/auto-model-config';
 import {
   resolveAiModelAndProvider,
   isValidAiProviderId,
@@ -109,6 +110,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Parse optional body for AI provider override
   const body = pipelineBodySchema.parse(await request.json().catch(() => undefined));
 
+  // Resolve user plan for model defaults
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: auth.userId },
+    select: { plan: true },
+  });
+  const tier = user.plan as 'FREE' | 'PRO';
+
   // Resolve AI provider — hoist above try/catch so catch block can report currentProvider
   let aiModel: string;
   let aiProvider: string;
@@ -124,14 +132,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     aiProvider = body.aiProvider;
     aiModel = body.aiModel;
   } else {
-    const [aiKey, user] = await Promise.all([
-      getAiKey(auth.userId),
-      prisma.user.findUniqueOrThrow({ where: { id: auth.userId }, select: { plan: true } }),
-    ]);
+    const aiKey = await getAiKey(auth.userId);
     const resolved = await resolveAiModelAndProvider({
       podcastAiModel: podcast.aiModel,
       aiKey,
-      plan: user.plan as 'FREE' | 'PRO',
+      plan: tier,
     });
     aiModel = resolved.model;
     aiProvider = resolved.provider;
@@ -139,18 +144,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const [{ classifications }, imageModels, videoModels] = await Promise.all([
+    const [{ classifications }, imageModels, videoModels, configuredVideo] = await Promise.all([
       classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic, {
         provider: aiProvider,
         model: aiModel,
         apiKeyOverride,
       }),
       fetchFalImageModels(),
-      fetchFalVideoModels(),
+      fetchAllVideoModels(),
+      resolveVideoModel(tier),
     ]);
 
     const defaultImageModel = cheapestModel(imageModels, (m) => m.pricePerImage, 'fal-recraft-v3');
-    const defaultVideoModel = cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
+    // Use the admin-configured video model; fall back to cheapest across all providers
+    const defaultVideoModel = configuredVideo.videoModel
+      ?? cheapestModel(videoModels, (m) => m.costPerMinute, 'fal-wan2.5-480p');
 
     const segments: PipelineSegmentNode[] = classifications.map((c) => {
       const input = segmentInputs.find((s) => s.segmentId === c.segmentId)!;
@@ -235,7 +243,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Invalid pipeline format', 400);
   }
 
-  const [imageModels, videoModels] = await Promise.all([fetchFalImageModels(), fetchFalVideoModels()]);
+  const [imageModels, videoModels] = await Promise.all([fetchFalImageModels(), fetchAllVideoModels()]);
 
   const validImageIds = new Set(imageModels.map((m) => m.modelId));
   const validVideoIds = new Set(videoModels.map((m) => m.modelId));

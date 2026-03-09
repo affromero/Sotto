@@ -98,6 +98,12 @@ export function isFalVideoModel(modelId: string): boolean {
   return resolveModelId(modelId) in VIDEO_ENDPOINTS;
 }
 
+/** Check if a model is a WAN text-to-video model (uses num_frames instead of duration). */
+export function isFalWanModel(modelId: string): boolean {
+  const resolved = resolveModelId(modelId);
+  return resolved.startsWith('fal-wan');
+}
+
 export function isFalImageModel(modelId: string): boolean {
   return resolveModelId(modelId) in IMAGE_ENDPOINTS;
 }
