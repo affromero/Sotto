@@ -321,12 +321,14 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
       .catch(() => {});
   }, [isOwner, liveStatus, podcast.id]);
 
-  // Fall back to transcript if video tab is active but no visuals available
+  // Auto-select video tab when visuals become available; fall back to transcript when removed
   useEffect(() => {
-    if (segmentVisuals.length === 0 && viewMode === 'video') {
+    if (segmentVisuals.length > 0 && viewMode !== 'video') {
+      setViewMode('video');
+    } else if (segmentVisuals.length === 0 && viewMode === 'video') {
       setViewMode('transcript');
     }
-  }, [segmentVisuals, viewMode]);
+  }, [segmentVisuals.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleGenerateVideo = useCallback(async (overrideProvider?: { aiProvider: string; aiModel: string }) => {
     setPipelineLoading(true);
@@ -1221,7 +1223,7 @@ export function PodcastPlayerView({ podcast, isOwner, isAdmin, isAuthenticated, 
             </button>
             {segmentVisuals.length > 0 && (
               <button
-                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : ''}`}
+                className={`${styles.viewToggleBtn} ${viewMode === 'video' ? styles.viewToggleBtnActive : styles.viewToggleBtnHighlight}`}
                 onClick={() => setViewMode('video')}
                 role="tab"
                 aria-selected={viewMode === 'video'}
