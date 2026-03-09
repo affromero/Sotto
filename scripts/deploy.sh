@@ -121,7 +121,6 @@ echo ""
 echo "=== Running database migrations ==="
 docker compose -f "$COMPOSE_APP" -p "sotto-${NEW_SLOT}" run --rm --no-deps \
   -e DATABASE_URL="postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public" \
-  --network sotto-network \
   web npx prisma@6 db push --skip-generate --schema=prisma/schema.prisma
 
 # --- Start new slot ---
