@@ -1,0 +1,105 @@
+# App services — deployed on every push via blue-green swap.
+# Parameterized by WEB_PORT and MAPS_PORT for slot isolation.
+#
+# Usage:
+#   WEB_PORT=3000 MAPS_PORT=3002 docker compose -f docker-compose.app.yml -p sotto-blue up -d
+#   WEB_PORT=3010 MAPS_PORT=3012 docker compose -f docker-compose.app.yml -p sotto-green up -d
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        COMMIT_SHA: ${COMMIT_SHA:-dev}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    ports:
+      - '127.0.0.1:${WEB_PORT:?Set WEB_PORT}:3000'
+    volumes:
+      - ./.pitch:/app/apps/web/.pitch:ro
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    healthcheck:
+      test:
+        ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  workers:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.workers
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sotto}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sotto}?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '50m'
+        max-file: '5'
+
+  maps:
+    build:
+      context: .
+      dockerfile: apps/maps/Dockerfile
+      args:
+        NEXT_PUBLIC_MAPBOX_TOKEN: ${NEXT_PUBLIC_MAPBOX_TOKEN:-}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - '127.0.0.1:${MAPS_PORT:?Set MAPS_PORT}:3002'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3002/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - sotto-network
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+networks:
+  sotto-network:
+    external: true
+    name: sotto-network
