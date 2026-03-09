@@ -143,11 +143,11 @@ describe('createPodcastSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('accepts durationTarget at minimum boundary (5)', () => {
+  it('accepts durationTarget at minimum boundary (1)', () => {
     const result = createPodcastSchema.safeParse({
       title: 'My Podcast',
       topic: 'A topic',
-      metadata: { topic: 'A topic', durationTarget: 5 },
+      metadata: { topic: 'A topic', durationTarget: 1 },
     });
     expect(result.success).toBe(true);
   });
@@ -161,11 +161,11 @@ describe('createPodcastSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects durationTarget below minimum', () => {
+  it('rejects durationTarget below minimum (1)', () => {
     const result = createPodcastSchema.safeParse({
       title: 'My Podcast',
       topic: 'A topic',
-      metadata: { topic: 'A topic', durationTarget: 3 },
+      metadata: { topic: 'A topic', durationTarget: 0 },
     });
     expect(result.success).toBe(false);
   });
