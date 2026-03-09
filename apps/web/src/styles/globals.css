@@ -301,6 +301,15 @@ body {
   --glass-blur-strong: 20px;
 }
 
+/* Dark mode ambient glow + warm selection */
+[data-theme='dark'] body {
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(217, 119, 6, 0.03) 0%, transparent 60%);
+}
+
+[data-theme='dark'] ::selection {
+  background: rgba(217, 119, 6, 0.3);
+}
+
 /* ============================================ */
 /* TYPOGRAPHY UTILITIES                          */
 /* ============================================ */

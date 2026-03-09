@@ -116,6 +116,17 @@
   to { transform: translateY(0); }
 }
 
+/* Dark mode: glass effect + amber progress glow */
+:global([data-theme='dark']) .miniPlayer {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  border-top: 1px solid var(--glass-border);
+}
+
+:global([data-theme='dark']) .progressLine {
+  box-shadow: 0 0 8px rgba(232, 137, 15, 0.3);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .miniPlayer {
     animation: none;
