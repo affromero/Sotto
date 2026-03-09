@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ---- Mocks ----
 
-const mockCacheGet = vi.fn();
-const mockCacheSet = vi.fn();
+const mockFindMany = vi.fn();
 
-vi.mock('@/lib/redis', () => ({
-  cache: {
-    get: (...args: unknown[]) => mockCacheGet(...args),
-    set: (...args: unknown[]) => mockCacheSet(...args),
+vi.mock('@/lib/prisma', () => ({
+  prisma: {
+    ingestedArticle: {
+      findMany: (...args: unknown[]) => mockFindMany(...args),
+    },
   },
 }));
 
@@ -19,6 +19,7 @@ vi.mock('@/lib/logger', () => ({
 import {
   FEEDS,
   parseRssFeed,
+  fetchFeed,
   fetchNewsletterArticles,
   formatArticlesForPrompt,
 } from '@/lib/newsletter-fetcher';
@@ -28,13 +29,12 @@ import {
 describe('newsletter-fetcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCacheGet.mockResolvedValue(null);
-    mockCacheSet.mockResolvedValue(undefined);
+    mockFindMany.mockResolvedValue([]);
   });
 
   describe('FEEDS', () => {
-    it('has at least 10 curated feeds', () => {
-      expect(FEEDS.length).toBeGreaterThanOrEqual(10);
+    it('has at least 20 curated feeds', () => {
+      expect(FEEDS.length).toBeGreaterThanOrEqual(20);
     });
 
     it('includes feeds from multiple political perspectives', () => {
@@ -50,10 +50,18 @@ describe('newsletter-fetcher', () => {
       expect(names).toContain('Ars Technica');
     });
 
-    it('all feeds have name and url', () => {
+    it('includes aggregator and community feeds', () => {
+      const names = FEEDS.map((f) => f.name);
+      expect(names).toContain('Google News — Top Stories');
+      expect(names).toContain('Hacker News — Best');
+      expect(names).toContain('The Guardian');
+    });
+
+    it('all feeds have name, url, and category', () => {
       for (const feed of FEEDS) {
         expect(feed.name).toBeTruthy();
         expect(feed.url).toMatch(/^https?:\/\//);
+        expect(feed.category).toBeTruthy();
       }
     });
   });
@@ -145,19 +153,38 @@ describe('newsletter-fetcher', () => {
   });
 
   describe('fetchNewsletterArticles', () => {
-    it('returns cached articles when available', async () => {
-      const cachedArticles = [
-        { title: 'Cached Article', url: 'https://example.com', summary: 'cached', pubDate: '2026-02-27', source: 'Test' },
+    it('returns articles from DB when available', async () => {
+      const dbArticles = [
+        {
+          id: 'art1',
+          title: 'DB Article',
+          url: 'https://example.com/db',
+          summary: 'From database',
+          source: 'Reuters',
+          sourceUrl: 'https://reuters.com/feed',
+          category: 'world',
+          pubDate: new Date('2026-03-08T10:00:00Z'),
+          fetchedAt: new Date(),
+        },
       ];
-      mockCacheGet.mockResolvedValue(cachedArticles);
+      mockFindMany.mockResolvedValue(dbArticles);
 
       const result = await fetchNewsletterArticles('1w');
-      expect(result).toEqual(cachedArticles);
-      expect(mockCacheGet).toHaveBeenCalledWith('newsletter:articles:1w');
+      expect(result).toHaveLength(1);
+      expect(result[0].title).toBe('DB Article');
+      expect(result[0].source).toBe('Reuters');
+      expect(result[0].pubDate).toBe('2026-03-08T10:00:00.000Z');
+      expect(mockFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { pubDate: 'desc' },
+          take: 100,
+        })
+      );
     });
 
-    it('fetches from feeds when cache is empty', async () => {
-      // Mock fetch to return a simple RSS feed
+    it('falls back to live RSS when DB is empty', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -176,13 +203,36 @@ describe('newsletter-fetcher', () => {
       expect(result.length).toBeGreaterThan(0);
       expect(result[0].title).toBe('Fresh Article');
 
-      // Should cache results
-      expect(mockCacheSet).toHaveBeenCalled();
+      globalThis.fetch = originalFetch;
+    });
+
+    it('falls back to live RSS when DB query fails', async () => {
+      mockFindMany.mockRejectedValue(new Error('DB connection failed'));
+
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(`<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Fallback Article</title>
+    <link>https://example.com/fallback</link>
+    <description>Fallback</description>
+    <pubDate>${new Date().toUTCString()}</pubDate>
+  </item>
+</channel></rss>`),
+      });
+
+      const result = await fetchNewsletterArticles('1w');
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].title).toBe('Fallback Article');
 
       globalThis.fetch = originalFetch;
     });
 
-    it('handles feed fetch failures gracefully', async () => {
+    it('handles both DB empty and feed failures gracefully', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
@@ -192,9 +242,10 @@ describe('newsletter-fetcher', () => {
       globalThis.fetch = originalFetch;
     });
 
-    it('limits results to 40 articles', async () => {
+    it('limits fallback results to 100 articles', async () => {
+      mockFindMany.mockResolvedValue([]);
+
       const originalFetch = globalThis.fetch;
-      // Each feed returns 5 articles, 14 feeds × 5 = 70, should be capped at 40
       const items = Array.from({ length: 5 }, (_, i) =>
         `<item><title>Article ${i}</title><link>https://example.com/${i}</link><description>Desc</description><pubDate>${new Date().toUTCString()}</pubDate></item>`
       ).join('');
@@ -204,7 +255,42 @@ describe('newsletter-fetcher', () => {
       });
 
       const result = await fetchNewsletterArticles('1m');
-      expect(result.length).toBeLessThanOrEqual(40);
+      expect(result.length).toBeLessThanOrEqual(100);
+
+      globalThis.fetch = originalFetch;
+    });
+  });
+
+  describe('fetchFeed', () => {
+    it('fetches and parses a single feed', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(`<?xml version="1.0"?>
+<rss version="2.0"><channel>
+  <item>
+    <title>Single Feed Article</title>
+    <link>https://example.com/single</link>
+    <description>A test article</description>
+    <pubDate>${new Date().toUTCString()}</pubDate>
+  </item>
+</channel></rss>`),
+      });
+
+      const articles = await fetchFeed({ name: 'Test Feed', url: 'https://example.com/rss', category: 'tech' });
+      expect(articles).toHaveLength(1);
+      expect(articles[0].title).toBe('Single Feed Article');
+      expect(articles[0].source).toBe('Test Feed');
+
+      globalThis.fetch = originalFetch;
+    });
+
+    it('returns empty array on fetch failure', async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+
+      const articles = await fetchFeed({ name: 'Bad Feed', url: 'https://example.com/bad', category: 'world' });
+      expect(articles).toEqual([]);
 
       globalThis.fetch = originalFetch;
     });

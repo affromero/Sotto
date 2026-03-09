@@ -37,6 +37,7 @@ BullMQ workers that process async jobs. Each worker runs in a separate thread wi
 | `place-enrichment`          | `place-enrichment`          | 3      | SegmentVisual places → gazetteer resolution (WHG/GeoNames/Pleiades) with yearHint → merge enriched metadata    | Updates SegmentVisual.metadata with coordinates/historicalContext/confidence, queues visual-generation |
 | `visual-generation`         | `visual-generation`         | 5      | SegmentVisual → AI illustration (fal FLUX), stock footage (Pexels), or map image (Mapbox from pre-enriched places) → upload asset to R2. For video-mode segments: always generates first + last frame images (from prompt + endStatePrompt), persists `firstFrameUrl`/`lastFrameUrl`, passes both to video provider. Multi-clip chains use bookend strategy (first frame on clip 0, last frame on final clip). | Updates SegmentVisual.assetUrl + firstFrameUrl + lastFrameUrl + status, queues video-composition when all segments ready |
 | `video-composition`         | `video-composition`         | 1      | All segment visuals ready → POST to Remotion sidecar → poll for completion → upload MP4 to R2                  | Sets VideoGeneration.status=READY, Podcast.videoUrl, queues VIDEO_READY notification    |
+| `news-ingest`               | `news-ingest`               | 1      | Scheduled (every 30min) → fetch all RSS feeds → upsert into IngestedArticle → prune >30 days                  | Populates IngestedArticle table for `/api/news` + `fetchNewsletterArticles()` DB reads  |
 
 ## Pipeline Flow
 
@@ -54,6 +55,7 @@ twitter-auto-tweet (on-demand) → interpolates template → posts tweet → upd
 telegram-bot (webhook in prod, 5s polling in dev) → routes Telegram updates → saves topic/URL as PodcastIdea → sends confirmation reply
 telegram-reply (on completion) → sends "Listen Now" notification to any user with telegramEnabled + telegramChatId
 email-digest (cron, Sunday 10:00 UTC) → queries new podcasts + stats → sends weekly digest to subscribed waitlist emails
+news-ingest (repeatable, every 30min) → fetches all RSS feeds → upserts IngestedArticle → prunes old articles
 
 Script review (at SCRIPT_READY):
   User edits script → PATCH /api/podcasts/[id]/script (save edits)

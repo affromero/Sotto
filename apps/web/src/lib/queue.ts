@@ -50,6 +50,7 @@ export enum JobType {
   COMPOSE_VIDEO = 'compose_video',
   GENERATE_AVATAR = 'generate_avatar',
   PLACE_ENRICHMENT = 'place_enrichment',
+  INGEST_NEWS = 'ingest_news',
 }
 
 /**
@@ -211,6 +212,8 @@ export interface AutoTweetPayload {
 }
 
 export interface PollTwitterTrendsPayload {}
+
+export interface NewsIngestPayload {}
 
 export interface AdminThreadToPodcastPayload {
   tweetUrl: string;
@@ -810,6 +813,7 @@ export const visualGenerationQueue = createQueue('visual-generation', { attempts
 export const videoCompositionQueue = createQueue('video-composition', { attempts: 2 });
 export const avatarGenerationQueue = createQueue('avatar-generation', { attempts: 2 });
 export const placeEnrichmentQueue = createQueue('place-enrichment', { attempts: 2 });
+export const newsIngestQueue = createQueue('news-ingest', { attempts: 2, skipEvents: true });
 
 /** All queue names — single source of truth for admin and health endpoints */
 export const ALL_QUEUE_NAMES = [
@@ -849,4 +853,5 @@ export const ALL_QUEUE_NAMES = [
   'video-composition',
   'avatar-generation',
   'place-enrichment',
+  'news-ingest',
 ] as const;
