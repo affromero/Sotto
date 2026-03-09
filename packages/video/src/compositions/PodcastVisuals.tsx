@@ -7,6 +7,7 @@ import { AttributionOverlay } from './shared/AttributionOverlay';
 import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
 import { TransitionOverlay } from './shared/TransitionOverlay';
+import { ProviderBadge } from './shared/ProviderBadge';
 
 const TRANSITION_FRAMES = 30;
 
@@ -167,6 +168,7 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
         })}
 
         <SottoWatermark />
+        <ProviderBadge segments={segments} />
       </Background>
     </AbsoluteFill>
   );
