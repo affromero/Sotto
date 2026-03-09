@@ -98,6 +98,13 @@
   color: var(--color-text-primary);
 }
 
+/* Dark mode: glass effect */
+:global([data-theme='dark']) .topBar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  border-bottom-color: var(--glass-border);
+}
+
 @media (max-width: 768px) {
   .nav {
     display: none;

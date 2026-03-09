@@ -6,7 +6,8 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
   font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(var(--glass-blur));
   transition: all var(--transition-base);
   min-width: 300px;
   max-width: 500px;
@@ -15,6 +16,7 @@
 .visible {
   opacity: 1;
   transform: translateY(0);
+  animation: springPop 0.4s var(--ease-spring);
 }
 
 .hidden {

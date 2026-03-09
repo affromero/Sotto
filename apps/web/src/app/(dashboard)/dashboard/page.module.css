@@ -16,6 +16,7 @@
 
 .greeting {
   font: var(--text-h1);
+  font-size: clamp(1.5rem, 3vw + 0.5rem, 2.25rem);
   color: var(--color-text-primary);
 }
 
@@ -58,11 +59,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
-  transition: background var(--transition-fast);
+  transition: background 350ms var(--ease-out-expo),
+    box-shadow 350ms var(--ease-out-expo),
+    transform 350ms var(--ease-out-expo);
 }
 
 .statCard:hover {
   background: var(--color-surface-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
 }
 
 /* Stat card accent colors */
@@ -95,7 +100,8 @@
 
 .statValue {
   font-size: var(--font-size-3xl);
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
   line-height: 1.2;
 }
@@ -430,10 +436,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .statCard,
   .miniGradientCard {
     transition: box-shadow var(--transition-base);
   }
 
+  .statCard:hover,
   .miniGradientCard:hover {
     transform: none;
   }

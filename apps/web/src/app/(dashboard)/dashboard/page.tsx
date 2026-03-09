@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { SectionErrorBoundary } from '@/components/ui/SectionErrorBoundary';
+import { ScrollReveal } from '@/components/ui/ScrollReveal';
 import { DashboardStats } from './DashboardStats';
 import { MyPodcastsSection } from './MyPodcastsSection';
 import { TrendingToForkSection } from './TrendingToForkSection';
@@ -63,8 +64,8 @@ export default async function DashboardPage() {
   const displayName = user?.name || 'there';
 
   return (
-    <main className={styles.main}>
-      <section className={styles.header}>
+    <ScrollReveal as="main" className={styles.main}>
+      <section className={styles.header} data-reveal>
         <h1 className={styles.greeting}>Welcome back, {displayName}</h1>
         <Link href="/create" className={styles.createButton}>
           <svg
@@ -85,23 +86,29 @@ export default async function DashboardPage() {
         </Link>
       </section>
 
-      <SectionErrorBoundary sectionName="Stats">
-        <Suspense fallback={<StatsSkeleton />}>
-          <DashboardStats userId={userId} userEmail={session?.user?.email} userRole={userRole} />
-        </Suspense>
-      </SectionErrorBoundary>
+      <div data-reveal style={{ '--reveal-index': 1 } as React.CSSProperties}>
+        <SectionErrorBoundary sectionName="Stats">
+          <Suspense fallback={<StatsSkeleton />}>
+            <DashboardStats userId={userId} userEmail={session?.user?.email} userRole={userRole} />
+          </Suspense>
+        </SectionErrorBoundary>
+      </div>
 
-      <SectionErrorBoundary sectionName="My Podcasts">
-        <Suspense fallback={<PodcastsSkeleton />}>
-          <MyPodcastsSection userId={userId} userRole={userRole} />
-        </Suspense>
-      </SectionErrorBoundary>
+      <div data-reveal style={{ '--reveal-index': 2 } as React.CSSProperties}>
+        <SectionErrorBoundary sectionName="My Podcasts">
+          <Suspense fallback={<PodcastsSkeleton />}>
+            <MyPodcastsSection userId={userId} userRole={userRole} />
+          </Suspense>
+        </SectionErrorBoundary>
+      </div>
 
-      <SectionErrorBoundary sectionName="Trending to Fork">
-        <Suspense fallback={<TrendingSkeleton />}>
-          <TrendingToForkSection userId={userId} />
-        </Suspense>
-      </SectionErrorBoundary>
-    </main>
+      <div data-reveal style={{ '--reveal-index': 3 } as React.CSSProperties}>
+        <SectionErrorBoundary sectionName="Trending to Fork">
+          <Suspense fallback={<TrendingSkeleton />}>
+            <TrendingToForkSection userId={userId} />
+          </Suspense>
+        </SectionErrorBoundary>
+      </div>
+    </ScrollReveal>
   );
 }

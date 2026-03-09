@@ -41,7 +41,7 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: var(--color-primary);
+  background: var(--gradient-warm);
   border-radius: var(--radius-full);
   transition: width 100ms linear;
 }
@@ -61,11 +61,19 @@
 
 .progressBar:hover .progressThumb {
   opacity: 1;
+  box-shadow: var(--shadow-primary-glow);
 }
 
 .controlsRow {
   display: flex;
   justify-content: center;
+}
+
+/* Dark mode: glass effect */
+:global([data-theme='dark']) .player {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
 }
 
 @media (max-width: 768px) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useScrollReveal } from '@/lib/hooks/useScrollReveal';
 import styles from './LandingShell.module.css';
 
 const INTERACTIVE_SELECTOR = 'a, button, input, textarea, select, form, [role="button"]';
@@ -8,13 +9,12 @@ const MAX_RIPPLES = 3;
 
 interface LandingShellProps {
   children: ReactNode;
-  revealClassName: string;
-  visibleClassName: string;
 }
 
-export function LandingShell({ children, revealClassName, visibleClassName }: LandingShellProps) {
-  const shellRef = useRef<HTMLDivElement>(null);
+export function LandingShell({ children }: LandingShellProps) {
+  const shellRef = useRef<HTMLElement | null>(null);
   const activeRipples = useRef(0);
+  const revealRef = useScrollReveal();
 
   const handleClick = useCallback((e: MouseEvent) => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -46,34 +46,27 @@ export function LandingShell({ children, revealClassName, visibleClassName }: La
   }, []);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add(visibleClassName);
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
-    );
-    document.querySelectorAll(`.${revealClassName}`).forEach((el) => observer.observe(el));
-
     const el = shellRef.current;
     if (el) {
       el.addEventListener('click', handleClick);
     }
-
     return () => {
-      observer.disconnect();
       if (el) {
         el.removeEventListener('click', handleClick);
       }
     };
-  }, [handleClick, revealClassName, visibleClassName]);
+  }, [handleClick]);
+
+  const combinedRef = useCallback(
+    (node: HTMLElement | null) => {
+      shellRef.current = node;
+      revealRef(node);
+    },
+    [revealRef]
+  );
 
   return (
-    <main ref={shellRef} className={styles.shell}>
+    <main ref={combinedRef} className={styles.shell}>
       {children}
     </main>
   );
