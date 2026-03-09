@@ -6,6 +6,13 @@ import * as AudioPlayerProvider from '@/components/providers/AudioPlayerProvider
 
 vi.mock('@/components/providers/AudioPlayerProvider');
 
+// Mock LottieAnimation to avoid lottie-web Canvas dependency in jsdom
+vi.mock('@/components/ui/LottieAnimation', () => ({
+  LottieAnimation: ({ className }: { className?: string }) => (
+    <div data-testid="lottie-animation" className={className} />
+  ),
+}));
+
 describe('MiniPlayer', () => {
   const mockPlayer = {
     podcastId: 'test-podcast-id',
@@ -62,14 +69,29 @@ describe('MiniPlayer', () => {
     expect(screen.getByText('Now Playing')).toBeInTheDocument();
   });
 
-  it('displays first letter of podcast title in artwork', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
+  it('shows Lottie waveform in artwork when playing', () => {
+    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
+      ...mockPlayer,
+      isPlaying: true,
+    });
+    render(<MiniPlayer podcastTitle="Test Podcast" />);
+    expect(screen.getByTestId('lottie-animation')).toBeInTheDocument();
+  });
+
+  it('displays first letter of podcast title in artwork when paused', () => {
+    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
+      ...mockPlayer,
+      isPlaying: false,
+    });
     render(<MiniPlayer podcastTitle="Test Podcast" />);
     expect(screen.getByText('T')).toBeInTheDocument();
   });
 
-  it('displays P in artwork when no title provided', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
+  it('displays P in artwork when no title provided and paused', () => {
+    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
+      ...mockPlayer,
+      isPlaying: false,
+    });
     render(<MiniPlayer />);
     expect(screen.getByText('P')).toBeInTheDocument();
   });
@@ -147,7 +169,6 @@ describe('MiniPlayer', () => {
       duration: 180,
     });
     const { container } = render(<MiniPlayer />);
-    // Progress line has no accessible role — CSS class query is the only option
     const progressLine = container.querySelector('[class*="progressLine"]');
     expect(progressLine).toHaveStyle({ width: '50%' });
   });
@@ -159,13 +180,15 @@ describe('MiniPlayer', () => {
       duration: 0,
     });
     const { container } = render(<MiniPlayer />);
-    // Progress line has no accessible role — CSS class query is the only option
     const progressLine = container.querySelector('[class*="progressLine"]');
     expect(progressLine).toHaveStyle({ width: '0%' });
   });
 
-  it('capitalizes first letter of lowercase title', () => {
-    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue(mockPlayer);
+  it('capitalizes first letter of lowercase title when paused', () => {
+    vi.mocked(AudioPlayerProvider.usePlayer).mockReturnValue({
+      ...mockPlayer,
+      isPlaying: false,
+    });
     render(<MiniPlayer podcastTitle="quantum physics" />);
     expect(screen.getByText('Q')).toBeInTheDocument();
   });
