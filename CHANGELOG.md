@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.11.0] - 2026-03-10
+
+### Added
+- **Frontend overhaul**: Complete visual upgrade across all pages — expressive easing curves (expo, back, spring), multi-layer shadows, glassmorphism tokens, fluid `clamp()` typography, and gradient tokens
+- **Scroll storytelling**: Global `[data-reveal]` scroll animation system with `useScrollReveal` hook and `ScrollReveal` wrapper component — staggered reveals on landing, dashboard, and feed pages
+- **Hero transformation**: Animated gradient blobs, Lottie waveform visualization, glassmorphism badge, and fluid hero typography on the landing page
+- **Lottie animations**: `LottieAnimation` component with reduced-motion support; branded loader in GenerationProgress orb, waveform visualization in MiniPlayer, and hero waveform
+- **Dark mode "cozy evening"**: Warm amber ambient gradient, glass effects on Sidebar/TopBar/MiniPlayer/AudioPlayer, amber selection color, warm-tinted shadows
+- **Provider showcase**: 5 marquee tracks (Voice, Intelligence, Images, Video, Avatars) with all supported providers, moved higher on landing page
+- **Video provider badge**: ProviderBadge overlay component for showcase videos with TTS provider/model pass-through to Remotion
+
+### Changed
+- Card hover lifts with `translateY(-6px)` + `shadow-xl`, button press scales to `0.98`, modal enters with scale+slide, toast uses `springPop` animation
+- Dashboard stat cards lift on hover with multi-layer shadows and use `tabular-nums` for numeric alignment
+- Feed skeleton loading uses shimmer (moving gradient) instead of pulse, filter pills use spring easing
+- Audio player progress bar uses warm gradient fill with amber glow on thumb hover
+- BYOK provider pills expanded with Google and Together AI
+
 ## [0.10.0] - 2026-03-09
 
 ### Added
