@@ -639,12 +639,24 @@ export const regenerateWithFeedbackSchema = z.object({
 /**
  * Video generation request validation
  */
+const pipelineSubVisualSchema = z.object({
+  subOrder: z.number().int().min(0),
+  startOffset: z.number().min(0),
+  duration: z.number().positive(),
+  visualType: z.string(),
+  visualMode: z.enum(['image', 'video', 'programmatic']),
+  model: z.string().nullable(),
+  prompt: z.string().nullable(),
+  metadata: z.record(z.unknown()).nullable(),
+  endStatePrompt: z.string().nullable().optional(),
+});
+
 export const generateVideoSchema = z
   .object({
     imageModel: z.string().optional(),
     pipeline: z
       .object({
-        version: z.literal(1),
+        version: z.union([z.literal(1), z.literal(2)]),
         defaultImageModel: z.string(),
         defaultVideoModel: z.string(),
         segments: z.array(
@@ -657,6 +669,7 @@ export const generateVideoSchema = z
             prompt: z.string().nullable(),
             metadata: z.record(z.unknown()).nullable(),
             endStatePrompt: z.string().nullable().optional(),
+            subVisuals: z.array(pipelineSubVisualSchema).optional(),
           }),
         ),
       })

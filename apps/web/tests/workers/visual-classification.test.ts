@@ -57,7 +57,7 @@ beforeEach(() => {
 describe('visual-classification worker', () => {
   const baseData = { podcastId: 'pod-1', videoGenerationId: 'vg-1', userId: 'user-1' };
 
-  it('classifies segments and queues external asset jobs', async () => {
+  it('classifies segments with sub-visuals and queues external asset jobs', async () => {
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Test Podcast',
       topic: 'Test topic',
@@ -69,8 +69,14 @@ describe('visual-classification worker', () => {
 
     mockClassify.mockResolvedValue({
       classifications: [
-        { segmentId: 'seg-1', order: 0, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null, endStatePrompt: 'scene after narration' },
-        { segmentId: 'seg-2', order: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' }, endStatePrompt: null },
+        {
+          segmentId: 'seg-1', order: 0,
+          subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null, endStatePrompt: 'scene after narration' }],
+        },
+        {
+          segmentId: 'seg-2', order: 1,
+          subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' }, endStatePrompt: null }],
+        },
       ],
       inputTokens: 100,
       outputTokens: 200,
@@ -78,17 +84,17 @@ describe('visual-classification worker', () => {
     });
 
     mockPrisma.segmentVisual.findMany.mockResolvedValue([
-      { id: 'sv-1', segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null },
-      { id: 'sv-2', segmentId: 'seg-2', visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' } },
+      { id: 'sv-1', segmentId: 'seg-1', subOrder: 0, visualType: 'AI_ILLUSTRATION', prompt: 'editorial style', metadata: null },
+      { id: 'sv-2', segmentId: 'seg-2', subOrder: 0, visualType: 'DATA_CHART', prompt: null, metadata: { chartType: 'bar' } },
     ]);
 
     await processVisualClassification(makeJob(baseData));
 
-    // Should create segment visuals
+    // Should create segment visuals with subOrder/startOffset/subDuration
     expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending', endStatePrompt: 'scene after narration' }),
-        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready', endStatePrompt: null }),
+        expect.objectContaining({ segmentId: 'seg-1', visualType: 'AI_ILLUSTRATION', status: 'pending', subOrder: 0, startOffset: 0, subDuration: 5, endStatePrompt: 'scene after narration' }),
+        expect.objectContaining({ segmentId: 'seg-2', visualType: 'DATA_CHART', status: 'ready', subOrder: 0, startOffset: 0, subDuration: 8, endStatePrompt: null }),
       ]),
     });
 
@@ -101,7 +107,48 @@ describe('visual-classification worker', () => {
     );
   });
 
-  it('routes MAP_OVERLAY segments to place-enrichment instead of visual-generation', async () => {
+  it('creates multiple SegmentVisual records for multi-sub-visual segments', async () => {
+    mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
+      title: 'Geography Podcast',
+      topic: 'World places',
+      segments: [
+        { id: 'seg-1', order: 0, speaker: 'Host', text: 'The Silk Road stretched from Xi\'an to Constantinople...', startTime: 0, duration: 30 },
+      ],
+    });
+
+    mockClassify.mockResolvedValue({
+      classifications: [
+        {
+          segmentId: 'seg-1', order: 0,
+          subVisuals: [
+            { subOrder: 0, startOffsetFraction: 0, durationFraction: 0.4, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'The Silk Road' }, endStatePrompt: null },
+            { subOrder: 1, startOffsetFraction: 0.4, durationFraction: 0.6, visualType: 'MAP_OVERLAY', prompt: 'Silk Road trade route', metadata: { places: [{ name: "Xi'an" }, { name: 'Constantinople' }], preset: 'vintage' }, endStatePrompt: null },
+          ],
+        },
+      ],
+      inputTokens: 80,
+      outputTokens: 120,
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    mockPrisma.segmentVisual.findMany.mockResolvedValue([
+      { id: 'sv-1', segmentId: 'seg-1', subOrder: 0, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'The Silk Road' } },
+      { id: 'sv-2', segmentId: 'seg-1', subOrder: 1, visualType: 'MAP_OVERLAY', prompt: 'Silk Road trade route', metadata: { places: [{ name: "Xi'an" }, { name: 'Constantinople' }], preset: 'vintage' } },
+    ]);
+
+    await processVisualClassification(makeJob(baseData));
+
+    // Should create 2 records for the single segment
+    expect(mockPrisma.segmentVisual.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ segmentId: 'seg-1', subOrder: 0, visualType: 'TEXT_CARD', startOffset: 0, subDuration: 12, status: 'ready' }),
+        expect.objectContaining({ segmentId: 'seg-1', subOrder: 1, visualType: 'MAP_OVERLAY', startOffset: 12, subDuration: 18, status: 'pending' }),
+      ]),
+    });
+    expect(mockPrisma.segmentVisual.createMany.mock.calls[0][0].data).toHaveLength(2);
+  });
+
+  it('routes MAP_OVERLAY sub-visuals to place-enrichment queue', async () => {
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Ancient Rome',
       topic: 'History',
@@ -113,12 +160,14 @@ describe('visual-classification worker', () => {
     mockClassify.mockResolvedValue({
       classifications: [
         {
-          segmentId: 'seg-1',
-          order: 0,
-          visualType: 'MAP_OVERLAY',
-          prompt: 'Ancient Rome city',
-          metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
-          endStatePrompt: null,
+          segmentId: 'seg-1', order: 0,
+          subVisuals: [{
+            subOrder: 0, startOffsetFraction: 0, durationFraction: 1,
+            visualType: 'MAP_OVERLAY',
+            prompt: 'Ancient Rome city',
+            metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
+            endStatePrompt: null,
+          }],
         },
       ],
       inputTokens: 80,
@@ -130,6 +179,7 @@ describe('visual-classification worker', () => {
       {
         id: 'sv-1',
         segmentId: 'seg-1',
+        subOrder: 0,
         visualType: 'MAP_OVERLAY',
         prompt: 'Ancient Rome city',
         metadata: { places: [{ name: 'Rome', yearHint: -753 }], preset: 'vintage' },
@@ -152,7 +202,7 @@ describe('visual-classification worker', () => {
     );
   });
 
-  it('skips to composition when all segments are programmatic', async () => {
+  it('skips to composition when all sub-visuals are programmatic', async () => {
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({
       title: 'Test',
       topic: 'Test',
@@ -163,7 +213,10 @@ describe('visual-classification worker', () => {
 
     mockClassify.mockResolvedValue({
       classifications: [
-        { segmentId: 'seg-1', order: 0, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Test' }, endStatePrompt: null },
+        {
+          segmentId: 'seg-1', order: 0,
+          subVisuals: [{ subOrder: 0, startOffsetFraction: 0, durationFraction: 1, visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Test' }, endStatePrompt: null }],
+        },
       ],
       inputTokens: 50,
       outputTokens: 30,
