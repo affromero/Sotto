@@ -51,7 +51,6 @@ services:
         max-file: '3'
 
   web:
-    image: ghcr.io/affromero/sotto-web:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -101,7 +100,6 @@ services:
         max-file: '5'
 
   workers:
-    image: ghcr.io/affromero/sotto-workers:latest
     build:
       context: .
       dockerfile: apps/web/Dockerfile.workers
@@ -135,7 +133,6 @@ services:
         max-file: '5'
 
   kittentts:
-    image: ghcr.io/affromero/sotto-kittentts:latest
     build:
       context: ./services/kittentts
       dockerfile: Dockerfile
@@ -220,7 +217,6 @@ services:
         max-file: '3'
 
   maps:
-    image: ghcr.io/affromero/sotto-maps:latest
     build:
       context: .
       dockerfile: apps/maps/Dockerfile
