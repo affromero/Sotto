@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styles from './AvatarOverlay.module.css';
 
+export type AvatarMaskShape = 'none' | 'rounded' | 'circle' | 'hexagon' | 'diamond' | 'blob' | 'squircle';
+
+export const AVATAR_MASK_SHAPES: AvatarMaskShape[] = ['none', 'rounded', 'circle', 'hexagon', 'diamond', 'blob', 'squircle'];
+
 interface AvatarOverlayProps {
   videoUrl: string;
   speaker: string;
@@ -16,7 +20,7 @@ interface AvatarOverlayProps {
   containerHeight: number;
   onPositionChange: (pos: { posX: number; posY: number; width: number; height: number }) => void;
   editable: boolean;
-  maskShape?: 'none' | 'rounded' | 'circle';
+  maskShape?: AvatarMaskShape;
 }
 
 export function AvatarOverlay({
@@ -121,10 +125,21 @@ export function AvatarOverlay({
     [editable, width, height],
   );
 
+  const maskClassMap: Record<string, string> = {
+    rounded: styles.maskRounded,
+    circle: styles.maskCircle,
+    hexagon: styles.maskHexagon,
+    diamond: styles.maskDiamond,
+    blob: styles.maskBlob,
+    squircle: styles.maskSquircle,
+  };
+  const hasMask = maskShape && maskShape !== 'none' && maskClassMap[maskShape];
+  const maskClass = hasMask ? `${styles.maskedOverlay} ${maskClassMap[maskShape]}` : '';
+
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskShape === 'rounded' ? `${styles.maskedOverlay} ${styles.maskRounded}` : ''} ${maskShape === 'circle' ? `${styles.maskedOverlay} ${styles.maskCircle}` : ''}`}
+      className={`${styles.overlay} ${editable ? styles.editable : ''} ${dragging ? styles.dragging : ''} ${maskClass}`}
       style={{
         left: pxLeft,
         top: pxTop,
