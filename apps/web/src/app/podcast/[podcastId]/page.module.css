@@ -472,6 +472,15 @@
   color: var(--color-text-inverse);
 }
 
+.viewToggleBtnHighlight {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.viewToggleBtnHighlight:hover {
+  color: var(--color-primary);
+}
+
 /* Transcript */
 
 .transcriptSection {
