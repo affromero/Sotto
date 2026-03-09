@@ -1,8 +1,9 @@
 import { Job } from 'bullmq';
 import { GenerateAudioPayload, addJob, JobType, audioStitchingQueue } from '@/lib/queue';
 import { prismaUnfiltered as prisma } from '@/lib/prisma';
-import { resolveTtsProvider } from '@/lib/providers';
+import { resolveTtsProvider, createTtsProviderAsync } from '@/lib/providers';
 import { getProviderMeta, type TtsProviderId } from '@/lib/providers/tts-registry';
+import type { TtsProvider } from '@/lib/providers/tts';
 import { uploadSegmentAudio } from '@/lib/r2';
 import { getAudioDuration } from '@/lib/audio-stitcher';
 import { getElevenLabsConcurrencyLimit } from '@/lib/elevenlabs';
@@ -19,6 +20,20 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { writeFile, rm } from 'fs/promises';
+
+/** Return the platform API key for a given TTS provider (not BYOK). */
+function getPlatformTtsKey(pid: TtsProviderId): string | undefined {
+  switch (pid) {
+    case 'elevenlabs': return process.env.ELEVENLABS_API_KEY;
+    case 'openai': return process.env.OPENAI_API_KEY;
+    case 'cartesia': return process.env.CARTESIA_API_KEY;
+    case 'hume': return process.env.HUME_API_KEY;
+    case 'fal': case 'minimax': return process.env.FAL_KEY;
+    case 'replicate': return process.env.REPLICATE_API_TOKEN;
+    case 'kittentts': return undefined;
+    default: return undefined;
+  }
+}
 
 export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Promise<void> {
   const { podcastId, segmentId, speaker, text, previousText, nextText, direction } = job.data;
@@ -38,10 +53,10 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
     return;
   }
 
-  // Idempotency: skip if segment already has audio
+  // Idempotency: skip if segment already has audio; also fetch per-segment TTS overrides
   const existingSegment = await prisma.segment.findUnique({
     where: { id: segmentId },
-    select: { audioUrl: true },
+    select: { audioUrl: true, ttsProvider: true, ttsModel: true, ttsVoiceId: true },
   });
 
   if (existingSegment?.audioUrl) {
@@ -127,35 +142,22 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
 
   const startTime = Date.now();
 
-  // Resolve provider using the multi-provider system
-  const { provider, source, providerId } = await resolveTtsProvider({
-    userId: podcast.userId,
-    podcastId,
-    requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
-    requestedModel: podcast.ttsModel,
-    plan: podcast.user.plan as 'FREE' | 'PRO',
-  });
+  let provider: TtsProvider;
+  let providerId: TtsProviderId;
+  let source: string;
+  let voiceId: string;
 
-  const ttsModelId = provider.getModelId();
+  if (existingSegment?.ttsProvider) {
+    // ---- Per-segment TTS override (admin showcase builder) ----
+    const segProviderId = existingSegment.ttsProvider as TtsProviderId;
+    const platformKey = getPlatformTtsKey(segProviderId);
+    provider = await createTtsProviderAsync(segProviderId, platformKey, undefined, existingSegment.ttsModel ?? undefined);
+    providerId = segProviderId;
+    source = 'platform';
 
-  // Write back resolved provider and model if not already set
-  if (!podcast.ttsProvider || !podcast.ttsModel) {
-    await prisma.podcast.update({
-      where: { id: podcastId },
-      data: { ttsProvider: providerId, ttsModel: ttsModelId },
-    }).catch((err) => {
-      logger.warn('Failed to write back TTS provider to podcast', { podcastId, error: err instanceof Error ? err.message : String(err) });
-    });
-  }
+    voiceId = existingSegment.ttsVoiceId ?? provider.getVoiceId(speaker, podcastId, voiceMetadata);
 
-  // Use custom voice ID if set and provider matches, otherwise let the provider pick from its pool
-  const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
-  const voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
-    ? podcastVoice.voiceId
-    : provider.getVoiceId(speaker, podcastId, voiceMetadata);
-
-  // Persist resolved voice for retry consistency and analytics
-  if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+    // Persist resolved voice for consistency
     try {
       await prisma.podcastVoice.upsert({
         where: { podcastId_speaker: { podcastId, speaker } },
@@ -167,14 +169,56 @@ export async function processAudioGeneration(job: Job<GenerateAudioPayload>): Pr
         podcastId, speaker, error: err instanceof Error ? err.message : String(err),
       });
     }
+  } else {
+    // ---- Standard flow: resolve provider at podcast level ----
+    const resolved = await resolveTtsProvider({
+      userId: podcast.userId,
+      podcastId,
+      requestedProvider: (podcast.ttsProvider as TtsProviderId | null) ?? undefined,
+      requestedModel: podcast.ttsModel,
+      plan: podcast.user.plan as 'FREE' | 'PRO',
+    });
+    provider = resolved.provider;
+    providerId = resolved.providerId;
+    source = resolved.source;
+
+    const ttsModelId = provider.getModelId();
+
+    // Write back resolved provider and model if not already set
+    if (!podcast.ttsProvider || !podcast.ttsModel) {
+      await prisma.podcast.update({
+        where: { id: podcastId },
+        data: { ttsProvider: providerId, ttsModel: ttsModelId },
+      }).catch((err) => {
+        logger.warn('Failed to write back TTS provider to podcast', { podcastId, error: err instanceof Error ? err.message : String(err) });
+      });
+    }
+
+    // Use custom voice ID if set and provider matches, otherwise let the provider pick from its pool
+    const podcastVoice = podcast.voices.find(v => v.speaker === speaker);
+    voiceId = (podcastVoice?.voiceId && podcastVoice.provider === providerId)
+      ? podcastVoice.voiceId
+      : provider.getVoiceId(speaker, podcastId, voiceMetadata);
+
+    // Persist resolved voice for retry consistency and analytics
+    if (!podcastVoice || podcastVoice.provider !== providerId || podcastVoice.voiceId !== voiceId) {
+      try {
+        await prisma.podcastVoice.upsert({
+          where: { podcastId_speaker: { podcastId, speaker } },
+          update: { voiceId, provider: providerId },
+          create: { podcastId, speaker, voiceId, provider: providerId },
+        });
+      } catch (err) {
+        logger.warn('Failed to persist voice assignment', {
+          podcastId, speaker, error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
   }
 
   // Resolve the raw API key for concurrency lookups
   const resolvedApiKey = await getByokKey(podcast.userId, providerId)
-    || (providerId === 'elevenlabs' ? process.env.ELEVENLABS_API_KEY
-      : providerId === 'cartesia' ? process.env.CARTESIA_API_KEY
-      : providerId === 'hume' ? process.env.HUME_API_KEY
-      : undefined);
+    || getPlatformTtsKey(providerId);
 
   let concurrencyLimit = 5;
   if (providerId === 'elevenlabs' && resolvedApiKey) {

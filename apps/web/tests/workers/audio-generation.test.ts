@@ -76,12 +76,13 @@ const mockProviderGetVoiceId = vi.fn().mockReturnValue('voice-abc');
 const mockStandardGetVoiceId = vi.fn().mockReturnValue('openai-voice-abc');
 
 const mockResolveTtsProvider = vi.fn();
+const mockCreateTtsProviderAsync = vi.fn();
 
 vi.mock('@/lib/providers', () => ({
   resolveTtsProvider: (...args: unknown[]) => mockResolveTtsProvider(...args),
   createPremiumTtsProvider: vi.fn(),
   createTtsProvider: vi.fn(),
-  createTtsProviderAsync: vi.fn(),
+  createTtsProviderAsync: (...args: unknown[]) => mockCreateTtsProviderAsync(...args),
 }));
 
 vi.mock('@/lib/providers/tts-registry', () => ({
@@ -1246,6 +1247,118 @@ describe('processAudioGeneration', () => {
 
       await expect(processAudioGeneration(job)).rejects.toThrow('(429)');
       expect(semaphore.release).toHaveBeenCalled();
+      delete process.env.CARTESIA_API_KEY;
+    });
+  });
+
+  describe('per-segment TTS override (showcase)', () => {
+    const mockOverrideGenerateSpeech = vi.fn().mockResolvedValue(Buffer.from('override-audio'));
+    const mockOverrideGetVoiceId = vi.fn().mockReturnValue('cartesia-voice-1');
+
+    function setupSegmentOverride(overrides: { ttsProvider: string; ttsModel?: string; ttsVoiceId?: string }) {
+      // Segment exists (no audio yet) with TTS overrides
+      mockPrismaSegmentFindUnique.mockResolvedValue({
+        audioUrl: null,
+        ttsProvider: overrides.ttsProvider,
+        ttsModel: overrides.ttsModel ?? null,
+        ttsVoiceId: overrides.ttsVoiceId ?? null,
+      });
+
+      // createTtsProviderAsync returns a mock provider for the override
+      mockCreateTtsProviderAsync.mockResolvedValue({
+        generateSpeech: (...args: unknown[]) => mockOverrideGenerateSpeech(...args),
+        getVoiceId: (...args: unknown[]) => mockOverrideGetVoiceId(...args),
+        getModelId: () => overrides.ttsModel ?? 'sonic-3',
+        providerId: overrides.ttsProvider,
+      });
+    }
+
+    beforeEach(() => {
+      mockOverrideGenerateSpeech.mockResolvedValue(Buffer.from('override-audio'));
+      mockOverrideGetVoiceId.mockReturnValue('cartesia-voice-1');
+    });
+
+    it('uses segment-level provider when ttsProvider is set', async () => {
+      setupSegmentOverride({ ttsProvider: 'cartesia', ttsModel: 'sonic-3' });
+      process.env.CARTESIA_API_KEY = 'platform-cartesia-key';
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      // Should use createTtsProviderAsync, not resolveTtsProvider
+      expect(mockCreateTtsProviderAsync).toHaveBeenCalledWith(
+        'cartesia', 'platform-cartesia-key', undefined, 'sonic-3'
+      );
+      expect(mockResolveTtsProvider).not.toHaveBeenCalled();
+      expect(mockOverrideGenerateSpeech).toHaveBeenCalled();
+
+      delete process.env.CARTESIA_API_KEY;
+    });
+
+    it('falls back to podcast-level flow when segment has no ttsProvider', async () => {
+      // Segment with no TTS override
+      mockPrismaSegmentFindUnique.mockResolvedValue({
+        audioUrl: null,
+        ttsProvider: null,
+        ttsModel: null,
+        ttsVoiceId: null,
+      });
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockResolveTtsProvider).toHaveBeenCalled();
+      expect(mockCreateTtsProviderAsync).not.toHaveBeenCalled();
+    });
+
+    it('uses segment ttsVoiceId when provided', async () => {
+      setupSegmentOverride({
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
+        ttsVoiceId: 'specific-voice-id',
+      });
+      process.env.ELEVENLABS_API_KEY = 'platform-el-key';
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockOverrideGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ voiceId: 'specific-voice-id' })
+      );
+      // Should NOT call provider.getVoiceId since segment specifies voice
+      expect(mockOverrideGetVoiceId).not.toHaveBeenCalled();
+
+      delete process.env.ELEVENLABS_API_KEY;
+    });
+
+    it('falls back to provider getVoiceId when segment has no ttsVoiceId', async () => {
+      setupSegmentOverride({ ttsProvider: 'cartesia' });
+      process.env.CARTESIA_API_KEY = 'platform-cartesia-key';
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockOverrideGetVoiceId).toHaveBeenCalledWith('HOST', 'podcast-001', undefined);
+      expect(mockOverrideGenerateSpeech).toHaveBeenCalledWith(
+        expect.objectContaining({ voiceId: 'cartesia-voice-1' })
+      );
+
+      delete process.env.CARTESIA_API_KEY;
+    });
+
+    it('persists voice assignment for segment override', async () => {
+      setupSegmentOverride({ ttsProvider: 'cartesia', ttsVoiceId: 'cart-voice-42' });
+      process.env.CARTESIA_API_KEY = 'platform-key';
+
+      const job = createMockJob(defaultPayload);
+      await processAudioGeneration(job);
+
+      expect(mockPrismaPodcastVoiceUpsert).toHaveBeenCalledWith({
+        where: { podcastId_speaker: { podcastId: 'podcast-001', speaker: 'HOST' } },
+        update: { voiceId: 'cart-voice-42', provider: 'cartesia' },
+        create: { podcastId: 'podcast-001', speaker: 'HOST', voiceId: 'cart-voice-42', provider: 'cartesia' },
+      });
+
       delete process.env.CARTESIA_API_KEY;
     });
   });
