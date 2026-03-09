@@ -8,13 +8,21 @@ import type { VideoProvider } from '../video';
 const MINIMAX_API_BASE = 'https://api.minimax.io/v1';
 
 /** Map pricetoken model IDs to MiniMax API model names. */
-const MODEL_MAP: Record<string, { apiModel: string; resolution: string; requiresFirstFrame?: boolean }> = {
-  'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P', requiresFirstFrame: true },
-  'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P' },
-  'minimax-hailuo02-pro-1080p': { apiModel: 'MiniMax-Hailuo-02', resolution: '1080P' },
+const MODEL_MAP: Record<string, { apiModel: string; resolution: string; requiresFirstFrame?: boolean; validDurations?: number[] }> = {
+  'minimax-hailuo02-512p': { apiModel: 'MiniMax-Hailuo-02', resolution: '512P', requiresFirstFrame: true, validDurations: [6, 10] },
+  'minimax-hailuo02-768p': { apiModel: 'MiniMax-Hailuo-02', resolution: '768P', validDurations: [6, 10] },
+  'minimax-hailuo02-pro-1080p': { apiModel: 'MiniMax-Hailuo-02', resolution: '1080P', validDurations: [6, 10] },
   'minimax-hailuo23-fast-1080p': { apiModel: 'MiniMax-Hailuo-2.3', resolution: '1080P' },
   'minimax-hailuo23-fast-768p': { apiModel: 'MiniMax-Hailuo-2.3', resolution: '768P' },
 };
+
+/** Snap duration to the nearest valid value for a model, rounding up. */
+function snapDuration(raw: number, validDurations?: number[]): number {
+  if (!validDurations || validDurations.length === 0) return Math.round(raw);
+  // Pick the smallest valid duration >= raw, or the largest valid duration
+  const sorted = [...validDurations].sort((a, b) => a - b);
+  return sorted.find((d) => d >= raw) ?? sorted[sorted.length - 1];
+}
 
 interface MiniMaxBaseResp {
   base_resp: { status_code: number; status_msg: string };
@@ -63,7 +71,7 @@ export class MiniMaxVideoProvider implements VideoProvider {
       model: mapping.apiModel,
       prompt: params.prompt,
       prompt_optimizer: true,
-      duration: params.duration ?? 6,
+      duration: snapDuration(params.duration ?? 6, mapping.validDurations),
       resolution: mapping.resolution,
     };
 
