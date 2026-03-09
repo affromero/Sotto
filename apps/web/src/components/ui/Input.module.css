@@ -19,14 +19,14 @@
   font-family: var(--font-body);
   font-size: var(--font-size-base);
   color: var(--color-text-primary);
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
   width: 100%;
 }
 
 .input:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+  box-shadow: 0 0 0 4px var(--color-primary-subtle), 0 0 0 1px var(--color-primary);
 }
 
 .input::placeholder {

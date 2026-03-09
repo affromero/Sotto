@@ -21,9 +21,16 @@
 .primary {
   background: var(--color-primary);
   color: var(--color-text-inverse);
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.25);
 }
 .primary:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  box-shadow: var(--shadow-primary-glow);
+  transform: translateY(-1px);
+}
+.primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.2);
 }
 
 .secondary {
