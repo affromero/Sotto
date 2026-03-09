@@ -270,7 +270,7 @@ describe('visual-generation worker', () => {
     mockPrisma.segmentVisual.findUnique
       .mockResolvedValueOnce({ assetUrl: null, status: 'pending' })                                                      // idempotency
       .mockResolvedValueOnce({ visualMode: 'video', videoModel: 'minimax-hailuo02-512p', endStatePrompt: 'scene ends' }) // mode check
-      .mockResolvedValueOnce({ segmentId: 'seg-1' });                                                                     // duration lookup
+      .mockResolvedValueOnce({ segmentId: 'seg-1', subDuration: null });                                                    // duration lookup
     mockPrisma.segment.findUnique.mockResolvedValue({ duration: 8 });
     mockPrisma.podcast.findUniqueOrThrow.mockResolvedValue({ userId: 'user-1' });
     mockPrisma.podcast.findUnique.mockResolvedValue({ userId: 'user-1' });
