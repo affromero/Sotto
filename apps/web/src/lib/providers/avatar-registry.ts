@@ -6,7 +6,7 @@
  * dynamically at runtime via avatar-cost-estimator.ts.
  */
 
-export type AvatarProviderId = 'heygen' | 'fal';
+export type AvatarProviderId = 'heygen' | 'fal' | 'runway';
 
 export interface AvatarModelOption {
   id: string;
@@ -56,6 +56,32 @@ const AVATAR_PROVIDERS: Record<AvatarProviderId, AvatarProviderMeta> = {
         try {
           const res = await fetch('https://api.heygen.com/v2/avatars', {
             headers: { 'x-api-key': creds.apiKey },
+          });
+          return res.ok;
+        } catch {
+          return false;
+        }
+      },
+    },
+  },
+
+  runway: {
+    id: 'runway',
+    displayName: 'Runway',
+    getApiKeyUrl: 'https://dev.runwayml.com',
+    defaultModel: 'runway-avatar-realtime',
+    models: [
+      { id: 'runway-avatar-realtime', displayName: 'Realtime Avatar', tier: 'premium' },
+    ],
+    platformKeyEnv: 'RUNWAY_API_KEY',
+    auth: {
+      validate: async (creds) => {
+        try {
+          const res = await fetch('https://api.dev.runwayml.com/v1/avatars?limit=1', {
+            headers: {
+              Authorization: `Bearer ${creds.apiKey}`,
+              'X-Runway-Version': '2024-11-06',
+            },
           });
           return res.ok;
         } catch {

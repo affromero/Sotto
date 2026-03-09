@@ -251,3 +251,52 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.providerTabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 24px 0;
+  flex-shrink: 0;
+}
+
+.providerTab {
+  padding: 6px 16px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.providerTab:hover {
+  color: #e0e0e0;
+  border-color: #666;
+}
+
+.providerTabActive {
+  border-color: #d97706;
+  color: #d97706;
+  background: #332a1a;
+}
+
+.providerBadge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #1e3a5f;
+  color: #93c5fd;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.runwayNotice {
+  padding: 0 24px 4px;
+  margin: 0;
+  font-size: 12px;
+  color: #93c5fd;
+  text-align: center;
+  flex-shrink: 0;
+}

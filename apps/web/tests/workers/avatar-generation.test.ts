@@ -38,6 +38,10 @@ vi.mock('@/lib/heygen', () => ({
   isNonRetryableHeyGenError: vi.fn().mockReturnValue(false),
 }));
 
+vi.mock('@/lib/runway', () => ({
+  isNonRetryableRunwayError: vi.fn().mockReturnValue(false),
+}));
+
 vi.mock('@/lib/avatar-audio-concat', () => ({
   concatenateSpeakerAudio: vi.fn().mockResolvedValue({ durationSeconds: 120 }),
 }));
@@ -84,6 +88,11 @@ beforeEach(() => {
     status: 'pending',
     failureReason: null,
     durationSeconds: null,
+    avatarProvider: null,
+    maskShape: null,
+    runwaySessionId: null,
+    runwayChunkIndex: null,
+    runwayTotalChunks: null,
     posX: 0.02,
     posY: 0.55,
     width: 0.25,
@@ -196,6 +205,11 @@ describe('processAvatarGeneration', () => {
       posY: 0.55,
       width: 0.25,
       height: 0.35,
+      avatarProvider: null,
+      maskShape: null,
+      runwaySessionId: null,
+      runwayChunkIndex: null,
+      runwayTotalChunks: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -224,6 +238,11 @@ describe('processAvatarGeneration', () => {
       posY: 0.55,
       width: 0.25,
       height: 0.35,
+      avatarProvider: null,
+      maskShape: null,
+      runwaySessionId: null,
+      runwayChunkIndex: null,
+      runwayTotalChunks: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -241,6 +260,57 @@ describe('processAvatarGeneration', () => {
     const err = await processAvatarGeneration(mockJob).catch((e: Error) => e);
     expect(err).toBeDefined();
     expect(err!.constructor.name).toBe('UnrecoverableError');
+  });
+});
+
+describe('provider dispatch', () => {
+  it('dispatches to HeyGen when avatarProvider is undefined', async () => {
+    // Default mockJob has no avatarProvider — should use HeyGen path
+    await processAvatarGeneration(mockJob);
+
+    // HeyGen path calls submitAvatarVideo
+    expect(submitAvatarVideo).toHaveBeenCalled();
+  });
+
+  it('dispatches to HeyGen when avatarProvider is heygen', async () => {
+    const heygenJob = {
+      data: {
+        podcastId: 'pod_1',
+        videoGenerationId: 'vg_1',
+        avatarOverlayId: 'ao_1',
+        speaker: 'Host',
+        avatarId: 'avatar_anna',
+        avatarProvider: 'heygen' as const,
+      },
+      updateProgress: vi.fn(),
+    } as never;
+
+    await processAvatarGeneration(heygenJob);
+
+    expect(submitAvatarVideo).toHaveBeenCalled();
+  });
+
+  it('dispatches to Runway when avatarProvider is runway', async () => {
+    process.env.RUNWAY_API_KEY = 'test-runway-key';
+
+    const runwayJob = {
+      data: {
+        podcastId: 'pod_1',
+        videoGenerationId: 'vg_1',
+        avatarOverlayId: 'ao_1',
+        speaker: 'Host',
+        avatarId: 'avatar_anna',
+        avatarProvider: 'runway' as const,
+        isPreset: true,
+      },
+      updateProgress: vi.fn(),
+    } as never;
+
+    // Runway path will fail trying to fetch concat audio, which proves dispatch worked
+    await expect(processAvatarGeneration(runwayJob)).rejects.toThrow();
+
+    // Should NOT have called HeyGen
+    expect(submitAvatarVideo).not.toHaveBeenCalled();
   });
 });
 

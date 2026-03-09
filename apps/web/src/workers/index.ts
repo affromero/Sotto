@@ -100,7 +100,7 @@ const workers = [
   createWorker('visual-classification', processVisualClassification, { concurrency: 2 }),
   createWorker('visual-generation', processVisualGeneration, { concurrency: 5 }),
   createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
-  createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 600000 }),
+  createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 1200000 }),
   createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
   createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
 ];

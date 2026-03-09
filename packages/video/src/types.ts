@@ -54,6 +54,7 @@ export interface AvatarOverlayInput {
   posY: number;
   width: number;
   height: number;
+  maskShape?: 'none' | 'rounded' | 'circle';
 }
 
 export interface RenderInput extends VisualsInput {
