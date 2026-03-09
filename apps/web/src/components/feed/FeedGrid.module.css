@@ -53,7 +53,8 @@
 .skeletonCover {
   height: 180px;
   background: linear-gradient(145deg, var(--color-border), var(--color-background));
-  animation: pulse 1.5s ease-in-out infinite;
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -70,7 +71,7 @@
   width: 56px;
   background: rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-full);
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
   animation-delay: 200ms;
 }
 
@@ -85,7 +86,7 @@
   width: 75%;
   background: rgba(0, 0, 0, 0.1);
   border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
   animation-delay: 300ms;
 }
 
@@ -94,7 +95,7 @@
   width: 55%;
   background: rgba(0, 0, 0, 0.06);
   border-radius: var(--radius-md);
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
   animation-delay: 400ms;
 }
 
@@ -109,7 +110,7 @@
   width: 48px;
   background: rgba(0, 0, 0, 0.06);
   border-radius: var(--radius-full);
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
   animation-delay: 500ms;
 }
 
@@ -119,12 +120,17 @@
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
     opacity: 1;
   }
   50% {
-    opacity: 0.4;
+    opacity: 0.6;
+  }
+  100% {
+    background-position: -200% 0;
+    opacity: 1;
   }
 }
 
