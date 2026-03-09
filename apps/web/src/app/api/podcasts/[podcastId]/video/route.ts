@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   // Parse optional body
   let imageModel: string | undefined;
   let pipeline: {
-    version: 1 | 2;
+    version: 1 | 2 | 3;
     defaultImageModel: string;
     defaultVideoModel: string;
     segments: Array<{

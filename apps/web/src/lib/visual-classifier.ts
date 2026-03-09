@@ -281,6 +281,7 @@ Classify each segment with sub-visuals. Return JSON only.`;
           endStatePrompt: null,
         }],
       })),
+      transitionRecommendations: [],
     };
   }
 

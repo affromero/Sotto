@@ -9,6 +9,7 @@ import { classifySegmentVisuals, type VisualTypeString } from '@/lib/visual-clas
 import {
   estimateSegmentCost,
   estimatePipelineCost,
+  estimateTransitionCost,
   fetchFalImageModels,
   fetchAllVideoModels,
   cheapestModel,
@@ -21,7 +22,8 @@ import {
 } from '@/lib/providers/ai-registry';
 import { classifyError, type ByokErrorKind } from '@/lib/byok-errors';
 import { getAiKey } from '@/lib/byok';
-import type { PipelineSegmentNode, VisualMode, VideoPipeline } from '@/types/pipeline';
+import type { PipelineSegmentNode, PipelineTransition, VisualMode, VideoPipeline } from '@/types/pipeline';
+import { getAllVideoProviderMeta, videoModelSupportsLastFrame } from '@/lib/providers/video-registry';
 import { logger } from '@/lib/logger';
 
 type RouteParams = { params: Promise<{ podcastId: string }> };
@@ -144,7 +146,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const [{ classifications }, imageModels, videoModels, configuredVideo] = await Promise.all([
+    const [{ classifications, transitionRecommendations }, imageModels, videoModels, configuredVideo] = await Promise.all([
       classifySegmentVisuals(segmentInputs, podcast.title, podcast.topic, {
         provider: aiProvider,
         model: aiModel,
@@ -204,17 +206,63 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return node;
     });
 
+    // Find cheapest FLF2V-capable model for transitions
+    const flf2vModels: { id: string; costPerMinute: number }[] = [];
+    for (const provider of getAllVideoProviderMeta()) {
+      for (const model of provider.models) {
+        if (model.supportsLastFrame) {
+          flf2vModels.push({ id: model.id, costPerMinute: model.costPerMinute });
+        }
+      }
+    }
+    const defaultTransitionModel = flf2vModels.length > 0
+      ? flf2vModels.reduce((a, b) => (a.costPerMinute <= b.costPerMinute ? a : b)).id
+      : null;
+
+    // Build PipelineTransition[] for all segment boundaries
+    const recommendedSet = new Set(
+      transitionRecommendations.map((r) => `${r.fromSegmentOrder}-${r.toSegmentOrder}`),
+    );
+    const recommendationReasons = new Map(
+      transitionRecommendations.map((r) => [`${r.fromSegmentOrder}-${r.toSegmentOrder}`, r.reason]),
+    );
+
+    const transitions: PipelineTransition[] = [];
+    for (let i = 0; i < segments.length - 1; i++) {
+      const from = segments[i];
+      const to = segments[i + 1];
+      const key = `${from.order}-${to.order}`;
+      const recommended = recommendedSet.has(key);
+      const transition: PipelineTransition = {
+        fromSegmentOrder: from.order,
+        toSegmentOrder: to.order,
+        fromSegmentId: from.segmentId,
+        toSegmentId: to.segmentId,
+        enabled: recommended,
+        recommended,
+        recommendationReason: recommendationReasons.get(key),
+        transitionModel: defaultTransitionModel,
+        durationSeconds: 1,
+        estimatedCost: 0,
+      };
+      transition.estimatedCost = estimateTransitionCost(transition, videoModels);
+      transitions.push(transition);
+    }
+
     const pipeline: VideoPipeline = {
-      version: 2,
+      version: 3,
       segments,
-      totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
+      transitions,
+      totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels, transitions),
       defaultImageModel,
       defaultVideoModel,
+      defaultTransitionModel: defaultTransitionModel ?? undefined,
     };
 
     logger.info('Pipeline created for editor', {
       podcastId,
       segmentCount: String(segments.length),
+      transitionCount: String(transitions.filter((t) => t.enabled).length),
       totalCost: String(pipeline.totalEstimatedCost),
     });
 
@@ -260,7 +308,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return errorResponse('Invalid JSON body', 400);
   }
 
-  if (body.version !== 1 || !Array.isArray(body.segments)) {
+  if (![1, 2, 3].includes(body.version) || !Array.isArray(body.segments)) {
     return errorResponse('Invalid pipeline format', 400);
   }
 
@@ -278,15 +326,33 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
   }
 
+  // Validate transition models
+  if (body.transitions) {
+    for (const t of body.transitions) {
+      if (t.transitionModel && !validVideoIds.has(t.transitionModel)) {
+        // Check video registry directly for non-pricetoken models
+        if (!videoModelSupportsLastFrame(t.transitionModel)) {
+          return errorResponse(`Unknown transition model: ${t.transitionModel}`, 400);
+        }
+      }
+    }
+  }
+
   const segments = body.segments.map((seg) => ({
     ...seg,
     estimatedCost: estimateSegmentCost(seg, imageModels, videoModels),
   }));
 
+  const transitions = (body.transitions ?? []).map((t) => ({
+    ...t,
+    estimatedCost: estimateTransitionCost(t, videoModels),
+  }));
+
   const pipeline: VideoPipeline = {
     ...body,
     segments,
-    totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels),
+    transitions,
+    totalEstimatedCost: estimatePipelineCost(segments, imageModels, videoModels, transitions),
   };
 
   return NextResponse.json(pipeline);
