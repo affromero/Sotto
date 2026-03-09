@@ -18,9 +18,30 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
 
   if (!collection) return { title: 'Collection Not Found' };
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const title = `${collection.name} — Sotto Collection`;
+  const description = collection.description || `A curated podcast collection by ${collection.user.name || 'Anonymous'}`;
+  const canonicalUrl = `${appUrl}/collections/${collectionId}`;
+
   return {
-    title: `${collection.name} — Sotto Collection`,
-    description: collection.description || `A curated podcast collection by ${collection.user.name || 'Anonymous'}`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      url: canonicalUrl,
+      siteName: 'Sotto',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      site: '@SottoFM',
+    },
+    alternates: {
+      canonical: canonicalUrl,
+    },
   };
 }
 

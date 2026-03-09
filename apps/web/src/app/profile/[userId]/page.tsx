@@ -13,17 +13,34 @@ export async function generateMetadata({ params }: ProfilePageProps): Promise<Me
   const { userId } = await params;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true, bio: true },
+    select: { name: true, bio: true, handle: true },
   });
 
   if (!user) return { title: 'User Not Found' };
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://sotto.fm';
+  const displayName = user.name || 'Profile';
+  const description = user.bio || `${displayName}'s podcasts on Sotto`;
+  const canonicalUrl = user.handle ? `${appUrl}/@${user.handle}` : `${appUrl}/profile/${userId}`;
 
   return {
-    title: user.name || 'Profile',
-    description: user.bio || `${user.name || 'User'}'s podcasts on Sotto`,
+    title: displayName,
+    description,
+    openGraph: {
+      title: displayName,
+      description,
+      type: 'profile',
+      url: canonicalUrl,
+      siteName: 'Sotto',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${displayName} — Sotto`,
+      description,
+      site: '@SottoFM',
+    },
     alternates: {
+      canonical: canonicalUrl,
       types: {
         'application/rss+xml': `${appUrl}/api/users/${userId}/rss`,
       },
