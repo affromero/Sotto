@@ -16,6 +16,7 @@ import {
   r2UsageQueue,
   pricingFetchQueue,
   featureComputationQueue,
+  newsIngestQueue,
   JobType,
 } from '@/lib/queue';
 import { processAnnouncement } from './announcement.worker';
@@ -57,6 +58,7 @@ import { processVisualGeneration } from './visual-generation.worker';
 import { processVideoComposition } from './video-composition.worker';
 import { processAvatarGeneration } from './avatar-generation.worker';
 import { processPlaceEnrichment } from './place-enrichment.worker';
+import { processNewsIngest } from './news-ingest.worker';
 import { isR2MonitoringConfigured } from '@/lib/cloudflare-r2-usage';
 import { startPricingRefreshInterval } from '@/lib/pricing';
 
@@ -100,6 +102,7 @@ const workers = [
   createWorker('video-composition', processVideoComposition, { concurrency: 1, lockDuration: 600000 }),
   createWorker('avatar-generation', processAvatarGeneration, { concurrency: 2, lockDuration: 600000 }),
   createWorker('place-enrichment', processPlaceEnrichment, { concurrency: 3 }),
+  createWorker('news-ingest', processNewsIngest, { concurrency: 1 }),
 ];
 
 // Set up Twitter mentions polling if credentials are configured
@@ -194,6 +197,12 @@ featureComputationQueue
   .add(JobType.COMPUTE_FEATURES, { scope: 'all' }, { repeat: { every: 86400000 } })
   .then(() => logger.info('Feature computation catch-up scheduled', { intervalMs: '86400000' }))
   .catch((err) => logger.error('Failed to schedule feature computation', { error: err.message }));
+
+// Schedule news ingestion every 30 minutes
+newsIngestQueue
+  .add(JobType.INGEST_NEWS, {}, { repeat: { every: 30 * 60 * 1000 } })
+  .then(() => logger.info('News ingestion scheduled', { intervalMs: '1800000' }))
+  .catch((err) => logger.error('Failed to schedule news ingestion', { error: err.message }));
 
 // Start in-memory pricing refresh interval (picks up DB changes every 5 min)
 startPricingRefreshInterval();
