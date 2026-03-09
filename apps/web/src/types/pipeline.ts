@@ -31,9 +31,24 @@ export interface PipelineSegmentNode {
   subVisuals?: PipelineSubVisualNode[];
 }
 
+export interface PipelineTransition {
+  fromSegmentOrder: number;
+  toSegmentOrder: number;
+  fromSegmentId: string;
+  toSegmentId: string;
+  enabled: boolean;
+  recommended: boolean;
+  recommendationReason?: string;
+  transitionModel: string | null;
+  durationSeconds: number;
+  estimatedCost: number;
+}
+
 export interface VideoPipeline {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   segments: PipelineSegmentNode[];
+  transitions?: PipelineTransition[];
+  defaultTransitionModel?: string;
   totalEstimatedCost: number;
   defaultImageModel: string;
   defaultVideoModel: string;
