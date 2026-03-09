@@ -22,6 +22,8 @@ export interface VideoSegment {
   assetUrl?: string;
   assetType?: string;
   subVisuals?: VideoSubVisual[];
+  ttsProvider?: string; // Showcase: per-segment TTS provider ID (e.g. 'elevenlabs')
+  ttsModel?: string; // Showcase: per-segment TTS model ID
 }
 
 export interface RenderConfig {

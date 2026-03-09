@@ -71,6 +71,8 @@ describe('video-composition worker', () => {
       text: 'Hello',
       startTime: 0,
       duration: 5,
+      ttsProvider: 'elevenlabs',
+      ttsModel: 'eleven_turbo_v2_5',
       segmentVisuals: [{ visualType: 'AI_ILLUSTRATION', prompt: 'editorial', metadata: null, assetUrl: 'https://cdn.example.com/vis.png', assetType: 'image/png', subOrder: 0, startOffset: 0, subDuration: 5 }],
     },
     {
@@ -80,6 +82,8 @@ describe('video-composition worker', () => {
       text: 'Data shows...',
       startTime: 5,
       duration: 8,
+      ttsProvider: null,
+      ttsModel: null,
       segmentVisuals: [{ visualType: 'TEXT_CARD', prompt: null, metadata: { headline: 'Stats' }, assetUrl: null, assetType: null, subOrder: 0, startOffset: 0, subDuration: 8 }],
     },
   ];
@@ -172,6 +176,36 @@ describe('video-composition worker', () => {
     const assertion = expect(promise).rejects.toThrow('out of memory');
     await vi.advanceTimersByTimeAsync(10000);
     await assertion;
+  });
+
+  it('includes ttsProvider and ttsModel in render payload', async () => {
+    mockPrisma.podcast.findUnique.mockResolvedValue(podcast);
+    mockPrisma.segment.findMany.mockResolvedValue(segments);
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ jobId: 'render-tts' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 'done', progress: 1 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(new ArrayBuffer(512)),
+      });
+
+    const promise = processVideoComposition(makeJob(baseData));
+    await vi.advanceTimersByTimeAsync(10000);
+    await promise;
+
+    const renderCall = mockFetch.mock.calls[0];
+    const body = JSON.parse(renderCall[1].body);
+    expect(body.segments[0].ttsProvider).toBe('elevenlabs');
+    expect(body.segments[0].ttsModel).toBe('eleven_turbo_v2_5');
+    expect(body.segments[1].ttsProvider).toBeUndefined();
+    expect(body.segments[1].ttsModel).toBeUndefined();
   });
 
   it('throws on 429 from Remotion sidecar', async () => {
