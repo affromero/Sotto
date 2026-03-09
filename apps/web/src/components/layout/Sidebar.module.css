@@ -158,6 +158,20 @@
   background: var(--color-primary-subtle);
 }
 
+/* Dark mode: subtle gradient, amber active glow */
+:global([data-theme='dark']) .sidebar {
+  background: linear-gradient(180deg, var(--color-surface) 0%, var(--color-background) 100%);
+  border-right-color: var(--color-border);
+}
+
+:global([data-theme='dark']) .navLinkActive {
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+:global([data-theme='dark']) .brand {
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+
 /* Desktop: always visible */
 @media (min-width: 769px) {
   .overlay {
