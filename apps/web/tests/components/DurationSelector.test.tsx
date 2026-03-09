@@ -47,4 +47,22 @@ describe('DurationSelector', () => {
     expect(handleChange).toHaveBeenNthCalledWith(2, 25);
   });
 
+  it('renders 11 options when isAdmin is true (3 short + 8 standard)', () => {
+    render(<DurationSelector value={2} onChange={vi.fn()} isAdmin />);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(11);
+    expect(screen.getByText('1 min')).toBeInTheDocument();
+    expect(screen.getByText('2 min')).toBeInTheDocument();
+    expect(screen.getByText('3 min')).toBeInTheDocument();
+    expect(screen.getByText('5 min')).toBeInTheDocument();
+    expect(screen.getByText('40 min')).toBeInTheDocument();
+  });
+
+  it('does not render admin short options when isAdmin is false', () => {
+    render(<DurationSelector value={10} onChange={vi.fn()} isAdmin={false} />);
+    const buttons = screen.getAllByRole('button');
+    expect(buttons).toHaveLength(8);
+    expect(screen.queryByText('1 min')).not.toBeInTheDocument();
+  });
+
 });

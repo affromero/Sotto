@@ -150,8 +150,10 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
   const handleDiscoveryComplete = useCallback((meta: DiscoveryMetadata) => {
     setMetadata(meta);
     if (meta.durationTarget) {
-      // Clamp to nearest valid step (5–max, step 5)
-      const clamped = Math.max(5, Math.min(maxDuration, Math.round(meta.durationTarget / 5) * 5));
+      // Clamp duration — admin users can use short durations (1-3 min)
+      const clamped = isAdmin
+        ? Math.max(1, Math.min(maxDuration, meta.durationTarget))
+        : Math.max(5, Math.min(maxDuration, Math.round(meta.durationTarget / 5) * 5));
       setDurationTarget(clamped);
     }
     setStep('voice');
@@ -178,6 +180,10 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
           body: JSON.stringify({
             title: metadata.topic,
             topic: metadata.topic,
+            metadata: { ...metadata, durationTarget, speakers: voiceSelection.speakers },
+            ttsProvider,
+            ttsModel,
+            aiModel,
           }),
         });
       } else {
@@ -552,8 +558,8 @@ function CreatePageContent({ freeTier, isByokUser, isProUser, maxDurationMinutes
                 setTtsModel(model);
               }}
             />
-            {maxDuration > 5 && (
-              <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} />
+            {(maxDuration > 5 || isAdmin) && (
+              <DurationSelector value={durationTarget} onChange={setDurationTarget} max={maxDuration} isAdmin={isAdmin} />
             )}
             <div className={styles.voiceActions}>
               <button
