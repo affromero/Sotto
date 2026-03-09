@@ -68,7 +68,7 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
     await job.updateProgress(30);
 
     // Classify all segments in a single AI call
-    const { classifications, inputTokens, outputTokens, model } = await classifySegmentVisuals(
+    const { classifications, transitionRecommendations, inputTokens, outputTokens, model } = await classifySegmentVisuals(
       segmentInputs,
       podcast.title,
       podcast.topic,
@@ -98,6 +98,28 @@ export async function processVisualClassification(job: Job<ClassifyVisualsPayloa
         })),
       ),
     });
+
+    // Create SegmentTransition records for classifier-recommended boundaries
+    if (transitionRecommendations.length > 0) {
+      const orderToId = new Map(segmentInputs.map((s) => [s.order, s.segmentId]));
+      const transitionData = transitionRecommendations
+        .filter((t) => orderToId.has(t.fromSegmentOrder) && orderToId.has(t.toSegmentOrder))
+        .map((t) => ({
+          videoGenerationId,
+          fromSegmentId: orderToId.get(t.fromSegmentOrder)!,
+          toSegmentId: orderToId.get(t.toSegmentOrder)!,
+          fromSegmentOrder: t.fromSegmentOrder,
+          toSegmentOrder: t.toSegmentOrder,
+          recommended: true,
+          enabled: true,
+          status: 'pending',
+          durationSeconds: 1,
+        }));
+
+      if (transitionData.length > 0) {
+        await prisma.segmentTransition.createMany({ data: transitionData });
+      }
+    }
 
     // Update status to GENERATING_VISUALS
     await prisma.videoGeneration.update({

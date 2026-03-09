@@ -6,8 +6,9 @@ import { SottoWatermark } from './shared/SottoWatermark';
 import { AttributionOverlay } from './shared/AttributionOverlay';
 import { SpeakerLabel } from './shared/SpeakerLabel';
 import { Background } from './shared/Background';
+import { TransitionOverlay } from './shared/TransitionOverlay';
 
-const TRANSITION_FRAMES = 8;
+const TRANSITION_FRAMES = 30;
 
 const SegmentWithFade: React.FC<{
   children: React.ReactNode;
@@ -32,10 +33,11 @@ const SegmentWithFade: React.FC<{
 export const PodcastVisuals: React.FC<VisualsInput> = ({
   segments,
   branding,
+  transitions,
 }) => {
   const { fps } = useVideoConfig();
 
-  // Prefetch all image/video assets — including sub-visual assets
+  // Prefetch all image/video assets — including sub-visual and transition assets
   React.useEffect(() => {
     const cleanups: (() => void)[] = [];
     for (const segment of segments) {
@@ -52,8 +54,19 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
         }
       }
     }
+    if (transitions) {
+      for (const t of transitions) {
+        if (t.assetUrl) {
+          const { free } = prefetch(t.assetUrl, { method: 'blob-url' });
+          cleanups.push(free);
+        }
+      }
+    }
     return () => cleanups.forEach((fn) => fn());
-  }, [segments]);
+  }, [segments, transitions]);
+
+  // Build a lookup from toSegmentOrder → segment startTime for transition positioning
+  const segmentStartMap = new Map(segments.map((s) => [s.order, s.startTime]));
 
   return (
     <AbsoluteFill>
@@ -127,6 +140,28 @@ export const PodcastVisuals: React.FC<VisualsInput> = ({
                   />
                 )}
               </SegmentWithFade>
+            </Sequence>
+          );
+        })}
+
+        {transitions?.map((t) => {
+          const boundaryTime = segmentStartMap.get(t.toSegmentOrder);
+          if (boundaryTime === undefined) return null;
+          const transitionDurationFrames = Math.round(t.durationSeconds * fps);
+          const halfDuration = Math.round(transitionDurationFrames / 2);
+          const centerFrame = Math.round(boundaryTime * fps);
+          const fromFrame = Math.max(0, centerFrame - halfDuration);
+
+          return (
+            <Sequence
+              key={`transition-${t.fromSegmentOrder}-${t.toSegmentOrder}`}
+              from={fromFrame}
+              durationInFrames={transitionDurationFrames}
+            >
+              <TransitionOverlay
+                src={t.assetUrl}
+                durationInFrames={transitionDurationFrames}
+              />
             </Sequence>
           );
         })}

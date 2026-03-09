@@ -1,0 +1,140 @@
+/* Compact connector between segment cards */
+
+.root {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 8px;
+  min-height: 32px;
+}
+
+.line {
+  flex: 0 0 1px;
+  height: 16px;
+  background: #444;
+  margin: 0 auto;
+}
+
+.root.enabled .line {
+  background: var(--color-primary, #d97706);
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.root.enabled .content {
+  background: rgba(217, 119, 6, 0.08);
+}
+
+/* Toggle */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  min-height: 28px;
+}
+
+.root.enabled .toggle {
+  color: #ccc;
+}
+
+.checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary, #d97706);
+  cursor: pointer;
+}
+
+.toggleLabel {
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-primary, #d97706);
+  background: rgba(217, 119, 6, 0.15);
+  border-radius: var(--radius-full, 9999px);
+  cursor: help;
+}
+
+/* Details (expanded when enabled) */
+
+.details {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.modelSelect {
+  padding: 3px 6px;
+  font-size: 11px;
+  color: #ccc;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  max-width: 160px;
+}
+
+.modelSelect:focus-visible {
+  outline: 2px solid var(--color-primary, #d97706);
+  outline-offset: 1px;
+}
+
+.warning {
+  font-size: 14px;
+  cursor: help;
+}
+
+.cost {
+  font-size: 11px;
+  color: #888;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Disabled state */
+
+.root.disabled .content {
+  opacity: 0.6;
+}
+
+/* Mobile */
+
+@media (max-width: 480px) {
+  .root {
+    padding: 0 4px;
+    min-height: 28px;
+  }
+
+  .modelSelect {
+    max-width: 120px;
+  }
+}
+
+/* Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    transition: none;
+  }
+}

@@ -16,6 +16,7 @@ const {
     podcast: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     videoGeneration: { findUnique: vi.fn(), update: vi.fn() },
     avatarOverlay: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
+    segmentTransition: { count: vi.fn().mockResolvedValue(0), findMany: vi.fn().mockResolvedValue([]) },
   },
   mockResolveImageProvider: vi.fn(),
   mockResolveVideoProvider: vi.fn(),
@@ -42,9 +43,10 @@ vi.mock('@/lib/r2', () => ({
 }));
 vi.mock('@/lib/queue', () => ({
   addJob: (...args: unknown[]) => mockAddJob(...args),
-  JobType: { COMPOSE_VIDEO: 'compose_video', GENERATE_AVATAR: 'generate_avatar' },
+  JobType: { COMPOSE_VIDEO: 'compose_video', GENERATE_AVATAR: 'generate_avatar', GENERATE_TRANSITION: 'generate_transition' },
   videoCompositionQueue: { name: 'video-composition' },
   avatarGenerationQueue: { name: 'avatar-generation' },
+  transitionGenerationQueue: { name: 'transition-generation' },
 }));
 vi.mock('@/lib/providers/video', () => ({
   resolveVideoProvider: (...args: unknown[]) => mockResolveVideoProvider(...args),

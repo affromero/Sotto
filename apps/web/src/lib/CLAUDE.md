@@ -101,7 +101,7 @@ All shared business logic and external service integrations live here.
 | `visual-classifier.ts` | Claude Haiku-based batch segment classification: assigns visual type + prompt/metadata + `endStatePrompt` per segment (8 types: ai-illustration, stock-footage, data-chart, quote, comparison, timeline, diagram, text-card). `endStatePrompt` describes how the scene should look after narration ends (used for last-frame image generation in video mode) | Uses `llm.ts` |
 | `stock-footage.ts` | Pexels Video API search + download: returns stock video clips for STOCK_FOOTAGE segments, falls back to TEXT_CARD if no results | Pexels API |
 | `video-gate.ts` | PRO/admin feature gate for video generation: checks user plan, role, and fal key availability (BYOK or platform FAL_KEY) | Uses `prisma.ts` |
-| `video-cost-estimator.ts` | Pricetoken-based cost calculation for video pipeline: `estimateSegmentCost()`, `estimatePipelineCost()`, `formatCost()`, `fetchFalImageModels()`, `fetchFalVideoModels()`, `cheapestModel()` — live pricing via `PriceTokenClient` | pricetoken API |
+| `video-cost-estimator.ts` | Pricetoken-based cost calculation for video pipeline: `estimateSegmentCost()`, `estimateTransitionCost()`, `estimateAllTransitionsCost()`, `estimatePipelineCost()`, `formatCost()`, `fetchFalImageModels()`, `fetchFalVideoModels()`, `cheapestModel()` — live pricing via `PriceTokenClient` | pricetoken API |
 
 ## Hooks (`src/lib/hooks/`)
 

@@ -43,6 +43,7 @@ enum VideoStatus {
   PENDING
   CLASSIFYING
   GENERATING_VISUALS
+  GENERATING_TRANSITIONS
   GENERATING_AVATARS
   COMPOSING
   READY
@@ -531,6 +532,8 @@ model Segment {
   podcast            Podcast             @relation(fields: [podcastId], references: [id], onDelete: Cascade)
   voiceTrackSegments VoiceTrackSegment[]
   segmentVisuals     SegmentVisual[]
+  transitionsFrom    SegmentTransition[] @relation("TransitionFrom")
+  transitionsTo      SegmentTransition[] @relation("TransitionTo")
 
   @@index([podcastId])
   @@index([order])
@@ -2101,11 +2104,41 @@ model VideoGeneration {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  podcast        Podcast          @relation(fields: [podcastId], references: [id], onDelete: Cascade)
+  podcast        Podcast              @relation(fields: [podcastId], references: [id], onDelete: Cascade)
   visuals        SegmentVisual[]
   avatarOverlays AvatarOverlay[]
+  transitions    SegmentTransition[]
 
   @@index([podcastId])
+}
+
+model SegmentTransition {
+  id                String  @id @default(cuid())
+  videoGenerationId String
+  fromSegmentId     String
+  toSegmentId       String
+  fromSegmentOrder  Int
+  toSegmentOrder    Int
+  transitionModel   String? // pricetoken model ID (FLF2V-capable video model)
+  prompt            String? @db.Text
+  assetUrl          String?
+  assetType         String? // 'video/mp4'
+  status            String  @default("pending") // pending | generating | ready | failed
+  failureReason     String? @db.Text
+  cost              Float?
+  recommended       Boolean @default(false)
+  enabled           Boolean @default(true)
+  durationSeconds   Float   @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  videoGeneration VideoGeneration @relation(fields: [videoGenerationId], references: [id], onDelete: Cascade)
+  fromSegment     Segment         @relation("TransitionFrom", fields: [fromSegmentId], references: [id], onDelete: Cascade)
+  toSegment       Segment         @relation("TransitionTo", fields: [toSegmentId], references: [id], onDelete: Cascade)
+
+  @@unique([videoGenerationId, fromSegmentId, toSegmentId])
+  @@index([videoGenerationId])
 }
 
 model SegmentVisual {
